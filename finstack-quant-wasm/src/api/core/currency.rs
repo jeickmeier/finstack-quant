@@ -1,6 +1,5 @@
 //! WASM bindings for [`finstack_quant_core::currency::Currency`].
 
-use crate::utils::input::from_js_json;
 use crate::utils::to_js_err;
 use finstack_quant_core::currency::Currency as RustCurrency;
 use std::str::FromStr;
@@ -100,28 +99,9 @@ impl JsCurrency {
     pub fn to_string(&self) -> String {
         self.inner.to_string()
     }
-
-    /// Serialize to a JSON string.
-    ///
-    /// @returns A JSON string (the ISO-4217 alphabetic code in quotes).
-    /// @throws If serialization fails (should not happen for valid `Currency`).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
-    /// Deserialize from a JSON string produced by `Currency.toJson`.
-    ///
-    /// @param json - A JSON string containing a quoted ISO-4217 code.
-    /// @returns The parsed `Currency`.
-    /// @throws If `json` is malformed or contains an unknown code.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsCurrency, JsValue> {
-        from_js_json(&json, "json").map(|inner| JsCurrency { inner })
-    }
 }
+
+json_round_trip!(JsCurrency, Currency);
 
 #[cfg(test)]
 mod tests {

@@ -403,7 +403,7 @@ impl PyMarketContext {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.core.market_data._context", "MarketContext.prices")]
     fn prices<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyDict>> {
         let prices = pyo3::types::PyDict::new(py);
-        for (id, scalar) in self.inner.prices() {
+        for (id, scalar) in self.inner.prices_iter() {
             if let Some(money) = scalar.get_price() {
                 prices.set_item(id.as_str(), PyMoney::from_inner(money))?;
             } else if let Some(value) = scalar.get_unitless() {

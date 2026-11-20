@@ -11,7 +11,7 @@ use super::{
     types::ExtrapolationPolicy,
     utils::{
         BoundaryDecision, classify_prime_query, classify_value_query, exact_f64_eq,
-        locate_segment_unchecked, validate_positive_series,
+        validate_positive_series,
     },
 };
 use std::vec::Vec;
@@ -95,6 +95,63 @@ fn eval_scaled_exp(anchor: f64, exponent: f64, context: &str) -> crate::Result<f
     }
     let alt = (anchor.ln() + exponent).exp();
     checked_positive_finite(alt, context)
+}
+
+#[inline]
+fn linear_extrapolate(
+    x: f64,
+    anchor_x: f64,
+    anchor_y: f64,
+    slope: f64,
+    context: &str,
+) -> crate::Result<f64> {
+    let y = if slope == 0.0 {
+        anchor_y
+    } else {
+        anchor_y + slope * (x - anchor_x)
+    };
+    checked_finite(y, context)
+}
+
+#[inline]
+fn exp_extrapolate(
+    x: f64,
+    anchor_x: f64,
+    anchor_y: f64,
+    log_slope: f64,
+    context: &str,
+) -> crate::Result<f64> {
+    let exponent = if log_slope == 0.0 {
+        0.0
+    } else {
+        log_slope * (x - anchor_x)
+    };
+    eval_scaled_exp(anchor_y, exponent, context)
+}
+
+fn discrete_forwards(
+    knots: &[f64],
+    values: &[f64],
+    width_label: &str,
+    fwd_label: &str,
+) -> crate::Result<(Vec<f64>, Vec<f64>)> {
+    let n = knots.len();
+    debug_assert!(n >= 2);
+    let mut widths = Vec::with_capacity(n - 1);
+    let mut forwards = Vec::with_capacity(n - 1);
+    for i in 0..n - 1 {
+        let width = knots[i + 1] - knots[i];
+        if !width.is_finite() || width <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "{width_label} segment width must be finite and positive (got {width})"
+            )));
+        }
+        let dy = -safe_log_ratio(values[i], values[i + 1])?;
+        let fwd = checked_finite(dy / width, fwd_label)?;
+        widths.push(width);
+        forwards.push(fwd);
+    }
+    Ok((widths, forwards))
 }
 
 /// Strategy for piecewise linear interpolation on ordinate values.
@@ -192,25 +249,20 @@ impl InterpolationStrategy for LinearStrategy {
             BoundaryDecision::Return(val) => Ok(val),
             BoundaryDecision::ExtendLeft => {
                 let slope = safe_slope(knots[0], values[0], knots[1], values[1])?;
-                let y = if slope == 0.0 {
-                    values[0]
-                } else {
-                    values[0] + slope * (x - knots[0])
-                };
-                checked_finite(y, "linear left extrapolation")
+                linear_extrapolate(x, knots[0], values[0], slope, "linear left extrapolation")
             }
             BoundaryDecision::ExtendRight => {
                 let n = knots.len();
                 let slope = safe_slope(knots[n - 2], values[n - 2], knots[n - 1], values[n - 1])?;
-                let y = if slope == 0.0 {
-                    values[n - 1]
-                } else {
-                    values[n - 1] + slope * (x - knots[n - 1])
-                };
-                checked_finite(y, "linear right extrapolation")
+                linear_extrapolate(
+                    x,
+                    knots[n - 1],
+                    values[n - 1],
+                    slope,
+                    "linear right extrapolation",
+                )
             }
-            BoundaryDecision::Interior => {
-                let idx = locate_segment_unchecked(knots, x);
+            BoundaryDecision::Interior(idx) => {
                 let x0 = knots[idx];
                 let x1 = knots[idx + 1];
                 let y0 = values[idx];
@@ -235,8 +287,7 @@ impl InterpolationStrategy for LinearStrategy {
                 let n = knots.len();
                 safe_slope(knots[n - 2], values[n - 2], knots[n - 1], values[n - 1])
             }
-            BoundaryDecision::Interior => {
-                let idx = locate_segment_unchecked(knots, x);
+            BoundaryDecision::Interior(idx) => {
                 safe_slope(knots[idx], values[idx], knots[idx + 1], values[idx + 1])
             }
         }
@@ -281,25 +332,26 @@ impl InterpolationStrategy for LogLinearStrategy {
             BoundaryDecision::Return(val) => Ok(val),
             BoundaryDecision::ExtendLeft => {
                 let slope = self.boundary_slope(knots, 0)?;
-                let exponent = if slope == 0.0 {
-                    0.0
-                } else {
-                    slope * (x - knots[0])
-                };
-                eval_scaled_exp(values[0], exponent, "log-linear left extrapolation")
+                exp_extrapolate(
+                    x,
+                    knots[0],
+                    values[0],
+                    slope,
+                    "log-linear left extrapolation",
+                )
             }
             BoundaryDecision::ExtendRight => {
                 let last = knots.len() - 1;
                 let slope = self.boundary_slope(knots, last)?;
-                let exponent = if slope == 0.0 {
-                    0.0
-                } else {
-                    slope * (x - knots[last])
-                };
-                eval_scaled_exp(values[last], exponent, "log-linear right extrapolation")
+                exp_extrapolate(
+                    x,
+                    knots[last],
+                    values[last],
+                    slope,
+                    "log-linear right extrapolation",
+                )
             }
-            BoundaryDecision::Interior => {
-                let idx = locate_segment_unchecked(knots, x);
+            BoundaryDecision::Interior(idx) => {
                 let w = safe_unit_coord(x, knots[idx], knots[idx + 1]);
                 eval_scaled_exp(
                     values[idx],
@@ -321,27 +373,28 @@ impl InterpolationStrategy for LogLinearStrategy {
             BoundaryDecision::Return(val) => Ok(val),
             BoundaryDecision::ExtendLeft => {
                 let slope = self.boundary_slope(knots, 0)?;
-                let exponent = if slope == 0.0 {
-                    0.0
-                } else {
-                    slope * (x - knots[0])
-                };
-                let y = eval_scaled_exp(values[0], exponent, "log-linear left extrapolation")?;
+                let y = exp_extrapolate(
+                    x,
+                    knots[0],
+                    values[0],
+                    slope,
+                    "log-linear left extrapolation",
+                )?;
                 checked_finite(y * slope, "log-linear left derivative")
             }
             BoundaryDecision::ExtendRight => {
                 let last = knots.len() - 1;
                 let slope = self.boundary_slope(knots, last)?;
-                let exponent = if slope == 0.0 {
-                    0.0
-                } else {
-                    slope * (x - knots[last])
-                };
-                let y = eval_scaled_exp(values[last], exponent, "log-linear right extrapolation")?;
+                let y = exp_extrapolate(
+                    x,
+                    knots[last],
+                    values[last],
+                    slope,
+                    "log-linear right extrapolation",
+                )?;
                 checked_finite(y * slope, "log-linear right derivative")
             }
-            BoundaryDecision::Interior => {
-                let idx = locate_segment_unchecked(knots, x);
+            BoundaryDecision::Interior(idx) => {
                 let x0 = knots[idx];
                 let x1 = knots[idx + 1];
                 let slope = self.segment_log_slope(x0, x1, idx)?;
@@ -417,22 +470,12 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
         validate_positive_series(values)?;
 
         let n = knots.len();
-        debug_assert!(n >= 2);
-
-        let mut h = Vec::with_capacity(n - 1);
-        let mut q = Vec::with_capacity(n - 1);
-        for i in 0..n - 1 {
-            let width = knots[i + 1] - knots[i];
-            if !width.is_finite() || width <= 0.0 {
-                return Err(crate::Error::Validation(format!(
-                    "piecewise quadratic forward segment width must be finite and positive (got {width})"
-                )));
-            }
-            let dy = -safe_log_ratio(values[i], values[i + 1])?;
-            let q_i = checked_finite(dy / width, "piecewise quadratic forward interval forward")?;
-            h.push(width);
-            q.push(q_i);
-        }
+        let (h, q) = discrete_forwards(
+            knots,
+            values,
+            "piecewise quadratic forward",
+            "piecewise quadratic forward interval forward",
+        )?;
 
         if n == 2 {
             return Ok(Self {
@@ -514,8 +557,7 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
             BoundaryDecision::Return(val) => Ok(val),
             BoundaryDecision::ExtendLeft => self.extend_df(x, knots, values, 0),
             BoundaryDecision::ExtendRight => self.extend_df(x, knots, values, knots.len() - 1),
-            BoundaryDecision::Interior => {
-                let idx = locate_segment_unchecked(knots, x);
+            BoundaryDecision::Interior(idx) => {
                 let s = x - knots[idx];
                 let dy = s * (self.b[idx] + s * (self.c[idx] + s * self.d[idx]));
                 eval_scaled_exp(
@@ -547,8 +589,7 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
                 let slope = self.boundary_slope(knots, last);
                 checked_finite(-slope * df, "piecewise quadratic forward right derivative")
             }
-            BoundaryDecision::Interior => {
-                let idx = locate_segment_unchecked(knots, x);
+            BoundaryDecision::Interior(idx) => {
                 let x0 = knots[idx];
                 let x1 = knots[idx + 1];
                 let s = x - x0;
@@ -588,14 +629,11 @@ impl PiecewiseQuadraticForwardStrategy {
         boundary_index: usize,
     ) -> crate::Result<f64> {
         let slope = self.boundary_slope(knots, boundary_index);
-        let exponent = if slope == 0.0 {
-            0.0
-        } else {
-            -slope * (x - knots[boundary_index])
-        };
-        eval_scaled_exp(
+        exp_extrapolate(
+            x,
+            knots[boundary_index],
             values[boundary_index],
-            exponent,
+            -slope,
             "piecewise quadratic forward extrapolation",
         )
     }
@@ -638,27 +676,24 @@ impl InterpolationStrategy for CubicHermiteStrategy {
     ) -> crate::Result<f64> {
         match classify_value_query(x, knots, values, extrapolation)? {
             BoundaryDecision::Return(val) => Ok(val),
-            BoundaryDecision::ExtendLeft => {
-                let slope = self.ms[0];
-                let y = if slope == 0.0 {
-                    values[0]
-                } else {
-                    values[0] + slope * (x - knots[0])
-                };
-                checked_finite(y, "cubic hermite left extrapolation")
-            }
+            BoundaryDecision::ExtendLeft => linear_extrapolate(
+                x,
+                knots[0],
+                values[0],
+                self.ms[0],
+                "cubic hermite left extrapolation",
+            ),
             BoundaryDecision::ExtendRight => {
                 let last = knots.len() - 1;
-                let slope = self.ms[last];
-                let y = if slope == 0.0 {
-                    values[last]
-                } else {
-                    values[last] + slope * (x - knots[last])
-                };
-                checked_finite(y, "cubic hermite right extrapolation")
+                linear_extrapolate(
+                    x,
+                    knots[last],
+                    values[last],
+                    self.ms[last],
+                    "cubic hermite right extrapolation",
+                )
             }
-            BoundaryDecision::Interior => {
-                let i = locate_segment_unchecked(knots, x);
+            BoundaryDecision::Interior(i) => {
                 let x0 = knots[i];
                 let x1 = knots[i + 1];
                 let t = safe_unit_coord(x, x0, x1);
@@ -703,8 +738,7 @@ impl InterpolationStrategy for CubicHermiteStrategy {
             BoundaryDecision::Return(val) => Ok(val),
             BoundaryDecision::ExtendLeft => Ok(self.ms[0]),
             BoundaryDecision::ExtendRight => Ok(self.ms[self.ms.len() - 1]),
-            BoundaryDecision::Interior => {
-                let i = locate_segment_unchecked(knots, x);
+            BoundaryDecision::Interior(i) => {
                 let x0 = knots[i];
                 let x1 = knots[i + 1];
                 let t = safe_unit_coord(x, x0, x1);
@@ -854,26 +888,27 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
         match classify_value_query(x, knots, values, extrapolation)? {
             BoundaryDecision::Return(val) => Ok(val),
             BoundaryDecision::ExtendLeft => {
-                let dt = x - knots[0];
                 let f0 = self.left_boundary_forward();
-                eval_scaled_exp(
+                exp_extrapolate(
+                    x,
+                    knots[0],
                     values[0],
-                    if f0 == 0.0 { 0.0 } else { -f0 * dt },
+                    -f0,
                     "monotone convex left extrapolation",
                 )
             }
             BoundaryDecision::ExtendRight => {
                 let last = knots.len() - 1;
-                let dt = x - knots[last];
                 let f_last = self.right_boundary_forward();
-                eval_scaled_exp(
+                exp_extrapolate(
+                    x,
+                    knots[last],
                     values[last],
-                    if f_last == 0.0 { 0.0 } else { -f_last * dt },
+                    -f_last,
                     "monotone convex right extrapolation",
                 )
             }
-            BoundaryDecision::Interior => {
-                let i = locate_segment_unchecked(knots, x);
+            BoundaryDecision::Interior(i) => {
                 let (df, _) = self.segment_df_and_forward(i, x, knots, values)?;
                 Ok(df)
             }
@@ -890,28 +925,29 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
         match classify_prime_query(x, knots, extrapolation)? {
             BoundaryDecision::Return(val) => Ok(val),
             BoundaryDecision::ExtendLeft => {
-                let dt = x - knots[0];
                 let f0 = self.left_boundary_forward();
-                let df = eval_scaled_exp(
+                let df = exp_extrapolate(
+                    x,
+                    knots[0],
                     values[0],
-                    if f0 == 0.0 { 0.0 } else { -f0 * dt },
+                    -f0,
                     "monotone convex left extrapolation",
                 )?;
                 checked_finite(-f0 * df, "monotone convex left derivative")
             }
             BoundaryDecision::ExtendRight => {
                 let last = knots.len() - 1;
-                let dt = x - knots[last];
                 let f_last = self.right_boundary_forward();
-                let df = eval_scaled_exp(
+                let df = exp_extrapolate(
+                    x,
+                    knots[last],
                     values[last],
-                    if f_last == 0.0 { 0.0 } else { -f_last * dt },
+                    -f_last,
                     "monotone convex right extrapolation",
                 )?;
                 checked_finite(-f_last * df, "monotone convex right derivative")
             }
-            BoundaryDecision::Interior => {
-                let i = locate_segment_unchecked(knots, x);
+            BoundaryDecision::Interior(i) => {
                 let (df, fwd) = self.segment_df_and_forward(i, x, knots, values)?;
                 checked_finite(-fwd * df, "monotone convex derivative")
             }
@@ -922,22 +958,12 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
 impl MonotoneConvexStrategy {
     fn build_hagan_west(knots: &[f64], dfs: &[f64]) -> crate::Result<Self> {
         let n = knots.len();
-        debug_assert!(n >= 2);
-
-        let mut dt = Vec::with_capacity(n - 1);
-        let mut fd = Vec::with_capacity(n - 1);
-        for i in 0..n - 1 {
-            let width = knots[i + 1] - knots[i];
-            if !width.is_finite() || width <= 0.0 {
-                return Err(crate::Error::Validation(format!(
-                    "monotone convex segment width must be finite and positive (got {width})"
-                )));
-            }
-            let dy = -safe_log_ratio(dfs[i], dfs[i + 1])?;
-            let fd_i = checked_finite(dy / width, "monotone convex discrete forward")?;
-            dt.push(width);
-            fd.push(fd_i);
-        }
+        let (dt, fd) = discrete_forwards(
+            knots,
+            dfs,
+            "monotone convex",
+            "monotone convex discrete forward",
+        )?;
 
         let mut f = vec![0.0; n];
         if n == 2 {

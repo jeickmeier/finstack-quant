@@ -142,14 +142,19 @@ pub fn evaluate_dcf_monte_carlo(
         .percentiles
         .iter()
         .map(|&probability| {
-            use finstack_quant_core::math::stats::quantile_checked;
+            use finstack_quant_core::math::stats::quantile_sorted;
+            let missing_quantile =
+                || Error::invalid_input("A nonempty finite ascending sample is required");
             Ok(DcfPathQuantile {
                 probability,
                 enterprise_value: Money::new(
-                    quantile_checked(&enterprise, probability)?,
+                    quantile_sorted(&enterprise, probability)?.ok_or_else(missing_quantile)?,
                     currency,
                 )?,
-                equity_value: Money::new(quantile_checked(&equity, probability)?, currency)?,
+                equity_value: Money::new(
+                    quantile_sorted(&equity, probability)?.ok_or_else(missing_quantile)?,
+                    currency,
+                )?,
             })
         })
         .collect::<Result<Vec<_>>>()?;

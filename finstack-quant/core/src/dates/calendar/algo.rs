@@ -88,6 +88,33 @@ pub(crate) fn easter_monday(year: i32) -> Option<Date> {
     easter_sunday.checked_add(Duration::days(1)) // Easter Monday = Sunday + 1
 }
 
+/// Required table lookup: a missing year is an error, not an absent holiday.
+pub(super) fn required_table_date(
+    value: Option<Date>,
+    table: &str,
+    year: i32,
+) -> crate::Result<Date> {
+    value.ok_or_else(|| {
+        crate::Error::from(crate::InputError::NotFound {
+            id: format!("{table} table entry for year {year}"),
+        })
+    })
+}
+
+/// Gregorian Easter Monday for a positive representable year.
+pub(super) fn require_easter_monday(year: i32) -> crate::Result<Date> {
+    if year <= 0 {
+        return Err(crate::Error::Validation(format!(
+            "invalid holiday rule: Gregorian Easter is not supported for year {year}"
+        )));
+    }
+    easter_monday(year).ok_or_else(|| {
+        crate::Error::Validation(format!(
+            "invalid holiday rule: Easter Monday for year {year} is not representable"
+        ))
+    })
+}
+
 // Chinese New Year, lunar festivals and Japanese equinoxes (generated lookups,
 // 1970-2150): `cny_date` and one `*_date(year) -> Option<Date>` per festival.
 include!("../../generated/cny_generated.rs");
@@ -111,31 +138,26 @@ pub(crate) fn nth_weekday_of_month(
     weekday: Weekday,
     n: i8,
 ) -> Option<Date> {
-    let result = if n > 0 {
+    if !(1..=5).contains(&n) && !(-5..=-1).contains(&n) {
+        return None;
+    }
+    let last_day = month.length(year);
+    let target = i64::from(weekday.number_days_from_monday());
+    let day = if n > 0 {
         let first = Date::from_calendar_date(year, month, 1).ok()?;
-        // Days to step forward from the 1st to reach `weekday`, in 0..=6.
-        let offset =
-            (7 + weekday.number_days_from_monday() - first.weekday().number_days_from_monday()) % 7;
-        first
-            .checked_add(Duration::days(i64::from(offset)))?
-            .checked_add(Duration::weeks(i64::from(n) - 1))?
+        let offset = (target - i64::from(first.weekday().number_days_from_monday())).rem_euclid(7);
+        1 + offset + 7 * (i64::from(n) - 1)
     } else {
-        let (ny, nm) = if month == Month::December {
-            (year.checked_add(1)?, Month::January)
-        } else {
-            (year, month.next())
-        };
-        let last = Date::from_calendar_date(ny, nm, 1)
-            .ok()?
-            .checked_sub(Duration::days(1))?;
-        // Days to step backward from the last day to reach `weekday`, in 0..=6.
-        let offset =
-            (7 + last.weekday().number_days_from_monday() - weekday.number_days_from_monday()) % 7;
-        let pos = i64::from(-n); // 1=last, 2=second-last
-        last.checked_sub(Duration::days(i64::from(offset)))?
-            .checked_sub(Duration::weeks(pos - 1))?
+        let last = Date::from_calendar_date(year, month, last_day).ok()?;
+        let offset = (i64::from(last.weekday().number_days_from_monday()) - target).rem_euclid(7);
+        i64::from(last_day) - offset - 7 * (i64::from(-n) - 1)
     };
-    (result.year() == year && result.month() == month).then_some(result)
+    if day < 1 || day > i64::from(last_day) {
+        return None;
+    }
+    u8::try_from(day)
+        .ok()
+        .and_then(|day| Date::from_calendar_date(year, month, day).ok())
 }
 
 #[cfg(test)]
@@ -224,11 +246,7 @@ mod tests {
     #[test]
     fn nth_weekday_is_none_at_the_date_range_edge() {
         let last_year = Date::MAX.year();
-        // The last Monday of the final December needs the successor month.
-        assert_eq!(
-            nth_weekday_of_month(last_year, Month::December, Weekday::Monday, -1),
-            None
-        );
+        assert!(nth_weekday_of_month(last_year, Month::December, Weekday::Monday, -1).is_some());
         assert!(nth_weekday_of_month(last_year, Month::November, Weekday::Monday, -1).is_some());
         assert_eq!(
             nth_weekday_of_month(i32::MAX, Month::December, Weekday::Friday, 1),

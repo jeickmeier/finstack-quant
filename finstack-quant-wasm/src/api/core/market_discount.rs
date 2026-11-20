@@ -318,34 +318,6 @@ impl JsDiscountCurve {
             .map_err(to_js_err)
     }
 
-    /// Deserialize from the canonical JSON wire form shared with Python `DiscountCurve.to_json`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical DiscountCurve JSON text or plain object; unknown
-    ///   fields are rejected and the curve is re-validated.
-    ///
-    /// @returns The validated `DiscountCurve`.
-    /// @throws `TypeError` if `json` is not a JSON string or plain object;
-    /// `FinstackError` (kind `validation`) if it does not match the schema or
-    /// fails curve validation.
-    /// @param json - Canonical DiscountCurve JSON text or plain object; unknown fields are rejected and the curve is re-validated.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsDiscountCurve, JsValue> {
-        from_js_json::<RustDiscountCurve>(&json, "json").map(Self::from_inner)
-    }
-
-    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
-    ///
-    /// @returns Compact JSON text.
-    /// @throws If serialization fails (not expected for a valid curve).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&*self.inner).map_err(to_js_err)
-    }
-
     /// Zero rate at year fraction `t` or on an ISO-8601 date under an explicit
     /// compounding convention (Rust `DiscountCurve::zero_rate` / `DiscountCurve::zero_rate_on_date`).
     ///
@@ -472,3 +444,5 @@ impl JsDiscountCurve {
         }
     }
 }
+
+json_round_trip!(JsDiscountCurve, DiscountCurve, arc);

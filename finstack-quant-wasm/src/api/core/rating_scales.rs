@@ -7,7 +7,7 @@
 //! registry entries cross as `{ id, source, scale }` objects.
 
 use crate::api::core::config::JsFinstackConfig;
-use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, json_text};
+use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::rating_scales::{
     RATING_SCALES_EXTENSION_KEY, RatingLevel, RatingScaleEntry, RatingScaleRegistry,
@@ -329,38 +329,9 @@ impl JsRatingScaleRegistry {
             .map_err(to_js_err)?;
         to_js_value(scale)
     }
-
-    /// Serialize to the canonical JSON wire form shared with Python `RatingScaleRegistry.to_json`.
-    ///
-    /// @returns Compact JSON text.
-    /// @throws If serialization fails (not expected for a valid registry).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
-    /// Deserialize and validate a registry (Rust `RatingScaleRegistry::from_json`).
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Registry JSON text or plain object, such as `toJson()`
-    ///   output. Validation enforces the schema version, a nonempty list,
-    ///   unique normalized scale ids, nonblank sources and valid scales.
-    ///
-    /// @returns The validated `RatingScaleRegistry`.
-    /// @throws `TypeError` if `json` is not a JSON string or plain object;
-    /// `FinstackError` (kind `validation`) if it is malformed or fails
-    /// validation.
-    /// @param json - Registry JSON text or plain object, such as `toJson()` output. Validation enforces the schema version, a nonempty list, unique normalized scale ids, nonblank sources and valid scales.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsRatingScaleRegistry, JsValue> {
-        RatingScaleRegistry::from_json(&json_text(&json, "json")?)
-            .map(|inner| Self { inner })
-            .map_err(to_js_err)
-    }
 }
+
+json_round_trip!(JsRatingScaleRegistry, RatingScaleRegistry);
 
 /// Rating-scale registry held in a configuration (Rust `registry_from_config`).
 ///

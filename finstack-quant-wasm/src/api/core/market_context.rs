@@ -15,7 +15,7 @@ use crate::api::core::market_hazard::JsHazardCurve;
 use crate::api::core::market_scalars::{JsInflationIndex, JsScalarTimeSeries};
 use crate::api::core::money::JsMoney;
 use crate::api::core::surfaces::{JsFxDeltaVolSurface, JsVolCube, JsVolSurface};
-use crate::utils::input::{from_js_json, js_f64, js_opt_currency, js_string, json_text};
+use crate::utils::input::{js_f64, js_opt_currency, js_string, json_text};
 use crate::utils::wire::js_date;
 use crate::utils::{contract_to_js_err, to_js_err, to_js_value};
 use finstack_quant_core::contract::LoadLimits;
@@ -672,7 +672,7 @@ impl JsMarketContext {
     pub fn prices(&self) -> Result<JsValue, JsValue> {
         let values: std::collections::BTreeMap<_, _> = self
             .inner
-            .prices()
+            .prices_iter()
             .map(|(id, scalar)| (id.as_str(), scalar))
             .collect();
         to_js_value(&values)
@@ -923,29 +923,6 @@ impl JsConvertedMoney {
             .clone()
             .map(|inner| JsFxRateResult { inner })
     }
-
-    /// Serialize to the canonical JSON wire form shared with Python `ConvertedMoney.to_json`.
-    ///
-    /// @returns Compact JSON text with `amount` and `rate`.
-    /// @throws If serialization fails (not expected for a valid result).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
-    /// Deserialize from the canonical JSON wire form produced by `toJson`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical ConvertedMoney JSON text or plain object; unknown fields are rejected.
-    ///
-    /// @returns The parsed `ConvertedMoney`.
-    /// @throws `FinstackError` (kind `validation`) if `json` is malformed or has unknown or missing fields.
-    /// @param json - Canonical ConvertedMoney JSON text or plain object; unknown fields are rejected.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsConvertedMoney, JsValue> {
-        from_js_json::<ConvertedMoney>(&json, "json").map(|inner| JsConvertedMoney { inner })
-    }
 }
+
+json_round_trip!(JsConvertedMoney, ConvertedMoney);

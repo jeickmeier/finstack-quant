@@ -128,33 +128,6 @@ impl JsRoundingMode {
             .map_err(to_js_err)
     }
 
-    /// Serialize to the canonical JSON wire form (a quoted lowercase name).
-    ///
-    /// @returns JSON text such as `"\"bankers\""`.
-    /// @throws If serialization fails (not expected).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
-    /// Deserialize from the canonical JSON wire form produced by `toJson`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - JSON text holding the quoted lowercase mode name, such as
-    ///   `"\"bankers\""`.
-    ///
-    /// @returns The parsed `RoundingMode`.
-    /// @throws `TypeError` if `json` is not a string; `FinstackError` (kind
-    /// `validation`) if it is not a quoted mode name.
-    /// @param json - JSON text holding the quoted lowercase mode name, such as `"\"bankers\""`.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "string")] json: JsValue,
-    ) -> Result<JsRoundingMode, JsValue> {
-        from_js_json(&json, "json").map(Self::from_inner)
-    }
-
     /// Lowercase name of the mode, such as `"bankers"`.
     ///
     /// @returns The name accepted by `fromName`.
@@ -513,34 +486,10 @@ impl JsFinstackConfig {
             None => Ok(JsValue::UNDEFINED),
         }
     }
-
-    /// Serialize to the canonical JSON wire form shared with Python `FinstackConfig.to_json`.
-    ///
-    /// @returns Compact JSON text with `rounding`, `tolerances` and any `extensions`.
-    /// @throws If serialization fails (not expected for a valid configuration).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
-    /// Deserialize from the canonical JSON wire form produced by `toJson`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - FinstackConfig JSON text or plain object; unknown fields
-    ///   and malformed extension keys are rejected.
-    ///
-    /// @returns The parsed `FinstackConfig`.
-    /// @throws `TypeError` if `json` is not a JSON string or plain object;
-    /// `FinstackError` (kind `validation`) if it does not match the schema.
-    /// @param json - FinstackConfig JSON text or plain object; unknown fields and malformed extension keys are rejected.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsFinstackConfig, JsValue> {
-        from_js_json::<FinstackConfig>(&json, "json").map(|inner| Self { inner })
-    }
 }
+
+json_round_trip!(JsRoundingMode, RoundingMode, string);
+json_round_trip!(JsFinstackConfig, FinstackConfig);
 
 thread_local! {
     static CONFIG_PROTOTYPE: std::cell::OnceCell<js_sys::Object> = const { std::cell::OnceCell::new() };
@@ -562,43 +511,16 @@ pub(crate) fn js_opt_finstack_config(
     if value.is_null() || value.is_undefined() {
         return Ok(None);
     }
-    let Some(obj) = value.dyn_ref::<js_sys::Object>() else {
-        return Err(crate::utils::input::invalid_type(
-            label,
-            "expected a FinstackConfig instance",
-        ));
-    };
-    let expected_proto = CONFIG_PROTOTYPE.with(|cell| -> Result<js_sys::Object, JsValue> {
-        if let Some(proto) = cell.get() {
-            return Ok(proto.clone());
-        }
-        let sample = JsValue::from(JsFinstackConfig::new(None, None)?);
-        let proto = js_sys::Object::get_prototype_of(&sample);
-        if let Ok(free_fn) = js_sys::Reflect::get(&sample, &JsValue::from("free"))
-            && let Some(free_fn) = free_fn.dyn_ref::<js_sys::Function>()
-        {
-            let _ = free_fn.call0(&sample);
-        }
-        let _ = cell.set(proto.clone());
-        Ok(proto)
+    let json = crate::utils::input::wasm_handle_string(
+        value,
+        label,
+        &CONFIG_PROTOTYPE,
+        || JsFinstackConfig::new(None, None),
+        "toJson",
+    )?
+    .ok_or_else(|| {
+        crate::utils::input::invalid_type(label, "expected a FinstackConfig instance")
     })?;
-    if !js_sys::Object::is(&js_sys::Object::get_prototype_of(obj), &expected_proto) {
-        return Err(crate::utils::input::invalid_type(
-            label,
-            "expected a FinstackConfig instance",
-        ));
-    }
-    let ptr = js_sys::Reflect::get(obj, &JsValue::from("__wbg_ptr"))?;
-    if ptr.as_f64().unwrap_or(0.0) == 0.0 {
-        return Err(to_js_err("FinstackConfig handle has been freed"));
-    }
-    let to_json_fn = js_sys::Reflect::get(obj, &JsValue::from("toJson"))?
-        .dyn_into::<js_sys::Function>()
-        .map_err(|_| to_js_err("FinstackConfig instance is missing toJson()"))?;
-    let json = to_json_fn
-        .call0(obj)?
-        .as_string()
-        .ok_or_else(|| to_js_err("FinstackConfig.toJson() did not return a string"))?;
     serde_json::from_str::<FinstackConfig>(&json)
         .map(Some)
         .map_err(to_js_err)

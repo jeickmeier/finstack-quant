@@ -76,7 +76,7 @@ pub use nearest_correlation::{NearestCorrelationOpts, nearest_correlation};
 /// the largest factor diagonal magnitude. Both criteria are invariant to a
 /// uniform rescaling of the system. The correlation-specific path
 /// (`cholesky_correlation`) uses the relative pivot tolerance instead.
-pub const SINGULAR_THRESHOLD: f64 = 1e-10;
+const SINGULAR_THRESHOLD: f64 = 1e-10;
 
 /// Default tolerance for diagonal elements in correlation matrices.
 ///
@@ -86,7 +86,7 @@ pub const SINGULAR_THRESHOLD: f64 = 1e-10;
 /// defect in the input. A diagonal of, say, 1.000001 signals a mis-normalized
 /// covariance matrix rather than rounding, so the tolerance is set at
 /// noise scale to reject it instead of passing it through to Cholesky.
-pub const DIAGONAL_TOLERANCE: f64 = 1e-10;
+const DIAGONAL_TOLERANCE: f64 = 1e-10;
 
 /// Default tolerance for symmetry checks in correlation matrices.
 ///
@@ -925,36 +925,7 @@ pub fn cholesky_decomposition(
     matrix: &[f64],
     n: usize,
 ) -> std::result::Result<Vec<f64>, CholeskyError> {
-    let mut l = vec![0.0; matrix.len()];
-    cholesky_decomposition_into(matrix, n, &mut l)?;
-    Ok(l)
-}
-
-/// Cholesky decomposition into a caller-provided buffer (avoids allocation).
-///
-/// The output buffer `l` must have length `n * n` and will be overwritten.
-/// Singularity uses the same scale-relative criterion as
-/// [`cholesky_decomposition`].
-///
-/// # Arguments
-///
-/// * `matrix` - Symmetric positive-definite input matrix in row-major order
-///   with exactly `n * n` finite entries.
-/// * `n` - Matrix dimension used to interpret both flat buffers.
-/// * `l` - Mutable `n * n` output buffer overwritten with the lower-triangular
-///   Cholesky factor in row-major order.
-pub fn cholesky_decomposition_into(
-    matrix: &[f64],
-    n: usize,
-    l: &mut [f64],
-) -> std::result::Result<(), CholeskyError> {
     check_square_finite(matrix, n)?;
-    if l.len() != matrix.len() {
-        return Err(CholeskyError::DimensionMismatch {
-            expected: n,
-            actual: l.len(),
-        });
-    }
     check_symmetric(matrix, n)?;
 
     let matrix_scale = (0..n)
@@ -962,7 +933,6 @@ pub fn cholesky_decomposition_into(
         .fold(0.0_f64, f64::max);
     let factor_scale = matrix_scale.sqrt();
 
-    l.fill(0.0);
     if n > 0 && matrix_scale == 0.0 {
         return Err(CholeskyError::Singular {
             value: 0.0,
@@ -972,6 +942,7 @@ pub fn cholesky_decomposition_into(
         });
     }
 
+    let mut l = vec![0.0; matrix.len()];
     for i in 0..n {
         for j in 0..=i {
             let mut sum = 0.0;
@@ -1003,11 +974,11 @@ pub fn cholesky_decomposition_into(
         }
     }
 
-    for value in l {
+    for value in &mut l {
         *value *= factor_scale;
     }
 
-    Ok(())
+    Ok(l)
 }
 /// Apply a lower-triangular factor `L` to a vector `z`, returning `L z`.
 ///
@@ -1280,8 +1251,8 @@ pub fn cholesky_solve(chol: &[f64], b: &[f64], x: &mut [f64]) -> Result<()> {
 /// Validate a flattened row-major correlation matrix with located diagnostics.
 ///
 /// Checks matrix size, unit diagonal, coefficient bounds, symmetry, and
-/// positive semidefiniteness in that order. The diagonal and symmetry checks
-/// use [`DIAGONAL_TOLERANCE`] and [`SYMMETRY_TOLERANCE`]; positive
+/// positive semidefiniteness in that order. The diagonal check uses `1e-10`
+/// and the symmetry check uses [`SYMMETRY_TOLERANCE`]; positive
 /// semidefiniteness is tested with [`cholesky_correlation`].
 ///
 /// # Arguments
@@ -1387,10 +1358,6 @@ mod tests {
     fn size_checks_reject_a_square_that_overflows() {
         for n in WRAPPING_N {
             assert!(cholesky_decomposition(&[], n).is_err(), "n = {n}");
-            assert!(
-                cholesky_decomposition_into(&[], n, &mut []).is_err(),
-                "n = {n}"
-            );
             assert!(cholesky_correlation(&[], n).is_err(), "n = {n}");
             assert!(symmetric_eigen(&[], n).is_err(), "n = {n}");
             assert!(apply_lower_triangular(&[], n, &[]).is_err(), "n = {n}");
@@ -2045,7 +2012,6 @@ mod tests {
         let n = usize::MAX;
         assert!(cholesky_correlation(&[], n).is_err());
         assert!(cholesky_decomposition(&[], n).is_err());
-        assert!(cholesky_decomposition_into(&[], n, &mut []).is_err());
         assert!(symmetric_eigen(&[], n).is_err());
         let error = validate_correlation_matrix(&[], n).expect_err("overflowing square");
         assert!(error.to_string().contains("Invalid matrix size"));
@@ -2123,52 +2089,20 @@ mod tests {
     }
 
     #[test]
-    fn cholesky_decomposition_into_matches_allocating_variant() {
-        let a = vec![4.0_f64, 2.0, 2.0, 3.0];
-        let expected = cholesky_decomposition(&a, 2).expect("positive definite");
-        let mut out = vec![f64::NAN; 4];
-
-        cholesky_decomposition_into(&a, 2, &mut out).expect("positive definite");
-
-        assert_eq!(out, expected);
-    }
-
-    #[test]
-    fn cholesky_decomposition_into_rejects_bad_output_len() {
-        let a = vec![4.0_f64, 2.0, 2.0, 3.0];
-        let mut out = vec![0.0; 3];
-
-        match cholesky_decomposition_into(&a, 2, &mut out) {
-            Err(CholeskyError::DimensionMismatch { expected, actual }) => {
-                assert_eq!(expected, 2);
-                // The offending buffer is the output, not the matrix.
-                assert_eq!(actual, 3);
-            }
-            other => panic!("expected DimensionMismatch, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn cholesky_decomposition_into_rejects_non_positive_definite() {
+    fn cholesky_decomposition_rejects_non_positive_definite() {
         let indefinite = vec![1.0_f64, 2.0, 2.0, 1.0];
-        let mut out = vec![0.0; 4];
 
         assert!(matches!(
-            cholesky_decomposition_into(&indefinite, 2, &mut out),
+            cholesky_decomposition(&indefinite, 2),
             Err(CholeskyError::NotPositiveDefinite { .. })
         ));
     }
 
     #[test]
-    fn generic_cholesky_variants_reject_non_finite_entries() {
+    fn cholesky_decomposition_rejects_non_finite_entries() {
         for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             assert!(matches!(
                 cholesky_decomposition(&[bad], 1),
-                Err(CholeskyError::NonFiniteInput { .. })
-            ));
-            let mut out = [0.0];
-            assert!(matches!(
-                cholesky_decomposition_into(&[bad], 1, &mut out),
                 Err(CholeskyError::NonFiniteInput { .. })
             ));
         }
@@ -2202,10 +2136,6 @@ mod tests {
         for scale in [1e-300, 1e-24, 1.0, 1e24, 1e300] {
             let scaled = matrix.map(|value| scale * value);
             let factor = cholesky_decomposition(&scaled, 2).expect("scaled SPD matrix");
-            let mut buffer = [f64::NAN; 4];
-            cholesky_decomposition_into(&scaled, 2, &mut buffer)
-                .expect("scaled SPD matrix into supplied buffer");
-            assert_eq!(factor, buffer);
 
             for (actual, expected) in mat_mul_lt(&factor, 2).iter().zip(matrix) {
                 assert!((actual / scale - expected).abs() < 1e-12);
@@ -2229,10 +2159,6 @@ mod tests {
             ] {
                 assert!(matches!(
                     cholesky_decomposition(&matrix, 2),
-                    Err(CholeskyError::Singular { .. })
-                ));
-                assert!(matches!(
-                    cholesky_decomposition_into(&matrix, 2, &mut [0.0; 4]),
                     Err(CholeskyError::Singular { .. })
                 ));
             }

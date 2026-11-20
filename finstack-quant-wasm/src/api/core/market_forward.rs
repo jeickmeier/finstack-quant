@@ -328,33 +328,6 @@ impl JsForwardCurve {
             .map_err(to_js_err)
     }
 
-    /// Deserialize a forward curve from its canonical JSON wire form (the
-    /// Rust serde schema shared with Python `ForwardCurve.to_json`).
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical ForwardCurve JSON text or plain object; unknown
-    ///   fields are rejected and the curve is re-validated.
-    ///
-    /// @returns The validated `ForwardCurve`.
-    /// @throws If `json` is malformed, has unknown fields, or fails curve validation.
-    /// @param json - Canonical ForwardCurve JSON text or plain object; unknown fields are rejected and the curve is re-validated.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsForwardCurve, JsValue> {
-        from_js_json::<RustForwardCurve>(&json, "json").map(Self::from_inner)
-    }
-
-    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
-    ///
-    /// @returns Compact JSON text.
-    /// @throws If serialization fails (not expected for a valid curve).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&*self.inner).map_err(to_js_err)
-    }
-
     /// Projection factor `P_x(t)` at year fraction `t` or on an ISO-8601 date.
     ///
     /// # Arguments
@@ -566,6 +539,8 @@ impl JsForwardCurve {
         }
     }
 }
+
+json_round_trip!(JsForwardCurve, ForwardCurve, arc);
 
 #[cfg(test)]
 mod tests {

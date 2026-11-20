@@ -1,20 +1,15 @@
 //! Forward-curve bumping and forward/backward conditioning transformations.
 
-use super::super::common::factor::{roll_positive_factor_points, verify_triangular_breakpoints};
-use super::super::common::signed_curve_year_fraction;
 use super::{ForwardCurve, ForwardCurveBuilder};
 use crate::dates::Date;
 use crate::market_data::bumps::{BumpSpec, Bumpable};
-use crate::math::interp::exact_f64_eq;
 use crate::types::CurveId;
 
 impl ForwardCurve {
     /// Create a builder pre-populated with this curve's data under a new ID.
     pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> ForwardCurveBuilder {
-        let mut builder = self
-            .metadata_builder(new_id)
-            .knots(self.knots.iter().copied().zip(self.factors.iter().copied()));
-        builder.transform = self.transform.clone();
+        let mut builder = self.metadata_builder(new_id).knots(self.core.knot_points());
+        builder.transform = self.core.transform.clone();
         builder
     }
 
@@ -41,12 +36,12 @@ impl ForwardCurve {
     /// Builder pre-populated with this curve's metadata and no knots.
     pub(crate) fn metadata_builder(&self, new_id: impl Into<CurveId>) -> ForwardCurveBuilder {
         ForwardCurve::builder(new_id)
-            .base_date(self.base)
-            .day_count(self.day_count)
-            .calendar_id_opt(self.calendar.as_ref().map(|calendar| calendar.id.clone()))
+            .base_date(self.core.base)
+            .day_count(self.core.day_count)
+            .calendar_id_opt(self.core.calendar_id().map(str::to_owned))
             .index_tenor_opt(self.index_tenor)
-            .interp(self.interp.style())
-            .extrapolation(self.interp.extrapolation())
+            .interp(self.core.interp.style())
+            .extrapolation(self.core.interp.extrapolation())
             .rate_calibration_opt(self.rate_calibration.clone())
             .fx_policy_opt(self.fx_policy.clone())
     }
@@ -58,41 +53,9 @@ impl ForwardCurve {
     /// Triangular shocks act continuously in maturity, including between and
     /// beyond stored pillars. Multiplicative/factor shocks are rejected.
     pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
-        let val = spec.resolve_additive_or_error("ForwardCurve")?;
-        if exact_f64_eq(val, 0.0) {
-            return Ok(());
+        if self.core.bump_in_place("ForwardCurve", spec)? {
+            self.rate_calibration = None;
         }
-        let mut transform = self
-            .transform
-            .clone()
-            .unwrap_or_else(|| super::evaluation::CurveTransform::from_curve(self));
-        transform.bump(val, spec.bump_type)?;
-
-        let mut factors = Vec::with_capacity(self.knots.len());
-        for &time in self.knots.iter() {
-            factors.push(transform.df(&self.interp, time)?);
-        }
-
-        let min_src = self
-            .transform
-            .as_ref()
-            .map_or(self.knots[0], |tr| tr.source_first_knot());
-        let max_src = self.transform.as_ref().map_or_else(
-            || self.knots[self.knots.len() - 1],
-            |tr| tr.source_points()[tr.source_points().len() - 1].0,
-        );
-        verify_triangular_breakpoints(
-            spec,
-            &self.interp,
-            min_src,
-            max_src,
-            transform.offset(),
-            |src_t| transform.df_at_source_time(&self.interp, src_t),
-        )?;
-
-        self.factors = factors.into_boxed_slice();
-        self.transform = Some(transform);
-        self.rate_calibration = None;
         Ok(())
     }
 
@@ -139,52 +102,16 @@ impl ForwardCurve {
     /// # }
     /// ```
     pub fn condition(&self, reference_date: Date) -> crate::Result<Self> {
-        let src_base = self.source_base_date();
-        if reference_date < src_base {
-            return Err(crate::Error::Validation(format!(
-                "ForwardCurve::condition requires reference_date ({reference_date}) on or after source base date ({src_base})"
-            )));
-        }
-        let _ = signed_curve_year_fraction(
-            src_base,
-            reference_date,
-            self.day_count,
-            self.calendar.as_ref(),
-        )?;
-        let c_w = self.df_on_date(reference_date)?;
-        if !c_w.is_finite() || c_w <= 0.0 {
-            return Err(crate::InputError::NonPositiveValue.into());
-        }
-        if reference_date == self.base {
+        let Some(core) = self.core.condition("ForwardCurve", reference_date)? else {
             return Ok(self.clone());
-        }
-
-        let mut transform = self
-            .transform
-            .clone()
-            .unwrap_or_else(|| super::evaluation::CurveTransform::from_curve(self));
-        transform.condition(
-            &self.interp,
-            reference_date,
-            self.day_count,
-            self.day_count_context(),
-        )?;
-        let new_offset = transform.offset();
-
-        let (knots, factors) = roll_positive_factor_points(
-            transform.source_points(),
-            &self.interp,
-            new_offset,
-            |source_t| transform.df_at_source_time(&self.interp, source_t),
-        )?;
-
-        let mut conditioned = self.clone();
-        conditioned.base = reference_date;
-        conditioned.knots = knots.into_boxed_slice();
-        conditioned.factors = factors.into_boxed_slice();
-        conditioned.transform = Some(transform);
-        conditioned.rate_calibration = None;
-        Ok(conditioned)
+        };
+        Ok(Self {
+            id: self.id.clone(),
+            core,
+            index_tenor: self.index_tenor,
+            rate_calibration: None,
+            fx_policy: self.fx_policy.clone(),
+        })
     }
 }
 

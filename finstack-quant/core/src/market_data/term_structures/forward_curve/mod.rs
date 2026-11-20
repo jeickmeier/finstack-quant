@@ -37,9 +37,9 @@
 //! assert!(fc.rate_between(0.0, 0.25, 0.25).expect("valid rate") > 0.0);
 //! ```
 
-use super::common::CurveCalendar;
+use super::common::factor::FactorCore;
 use crate::dates::{Date, DayCount, Tenor};
-use crate::math::interp::{ExtrapolationPolicy, Interp, InterpStyle};
+use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 use crate::types::CurveId;
 
 /// Positive normalized factor curve for projecting floating-rate index fixings.
@@ -53,20 +53,9 @@ use crate::types::CurveId;
 #[serde(try_from = "RawForwardCurve", into = "RawForwardCurve")]
 pub struct ForwardCurve {
     pub(crate) id: CurveId,
-    pub(crate) base: Date,
-    /// Day-count basis mapping dates to projection factor times.
-    pub(crate) day_count: DayCount,
-    /// Business-day calendar of the time axis; required by Bus/252.
-    pub(crate) calendar: Option<CurveCalendar>,
+    pub(crate) core: FactorCore,
     /// Optional index accrual tenor metadata associated with this projection source.
     pub(crate) index_tenor: Option<Tenor>,
-    /// Knot times in **years**.
-    pub(crate) knots: Box<[f64]>,
-    /// Normalized positive projection factors (unitless, `P_x(0) = 1.0`).
-    pub(crate) factors: Box<[f64]>,
-    pub(crate) interp: Interp,
-    /// Exact accumulated conditioning and continuous zero-rate shock evaluation.
-    transform: Option<evaluation::CurveTransform>,
     /// Exact typed recipe used to replay calibration after quote shocks.
     pub(crate) rate_calibration: Option<super::RateCalibrationRecipe>,
     /// Opaque FX policy stamp when bootstrap used cross-currency assumptions.
@@ -75,7 +64,6 @@ pub struct ForwardCurve {
 
 mod builder;
 mod curve;
-mod evaluation;
 #[cfg(test)]
 mod tests;
 mod transform;

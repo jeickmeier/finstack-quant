@@ -1,16 +1,15 @@
 //! Heterogeneous curve storage and curve-specific transformation plumbing.
 
-use crate::market_data::bumps::Bumpable;
 use std::sync::Arc;
 
 use crate::Result;
+use crate::market_data::bumps::{BumpSpec, Bumpable};
 use crate::types::CurveId;
 
 use super::super::term_structures::{
     BaseCorrelationCurve, DiscountCurve, ForwardCurve, HazardCurve, InflationCurve,
     ParametricCurve, PriceCurve,
 };
-use crate::market_data::bumps::BumpSpec;
 
 macro_rules! for_each_context_curve {
     ($macro:ident) => {
@@ -30,29 +29,6 @@ macro_rules! for_each_context_curve {
     };
 }
 pub(crate) use for_each_context_curve;
-
-/// Trait for curves that can be rebuilt with a new ID while preserving all other data.
-///
-/// This is used during market bumping operations where the bump produces a curve
-/// with a modified ID (e.g., "USD-OIS_bump_+10bp") but we want to keep the original ID.
-trait RebuildableWithId: Sized {
-    /// Rebuild the curve with a new ID, preserving all other data.
-    fn rebuild_with_id(&self, id: CurveId) -> Result<Self>;
-}
-
-macro_rules! impl_simple_rebuildable_with_id {
-    ($($ty:ty),* $(,)?) => {
-        $(
-            impl RebuildableWithId for $ty {
-                fn rebuild_with_id(&self, id: CurveId) -> Result<Self> {
-                    self.to_builder_with_id(id).build()
-                }
-            }
-        )*
-    };
-}
-
-impl_simple_rebuildable_with_id!(InflationCurve, BaseCorrelationCurve, PriceCurve);
 
 macro_rules! define_curve_storage {
     ($( $variant:ident => {
@@ -172,36 +148,12 @@ impl CurveStorage {
 
     /// Apply a bump to this curve storage, preserving the original ID.
     ///
-    /// After bumping, if the bumped curve has a different ID (e.g., "USD-OIS_bump_+10bp"),
-    /// it is rebuilt with the original ID to maintain context consistency.
-    ///
     /// # Special Cases
     ///
     /// - `InflationCurve` with `TriangularKeyRate` bump: Custom point-level bumping
     ///   that modifies the CPI level at the target bucket.
-    pub(crate) fn apply_bump_preserving_id(
-        &mut self,
-        original_id: &CurveId,
-        spec: BumpSpec,
-    ) -> Result<()> {
+    pub(crate) fn apply_bump_preserving_id(&mut self, spec: BumpSpec) -> Result<()> {
         spec.validate()?;
-
-        fn bump_curve_preserving_id<C>(
-            original: &C,
-            original_id: &CurveId,
-            spec: BumpSpec,
-            id_of: fn(&C) -> &CurveId,
-        ) -> Result<C>
-        where
-            C: Bumpable + RebuildableWithId,
-        {
-            let bumped = original.apply_bump(spec)?;
-            if id_of(&bumped) != original_id {
-                bumped.rebuild_with_id(original_id.clone())
-            } else {
-                Ok(bumped)
-            }
-        }
 
         match self {
             Self::Discount(arc) => {
@@ -218,28 +170,17 @@ impl CurveStorage {
                 Ok(())
             }
             Self::Inflation(original) => {
-                let curve = bump_curve_preserving_id(
-                    original.as_ref(),
-                    original_id,
-                    spec,
-                    InflationCurve::id,
-                )?;
+                let curve = original.apply_bump(spec)?;
                 *self = Self::Inflation(Arc::new(curve));
                 Ok(())
             }
             Self::BaseCorrelation(original) => {
-                let curve = bump_curve_preserving_id(
-                    original.as_ref(),
-                    original_id,
-                    spec,
-                    BaseCorrelationCurve::id,
-                )?;
+                let curve = original.apply_bump(spec)?;
                 *self = Self::BaseCorrelation(Arc::new(curve));
                 Ok(())
             }
             Self::Price(original) => {
-                let curve =
-                    bump_curve_preserving_id(original.as_ref(), original_id, spec, PriceCurve::id)?;
+                let curve = original.apply_bump(spec)?;
                 *self = Self::Price(Arc::new(curve));
                 Ok(())
             }
@@ -281,7 +222,7 @@ mod tests {
         let original = json(&curve);
         let mut storage = CurveStorage::from(curve);
         storage
-            .apply_bump_preserving_id(&CurveId::from("FWD"), BumpSpec::parallel_bp(1.0))
+            .apply_bump_preserving_id(BumpSpec::parallel_bp(1.0))
             .expect("bump succeeds");
         let bumped_curve = storage.forward().expect("forward curve");
         let bumped_json = json(bumped_curve.as_ref());
@@ -305,7 +246,7 @@ mod tests {
         let original = json(&curve);
         let mut storage = CurveStorage::from(curve);
         storage
-            .apply_bump_preserving_id(&CurveId::from("CPI"), BumpSpec::inflation_shift_pct(1.0))
+            .apply_bump_preserving_id(BumpSpec::inflation_shift_pct(1.0))
             .expect("bump succeeds");
         let bumped_curve = storage.inflation().expect("inflation curve");
         let bumped_json = json(bumped_curve.as_ref());
@@ -335,10 +276,7 @@ mod tests {
             .expect("curve builds");
         let mut storage = CurveStorage::from(curve);
         storage
-            .apply_bump_preserving_id(
-                &CurveId::from("CPI"),
-                BumpSpec::triangular_key_rate_bp(0.0, 5.0, 10.0, 100.0),
-            )
+            .apply_bump_preserving_id(BumpSpec::triangular_key_rate_bp(0.0, 5.0, 10.0, 100.0))
             .expect("triangular bump succeeds");
         let bumped = storage.inflation().expect("inflation curve");
         let levels = bumped.cpi_levels();
@@ -380,36 +318,12 @@ mod tests {
         let original = json(&curve);
         let mut storage = CurveStorage::from(curve);
         storage
-            .apply_bump_preserving_id(&CurveId::from("DISC"), BumpSpec::parallel_bp(1.0))
+            .apply_bump_preserving_id(BumpSpec::parallel_bp(1.0))
             .expect("bump succeeds");
         let bumped_curve = storage.discount().expect("discount curve");
         let bumped_json = json(bumped_curve.as_ref());
         assert_eq!(bumped_curve.interp_style(), InterpStyle::Linear);
         assert_eq!(bumped_json["extrapolation"], original["extrapolation"]);
         assert_eq!(bumped_json["day_count"], original["day_count"]);
-    }
-}
-
-#[cfg(test)]
-mod base_correlation_tests {
-    use super::{BaseCorrelationCurve, RebuildableWithId};
-
-    #[test]
-    fn rebuilding_stressed_curve_with_id_preserves_quotes_and_values() {
-        let curve = BaseCorrelationCurve::builder("CDX")
-            .knots([(3.0, 0.25), (7.0, 1.0), (10.0, 0.60)])
-            .build()
-            .unwrap();
-        let rebuilt = curve.rebuild_with_id("RENAMED".into()).unwrap();
-        assert_eq!(rebuilt.id().as_str(), "RENAMED");
-        assert_eq!(rebuilt.correlations(), curve.correlations());
-        for detachment in [3.0, 5.0, 7.0, 8.5, 10.0] {
-            assert_eq!(
-                rebuilt
-                    .get_correlation(detachment)
-                    .expect("valid detachment"),
-                curve.get_correlation(detachment).expect("valid detachment")
-            );
-        }
     }
 }

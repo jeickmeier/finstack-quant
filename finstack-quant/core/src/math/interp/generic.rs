@@ -79,9 +79,6 @@ fn new_with_strategy<S: InterpolationStrategy>(
     if knots.len() != values.len() {
         return Err(InputError::DimensionMismatch.into());
     }
-    if knots.len() < 2 {
-        return Err(InputError::TooFewPoints.into());
-    }
     validate_knots(&knots)?;
     validate_finite_series(&values)?;
 
@@ -93,6 +90,14 @@ fn new_with_strategy<S: InterpolationStrategy>(
         strategy,
         extrapolation,
     })
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawInterpolator {
+    knots: Box<[f64]>,
+    values: Box<[f64]>,
+    extrapolation: ExtrapolationPolicy,
 }
 
 #[inline]
@@ -123,14 +128,6 @@ macro_rules! impl_interpolator_strategy {
                 where
                     D: serde::Deserializer<'de>,
                 {
-                    #[derive(serde::Deserialize)]
-                    #[serde(deny_unknown_fields)]
-                    struct RawInterpolator {
-                        knots: Box<[f64]>,
-                        values: Box<[f64]>,
-                        extrapolation: ExtrapolationPolicy,
-                    }
-
                     let raw = RawInterpolator::deserialize(deserializer)?;
                     new_with_strategy(raw.knots, raw.values, raw.extrapolation)
                         .map_err(serde::de::Error::custom)

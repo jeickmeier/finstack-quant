@@ -3,7 +3,7 @@
 use finstack_quant_core::math::{
     integration::{
         GaussHermiteQuadrature, adaptive_simpson, adaptive_simpson_pair,
-        gauss_legendre_integrate_adaptive, gauss_legendre_integrate_composite, simpson_rule,
+        gauss_legendre_integrate_adaptive, gauss_legendre_integrate_composite,
     },
     special_functions::{erf, norm_cdf},
 };
@@ -11,23 +11,6 @@ use std::f64::consts::PI;
 
 /// Evaluation limit generous enough never to bind in these tests unless a test says so.
 const MAX_EVALS: usize = 1_000_000;
-
-#[test]
-fn test_simpson_rule_polynomial() {
-    // Test Simpson's rule on x² over [0, 1] = 1/3
-    let f = |x: f64| x * x;
-    let result = simpson_rule(|x| Ok(f(x)), 0.0, 1.0, 100).unwrap();
-    assert!((result - 1.0 / 3.0).abs() < 1e-6);
-}
-
-#[test]
-fn test_simpson_rule_sin() {
-    // Test Simpson's rule on sin(x) over [0, π] = 2
-    let f = |x: f64| x.sin();
-    let result = simpson_rule(|x| Ok(f(x)), 0.0, PI, 100).unwrap();
-    // Simpson with n=100 on sin(x): error ~ π/180 * (π/100)^4 ≈ 1.7e-9
-    assert!((result - 2.0).abs() < 1e-7);
-}
 
 #[test]
 fn test_adaptive_simpson_smooth_function() {
@@ -100,28 +83,14 @@ fn test_financial_application_option_payoff() {
 
 #[test]
 fn test_integration_methods_comparison() {
-    // Compare different methods on same function: x³ over [0, 2] = 4
+    // Verify adaptive Simpson on x³ over [0, 2] = 4
     let f = |x: f64| x * x * x;
     let exact = 4.0;
 
-    let simpson = simpson_rule(|x| Ok(f(x)), 0.0, 2.0, 100).unwrap();
     let adaptive = adaptive_simpson(|x| Ok(f(x)), 0.0, 2.0, 1e-6, 20, MAX_EVALS).unwrap();
 
-    // Simpson should be most accurate for polynomials
-    assert!((simpson - exact).abs() < 1e-8);
     // Adaptive should be very accurate
     assert!((adaptive - exact).abs() < 1e-10);
-}
-
-#[test]
-fn test_integration_error_cases() {
-    let f = |x: f64| x;
-
-    // Simpson with odd number of intervals should fail
-    assert!(simpson_rule(|x| Ok(f(x)), 0.0, 1.0, 99).is_err());
-
-    // Zero intervals should fail
-    assert!(simpson_rule(|x| Ok(f(x)), 0.0, 1.0, 0).is_err());
 }
 
 #[test]
@@ -131,7 +100,8 @@ fn test_financial_yield_curve_integration() {
     let f = |t: f64| 0.03 + 0.01 * t; // Simple linear forward rate
 
     // Integrate from 0 to 5 years
-    let integrated_rate = simpson_rule(|x| Ok(f(x)), 0.0, 5.0, 1000).unwrap() / 5.0_f64;
+    let integrated_rate =
+        adaptive_simpson(|x| Ok(f(x)), 0.0, 5.0, 1e-8, 20, MAX_EVALS).unwrap() / 5.0_f64;
 
     // Should be around 5.5% (average of 3% to 8%)
     assert!((integrated_rate - 0.055).abs() < 1e-3);
@@ -269,19 +239,6 @@ fn test_adaptive_simpson_various_tolerances() {
 }
 
 #[test]
-fn test_simpson_rule_edge_cases() {
-    let f = |x: f64| x;
-
-    // Zero-width interval
-    let result = simpson_rule(|x| Ok(f(x)), 5.0, 5.0, 100).unwrap();
-    assert!(result.abs() < 1e-12);
-
-    // Negative interval (b < a)
-    let result = simpson_rule(|x| Ok(f(x)), 5.0, 0.0, 100).unwrap();
-    assert!((result + 12.5).abs() < 1e-3); // Should be negative of [0,5]
-}
-
-#[test]
 fn test_gauss_legendre_composite() {
     // x³ on [0,2] = 4
     let f = |x: f64| x * x * x;
@@ -357,25 +314,6 @@ fn test_integration_numerical_stability() {
     // Sinc function integral is well-known
     assert!(result.is_finite());
     assert!(result > 0.0);
-}
-
-#[test]
-fn test_convergence_behavior() {
-    let f = |x: f64| x.exp();
-    let exact = 1.0_f64.exp() - 1.0;
-
-    // Test convergence as we increase intervals
-    let result10 = simpson_rule(|x| Ok(f(x)), 0.0, 1.0, 10).unwrap();
-    let result100 = simpson_rule(|x| Ok(f(x)), 0.0, 1.0, 100).unwrap();
-    let result1000 = simpson_rule(|x| Ok(f(x)), 0.0, 1.0, 1000).unwrap();
-
-    // Error should decrease
-    let err10 = (result10 - exact).abs();
-    let err100 = (result100 - exact).abs();
-    let err1000 = (result1000 - exact).abs();
-
-    assert!(err100 < err10);
-    assert!(err1000 < err100);
 }
 
 // ── H1 regression: compensated accumulation for order-20 cancellation-prone integrand ──
@@ -663,8 +601,6 @@ fn adaptive_simpson_zero_width_validates_controls_and_makes_no_callback() {
     let zero_pair = adaptive_simpson_pair(|x| Ok((counted(x)?, x)), 2.0, 2.0, [0.0, 0.0], 0, 1)
         .expect("zero-width pair identity");
     assert_eq!(zero_pair, (0.0, 0.0));
-    let fixed = simpson_rule(counted, 5.0, 5.0, 2).expect("zero-width fixed rule");
-    assert_eq!(fixed.to_bits(), 0.0_f64.to_bits());
     assert_eq!(calls.get(), 0, "a zero-width interval makes no callback");
 
     // Controls are admitted before the zero-width identity.
@@ -674,10 +610,6 @@ fn adaptive_simpson_zero_width_validates_controls_and_makes_no_callback() {
     ));
     assert!(matches!(
         adaptive_simpson(counted, 2.0, 2.0, 0.0, 0, 0),
-        Err(Error::Validation(_))
-    ));
-    assert!(matches!(
-        simpson_rule(counted, 5.0, 5.0, 3),
         Err(Error::Validation(_))
     ));
     assert_eq!(calls.get(), 0);
@@ -715,10 +647,6 @@ fn adaptive_simpson_reversed_bounds_negate_the_same_samples() {
     .expect("reversed");
     assert_eq!(reversed.to_bits(), (-forward).to_bits());
     assert_eq!(*forward_nodes.borrow(), *reversed_nodes.borrow());
-
-    let fixed_forward = simpson_rule(|x| Ok(x.exp()), 0.0, 1.0, 10).expect("fixed forward");
-    let fixed_reversed = simpson_rule(|x| Ok(x.exp()), 1.0, 0.0, 10).expect("fixed reversed");
-    assert_eq!(fixed_reversed.to_bits(), (-fixed_forward).to_bits());
 }
 
 #[test]
@@ -741,13 +669,6 @@ fn adaptive_simpson_stops_at_the_first_callback_error_and_keeps_its_category() {
     };
     assert!(message.contains("caller rejected"));
     assert_eq!(calls.get(), 4, "no callback after the first error");
-
-    calls.set(0);
-    assert!(matches!(
-        simpson_rule(failing, 0.0, 1.0, 10),
-        Err(Error::Validation(_))
-    ));
-    assert_eq!(calls.get(), 4);
 }
 
 #[test]
@@ -1063,9 +984,7 @@ fn fixed_rules_reject_invalid_samples_and_stop_at_the_first_callback_error() {
     let hermite = GaussHermiteQuadrature::new(7).unwrap();
     for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         assert!(hermite.integrate(|_| Ok(bad)).is_err());
-        assert!(simpson_rule(|_| Ok(bad), 0.0, 1.0, 4).is_err());
         assert!(gauss_legendre_integrate_composite(|_| Ok(bad), 0.0, 1.0, 4, 2).is_err());
-        assert!(simpson_rule(|_| panic!("invalid bounds must fail first"), bad, 1.0, 4).is_err());
     }
     let marker = finstack_quant_core::Error::Validation("callback sentinel".into());
     let mut calls = 0;
@@ -1074,25 +993,13 @@ fn fixed_rules_reject_invalid_samples_and_stop_at_the_first_callback_error() {
         Err(marker.clone())
     };
     assert_eq!(hermite.integrate(&mut fail), Err(marker.clone()));
-    assert_eq!(simpson_rule(&mut fail, 5.0, 2.0, 4), Err(marker.clone()));
     assert_eq!(
         gauss_legendre_integrate_composite(&mut fail, 5.0, 2.0, 4, 2),
         Err(marker)
     );
-    assert_eq!(calls, 3);
-    assert_eq!(simpson_rule(|_| unreachable!(), 1.0, 1.0, 4).unwrap(), 0.0);
+    assert_eq!(calls, 2);
     assert_eq!(
         gauss_legendre_integrate_composite(|_| unreachable!(), 1.0, 1.0, 4, 2).unwrap(),
         0.0
     );
-}
-
-#[test]
-fn fixed_simpson_keeps_representable_integrals_when_a_weight_is_out_of_range() {
-    let extreme = f64::MAX;
-    let v = simpson_rule(|_| Ok(0.25), -extreme, extreme, 2).unwrap();
-    assert!((v / (extreme * 0.5) - 1.0).abs() < 4.0 * f64::EPSILON);
-    let step = f64::from_bits(1);
-    let subnormal = simpson_rule(|_| Ok(3.0), 0.0, 2.0 * step, 2).unwrap();
-    assert_eq!(subnormal.to_bits(), 6);
 }

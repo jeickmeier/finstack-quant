@@ -5,7 +5,7 @@
 //! source clock and optional continuous-zero shocks / dated conditioning views.
 
 use super::common::{
-    CurveCalendar, PiecewiseLinearAdjustment, RateShock, signed_curve_year_fraction,
+    CurveCalendar, PiecewiseLinearAdjustment, signed_curve_year_fraction,
     stable_positive_log_ratio, validate_curve_clock,
 };
 use crate::{
@@ -604,9 +604,7 @@ struct RawParametricCurve {
 
 impl From<ParametricCurve> for RawParametricCurve {
     fn from(curve: ParametricCurve) -> Self {
-        let has_adj = serde_json::to_value(&curve.adjustment)
-            .ok()
-            .is_some_and(|v| v != serde_json::json!({ "initial_value": 0.0, "segments": [] }));
+        let has_adj = !curve.adjustment.is_zero();
         RawParametricCurve {
             id: curve.id.to_string(),
             base_date: curve.base_date,
@@ -909,7 +907,7 @@ impl ParametricCurve {
         }
         let mut next = self.clone();
         next.adjustment
-            .add_bump(self.offset, rate, spec.bump_type, RateShock::ZeroRate)?;
+            .add_bump(self.offset, rate, spec.bump_type)?;
         next.adjustment.validate()?;
         if let crate::market_data::bumps::BumpType::TriangularKeyRate {
             prev_bucket,

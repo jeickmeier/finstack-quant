@@ -2,9 +2,7 @@
 
 use crate::api::core::config::js_opt_finstack_config;
 use crate::api::core::currency::JsCurrency;
-use crate::utils::input::{
-    from_js_json, js_f64, js_opt_bool, js_opt_string, js_opt_uint, js_string, js_uint,
-};
+use crate::utils::input::{js_f64, js_opt_bool, js_opt_string, js_opt_uint, js_string, js_uint};
 use crate::utils::to_js_err;
 use crate::utils::wire::js_decimal;
 use finstack_quant_core::config::RoundingMode;
@@ -456,28 +454,6 @@ impl JsMoney {
         self.inner.to_string()
     }
 
-    /// Serialize to a JSON string using the canonical Rust serde schema.
-    ///
-    /// @returns A JSON string carrying the exact decimal amount and the
-    /// ISO-4217 currency code.
-    /// @throws If serialization fails (should not happen for valid `Money`).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
-    /// Deserialize from a JSON string produced by `Money.toJson`.
-    ///
-    /// @param json - A JSON string in the canonical Rust `Money` schema.
-    /// @returns The parsed `Money`.
-    /// @throws If `json` is malformed or fails strict schema validation.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsMoney, JsValue> {
-        from_js_json(&json, "json").map(|inner| JsMoney { inner })
-    }
-
     /// Construct from exact decimal text, rejecting inexact amounts.
     ///
     /// `amount` accepts fixed-point (`"1234.56"`) or scientific (`"1.2345e3"`)
@@ -522,7 +498,8 @@ impl JsMoney {
         let amount: &str = &js_string(&amount, "amount")?;
         let config = js_opt_finstack_config(config.as_ref(), "config")?;
         let inner = match config.as_ref() {
-            Some(cfg) => RustMoney::from_decimal_str_with_config(amount, currency.inner, cfg),
+            Some(cfg) => finstack_quant_core::decimal::parse_decimal(amount)
+                .and_then(|exact| RustMoney::from_decimal_with_config(exact, currency.inner, cfg)),
             None => RustMoney::from_decimal_str(amount, currency.inner),
         }
         .map_err(to_js_err)?;
@@ -544,6 +521,8 @@ impl JsMoney {
         }
     }
 }
+
+json_round_trip!(JsMoney, Money);
 
 #[cfg(test)]
 mod tests {

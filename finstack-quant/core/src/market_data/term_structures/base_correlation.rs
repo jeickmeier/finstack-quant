@@ -300,21 +300,6 @@ impl BaseCorrelationCurve {
         &self.id
     }
 
-    /// Create a builder initialized with this curve's knots under a new identifier.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Replacement curve identifier assigned to the returned builder.
-    #[must_use]
-    pub fn to_builder_with_id(&self, id: impl Into<CurveId>) -> BaseCorrelationCurveBuilder {
-        BaseCorrelationCurve::builder(id).knots(
-            self.detachment_points
-                .iter()
-                .copied()
-                .zip(self.correlations.iter().copied()),
-        )
-    }
-
     /// Apply a filtered additive bump to matching detachment points.
     ///
     /// # Arguments

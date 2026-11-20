@@ -870,12 +870,6 @@ impl MarketBump {
             Self::FxPct { .. } => None,
         }
     }
-
-    /// Borrow the [`BumpSpec`] when this bump carries one.
-    #[must_use]
-    pub fn spec(&self) -> Option<&BumpSpec> {
-        self.target_and_spec().map(|(_, spec)| spec)
-    }
 }
 
 /// Format a bump magnitude for embedding in a derived curve ID.

@@ -46,6 +46,34 @@ impl core::fmt::Debug for CompositeCalendar<'_> {
     }
 }
 
+fn intersect_supported_years(
+    calendars: &[&dyn HolidayCalendar],
+) -> Option<(Option<i32>, Option<i32>)> {
+    let mut max_from: Option<i32> = None;
+    let mut min_to: Option<i32> = None;
+    for calendar in calendars {
+        if let Some((from, to)) = calendar.supported_years() {
+            max_from = match (max_from, from) {
+                (Some(a), Some(b)) => Some(a.max(b)),
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            };
+            min_to = match (min_to, to) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            };
+        }
+    }
+    if max_from.is_some() || min_to.is_some() {
+        Some((max_from, min_to))
+    } else {
+        None
+    }
+}
+
 impl<'a> CompositeCalendar<'a> {
     /// Construct a composite calendar combining one or more sub-calendars.
     ///
@@ -67,25 +95,7 @@ impl<'a> CompositeCalendar<'a> {
                 "composite calendar requires at least one member calendar".to_string(),
             ));
         }
-        let mut max_from: Option<i32> = None;
-        let mut min_to: Option<i32> = None;
-        for calendar in calendars {
-            if let Some((from, to)) = calendar.supported_years() {
-                max_from = match (max_from, from) {
-                    (Some(a), Some(b)) => Some(a.max(b)),
-                    (Some(a), None) => Some(a),
-                    (None, Some(b)) => Some(b),
-                    (None, None) => None,
-                };
-                min_to = match (min_to, to) {
-                    (Some(a), Some(b)) => Some(a.min(b)),
-                    (Some(a), None) => Some(a),
-                    (None, Some(b)) => Some(b),
-                    (None, None) => None,
-                };
-            }
-        }
-        if let (Some(from), Some(to)) = (max_from, min_to)
+        if let Some((Some(from), Some(to))) = intersect_supported_years(calendars)
             && from > to
         {
             return Err(crate::Error::Validation(format!(
@@ -119,29 +129,7 @@ impl HolidayCalendar for CompositeCalendar<'_> {
     }
 
     fn supported_years(&self) -> Option<(Option<i32>, Option<i32>)> {
-        let mut max_from: Option<i32> = None;
-        let mut min_to: Option<i32> = None;
-        for calendar in self.calendars {
-            if let Some((from, to)) = calendar.supported_years() {
-                max_from = match (max_from, from) {
-                    (Some(a), Some(b)) => Some(a.max(b)),
-                    (Some(a), None) => Some(a),
-                    (None, Some(b)) => Some(b),
-                    (None, None) => None,
-                };
-                min_to = match (min_to, to) {
-                    (Some(a), Some(b)) => Some(a.min(b)),
-                    (Some(a), None) => Some(a),
-                    (None, Some(b)) => Some(b),
-                    (None, None) => None,
-                };
-            }
-        }
-        if max_from.is_some() || min_to.is_some() {
-            Some((max_from, min_to))
-        } else {
-            None
-        }
+        intersect_supported_years(self.calendars)
     }
 
     fn calendar_id(&self) -> Option<String> {

@@ -13,6 +13,70 @@ use rust_decimal::Decimal;
 /// Largest Decimal coefficient magnitude, `2^96 - 1`.
 const MAX_COEFFICIENT: u128 = (1_u128 << 96) - 1;
 
+/// Parsed ASCII components of a decimal literal before magnitude/range validation.
+pub(crate) struct ScannedDecimal<'a> {
+    pub(crate) negative: bool,
+    pub(crate) int_digits: &'a str,
+    pub(crate) frac_digits: &'a str,
+    pub(crate) exponent: i64,
+}
+
+/// Scan `[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?` into sign, digits, and exponent.
+pub(crate) fn scan_decimal_literal(text: &str) -> Option<ScannedDecimal<'_>> {
+    let bytes = text.as_bytes();
+    let mut index = 0;
+    let negative = match bytes.first() {
+        Some(b'+') => {
+            index = 1;
+            false
+        }
+        Some(b'-') => {
+            index = 1;
+            true
+        }
+        _ => false,
+    };
+    let int_start = index;
+    while index < bytes.len() && bytes[index].is_ascii_digit() {
+        index += 1;
+    }
+    let int_digits = &text[int_start..index];
+    let mut frac_digits = "";
+    if index < bytes.len() && bytes[index] == b'.' {
+        index += 1;
+        let frac_start = index;
+        while index < bytes.len() && bytes[index].is_ascii_digit() {
+            index += 1;
+        }
+        frac_digits = &text[frac_start..index];
+    }
+    if int_digits.is_empty() && frac_digits.is_empty() {
+        return None;
+    }
+    let mut exponent: i64 = 0;
+    if index < bytes.len() && (bytes[index] == b'e' || bytes[index] == b'E') {
+        index += 1;
+        let exp_start = index;
+        if index < bytes.len() && (bytes[index] == b'+' || bytes[index] == b'-') {
+            index += 1;
+        }
+        let digits_start = index;
+        while index < bytes.len() && bytes[index].is_ascii_digit() {
+            index += 1;
+        }
+        if index == digits_start {
+            return None;
+        }
+        exponent = text[exp_start..index].parse::<i64>().ok()?;
+    }
+    (index == bytes.len()).then_some(ScannedDecimal {
+        negative,
+        int_digits,
+        frac_digits,
+        exponent,
+    })
+}
+
 /// Parse exact fixed-point or scientific decimal text without rounding.
 ///
 /// After outer whitespace trimming, the text must match
@@ -58,57 +122,12 @@ pub fn parse_decimal(amount: &str) -> Result<Decimal> {
             "decimal {amount:?} is not exactly representable as Decimal (coefficient up to 2^96-1, scale up to 28)"
         ))
     };
-    let bytes = text.as_bytes();
-    let mut index = 0;
-    let negative = match bytes.first() {
-        Some(b'+') => {
-            index = 1;
-            false
-        }
-        Some(b'-') => {
-            index = 1;
-            true
-        }
-        _ => false,
-    };
-    let int_start = index;
-    while index < bytes.len() && bytes[index].is_ascii_digit() {
-        index += 1;
-    }
-    let int_digits = &text[int_start..index];
-    let mut frac_digits = "";
-    if index < bytes.len() && bytes[index] == b'.' {
-        index += 1;
-        let frac_start = index;
-        while index < bytes.len() && bytes[index].is_ascii_digit() {
-            index += 1;
-        }
-        frac_digits = &text[frac_start..index];
-    }
-    if int_digits.is_empty() && frac_digits.is_empty() {
-        return Err(malformed());
-    }
-    let mut exponent: i64 = 0;
-    if index < bytes.len() && (bytes[index] == b'e' || bytes[index] == b'E') {
-        index += 1;
-        let exp_start = index;
-        if index < bytes.len() && (bytes[index] == b'+' || bytes[index] == b'-') {
-            index += 1;
-        }
-        let digits_start = index;
-        while index < bytes.len() && bytes[index].is_ascii_digit() {
-            index += 1;
-        }
-        if index == digits_start {
-            return Err(malformed());
-        }
-        exponent = text[exp_start..index]
-            .parse::<i64>()
-            .map_err(|_| malformed())?;
-    }
-    if index != bytes.len() {
-        return Err(malformed());
-    }
+    let ScannedDecimal {
+        negative,
+        int_digits,
+        frac_digits,
+        exponent,
+    } = scan_decimal_literal(text).ok_or_else(malformed)?;
 
     // value = digits * 10^(exponent - frac_len); strip leading zeros.
     let digits = format!("{int_digits}{frac_digits}");

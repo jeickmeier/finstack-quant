@@ -359,7 +359,7 @@ impl GaussHermiteQuadrature {
                     "integrand was not finite",
                 ));
             }
-            direct &= sample.abs() <= HERMITE_DIRECT_LIMIT;
+            direct &= sample.abs() <= DIRECT_SUM_LIMIT;
             samples[i] = sample;
         }
         let mut acc = NeumaierAccumulator::new();
@@ -403,9 +403,10 @@ impl GaussHermiteQuadrature {
 /// Largest supported Gauss-Hermite order.
 const MAX_HERMITE_ORDER: usize = 20;
 
-/// Largest sample magnitude for which the unnormalized Hermite sum, whose
-/// weights total `√π`, cannot overflow.
-const HERMITE_DIRECT_LIMIT: f64 = f64::MAX / 8.0;
+/// Largest sample magnitude for which small fixed-weight sums (such as the
+/// Gauss-Hermite sum whose weights total `√π` or the Simpson panel sum
+/// `fa + 4 fm + fb`) cannot overflow.
+const DIRECT_SUM_LIMIT: f64 = f64::MAX / 8.0;
 
 /// Largest count that converts to `f64` without losing its identity.
 const MAX_EXACT_COUNT: u64 = 1 << 53;
@@ -461,153 +462,6 @@ fn interval_point(lo: f64, hi: f64, fraction: f64) -> f64 {
     } else {
         fraction.mul_add(hi, (1.0 - fraction) * lo)
     }
-}
-
-/// Simpson's rule on `n` equal subintervals.
-///
-/// Evaluates `(b - a) * sum(w_i * f(x_i))` with endpoint weights `1/(3n)` and
-/// alternating interior weights `4/(3n)` and `2/(3n)`. The weights sum to one,
-/// so the weighted sum is an average of the samples and cannot overflow when
-/// the samples are representable. Exact for polynomials of degree three or
-/// less; no accuracy claim is made for other integrands.
-///
-/// # Arguments
-///
-/// * `f` - Fallible integrand evaluated once at each of the `n + 1` nodes, in
-///   increasing coordinate order. It must describe one deterministic function
-///   for the whole call. The first error it returns stops the rule and is
-///   returned unchanged.
-/// * `a` - Finite lower endpoint, in the domain units accepted by `f`.
-/// * `b` - Finite upper endpoint in the same units. `b < a` evaluates the same
-///   increasing-bound rule and negates the result; `b == a` returns `+0.0`
-///   without calling `f`.
-/// * `n` - Positive even number of equal subintervals, at most `2^53` so the
-///   count converts to `f64` exactly.
-///
-/// # Returns
-///
-/// The finite Simpson estimate of the signed integral of `f` from `a` to `b`.
-///
-/// # Errors
-///
-/// Returns [`Error::Validation`] for a non-finite endpoint or an `n` that is
-/// zero, odd or above `2^53`. Returns the callback's own error unchanged.
-/// Returns [`InputError::SolverConvergenceFailed`] (a computation error) when
-/// a sample is NaN or infinite, when a nonzero weighted sample underflows to
-/// zero, when interior nodes cannot be told apart in binary64, or when the
-/// result is not representable; `iterations` is the number of callbacks made
-/// and `last_x` the coordinate concerned.
-///
-/// # Example
-///
-/// ```rust
-/// use finstack_quant_core::math::integration::simpson_rule;
-///
-/// // Integrate x² from 0 to 1 (exact answer: 1/3)
-/// let integral = simpson_rule(|x| Ok(x * x), 0.0, 1.0, 100)?;
-/// assert!((integral - 1.0 / 3.0).abs() < 1e-12);
-/// # Ok::<(), finstack_quant_core::Error>(())
-/// ```
-pub fn simpson_rule<F>(mut f: F, a: f64, b: f64, n: usize) -> Result<f64, Error>
-where
-    F: FnMut(f64) -> Result<f64, Error>,
-{
-    const RULE: &str = "simpson_rule";
-    if !a.is_finite() || !b.is_finite() {
-        return Err(Error::Validation(format!(
-            "{RULE}: endpoints must be finite, got [{a}, {b}]"
-        )));
-    }
-    if n == 0 || !n.is_multiple_of(2) {
-        return Err(Error::Validation(format!(
-            "Simpson's rule needs a positive even number of intervals, got {n}"
-        )));
-    }
-    if n as u64 > MAX_EXACT_COUNT {
-        return Err(Error::Validation(format!(
-            "{RULE}: interval count {n} does not convert to f64 exactly"
-        )));
-    }
-    #[allow(clippy::float_cmp)]
-    if a == b {
-        return Ok(0.0);
-    }
-    let (lo, hi, negate) = if a < b { (a, b, false) } else { (b, a, true) };
-    let count = n as f64;
-    let unit = 1.0 / (3.0 * count);
-    let mut average = NeumaierAccumulator::new();
-    let mut previous = lo;
-    for i in 0..=n {
-        let x = if i == 0 {
-            lo
-        } else if i == n {
-            hi
-        } else {
-            interval_point(lo, hi, i as f64 / count)
-        };
-        if i > 0 && x <= previous {
-            return Err(quadrature_failure(
-                RULE,
-                i,
-                f64::NAN,
-                x,
-                "adjacent nodes are not distinct in binary64 on a nonzero interval",
-            ));
-        }
-        previous = x;
-        let sample = f(x)?;
-        let made = i + 1;
-        if !sample.is_finite() {
-            return Err(quadrature_failure(
-                RULE,
-                made,
-                f64::NAN,
-                x,
-                "integrand was not finite",
-            ));
-        }
-        let weight = if i == 0 || i == n {
-            unit
-        } else if i % 2 == 1 {
-            4.0 * unit
-        } else {
-            2.0 * unit
-        };
-        let term = sample * weight;
-        if sample != 0.0 && term == 0.0 {
-            return Err(quadrature_failure(
-                RULE,
-                made,
-                f64::NAN,
-                x,
-                "a nonzero weighted sample underflowed to zero",
-            ));
-        }
-        average.add(term).map_err(|_| {
-            quadrature_failure(RULE, made, f64::NAN, x, "weighted sum is not representable")
-        })?;
-    }
-    let evaluations = n + 1;
-    let average = average.get_total().map_err(|_| {
-        quadrature_failure(
-            RULE,
-            evaluations,
-            f64::NAN,
-            hi,
-            "weighted sum is not representable",
-        )
-    })?;
-    let value = scale_by_width(average, lo, hi);
-    if !value.is_finite() || (average != 0.0 && value == 0.0) {
-        return Err(quadrature_failure(
-            RULE,
-            evaluations,
-            f64::NAN,
-            hi,
-            "integral is not representable in binary64",
-        ));
-    }
-    Ok(oriented(value, negate))
 }
 
 /// Apply the requested orientation, keeping an exact zero as `+0.0`.
@@ -725,16 +579,6 @@ struct SimpsonPanel<const N: usize> {
     depth: usize,
 }
 
-/// Largest sample magnitude for which `fa + 4 fm + fb` cannot overflow.
-const SIMPSON_DIRECT_LIMIT: f64 = f64::MAX / 8.0;
-
-/// One-panel Simpson value per component, `(b - a) / 6 * (fa + 4 fm + fb)`.
-///
-/// Ordinary samples use the classical weighted sum. Samples large enough for
-/// `4 * f` to overflow use the equivalent average `fa/6 + 2 fm/3 + fb/6`
-/// scaled by the width, so a representable result is not lost. Returns the
-/// failing component when a nonzero product underflows to zero or the value
-/// is not representable.
 fn simpson_panel<const N: usize>(
     a: f64,
     b: f64,
@@ -744,9 +588,9 @@ fn simpson_panel<const N: usize>(
 ) -> Result<[f64; N], usize> {
     let mut out = [0.0; N];
     for i in 0..N {
-        let direct = fa[i].abs() <= SIMPSON_DIRECT_LIMIT
-            && fm[i].abs() <= SIMPSON_DIRECT_LIMIT
-            && fb[i].abs() <= SIMPSON_DIRECT_LIMIT;
+        let direct = fa[i].abs() <= DIRECT_SUM_LIMIT
+            && fm[i].abs() <= DIRECT_SUM_LIMIT
+            && fb[i].abs() <= DIRECT_SUM_LIMIT;
         let (factor, value) = if direct {
             let sum = fa[i] + 4.0 * fm[i] + fb[i];
             (sum, (half_width(a, b) / 3.0) * sum)
@@ -1727,16 +1571,6 @@ mod tests {
             (result - width).abs() / width < 1.0e-10,
             "Expected ~{width}, got {result}"
         );
-    }
-
-    #[test]
-    fn test_simpson_rule() {
-        // Test Simpson's rule on a simple polynomial x² on [0, 1]
-        // Exact integral = 1/3
-        let f = |x: f64| Ok(x * x);
-        let integral = simpson_rule(f, 0.0, 1.0, 100)
-            .expect("Simpson rule integration should succeed in test");
-        assert!((integral - 1.0 / 3.0).abs() < 1e-6);
     }
 
     #[test]

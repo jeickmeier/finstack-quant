@@ -87,7 +87,7 @@ fn cdx_ig_46_option_payoff_matches_threshold_split_integration() {
     // there gives a smooth reference integrand, independent of production's
     // adaptive treatment of the positive-part kink.
     let boundary = ((strike / m).ln() + 0.5 * vol_time * vol_time) / vol_time;
-    let reference = finstack_quant_core::math::integration::simpson_rule(
+    let reference = finstack_quant_core::math::integration::adaptive_simpson(
         |z| {
             let spread = m * (-0.5 * vol_time * vol_time + vol_time * z).exp();
             Ok(
@@ -98,7 +98,9 @@ fn cdx_ig_46_option_payoff_matches_threshold_split_integration() {
         },
         boundary,
         z_limit(sigma, ctx.t_expiry),
-        4096,
+        1e-12,
+        20,
+        100_000,
     )
     .expect("smooth reference integral")
         * ctx.df_to_settlement

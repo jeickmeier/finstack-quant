@@ -1,11 +1,8 @@
 //! Discount-curve bumping and forward-conditioning transformations.
 
-use super::super::common::factor::{roll_positive_factor_points, verify_triangular_breakpoints};
-use super::super::common::signed_curve_year_fraction;
 use super::DiscountCurve;
 use crate::dates::Date;
 use crate::market_data::bumps::{BumpSpec, Bumpable};
-use crate::math::interp::exact_f64_eq;
 
 impl DiscountCurve {
     /// Apply a bump specification in-place, retaining the original interpolation.
@@ -14,42 +11,9 @@ impl DiscountCurve {
     /// (`DF *= exp(-delta_r * t)`), not quote re-bootstraps. Triangular shocks act
     /// continuously in maturity, including between and beyond stored pillars.
     pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
-        let val = spec.resolve_additive_or_error("DiscountCurve")?;
-        if exact_f64_eq(val, 0.0) {
-            return Ok(());
+        if self.core.bump_in_place("DiscountCurve", spec)? {
+            self.rate_calibration = None;
         }
-        let mut transform = self
-            .transform
-            .clone()
-            .unwrap_or_else(|| super::evaluation::CurveTransform::from_curve(self));
-        transform.bump(val, spec.bump_type)?;
-
-        let mut dfs = Vec::with_capacity(self.knots.len());
-        for &time in self.knots.iter() {
-            dfs.push(transform.df(&self.interp, time)?);
-        }
-
-        // Check in-coverage shape breakpoints for triangular key-rate shocks.
-        let min_src = self
-            .transform
-            .as_ref()
-            .map_or(self.knots[0], |tr| tr.source_first_knot());
-        let max_src = self.transform.as_ref().map_or_else(
-            || self.knots[self.knots.len() - 1],
-            |tr| tr.source_points()[tr.source_points().len() - 1].0,
-        );
-        verify_triangular_breakpoints(
-            spec,
-            &self.interp,
-            min_src,
-            max_src,
-            transform.offset(),
-            |src_t| transform.df_at_source_time(&self.interp, src_t),
-        )?;
-
-        self.dfs = dfs.into_boxed_slice();
-        self.transform = Some(transform);
-        self.rate_calibration = None;
         Ok(())
     }
 
@@ -94,52 +58,15 @@ impl DiscountCurve {
     /// # }
     /// ```
     pub fn condition(&self, reference_date: Date) -> crate::Result<Self> {
-        let src_base = self.source_base_date();
-        if reference_date < src_base {
-            return Err(crate::Error::Validation(format!(
-                "DiscountCurve::condition requires reference_date ({reference_date}) on or after source base date ({src_base})"
-            )));
-        }
-        let _ = signed_curve_year_fraction(
-            src_base,
-            reference_date,
-            self.day_count,
-            self.calendar.as_ref(),
-        )?;
-        let c_w = self.df_on_date(reference_date)?;
-        if !c_w.is_finite() || c_w <= 0.0 {
-            return Err(crate::InputError::NonPositiveValue.into());
-        }
-        if reference_date == self.base {
+        let Some(core) = self.core.condition("DiscountCurve", reference_date)? else {
             return Ok(self.clone());
-        }
-
-        let mut transform = self
-            .transform
-            .clone()
-            .unwrap_or_else(|| super::evaluation::CurveTransform::from_curve(self));
-        transform.condition(
-            &self.interp,
-            reference_date,
-            self.day_count,
-            self.day_count_context(),
-        )?;
-        let new_offset = transform.offset();
-
-        let (knots, dfs) = roll_positive_factor_points(
-            transform.source_points(),
-            &self.interp,
-            new_offset,
-            |source_t| transform.df_at_source_time(&self.interp, source_t),
-        )?;
-
-        let mut conditioned = self.clone();
-        conditioned.base = reference_date;
-        conditioned.knots = knots.into_boxed_slice();
-        conditioned.dfs = dfs.into_boxed_slice();
-        conditioned.transform = Some(transform);
-        conditioned.rate_calibration = None;
-        Ok(conditioned)
+        };
+        Ok(Self {
+            id: self.id.clone(),
+            core,
+            rate_calibration: None,
+            fx_policy: self.fx_policy.clone(),
+        })
     }
 }
 

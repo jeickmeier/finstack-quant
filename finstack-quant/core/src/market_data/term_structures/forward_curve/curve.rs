@@ -2,8 +2,7 @@
 
 use super::super::DiscountCurve;
 use super::super::common::factor::{
-    dated_points_to_knots, df_between_admitted_factors,
-    instantaneous_forward as factor_instantaneous_forward, simple_rate_from_factors,
+    dated_points_to_knots, df_between_admitted_factors, simple_rate_from_factors,
     zero_rate_points_to_factors,
 };
 use super::super::common::{signed_curve_year_fraction, validate_curve_clock};
@@ -175,16 +174,8 @@ impl ForwardCurve {
     ) -> Self {
         Self {
             id: id.into(),
-            base: discount.base,
-            day_count: discount.day_count,
-            calendar: discount.calendar.clone(),
+            core: discount.core.clone(),
             index_tenor,
-            knots: discount.knots.clone(),
-            factors: discount.dfs.clone(),
-            interp: discount.interp.clone(),
-            transform: discount
-                .transform_snapshot()
-                .map(super::evaluation::CurveTransform::from_snapshot),
             rate_calibration: None,
             fx_policy: discount.fx_policy.clone(),
         }
@@ -199,37 +190,32 @@ impl ForwardCurve {
     /// Valuation **base date** anchoring `t = 0`.
     #[inline]
     pub fn base_date(&self) -> Date {
-        self.base
+        self.core.base
     }
 
     /// Original untransformed anchor date for conditioned curves, or `base_date()` otherwise.
     #[inline]
     #[must_use]
     pub fn source_base_date(&self) -> Date {
-        self.transform
-            .as_ref()
-            .map_or(self.base, |transform| transform.source_base_date())
+        self.core.source_base_date()
     }
 
     /// Day-count basis used for projection factor time mapping.
     #[inline]
     pub fn day_count(&self) -> DayCount {
-        self.day_count
+        self.core.day_count
     }
 
     /// Canonical id of the curve's time-axis holiday calendar, if any.
     #[must_use]
     pub fn calendar_id(&self) -> Option<&str> {
-        self.calendar.as_ref().map(|calendar| calendar.id.as_str())
+        self.core.calendar_id()
     }
 
     /// Day-count context of the curve's time axis: its holiday calendar, if any.
     #[must_use]
     pub fn day_count_context(&self) -> crate::dates::DayCountContext<'static> {
-        crate::dates::DayCountContext {
-            calendar: self.calendar.as_ref().map(|calendar| calendar.calendar),
-            ..crate::dates::DayCountContext::default()
-        }
+        self.core.day_count_context()
     }
 
     /// Optional contractual index accrual tenor metadata associated with this curve.
@@ -241,35 +227,25 @@ impl ForwardCurve {
     /// Knot times in **years** from [`base_date`](Self::base_date).
     #[inline]
     pub fn knots(&self) -> &[f64] {
-        &self.knots
+        &self.core.knots
     }
 
     /// Normalized positive projection factors at each knot.
     #[inline]
     pub fn factors(&self) -> &[f64] {
-        &self.factors
-    }
-
-    /// Paired `(time, factor)` pillars stored on this curve.
-    #[must_use]
-    pub fn knot_points(&self) -> Vec<(f64, f64)> {
-        self.knots
-            .iter()
-            .copied()
-            .zip(self.factors.iter().copied())
-            .collect()
+        &self.core.values
     }
 
     /// Interpolation style configured for this curve.
     #[inline]
     pub fn interp_style(&self) -> InterpStyle {
-        self.interp.style()
+        self.core.interp.style()
     }
 
     /// Extrapolation policy configured for out-of-bounds queries.
     #[inline]
     pub fn extrapolation(&self) -> ExtrapolationPolicy {
-        self.interp.extrapolation()
+        self.core.interp.extrapolation()
     }
 
     /// Exact typed recipe used to bootstrap this curve, when available.
@@ -291,14 +267,14 @@ impl ForwardCurve {
     #[inline]
     #[must_use]
     pub fn len(&self) -> usize {
-        self.knots.len()
+        self.core.knots.len()
     }
 
     /// Returns `true` if the curve has no knot points.
     #[inline]
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.knots.is_empty()
+        self.core.knots.is_empty()
     }
 
     /// Projection factor `P_x(t)` at time `t` in years from [`base_date`](Self::base_date).
@@ -318,19 +294,7 @@ impl ForwardCurve {
     #[must_use = "computed projection factor should not be discarded"]
     #[inline]
     pub fn df(&self, t: f64) -> crate::Result<f64> {
-        if !t.is_finite() {
-            return Err(crate::Error::Validation(format!(
-                "ForwardCurve::df requires finite time t, got {t}"
-            )));
-        }
-        if let Some(transform) = &self.transform {
-            return transform.df(&self.interp, t);
-        }
-        let val = self.interp.interp(t)?;
-        if !val.is_finite() || val <= 0.0 {
-            return Err(crate::InputError::NonPositiveValue.into());
-        }
-        Ok(val)
+        self.core.df(t, "ForwardCurve")
     }
 
     /// Projection factor on a specific date using the curve's signed clock.
@@ -349,18 +313,7 @@ impl ForwardCurve {
     #[inline]
     #[must_use = "computed projection factor should not be discarded"]
     pub fn df_on_date(&self, date: Date) -> crate::Result<f64> {
-        if let Some(transform) = &self.transform {
-            let source_t = signed_curve_year_fraction(
-                transform.source_base_date(),
-                date,
-                self.day_count,
-                self.calendar.as_ref(),
-            )?;
-            return transform.df_at_source_time(&self.interp, source_t);
-        }
-        let t =
-            signed_curve_year_fraction(self.base, date, self.day_count, self.calendar.as_ref())?;
-        self.df(t)
+        self.core.df_on_date(date, "ForwardCurve")
     }
 
     /// Relative projection factor `P_x(to) / P_x(from)` between two calendar dates.
@@ -460,19 +413,27 @@ impl ForwardCurve {
             )));
         }
         let anchor_base = self.source_base_date();
-        let t_start =
-            signed_curve_year_fraction(anchor_base, start, self.day_count, self.calendar.as_ref())?;
-        let t_end =
-            signed_curve_year_fraction(anchor_base, end, self.day_count, self.calendar.as_ref())?;
+        let t_start = signed_curve_year_fraction(
+            anchor_base,
+            start,
+            self.core.day_count,
+            self.core.calendar.as_ref(),
+        )?;
+        let t_end = signed_curve_year_fraction(
+            anchor_base,
+            end,
+            self.core.day_count,
+            self.core.calendar.as_ref(),
+        )?;
         if !t_start.is_finite() || !t_end.is_finite() || t_end < t_start {
             return Err(crate::Error::Validation(format!(
                 "ForwardCurve::rate_between_dates requires finite non-decreasing mapped coordinates for [{start}, {end}], got [{t_start}, {t_end}]"
             )));
         }
-        let (p1, p2) = if let Some(transform) = &self.transform {
+        let (p1, p2) = if let Some(transform) = &self.core.transform {
             (
-                transform.df_at_source_time(&self.interp, t_start)?,
-                transform.df_at_source_time(&self.interp, t_end)?,
+                transform.df_at_source_time(&self.core.interp, t_start, "ForwardCurve")?,
+                transform.df_at_source_time(&self.core.interp, t_end, "ForwardCurve")?,
             )
         } else {
             (self.df(t_start)?, self.df(t_end)?)
@@ -504,9 +465,6 @@ impl ForwardCurve {
     #[inline]
     #[must_use = "computed instantaneous forward rate should not be discarded"]
     pub fn instantaneous_forward(&self, t: f64) -> crate::Result<f64> {
-        if let Some(transform) = &self.transform {
-            return transform.instantaneous_forward(&self.interp, t);
-        }
-        factor_instantaneous_forward(&self.interp, None, t, "ForwardCurve")
+        self.core.instantaneous_forward(t, "ForwardCurve")
     }
 }

@@ -103,10 +103,6 @@ pub enum InputError {
     #[error("Input dimensions do not match")]
     DimensionMismatch,
 
-    /// Consecutive knots are too close together for stable interpolation.
-    #[error("Consecutive knots are too close together for stable interpolation")]
-    KnotSpacingTooSmall,
-
     // Date and Calendar
     /// The provided date range is inverted – the start date is after the end date.
     #[error("Invalid date range: start must be before end")]

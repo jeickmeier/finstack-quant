@@ -106,35 +106,6 @@ impl JsScalarTimeSeries {
             .map_err(to_js_err)
     }
 
-    /// Deserialize from the canonical JSON wire form shared with Python
-    /// `ScalarTimeSeries.to_json`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical ScalarTimeSeries JSON text or plain object;
-    ///   unknown fields are rejected and the series is re-validated.
-    ///
-    /// @returns The validated `ScalarTimeSeries`.
-    /// @throws `TypeError` if `json` is not a JSON string or plain object;
-    /// `FinstackError` (kind `validation`) if it does not match the schema or
-    /// fails validation.
-    /// @param json - Canonical ScalarTimeSeries JSON text or plain object; unknown fields are rejected and the series is re-validated.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsScalarTimeSeries, JsValue> {
-        from_js_json::<RustScalarTimeSeries>(&json, "json").map(|inner| Self { inner })
-    }
-
-    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
-    ///
-    /// @returns Compact JSON text.
-    /// @throws If serialization fails (not expected for a valid series).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
     /// Value on a date under the series interpolation and right-tail
     /// extrapolation policies (Rust `ScalarTimeSeries::get_value`).
     ///
@@ -222,6 +193,8 @@ impl JsScalarTimeSeries {
     }
 }
 
+json_round_trip!(JsScalarTimeSeries, ScalarTimeSeries);
+
 /// Immutable monthly CPI fixing snapshot at an explicit knowledge cutoff.
 ///
 /// @example
@@ -293,36 +266,6 @@ impl JsInflationIndex {
         )
         .map_err(to_js_err)?;
         Ok(Self::from_inner(Arc::new(inner)))
-    }
-
-    /// Deserialize from the canonical JSON wire form shared with Python
-    /// `InflationIndex.to_json`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical InflationIndex JSON text or plain object; unknown
-    ///   fields are rejected and the index is re-validated.
-    ///
-    /// @returns The validated `InflationIndex`.
-    /// @throws `TypeError` if `json` is not a JSON string or plain object;
-    /// `FinstackError` (kind `validation`) if it does not match the schema or
-    /// fails validation.
-    /// @param json - Canonical InflationIndex JSON text or plain object; unknown fields are rejected and the index is re-validated.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsInflationIndex, JsValue> {
-        from_js_json::<RustInflationIndex>(&json, "json")
-            .map(|index| Self::from_inner(Arc::new(index)))
-    }
-
-    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
-    ///
-    /// @returns Compact JSON text.
-    /// @throws If serialization fails (not expected for a valid index).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&*self.inner).map_err(to_js_err)
     }
 
     /// Look up the exact stored observation for a canonical reference month.
@@ -485,3 +428,5 @@ impl JsInflationIndex {
         to_js_value(&self.inner.get_expected_releases())
     }
 }
+
+json_round_trip!(JsInflationIndex, InflationIndex, arc);

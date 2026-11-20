@@ -284,48 +284,37 @@ pub fn norm_cdf_unchecked(x: f64) -> f64 {
 /// see <https://dlmf.nist.gov/7.12.E1>.
 pub fn log_norm_cdf(x: f64) -> crate::Result<f64> {
     validate_normal_variate(x)?;
-    let value = log_norm_cdf_unchecked(x);
+    let value = if x >= 0.0 {
+        (-norm_cdf_unchecked(-x)).ln_1p()
+    } else if x > -10.0 {
+        norm_cdf_unchecked(x).ln()
+    } else {
+        // Phi(-a) = phi(a)/a * (1 - 1/a² + 3/a⁴ - 15/a⁶ + ...).
+        // At a >= 10 the terms reach machine precision well before their
+        // asymptotic growth starts. Stop before growth even for future changes
+        // to the switching point.
+        let inverse_square = (1.0 / x).powi(2);
+        let mut term = 1.0_f64;
+        let mut sum = 1.0_f64;
+        for order in 1..100 {
+            let next = -term * f64::from(2 * order - 1) * inverse_square;
+            if next.abs() >= term.abs() {
+                break;
+            }
+            sum += next;
+            if next.abs() <= f64::EPSILON * sum.abs() {
+                break;
+            }
+            term = next;
+        }
+        -0.5 * x * x - (-x).ln() - 0.5 * (2.0 * std::f64::consts::PI).ln() + sum.ln()
+    };
     if x.is_finite() && !value.is_finite() {
         return Err(crate::Error::Internal(
             "normal log probability exceeds the finite output range".into(),
         ));
     }
     Ok(value)
-}
-
-/// Logarithmic Gaussian probability for an established non-NaN variate.
-///
-/// # Arguments
-/// * `x` - A validated standard-deviation threshold. The caller owns handling
-///   the negative tail if its logarithm overflows finite binary64.
-#[doc(hidden)]
-pub fn log_norm_cdf_unchecked(x: f64) -> f64 {
-    if x >= 0.0 {
-        return (-norm_cdf_unchecked(-x)).ln_1p();
-    }
-    if x > -10.0 {
-        return norm_cdf_unchecked(x).ln();
-    }
-
-    // Phi(-a) = phi(a)/a * (1 - 1/a² + 3/a⁴ - 15/a⁶ + ...).
-    // At a >= 10 the terms reach machine precision well before their
-    // asymptotic growth starts. Stop before growth even for future changes
-    // to the switching point.
-    let inverse_square = (1.0 / x).powi(2);
-    let mut term = 1.0_f64;
-    let mut sum = 1.0_f64;
-    for order in 1..100 {
-        let next = -term * f64::from(2 * order - 1) * inverse_square;
-        if next.abs() >= term.abs() {
-            break;
-        }
-        sum += next;
-        if next.abs() <= f64::EPSILON * sum.abs() {
-            break;
-        }
-        term = next;
-    }
-    -0.5 * x * x - (-x).ln() - 0.5 * (2.0 * std::f64::consts::PI).ln() + sum.ln()
 }
 
 // Precomputed 1/√(2π) for direct norm_pdf evaluation.
@@ -404,17 +393,12 @@ fn validate_normal_variate(x: f64) -> crate::Result<()> {
     Ok(())
 }
 
-fn validate_finite_positive(name: &str, value: f64) -> crate::Result<()> {
-    if !value.is_finite() || value <= 0.0 {
-        return Err(crate::Error::Validation(format!(
-            "{name} must be finite and positive"
-        )));
-    }
-    Ok(())
-}
-
 fn standardize_normal(x: f64, mean: f64, std_dev: f64) -> crate::Result<f64> {
-    validate_finite_positive("std_dev", std_dev)?;
+    if !std_dev.is_finite() || std_dev <= 0.0 {
+        return Err(crate::Error::Validation(
+            "std_dev must be finite and positive".into(),
+        ));
+    }
     if !mean.is_finite() {
         return Err(crate::Error::Validation(format!(
             "mean must be finite, got {mean}"

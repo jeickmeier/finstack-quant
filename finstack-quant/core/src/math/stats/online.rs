@@ -1,6 +1,7 @@
 //! Single-pass mergeable accumulators for moments and covariance.
 
-use super::{MAX_EXACT_COUNT, frexp_exp, ldexp, normalize_zero, same_float};
+use super::{MAX_EXACT_COUNT, frexp_exp, ldexp, normalize_zero};
+use crate::math::interp::exact_f64_eq;
 use crate::math::special_functions::student_t_inv_cdf;
 
 /// Internal shifted and power-of-two scaled per-axis state shared by
@@ -37,7 +38,7 @@ impl AxisState {
                 0,
             );
         }
-        if self.is_constant && same_float(x, self.first) {
+        if self.is_constant && exact_f64_eq(x, self.first) {
             return (
                 Self {
                     count: next_count,
@@ -114,7 +115,7 @@ impl AxisState {
     /// eff_n, exp_shift_a, exp_shift_b)` where `delta_s = mean_b_c - mean_a_c`
     /// in the common `(origin, exp)` frame.
     fn merge_candidate(a: Self, b: Self, total_count: usize) -> (Self, f64, f64, i32, i32) {
-        if a.is_constant && b.is_constant && same_float(a.first, b.first) {
+        if a.is_constant && b.is_constant && exact_f64_eq(a.first, b.first) {
             return (
                 Self {
                     count: total_count,
@@ -497,51 +498,6 @@ impl OnlineStats {
         }
         Ok(Some(h))
     }
-
-    /// Two-sided `(1 - alpha)` Student-t confidence interval `(lower, upper)`
-    /// for the population mean.
-    ///
-    /// Validates `alpha` in `(0, 1)` before checking sample count. Returns
-    /// `Ok(None)` when `count < 2`, and `Ok(Some((mean, mean)))` when constant.
-    ///
-    /// # Arguments
-    ///
-    /// * `alpha` - Finite two-sided significance probability strictly in
-    ///   `(0.0, 1.0)`; for example, `0.05` requests a 95% confidence interval.
-    ///
-    /// # Errors
-    ///
-    /// * Returns [`crate::Error::Validation`] if `alpha` is non-finite or
-    ///   outside `(0.0, 1.0)`.
-    /// * Returns [`crate::Error::Internal`] if the half-width or mean cannot be
-    ///   resolved, or if positive half-width causes bounds to overflow or collapse
-    ///   onto `mean`.
-    pub fn get_confidence_interval(&self, alpha: f64) -> crate::Result<Option<(f64, f64)>> {
-        let Some(h) = self.get_ci_half_width(alpha)? else {
-            return Ok(None);
-        };
-        let Some(mean) = self.get_mean()? else {
-            return Err(crate::Error::Internal(
-                "Mean unexpectedly unavailable for confidence interval".into(),
-            ));
-        };
-        if self.state.is_constant {
-            return Ok(Some((mean, mean)));
-        }
-        let lo = mean - h;
-        let hi = mean + h;
-        if !lo.is_finite() || !hi.is_finite() || !(lo < mean && mean < hi) {
-            return Err(crate::Error::Internal(
-                "Confidence interval bounds overflowed or collapsed onto the sample mean".into(),
-            ));
-        }
-        Ok(Some((normalize_zero(lo), normalize_zero(hi))))
-    }
-
-    /// Reset to empty state.
-    pub fn reset(&mut self) {
-        self.state = AxisState::default();
-    }
 }
 
 /// Online covariance accumulator using shifted, power-of-two scaled Welford/Chan
@@ -721,26 +677,6 @@ impl OnlineCovariance {
         self.y.get_variance()
     }
 
-    /// Sample standard deviation of `x`, or `Ok(None)` when `count < 2`.
-    ///
-    /// # Errors
-    ///
-    /// * Returns [`crate::Error::Internal`] if standard deviation of a
-    ///   non-constant series overflows or underflows out of the positive finite range.
-    pub fn get_std_dev_x(&self) -> crate::Result<Option<f64>> {
-        self.x.get_std_dev()
-    }
-
-    /// Sample standard deviation of `y`, or `Ok(None)` when `count < 2`.
-    ///
-    /// # Errors
-    ///
-    /// * Returns [`crate::Error::Internal`] if standard deviation of a
-    ///   non-constant series overflows or underflows out of the positive finite range.
-    pub fn get_std_dev_y(&self) -> crate::Result<Option<f64>> {
-        self.y.get_std_dev()
-    }
-
     /// Sample covariance (unbiased `n - 1` denominator), or `Ok(None)` when `count < 2`.
     ///
     /// Returns `Ok(Some(0.0))` when either series is constant with `count >= 2`.
@@ -873,12 +809,5 @@ impl OnlineCovariance {
             ));
         }
         Ok(Some(normalize_zero(beta)))
-    }
-
-    /// Reset to empty state.
-    pub fn reset(&mut self) {
-        self.x = AxisState::default();
-        self.y = AxisState::default();
-        self.c_s = 0.0;
     }
 }

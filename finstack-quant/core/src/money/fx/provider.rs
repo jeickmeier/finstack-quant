@@ -101,6 +101,23 @@ pub(crate) fn validate_stored_quote(from: Currency, to: Currency, rate: f64) -> 
     validate_fx_rate(from, to, rate)
 }
 
+/// Validate a batch of `(from, to, on, policy, rate)` quotes and reject duplicate keys.
+pub(super) fn validate_pinned_batch(
+    quotes: &[(Currency, Currency, Date, FxConversionPolicy, f64)],
+    duplicate_prefix: &str,
+) -> crate::Result<crate::FxHashMap<(Currency, Currency, Date, FxConversionPolicy), f64>> {
+    let mut batch = crate::FxHashMap::default();
+    for &(from, to, on, policy, rate) in quotes {
+        let rate = validate_stored_quote(from, to, rate)?;
+        if batch.insert((from, to, on, policy), rate).is_some() {
+            return Err(crate::Error::Validation(format!(
+                "{duplicate_prefix} {from}->{to} on {on} ({policy})"
+            )));
+        }
+    }
+    Ok(batch)
+}
+
 /// Complete stored quote state of a quote-backed [`FxProvider`].
 ///
 /// `quotes` hold pair-global rates (`to` units per `from` unit, every date

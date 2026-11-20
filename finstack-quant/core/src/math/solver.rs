@@ -150,12 +150,6 @@ impl BrentSolver {
         self.tolerance
     }
 
-    /// Return the configured maximum Brent update iterations.
-    #[must_use]
-    pub fn get_max_iterations(&self) -> usize {
-        self.max_iterations
-    }
-
     /// Search `[min, max]` around `initial_guess` for a sign-changing bracket and solve `f(x) = 0`.
     ///
     /// Forms the initial pair `[max(min, initial_guess - initial_half_width),
@@ -1031,7 +1025,6 @@ mod tests {
 
         // Accessors.
         assert_eq!(solver.get_tolerance(), 1e-12);
-        assert_eq!(solver.get_max_iterations(), 100);
 
         // Non-finite brackets rejected before callback.
         for (a, b) in [

@@ -383,32 +383,6 @@ impl Money {
         ))
     }
 
-    /// Construct from exact decimal text using the configured ingest rounding policy.
-    ///
-    /// Parses `amount` with [`Self::from_decimal_str`] without rounding through
-    /// `f64`, then applies `cfg`'s ingest rounding via
-    /// [`Self::from_decimal_with_config`].
-    ///
-    /// # Arguments
-    ///
-    /// * `amount` - Exact decimal amount text in major currency units, in fixed-point or scientific notation.
-    /// * `currency` - ISO-4217 currency whose ingest override, if any, selects the scale.
-    /// * `cfg` - Configuration supplying the optional currency scale override and the rounding mode it requires.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Error::Validation` when `amount` cannot be represented
-    /// exactly as a `Decimal` or when `currency` has an ingest scale
-    /// override and `cfg` selects no rounding mode.
-    pub fn from_decimal_str_with_config(
-        amount: &str,
-        currency: Currency,
-        cfg: &FinstackConfig,
-    ) -> Result<Self, Error> {
-        let exact = crate::decimal::parse_decimal(amount)?;
-        Self::from_decimal_with_config(exact, currency, cfg)
-    }
-
     /// Construct from an exact Decimal using the configured ingest rounding policy.
     ///
     /// Without an ingest scale override for `currency` the amount is kept
@@ -893,7 +867,7 @@ impl Money {
                 "proportional change ratio overflowed or underflowed f64".into(),
             ));
         }
-        Ok(if ratio == 0.0 { 0.0 } else { ratio })
+        Ok(ratio)
     }
 
     /// Return the absolute amount in the same currency without rounding.
@@ -1773,26 +1747,7 @@ mod tests {
     }
 
     #[test]
-    fn from_decimal_str_with_config_and_amount_nearest_even() {
-        let mut cfg = FinstackConfig::default();
-        let kept = Money::from_decimal_str_with_config("1.245", Currency::USD, &cfg)
-            .expect("exact without override");
-        assert_eq!(kept.amount_decimal().to_string(), "1.245");
-
-        cfg.rounding
-            .ingest_scale
-            .set_scale(Currency::USD, 2)
-            .expect("valid scale");
-        assert!(Money::from_decimal_str_with_config("1.245", Currency::USD, &cfg).is_err());
-
-        cfg.rounding.mode = Some(RoundingMode::Bankers);
-        let rounded = Money::from_decimal_str_with_config("1.245", Currency::USD, &cfg)
-            .expect("rounded with mode");
-        assert_eq!(rounded.amount_decimal().to_string(), "1.24");
-
-        // Reject malformed decimal text even when config is provided.
-        assert!(Money::from_decimal_str_with_config("NaN", Currency::USD, &cfg).is_err());
-
+    fn amount_nearest_even() {
         // Money::amount() delegates to decimal_to_f64_nearest (single rounding).
         let edge = Money::from_decimal_str("9007199254740993", Currency::USD).expect("2^53+1");
         assert_eq!(edge.amount(), 9_007_199_254_740_992.0);

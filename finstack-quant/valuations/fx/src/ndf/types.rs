@@ -539,11 +539,12 @@ impl Ndf {
             business_day_convention,
             preserve_business_eom,
         } = params;
-        use finstack_quant_core::dates::{DateExt, adjust, resolve_joint_calendar};
+        use finstack_quant_core::dates::{DateExt, adjust, calendar_by_id_strict};
 
         // Settlement and fixing are separate dates: the maturity is the
         // settlement date from spot; the fixing steps back from it.
-        let joint_cal = resolve_joint_calendar(&base_calendar_id, &settlement_calendar_id)?;
+        let joint_cal =
+            calendar_by_id_strict(&format!("{base_calendar_id}+{settlement_calendar_id}"))?;
         let spot_date = crate::shared::spot_date_from_lag(trade_date, settlement_days, joint_cal)?;
         let maturity = finstack_quant_core::dates::fx::fx_forward_date(
             spot_date,

@@ -229,10 +229,10 @@ impl ScorecardScale {
     ///
     /// Returns [`Error::Validation`] if the scale has no band with that label.
     pub fn level_position(&self, label: &str) -> Result<usize> {
-        let key = normalize_label(label);
+        let key = normalize_key(label);
         self.ratings
             .iter()
-            .position(|level| normalize_label(&level.name) == key)
+            .position(|level| normalize_key(&level.name) == key)
             .ok_or_else(|| {
                 Error::Validation(format!(
                     "rating scale '{}' has no band '{}'",
@@ -322,7 +322,7 @@ impl RatingScaleEntry {
         source: impl Into<String>,
         scale: ScorecardScale,
     ) -> Result<Self> {
-        let id = normalize_id(&id.into());
+        let id = normalize_key(&id.into());
         if id.is_empty() {
             return Err(Error::Validation(
                 "rating scale registry contains a blank scale id".to_string(),
@@ -467,7 +467,7 @@ impl RatingScaleRegistry {
     ///
     /// Returns [`Error::Validation`] if no scale has that id.
     pub fn entry(&self, id: &str) -> Result<&RatingScaleEntry> {
-        let key = normalize_id(id);
+        let key = normalize_key(id);
         self.rating_scales
             .iter()
             .find(|entry| entry.id == key)
@@ -520,12 +520,8 @@ pub fn registry_from_config(config: &FinstackConfig) -> Result<RatingScaleRegist
     })
 }
 
-fn normalize_id(id: &str) -> String {
-    id.trim().to_ascii_lowercase()
-}
-
-fn normalize_label(label: &str) -> String {
-    label.trim().to_ascii_lowercase()
+fn normalize_key(text: &str) -> String {
+    text.trim().to_ascii_lowercase()
 }
 
 fn validate_rating_level(level: &RatingLevel) -> Result<()> {
@@ -534,7 +530,7 @@ fn validate_rating_level(level: &RatingLevel) -> Result<()> {
             "rating level contains a blank name".to_string(),
         ));
     }
-    if RESERVED_UNRATED_LABELS.contains(&normalize_label(&level.name).as_str()) {
+    if RESERVED_UNRATED_LABELS.contains(&normalize_key(&level.name).as_str()) {
         return Err(Error::Validation(format!(
             "rating level '{}' is an unrated status, not a scorecard band",
             level.name
@@ -565,7 +561,7 @@ fn validate_scorecard_scale(scale: &ScorecardScale) -> Result<()> {
     };
     let mut names = BTreeSet::new();
     for level in &scale.ratings {
-        if !names.insert(normalize_label(&level.name)) {
+        if !names.insert(normalize_key(&level.name)) {
             return Err(Error::Validation(format!(
                 "rating scale '{label}' contains duplicate level '{}'",
                 level.name
