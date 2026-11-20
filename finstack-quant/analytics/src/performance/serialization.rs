@@ -102,7 +102,6 @@ impl TryFrom<LookbackReturnsState> for super::LookbackReturns {
 
 impl super::LookbackReturns {
     pub(crate) fn validate(&self) -> finstack_quant_core::Result<()> {
-        use finstack_quant_core::dates::DateExt;
         let error = |message: &str| finstack_quant_core::Error::Validation(message.to_string());
         let mut names = std::collections::HashSet::new();
         if self.ticker_names.is_empty()
@@ -113,17 +112,7 @@ impl super::LookbackReturns {
         {
             return Err(error("lookback ticker names must be nonempty and unique"));
         }
-        let make_start = |month| {
-            Date::from_calendar_date(self.ref_date.year(), month, 1)
-                .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))
-        };
-        let starts = [
-            make_start(self.ref_date.month())?,
-            make_start(time::Month::January.nth_next((self.ref_date.quarter() - 1) * 3))?,
-            make_start(time::Month::January)?,
-            self.fiscal_config
-                .year_start(self.ref_date.fiscal_year(self.fiscal_config))?,
-        ];
+        let starts = super::lookback_starts(self.ref_date, self.fiscal_config)?;
         let horizons = [
             (&self.mtd, &self.mtd_samples),
             (&self.qtd, &self.qtd_samples),

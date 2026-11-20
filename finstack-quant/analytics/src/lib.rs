@@ -31,7 +31,7 @@
 //! [`LookbackReturns`], [`CagrDayCount`]) are re-exported here because `Performance` takes or returns them.
 //!
 //! Calculation inputs such as confidence, cash, frequency, and windows are
-//! explicit. [`DEFAULT_ANNUALIZE`] controls only the host presentation flag.
+//! explicit.
 //!
 //! Freestanding public exceptions are intentionally narrow:
 //! - [`sharpe`], [`sortino`], [`volatility`], and [`max_drawdown`] operate on
@@ -83,7 +83,6 @@
 pub(crate) mod aggregation;
 pub(crate) mod benchmark;
 mod correlation;
-pub(crate) mod defaults;
 pub(crate) mod drawdown;
 mod exact;
 pub(crate) mod multi_factor;
@@ -97,7 +96,6 @@ pub mod schema;
 pub use aggregation::{LookbackSample, PeriodStats, PeriodicReturn};
 pub use benchmark::{BetaResult, GreeksResult, RollingGreeks, beta};
 pub use correlation::CorrelationResult;
-pub use defaults::DEFAULT_ANNUALIZE;
 pub use drawdown::DrawdownEpisode;
 pub use multi_factor::{MultiFactorResult, ReturnKind, multi_factor_greeks};
 pub use performance::{

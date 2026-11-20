@@ -4,25 +4,17 @@
 //! and classical plug-in Cornish–Fisher quantiles approximate additive sums;
 //! their finite outputs may lie below the investment-return lower bound -1.
 
+use crate::exact::{rational, rational_output};
+use crate::returns::{validate_confidence, validate_history};
 use finstack_quant_core::math::stats::{empirical_tail_mean, quantile_ratio, quantile_sorted};
 use finstack_quant_core::{Error, Result};
 use num_rational::BigRational;
-use num_traits::{Signed, ToPrimitive, Zero};
+use num_traits::{Signed, Zero};
 
 const MAX_HORIZON: u64 = (1_u64 << 53) - 1;
 
 fn calculation(message: &str) -> Error {
     Error::Internal(format!("Tail calculation failed: {message}"))
-}
-
-fn validate_confidence(confidence: f64) -> Result<()> {
-    if confidence.is_finite() && confidence > 0.5 && confidence < 1.0 {
-        Ok(())
-    } else {
-        Err(Error::Validation(
-            "confidence must be finite and strictly between 0.5 and 1".into(),
-        ))
-    }
 }
 
 fn validate_horizon(horizon_periods: Option<u64>) -> Result<f64> {
@@ -37,32 +29,10 @@ fn validate_horizon(horizon_periods: Option<u64>) -> Result<f64> {
 
 fn historical_sample(returns: &[f64], confidence: f64) -> Result<Vec<f64>> {
     validate_confidence(confidence)?;
-    crate::returns::validate_history(returns)?;
+    validate_history(returns)?;
     let mut data = returns.to_vec();
     data.sort_unstable_by(f64::total_cmp);
     Ok(data)
-}
-
-/// Exact power-of-two normalization, including subnormal observations.
-fn normalized(value: f64) -> (f64, i32) {
-    if value == 0.0 {
-        return (0.0, 0);
-    }
-    let magnitude = value.abs();
-    let raw_exponent = ((magnitude.to_bits() >> 52) & 0x7ff) as i32;
-    if raw_exponent == 0 {
-        let (mantissa, exponent) = normalized(value * 2_f64.powi(1022));
-        return (mantissa, exponent - 1022);
-    }
-    let exponent = raw_exponent - 1023;
-    (value / 2_f64.powi(exponent), exponent)
-}
-
-fn expected_shortfall_from_sorted(data: &[f64], confidence: f64) -> Result<f64> {
-    if data.is_empty() {
-        return Ok(f64::NAN);
-    }
-    empirical_tail_mean(data, 1.0 - confidence)
 }
 
 /// Signed native-period R-7 historical lower quantile.
@@ -93,7 +63,10 @@ pub(crate) fn value_at_risk(returns: &[f64], confidence: f64) -> Result<f64> {
 /// Undefined for empty history; invalid requests or numerical failures return an error.
 pub(crate) fn expected_shortfall(returns: &[f64], confidence: f64) -> Result<f64> {
     let data = historical_sample(returns, confidence)?;
-    expected_shortfall_from_sorted(&data, confidence)
+    if data.is_empty() {
+        return Ok(f64::NAN);
+    }
+    empirical_tail_mean(&data, 1.0 - confidence)
 }
 
 /// Evaluate both selected historical estimators on one sorted active sample.
@@ -111,7 +84,7 @@ pub(crate) fn value_at_risk_and_es(returns: &[f64], confidence: f64) -> Result<(
     }
     let var = quantile_sorted(&data, 1.0 - confidence)?
         .ok_or_else(|| calculation("empty sample after emptiness check"))?;
-    let es = expected_shortfall_from_sorted(&data, confidence)?;
+    let es = empirical_tail_mean(&data, 1.0 - confidence)?;
     if es > var {
         return Err(calculation("empirical ES exceeds the paired R-7 quantile"));
     }
@@ -146,8 +119,11 @@ struct Moments {
 /// Dimensional quantities remain normalized until a requested final estimate is formed.
 fn moments(returns: &[f64], shape_order: u8) -> Result<Moments> {
     let magnitude = returns.iter().map(|x| x.abs()).fold(0.0, f64::max);
-    let (_, exponent) = normalized(magnitude);
-    let exponent = exponent.max(-1022);
+    let exponent = if magnitude == 0.0 {
+        0
+    } else {
+        (((magnitude.to_bits() >> 52) & 0x7ff) as i32 - 1023).max(-1022)
+    };
     let scale = BigRational::from_integer(2.into()).pow(exponent);
     let data: Vec<BigRational> = returns
         .iter()
@@ -233,7 +209,7 @@ fn moments(returns: &[f64], shape_order: u8) -> Result<Moments> {
 /// Dimensionless shape, undefined below three observations or for constant history.
 /// Invalid inputs and numerical failures return an error.
 pub(crate) fn skewness(returns: &[f64]) -> Result<f64> {
-    crate::returns::validate_history(returns)?;
+    validate_history(returns)?;
     if returns.len() < 3 {
         return Ok(f64::NAN);
     }
@@ -252,7 +228,7 @@ pub(crate) fn skewness(returns: &[f64]) -> Result<f64> {
 /// Dimensionless excess shape, undefined below four observations or for constant history.
 /// Invalid inputs and numerical failures return an error.
 pub(crate) fn kurtosis(returns: &[f64]) -> Result<f64> {
-    crate::returns::validate_history(returns)?;
+    validate_history(returns)?;
     if returns.len() < 4 {
         return Ok(f64::NAN);
     }
@@ -260,20 +236,6 @@ pub(crate) fn kurtosis(returns: &[f64]) -> Result<f64> {
         .kurt
         .as_ref()
         .map_or(Ok(f64::NAN), rational_output)
-}
-
-fn rational(value: f64) -> Result<BigRational> {
-    BigRational::from_float(value).ok_or_else(|| calculation("nonfinite rational operand"))
-}
-
-fn rational_output(value: &BigRational) -> Result<f64> {
-    let rounded = value
-        .to_f64()
-        .ok_or_else(|| calculation("requested output cannot be reconstructed"))?;
-    if !rounded.is_finite() || rounded == 0.0 && !value.is_zero() {
-        return Err(calculation("requested nonzero output is not representable"));
-    }
-    Ok(rounded)
 }
 
 fn horizon_quantile(moment: &Moments, z: &BigRational, horizon: f64) -> Result<f64> {
@@ -300,7 +262,7 @@ pub(crate) fn parametric_var(
 ) -> Result<f64> {
     validate_confidence(confidence)?;
     let horizon = validate_horizon(horizon_periods)?;
-    crate::returns::validate_history(returns)?;
+    validate_history(returns)?;
     if returns.len() < 2 {
         return Ok(f64::NAN);
     }
@@ -363,7 +325,7 @@ pub(crate) fn cornish_fisher_var(
 ) -> Result<f64> {
     validate_confidence(confidence)?;
     let horizon = validate_horizon(horizon_periods)?;
-    crate::returns::validate_history(returns)?;
+    validate_history(returns)?;
     if returns.len() < 4 {
         return Ok(f64::NAN);
     }

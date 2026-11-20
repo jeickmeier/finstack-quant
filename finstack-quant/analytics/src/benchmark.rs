@@ -113,11 +113,10 @@ fn centered(values: &[f64]) -> Result<Centered> {
     })
 }
 
-fn centered_r_squared(p: &Centered, b: &Centered) -> Result<f64> {
+fn centered_r_squared(p: &Centered, b: &Centered, cross: f64) -> Result<f64> {
     if p.scale == 0.0 || b.scale == 0.0 {
         return Ok(f64::NAN);
     }
-    let cross = neumaier_sum(p.values.iter().zip(&b.values).map(|(x, y)| x * y))?;
     let correlation = (cross / b.sum_squares.sqrt()) / p.sum_squares.sqrt();
     let result = correlation * correlation;
     if !result.is_finite() || result > 1.0 + 32.0 * f64::EPSILON || (result == 0.0 && cross != 0.0)
@@ -176,7 +175,7 @@ fn fit(portfolio: &[f64], benchmark: &[f64], uncertainty: bool, fit_stats: bool)
         return Err(calculation("invalid centered residual variation"));
     }
     let r_squared = if fit_stats {
-        centered_r_squared(&p, &b)?
+        centered_r_squared(&p, &b, cross)?
     } else {
         f64::NAN
     };
@@ -383,7 +382,7 @@ pub(crate) fn r_squared(returns: &[f64], benchmark: &[f64]) -> Result<f64> {
         let pair = exact_pair(returns, benchmark)?;
         return rational_output(&((&pair.sxy * &pair.sxy) / (&pair.sxx * &pair.syy)));
     }
-    centered_r_squared(&p, &b)
+    centered_r_squared(&p, &b, cross)
 }
 
 /// OLS beta result with standard error and 95% confidence interval.
@@ -1049,36 +1048,6 @@ pub(crate) fn batting_average(returns: &[f64], benchmark: &[f64]) -> Result<f64>
     Ok(returns.iter().zip(benchmark).filter(|(p, b)| p > b).count() as f64 / returns.len() as f64)
 }
 
-/// Absolute annual arithmetic M-squared; zero benchmark risk targets cash.
-///
-/// # Arguments
-/// * `ann_return` - Arithmetic mean portfolio return multiplied by `ann_factor`.
-/// * `ann_vol` - Portfolio sample volatility on the annualized frequency basis.
-/// * `bench_vol` - Same-span benchmark sample volatility on the identical basis.
-/// * `risk_free_rate` - Explicit annual effective decimal cash rate greater than -1.
-/// * `ann_factor` - Explicit finite positive observations per year.
-pub(crate) fn m_squared(
-    ann_return: f64,
-    ann_vol: f64,
-    bench_vol: f64,
-    risk_free_rate: f64,
-    ann_factor: f64,
-) -> Result<f64> {
-    let cash = crate::returns::periodic_risk_free_rate(risk_free_rate, ann_factor)? * ann_factor;
-    finite(cash)?;
-    if ann_vol.is_nan() || bench_vol.is_nan() || ann_return.is_nan() || ann_vol == 0.0 {
-        return Ok(f64::NAN);
-    }
-    if !ann_vol.is_finite() || !bench_vol.is_finite() || ann_vol < 0.0 || bench_vol < 0.0 {
-        return Err(calculation("invalid sample risk"));
-    }
-    if bench_vol == 0.0 {
-        return Ok(cash);
-    }
-    let adjustment = product_ratio(ann_return - cash, bench_vol, ann_vol)?;
-    finite(cash + adjustment)
-}
-
 /// Treynor evaluated from paired raw returns so unrequested annual means need
 /// not overflow before division by a large identified beta.
 pub(crate) fn treynor_from_returns(
@@ -1141,7 +1110,8 @@ pub(crate) fn m_squared_from_returns(
         && p_vol > 0.0
         && b_vol > 0.0
     {
-        return m_squared(annual_mean, p_vol, b_vol, risk_free_rate, ann_factor);
+        let adjustment = product_ratio(annual_mean - cash, b_vol, p_vol)?;
+        return finite(cash + adjustment);
     }
     let excess = finite(p.mean - period_cash)?;
     if excess == 0.0 {
@@ -1834,14 +1804,24 @@ mod tests {
 
     #[test]
     fn m_squared_hand_calc() {
-        let m2 = m_squared(0.12, 0.20, 0.15, 0.02, 1.0).expect("valid benchmark request");
+        let m2 = m_squared_from_returns(&[-0.08, 0.12, 0.32], &[-0.15, 0.0, 0.15], 0.02, 1.0)
+            .expect("valid benchmark request");
         assert!((m2 - 0.095).abs() < 1e-12);
     }
 
     #[test]
     fn m_squared_zero_vol() {
-        assert!(m_squared(0.1, 0.0, 0.15, 0.02, 1.0).unwrap().is_nan());
-        assert!((m_squared(0.1, 0.2, 0.0, 0.02, 1.0).unwrap() - 0.02).abs() < 1e-14);
+        assert!(
+            m_squared_from_returns(&[0.1, 0.1, 0.1], &[-0.15, 0.0, 0.15], 0.02, 1.0)
+                .unwrap()
+                .is_nan()
+        );
+        assert!(
+            (m_squared_from_returns(&[-0.08, 0.12, 0.32], &[0.0, 0.0, 0.0], 0.02, 1.0).unwrap()
+                - 0.02)
+                .abs()
+                < 1e-14
+        );
     }
 
     #[test]

@@ -95,11 +95,7 @@ pub(crate) fn cagr(
     if returns.is_empty() || years == 0.0 {
         return Ok(f64::NAN);
     }
-    let mut engine = crate::returns::WealthEngine::new();
-    for &r in returns {
-        engine.step(r);
-    }
-    let log_growth = engine.log_growth();
+    let log_growth = crate::returns::WealthEngine::log_growth_of(returns);
     let result = finite_result((log_growth / years).exp_m1(), "CAGR")?;
     if result == 0.0 && log_growth != 0.0 {
         return Err(Error::Internal("nonzero CAGR underflowed".into()));
@@ -293,7 +289,7 @@ fn scaled_product(scale: f64, value: f64, multiplier: f64, metric: &str) -> Resu
 
 fn scaled_ratio(ns: f64, n: f64, ds: f64, d: f64, multiplier: f64, metric: &str) -> Result<f64> {
     if d == 0.0 {
-        return Ok(super::ratio_or_sign_infinity(n, 0.0));
+        return Ok(super::zero_denom_ratio(n));
     }
     if n == 0.0 {
         return Ok(0.0);
@@ -416,27 +412,15 @@ fn downside_scaled(returns: &[f64], mar: f64) -> Result<(f64, f64)> {
     Ok((scale, rms))
 }
 
-/// All-observation shortfall RMS; explicit MAR is in observation-period units.
-pub(crate) fn downside_deviation(
-    returns: &[f64],
-    mar: f64,
-    annualize: bool,
-    ann_factor: f64,
-) -> Result<f64> {
+/// All-observation annualized shortfall RMS; explicit MAR is in observation-period units.
+pub(crate) fn downside_deviation(returns: &[f64], mar: f64, ann_factor: f64) -> Result<f64> {
     validate_history(returns)?;
-    if annualize {
-        validate_frequency(ann_factor)?;
-    }
+    validate_frequency(ann_factor)?;
     let (scale, rms) = downside_scaled(returns, mar)?;
     if returns.is_empty() {
         return Ok(f64::NAN);
     }
-    scaled_product(
-        scale,
-        rms,
-        if annualize { ann_factor.sqrt() } else { 1.0 },
-        "downside deviation",
-    )
+    scaled_product(scale, rms, ann_factor.sqrt(), "downside deviation")
 }
 
 /// Annualized mean reward above MAR per unit of full-sample shortfall RMS.
@@ -480,11 +464,7 @@ pub(crate) fn geometric_mean(returns: &[f64]) -> Result<f64> {
     if returns.is_empty() {
         return Ok(f64::NAN);
     }
-    let mut engine = crate::returns::WealthEngine::new();
-    for &r in returns {
-        engine.step(r);
-    }
-    let log_growth = engine.log_growth();
+    let log_growth = crate::returns::WealthEngine::log_growth_of(returns);
     let value = finite_result(
         (log_growth / returns.len() as f64).exp_m1(),
         "geometric mean",
@@ -538,7 +518,7 @@ pub(crate) fn omega_ratio(returns: &[f64], threshold: f64) -> Result<f64> {
         ));
     }
     if losses == 0.0 {
-        return Ok(super::ratio_or_sign_infinity(gains, losses));
+        return Ok(super::zero_denom_ratio(gains));
     }
     scaled_ratio(1.0, gains, 1.0, losses, 1.0, "Omega")
 }
@@ -561,7 +541,7 @@ pub(crate) fn gain_to_pain(returns: &[f64]) -> Result<f64> {
                 "positive loss magnitude was lost numerically".into(),
             ));
         }
-        return Ok(super::ratio_or_sign_infinity(net, losses));
+        return Ok(super::zero_denom_ratio(net));
     }
     scaled_ratio(1.0, net, 1.0, losses, 1.0, "gain-to-pain")
 }
@@ -655,15 +635,15 @@ mod tests {
         assert!(sortino(&[0.0, 0.0], 0.0, 12.0).unwrap().is_nan());
         assert!(omega_ratio(&[0.0, 0.0], 0.0).unwrap().is_nan());
         assert!(gain_to_pain(&[0.0, 0.0]).unwrap().is_nan());
-        assert!(downside_deviation(&[], 0.0, true, 12.0).unwrap().is_nan());
+        assert!(downside_deviation(&[], 0.0, 12.0).unwrap().is_nan());
     }
 
     #[test]
     fn downside_all_observation_denominator_and_any_finite_mar() {
         let returns = [0.02, 0.0, -0.01];
-        assert!((downside_deviation(&returns, 0.0, true, 12.0).unwrap() - 0.02).abs() < 1e-15);
+        assert!((downside_deviation(&returns, 0.0, 12.0).unwrap() - 0.02).abs() < 1e-15);
         assert!((sortino(&returns, 0.0, 12.0).unwrap() - 2.0).abs() < 1e-14);
-        assert_eq!(downside_deviation(&returns, -2.0, true, 12.0).unwrap(), 0.0);
+        assert_eq!(downside_deviation(&returns, -2.0, 12.0).unwrap(), 0.0);
         assert_eq!(sortino(&returns, -2.0, 12.0).unwrap(), f64::INFINITY);
     }
 

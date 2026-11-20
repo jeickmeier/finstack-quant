@@ -35,6 +35,17 @@ pub(crate) fn validate_cash(cash: f64) -> Result<()> {
     Ok(())
 }
 
+/// Reject a tail confidence outside the open interval `(0.5, 1)`.
+pub(crate) fn validate_confidence(confidence: f64) -> Result<()> {
+    if confidence.is_finite() && confidence > 0.5 && confidence < 1.0 {
+        Ok(())
+    } else {
+        Err(Error::Validation(format!(
+            "confidence must lie in the open interval (0.5, 1); got {confidence}"
+        )))
+    }
+}
+
 /// Reject an unrepresentable required statistic rather than manufacture a sentinel.
 pub(crate) fn finite_result(value: f64, metric: &str) -> Result<f64> {
     if value.is_finite() {
@@ -152,6 +163,15 @@ impl WealthEngine {
             self.acc.get_total().unwrap_or(f64::NAN)
         }
     }
+
+    /// Accumulate simple returns and return final [`Self::log_growth`].
+    pub(crate) fn log_growth_of(returns: &[f64]) -> f64 {
+        let mut engine = Self::new();
+        for &r in returns {
+            engine.step(r);
+        }
+        engine.log_growth()
+    }
 }
 
 /// One cumulative return per selected return endpoint, without a baseline row.
@@ -173,11 +193,10 @@ pub(crate) fn comp_total(returns: &[f64]) -> Result<f64> {
     if returns.is_empty() {
         return Ok(f64::NAN);
     }
-    let mut engine = WealthEngine::new();
-    for &r in returns {
-        engine.step(r);
-    }
-    finite_result(engine.log_growth().exp_m1(), "total return")
+    finite_result(
+        WealthEngine::log_growth_of(returns).exp_m1(),
+        "total return",
+    )
 }
 
 #[cfg(test)]
