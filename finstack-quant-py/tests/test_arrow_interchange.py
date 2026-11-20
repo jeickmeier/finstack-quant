@@ -13,8 +13,9 @@ import math
 
 import polars as pl
 import pyarrow as pa
+import pytest
 
-from finstack_quant import statements
+from finstack_quant import analytics, statements
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.core.table import ArrowTable
 from finstack_quant.portfolio import Portfolio, value_portfolio
@@ -155,3 +156,49 @@ def test_portfolio_positions_to_arrow() -> None:
     # Values agree exactly with polars consumption of the same export.
     df_pl = pl.DataFrame(val.to_arrow_positions())
     assert df_pl.get_column("value_base").to_list() == [value_base]
+
+
+def test_performance_to_arrow_roundtrips_with_polars_pyarrow_and_pandas() -> None:
+    dates = [date(2025, 1, 2), date(2025, 1, 3), date(2025, 1, 4)]
+    pl_returns = pl.DataFrame({
+        "date": dates,
+        "FUND": [0.10, -0.20, 0.05],
+        "BENCH": [0.02, -0.03, 0.01],
+    })
+    perf = analytics.Performance.from_returns(
+        pl_returns,
+        initial_date=date(2025, 1, 1),
+        frequency="daily",
+        benchmark_ticker="BENCH",
+    )
+    at = perf.to_arrow(0.0, 0.0, 0.0, 0.95)
+    tbl = pa.table(at)
+    assert tbl.schema.field("ticker").metadata.get(b"finstack:role") == b"dimension"
+    assert tbl.schema.field("sharpe").metadata.get(b"finstack:role") == b"measure"
+    table_meta = json.loads(tbl.schema.metadata[b"finstack:metadata"])
+    assert table_meta["kind"] == "analytics_summary"
+
+    df_pl = pl.DataFrame(at)
+    df_pd = perf.to_dataframe(0.0, 0.0, 0.0, 0.95)
+    assert df_pl.get_column("ticker").to_list() == list(df_pd.index)
+    assert df_pl.equals(at.to_polars())
+    pa_tbl = at.to_pyarrow()
+    assert tbl.schema.equals(pa_tbl.schema, check_metadata=True)
+    assert tbl.column_names == pa_tbl.column_names
+    for name in tbl.column_names:
+        for left, right in zip(tbl.column(name).to_pylist(), pa_tbl.column(name).to_pylist(), strict=True):
+            if isinstance(left, float) and math.isnan(left):
+                assert isinstance(right, float)
+                assert math.isnan(right)
+            else:
+                assert left == right
+    assert at.to_pandas().set_index("ticker").equals(df_pd)
+
+    for col in df_pd.columns:
+        pl_vals = df_pl.get_column(col).to_list()
+        pd_vals = df_pd[col].tolist()
+        for left, right in zip(pl_vals, pd_vals, strict=True):
+            if math.isnan(right):
+                assert math.isnan(left)
+            else:
+                assert left == pytest.approx(right, rel=0.0, abs=0.0)

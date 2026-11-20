@@ -9,12 +9,13 @@ and the :class:`AnalyticsError` exception.
 
 Examples:
 --------
->>> from datetime import date
->>> from finstack_quant.analytics import Performance, PerformancePanel
->>> panel = PerformancePanel(
-...     dates=[date(2024, 1, 1), date(2024, 1, 2)], series=[[0.01]], kind="returns", ticker_names=["FUND"]
+>>> import pandas as pd
+>>> from finstack_quant.analytics import Performance
+>>> prices = pd.DataFrame(
+...     {"FUND": [100.0, 101.0]},
+...     index=pd.to_datetime(["2024-01-01", "2024-01-02"]),
 ... )
->>> perf = Performance.from_panel(panel)
+>>> perf = Performance(prices)
 >>> perf.get_ticker_names()
 ['FUND']
 """
@@ -24,7 +25,6 @@ from finstack_quant.finstack_quant import analytics as _analytics
 AnalyticsError = _analytics.AnalyticsError
 
 Performance = _analytics.Performance
-PerformancePanel = _analytics.PerformancePanel
 
 LookbackReturns = _analytics.LookbackReturns
 PeriodStats = _analytics.PeriodStats
@@ -57,7 +57,6 @@ __all__: list[str] = [
     "LookbackSample",
     "MultiFactorResult",
     "Performance",
-    "PerformancePanel",
     "PeriodStats",
     "RollingGreeks",
     "constrained_least_squares",

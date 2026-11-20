@@ -28,7 +28,7 @@ import math
 import pandas as pd
 import pytest
 
-from finstack_quant.analytics import MultiFactorResult, Performance, PerformancePanel
+from finstack_quant.analytics import MultiFactorResult, Performance
 from finstack_quant.core.market_data import FxMatrix, InflationIndex, ScalarTimeSeries
 from finstack_quant.models.credit import liability_management, pd as credit_pd, recovery_waterfall
 from finstack_quant.models.factor.credit import (
@@ -37,7 +37,7 @@ from finstack_quant.models.factor.credit import (
     decompose_levels,
     decompose_period,
 )
-from tests.analytics_helpers import valuation_grid
+from tests.analytics_helpers import opening_date
 
 # analytics
 
@@ -54,15 +54,11 @@ def _benchmarked_performance() -> Performance:
     benchmark = [-0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.015, -0.005]
     residual = [0.004, -0.003, 0.006, -0.002, 0.001, -0.005, 0.003, -0.004]
     fund = [2.0 * value + noise for value, noise in zip(benchmark, residual, strict=True)]
-    return Performance.from_panel(
-        PerformancePanel(
-            dates=valuation_grid(dates),
-            series=[fund, benchmark],
-            kind="returns",
-            ticker_names=["FUND", "BENCH"],
-            benchmark_ticker="BENCH",
-            frequency="monthly",
-        )
+    return Performance.from_returns(
+        pd.DataFrame({"FUND": fund, "BENCH": benchmark}, index=dates),
+        initial_date=opening_date(dates),
+        benchmark_ticker="BENCH",
+        frequency="monthly",
     )
 
 
@@ -122,15 +118,11 @@ def _multi_factor_result(swap_factors: bool = False) -> MultiFactorResult:
     """Two-factor regression with betas 2.0 and 0.5, optionally supplied swapped."""
     dates = [dt_date(2024, 1, 1) + timedelta(days=i) for i in range(8)]
     returns = [2.0 * a + 0.5 * b for a, b in zip(_FACTOR_A, _FACTOR_B, strict=True)]
-    perf = Performance.from_panel(
-        PerformancePanel(
-            dates=valuation_grid(dates),
-            series=[returns],
-            kind="returns",
-            ticker_names=["FUND"],
-            frequency="monthly",
-            benchmark_ticker="FUND",
-        )
+    perf = Performance.from_returns(
+        pd.DataFrame({"FUND": returns}, index=dates),
+        initial_date=opening_date(dates),
+        frequency="monthly",
+        benchmark_ticker="FUND",
     )
     factors = [_FACTOR_B, _FACTOR_A] if swap_factors else [_FACTOR_A, _FACTOR_B]
     return perf.multi_factor_greeks(0, factors, risk_free_rate=0.0)
@@ -169,15 +161,11 @@ def test_multi_factor_result_to_dataframe_accepts_factor_names() -> None:
 
 def test_multi_factor_constant_response_frame_preserves_nan() -> None:
     dates = [dt_date(2024, 1, 1) + timedelta(days=i) for i in range(8)]
-    perf = Performance.from_panel(
-        PerformancePanel(
-            dates=valuation_grid(dates),
-            series=[[0.01] * 8],
-            kind="returns",
-            ticker_names=["FUND"],
-            frequency="daily",
-            benchmark_ticker="FUND",
-        )
+    perf = Performance.from_returns(
+        pd.DataFrame({"FUND": [0.01] * 8}, index=dates),
+        initial_date=opening_date(dates),
+        frequency="daily",
+        benchmark_ticker="FUND",
     )
     result = perf.multi_factor_greeks(0, [[-0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.015, -0.005]], risk_free_rate=0.0)
     frame = result.to_dataframe(["market"])

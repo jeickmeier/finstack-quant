@@ -14,10 +14,11 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 import pytest
 
-from finstack_quant.analytics import Performance, PerformancePanel
-from tests.analytics_helpers import valuation_grid
+from finstack_quant.analytics import Performance
+from tests.analytics_helpers import opening_date
 
 
 def _fixture() -> dict[str, Any]:
@@ -45,15 +46,11 @@ def _build_performance(fixture: dict[str, Any]) -> Performance:
     dates = _dates(fixture["dates"])
     target = fixture["returns"]
     benchmark = fixture["benchmark"]
-    return Performance.from_panel(
-        PerformancePanel(
-            dates=valuation_grid(dates),
-            series=[target, benchmark],
-            kind="returns",
-            ticker_names=["TARGET", "BENCH"],
-            benchmark_ticker="BENCH",
-            frequency="daily",
-        )
+    return Performance.from_returns(
+        pd.DataFrame({"TARGET": target, "BENCH": benchmark}, index=dates),
+        initial_date=opening_date(dates),
+        benchmark_ticker="BENCH",
+        frequency="daily",
     )
 
 

@@ -5,18 +5,18 @@ import json
 import math
 import pickle
 
+import pandas as pd
 import pytest
 
 from finstack_quant.analytics import (
     AnalyticsError,
     MultiFactorResult,
     Performance,
-    PerformancePanel,
     max_drawdown,
     sharpe,
     sortino,
 )
-from tests.analytics_helpers import valuation_grid
+from tests.analytics_helpers import opening_date
 
 
 def dates(n: int) -> list[date]:
@@ -24,15 +24,12 @@ def dates(n: int) -> list[date]:
 
 
 def panel(values: list[float], frequency: str = "daily") -> Performance:
-    return Performance.from_panel(
-        PerformancePanel(
-            dates=valuation_grid(dates(len(values))),
-            series=[values],
-            kind="returns",
-            ticker_names=["A"],
-            frequency=frequency,
-            benchmark_ticker="A",
-        )
+    grid = dates(len(values))
+    return Performance.from_returns(
+        pd.DataFrame({"A": values}, index=grid),
+        initial_date=opening_date(grid),
+        frequency=frequency,
+        benchmark_ticker="A",
     )
 
 
@@ -92,30 +89,23 @@ def test_extreme_wealth_preserves_annualized_growth_and_relative_drawdowns() -> 
         ([date(year, 1, 1) for year in range(2001, 2021)], [-0.9] * 20, 0.1 ** (20 / (7305 / 365.0)) - 1),
         ([date(2021, 1, 1), date(2022, 1, 1)], [1e200] * 2, 1e200 ** (2 / (731 / 365.0))),
     ):
-        perf = Performance.from_panel(
-            PerformancePanel(
-                dates=[date(grid[0].year - 1, 1, 1), *grid],
-                series=[values],
-                kind="returns",
-                ticker_names=["A"],
-                frequency="annual",
-                benchmark_ticker="A",
-            )
+        perf = Performance.from_returns(
+            pd.DataFrame({"A": values}, index=grid),
+            initial_date=date(grid[0].year - 1, 1, 1),
+            frequency="annual",
+            benchmark_ticker="A",
         )
         result = perf.cagr().iloc[0]
         assert math.isfinite(result)
         assert result == pytest.approx(expected, rel=1e-12)
 
     for values in ([-0.9] * 20, [1e300] * 4):
-        perf = Performance.from_panel(
-            PerformancePanel(
-                dates=valuation_grid(dates(len(values))),
-                series=[values, values],
-                kind="returns",
-                ticker_names=["BENCH", "A"],
-                frequency="daily",
-                benchmark_ticker="BENCH",
-            )
+        grid = dates(len(values))
+        perf = Performance.from_returns(
+            pd.DataFrame({"BENCH": values, "A": values}, index=grid),
+            initial_date=opening_date(grid),
+            frequency="daily",
+            benchmark_ticker="BENCH",
         )
         assert all(value == 0.0 for series in perf.cumulative_returns_outperformance() for value in series)
 
@@ -131,15 +121,10 @@ def test_extreme_wealth_preserves_annualized_growth_and_relative_drawdowns() -> 
 
 
 def test_lookback_returns_accepts_maximum_calendar_date() -> None:
-    perf = Performance.from_panel(
-        PerformancePanel(
-            dates=[date(9999, 12, 30), date.max],
-            series=[[100.0, 110.0]],
-            kind="prices",
-            ticker_names=["A"],
-            frequency="daily",
-            benchmark_ticker="A",
-        )
+    perf = Performance(
+        pd.DataFrame({"A": [100.0, 110.0]}, index=[date(9999, 12, 30), date.max]),
+        frequency="daily",
+        benchmark_ticker="A",
     )
     lookback = perf.lookback_returns(date.max)
     for values in (lookback.mtd, lookback.qtd, lookback.ytd, lookback.fytd):
@@ -185,27 +170,19 @@ def test_rolling_sortino_preserves_small_returns_after_positive_outlier(tail: fl
 
 
 def test_constructors_reject_duplicate_tickers_and_derived_nan() -> None:
+    grid = dates(2)
     with pytest.raises(AnalyticsError, match="duplicate ticker"):
-        Performance.from_panel(
-            PerformancePanel(
-                dates=valuation_grid(dates(2)),
-                series=[[0.01, 0.02], [0.03, 0.04]],
-                kind="returns",
-                ticker_names=["A", "A"],
-                frequency="daily",
-                benchmark_ticker="A",
-            )
+        Performance.from_returns(
+            pd.DataFrame([[0.01, 0.03], [0.02, 0.04]], columns=["A", "A"], index=grid),
+            initial_date=opening_date(grid),
+            frequency="daily",
+            benchmark_ticker="A",
         )
     with pytest.raises(RuntimeError):
-        Performance.from_panel(
-            PerformancePanel(
-                dates=dates(2),
-                series=[[1e-300, 1e300]],
-                kind="prices",
-                ticker_names=["A"],
-                frequency="daily",
-                benchmark_ticker="A",
-            )
+        Performance(
+            pd.DataFrame({"A": [1e-300, 1e300]}, index=dates(2)),
+            frequency="daily",
+            benchmark_ticker="A",
         )
 
 
@@ -225,15 +202,10 @@ def test_restoration_validates_state_and_rebuilds_caches() -> None:
 
 
 def test_initial_drawdown_and_performance_conventions() -> None:
-    perf = Performance.from_panel(
-        PerformancePanel(
-            dates=dates(3),
-            series=[[100.0, 90.0, 100.0]],
-            kind="prices",
-            ticker_names=["A"],
-            frequency="daily",
-            benchmark_ticker="A",
-        )
+    perf = Performance(
+        pd.DataFrame({"A": [100.0, 90.0, 100.0]}, index=dates(3)),
+        frequency="daily",
+        benchmark_ticker="A",
     )
     episode = perf.drawdown_details(0, n=5)[0]
     assert episode.start == dates(3)[0]

@@ -35,9 +35,10 @@ import shutil
 import subprocess  # nosec B404 # fixed Cargo benchmark command, no shell
 
 import numpy as np
+import pandas as pd
 import pytest
 
-from finstack_quant.analytics import Performance, PerformancePanel
+from finstack_quant.analytics import Performance
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, FxMatrix, MarketContext
@@ -136,12 +137,10 @@ PRICES_10K_ALT: list[float] = list(accumulate(RETURNS_10K_ALT, lambda p, r: p * 
 DATES_252 = [date(2024, 1, 1) + timedelta(days=i) for i in range(252)]
 DATES_10K = [date(2000, 1, 1) + timedelta(days=i) for i in range(10_000)]
 
-_PERFORMANCE_10K = Performance.from_panel(
-    PerformancePanel(
-        dates=DATES_10K,
-        series=[PRICES_10K[:10_000], PRICES_10K_ALT[:10_000]],
-        kind="prices",
-        ticker_names=["ASSET", "BENCH"],
+_PERFORMANCE_10K = Performance(
+    pd.DataFrame(
+        {"ASSET": PRICES_10K[:10_000], "BENCH": PRICES_10K_ALT[:10_000]},
+        index=DATES_10K,
     )
 )
 
@@ -702,9 +701,8 @@ class TestAnalyticsBenchmarks:
     def test_performance_construction(self, benchmark) -> None:
         n = 252
         dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(n)]
-        prices = [100.0 + i * 0.1 for i in range(n)]
-        panel = PerformancePanel(dates=dates, series=[prices], kind="prices", ticker_names=["BENCH"])
-        benchmark(Performance.from_panel, panel)
+        frame = pd.DataFrame({"BENCH": [100.0 + i * 0.1 for i in range(n)]}, index=dates)
+        benchmark(Performance, frame)
 
     def test_sharpe(self, benchmark) -> None:
         benchmark(_PERFORMANCE_10K.sharpe)

@@ -15,7 +15,7 @@ from finstack_quant.analytics import Performance
 
 
 def main() -> None:
-    # 1) Your data: a DataFrame of returns (or raw lists via Performance.from_panel(PerformancePanel(...))).
+    # 1) Your data: a pandas or Polars DataFrame of returns.
     idx = pd.bdate_range("2021-01-04", "2024-12-31")
     import math
 

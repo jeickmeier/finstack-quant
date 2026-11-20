@@ -5,9 +5,11 @@ from __future__ import annotations
 import datetime
 from typing import Any, Sequence
 from finstack_quant.core.dates import FiscalConfig
+from finstack_quant.core.table import ArrowTable
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import polars as pl
 from finstack_quant.core.dates import DayCount, DayCountContext
 from finstack_quant.analytics._types import (
     BetaResult,
@@ -21,236 +23,20 @@ from finstack_quant.analytics._types import (
     RollingGreeks,
 )
 
-# Performance panel
-
-class PerformancePanel:
-    """
-    Dated panel of price or return series, one per ticker: the Rust
-    ``PerformancePanel`` a :class:`Performance` is built from.
-
-    Immutable, compares by value, picklable. ``Performance(df)`` and
-    ``Performance.from_returns(df)`` build one from a pandas frame; construct
-    it directly for raw lists and pass it to :meth:`Performance.from_panel`.
-
-    Parameters
-    ----------
-    dates : Sequence[object]
-        Strictly ascending actual valuation dates (``datetime.date``,
-        ``pd.Timestamp`` or ISO strings). L dates require L prices or L - 1
-        interval returns per ticker; each return covers consecutive dates.
-    series : list[list[float]]
-        Ticker-major prices or interval simple returns in the kind-specific shape.
-        Leading or trailing ``nan`` gaps are allowed; each ticker's observed
-        span must be contiguous.
-    kind : str
-        ``"prices"`` (positive levels, permitting a final terminal zero; derived pairwise)
-        or ``"returns"`` (simple decimal returns, ``0.01`` = +1%).
-    ticker_names : list[str]
-        Unique ticker names, one per series.
-    benchmark_ticker : str, optional
-        Explicit comparison ticker; ``None`` leaves benchmark context absent.
-    frequency : str, optional
-        ``"daily"``, ``"weekly"``, ``"monthly"``, ``"quarterly"``,
-        ``"semi_annual"`` or ``"annual"``; ``None`` leaves frequency context absent.
-
-    Raises
-    ------
-    ValueError
-        If ``kind`` is not ``"prices"`` or ``"returns"``.
-    AnalyticsError
-        If ``frequency`` is not a recognized frequency.
-
-    Examples
-    --------
-    >>> from datetime import date
-    >>> from finstack_quant.analytics import PerformancePanel
-    >>> panel = PerformancePanel(
-    ...     dates=[date(2024, 1, 1), date(2024, 1, 2)], series=[[0.01]], kind="returns", ticker_names=["FUND"]
-    ... )
-    >>> panel.kind, panel.frequency
-    ('returns', None)
-    """
-
-    def __init__(
-        self,
-        *,
-        dates: Sequence[object],
-        series: list[list[float]],
-        kind: str,
-        ticker_names: list[str],
-        benchmark_ticker: str | None = None,
-        frequency: str | None = None,
-    ) -> None: ...
-    @property
-    def dates(self) -> list[datetime.date]:
-        """
-        Observation dates, one per value of every series.
-
-        Returns
-        -------
-        list[datetime.date]
-            Strictly ascending dates.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def series(self) -> list[list[float]]:
-        """
-        Ticker-major series, ``nan`` for a gap.
-
-        Returns
-        -------
-        list[list[float]]
-            ``series[i][t]`` is ticker ``i`` at ``dates[t]``.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def kind(self) -> str:
-        """
-        Whether the series are prices or simple returns.
-
-        Returns
-        -------
-        str
-            ``"prices"`` or ``"returns"``.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def ticker_names(self) -> list[str]:
-        """
-        Ticker names, one per series.
-
-        Returns
-        -------
-        list[str]
-            Unique names in series order.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def benchmark_ticker(self) -> str | None:
-        """
-        Benchmark ticker.
-
-        Returns
-        -------
-        str | None
-            The benchmark name, or ``None`` for the first ticker.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def frequency(self) -> str | None:
-        """
-        Observation frequency used for annualization.
-
-        Returns
-        -------
-        str | None
-            The declared frequency label, or ``None`` when no frequency was supplied.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    def to_json(self) -> str:
-        """
-        Serialize to compact JSON with the canonical field names.
-
-        Returns
-        -------
-        str
-            JSON object with ``dates``, ``series`` (gaps as ``null``),
-            ``kind``, ``ticker_names`` and any ``benchmark_ticker`` and
-            ``frequency``. Does not raise.
-        """
-        ...
-
-    @staticmethod
-    def from_json(json: str) -> PerformancePanel:
-        """
-        Deserialize from the JSON produced by :meth:`to_json`.
-
-        Parameters
-        ----------
-        json : str
-            JSON object with ``dates``, ``series``, ``kind``, ``ticker_names``
-            and optional ``benchmark_ticker`` and ``frequency``.
-
-        Returns
-        -------
-        PerformancePanel
-            Reconstructed panel.
-
-        Raises
-        ------
-        ValueError
-            If a field is missing, unknown or malformed.
-
-        Examples
-        --------
-        >>> from datetime import date
-        >>> from finstack_quant.analytics import PerformancePanel
-        >>> panel = PerformancePanel(
-        ...     dates=[date(2024, 1, 1), date(2024, 1, 2)], series=[[100.0, 101.0]], kind="prices", ticker_names=["A"]
-        ... )
-        >>> PerformancePanel.from_json(panel.to_json()) == panel
-        True
-        """
-        ...
-
-    def __eq__(self, other: object) -> bool: ...
-    def __reduce__(self) -> tuple[Any, tuple[str]]:
-        """Reconstruct this value for ``pickle`` through its canonical JSON form.
-
-        Returns
-        -------
-        tuple[Any, tuple[str]]
-            The bound ``from_json`` reconstruction callable and its JSON payload.
-
-        Raises
-        ------
-        ValueError
-            If serialization fails or the JSON payload cannot reconstruct the
-            stored value, including non-finite floats unsupported by its schema.
-        """
-        ...
-
 # Performance engine
 
 class Performance:
     """
-    Stateful performance analytics engine over a panel of ticker series.
+    Stateful performance analytics engine over a dated table of ticker series.
 
-    Construct from a pandas DataFrame or Series of prices
-    (``Performance(df)``), a DataFrame or Series of returns
-    (``Performance.from_returns(df, initial_date=...)``), or a :class:`PerformancePanel` of raw
-    lists (``Performance.from_panel(panel)``). The pandas constructors read
-    the row index as the dates and the column headings as the ticker names.
+    Construct from a pandas ``DataFrame`` or ``Series`` of prices
+    (``Performance(df)``), a Polars ``DataFrame`` of prices with a date column
+    (auto-detected when unique, or selected via ``date_col=...``), or from
+    simple returns with an explicit opening valuation date
+    (``Performance.from_returns(df, initial_date=...)``). Pandas inputs read
+    the row index as dates by default (or a column when ``date_col=...`` is
+    supplied) and column headings as ticker names; Polars inputs treat the
+    selected date column as dates and all remaining columns as ticker names.
 
     Scalar-per-ticker metrics return a ``pandas.Series`` indexed by ticker name
     and named after the metric, so results are selected by label rather than by
@@ -260,7 +46,7 @@ class Performance:
     Examples
     --------
     >>> import pandas as pd
-    >>> from finstack_quant.analytics import Performance, PerformancePanel
+    >>> from finstack_quant.analytics import Performance
     >>> prices = pd.DataFrame(
     ...     {"FUND": [100.0, 101.0, 103.0]},
     ...     index=pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-03"]),
@@ -271,53 +57,61 @@ class Performance:
 
     def __init__(
         self,
-        prices: pd.DataFrame | pd.Series,
+        prices: pd.DataFrame | pd.Series | pl.DataFrame,
         benchmark_ticker: str | None = None,
         frequency: str | None = None,
+        date_col: str | None = None,
     ) -> None:
         """
         Build a validated analytics engine from actual dated price observations.
 
         Parameters
         ----------
-        prices : pd.DataFrame or pd.Series
-            Strictly increasing date-indexed price or prepared wealth-index levels, with unique nonblank string ticker labels; only contiguous observed spans with edge NaNs are admitted.
+        prices : pd.DataFrame, pd.Series, or pl.DataFrame
+            Strictly increasing date-indexed (pandas) or date-column (Polars) price or prepared wealth-index levels, with unique nonblank string ticker labels; only contiguous observed spans with edge missing values (``NaN`` or Polars ``null``) are admitted.
         benchmark_ticker : str, optional
             Explicit loaded comparison ticker; None leaves benchmark context absent.
         frequency : str, optional
             Declared observation frequency used for annualized risk and cash conversion; None leaves frequency absent.
+        date_col : str, optional
+            Name of the column holding observation dates; all other columns must be numeric ticker series. Auto-detects a unique Polars ``Date``/``Datetime`` column when ``None`` (pass ``date_col`` when dates use another dtype such as ISO strings); optional for pandas ``DataFrame`` inputs to read dates from a column instead of the index; must be ``None`` for a pandas ``Series``.
 
         Raises
         ------
         AnalyticsError
             If chronology, shapes, labels, economic values or supplied frequency are invalid.
         KeyError
-            If an explicit benchmark label is unknown.
+            If an explicit benchmark label or ``date_col`` is unknown.
         TypeError
-            If prices is not a supported numeric pandas object.
+            If ``prices`` is not a supported numeric pandas or Polars object (including a Polars ``Series``, which lacks dates).
+        ValueError
+            If ``date_col`` cannot be resolved uniquely or is passed with a pandas ``Series``.
         """
         ...
 
     @staticmethod
     def from_returns(
-        returns: pd.DataFrame | pd.Series,
+        returns: pd.DataFrame | pd.Series | pl.DataFrame,
         initial_date: datetime.date | str,
         benchmark_ticker: str | None = None,
         frequency: str | None = None,
+        date_col: str | None = None,
     ) -> Performance:
         """
         Build from simple investment returns and an explicit actual opening valuation date.
 
         Parameters
         ----------
-        returns : pd.DataFrame or pd.Series
-            Return-ending date index with decimal simple-return columns; values are at least -1 and a terminal -1 must be the last observed return.
+        returns : pd.DataFrame, pd.Series, or pl.DataFrame
+            Return-ending date-indexed (pandas) or date-column (Polars) decimal simple-return columns; values are at least -1 and a terminal -1 must be the last observed return.
         initial_date : datetime.date or str
             Actual valuation date before the first return endpoint; anchors the first declared holding interval.
         benchmark_ticker : str, optional
             Explicit comparison label; None leaves benchmark context absent.
         frequency : str, optional
             Declared observation frequency; None leaves annualization context absent.
+        date_col : str, optional
+            Name of the column holding return-ending dates. Auto-detects a unique Polars ``Date``/``Datetime`` column when ``None``; optional for pandas ``DataFrame`` inputs; must be ``None`` for a pandas ``Series``.
 
         Returns
         -------
@@ -329,9 +123,11 @@ class Performance:
         AnalyticsError
             If dates, interval data, values, labels, frequency or opening date are invalid.
         KeyError
-            If an explicit benchmark label is unknown.
+            If an explicit benchmark label or ``date_col`` is unknown.
         TypeError
-            If returns or initial_date has an unsupported host type.
+            If ``returns`` or ``initial_date`` has an unsupported host type (including a Polars ``Series``).
+        ValueError
+            If ``date_col`` cannot be resolved uniquely or is passed with a pandas ``Series``.
 
         Examples
         --------
@@ -339,41 +135,6 @@ class Performance:
         >>> from finstack_quant.analytics import Performance
         >>> frame = pd.Series([0.01, -0.02], index=pd.to_datetime(["2024-01-02", "2024-01-03"]), name="FUND")
         >>> Performance.from_returns(frame, initial_date="2024-01-01").get_ticker_names()
-        ['FUND']
-        """
-        ...
-
-    @staticmethod
-    def from_panel(panel: PerformancePanel) -> Performance:
-        """
-        Build from the canonical actual valuation-grid panel.
-
-        Parameters
-        ----------
-        panel : PerformancePanel
-            A validated panel with L actual dates and L prices or L - 1 interval returns per ticker.
-
-        Returns
-        -------
-        Performance
-            Engine preserving ticker identity, optional context and the complete supplied interval grid.
-
-        Raises
-        ------
-        AnalyticsError
-            If the panel violates chronology, shape, economic-domain, contiguous-span or identity rules.
-        KeyError
-            If an explicit benchmark is unknown.
-        RuntimeError
-            If adjacent price changes cannot be represented faithfully as finite simple returns.
-
-        Examples
-        --------
-        >>> from finstack_quant.analytics import Performance, PerformancePanel
-        >>> panel = PerformancePanel(
-        ...     dates=["2024-01-01", "2024-01-02"], series=[[0.01]], kind="returns", ticker_names=["FUND"]
-        ... )
-        >>> Performance.from_panel(panel).get_ticker_names()
         ['FUND']
         """
         ...
@@ -1462,13 +1223,15 @@ class Performance:
         """
         ...
 
-    def excess_returns(self, rf: Sequence[float] | npt.NDArray[np.float64] | pd.Series) -> list[list[float]]:
+    def excess_returns(
+        self, rf: Sequence[float] | npt.NDArray[np.float64] | pd.Series | pl.Series
+    ) -> list[list[float]]:
         """
         Subtract annual-effective cash converted geometrically at the declared frequency.
 
         Parameters
         ----------
-        rf : sequence of float, numpy.ndarray or pandas.Series
+        rf : sequence of float, numpy.ndarray, pandas.Series or polars.Series
             One finite annual-effective decimal cash rate greater than -1 for every global active return-ending position, including positions unused by a ticker; positional alignment is required.
 
         Returns
@@ -1709,7 +1472,11 @@ class Performance:
         ...
 
     def multi_factor_greeks(
-        self, ticker_idx: int | str, factor_returns: Sequence[Sequence[float]] | pd.DataFrame, risk_free_rate: float
+        self,
+        ticker_idx: int | str,
+        factor_returns: Sequence[Sequence[float]] | pd.DataFrame | pl.DataFrame,
+        risk_free_rate: float,
+        date_col: str | None = None,
     ) -> MultiFactorResult:
         """
         Fit the active total-investment ticker after response-only cash subtraction.
@@ -1718,13 +1485,15 @@ class Performance:
         ----------
         ticker_idx : int or str
             Zero-based ticker column index or an exact, case-sensitive loaded ticker name.
-        factor_returns : sequence of sequences of float or pandas.DataFrame
+        factor_returns : sequence of sequences of float, pandas.DataFrame or polars.DataFrame
             Supply finite factor-major predictors aligned to this ticker's active interval sample.
-            A DataFrame uses string-labeled factor columns and date-like return end dates as its index.
+            A pandas DataFrame uses string-labeled factor columns and date-like return end dates as its index (or ``date_col`` when supplied); a Polars DataFrame uses a date column (auto-detected when unique, or selected via ``date_col``) and numeric factor columns.
             Rows are selected and ordered by the ticker's active dates. Extra dates are ignored.
             Factors use the caller's units and are used without subtracting cash.
         risk_free_rate : float
             Explicit annual-effective decimal cash rate, finite and greater than -1; geometric per-observation conversion uses the declared frequency where required.
+        date_col : str, optional
+            Name of the date column when ``factor_returns`` is a DataFrame. Auto-detects a unique Polars ``Date``/``Datetime`` column when omitted; optional for pandas ``DataFrame`` inputs; rejected if ``factor_returns`` is a sequence.
 
         Returns
         -------
@@ -1734,15 +1503,13 @@ class Performance:
         Raises
         ------
         AnalyticsError
-            If an integer ticker index is outside the loaded columns.
+            If an integer ticker index is outside the loaded columns, or if ticker or factor shapes are invalid, frequency is absent, cash is invalid, or the model lacks enough observations or full factor rank.
         KeyError
-            If a string ticker name is not loaded or the DataFrame omits an active date.
+            If a string ticker name is not loaded, ``date_col`` is unknown, or the DataFrame omits an active date.
         ValueError
-            If two DataFrame rows map to the same date or any selected factor value is non-finite.
+            If ``date_col`` is ambiguous or passed with sequences, two DataFrame rows map to the same date, or any selected factor value is non-finite.
         TypeError
             If the predictors cannot be converted to numeric sequences or DataFrame columns.
-        AnalyticsError
-            If ticker or factor shapes are invalid, frequency is absent, cash is invalid, or the model lacks enough observations or full factor rank.
         RuntimeError
             If a required numerical calculation or requested finite result cannot be represented.
         """
@@ -1866,16 +1633,15 @@ class Performance:
 
         Examples
         --------
-        >>> from finstack_quant.analytics import Performance, PerformancePanel, validate_summary
-        >>> panel = PerformancePanel(
-        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-        ...     kind="returns",
-        ...     ticker_names=["FUND", "BENCH"],
-        ...     frequency="daily",
-        ...     benchmark_ticker="BENCH",
+        >>> import pandas as pd
+        >>> from finstack_quant.analytics import Performance, validate_summary
+        >>> returns = pd.DataFrame(
+        ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+        ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
         ... )
-        >>> perf = Performance.from_panel(panel)
+        >>> perf = Performance.from_returns(
+        ...     returns, initial_date="2024-01-01", frequency="daily", benchmark_ticker="BENCH"
+        ... )
         >>> report = perf.summary(0.0, 0.0, 0.0, 0.95)
         >>> validate_summary(report) is None
         True
@@ -1910,6 +1676,56 @@ class Performance:
             If benchmark/frequency context is absent, cash is invalid, MAR/Omega is nonfinite, or confidence is outside the open interval (0.5, 1).
         RuntimeError
             If a required numerical calculation or requested finite result cannot be represented.
+        """
+        ...
+
+    def to_arrow(self, risk_free_rate: float, mar: float, omega_threshold: float, confidence: float) -> ArrowTable:
+        """
+        Export the fixed 22-metric summary table via Arrow (zero-copy for Polars and PyArrow).
+
+        Returns an :class:`~finstack_quant.core.table.ArrowTable` implementing
+        ``__arrow_c_stream__`` with 23 columns (``ticker`` followed by the 22
+        summary metrics) plus field roles and summary provenance metadata;
+        consume with ``polars.DataFrame(table)``, ``pyarrow.table(table)``, or
+        ``table.to_polars()``.
+
+        Parameters
+        ----------
+        risk_free_rate : float
+            Explicit annual-effective decimal cash rate, finite and greater than -1; geometric per-observation conversion uses the declared frequency where required.
+        mar : float
+            Explicit finite minimum acceptable decimal return per observation; this is not an annual rate.
+        omega_threshold : float
+            Explicit finite decimal per-observation Omega hurdle, independent of MAR.
+        confidence : float
+            Explicit finite decimal tail confidence strictly between 0.5 and 1; the lower-tail probability is 1 - confidence.
+
+        Returns
+        -------
+        ArrowTable
+            Arrow table with one row per ticker and the 22 fixed metric columns; non-finite floats (``NaN`` / ``inf``) are preserved natively.
+
+        Raises
+        ------
+        AnalyticsError
+            If benchmark/frequency context is absent, cash is invalid, MAR/Omega is nonfinite, or confidence is outside the open interval (0.5, 1).
+        RuntimeError
+            If a required numerical calculation or requested finite result cannot be represented.
+
+        Examples
+        --------
+        >>> import pandas as pd
+        >>> from finstack_quant.analytics import Performance
+        >>> returns = pd.DataFrame(
+        ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+        ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
+        ... )
+        >>> perf = Performance.from_returns(
+        ...     returns, initial_date="2024-01-01", frequency="daily", benchmark_ticker="BENCH"
+        ... )
+        >>> table = perf.to_arrow(0.0, 0.0, 0.0, 0.95)
+        >>> (table.num_rows, table.num_columns)
+        (2, 23)
         """
         ...
 
@@ -1955,15 +1771,13 @@ class Performance:
 
         Examples
         --------
-        >>> from datetime import date
-        >>> from finstack_quant.analytics import Performance, PerformancePanel
-        >>> panel = PerformancePanel(
-        ...     dates=[date(2024, 1, 1), date(2024, 1, 2), date(2024, 1, 3)],
-        ...     series=[[0.01, 0.02]],
-        ...     kind="returns",
-        ...     ticker_names=["FUND"],
+        >>> import pandas as pd
+        >>> from finstack_quant.analytics import Performance
+        >>> returns = pd.DataFrame(
+        ...     {"FUND": [0.01, 0.02]},
+        ...     index=pd.to_datetime(["2024-01-02", "2024-01-03"]),
         ... )
-        >>> perf = Performance.from_panel(panel)
+        >>> perf = Performance.from_returns(returns, initial_date="2024-01-01")
         >>> Performance.from_json(perf.to_json()).get_ticker_names()
         ['FUND']
         """
@@ -1986,7 +1800,7 @@ class Performance:
         ...
 
 def sharpe(
-    returns: Sequence[float] | npt.NDArray[np.float64] | pd.Series,
+    returns: Sequence[float] | npt.NDArray[np.float64] | pd.Series | pl.Series,
     risk_free_rate: float,
     periods_per_year: float,
 ) -> float:
@@ -1995,7 +1809,7 @@ def sharpe(
 
     Parameters
     ----------
-    returns : sequence of float, numpy.ndarray or pandas.Series
+    returns : sequence of float, numpy.ndarray, pandas.Series or polars.Series
         Finite decimal simple investment returns in chronological order, each at least -1; an exact terminal -1 may occur only as the last observation.
     risk_free_rate : float
         Explicit annual-effective decimal cash rate, finite and greater than -1; geometric per-observation conversion uses the declared frequency where required.
@@ -2025,7 +1839,7 @@ def sharpe(
     ...
 
 def sortino(
-    returns: Sequence[float] | npt.NDArray[np.float64] | pd.Series,
+    returns: Sequence[float] | npt.NDArray[np.float64] | pd.Series | pl.Series,
     mar: float,
     periods_per_year: float,
 ) -> float:
@@ -2034,7 +1848,7 @@ def sortino(
 
     Parameters
     ----------
-    returns : sequence of float, numpy.ndarray or pandas.Series
+    returns : sequence of float, numpy.ndarray, pandas.Series or polars.Series
         Finite decimal simple investment returns in chronological order, each at least -1; an exact terminal -1 may occur only as the last observation.
     mar : float
         Explicit finite minimum acceptable decimal return per observation; this is not an annual rate.
@@ -2064,7 +1878,7 @@ def sortino(
     ...
 
 def volatility(
-    returns: Sequence[float] | npt.NDArray[np.float64] | pd.Series,
+    returns: Sequence[float] | npt.NDArray[np.float64] | pd.Series | pl.Series,
     periods_per_year: float,
 ) -> float:
     """
@@ -2072,7 +1886,7 @@ def volatility(
 
     Parameters
     ----------
-    returns : sequence of float, numpy.ndarray or pandas.Series
+    returns : sequence of float, numpy.ndarray, pandas.Series or polars.Series
         Finite decimal simple investment returns in chronological order, each at least -1; an exact terminal -1 may occur only as the last observation.
     periods_per_year : float
         Explicit positive finite observation count per year; scales sample deviation by its square root.
@@ -2100,14 +1914,14 @@ def volatility(
     ...
 
 def max_drawdown(
-    returns: Sequence[float] | npt.NDArray[np.float64] | pd.Series,
+    returns: Sequence[float] | npt.NDArray[np.float64] | pd.Series | pl.Series,
 ) -> float:
     """
     Most negative compounded percentage drawdown from an opening unit wealth.
 
     Parameters
     ----------
-    returns : sequence of float, numpy.ndarray or pandas.Series
+    returns : sequence of float, numpy.ndarray, pandas.Series or polars.Series
         Finite decimal simple investment returns in chronological order, each at least -1; an exact terminal -1 may occur only as the last observation.
 
     Returns
@@ -2133,8 +1947,8 @@ def max_drawdown(
     ...
 
 def multi_factor_greeks(
-    returns: Sequence[float] | npt.NDArray[np.float64] | pd.Series,
-    factor_returns: Sequence[Sequence[float]],
+    returns: Sequence[float] | npt.NDArray[np.float64] | pd.Series | pl.Series,
+    factor_returns: Sequence[Sequence[float] | npt.NDArray[np.float64] | pd.Series | pl.Series],
     periods_per_year: float,
     return_kind: str,
     risk_free_rate: float | None = None,
@@ -2147,11 +1961,11 @@ def multi_factor_greeks(
 
     Parameters
     ----------
-    returns : sequence of float, numpy.ndarray or pandas.Series
+    returns : sequence of float, numpy.ndarray, pandas.Series or polars.Series
         Finite chronological response observations. Excess responses may be
         below -1; total investment returns are at least -1 and an exact -1
         must end the observed history.
-    factor_returns : sequence of sequence of float
+    factor_returns : sequence of numeric sequences or Series
         Factor-major finite predictors, each with exactly the response length.
         Do not include an intercept column; the model inserts one.
     periods_per_year : float

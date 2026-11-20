@@ -13,7 +13,10 @@ from __future__ import annotations
 from datetime import date
 import json
 
-from finstack_quant import statements
+import pandas as pd
+import pytest
+
+from finstack_quant import analytics, statements
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.core.table import ArrowTable
 from finstack_quant.portfolio import Portfolio, value_portfolio
@@ -115,3 +118,26 @@ def test_to_arrow_positions_matches_positions_to_table_columns() -> None:
         "risk_error",
     ]
     assert at.num_rows == len(valuation)
+
+
+def test_performance_to_arrow_matches_summary_columns_and_rejects_missing_context() -> None:
+    dates = [date(2025, 1, 2), date(2025, 1, 3), date(2025, 1, 4)]
+    perf = analytics.Performance.from_returns(
+        pd.DataFrame({"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]}, index=dates),
+        initial_date=date(2025, 1, 1),
+        frequency="daily",
+        benchmark_ticker="BENCH",
+    )
+    at = perf.to_arrow(0.0, 0.0, 0.0, 0.95)
+    assert isinstance(at, ArrowTable)
+    assert at.num_rows == 2
+    assert at.num_columns == 23
+    df = perf.to_dataframe(0.0, 0.0, 0.0, 0.95)
+    assert at.column_names() == ["ticker", *df.columns]
+
+    no_context = analytics.Performance.from_returns(
+        pd.DataFrame({"FUND": [0.10, -0.20, 0.05]}, index=dates),
+        initial_date=date(2025, 1, 1),
+    )
+    with pytest.raises(analytics.AnalyticsError):
+        no_context.to_arrow(0.0, 0.0, 0.0, 0.95)

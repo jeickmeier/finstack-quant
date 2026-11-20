@@ -13,9 +13,10 @@ import json
 import os
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
-from finstack_quant.analytics import Performance, PerformancePanel
+from finstack_quant.analytics import Performance
 
 FIXTURE = Path(__file__).parent / "fixtures" / "lookback_default.json"
 DATES = ["2025-01-29", "2025-01-30", "2025-01-31", "2025-02-03", "2025-02-04", "2025-02-05"]
@@ -23,15 +24,11 @@ RETURNS = [[0.01, -0.02, 0.03, 0.005, 0.0]]
 
 
 def _panel() -> Performance:
-    return Performance.from_panel(
-        PerformancePanel(
-            dates=DATES,
-            series=RETURNS,
-            kind="returns",
-            ticker_names=["asset"],
-            frequency="daily",
-            benchmark_ticker=(["asset"])[0],
-        )
+    return Performance.from_returns(
+        pd.DataFrame({"asset": RETURNS[0]}, index=DATES[1:]),
+        initial_date=DATES[0],
+        frequency="daily",
+        benchmark_ticker="asset",
     )
 
 

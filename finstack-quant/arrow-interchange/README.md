@@ -146,6 +146,7 @@ Producers that return an `ArrowTable`:
 |---------------|-------|
 | `to_arrow_long()`, `to_arrow_wide()` | `finstack_quant.statements.StatementResult` |
 | `to_arrow_positions()` | `finstack_quant.portfolio.PortfolioValuation` |
+| `to_arrow(...)` | `finstack_quant.analytics.Performance` |
 | `to_comparison_table(metrics)` | `finstack_quant.statements_analytics.ScenarioResults` |
 
 Parity note: `finstack-quant-py/parity_contract.toml` marks `core.table` as

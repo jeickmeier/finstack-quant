@@ -5,9 +5,10 @@ import json
 import math
 
 import pandas as pd
+import polars as pl
 import pytest
 
-from finstack_quant.analytics import AnalyticsError, Performance, PerformancePanel, RollingGreeks, max_drawdown
+from finstack_quant.analytics import AnalyticsError, Performance, RollingGreeks, max_drawdown
 
 
 def test_return_frame_uses_the_supplied_actual_opening_valuation() -> None:
@@ -21,24 +22,19 @@ def test_return_frame_uses_the_supplied_actual_opening_valuation() -> None:
         Performance.from_returns(returns, date(2025, 1, 6))
 
 
-def test_panel_rejects_infinity_before_it_can_become_missing_wire_data() -> None:
+def test_frames_reject_infinity_before_it_can_become_missing_wire_data() -> None:
+    returns_pd = pd.DataFrame({"FUND": [math.inf, 0.01]}, index=[date(2025, 1, 2), date(2025, 1, 3)])
     with pytest.raises(AnalyticsError):
-        PerformancePanel(
-            dates=[date(2025, 1, 1), date(2025, 1, 2), date(2025, 1, 3)],
-            series=[[math.inf, 0.01]],
-            kind="returns",
-            ticker_names=["FUND"],
-        )
+        Performance.from_returns(returns_pd, date(2025, 1, 1))
+    returns_pl = pl.DataFrame({"date": [date(2025, 1, 2), date(2025, 1, 3)], "FUND": [math.inf, 0.01]})
+    with pytest.raises(AnalyticsError):
+        Performance.from_returns(returns_pl, date(2025, 1, 1))
 
 
 def test_reversed_date_reset_fails_atomically() -> None:
-    perf = Performance.from_panel(
-        PerformancePanel(
-            dates=[date(2025, 1, 1), date(2025, 1, 2), date(2025, 1, 3)],
-            series=[[0.01, -0.02]],
-            kind="returns",
-            ticker_names=["FUND"],
-        )
+    perf = Performance.from_returns(
+        pd.DataFrame({"FUND": [0.01, -0.02]}, index=[date(2025, 1, 2), date(2025, 1, 3)]),
+        initial_date=date(2025, 1, 1),
     )
     before = perf.to_json()
     with pytest.raises(AnalyticsError):
@@ -139,17 +135,17 @@ def test_restored_summary_retains_nan_sentinels_and_validates_provenance() -> No
 
 
 def test_performance_summary_produces_validatable_table_envelope_with_nonfinite_sentinels() -> None:
-    from finstack_quant.analytics import PerformancePanel, validate_summary
+    from finstack_quant.analytics import validate_summary
 
-    panel = PerformancePanel(
-        dates=[date(2025, 1, 1), date(2025, 1, 2), date(2025, 1, 3), date(2025, 1, 4)],
-        series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-        kind="returns",
-        ticker_names=["FUND", "BENCH"],
+    perf = Performance.from_returns(
+        pd.DataFrame(
+            {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+            index=[date(2025, 1, 2), date(2025, 1, 3), date(2025, 1, 4)],
+        ),
+        initial_date=date(2025, 1, 1),
         frequency="daily",
         benchmark_ticker="BENCH",
     )
-    perf = Performance.from_panel(panel)
     report = perf.summary(0.0, 0.0, 0.0, 0.95)
 
     assert validate_summary(report) is None
@@ -167,17 +163,17 @@ def test_performance_summary_produces_validatable_table_envelope_with_nonfinite_
 
 
 def test_correlation_and_multi_factor_result_wrappers() -> None:
-    from finstack_quant.analytics import CorrelationResult, MultiFactorResult, PerformancePanel
+    from finstack_quant.analytics import CorrelationResult, MultiFactorResult
 
-    panel = PerformancePanel(
-        dates=[date(2025, 1, 1), date(2025, 1, 2), date(2025, 1, 3), date(2025, 1, 4)],
-        series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-        kind="returns",
-        ticker_names=["FUND", "BENCH"],
+    perf = Performance.from_returns(
+        pd.DataFrame(
+            {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+            index=[date(2025, 1, 2), date(2025, 1, 3), date(2025, 1, 4)],
+        ),
+        initial_date=date(2025, 1, 1),
         frequency="daily",
         benchmark_ticker="BENCH",
     )
-    perf = Performance.from_panel(panel)
 
     corr = perf.correlation_matrix()
     assert isinstance(corr, CorrelationResult)

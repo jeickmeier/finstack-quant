@@ -1,30 +1,30 @@
 """
 Performance analytics: returns, drawdowns, risk metrics, and benchmarks.
 
-The panel entry point is :class:`Performance`. Construct from a pandas price
-panel (``Performance(prices_df)``), a pandas return panel
-(``Performance.from_returns(returns_df, initial_date=...)``), or a :class:`PerformancePanel` of
-raw lists (``Performance.from_panel(panel)``); every analytic — return / risk
-scalars, drawdown statistics, rolling windows, periodic returns
-(MTD / QTD / YTD / FYTD), benchmark alpha/beta, basic factor models — is a
-method on the resulting instance.
+The main entry point is :class:`Performance`. Construct from a pandas or Polars
+``DataFrame`` (or pandas ``Series``) of prices (``Performance(prices)``) or
+returns (``Performance.from_returns(returns, initial_date=...)``); every
+analytic — return / risk scalars, drawdown statistics, rolling windows, periodic
+returns (MTD / QTD / YTD / FYTD), benchmark alpha/beta, basic factor models —
+is a method on the resulting instance.
 
 The remaining classes are value-object outputs returned by `Performance`
 methods (`LookbackReturns`, `PeriodStats`, etc.) and the
 :class:`AnalyticsError` exception. Four scalar free functions
 (:func:`sharpe`, :func:`sortino`, :func:`volatility`, :func:`max_drawdown`)
-cover a single return series without a panel, and
+cover a single return series without a DataFrame, and
 :func:`constrained_least_squares` fits factor returns for factor-Brinson
 attribution.
 
 Examples
 --------
->>> from datetime import date
->>> from finstack_quant.analytics import Performance, PerformancePanel
->>> panel = PerformancePanel(
-...     dates=[date(2024, 1, 1), date(2024, 1, 2)], series=[[0.01]], kind="returns", ticker_names=["FUND"]
+>>> import pandas as pd
+>>> from finstack_quant.analytics import Performance
+>>> prices = pd.DataFrame(
+...     {"FUND": [100.0, 101.0]},
+...     index=pd.to_datetime(["2024-01-01", "2024-01-02"]),
 ... )
->>> perf = Performance.from_panel(panel)
+>>> perf = Performance(prices)
 >>> perf.get_ticker_names()
 ['FUND']
 """
@@ -46,7 +46,6 @@ from finstack_quant.analytics._types import (
 )
 from finstack_quant.analytics._performance import (
     Performance as Performance,
-    PerformancePanel as PerformancePanel,
     max_drawdown as max_drawdown,
     multi_factor_greeks as multi_factor_greeks,
     sharpe as sharpe,
@@ -68,7 +67,6 @@ __all__ = [
     "LookbackReturns",
     "MultiFactorResult",
     "Performance",
-    "PerformancePanel",
     "PeriodStats",
     "RollingGreeks",
     "constrained_least_squares",

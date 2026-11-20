@@ -13,9 +13,11 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+import polars as pl
 import pytest
 
-from finstack_quant.analytics import Performance, PerformancePanel
+from finstack_quant.analytics import Performance
 
 GOLDEN: dict[str, Any] = json.loads((Path(__file__).parent / "data" / "analytics_wasm_parity.json").read_text())
 NAMES: list[str] = GOLDEN["ticker_names"]
@@ -24,46 +26,57 @@ NAMES: list[str] = GOLDEN["ticker_names"]
 def price_panel() -> Performance:
     """Price panel of the shared golden."""
     prices = GOLDEN["prices"]
-    return Performance.from_panel(
-        PerformancePanel(
-            dates=prices["dates"],
-            series=prices["values"],
-            kind="prices",
-            ticker_names=NAMES,
-            benchmark_ticker=prices["benchmark_ticker"],
-            frequency=prices["frequency"],
-        )
+    frame = pd.DataFrame(dict(zip(NAMES, prices["values"], strict=True)), index=prices["dates"])
+    return Performance(
+        frame,
+        benchmark_ticker=prices["benchmark_ticker"],
+        frequency=prices["frequency"],
     )
 
 
 def test_price_panel_matches_the_shared_golden() -> None:
-    assert list(price_panel().sharpe(risk_free_rate=0.0)) == pytest.approx(GOLDEN["prices"]["sharpe"], rel=1e-12)
+    perf = price_panel()
+    assert list(perf.sharpe(risk_free_rate=0.0)) == pytest.approx(GOLDEN["prices"]["sharpe"], rel=1e-12)
+    prices = GOLDEN["prices"]
+    pl_frame = pl.DataFrame({"date": prices["dates"], **dict(zip(NAMES, prices["values"], strict=True))})
+    assert (
+        Performance(
+            pl_frame,
+            benchmark_ticker=prices["benchmark_ticker"],
+            frequency=prices["frequency"],
+            date_col="date",
+        ).to_json()
+        == perf.to_json()
+    )
     with pytest.raises(KeyError, match="missing"):
-        Performance.from_panel(
-            PerformancePanel(
-                dates=GOLDEN["prices"]["dates"],
-                series=GOLDEN["prices"]["values"],
-                kind="prices",
-                ticker_names=NAMES,
-                benchmark_ticker="missing",
-                frequency="daily",
-            )
+        Performance(
+            pd.DataFrame(dict(zip(NAMES, GOLDEN["prices"]["values"], strict=True)), index=GOLDEN["prices"]["dates"]),
+            benchmark_ticker="missing",
+            frequency="daily",
         )
 
 
 def test_return_panel_matches_the_shared_golden() -> None:
     returns = GOLDEN["returns"]
-    panel = Performance.from_panel(
-        PerformancePanel(
-            dates=returns["dates"],
-            series=returns["values"],
-            kind="returns",
-            ticker_names=NAMES,
-            frequency="daily",
-            benchmark_ticker=(NAMES)[0],
-        )
+    frame = pd.DataFrame(dict(zip(NAMES, returns["values"], strict=True)), index=returns["dates"][1:])
+    panel = Performance.from_returns(
+        frame,
+        initial_date=returns["dates"][0],
+        frequency="daily",
+        benchmark_ticker=NAMES[0],
     )
     assert list(panel.volatility(annualize=True)) == pytest.approx(returns["volatility"], rel=1e-12)
+    pl_frame = pl.DataFrame({"date": returns["dates"][1:], **dict(zip(NAMES, returns["values"], strict=True))})
+    assert (
+        Performance.from_returns(
+            pl_frame,
+            initial_date=returns["dates"][0],
+            frequency="daily",
+            benchmark_ticker=NAMES[0],
+            date_col="date",
+        ).to_json()
+        == panel.to_json()
+    )
 
 
 def test_json_round_trip_matches_the_shared_golden() -> None:

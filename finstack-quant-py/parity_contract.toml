@@ -246,7 +246,7 @@ drawdown     = { python = "finstack_quant.analytics", status = "flattened", note
 multi_factor  = { python = "finstack_quant.analytics", status = "flattened", note = "Raw multi_factor_greeks requires explicit excess/total interpretation and observation factor; the Performance adapter accepts total investment returns and explicit annual effective cash. ReturnKind::from_label owns interpretation validation." }
 performance  = { python = "finstack_quant.analytics", status = "flattened", note = "Performance validates actual valuation grids (L dates, L prices or L-1 returns), optional declared frequency and benchmark. Numerical assumptions (annualize, cash, MAR, confidence, windows, episode counts and grouping frequency) are explicit. CorrelationResult carries common-sample matrix provenance and has no repair flag. CAGR defaults to ACT/365F and accepts core DayCountContext. LookbackReturns retains resolved fiscal context and actual per-ticker sample coverage. All calculation errors propagate atomically through the shared Rust owner." }
 regression   = { python = "finstack_quant.analytics", status = "flattened", note = "constrained_least_squares (Jeet & Partani 2023, Appendix A) exposed flat on finstack_quant.analytics; plain numeric list[float] API, no JSON envelope" }
-returns      = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via the one Rust constructor Performance::new(&PerformancePanel), whose panel kind (prices or returns) selects the price-to-return or return-span path. Python Performance(prices) and Performance.from_returns(returns, initial_date) are pandas host adapters (DataFrame or single-asset Series; row index = dates, column headings = ticker names) that build the PerformancePanel; Performance.from_panel(PerformancePanel(...)) is the Rust-shaped path and maps to the WASM constructor `new Performance(panel)`. `to_json` / `from_json` (WASM `toJson` / `fromJson`) are the serde round trip of the Rust Performance panel in both hosts." }
+returns      = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via the one Rust constructor Performance::new(&PerformancePanel), whose panel kind (prices or returns) selects the price-to-return or return-span path. Python Performance(prices, ...) and Performance.from_returns(returns, initial_date, ...) standardize on pandas DataFrame/Series and Polars DataFrame inputs (optional date_col= selects a date column or auto-detects a unique Polars Date/Datetime column; plus Performance.to_arrow(...) returning core.table.ArrowTable). WASM keeps `new Performance(panel)` taking `PerformancePanel`. `to_json` / `from_json` (WASM `toJson` / `fromJson`) are the serde round trip of the Rust Performance engine in both hosts." }
 risk_metrics = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance scalar methods (CAGR/Sharpe/Sortino/VaR/etc.) plus the four freestanding single-series functions analytics.sharpe / sortino / volatility / max_drawdown (WASM camelCase twins). CagrDayCount parses via Rust FromStr (labels act365_25 / DayCount names); ReturnKind is built by Rust ReturnKind::from_label(label, risk_free_rate) (explicit excess / total; any supplied cash with excess is rejected) — no binding-side parse tables. Python Performance.cagr(day_count=...) additionally accepts a core DayCount object; WASM Performance.cagr(dayCount) accepts labels only (pass dayCount.toString() to reuse a core.DayCount handle). Both resolve through Rust CagrDayCount (FromStr, or the DayCount variant directly)." }
 schema       = { python = "finstack_quant.analytics.schema", status = "exists", note = "Registry-backed index/get/validate over the crate's published JSON Schemas; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 
@@ -266,7 +266,6 @@ public = [
     "LookbackSample",
     "MultiFactorResult",
     "Performance",
-    "PerformancePanel",
     "PeriodStats",
     "RollingGreeks",
     "constrained_least_squares",
@@ -2254,7 +2253,7 @@ excluded = { "__version__" = "dunder" }
 
 [parity.modules."finstack_quant.analytics"]
 js = "analytics"
-types = { AnalyticsError = "FinstackError", BetaResult = "BetaResult", CorrelationResult = "CorrelationResult", DatedSeries = "DatedSeries", DrawdownEpisode = "DrawdownEpisode", GreeksResult = "GreeksResult", LookbackReturns = "LookbackReturns", LookbackSample = "LookbackSample", MultiFactorResult = "MultiFactorResult", PerformancePanel = "PerformancePanel", PeriodStats = "PeriodStats", RollingGreeks = "RollingGreeks" }
+types = { AnalyticsError = "FinstackError", BetaResult = "BetaResult", CorrelationResult = "CorrelationResult", DatedSeries = "DatedSeries", DrawdownEpisode = "DrawdownEpisode", GreeksResult = "GreeksResult", LookbackReturns = "LookbackReturns", LookbackSample = "LookbackSample", MultiFactorResult = "MultiFactorResult", PeriodStats = "PeriodStats", RollingGreeks = "RollingGreeks" }
 
 [parity.modules."finstack_quant.analytics.schema"]
 js = "analytics.schema"
@@ -2669,7 +2668,6 @@ capitalStructureSummaryTable = "twin of Python CapitalStructureSummary.to_datafr
 relativeValueReportTable = "twin of Python RelativeValueReport.to_dataframe (WASM reports are plain objects, so Rust RelativeValueReport::to_table is a function taking it)"
 
 [parity.members."finstack_quant.analytics.Performance"]
-renames = { from_panel = { js = "constructor", reason = "Python's constructor is the pandas price adapter; from_panel takes the Rust PerformancePanel, which the WASM constructor takes (Rust Performance::new)" } }
 excluded = { from_returns = "pandas" }
 
 [parity.members."finstack_quant.core.dates.BusinessDayConvention"]

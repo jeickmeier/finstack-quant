@@ -22,16 +22,15 @@ class PeriodStats:
     Examples
     --------
     >>> from finstack_quant.analytics import PeriodStats
-    >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> panel = PerformancePanel(
-    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-    ...     kind="returns",
-    ...     ticker_names=["FUND", "BENCH"],
-    ...     frequency="monthly",
-    ...     benchmark_ticker="BENCH",
+    >>> import pandas as pd
+    >>> from finstack_quant.analytics import Performance
+    >>> returns = pd.DataFrame(
+    ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+    ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
     ... )
-    >>> perf = Performance.from_panel(panel)
+    >>> perf = Performance.from_returns(
+    ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+    ... )
     >>> result = perf.period_stats(0, "daily")
     >>> isinstance(result, PeriodStats)
     True
@@ -109,16 +108,15 @@ class PeriodStats:
         Examples
         --------
         >>> from finstack_quant.analytics import PeriodStats
-        >>> from finstack_quant.analytics import Performance, PerformancePanel
-        >>> panel = PerformancePanel(
-        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-        ...     kind="returns",
-        ...     ticker_names=["FUND", "BENCH"],
-        ...     frequency="monthly",
-        ...     benchmark_ticker="BENCH",
+        >>> import pandas as pd
+        >>> from finstack_quant.analytics import Performance
+        >>> returns = pd.DataFrame(
+        ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+        ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
         ... )
-        >>> perf = Performance.from_panel(panel)
+        >>> perf = Performance.from_returns(
+        ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+        ... )
         >>> result = perf.period_stats(0, "daily")
         >>> restored = PeriodStats.from_json(result.to_json())
         >>> isinstance(restored, PeriodStats)
@@ -403,16 +401,15 @@ class BetaResult:
     Examples
     --------
     >>> from finstack_quant.analytics import BetaResult
-    >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> panel = PerformancePanel(
-    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-    ...     kind="returns",
-    ...     ticker_names=["FUND", "BENCH"],
-    ...     frequency="monthly",
-    ...     benchmark_ticker="BENCH",
+    >>> import pandas as pd
+    >>> from finstack_quant.analytics import Performance
+    >>> returns = pd.DataFrame(
+    ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+    ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
     ... )
-    >>> perf = Performance.from_panel(panel)
+    >>> perf = Performance.from_returns(
+    ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+    ... )
     >>> result = perf.beta()[0]
     >>> isinstance(result, BetaResult)
     True
@@ -442,16 +439,15 @@ class BetaResult:
         Examples
         --------
         >>> from finstack_quant.analytics import BetaResult
-        >>> from finstack_quant.analytics import Performance, PerformancePanel
-        >>> panel = PerformancePanel(
-        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-        ...     kind="returns",
-        ...     ticker_names=["FUND", "BENCH"],
-        ...     frequency="monthly",
-        ...     benchmark_ticker="BENCH",
+        >>> import pandas as pd
+        >>> from finstack_quant.analytics import Performance
+        >>> returns = pd.DataFrame(
+        ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+        ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
         ... )
-        >>> perf = Performance.from_panel(panel)
+        >>> perf = Performance.from_returns(
+        ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+        ... )
         >>> result = perf.beta()[0]
         >>> restored = BetaResult.from_json(result.to_json())
         >>> isinstance(restored, BetaResult)
@@ -636,16 +632,15 @@ class GreeksResult:
     Examples
     --------
     >>> from finstack_quant.analytics import GreeksResult
-    >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> panel = PerformancePanel(
-    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-    ...     kind="returns",
-    ...     ticker_names=["FUND", "BENCH"],
-    ...     frequency="monthly",
-    ...     benchmark_ticker="BENCH",
+    >>> import pandas as pd
+    >>> from finstack_quant.analytics import Performance
+    >>> returns = pd.DataFrame(
+    ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+    ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
     ... )
-    >>> perf = Performance.from_panel(panel)
+    >>> perf = Performance.from_returns(
+    ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+    ... )
     >>> result = perf.greeks(0.0)[0]
     >>> isinstance(result, GreeksResult)
     True
@@ -675,16 +670,15 @@ class GreeksResult:
         Examples
         --------
         >>> from finstack_quant.analytics import GreeksResult
-        >>> from finstack_quant.analytics import Performance, PerformancePanel
-        >>> panel = PerformancePanel(
-        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-        ...     kind="returns",
-        ...     ticker_names=["FUND", "BENCH"],
-        ...     frequency="monthly",
-        ...     benchmark_ticker="BENCH",
+        >>> import pandas as pd
+        >>> from finstack_quant.analytics import Performance
+        >>> returns = pd.DataFrame(
+        ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+        ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
         ... )
-        >>> perf = Performance.from_panel(panel)
+        >>> perf = Performance.from_returns(
+        ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+        ... )
         >>> result = perf.greeks(0.0)[0]
         >>> restored = GreeksResult.from_json(result.to_json())
         >>> isinstance(restored, GreeksResult)
@@ -855,16 +849,15 @@ class RollingGreeks:
     Examples
     --------
     >>> from finstack_quant.analytics import RollingGreeks
-    >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> panel = PerformancePanel(
-    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-    ...     kind="returns",
-    ...     ticker_names=["FUND", "BENCH"],
-    ...     frequency="monthly",
-    ...     benchmark_ticker="BENCH",
+    >>> import pandas as pd
+    >>> from finstack_quant.analytics import Performance
+    >>> returns = pd.DataFrame(
+    ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+    ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
     ... )
-    >>> perf = Performance.from_panel(panel)
+    >>> perf = Performance.from_returns(
+    ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+    ... )
     >>> result = perf.rolling_greeks(0, 2, 0.0)
     >>> isinstance(result, RollingGreeks)
     True
@@ -894,16 +887,15 @@ class RollingGreeks:
         Examples
         --------
         >>> from finstack_quant.analytics import RollingGreeks
-        >>> from finstack_quant.analytics import Performance, PerformancePanel
-        >>> panel = PerformancePanel(
-        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-        ...     kind="returns",
-        ...     ticker_names=["FUND", "BENCH"],
-        ...     frequency="monthly",
-        ...     benchmark_ticker="BENCH",
+        >>> import pandas as pd
+        >>> from finstack_quant.analytics import Performance
+        >>> returns = pd.DataFrame(
+        ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+        ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
         ... )
-        >>> perf = Performance.from_panel(panel)
+        >>> perf = Performance.from_returns(
+        ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+        ... )
         >>> result = perf.rolling_greeks(0, 2, 0.0)
         >>> restored = RollingGreeks.from_json(result.to_json())
         >>> isinstance(restored, RollingGreeks)
@@ -1033,16 +1025,15 @@ class MultiFactorResult:
     Examples
     --------
     >>> from finstack_quant.analytics import MultiFactorResult
-    >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> panel = PerformancePanel(
-    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-    ...     kind="returns",
-    ...     ticker_names=["FUND", "BENCH"],
-    ...     frequency="monthly",
-    ...     benchmark_ticker="BENCH",
+    >>> import pandas as pd
+    >>> from finstack_quant.analytics import Performance
+    >>> returns = pd.DataFrame(
+    ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+    ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
     ... )
-    >>> perf = Performance.from_panel(panel)
+    >>> perf = Performance.from_returns(
+    ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+    ... )
     >>> result = perf.multi_factor_greeks(0, [[0.02, -0.03, 0.01]], 0.0)
     >>> isinstance(result, MultiFactorResult)
     True
@@ -1072,16 +1063,15 @@ class MultiFactorResult:
         Examples
         --------
         >>> from finstack_quant.analytics import MultiFactorResult
-        >>> from finstack_quant.analytics import Performance, PerformancePanel
-        >>> panel = PerformancePanel(
-        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-        ...     kind="returns",
-        ...     ticker_names=["FUND", "BENCH"],
-        ...     frequency="monthly",
-        ...     benchmark_ticker="BENCH",
+        >>> import pandas as pd
+        >>> from finstack_quant.analytics import Performance
+        >>> returns = pd.DataFrame(
+        ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+        ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
         ... )
-        >>> perf = Performance.from_panel(panel)
+        >>> perf = Performance.from_returns(
+        ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+        ... )
         >>> result = perf.multi_factor_greeks(0, [[0.02, -0.03, 0.01]], 0.0)
         >>> restored = MultiFactorResult.from_json(result.to_json())
         >>> isinstance(restored, MultiFactorResult)
@@ -1278,16 +1268,15 @@ class DrawdownEpisode:
     Examples
     --------
     >>> from finstack_quant.analytics import DrawdownEpisode
-    >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> panel = PerformancePanel(
-    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-    ...     kind="returns",
-    ...     ticker_names=["FUND", "BENCH"],
-    ...     frequency="monthly",
-    ...     benchmark_ticker="BENCH",
+    >>> import pandas as pd
+    >>> from finstack_quant.analytics import Performance
+    >>> returns = pd.DataFrame(
+    ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+    ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
     ... )
-    >>> perf = Performance.from_panel(panel)
+    >>> perf = Performance.from_returns(
+    ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+    ... )
     >>> result = perf.drawdown_details(0, 1)[0]
     >>> isinstance(result, DrawdownEpisode)
     True
@@ -1317,16 +1306,15 @@ class DrawdownEpisode:
         Examples
         --------
         >>> from finstack_quant.analytics import DrawdownEpisode
-        >>> from finstack_quant.analytics import Performance, PerformancePanel
-        >>> panel = PerformancePanel(
-        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-        ...     kind="returns",
-        ...     ticker_names=["FUND", "BENCH"],
-        ...     frequency="monthly",
-        ...     benchmark_ticker="BENCH",
+        >>> import pandas as pd
+        >>> from finstack_quant.analytics import Performance
+        >>> returns = pd.DataFrame(
+        ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+        ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
         ... )
-        >>> perf = Performance.from_panel(panel)
+        >>> perf = Performance.from_returns(
+        ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+        ... )
         >>> result = perf.drawdown_details(0, 1)[0]
         >>> restored = DrawdownEpisode.from_json(result.to_json())
         >>> isinstance(restored, DrawdownEpisode)
@@ -1486,16 +1474,15 @@ class LookbackReturns:
     Examples
     --------
     >>> from finstack_quant.analytics import LookbackReturns
-    >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> panel = PerformancePanel(
-    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-    ...     kind="returns",
-    ...     ticker_names=["FUND", "BENCH"],
-    ...     frequency="monthly",
-    ...     benchmark_ticker="BENCH",
+    >>> import pandas as pd
+    >>> from finstack_quant.analytics import Performance
+    >>> returns = pd.DataFrame(
+    ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+    ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
     ... )
-    >>> perf = Performance.from_panel(panel)
+    >>> perf = Performance.from_returns(
+    ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+    ... )
     >>> result = perf.lookback_returns()
     >>> isinstance(result, LookbackReturns)
     True
@@ -1605,16 +1592,15 @@ class LookbackReturns:
         Examples
         --------
         >>> from finstack_quant.analytics import LookbackReturns
-        >>> from finstack_quant.analytics import Performance, PerformancePanel
-        >>> panel = PerformancePanel(
-        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-        ...     kind="returns",
-        ...     ticker_names=["FUND", "BENCH"],
-        ...     frequency="monthly",
-        ...     benchmark_ticker="BENCH",
+        >>> import pandas as pd
+        >>> from finstack_quant.analytics import Performance
+        >>> returns = pd.DataFrame(
+        ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+        ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
         ... )
-        >>> perf = Performance.from_panel(panel)
+        >>> perf = Performance.from_returns(
+        ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+        ... )
         >>> result = perf.lookback_returns()
         >>> restored = LookbackReturns.from_json(result.to_json())
         >>> isinstance(restored, LookbackReturns)
@@ -1794,16 +1780,15 @@ class DatedSeries:
     Examples
     --------
     >>> from finstack_quant.analytics import DatedSeries
-    >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> panel = PerformancePanel(
-    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-    ...     kind="returns",
-    ...     ticker_names=["FUND", "BENCH"],
-    ...     frequency="monthly",
-    ...     benchmark_ticker="BENCH",
+    >>> import pandas as pd
+    >>> from finstack_quant.analytics import Performance
+    >>> returns = pd.DataFrame(
+    ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+    ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
     ... )
-    >>> perf = Performance.from_panel(panel)
+    >>> perf = Performance.from_returns(
+    ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+    ... )
     >>> result = perf.rolling_returns(0, 2)
     >>> isinstance(result, DatedSeries)
     True
@@ -1833,16 +1818,15 @@ class DatedSeries:
         Examples
         --------
         >>> from finstack_quant.analytics import DatedSeries
-        >>> from finstack_quant.analytics import Performance, PerformancePanel
-        >>> panel = PerformancePanel(
-        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-        ...     kind="returns",
-        ...     ticker_names=["FUND", "BENCH"],
-        ...     frequency="monthly",
-        ...     benchmark_ticker="BENCH",
+        >>> import pandas as pd
+        >>> from finstack_quant.analytics import Performance
+        >>> returns = pd.DataFrame(
+        ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+        ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
         ... )
-        >>> perf = Performance.from_panel(panel)
+        >>> perf = Performance.from_returns(
+        ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+        ... )
         >>> result = perf.rolling_returns(0, 2)
         >>> restored = DatedSeries.from_json(result.to_json())
         >>> isinstance(restored, DatedSeries)
@@ -1973,16 +1957,15 @@ class LookbackSample:
     Examples
     --------
     >>> from finstack_quant.analytics import LookbackSample
-    >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> panel = PerformancePanel(
-    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-    ...     kind="returns",
-    ...     ticker_names=["FUND", "BENCH"],
-    ...     frequency="monthly",
-    ...     benchmark_ticker="BENCH",
+    >>> import pandas as pd
+    >>> from finstack_quant.analytics import Performance
+    >>> returns = pd.DataFrame(
+    ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+    ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
     ... )
-    >>> perf = Performance.from_panel(panel)
+    >>> perf = Performance.from_returns(
+    ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+    ... )
     >>> result = perf.lookback_returns().mtd_samples[0]
     >>> isinstance(result, LookbackSample)
     True
@@ -2060,16 +2043,15 @@ class LookbackSample:
         Examples
         --------
         >>> from finstack_quant.analytics import LookbackSample
-        >>> from finstack_quant.analytics import Performance, PerformancePanel
-        >>> panel = PerformancePanel(
-        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-        ...     kind="returns",
-        ...     ticker_names=["FUND", "BENCH"],
-        ...     frequency="monthly",
-        ...     benchmark_ticker="BENCH",
+        >>> import pandas as pd
+        >>> from finstack_quant.analytics import Performance
+        >>> returns = pd.DataFrame(
+        ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+        ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
         ... )
-        >>> perf = Performance.from_panel(panel)
+        >>> perf = Performance.from_returns(
+        ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+        ... )
         >>> result = perf.lookback_returns().mtd_samples[0]
         >>> isinstance(result, LookbackSample)
         True
@@ -2120,16 +2102,15 @@ class CorrelationResult:
     Examples
     --------
     >>> from finstack_quant.analytics import CorrelationResult
-    >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> panel = PerformancePanel(
-    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-    ...     kind="returns",
-    ...     ticker_names=["FUND", "BENCH"],
-    ...     frequency="monthly",
-    ...     benchmark_ticker="BENCH",
+    >>> import pandas as pd
+    >>> from finstack_quant.analytics import Performance
+    >>> returns = pd.DataFrame(
+    ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+    ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
     ... )
-    >>> perf = Performance.from_panel(panel)
+    >>> perf = Performance.from_returns(
+    ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+    ... )
     >>> result = perf.correlation_matrix()
     >>> isinstance(result, CorrelationResult)
     True
@@ -2239,16 +2220,15 @@ class CorrelationResult:
         Examples
         --------
         >>> from finstack_quant.analytics import CorrelationResult
-        >>> from finstack_quant.analytics import Performance, PerformancePanel
-        >>> panel = PerformancePanel(
-        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
-        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
-        ...     kind="returns",
-        ...     ticker_names=["FUND", "BENCH"],
-        ...     frequency="monthly",
-        ...     benchmark_ticker="BENCH",
+        >>> import pandas as pd
+        >>> from finstack_quant.analytics import Performance
+        >>> returns = pd.DataFrame(
+        ...     {"FUND": [0.10, -0.20, 0.05], "BENCH": [0.02, -0.03, 0.01]},
+        ...     index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"]),
         ... )
-        >>> perf = Performance.from_panel(panel)
+        >>> perf = Performance.from_returns(
+        ...     returns, initial_date="2024-01-01", frequency="monthly", benchmark_ticker="BENCH"
+        ... )
         >>> result = perf.correlation_matrix()
         >>> isinstance(result, CorrelationResult)
         True

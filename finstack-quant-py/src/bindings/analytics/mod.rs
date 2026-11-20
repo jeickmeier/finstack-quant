@@ -2,11 +2,11 @@
 //!
 //! The primary Python-callable entry point is [`Performance`]: return
 //! transforms, return/risk metrics, periodic returns, benchmark comparisons,
-//! and basic factor models are methods on an instance built from a price or
-//! return panel. Four scalar free functions (`sharpe`, `sortino`,
-//! `volatility`, `max_drawdown`) cover the single-series case without a
-//! panel, and `constrained_least_squares` is the standalone factor-return
-//! solver for factor-Brinson attribution.
+//! and basic factor models are methods on an instance built from a pandas or
+//! Polars DataFrame (or a pandas Series). Four scalar free functions (`sharpe`,
+//! `sortino`, `volatility`, `max_drawdown`) cover the single-series case
+//! without a DataFrame, and `constrained_least_squares` is the standalone
+//! factor-return solver for factor-Brinson attribution.
 
 mod performance;
 mod regression;
@@ -46,7 +46,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "LookbackSample",
             "MultiFactorResult",
             "Performance",
-            "PerformancePanel",
             "PeriodStats",
             "RollingGreeks",
             "constrained_least_squares",

@@ -2,27 +2,25 @@
 
 from datetime import date
 
+import pandas as pd
 import pytest
 
-from finstack_quant.analytics import Performance, PerformancePanel
+from finstack_quant.analytics import Performance
 from finstack_quant.core.dates import PeriodKind
 from finstack_quant.statements import RollupSpec
-from tests.analytics_helpers import valuation_grid
+from tests.analytics_helpers import opening_date
 
 ALIASES = ["D", "B", "W", "M", "ME", "Q", "QE", "A", "Y", "YE", "semiannual", "DAILY", "monthly ", " daily", ""]
 CANONICAL = ["daily", "weekly", "monthly", "quarterly", "semi_annual", "annual"]
 
 
 def panel(frequency: str = "daily") -> Performance:
-    return Performance.from_panel(
-        PerformancePanel(
-            dates=valuation_grid([date(2025, 1, day) for day in range(1, 5)]),
-            series=[[0.01, -0.02, 0.03, 0.005]],
-            kind="returns",
-            ticker_names=["FUND"],
-            frequency=frequency,
-            benchmark_ticker="FUND",
-        )
+    grid = [date(2025, 1, day) for day in range(1, 5)]
+    return Performance.from_returns(
+        pd.DataFrame({"FUND": [0.01, -0.02, 0.03, 0.005]}, index=grid),
+        initial_date=opening_date(grid),
+        frequency=frequency,
+        benchmark_ticker="FUND",
     )
 
 

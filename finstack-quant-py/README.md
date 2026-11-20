@@ -342,7 +342,7 @@ primary IntelliSense surface; `py.typed` marks the package as typed. Runtime
 | Config | `core.config` | `FinstackConfig`, `RoundingMode`, `ToleranceConfig` |
 | Curves / context | `core.market_data` | `DiscountCurve`, `ForwardCurve`, `HazardCurve`, `FxMatrix`, `ScalarTimeSeries`, `MarketContext` |
 | Credit models | `models.credit` | Structural-credit models, `moodys_warf_factor`, and nested `scoring`, `pd`, `lgd`, `migration`, `recovery_waterfall`, and `liability_management` modules |
-| Arrow interchange | `core.table` | `ArrowTable` (the module's only export). Instances come from result wrappers elsewhere — `StatementResult.to_arrow_long` / `.to_arrow_wide`, `PortfolioValuation.to_arrow_positions`; consume with `pyarrow.table(...)`, `polars.DataFrame(...)` via the `__arrow_c_stream__` PyCapsule protocol |
+| Arrow interchange | `core.table` | `ArrowTable` (the module's only export). Instances come from result wrappers elsewhere — `StatementResult.to_arrow_long` / `.to_arrow_wide`, `PortfolioValuation.to_arrow_positions`, `Performance.to_arrow`; consume with `pyarrow.table(...)`, `polars.DataFrame(...)` via the `__arrow_c_stream__` PyCapsule protocol |
 | Cashflow schedules | `cashflows.builder` | `CashFlowBuilder`, `ScheduleParams`, `FixedCouponSpec`, `FloatingCouponSpec`, `AmortizationSpec`, … |
 | Pricing | `valuations.instruments` | `price_instrument`, `Bond`, `TermLoan`, `InterestRateSwap`, `Swaption`, `CapFloor`, `CreditDefaultSwap`, `FxForward`, `FxOption`, `EquityOption`, `StructuredCredit`, … |
 | Valuation envelope | `valuations` | `ValuationResult`, `CalibrationEnvelope`, `calibrate` |

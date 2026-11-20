@@ -9,13 +9,15 @@ alpha/beta, and basic factor models.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 import math
 import pickle
 
 import pandas as pd
+import polars as pl
 import pytest
 
+import finstack_quant.analytics as analytics_mod
 from finstack_quant.analytics import (
     AnalyticsError,
     BetaResult,
@@ -24,13 +26,16 @@ from finstack_quant.analytics import (
     LookbackReturns,
     MultiFactorResult,
     Performance,
-    PerformancePanel,
     PeriodStats,
     RollingGreeks,
+    max_drawdown,
     multi_factor_greeks,
+    sharpe,
+    sortino,
+    volatility,
 )
 from finstack_quant.core.dates import DayCountContext, FiscalConfig
-from tests.analytics_helpers import valuation_grid
+from tests.analytics_helpers import opening_date
 from tests.stub_helpers import stub_text as read_stub_text
 
 
@@ -58,30 +63,24 @@ def _returns_panel(prices: pd.DataFrame) -> pd.DataFrame:
 def test_beta_confidence_interval_uses_actual_degrees_of_freedom() -> None:
     benchmark = [-0.02 + i * 0.001 for i in range(42)]
     fund = [1.4 * value + (0.002 if i % 2 == 0 else -0.0015) for i, value in enumerate(benchmark)]
-    perf = Performance.from_panel(
-        PerformancePanel(
-            dates=valuation_grid(_daily_dates(42)),
-            series=[fund, benchmark],
-            kind="returns",
-            ticker_names=["FUND", "BENCH"],
-            benchmark_ticker="BENCH",
-            frequency="daily",
-        )
+    grid = _daily_dates(42)
+    perf = Performance.from_returns(
+        pd.DataFrame({"FUND": fund, "BENCH": benchmark}, index=grid),
+        initial_date=opening_date(grid),
+        benchmark_ticker="BENCH",
+        frequency="daily",
     )
     result = perf.beta()[0]
     assert (result.ci_upper - result.beta) / result.std_err == pytest.approx(2.0210753903062733, abs=1e-9)
 
 
 def test_native_frames_preserve_infinite_period_statistics() -> None:
-    perf = Performance.from_panel(
-        PerformancePanel(
-            dates=valuation_grid(_daily_dates(4)),
-            series=[[0.01, 0.02, 0.03, 0.04]],
-            kind="returns",
-            ticker_names=["FUND"],
-            frequency="daily",
-            benchmark_ticker="FUND",
-        )
+    grid = _daily_dates(4)
+    perf = Performance.from_returns(
+        pd.DataFrame({"FUND": [0.01, 0.02, 0.03, 0.04]}, index=grid),
+        initial_date=opening_date(grid),
+        frequency="daily",
+        benchmark_ticker="FUND",
     )
     stats = perf.period_stats(0, aggregation_frequency="daily")
     frame = stats.to_dataframe()
@@ -95,15 +94,12 @@ def test_native_frames_preserve_infinite_period_statistics() -> None:
 
 
 def test_degenerate_regression_frames_keep_numeric_nan_columns() -> None:
-    perf = Performance.from_panel(
-        PerformancePanel(
-            dates=valuation_grid(_daily_dates(4)),
-            series=[[0.01, -0.02, 0.03, 0.04], [0.01] * 4],
-            kind="returns",
-            ticker_names=["FUND", "BENCH"],
-            benchmark_ticker="BENCH",
-            frequency="daily",
-        )
+    grid = _daily_dates(4)
+    perf = Performance.from_returns(
+        pd.DataFrame({"FUND": [0.01, -0.02, 0.03, 0.04], "BENCH": [0.01] * 4}, index=grid),
+        initial_date=opening_date(grid),
+        benchmark_ticker="BENCH",
+        frequency="daily",
     )
     for frame in (
         perf.beta()[0].to_dataframe(),
@@ -118,15 +114,10 @@ def test_degenerate_regression_frames_keep_numeric_nan_columns() -> None:
 
 
 def test_drawdown_episode_frame_retains_populated_dtypes() -> None:
-    perf = Performance.from_panel(
-        PerformancePanel(
-            dates=_daily_dates(4),
-            series=[[100.0, 90.0, 100.0, 110.0]],
-            kind="prices",
-            ticker_names=["FUND"],
-            frequency="daily",
-            benchmark_ticker="FUND",
-        )
+    perf = Performance(
+        pd.DataFrame({"FUND": [100.0, 90.0, 100.0, 110.0]}, index=_daily_dates(4)),
+        frequency="daily",
+        benchmark_ticker="FUND",
     )
     frame = perf.drawdown_details(0, n=5)[0].to_dataframe()
     assert frame["duration_days"].dtype == "int64"
@@ -135,15 +126,12 @@ def test_drawdown_episode_frame_retains_populated_dtypes() -> None:
 
 
 def test_lookback_frame_preserves_ticker_and_metric_labels() -> None:
-    perf = Performance.from_panel(
-        PerformancePanel(
-            dates=valuation_grid(_daily_dates(4)),
-            series=[[0.01, 0.02, 0.03, 0.04], [-0.01, 0.03, 0.02, 0.01]],
-            kind="returns",
-            ticker_names=["A", "B"],
-            frequency="daily",
-            benchmark_ticker="A",
-        )
+    grid = _daily_dates(4)
+    perf = Performance.from_returns(
+        pd.DataFrame({"A": [0.01, 0.02, 0.03, 0.04], "B": [-0.01, 0.03, 0.02, 0.01]}, index=grid),
+        initial_date=opening_date(grid),
+        frequency="daily",
+        benchmark_ticker="A",
     )
     frame = perf.lookback_returns(_daily_dates(4)[-1]).to_dataframe()
     assert list(frame.index) == ["A", "B"]
@@ -205,34 +193,38 @@ class TestConstruction:
         assert perf.get_active_dates_for_ticker(1) == [date(2024, 1, 4), date(2024, 1, 5)]
         assert perf.cumulative_returns()[1] == pytest.approx([0.10, 0.21])
 
-    def test_from_panel_of_prices(self) -> None:
+    def test_panel_pathway_is_removed(self) -> None:
+        assert not hasattr(analytics_mod, "PerformancePanel")
+        assert not hasattr(Performance, "from_panel")
+        with pytest.raises(TypeError) as exc_info:
+            Performance([[100.0, 101.0]])  # type: ignore[arg-type]
+        assert "from_panel" not in str(exc_info.value)
+        assert "PerformancePanel" not in str(exc_info.value)
+
+    def test_from_prices_dataframe_with_date_col(self) -> None:
         dates = _daily_dates(5)
-        prices = [[100.0, 101.0, 102.0, 103.0, 104.0], [50.0, 50.5, 51.0, 51.5, 52.0]]
-        perf = Performance.from_panel(
-            PerformancePanel(
-                dates=dates,
-                series=prices,
-                kind="prices",
-                ticker_names=["A", "B"],
-                frequency="daily",
-                benchmark_ticker="A",
-            )
-        )
+        frame = pd.DataFrame({
+            "date": dates,
+            "A": [100.0, 101.0, 102.0, 103.0, 104.0],
+            "B": [50.0, 50.5, 51.0, 51.5, 52.0],
+        })
+        perf = Performance(frame, frequency="daily", benchmark_ticker="A", date_col="date")
         assert perf.get_ticker_names() == ["A", "B"]
         assert list(perf.cagr().index) == ["A", "B"]
 
-    def test_from_panel_of_returns(self) -> None:
+    def test_from_returns_dataframe_with_date_col(self) -> None:
         dates = _daily_dates(4)
-        returns = [[0.01, -0.02, 0.015, 0.0], [0.005, -0.01, 0.0, 0.005]]
-        perf = Performance.from_panel(
-            PerformancePanel(
-                dates=valuation_grid(dates),
-                series=returns,
-                kind="returns",
-                ticker_names=["A", "B"],
-                benchmark_ticker="B",
-                frequency="daily",
-            )
+        frame = pd.DataFrame({
+            "date": dates,
+            "A": [0.01, -0.02, 0.015, 0.0],
+            "B": [0.005, -0.01, 0.0, 0.005],
+        })
+        perf = Performance.from_returns(
+            frame,
+            initial_date=opening_date(dates),
+            benchmark_ticker="B",
+            frequency="daily",
+            date_col="date",
         )
         assert perf.get_benchmark_idx() == 1
         assert list(perf.cagr().index) == ["A", "B"]
@@ -304,19 +296,17 @@ class TestReturnRiskMetrics:
 
     def test_correlation_matrix_is_square_psd_identity_diag(self) -> None:
         dates = _daily_dates(6)
-        returns = [
-            [0.01, -0.02, 0.015, 0.0, 0.01, -0.01],
-            [0.005, -0.01, 0.0, 0.005, 0.02, -0.015],
-        ]
-        perf = Performance.from_panel(
-            PerformancePanel(
-                dates=valuation_grid(dates),
-                series=returns,
-                kind="returns",
-                ticker_names=["A", "B"],
-                frequency="daily",
-                benchmark_ticker="A",
-            )
+        perf = Performance.from_returns(
+            pd.DataFrame(
+                {
+                    "A": [0.01, -0.02, 0.015, 0.0, 0.01, -0.01],
+                    "B": [0.005, -0.01, 0.0, 0.005, 0.02, -0.015],
+                },
+                index=dates,
+            ),
+            initial_date=opening_date(dates),
+            frequency="daily",
+            benchmark_ticker="A",
         )
         result = perf.correlation_matrix()
         corr = result.matrix
@@ -462,15 +452,12 @@ class TestBenchmark:
         assert all(isinstance(r, GreeksResult) for r in results)
 
     def test_degenerate_beta_and_greeks_wire_round_trips_preserve_nan(self) -> None:
-        perf = Performance.from_panel(
-            PerformancePanel(
-                dates=valuation_grid([date(2024, 1, 1)]),
-                series=[[0.01], [0.01]],
-                kind="returns",
-                ticker_names=["TARGET", "BENCH"],
-                benchmark_ticker="BENCH",
-                frequency="daily",
-            )
+        grid = [date(2024, 1, 1)]
+        perf = Performance.from_returns(
+            pd.DataFrame({"TARGET": [0.01], "BENCH": [0.01]}, index=grid),
+            initial_date=opening_date(grid),
+            benchmark_ticker="BENCH",
+            frequency="daily",
         )
 
         beta_result = perf.beta()[0]
@@ -499,15 +486,11 @@ class TestBenchmark:
         dates = _daily_dates(6)
         benchmark = [-0.02, -0.01, 0.0, 0.01, 0.02, 0.03]
         target = [2.0 * value for value in benchmark]
-        perf = Performance.from_panel(
-            PerformancePanel(
-                dates=valuation_grid(dates),
-                series=[target, benchmark],
-                kind="returns",
-                ticker_names=["TARGET", "BENCH"],
-                benchmark_ticker="BENCH",
-                frequency="monthly",
-            )
+        perf = Performance.from_returns(
+            pd.DataFrame({"TARGET": target, "BENCH": benchmark}, index=dates),
+            initial_date=opening_date(dates),
+            benchmark_ticker="BENCH",
+            frequency="monthly",
         )
 
         zero_rf = perf.greeks(risk_free_rate=0.0)[0]
@@ -526,15 +509,11 @@ class TestBenchmark:
         dates = _daily_dates(8)
         benchmark = [-0.03, -0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.04]
         target = [1.5 * value for value in benchmark]
-        perf = Performance.from_panel(
-            PerformancePanel(
-                dates=valuation_grid(dates),
-                series=[target, benchmark],
-                kind="returns",
-                ticker_names=["TARGET", "BENCH"],
-                benchmark_ticker="BENCH",
-                frequency="monthly",
-            )
+        perf = Performance.from_returns(
+            pd.DataFrame({"TARGET": target, "BENCH": benchmark}, index=dates),
+            initial_date=opening_date(dates),
+            benchmark_ticker="BENCH",
+            frequency="monthly",
         )
 
         zero_rf = perf.rolling_greeks(0, window=5, risk_free_rate=0.0)
@@ -642,6 +621,258 @@ class TestDateRange:
         assert len(perf_prices.get_dates()) == 59
 
 
+# Polars & date_col standardization
+
+
+class TestPolarsAndDateCol:
+    def test_polars_prices_auto_detects_date_datetime_and_tz_aware(self) -> None:
+        dates = _daily_dates(5)
+        pd_df = pd.DataFrame(
+            {"ACME": [100.0, 102.0, 101.0, 104.0, 105.0], "BENCH": [100.0, 100.5, 101.0, 101.5, 102.0]},
+            index=pd.to_datetime(dates),
+        )
+        expected = Performance(pd_df, benchmark_ticker="BENCH", frequency="daily")
+
+        pl_date = pl.DataFrame({
+            "obs_date": dates,
+            "ACME": [100.0, 102.0, 101.0, 104.0, 105.0],
+            "BENCH": [100.0, 100.5, 101.0, 101.5, 102.0],
+        })
+        pl_naive_dt = pl.DataFrame({
+            "timestamp": [datetime(d.year, d.month, d.day, 16, 0) for d in dates],
+            "ACME": [100.0, 102.0, 101.0, 104.0, 105.0],
+            "BENCH": [100.0, 100.5, 101.0, 101.5, 102.0],
+        })
+        pl_utc_dt = pl.DataFrame({
+            "timestamp": [datetime(d.year, d.month, d.day, 21, 0, tzinfo=UTC) for d in dates],
+            "ACME": [100.0, 102.0, 101.0, 104.0, 105.0],
+            "BENCH": [100.0, 100.5, 101.0, 101.5, 102.0],
+        })
+
+        for frame in (pl_date, pl_naive_dt, pl_utc_dt):
+            actual = Performance(frame, benchmark_ticker="BENCH", frequency="daily")
+            assert actual.to_json() == expected.to_json()
+            assert actual.sharpe(0.0).equals(expected.sharpe(0.0))
+            assert actual.cagr().equals(expected.cagr())
+
+    def test_polars_explicit_date_col_with_iso_strings_and_multiple_date_cols(self) -> None:
+        dates = _daily_dates(4)
+        pd_perf = Performance(
+            pd.DataFrame({"A": [100.0, 101.0, 102.0, 103.0]}, index=dates),
+            frequency="daily",
+        )
+        pl_str = pl.DataFrame({
+            "A": [100.0, 101.0, 102.0, 103.0],
+            "iso_date": [d.isoformat() for d in dates],
+        })
+        assert Performance(pl_str, frequency="daily", date_col="iso_date").to_json() == pd_perf.to_json()
+
+        pl_multi = pl.DataFrame({
+            "trade_date": dates,
+            "settle_date": [d + timedelta(days=2) for d in dates],
+            "A": [100.0, 101.0, 102.0, 103.0],
+        })
+        with pytest.raises(ValueError, match="multiple Date/Datetime columns"):
+            Performance(pl_multi, frequency="daily")
+        with pytest.raises(ValueError, match="multiple Date/Datetime columns"):
+            Performance(
+                pl_multi.select([
+                    pl.col("trade_date"),
+                    pl.col("settle_date").cast(pl.Datetime),
+                    pl.col("A"),
+                ]),
+                frequency="daily",
+            )
+        with pytest.raises(TypeError, match="non-numeric Polars dtype"):
+            Performance(pl_multi, frequency="daily", date_col="settle_date")
+        selected = Performance(
+            pl_multi.select(["settle_date", "A"]),
+            frequency="daily",
+            date_col="settle_date",
+        )
+        assert selected.get_dates() == [d + timedelta(days=2) for d in dates[1:]]
+
+    def test_polars_from_returns_and_int_promotion(self) -> None:
+        dates = _daily_dates(4)
+        init = opening_date(dates)
+        pd_perf = Performance.from_returns(
+            pd.DataFrame({"A": [0.01, -0.02, 0.03, 0.01]}, index=dates),
+            initial_date=init,
+            frequency="daily",
+            benchmark_ticker="A",
+        )
+        pl_df = pl.DataFrame({
+            "date": dates,
+            "A": [0.01, -0.02, 0.03, 0.01],
+        })
+        assert (
+            Performance.from_returns(
+                pl_df,
+                initial_date=init,
+                frequency="daily",
+                benchmark_ticker="A",
+            ).to_json()
+            == pd_perf.to_json()
+        )
+        assert (
+            Performance.from_returns(
+                pl_df,
+                initial_date=init,
+                frequency="daily",
+                benchmark_ticker="A",
+                date_col="date",
+            ).to_json()
+            == pd_perf.to_json()
+        )
+        # Integer price columns promote cleanly to float64.
+        pl_int = pl.DataFrame({"date": dates, "A": [100, 101, 102, 103]})
+        assert Performance(pl_int, frequency="daily").cagr().iloc[0] > 0.0
+
+    def test_polars_null_and_nan_edge_gaps_and_domain_errors(self) -> None:
+        dates = _daily_dates(6)
+        pd_prices = pd.DataFrame(
+            {
+                "BENCH": [100.0, 101.0, 102.0, 103.0, 104.0, 105.0],
+                "PORT": [math.nan, math.nan, 50.0, 55.0, 60.5, math.nan],
+            },
+            index=dates,
+        )
+        pl_null = pl.DataFrame({
+            "date": dates,
+            "BENCH": [100.0, 101.0, 102.0, 103.0, 104.0, 105.0],
+            "PORT": [None, None, 50.0, 55.0, 60.5, None],
+        })
+        pl_nan = pl.DataFrame({
+            "date": dates,
+            "BENCH": [100.0, 101.0, 102.0, 103.0, 104.0, 105.0],
+            "PORT": [math.nan, math.nan, 50.0, 55.0, 60.5, math.nan],
+        })
+        expected = Performance(pd_prices, benchmark_ticker="BENCH", frequency="daily")
+        assert Performance(pl_null, benchmark_ticker="BENCH", frequency="daily").to_json() == expected.to_json()
+        assert Performance(pl_nan, benchmark_ticker="BENCH", frequency="daily").to_json() == expected.to_json()
+
+        # Interior missing and infinite values are rejected by Rust validation.
+        with pytest.raises(AnalyticsError):
+            Performance(
+                pl.DataFrame({"date": dates[:4], "A": [100.0, None, 102.0, 103.0]}),
+                frequency="daily",
+            )
+        with pytest.raises(AnalyticsError):
+            Performance(
+                pl.DataFrame({"date": dates[:3], "A": [100.0, math.inf, 102.0]}),
+                frequency="daily",
+            )
+        # Non-numeric value columns fail with TypeError.
+        for bad_col in (["a", "b", "c"], [True, False, True]):
+            with pytest.raises(TypeError, match="non-numeric Polars dtype"):
+                Performance(pl.DataFrame({"date": dates[:3], "A": bad_col}), frequency="daily")
+
+    def test_polars_and_pandas_date_col_error_paths(self) -> None:
+        dates = _daily_dates(3)
+        with pytest.raises(ValueError, match="no Date or Datetime column"):
+            Performance(pl.DataFrame({"A": [100.0, 101.0, 102.0]}))
+        # pl.Time and pl.Duration are temporal in Polars but are not dates.
+        with pytest.raises(ValueError, match="no Date or Datetime column"):
+            Performance(
+                pl.DataFrame({
+                    "dur": [timedelta(days=1), timedelta(days=2), timedelta(days=3)],
+                    "A": [100.0, 101.0, 102.0],
+                })
+            )
+        with pytest.raises(KeyError, match="missing_col"):
+            Performance(pl.DataFrame({"date": dates, "A": [100.0, 101.0, 102.0]}), date_col="missing_col")
+        with pytest.raises(TypeError, match="Polars Series"):
+            Performance(pl.Series("A", [100.0, 101.0, 102.0]))  # type: ignore[arg-type]
+        with pytest.raises(TypeError, match="Polars Series"):
+            Performance.from_returns(pl.Series("A", [0.01, 0.02]), initial_date=opening_date(dates))  # type: ignore[arg-type]
+
+        pd_df = pd.DataFrame({"date": dates, "A": [100.0, 101.0, 102.0]})
+        with pytest.raises(KeyError, match="missing_col"):
+            Performance(pd_df, date_col="missing_col")
+        pd_dup_date = pd.DataFrame(
+            [[dates[0], dates[0], 100.0], [dates[1], dates[1], 101.0], [dates[2], dates[2], 102.0]],
+            columns=["date", "date", "A"],
+        )
+        with pytest.raises(ValueError, match="duplicate date_col"):
+            Performance(pd_dup_date, date_col="date")
+        with pytest.raises(ValueError, match="date_col cannot be used with a pandas Series"):
+            Performance(pd.Series([100.0, 101.0, 102.0], index=dates, name="A"), date_col="date")
+
+    def test_multi_factor_polars_dataframe_and_series_inputs(self) -> None:
+        panel_dates = _daily_dates(8)
+        prices = pl.DataFrame({
+            "obs": panel_dates,
+            "ACME": [math.nan, 100.0, 102.0, 101.0, 105.0, 107.0, 106.0, math.nan],
+            "BENCH": [100.0 + i for i in range(8)],
+        })
+        perf = Performance(prices, benchmark_ticker="BENCH", frequency="daily")
+        active = perf.get_active_dates_for_ticker("ACME")
+        assert active == panel_dates[2:7]
+        factor = [0.001 * (i % 5) for i in range(len(active))]
+        expected = perf.multi_factor_greeks("ACME", [factor], 0.0)
+
+        # Unsorted rows + extra out-of-sample rows containing null/inf are ignored.
+        factor_pl = pl.DataFrame({
+            "obs": [*active, panel_dates[1], panel_dates[0]],
+            "factor": [*factor, None, math.inf],
+        }).reverse()
+        fit = perf.multi_factor_greeks("ACME", factor_pl, 0.0)
+        assert fit.betas == pytest.approx(expected.betas)
+        assert fit.alpha == pytest.approx(expected.alpha)
+
+        fit_explicit = perf.multi_factor_greeks(
+            "ACME",
+            factor_pl.rename({"obs": "f_date"}).with_columns(pl.col("f_date").cast(pl.String)),
+            0.0,
+            date_col="f_date",
+        )
+        assert fit_explicit.betas == pytest.approx(expected.betas)
+
+        with pytest.raises(KeyError, match=str(active[0])):
+            perf.multi_factor_greeks("ACME", factor_pl.filter(pl.col("obs") != active[0]), 0.0)
+        with pytest.raises(ValueError, match="duplicate factor date"):
+            perf.multi_factor_greeks("ACME", pl.concat([factor_pl, factor_pl.head(1)]), 0.0)
+        with pytest.raises(ValueError, match="aligned factor return must be finite"):
+            perf.multi_factor_greeks(
+                "ACME",
+                factor_pl.with_columns(
+                    pl
+                    .when(pl.col("obs") == active[0])
+                    .then(pl.lit(float("inf")))
+                    .otherwise(pl.col("factor"))
+                    .alias("factor")
+                ),
+                0.0,
+            )
+        with pytest.raises(ValueError, match="date_col"):
+            perf.multi_factor_greeks("ACME", [factor], 0.0, date_col="obs")
+
+    def test_polars_series_scalar_and_vector_inputs(self) -> None:
+        rets = [0.01, -0.02, 0.015, 0.003]
+        pl_rets = pl.Series("rets", rets)
+        assert sharpe(pl_rets, 0.0, 252.0) == pytest.approx(sharpe(rets, 0.0, 252.0))
+        assert sortino(pl_rets, 0.0, 252.0) == pytest.approx(sortino(rets, 0.0, 252.0))
+        assert volatility(pl_rets, 252.0) == pytest.approx(volatility(rets, 252.0))
+        assert max_drawdown(pl_rets) == pytest.approx(max_drawdown(rets))
+
+        with pytest.raises(AnalyticsError):
+            sharpe(pl.Series("bad", [0.01, None, 0.02]), 0.0, 252.0)
+        with pytest.raises(TypeError, match="non-numeric Polars dtype"):
+            volatility(pl.Series("bad", ["0.01", "0.02"]), 252.0)
+
+        perf = Performance(
+            pl.DataFrame({"date": _daily_dates(5), "A": [100.0, 101.0, 99.0, 102.0, 103.0]}),
+            frequency="daily",
+        )
+        rf_list = [0.02] * len(perf.get_active_dates())
+        assert perf.excess_returns(pl.Series("rf", rf_list)) == perf.excess_returns(rf_list)
+
+        factor = [0.0, 0.01, 0.02, -0.01]
+        assert multi_factor_greeks(pl_rets, [pl.Series("f", factor)], 252.0, "excess").betas == pytest.approx(
+            multi_factor_greeks(rets, [factor], 252.0, "excess").betas
+        )
+
+
 # Stubs
 
 
@@ -652,13 +883,16 @@ class TestStubs:
         stub_text = read_stub_text("finstack_quant.analytics")
         assert "class Performance:" in stub_text
         assert "from_returns" in stub_text
+        assert "to_arrow" in stub_text
         assert "rolling_returns" in stub_text
         assert '"Performance"' in stub_text
 
     def test_stub_drops_legacy_freestanding_functions(self) -> None:
         stub_text = read_stub_text("finstack_quant.analytics")
-        # These freestanding functions were deleted; ensure the stub matches the runtime.
+        # These freestanding functions and the panel pathway were removed; ensure stub matches runtime.
         assert "def estimate_ruin" not in stub_text
         assert "def fit_garch11" not in stub_text
         assert "def rolling_var_forecasts" not in stub_text
         assert "def classify_breaches" not in stub_text
+        assert "class PerformancePanel" not in stub_text
+        assert "def from_panel" not in stub_text

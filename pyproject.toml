@@ -371,6 +371,7 @@ exclude = [
 [tool.ty.analysis]
 allowed-unresolved-imports = [
     "pandas.**",
+    "polars.**",
     "numpy.**",
     "finstack_quant.finstack_quant",
 ]

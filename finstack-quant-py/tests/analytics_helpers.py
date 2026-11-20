@@ -1,13 +1,13 @@
-"""Actual valuation grids shared by analytics fixture declarations."""
+"""Actual valuation date helpers shared by analytics fixture declarations."""
 
 from collections.abc import Sequence
 from datetime import date, timedelta
 
 
-def valuation_grid(endpoints: Sequence[date | str]) -> list[date | str]:
+def opening_date(endpoints: Sequence[date | str]) -> date:
     """Declare a fixture opening valuation one day before its first endpoint."""
     if not endpoints:
-        return []
+        msg = "endpoints must be non-empty"
+        raise ValueError(msg)
     first = endpoints[0]
-    opening = (date.fromisoformat(first) if isinstance(first, str) else first) - timedelta(days=1)
-    return [opening, *endpoints]
+    return (date.fromisoformat(first) if isinstance(first, str) else first) - timedelta(days=1)
