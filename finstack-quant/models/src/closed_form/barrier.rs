@@ -1055,7 +1055,7 @@ mod tests {
 
     #[test]
     fn low_volatility_barrier_prices_match_conditional_bridge_integrals() {
-        use finstack_quant_core::math::integration::simpson_rule;
+        use finstack_quant_core::math::integration::adaptive_simpson;
         use finstack_quant_core::math::special_functions::norm_pdf;
 
         // These are the nontrivial strike/barrier regimes. Integrate over the
@@ -1074,7 +1074,7 @@ mod tests {
                 (0.0, strike_shock.min(12.0))
             };
             let expected = (-rate).exp()
-                * simpson_rule(
+                * adaptive_simpson(
                     |z| {
                         let log_terminal = log_barrier + vol * z;
                         let terminal = 100.0 * log_terminal.exp();
@@ -1085,7 +1085,9 @@ mod tests {
                     },
                     lower,
                     upper,
-                    20_000,
+                    1e-11,
+                    20,
+                    100_000,
                 )
                 .expect("valid conditional bridge integration");
             let actual = if is_up {
@@ -1131,7 +1133,7 @@ mod tests {
 
     #[test]
     fn negative_rate_at_hit_rebates_match_first_passage_density() {
-        use finstack_quant_core::math::integration::simpson_rule;
+        use finstack_quant_core::math::integration::adaptive_simpson;
 
         // Include both sides of the real-root boundary at q = 0. The direct
         // density integral is independent of the CDF integration-by-parts path.
@@ -1144,7 +1146,7 @@ mod tests {
                 let distance = (barrier / params.spot).ln().abs();
                 let nu = params.rate - params.div_yield - 0.5 * params.vol * params.vol;
                 let signed_drift = if is_up { nu } else { -nu };
-                let expected = simpson_rule(
+                let expected = adaptive_simpson(
                     |t| {
                         if t == 0.0 {
                             return Ok(0.0);
@@ -1159,7 +1161,9 @@ mod tests {
                     },
                     0.0,
                     params.time,
-                    20_000,
+                    1e-11,
+                    20,
+                    100_000,
                 )
                 .expect("valid first-passage density integration");
                 let actual = barrier_rebate(&params, 1.0, barrier_type, PayoutTiming::AtHit);

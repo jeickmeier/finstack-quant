@@ -138,20 +138,6 @@ fn test_online_stats_merge_empty_accumulators() {
 }
 
 #[test]
-fn test_confidence_intervals() {
-    let mut stats = OnlineStats::new();
-    for i in 1..=100 {
-        stats.update(i as f64).unwrap();
-    }
-
-    let mean = stats.get_mean().unwrap().unwrap();
-    let (lower, upper) = stats.get_confidence_interval(0.05).unwrap().unwrap();
-    assert!(lower < mean);
-    assert!(upper > mean);
-    assert!(lower < 50.5 && upper > 50.5);
-}
-
-#[test]
 fn confidence_intervals_account_for_estimated_small_sample_variance() {
     let mut pair = OnlineStats::new();
     pair.update(1.0).unwrap();
@@ -159,9 +145,6 @@ fn confidence_intervals_account_for_estimated_small_sample_variance() {
     // With one degree of freedom Student-t is Cauchy, giving an
     // independent analytic critical value cot(pi * alpha / 2).
     let critical = 1.0 / (std::f64::consts::PI * 0.025).tan();
-    let (lower, upper) = pair.get_confidence_interval(0.05).unwrap().unwrap();
-    assert!((lower - (2.0 - critical)).abs() < 1e-10);
-    assert!((upper - (2.0 + critical)).abs() < 1e-10);
     assert!((pair.get_stderr().unwrap().unwrap() - 1.0).abs() < 1e-12);
     assert!((pair.get_ci_half_width(0.05).unwrap().unwrap() - critical).abs() < 1e-10);
 
@@ -183,7 +166,6 @@ fn confidence_intervals_reject_insufficient_samples_and_invalid_alpha() {
         if count == 1 {
             stats.update(42.0).unwrap();
         }
-        assert_eq!(stats.get_confidence_interval(0.05).unwrap(), None);
         assert_eq!(stats.get_ci_half_width(0.05).unwrap(), None);
         // Invalid alpha must validate BEFORE returning None on n < 2.
         for bad_alpha in [0.0, 1.0, -0.1, 1.1, f64::NAN, f64::INFINITY] {
@@ -194,21 +176,10 @@ fn confidence_intervals_reject_insufficient_samples_and_invalid_alpha() {
                     .kind(),
                 crate::ErrorKind::Validation
             );
-            assert_eq!(
-                stats
-                    .get_confidence_interval(bad_alpha)
-                    .expect_err("invalid alpha on n<2")
-                    .kind(),
-                crate::ErrorKind::Validation
-            );
         }
     }
     stats.update(43.0).unwrap();
     for alpha in [0.0, 1.0, -0.1, 1.1, f64::NAN, f64::INFINITY] {
-        assert_eq!(
-            stats.get_confidence_interval(alpha).unwrap_err().kind(),
-            crate::ErrorKind::Validation
-        );
         assert_eq!(
             stats.get_ci_half_width(alpha).unwrap_err().kind(),
             crate::ErrorKind::Validation
@@ -245,16 +216,11 @@ fn covariance_and_correlation_reject_mismatched_lengths_and_nonfinite() {
         correlation(&x, &y),
         Err(crate::Error::Input(crate::InputError::DimensionMismatch))
     ));
-    assert!(matches!(
-        optimal_beta(&x, &y),
-        Err(crate::Error::Input(crate::InputError::DimensionMismatch))
-    ));
     // Length 1 with non-finite must error before insufficient-history None.
     assert!(covariance(&[f64::NAN], &[1.0]).is_err());
     assert!(correlation(&[1.0], &[f64::INFINITY]).is_err());
     assert_eq!(covariance(&[1.0], &[2.0]).unwrap(), None);
     assert_eq!(correlation(&[1.0], &[2.0]).unwrap(), None);
-    assert_eq!(optimal_beta(&[1.0], &[2.0]).unwrap(), None);
 }
 
 #[test]
@@ -417,14 +383,6 @@ fn test_constant_series_availability_contracts() {
     );
     assert_eq!(
         correlation(&[5.0, 5.0, 5.0], &[1.0, 2.0, 3.0]).unwrap(),
-        None
-    );
-    assert_eq!(
-        optimal_beta(&[5.0, 5.0, 5.0], &[1.0, 2.0, 3.0]).unwrap(),
-        Some(0.0)
-    );
-    assert_eq!(
-        optimal_beta(&[1.0, 2.0, 3.0], &[5.0, 5.0, 5.0]).unwrap(),
         None
     );
 }
@@ -788,10 +746,6 @@ fn shifted_scaled_boundary_rows_from_decision_record() {
     assert_eq!(cst.get_std_dev().unwrap(), Some(0.0));
     assert_eq!(cst.get_stderr().unwrap(), Some(0.0));
     assert_eq!(cst.get_ci_half_width(0.05).unwrap(), Some(0.0));
-    assert_eq!(
-        cst.get_confidence_interval(0.05).unwrap(),
-        Some((f64::MAX, f64::MAX))
-    );
     // Merge equal MAX constants without weighted mean overflow.
     let mut cst2 = OnlineStats::new();
     cst2.update(f64::MAX).unwrap();
@@ -873,23 +827,12 @@ fn shifted_scaled_boundary_rows_from_decision_record() {
             .unwrap()
             .is_finite()
     );
-    assert_eq!(
-        big_base.get_confidence_interval(0.05).unwrap_err().kind(),
-        crate::ErrorKind::Computation
-    );
 
     let mut huge_shift = OnlineStats::new();
     huge_shift.update(1.0e12).unwrap();
     huge_shift.update(1.0e12 + 1.0).unwrap();
     let h_small = huge_shift.get_ci_half_width(0.9999999).unwrap().unwrap();
     assert!(h_small > 0.0 && h_small.is_finite());
-    assert_eq!(
-        huge_shift
-            .get_confidence_interval(0.9999999)
-            .unwrap_err()
-            .kind(),
-        crate::ErrorKind::Computation
-    );
 
     // Tiny alpha underflowing alpha/2 fails as computation error.
     let mut two = OnlineStats::new();

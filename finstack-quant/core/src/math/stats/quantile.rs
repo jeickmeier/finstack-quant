@@ -1,6 +1,7 @@
 //! Exact binary64 rational R-7 quantiles, quantile ratios and tail means.
 
-use super::{MAX_EXACT_COUNT, normalize_zero, same_float, validate_finite_slice};
+use super::{MAX_EXACT_COUNT, normalize_zero, validate_finite_slice};
+use crate::math::interp::exact_f64_eq;
 use num_bigint::BigInt;
 use num_rational::BigRational;
 use num_traits::{One, Signed, ToPrimitive, Zero};
@@ -63,7 +64,7 @@ pub fn quantile(data: &mut [f64], p: f64) -> crate::Result<Option<f64>> {
     }
     data[lo + 1..].select_nth_unstable_by(0, f64::total_cmp);
     let v_hi = data[lo + 1];
-    if same_float(v_lo, v_hi) {
+    if exact_f64_eq(v_lo, v_hi) {
         return Ok(Some(normalize_zero(v_lo)));
     }
     let val = rational_to_f64(&interpolate_r7(v_lo, v_hi, &frac)?, true)?;
@@ -126,7 +127,7 @@ pub fn quantile_sorted(sorted: &[f64], p: f64) -> crate::Result<Option<f64>> {
         return Ok(Some(normalize_zero(lower)));
     }
     let upper = sorted[lo + 1];
-    if same_float(lower, upper) {
+    if exact_f64_eq(lower, upper) {
         return Ok(Some(normalize_zero(lower)));
     }
     let val = rational_to_f64(&interpolate_r7(lower, upper, &frac)?, true)?;

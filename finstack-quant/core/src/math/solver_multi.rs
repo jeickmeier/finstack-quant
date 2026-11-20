@@ -327,24 +327,6 @@ impl LevenbergMarquardtSolver {
         })
     }
 
-    /// Return the configured residual 2-norm tolerance.
-    #[must_use]
-    pub fn get_residual_tolerance(&self) -> f64 {
-        self.residual_tolerance
-    }
-
-    /// Return the configured effective step 2-norm tolerance.
-    #[must_use]
-    pub fn get_step_tolerance(&self) -> f64 {
-        self.step_tolerance
-    }
-
-    /// Return the configured maximum number of damped step attempts.
-    #[must_use]
-    pub fn get_max_iterations(&self) -> usize {
-        self.max_iterations
-    }
-
     /// Compute Jacobian for a system of residuals into a pre-allocated buffer.
     ///
     /// Writes a flat row-major Jacobian into `out`: `J[i * n_params + j]`.
@@ -1055,9 +1037,6 @@ mod tests {
             LevenbergMarquardtSolver::new(1e-12, f64::INFINITY, 10),
             Err(crate::Error::Validation(_))
         ));
-        assert_eq!(solver.get_residual_tolerance(), 1e-12);
-        assert_eq!(solver.get_step_tolerance(), 1e-12);
-        assert_eq!(solver.get_max_iterations(), 1);
     }
 
     #[test]

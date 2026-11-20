@@ -83,7 +83,7 @@ want it; domain-specific numerics (stochastic processes, payoffs) belong in
 
 | Path | What it is |
 |------|------------|
-| `math::stats` | `mean`, `variance`, `population_variance`, `std_dev`, `mean_var`, `correlation`, `covariance`, `optimal_beta`, `quantile`, `median`, `finite_min`/`finite_max`/`finite_count`, streaming `OnlineStats`/`OnlineCovariance`, realized-variance estimators. |
+| `math::stats` | `mean`, `variance`, `population_variance`, `std_dev`, `mean_var`, `correlation`, `covariance`, `quantile`, `median`, `finite_min`/`finite_max`/`finite_count`, streaming `OnlineStats`/`OnlineCovariance`, realized-variance estimators. |
 | `math::summation` | `kahan_sum`, `neumaier_sum`, `NeumaierAccumulator`. |
 | `math::special_functions` | `norm_cdf`, `norm_pdf`, `erf`, `ln_gamma`, `standard_normal_inv_cdf`, Student-t CDF/inverse. |
 | `math::linalg` | Cholesky (`cholesky_decomposition`, `cholesky_correlation`), `symmetric_eigen`, correlation-matrix construction and validation. |

@@ -63,7 +63,7 @@ mod realized;
 mod tests;
 
 pub use moments::{
-    correlation, covariance, finite_count, finite_max, finite_min, mean, mean_var, optimal_beta,
+    correlation, covariance, finite_count, finite_max, finite_min, mean, mean_var,
     population_variance, std_dev, variance,
 };
 pub use online::{OnlineCovariance, OnlineStats};
@@ -181,15 +181,12 @@ fn validate_finite_slice(xs: &[f64]) -> crate::Result<()> {
     Ok(())
 }
 
-#[inline]
-fn same_float(a: f64, b: f64) -> bool {
-    // Bit-exact value equality treating -0.0 == +0.0 without triggering clippy::float_cmp.
-    a <= b && b <= a
-}
-
 fn check_constant_slice(xs: &[f64]) -> Option<f64> {
     let first = *xs.first()?;
-    if xs.iter().all(|&x| same_float(x, first)) {
+    if xs
+        .iter()
+        .all(|&x| crate::math::interp::exact_f64_eq(x, first))
+    {
         Some(normalize_zero(first))
     } else {
         None
