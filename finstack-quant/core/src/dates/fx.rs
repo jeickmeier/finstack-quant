@@ -4,7 +4,7 @@
 //! There is no generic spot-date recipe here: a product either receives its
 //! actual spot/settlement date or derives it under its own explicit
 //! convention with [`DateExt::add_business_days`] and
-//! [`crate::dates::resolve_joint_calendar`]. [`fx_forward_date`] is the one
+//! [`crate::dates::calendar_by_id_strict`]. [`fx_forward_date`] is the one
 //! forward value-date operation: it adds a tenor to an actual open spot date
 //! on one explicit final settlement calendar.
 //!
@@ -124,9 +124,7 @@ fn last_open_day_of_month(date: Date, calendar: &dyn HolidayCalendar) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::{
-        WEEKENDS_ONLY, calendar_by_id_strict, create_date, resolve_calendar, resolve_joint_calendar,
-    };
+    use crate::dates::{WEEKENDS_ONLY, calendar_by_id_strict, create_date};
     use time::Month;
 
     fn d(year: i32, month: Month, day: u8) -> Date {
@@ -292,12 +290,12 @@ mod tests {
     #[test]
     fn date_range_boundaries_return_errors() {
         assert!(
-            resolve_joint_calendar("weekends_only", "weekends_only")
+            calendar_by_id_strict("weekends_only+weekends_only")
                 .and_then(|cal| Date::MAX.add_business_days(1, cal))
                 .is_err()
         );
         assert_eq!(
-            resolve_joint_calendar("weekends_only", "weekends_only")
+            calendar_by_id_strict("weekends_only+weekends_only")
                 .and_then(|cal| Date::MAX.add_business_days(0, cal))
                 .unwrap(),
             Date::MAX
@@ -305,8 +303,8 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_calendar_unknown_id() {
-        let result = resolve_calendar("unknown_calendar_id");
+    fn test_calendar_by_id_strict_unknown_id() {
+        let result = calendar_by_id_strict("unknown_calendar_id");
         let err = result.err().expect("unknown calendar must error");
         assert!(
             matches!(err, Error::Input(ref e) if matches!(
@@ -323,7 +321,7 @@ mod tests {
         // EUR/JPY traded Wed 2025-07-02: two-currency T+2 lands on the US
         // holiday; a composite with USNY rolls to Mon 2025-07-07.
         let trade = d(2025, Month::July, 2);
-        let spot_two_cal = resolve_joint_calendar("target2", "jpto")
+        let spot_two_cal = calendar_by_id_strict("target2+jpto")
             .and_then(|cal| trade.add_business_days(2, cal))
             .expect("two-calendar roll");
         assert_eq!(spot_two_cal, d(2025, Month::July, 4));

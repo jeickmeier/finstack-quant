@@ -713,7 +713,7 @@ fn test_time_and_settlement_helpers_match_curve_and_calendar_conventions() {
         "fallback settlement = 4 calendar days rolled forward off weekends"
     );
 
-    let nyse = finstack_quant_core::dates::resolve_calendar("nyse").expect("nyse calendar");
+    let nyse = finstack_quant_core::dates::calendar_by_id_strict("nyse").expect("nyse calendar");
     let friday =
         Date::from_calendar_date(2025, time::Month::January, 3).expect("valid Friday date");
     let monday =

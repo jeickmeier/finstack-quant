@@ -169,11 +169,11 @@ mod tests {
 
     #[test]
     fn indian_exchange_calendars_count_exceptional_trading_days() {
-        use crate::dates::calendar::business_days::resolve_calendar;
+        use crate::dates::calendar::business_days::calendar_by_id_strict;
         use time::macros::date;
 
         for id in ["bse", "nse"] {
-            let calendar = resolve_calendar(id).expect("exchange calendar");
+            let calendar = calendar_by_id_strict(id).expect("exchange calendar");
             for date in [
                 date!(2024 - 01 - 20),
                 date!(2024 - 03 - 02),
@@ -214,10 +214,10 @@ mod tests {
 
     #[test]
     fn sifma_veterans_day_observes_sunday_only() {
-        use crate::dates::calendar::business_days::resolve_calendar;
+        use crate::dates::calendar::business_days::calendar_by_id_strict;
         use time::macros::date;
 
-        let calendar = resolve_calendar("sifma").expect("bond market calendar");
+        let calendar = calendar_by_id_strict("sifma").expect("bond market calendar");
         assert!(
             calendar
                 .is_business_day(date!(2023 - 11 - 10))

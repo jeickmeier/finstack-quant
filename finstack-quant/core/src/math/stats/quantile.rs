@@ -67,7 +67,7 @@ pub fn quantile(data: &mut [f64], p: f64) -> crate::Result<Option<f64>> {
     if exact_f64_eq(v_lo, v_hi) {
         return Ok(Some(normalize_zero(v_lo)));
     }
-    let val = rational_to_f64(&interpolate_r7(v_lo, v_hi, &frac)?, true)?;
+    let val = rational_to_f64(&interpolate_r7(v_lo, v_hi, &frac)?)?;
     Ok(Some(normalize_zero(val)))
 }
 
@@ -121,16 +121,7 @@ pub fn quantile_sorted(sorted: &[f64], p: f64) -> crate::Result<Option<f64>> {
     if sorted.is_empty() {
         return Ok(None);
     }
-    let (lo, frac) = r7_rank(sorted.len(), p)?;
-    let lower = sorted[lo];
-    if frac.is_zero() {
-        return Ok(Some(normalize_zero(lower)));
-    }
-    let upper = sorted[lo + 1];
-    if exact_f64_eq(lower, upper) {
-        return Ok(Some(normalize_zero(lower)));
-    }
-    let val = rational_to_f64(&interpolate_r7(lower, upper, &frac)?, true)?;
+    let val = rational_to_f64(&quantile_rational(sorted, p)?)?;
     Ok(Some(normalize_zero(val)))
 }
 
@@ -203,40 +194,7 @@ pub fn quantile_ratio(sorted: &[f64], numerator_p: f64, denominator_p: f64) -> c
             f64::INFINITY
         });
     }
-    rational_to_f64(&(numerator / denominator), true)
-}
-
-/// Checked R-7 quantile with exact rank weights and one final output rounding.
-///
-/// This evaluates the same estimator as [`quantile_sorted`] while rejecting
-/// a nonzero mathematical result that would round to zero. Use
-/// [`quantile_ratio`] when a ratio is requested jointly instead of
-/// independently requested scalar quantiles.
-///
-/// # Arguments
-///
-/// * `sorted` - Nonempty finite observations in ascending order. The slice
-///   and its ordering are validated and are not modified.
-/// * `p` - Probability in the inclusive `0.0..=1.0` range, interpreted as
-///   its supplied binary64 value when forming the R-7 rank and weights.
-///
-/// # Errors
-///
-/// Returns [`crate::Error::Validation`] for invalid observations or
-/// probability, or [`crate::Error::Internal`] when a nonzero quantile
-/// cannot be represented as a nonzero finite binary64 result.
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::math::stats::quantile_checked;
-/// assert_eq!(quantile_checked(&[1.0, 2.0, 3.0, 4.0], 0.5)?, 2.5);
-/// assert!(quantile_checked(&[0.0, f64::from_bits(1)], 0.25).is_err());
-/// # Ok::<(), finstack_quant_core::Error>(())
-/// ```
-pub fn quantile_checked(sorted: &[f64], p: f64) -> crate::Result<f64> {
-    validate_sorted_sample(sorted)?;
-    rational_to_f64(&quantile_rational(sorted, p)?, true)
+    rational_to_f64(&(numerator / denominator))
 }
 
 /// Return the signed mean of the worst fractional tail of an empirical sample.
@@ -312,7 +270,7 @@ pub fn empirical_tail_mean(sorted: &[f64], p: f64) -> crate::Result<f64> {
         total += binary_rational(sorted[whole])? * &fraction;
     }
     let mass = BigRational::from_integer(BigInt::from(whole)) + fraction;
-    rational_to_f64(&(total / mass), true)
+    rational_to_f64(&(total / mass))
 }
 
 fn validate_sorted_sample(sorted: &[f64]) -> crate::Result<()> {
@@ -370,14 +328,12 @@ fn quantile_rational(sorted: &[f64], p: f64) -> crate::Result<BigRational> {
     interpolate_r7(lower, sorted[lo + 1], &fraction)
 }
 
-fn rational_to_f64(value: &BigRational, reject_zero_underflow: bool) -> crate::Result<f64> {
+fn rational_to_f64(value: &BigRational) -> crate::Result<f64> {
     let rounded = value.to_f64().ok_or_else(|| {
         crate::Error::Internal("Statistical result could not be reconstructed".into())
     })?;
     if !rounded.is_finite()
-        || (reject_zero_underflow
-            && rounded.classify() == std::num::FpCategory::Zero
-            && !value.is_zero())
+        || (rounded.classify() == std::num::FpCategory::Zero && !value.is_zero())
     {
         return Err(crate::Error::Internal(
             "Statistical result is outside the nonzero finite binary64 range".into(),

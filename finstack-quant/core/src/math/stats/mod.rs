@@ -68,8 +68,7 @@ pub use moments::{
 };
 pub use online::{OnlineCovariance, OnlineStats};
 pub use quantile::{
-    empirical_tail_mean, expected_shortfall, median, quantile, quantile_checked, quantile_ratio,
-    quantile_sorted,
+    empirical_tail_mean, expected_shortfall, median, quantile, quantile_ratio, quantile_sorted,
 };
 pub use realized::{RealizedVarMethod, log_returns, realized_variance, realized_variance_ohlc};
 

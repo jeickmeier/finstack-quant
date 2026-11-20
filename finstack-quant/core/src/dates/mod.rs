@@ -136,7 +136,7 @@ pub use volatility_clock::VolatilityClock;
 pub use calendar::business_days::canonical_calendar_id;
 pub use calendar::business_days::{
     BusinessDayConvention, CalendarMetadata, HolidayCalendar, adjust, available_calendars,
-    calendar_by_id_strict, resolve_calendar, resolve_joint_calendar,
+    calendar_by_id_strict,
 };
 pub use calendar::{WEEKENDS_ONLY, WEEKENDS_ONLY_ID};
 

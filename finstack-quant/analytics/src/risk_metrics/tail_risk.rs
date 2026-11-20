@@ -4,7 +4,7 @@
 //! and classical plug-in Cornish–Fisher quantiles approximate additive sums;
 //! their finite outputs may lie below the investment-return lower bound -1.
 
-use finstack_quant_core::math::stats::{empirical_tail_mean, quantile_checked, quantile_ratio};
+use finstack_quant_core::math::stats::{empirical_tail_mean, quantile_ratio, quantile_sorted};
 use finstack_quant_core::{Error, Result};
 use num_rational::BigRational;
 use num_traits::{Signed, ToPrimitive, Zero};
@@ -79,7 +79,8 @@ pub(crate) fn value_at_risk(returns: &[f64], confidence: f64) -> Result<f64> {
     if data.is_empty() {
         return Ok(f64::NAN);
     }
-    quantile_checked(&data, 1.0 - confidence)
+    quantile_sorted(&data, 1.0 - confidence)?
+        .ok_or_else(|| calculation("empty sample after emptiness check"))
 }
 
 /// Signed mean of exactly the worst empirical tail mass, including its boundary fraction.
@@ -108,7 +109,8 @@ pub(crate) fn value_at_risk_and_es(returns: &[f64], confidence: f64) -> Result<(
     if data.is_empty() {
         return Ok((f64::NAN, f64::NAN));
     }
-    let var = quantile_checked(&data, 1.0 - confidence)?;
+    let var = quantile_sorted(&data, 1.0 - confidence)?
+        .ok_or_else(|| calculation("empty sample after emptiness check"))?;
     let es = expected_shortfall_from_sorted(&data, confidence)?;
     if es > var {
         return Err(calculation("empirical ES exceeds the paired R-7 quantile"));

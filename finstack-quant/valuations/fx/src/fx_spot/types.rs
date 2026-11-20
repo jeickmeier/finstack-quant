@@ -203,7 +203,7 @@ impl FxSpot {
     ///   `settlement_date` is unset: the spot lag is counted from it on the
     ///   joint calendar. An explicit `settlement_date` ignores `as_of`.
     pub fn effective_settlement_date(&self, as_of: Date) -> Result<Date> {
-        use finstack_quant_core::dates::resolve_joint_calendar;
+        use finstack_quant_core::dates::calendar_by_id_strict;
 
         if let Some(date) = self.settlement_date {
             Ok(date)
@@ -219,7 +219,7 @@ impl FxSpot {
                     self.id
                 )));
             };
-            let calendar = resolve_joint_calendar(base, quote)?;
+            let calendar = calendar_by_id_strict(&format!("{base}+{quote}"))?;
             crate::shared::spot_date_from_lag(as_of, settlement_days, calendar)
         }
     }

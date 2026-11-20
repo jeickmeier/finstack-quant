@@ -2,7 +2,7 @@
 
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DateExt, HolidayCalendar, Schedule, StubKind, Tenor, TenorUnit,
-    adjust, resolve_joint_calendar,
+    adjust, calendar_by_id_strict,
 };
 use finstack_quant_core::math::stats::RealizedVarMethod;
 
@@ -24,11 +24,9 @@ struct ResolvedVarianceCalendar(&'static dyn HolidayCalendar);
 impl ResolvedVarianceCalendar {
     fn resolve(spec: VarianceCalendar<'_>) -> finstack_quant_core::Result<Self> {
         match spec {
-            VarianceCalendar::Single(id) => {
-                Ok(Self(finstack_quant_core::dates::calendar_by_id_strict(id)?))
-            }
+            VarianceCalendar::Single(id) => Ok(Self(calendar_by_id_strict(id)?)),
             VarianceCalendar::Joint { base, quote } => {
-                Ok(Self(resolve_joint_calendar(base, quote)?))
+                Ok(Self(calendar_by_id_strict(&format!("{base}+{quote}"))?))
             }
         }
     }

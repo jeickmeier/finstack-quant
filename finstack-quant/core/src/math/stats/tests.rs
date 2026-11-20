@@ -537,10 +537,10 @@ fn quantile_ratio_preserves_unrepresentable_components_and_rounding_residuals() 
             .expect("ratio above underflow midpoint"),
         tiny
     );
-    assert!(super::quantile_checked(&[0.0, tiny], 0.25).is_err());
+    assert!(super::quantile_sorted(&[0.0, tiny], 0.25).is_err());
     assert_eq!(
-        super::quantile_checked(&[0.0, tiny], 0.75).expect("rounded nonzero"),
-        tiny
+        super::quantile_sorted(&[0.0, tiny], 0.75).expect("rounded nonzero"),
+        Some(tiny)
     );
 }
 
@@ -559,15 +559,21 @@ fn empirical_tail_mean_preserves_fractional_mass_and_subnormal_constants() {
 
 #[test]
 fn checked_quantiles_and_tail_means_reject_invalid_requests_and_samples() {
-    for sorted in [&[][..], &[1.0, 0.0], &[0.0, f64::INFINITY]] {
+    assert_eq!(
+        super::quantile_sorted(&[], 0.5).expect("empty quantile"),
+        None
+    );
+    assert!(super::quantile_ratio(&[], 0.75, 0.25).is_err());
+    assert!(super::empirical_tail_mean(&[], 0.5).is_err());
+    for sorted in [&[1.0, 0.0][..], &[0.0, f64::INFINITY]] {
         assert!(super::quantile_ratio(sorted, 0.75, 0.25).is_err());
-        assert!(super::quantile_checked(sorted, 0.5).is_err());
+        assert!(super::quantile_sorted(sorted, 0.5).is_err());
         assert!(super::empirical_tail_mean(sorted, 0.5).is_err());
     }
     for p in [f64::NAN, -0.1, 1.1] {
         assert!(super::quantile_ratio(&[0.0, 1.0], p, 0.25).is_err());
         assert!(super::quantile_ratio(&[0.0, 1.0], 0.75, p).is_err());
-        assert!(super::quantile_checked(&[0.0, 1.0], p).is_err());
+        assert!(super::quantile_sorted(&[0.0, 1.0], p).is_err());
         assert!(super::empirical_tail_mean(&[0.0, 1.0], p).is_err());
     }
     assert!(super::empirical_tail_mean(&[0.0, 1.0], 0.0).is_err());
