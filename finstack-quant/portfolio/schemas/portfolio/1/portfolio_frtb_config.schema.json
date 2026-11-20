@@ -1038,6 +1038,177 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Exact sources for ordinary portfolio GIRR yield and single-name CDS CSR delta.",
+  "examples": [
+    {
+      "csr_sources": [
+        {
+          "classification": {
+            "as_of": "2024-01-02",
+            "bucket": 4,
+            "currency": "USD",
+            "issuer": "EXAMPLE-CORP",
+            "seniority": "senior",
+            "source_id": "example-approved-classification"
+          },
+          "curve_id": "EXAMPLE-CORP-CDS",
+          "vertices": {
+            "0.5Y": {
+              "pillar_date": "2024-07-02",
+              "quote_id": "EXAMPLE-CORP-CDS-0.5Y"
+            },
+            "10Y": {
+              "pillar_date": "2034-01-02",
+              "quote_id": "EXAMPLE-CORP-CDS-10Y"
+            },
+            "1Y": {
+              "pillar_date": "2025-01-02",
+              "quote_id": "EXAMPLE-CORP-CDS-1Y"
+            },
+            "3Y": {
+              "pillar_date": "2027-01-02",
+              "quote_id": "EXAMPLE-CORP-CDS-3Y"
+            },
+            "5Y": {
+              "pillar_date": "2029-01-02",
+              "quote_id": "EXAMPLE-CORP-CDS-5Y"
+            }
+          }
+        }
+      ],
+      "girr_targets": [
+        {
+          "quote": {
+            "pillar_date": "2024-04-02",
+            "quote_id": "USD-OIS-0.25Y"
+          },
+          "risk_currency": "USD",
+          "risk_curve_id": "USD-OIS",
+          "source": {
+            "curve_id": "USD-OIS",
+            "kind": "discount"
+          },
+          "vertex": "0.25Y"
+        },
+        {
+          "quote": {
+            "pillar_date": "2024-07-02",
+            "quote_id": "USD-OIS-0.5Y"
+          },
+          "risk_currency": "USD",
+          "risk_curve_id": "USD-OIS",
+          "source": {
+            "curve_id": "USD-OIS",
+            "kind": "discount"
+          },
+          "vertex": "0.5Y"
+        },
+        {
+          "quote": {
+            "pillar_date": "2025-01-02",
+            "quote_id": "USD-OIS-1Y"
+          },
+          "risk_currency": "USD",
+          "risk_curve_id": "USD-OIS",
+          "source": {
+            "curve_id": "USD-OIS",
+            "kind": "discount"
+          },
+          "vertex": "1Y"
+        },
+        {
+          "quote": {
+            "pillar_date": "2026-01-02",
+            "quote_id": "USD-OIS-2Y"
+          },
+          "risk_currency": "USD",
+          "risk_curve_id": "USD-OIS",
+          "source": {
+            "curve_id": "USD-OIS",
+            "kind": "discount"
+          },
+          "vertex": "2Y"
+        },
+        {
+          "quote": {
+            "pillar_date": "2027-01-02",
+            "quote_id": "USD-OIS-3Y"
+          },
+          "risk_currency": "USD",
+          "risk_curve_id": "USD-OIS",
+          "source": {
+            "curve_id": "USD-OIS",
+            "kind": "discount"
+          },
+          "vertex": "3Y"
+        },
+        {
+          "quote": {
+            "pillar_date": "2029-01-02",
+            "quote_id": "USD-OIS-5Y"
+          },
+          "risk_currency": "USD",
+          "risk_curve_id": "USD-OIS",
+          "source": {
+            "curve_id": "USD-OIS",
+            "kind": "discount"
+          },
+          "vertex": "5Y"
+        },
+        {
+          "quote": {
+            "pillar_date": "2034-01-02",
+            "quote_id": "USD-OIS-10Y"
+          },
+          "risk_currency": "USD",
+          "risk_curve_id": "USD-OIS",
+          "source": {
+            "curve_id": "USD-OIS",
+            "kind": "discount"
+          },
+          "vertex": "10Y"
+        },
+        {
+          "quote": {
+            "pillar_date": "2039-01-02",
+            "quote_id": "USD-OIS-15Y"
+          },
+          "risk_currency": "USD",
+          "risk_curve_id": "USD-OIS",
+          "source": {
+            "curve_id": "USD-OIS",
+            "kind": "discount"
+          },
+          "vertex": "15Y"
+        },
+        {
+          "quote": {
+            "pillar_date": "2044-01-02",
+            "quote_id": "USD-OIS-20Y"
+          },
+          "risk_currency": "USD",
+          "risk_curve_id": "USD-OIS",
+          "source": {
+            "curve_id": "USD-OIS",
+            "kind": "discount"
+          },
+          "vertex": "20Y"
+        },
+        {
+          "quote": {
+            "pillar_date": "2054-01-02",
+            "quote_id": "USD-OIS-30Y"
+          },
+          "risk_currency": "USD",
+          "risk_curve_id": "USD-OIS",
+          "source": {
+            "curve_id": "USD-OIS",
+            "kind": "discount"
+          },
+          "vertex": "30Y"
+        }
+      ]
+    }
+  ],
   "properties": {
     "csr_sources": {
       "description": "Admitted single-name CDS issuer classifications and their original spread quotes.",

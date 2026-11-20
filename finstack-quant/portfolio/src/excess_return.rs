@@ -440,17 +440,24 @@ pub fn cell_returns_from_reference(
 /// ```rust
 /// use finstack_quant_portfolio::excess_return::{cell_returns_from_curves, CellConfig};
 /// use finstack_quant_core::market_data::term_structures::DiscountCurve;
-/// use finstack_quant_core::dates::Date;
+/// use finstack_quant_core::dates::{Date, DayCount};
 /// use time::Month;
+/// use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 ///
 /// let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
 /// let start = DiscountCurve::builder("UST")
 ///     .base_date(base)
+///     .day_count(DayCount::Act365F)
 ///     .knots([(0.0, 1.0), (0.5, 0.980_198_67), (1.5, 0.941_764_53)])
+///     .interp(InterpStyle::Linear)
+///     .extrapolation(ExtrapolationPolicy::Extend)
 ///     .build()?;
 /// let end = DiscountCurve::builder("UST")
 ///     .base_date(base)
+///     .day_count(DayCount::Act365F)
 ///     .knots([(0.0, 1.0), (0.25, 0.990_049_83), (1.25, 0.951_229_42)])
+///     .interp(InterpStyle::Linear)
+///     .extrapolation(ExtrapolationPolicy::Extend)
 ///     .build()?;
 ///
 /// let table = cell_returns_from_curves(

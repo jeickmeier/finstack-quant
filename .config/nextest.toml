@@ -37,10 +37,16 @@ store-failure-output = true
 [profile.slow]
 # The `#[ignore]` slow suite (`--slow` on the mise rust-test* tasks): tests too
 # long for the 60 s PR-gate budget. Report SLOW at 60 s and kill at 10 min
-# (10 x 60 s; the longest, rough Heston, takes ~260 s under full load), so
-# a hung test still fails and the run moves on.
+# (10 x 60 s), so a hung test still fails and the run moves on.
 slow-timeout = { period = "60s", terminate-after = 10 }
 fail-fast = false
+
+[[profile.slow.overrides]]
+# These path batches use the default Rayon pool, which consumes the machine's
+# logical CPUs. Account for those workers instead of scheduling other tests
+# against the same CPUs. Keep their sample counts and ten-minute caps intact.
+filter = 'test(/monte_carlo::discretization::rough_heston::tests::mc_atm_price_matches_fourier_pricer$/) | test(/stochastic_recovery_large_pool_converges_to_lhp$/)'
+threads-required = "num-cpus"
 
 [[profile.slow.overrides]]
 # This fixed-seed acceptance test evaluates four 262k-path LSMC configurations.

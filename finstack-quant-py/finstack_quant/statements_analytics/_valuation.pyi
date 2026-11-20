@@ -1549,6 +1549,7 @@ def evaluate_lbo(model: Any, config: Mapping[str, Any] | str) -> LboResult:
         ``entry_metric_node`` (monetary node read at the selected entry period),
         ``transaction_fees`` (model currency), ``sources``
         (``[{"name": ..., "amount": ...}]`` funded at close, model currency),
+        ``entry_period`` (the period used to value the entry metric),
         ``exit_multiple``, ``exit_metric_node``, ``exit_net_debt_node``,
         ``exit_period`` (``"2029"`` or ``"2029Q4"``) and the optional
         ``check_mappings`` (a serde dict or a typed ``LboCheckMappings``),
@@ -1585,7 +1586,7 @@ def evaluate_lbo(model: Any, config: Mapping[str, Any] | str) -> LboResult:
     >>> config = {
     ...     "entry_multiple": 8.0,
     ...     "entry_metric_node": "ebitda",
-     "entry_period": "2025Q1",
+    ...     "entry_period": "2025Q1",
     ...     "transaction_fees": 0.0,
     ...     "sources": [{"name": "debt", "amount": 500.0}],
     ...     "exit_multiple": 9.0,

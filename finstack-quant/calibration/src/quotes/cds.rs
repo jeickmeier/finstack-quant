@@ -58,8 +58,7 @@ fn is_standard_upfront_running_coupon_bp(coupon_bp: f64) -> bool {
 ///
 /// Upfront quote:
 /// ```rust
-/// use finstack_quant_calibration::quotes::CdsQuote;
-/// use finstack_quant_calibration::quotes::{Pillar, QuoteId};
+/// use finstack_quant_calibration::quotes::{CdsQuote, CdsUpfrontBasis, Pillar, QuoteId};
 /// use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 /// use finstack_quant_core::currency::Currency;
 ///
@@ -73,7 +72,8 @@ fn is_standard_upfront_running_coupon_bp(coupon_bp: f64) -> bool {
 ///     },
 ///     pillar: Pillar::Tenor("5Y".parse()?),
 ///     coupon_bp: 500.0,
-///     upfront_pct: 0.02, // 2% upfront
+///     upfront_pct: 0.02, // 2% of notional before the accrued premium rebate
+///     upfront_basis: CdsUpfrontBasis::Clean,
 ///     recovery_rate: 0.40,
 /// };
 /// # Ok(())

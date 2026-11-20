@@ -910,6 +910,21 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Exact ordinary GIRR quote mapping at one regulatory vertex.",
+  "examples": [
+    {
+      "quote": {
+        "pillar_date": "2029-01-02",
+        "quote_id": "USD-OIS-5Y"
+      },
+      "risk_currency": "USD",
+      "risk_curve_id": "USD-OIS",
+      "source": {
+        "curve_id": "USD-OIS",
+        "kind": "discount"
+      },
+      "vertex": "5Y"
+    }
+  ],
   "properties": {
     "quote": {
       "$ref": "#/$defs/CalibrationQuoteCoordinate",

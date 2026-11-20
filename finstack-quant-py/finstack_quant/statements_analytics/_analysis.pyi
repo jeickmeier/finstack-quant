@@ -1134,56 +1134,55 @@ def evaluate_scenario_set_with_market(
 ) -> ScenarioResults:
     """Evaluate all scenarios in a scenario set against a market as of a date.
 
-        Each scenario is evaluated like ``Evaluator.evaluate_with_market``: the
-        capital structure's instruments are priced from ``market`` as of
-        ``as_of`` (floating coupons, swaps, caps), so every result carries
-        ``cs_cashflows``, and explicit actuals not yet available at ``as_of`` are
-        hidden. The market is shared unchanged by every scenario.
+    Each scenario is evaluated like ``Evaluator.evaluate_with_market``: the
+    capital structure's instruments are priced from ``market`` as of
+    ``as_of`` (floating coupons, swaps, caps), so every result carries
+    ``cs_cashflows``, and explicit actuals not yet available at ``as_of`` are
+    hidden. The market is shared unchanged by every scenario.
 
-        Parameters
-        ----------
-        model : FinancialModelSpec | str
-            A ``FinancialModelSpec`` object or a JSON string.
-        scenario_set : ScenarioSet | str
-            A typed scenario set or its JSON serialization.
-        market : MarketContext | str
-            Curves, fixings and FX the instruments are priced from, typed or its
-            canonical JSON.
-        as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-            Valuation date for the instruments' cashflows and the cutoff for
-            explicit-value visibility; ISO ``YYYY-MM-DD`` strings are accepted.
+    Parameters
+    ----------
+    model : FinancialModelSpec | str
+        A ``FinancialModelSpec`` object or a JSON string.
+    scenario_set : ScenarioSet | str
+        A typed scenario set or its JSON serialization.
+    market : MarketContext | str
+        Curves, fixings and FX the instruments are priced from, typed or its
+        canonical JSON.
+    as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
+        Valuation date for the instruments' cashflows and the cutoff for
+        explicit-value visibility; ISO ``YYYY-MM-DD`` strings are accepted.
 
-        Returns
-        -------
-        ScenarioResults
-            Typed mapping of scenario names to statement results.
+    Returns
+    -------
+    ScenarioResults
+        Typed mapping of scenario names to statement results.
 
-        Raises
-        ------
-        ValueError
-            If ``as_of`` is not date-like, the set is empty, a parent chain
-            cycles, an override is incompatible with its node, a forecast
-            override has invalid parameters, or evaluation fails.
-        KeyError
-            If an override names a node missing from the model, or an instrument
-            needs market data ``market`` lacks.
-        RuntimeError
-            If capital-structure cashflow generation or the waterfall fails.
+    Raises
+    ------
+    ValueError
+        If ``as_of`` is not date-like, the set is empty, a parent chain
+        cycles, an override is incompatible with its node, a forecast
+        override has invalid parameters, or evaluation fails.
+    KeyError
+        If an override names a node missing from the model, or an instrument
+        needs market data ``market`` lacks.
+    RuntimeError
+        If capital-structure cashflow generation or the waterfall fails.
 
-        Examples
-        --------
-        >>> from finstack_quant.core.market_data import MarketContext
-    from finstack_quant.core.money import Money
-        >>> from finstack_quant.statements import ModelBuilder
-        >>> from finstack_quant.statements_analytics import ScenarioSet, evaluate_scenario_set_with_market
-        >>> b = ModelBuilder("m")
-        >>> _ = b.periods("2025Q1..Q2", None)
-        >>> _ = b.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
-        >>> results = evaluate_scenario_set_with_market(
-        ...     b.build(), ScenarioSet({"base": {}, "down": {"revenue": 90.0}}), MarketContext(), "2025-01-01"
-        ... )
-        >>> results.names
-        ['base', 'down']
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.statements import ModelBuilder
+    >>> from finstack_quant.statements_analytics import ScenarioSet, evaluate_scenario_set_with_market
+    >>> b = ModelBuilder("m")
+    >>> _ = b.periods("2025Q1..Q2", None)
+    >>> _ = b.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
+    >>> results = evaluate_scenario_set_with_market(
+    ...     b.build(), ScenarioSet({"base": {}, "down": {"revenue": 90.0}}), MarketContext(), "2025-01-01"
+    ... )
+    >>> results.names
+    ['base', 'down']
     """
 
 def explain_formula(model: Any, results: Any, node_id: str, period: str) -> Explanation:

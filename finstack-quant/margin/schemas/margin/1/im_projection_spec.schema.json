@@ -111,6 +111,28 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Dated admitted SIMM netting scope and deterministic projection election.",
+  "examples": [
+    {
+      "as_of": "2025-01-01",
+      "currency": "USD",
+      "dates": [
+        "2025-01-01",
+        "2025-07-01",
+        "2026-01-01"
+      ],
+      "decay": {
+        "linear_to_maturity": {
+          "maturity_years": 1.0
+        }
+      },
+      "netting_set": {
+        "counterparty_id": "bank",
+        "csa_id": "agreement",
+        "kind": "bilateral"
+      },
+      "scope_source": "simm-execution"
+    }
+  ],
   "properties": {
     "as_of": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",

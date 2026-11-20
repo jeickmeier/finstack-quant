@@ -107,7 +107,7 @@ class QuantoOption:
         --------
         >>> from finstack_quant.valuations.instruments import QuantoOption
         >>> contract = QuantoOption.example()
-        >>> QuantoOption.from_json(future.to_json()).id == future.id != ""
+        >>> QuantoOption.from_json(contract.to_json()).id == contract.id != ""
         True
         """
         ...

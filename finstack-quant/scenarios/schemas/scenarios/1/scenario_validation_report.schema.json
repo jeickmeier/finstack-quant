@@ -3,6 +3,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Structural validation diagnostics without scenario application.",
+  "examples": [
+    {
+      "errors": [],
+      "mutates_instruments": false,
+      "operation_count": 1,
+      "requires_instruments": false,
+      "valid": true,
+      "warnings": []
+    }
+  ],
   "properties": {
     "errors": {
       "description": "Failures in specification and operation order.",

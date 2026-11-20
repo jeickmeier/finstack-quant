@@ -107,7 +107,7 @@ class FxTouchOption:
         --------
         >>> from finstack_quant.valuations.instruments import FxTouchOption
         >>> contract = FxTouchOption.example()
-        >>> FxTouchOption.from_json(future.to_json()).id == future.id != ""
+        >>> FxTouchOption.from_json(contract.to_json()).id == contract.id != ""
         True
         """
         ...

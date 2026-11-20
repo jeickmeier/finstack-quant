@@ -1104,8 +1104,9 @@ class PortfolioLossResult:
         ... )
         >>> config = PortfolioLossConfig(1000, 42, 0.99, CopulaSpec.gaussian())
         >>> result = simulate_portfolio_loss([CreditExposure("A", 1e6, 0.02, 0.6, [0.3])], config)
-        >>> PortfolioLossResult.from_json(result.to_json()).expected_loss
-        14400.0
+        >>> restored = PortfolioLossResult.from_json(result.to_json())
+        >>> restored.expected_loss == result.expected_loss
+        True
 
         Raises
         ------

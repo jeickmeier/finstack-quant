@@ -3132,6 +3132,42 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "One typed calibration step with inline observations.",
+  "examples": [
+    {
+      "quotes": [
+        {
+          "id": "USD-SOFR-DEP-1M",
+          "index": "USD-SOFR",
+          "kind": "rate_quote",
+          "pillar": {
+            "tenor": {
+              "count": 1,
+              "unit": "months"
+            }
+          },
+          "rate": 0.0525,
+          "type": "deposit"
+        }
+      ],
+      "step": {
+        "base_date": "2025-01-15",
+        "conventions": {
+          "curve_day_count": null,
+          "ois_compounding": null
+        },
+        "currency": "USD",
+        "curve_id": "USD-OIS",
+        "extrapolation": "extend",
+        "id": "usd_discount",
+        "interpolation": "log_linear",
+        "kind": "discount",
+        "method": "bootstrap",
+        "pricing_discount_id": null,
+        "pricing_forward_id": null,
+        "quote_set": "usd_deposits"
+      }
+    }
+  ],
   "properties": {
     "quotes": {
       "description": "Inputs to register in the named quote set, in calibration order.\nA later step can pass an empty list to reuse a previously registered set.",

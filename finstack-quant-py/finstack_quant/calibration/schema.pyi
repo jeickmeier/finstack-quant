@@ -31,8 +31,9 @@ def index() -> str:
     --------
     >>> import json
     >>> from finstack_quant.calibration import schema
-    >>> len(json.loads(schema.index())["artifacts"])
-    15
+    >>> paths = {artifact["path"] for artifact in json.loads(schema.index())["artifacts"]}
+    >>> "schemas/calibration/1/calibration.schema.json" in paths
+    True
     """
     ...
 

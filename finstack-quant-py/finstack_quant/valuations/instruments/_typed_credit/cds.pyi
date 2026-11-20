@@ -660,6 +660,7 @@ class CreditDefaultSwapBuilder:
     ...     CreditDefaultSwap
     ...     .builder()
     ...     .id("CDS-1")
+    ...     .include_valuation_date_cashflows(False)
     ...     .notional(Money(10_000_000.0, Currency("USD")))
     ...     .side("pay")
     ...     .convention("isda_na")

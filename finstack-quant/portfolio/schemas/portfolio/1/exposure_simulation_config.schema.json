@@ -2667,6 +2667,53 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Dated simulated market states, factor mappings, legal scope and optional cash collateral.",
+  "examples": [
+    {
+      "dates": [
+        "2024-01-02",
+        "2024-02-02"
+      ],
+      "factors": [
+        {
+          "kind": "equity",
+          "price_id": "STOCK-SPOT",
+          "state": 0
+        }
+      ],
+      "netting_set": {
+        "counterparty_id": "EXAMPLE-COUNTERPARTY",
+        "csa_id": "EXAMPLE-CSA",
+        "kind": "bilateral"
+      },
+      "netting_source_id": "example-netting-record",
+      "position_ids": [
+        "EQUITY_001"
+      ],
+      "simulation": {
+        "antithetic": true,
+        "fbm": null,
+        "initial_state": [
+          100.0
+        ],
+        "num_paths": 1000,
+        "process": {
+          "q": 0.0,
+          "r": 0.05,
+          "sigma": 0.2,
+          "type": "gbm"
+        },
+        "scheme": "default",
+        "seed": 42,
+        "time_grid": {
+          "times": [
+            0.0,
+            0.0849315068493
+          ],
+          "type": "times"
+        }
+      }
+    }
+  ],
   "properties": {
     "cash_vm": {
       "anyOf": [

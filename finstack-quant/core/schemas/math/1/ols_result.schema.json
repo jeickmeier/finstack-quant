@@ -3,6 +3,24 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Ordinary least-squares coefficients, residuals and fit diagnostics.",
+  "examples": [
+    {
+      "adj_r_squared": 1.0,
+      "coefficients": [
+        2.0
+      ],
+      "intercept": 1.0,
+      "n_features": 1,
+      "n_obs": 3,
+      "r_squared": 1.0,
+      "residual_std_error": 0.0,
+      "residuals": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
   "properties": {
     "adj_r_squared": {
       "description": "Coefficient of determination adjusted for residual degrees of freedom.",
