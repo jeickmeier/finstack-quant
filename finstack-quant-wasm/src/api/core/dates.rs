@@ -155,36 +155,9 @@ impl JsDayCountContext {
     pub fn end_is_termination_date(&self) -> Option<bool> {
         self.inner.get_end_is_termination_date()
     }
-
-    /// Serialize to the canonical JSON wire form shared with Python `DayCountContext.to_json`.
-    ///
-    /// @returns Compact JSON text (dates in the coupon period are ISO-8601).
-    /// @throws If serialization fails (not expected for a valid context).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
-    /// Deserialize from the canonical JSON wire form produced by `toJson`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical DayCountContext JSON text or plain object; unknown
-    ///   fields are rejected. As in Rust and Python, it is validated on load
-    ///   by `DayCountContextState::try_new`.
-    ///
-    /// @returns The parsed `DayCountContext`.
-    /// @throws `FinstackError` (kind `validation`) if `json` is malformed, has
-    /// unknown or mistyped fields, an inverted coupon period or a zero
-    /// business-day basis.
-    /// @param json - Canonical DayCountContext JSON text or plain object; unknown fields are rejected. As in Rust and Python, it is validated on load by `DayCountContextState::try_new`.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsDayCountContext, JsValue> {
-        from_js_json::<DayCountContextState>(&json, "json").map(|inner| JsDayCountContext { inner })
-    }
 }
+
+json_round_trip!(JsDayCountContext, DayCountContext);
 
 thread_local! {
     static DAY_COUNT_PROTOTYPE: std::cell::OnceCell<js_sys::Object> = const { std::cell::OnceCell::new() };
@@ -387,43 +360,9 @@ impl JsVolatilityClock {
         let expiry = js_epoch_days(&expiry_epoch_days, "expiryEpochDays")?;
         self.inner.expiry_time(expiry).map_err(to_js_err)
     }
-
-    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python `VolatilityClock.to_json`.
-    ///
-    /// @returns Compact JSON text with ISO-8601 `reference_date`.
-    /// @throws If serialization fails (not expected for a valid clock).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
-    /// Deserialize from the canonical JSON wire form produced by `toJson`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical `VolatilityClock` JSON text or plain object `{ reference_date, day_count, context }`; unknown fields are rejected.
-    ///
-    /// @returns A validated `VolatilityClock` handle owned by the caller; release it with `free()`.
-    /// @throws `FinstackError` (kind `validation` or `not_found`) if `json` is malformed, has unknown/mistyped fields, or fails clock context validation.
-    /// @param json - Canonical `VolatilityClock` JSON text or plain object `{ reference_date, day_count, context }`; unknown fields are rejected.
-    ///
-    /// @example
-    /// ```typescript
-    /// import init, { core } from "finstack-quant-wasm";
-    /// await init();
-    /// const original = new core.VolatilityClock(core.createDate(2025, 1, 15), core.DayCount.act365f());
-    /// const roundTripped = core.VolatilityClock.fromJson(original.toJson());
-    /// console.log(roundTripped.referenceDate === original.referenceDate);
-    /// roundTripped.free();
-    /// original.free();
-    /// ```
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsVolatilityClock, JsValue> {
-        from_js_json::<VolatilityClock>(&json, "json").map(|inner| JsVolatilityClock { inner })
-    }
 }
+
+json_round_trip!(JsVolatilityClock, VolatilityClock);
 
 /// Read a `[startEpochDays, endEpochDays]` pair.
 fn epoch_day_pair(value: &JsValue, label: &str) -> Result<(Date, Date), JsValue> {

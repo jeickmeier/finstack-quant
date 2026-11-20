@@ -1,7 +1,7 @@
 //! WASM bindings for [`finstack_quant_core::types`]: rate helpers (`Rate`, `Bps`),
 //! the credit-rating scale (`CreditRating`) and free-form `Attributes`.
 
-use crate::utils::input::{from_js_json, js_f64, js_string};
+use crate::utils::input::{js_f64, js_string};
 use crate::utils::to_js_err;
 use finstack_quant_core::types::{Attributes, Bps as RustBps, CreditRating, Rate as RustRate};
 use wasm_bindgen::prelude::*;
@@ -195,32 +195,9 @@ impl JsRate {
     pub fn is_negative(&self) -> bool {
         self.inner.is_negative()
     }
-
-    /// Serialize to the canonical JSON wire form shared with Python `Rate.to_json`.
-    ///
-    /// @returns Compact JSON text.
-    /// @throws If serialization fails (not expected for a valid value).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
-    /// Deserialize from the canonical JSON wire form produced by `toJson`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical `Rate` JSON text (or the equivalent plain value).
-    ///
-    /// @returns The parsed `Rate`.
-    /// @throws If `json` is malformed or holds an invalid value.
-    /// @param json - Canonical `Rate` JSON text (or the equivalent plain value).
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsRate, JsValue> {
-        from_js_json::<RustRate>(&json, "json").map(|inner| JsRate { inner })
-    }
 }
+
+json_round_trip!(JsRate, Rate);
 
 /// Basis points (1 bp = 0.01%, 10_000 bp = 100%).
 ///
@@ -338,32 +315,9 @@ impl JsBps {
     pub fn is_negative(&self) -> bool {
         self.inner.is_negative()
     }
-
-    /// Serialize to the canonical JSON wire form shared with Python `Bps.to_json`.
-    ///
-    /// @returns Compact JSON text.
-    /// @throws If serialization fails (not expected for a valid value).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
-    /// Deserialize from the canonical JSON wire form produced by `toJson`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical `Bps` JSON text (or the equivalent plain value).
-    ///
-    /// @returns The parsed `Bps`.
-    /// @throws If `json` is malformed or holds an invalid value.
-    /// @param json - Canonical `Bps` JSON text (or the equivalent plain value).
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsBps, JsValue> {
-        from_js_json::<RustBps>(&json, "json").map(|inner| JsBps { inner })
-    }
 }
+
+json_round_trip!(JsBps, Bps);
 
 /// Agency credit rating on the 23-step S&P/Fitch scale (`AAA` … `D`, plus `NR`).
 ///
@@ -655,33 +609,6 @@ impl JsCreditRating {
         self.inner.notches_to(other).map_err(to_js_err)
     }
 
-    /// Serialize to the canonical JSON wire form (the quoted S&P/Fitch spelling).
-    ///
-    /// @returns JSON text such as `"\"BBB-\""`.
-    /// @throws If serialization fails (not expected).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
-    /// Deserialize from the canonical JSON wire form produced by `toJson`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - JSON text holding the quoted S&P/Fitch spelling, such as
-    ///   `"\"BBB-\""`.
-    ///
-    /// @returns The parsed `CreditRating`.
-    /// @throws `TypeError` if `json` is not a string; `FinstackError` (kind
-    /// `validation`) if it is not a quoted rating.
-    /// @param json - JSON text holding the quoted S&P/Fitch spelling, such as `"\"BBB-\""`.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "string")] json: JsValue,
-    ) -> Result<JsCreditRating, JsValue> {
-        from_js_json(&json, "json").map(Self::from_inner)
-    }
-
     /// S&P/Fitch spelling of the rating, such as `"BBB-"`.
     ///
     /// @returns The rating text accepted by `new CreditRating(name)`.
@@ -691,6 +618,8 @@ impl JsCreditRating {
         self.inner.to_string()
     }
 }
+
+json_round_trip!(JsCreditRating, CreditRating, string);
 
 /// Tags and key/value metadata attached to an instrument or position, used
 /// by scenario and reporting selectors.
@@ -862,35 +791,9 @@ impl JsAttributes {
             })
             .collect()
     }
-
-    /// Serialize to the canonical JSON wire form shared with Python `Attributes.to_json`.
-    ///
-    /// @returns Compact JSON text with `tags` and `meta`.
-    /// @throws If serialization fails (not expected).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
-    /// Deserialize from the canonical JSON wire form produced by `toJson`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Attributes JSON text or plain object with `tags` (array of
-    ///   strings) and `meta` (string-to-string map); unknown fields are
-    ///   rejected.
-    ///
-    /// @returns The parsed `Attributes`.
-    /// @throws `TypeError` if `json` is not a JSON string or plain object;
-    /// `FinstackError` (kind `validation`) if it does not match the schema.
-    /// @param json - Attributes JSON text or plain object with `tags` (array of strings) and `meta` (string-to-string map); unknown fields are rejected.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsAttributes, JsValue> {
-        from_js_json::<Attributes>(&json, "json").map(|inner| Self { inner })
-    }
 }
+
+json_round_trip!(JsAttributes, Attributes);
 
 #[cfg(test)]
 mod tests {

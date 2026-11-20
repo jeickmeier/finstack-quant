@@ -161,35 +161,6 @@ impl JsInflationCurve {
         Self::build(from_js_json(&options, "options")?)
     }
 
-    /// Deserialize from the canonical JSON wire form shared with Python `InflationCurve.to_json`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical InflationCurve JSON text or plain object; unknown
-    ///   fields are rejected and the curve is re-validated.
-    ///
-    /// @returns The validated `InflationCurve`.
-    /// @throws `TypeError` if `json` is not a JSON string or plain object;
-    /// `FinstackError` (kind `validation`) if it does not match the schema or
-    /// fails curve validation.
-    /// @param json - Canonical InflationCurve JSON text or plain object; unknown fields are rejected and the curve is re-validated.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsInflationCurve, JsValue> {
-        from_js_json::<RustInflationCurve>(&json, "json")
-            .map(|curve| Self::from_inner(Arc::new(curve)))
-    }
-
-    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
-    ///
-    /// @returns Compact JSON text.
-    /// @throws If serialization fails (not expected for a valid curve).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&*self.inner).map_err(to_js_err)
-    }
-
     /// Projected CPI level at year fraction `t` or on an ISO-8601 date, without
     /// indexation lag (Rust `InflationCurve::cpi` / `InflationCurve::cpi_on_date`).
     ///
@@ -293,6 +264,8 @@ impl JsInflationCurve {
         self.inner.extrapolation().to_string()
     }
 }
+
+json_round_trip!(JsInflationCurve, InflationCurve, arc);
 
 /// Forward price curve for commodities and other price-based assets, or a
 /// volatility-index forward curve.
@@ -444,34 +417,6 @@ impl JsPriceCurve {
         Self::build(from_js_json(&options, "options")?)
     }
 
-    /// Deserialize from the canonical JSON wire form shared with Python `PriceCurve.to_json`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical PriceCurve JSON text or plain object; unknown
-    ///   fields are rejected and the curve is re-validated.
-    ///
-    /// @returns The validated `PriceCurve`.
-    /// @throws `TypeError` if `json` is not a JSON string or plain object;
-    /// `FinstackError` (kind `validation`) if it does not match the schema or
-    /// fails curve validation.
-    /// @param json - Canonical PriceCurve JSON text or plain object; unknown fields are rejected and the curve is re-validated.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsPriceCurve, JsValue> {
-        from_js_json::<RustPriceCurve>(&json, "json").map(|curve| Self::from_inner(Arc::new(curve)))
-    }
-
-    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
-    ///
-    /// @returns Compact JSON text.
-    /// @throws If serialization fails (not expected for a valid curve).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&*self.inner).map_err(to_js_err)
-    }
-
     /// Forward price at year fraction `t` or on an ISO-8601 date (Rust
     /// `PriceCurve::price` / `PriceCurve::price_on_date`).
     ///
@@ -551,6 +496,8 @@ impl JsPriceCurve {
     }
 }
 
+json_round_trip!(JsPriceCurve, PriceCurve, arc);
+
 /// Base-correlation curve for credit tranche pricing: correlation as a
 /// function of the detachment point.
 ///
@@ -601,36 +548,6 @@ impl JsBaseCorrelationCurve {
             .build()
             .map(|curve| Self::from_inner(Arc::new(curve)))
             .map_err(to_js_err)
-    }
-
-    /// Deserialize from the canonical JSON wire form shared with Python
-    /// `BaseCorrelationCurve.to_json`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical BaseCorrelationCurve JSON text or plain object;
-    ///   unknown fields are rejected and the curve is re-validated.
-    ///
-    /// @returns The validated `BaseCorrelationCurve`.
-    /// @throws `TypeError` if `json` is not a JSON string or plain object;
-    /// `FinstackError` (kind `validation`) if it does not match the schema or
-    /// fails curve validation.
-    /// @param json - Canonical BaseCorrelationCurve JSON text or plain object; unknown fields are rejected and the curve is re-validated.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsBaseCorrelationCurve, JsValue> {
-        from_js_json::<RustBaseCorrelationCurve>(&json, "json")
-            .map(|curve| Self::from_inner(Arc::new(curve)))
-    }
-
-    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
-    ///
-    /// @returns Compact JSON text.
-    /// @throws If serialization fails (not expected for a valid curve).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&*self.inner).map_err(to_js_err)
     }
 
     /// Base correlation at a detachment point (Rust `BaseCorrelationCurve::get_correlation`).
@@ -684,6 +601,8 @@ impl JsBaseCorrelationCurve {
         self.inner.extrapolation().to_string()
     }
 }
+
+json_round_trip!(JsBaseCorrelationCurve, BaseCorrelationCurve, arc);
 
 /// Market data of one credit index: constituent count, recovery, the index
 /// hazard curve and its base-correlation curve.

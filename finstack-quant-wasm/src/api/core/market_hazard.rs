@@ -251,35 +251,6 @@ impl JsHazardCurve {
             .map_err(to_js_err)
     }
 
-    /// Deserialize a hazard curve from its canonical JSON wire form (the
-    /// Rust serde schema shared with Python `HazardCurve.to_json`).
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical HazardCurve JSON text or plain object, such as
-    ///   `HazardCurve.toJson()` output (for example of the curve that
-    ///   `models.credit.MertonModel.toHazardCurve` returns). Unknown fields
-    ///   are rejected and the curve is re-validated.
-    ///
-    /// @returns The validated `HazardCurve`.
-    /// @throws If `json` is malformed, has unknown fields, or fails curve validation.
-    /// @param json - Canonical HazardCurve JSON text or plain object, such as `HazardCurve.toJson()` output (for example of the curve that `models.credit.MertonModel.toHazardCurve` returns). Unknown fields are rejected and the curve is re-validated.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsHazardCurve, JsValue> {
-        from_js_json::<RustHazardCurve>(&json, "json").map(Self::from_inner)
-    }
-
-    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
-    ///
-    /// @returns Compact JSON text.
-    /// @throws If serialization fails (not expected for a valid curve).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&*self.inner).map_err(to_js_err)
-    }
-
     /// Survival probability `S(t)` at year fraction `t` or on an ISO-8601 date.
     ///
     /// # Arguments
@@ -501,6 +472,8 @@ impl JsHazardCurve {
         }
     }
 }
+
+json_round_trip!(JsHazardCurve, HazardCurve, arc);
 
 #[cfg(test)]
 mod tests {

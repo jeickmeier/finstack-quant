@@ -7,7 +7,7 @@
 
 use super::config::PyFinstackConfig;
 use crate::bindings::macros::wire_methods;
-use crate::errors::{core_to_py, serde_json_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_core::rating_scales::{
     RATING_SCALES_EXTENSION_KEY, RatingLevel, RatingScaleEntry, RatingScaleRegistry,
     ScorecardScale, registry_from_config,
@@ -476,32 +476,13 @@ impl PyRatingScaleRegistry {
         };
         Ok(self.inner == rhs.inner)
     }
-
-    /// Serialize the registry to a JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "invalid RatingScaleRegistry"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a registry from JSON. The payload is validated.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        RatingScaleRegistry::from_json(json)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
 }
+
+wire_methods!(
+    PyRatingScaleRegistry,
+    RatingScaleRegistry,
+    "RatingScaleRegistry"
+);
 
 /// Load the rating-scale registry held in a ``FinstackConfig``.
 ///

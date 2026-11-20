@@ -158,44 +158,6 @@ impl JsVolCube {
         })
     }
 
-    /// Deserialize a canonical SABR cube state without flattening parameter nodes.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical VolCube JSON containing id, expiry and tenor axes in years,
-    ///   row-major SABR nodes and decimal-rate forwards, and interpolation_mode.
-    ///   Missing or null node shifts remain absent; unknown fields are rejected.
-    /// @returns A validated VolCube handle owned by the caller; release it with free().
-    /// @throws Error - Throws when JSON is malformed, fields are unknown, or native axis, parameter, or forward validation fails.
-    /// @param json - Canonical VolCube JSON containing id, expiry and tenor axes in years, row-major SABR nodes and decimal-rate forwards, and interpolation_mode. Missing or null node shifts remain absent; unknown fields are rejected.
-    ///
-    /// @example
-    /// ```typescript
-    /// import init, { core } from "finstack-quant-wasm";
-    /// await init();
-    /// const cube = core.VolCube.fromJson(
-    ///   JSON.stringify({
-    ///     id: "USD-SWAPTION",
-    ///     expiries: [1],
-    ///     tenors: [5],
-    ///     params: [{ alpha: 0.03, beta: 0.5, rho: -0.2, nu: 0.4, shift: null }],
-    ///     forwards: [0.03],
-    ///     interpolation_mode: "vol",
-    ///   })
-    /// );
-    /// console.log(cube.id);
-    /// cube.free();
-    /// ```
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsVolCube, JsValue> {
-        let inner = from_js_json::<RustVolCube>(&json, "json")?;
-        Ok(Self {
-            inner: Arc::new(inner),
-        })
-    }
-
     /// Interpolation contract used across the expiry axis.
     #[wasm_bindgen(getter, js_name = interpolationMode)]
     pub fn interpolation_mode(&self) -> Result<String, JsValue> {
@@ -206,15 +168,6 @@ impl JsVolCube {
     #[wasm_bindgen(getter, js_name = id)]
     pub fn id(&self) -> String {
         self.inner.id().as_str().to_string()
-    }
-
-    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
-    ///
-    /// @returns Compact JSON text.
-    /// @throws If serialization fails (not expected for a valid cube).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&*self.inner).map_err(to_js_err)
     }
 
     /// Option expiry axis in years.
@@ -302,6 +255,8 @@ impl JsVolCube {
     }
 }
 
+json_round_trip!(JsVolCube, VolCube, arc);
+
 thread_local! {
     static CURRENCY_PROTOTYPE: std::cell::OnceCell<js_sys::Object> = const { std::cell::OnceCell::new() };
 }
@@ -365,6 +320,38 @@ struct ParsedFxSurfaceOptions {
     expiry_clock: Option<finstack_quant_core::dates::VolatilityClock>,
 }
 
+fn parse_option_bag(
+    value: &JsValue,
+    type_name: &str,
+    options_type: &str,
+    allowed_keys: &[&str],
+) -> Result<js_sys::Object, JsValue> {
+    if !is_plain_object(value) {
+        return Err(invalid_type(
+            "options",
+            &format!("expected a plain {options_type} object"),
+        ));
+    }
+    let obj = js_sys::Object::from(value.clone());
+    for key_val in js_sys::Object::keys(&obj).iter() {
+        let Some(key) = key_val.as_string() else {
+            continue;
+        };
+        if !allowed_keys.contains(&key.as_str()) {
+            return Err(to_js_err(finstack_quant_core::Error::Validation(format!(
+                "unknown {type_name} option `{key}`; allowed keys are {}",
+                allowed_keys.join(", ")
+            ))));
+        }
+    }
+    Ok(obj)
+}
+
+fn option_field(obj: &js_sys::Object, name: &str) -> Result<JsValue, JsValue> {
+    js_sys::Reflect::get(obj, &JsValue::from(name))
+        .map_err(|_| invalid_type(&format!("options.{name}"), "could not read property"))
+}
+
 fn parse_fx_surface_options(opts_val: &JsValue) -> Result<ParsedFxSurfaceOptions, JsValue> {
     const ALLOWED_KEYS: [&str; 6] = [
         "rr10d",
@@ -374,36 +361,23 @@ fn parse_fx_surface_options(opts_val: &JsValue) -> Result<ParsedFxSurfaceOptions
         "butterflyConvention",
         "expiryClock",
     ];
-    if !is_plain_object(opts_val) {
-        return Err(invalid_type(
-            "options",
-            "expected a plain FxDeltaVolSurfaceOptions object",
-        ));
-    }
-    let obj = js_sys::Object::from(opts_val.clone());
-    for key_val in js_sys::Object::keys(&obj).iter() {
-        let Some(key) = key_val.as_string() else {
-            continue;
-        };
-        if !ALLOWED_KEYS.contains(&key.as_str()) {
-            return Err(to_js_err(finstack_quant_core::Error::Validation(format!(
-                "unknown FxDeltaVolSurface option `{key}`; allowed keys are {}",
-                ALLOWED_KEYS.join(", ")
-            ))));
-        }
-    }
-    let field = |name: &str| {
-        js_sys::Reflect::get(&obj, &JsValue::from(name))
-            .map_err(|_| invalid_type(&format!("options.{name}"), "could not read property"))
-    };
-    let label = |name: &str| js_string(&field(name)?, &format!("options.{name}"));
+    let obj = parse_option_bag(
+        opts_val,
+        "FxDeltaVolSurface",
+        "FxDeltaVolSurfaceOptions",
+        &ALLOWED_KEYS,
+    )?;
+    let label = |name: &str| js_string(&option_field(&obj, name)?, &format!("options.{name}"));
     Ok(ParsedFxSurfaceOptions {
         delta_convention: parse_label(&label("deltaConvention")?)?,
         atm_convention: parse_label(&label("atmConvention")?)?,
         butterfly_convention: parse_label(&label("butterflyConvention")?)?,
-        rr10d: js_opt_f64_seq(Some(&field("rr10d")?), "options.rr10d")?,
-        bf10d: js_opt_f64_seq(Some(&field("bf10d")?), "options.bf10d")?,
-        expiry_clock: js_opt_volatility_clock(Some(&field("expiryClock")?), "options.expiryClock")?,
+        rr10d: js_opt_f64_seq(Some(&option_field(&obj, "rr10d")?), "options.rr10d")?,
+        bf10d: js_opt_f64_seq(Some(&option_field(&obj, "bf10d")?), "options.bf10d")?,
+        expiry_clock: js_opt_volatility_clock(
+            Some(&option_field(&obj, "expiryClock")?),
+            "options.expiryClock",
+        )?,
     })
 }
 
@@ -508,51 +482,6 @@ impl JsFxDeltaVolSurface {
         })
     }
 
-    /// Deserialize canonical FX delta quotes without reconstructing positional arrays.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical FxDeltaVolSurface JSON with `pair`, conventions,
-    ///   expiries in years, and annualized decimal ATM, risk-reversal, and
-    ///   butterfly quotes. Optional 10-delta wings must occur together; unknown
-    ///   fields are rejected.
-    /// @returns A validated FxDeltaVolSurface handle owned by the caller; release it with free().
-    /// @throws Error - Throws when JSON is malformed, fields are unknown, or native expiry, quote, or wing validation fails.
-    /// @param json - Canonical FxDeltaVolSurface JSON with `pair`, conventions, expiries in years, and annualized decimal ATM, risk-reversal, and butterfly quotes. Optional 10-delta wings must occur together; unknown fields are rejected.
-    ///
-    /// @example
-    /// ```typescript
-    /// import init, { core } from "finstack-quant-wasm";
-    /// await init();
-    /// const surface = core.FxDeltaVolSurface.fromJson(
-    ///   JSON.stringify({
-    ///     id: "EURUSD",
-    ///     pair: { base: "EUR", quote: "USD" },
-    ///     delta_convention: "forward_unadjusted",
-    ///     atm_convention: "delta_neutral_straddle",
-    ///     butterfly_convention: "smile",
-    ///     expiries: [1],
-    ///     atm_vols: [0.12],
-    ///     rr_25d: [0.01],
-    ///     bf_25d: [0.002],
-    ///     rr_10d: null,
-    ///     bf_10d: null,
-    ///     expiry_clock: null,
-    ///   })
-    /// );
-    /// console.log(surface.id, surface.pair);
-    /// surface.free();
-    /// ```
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsFxDeltaVolSurface, JsValue> {
-        let inner = from_js_json::<RustFxDeltaVolSurface>(&json, "json")?;
-        Ok(Self {
-            inner: Arc::new(inner),
-        })
-    }
-
     /// Surface identifier.
     #[wasm_bindgen(getter, js_name = id)]
     pub fn id(&self) -> String {
@@ -569,15 +498,6 @@ impl JsFxDeltaVolSurface {
     #[wasm_bindgen(getter, js_name = expiries)]
     pub fn expiries(&self) -> Box<[f64]> {
         self.inner.expiries().into()
-    }
-
-    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
-    ///
-    /// @returns Compact JSON text.
-    /// @throws If serialization fails (not expected for a valid surface).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&*self.inner).map_err(to_js_err)
     }
 
     /// ATM delta-neutral straddle vols per expiry (decimals).
@@ -644,6 +564,8 @@ impl JsFxDeltaVolSurface {
     }
 }
 
+json_round_trip!(JsFxDeltaVolSurface, FxDeltaVolSurface, arc);
+
 /// Implied-volatility surface on an expiry × secondary-coordinate (strike or tenor) grid.
 ///
 /// Volatilities are decimals (`0.20` is 20%); expiries are year fractions.
@@ -695,42 +617,21 @@ fn parse_vol_surface_options(value: &JsValue) -> Result<ParsedVolSurfaceOptions,
         "displacements",
         "expiryClock",
     ];
-    if !is_plain_object(value) {
-        return Err(invalid_type(
-            "options",
-            "expected a plain VolSurfaceOptions object",
-        ));
-    }
-    let obj = js_sys::Object::from(value.clone());
-    for key_val in js_sys::Object::keys(&obj).iter() {
-        let Some(key) = key_val.as_string() else {
-            continue;
-        };
-        if !ALLOWED_KEYS.contains(&key.as_str()) {
-            return Err(to_js_err(finstack_quant_core::Error::Validation(format!(
-                "unknown VolSurface option `{key}`; allowed keys are {}",
-                ALLOWED_KEYS.join(", ")
-            ))));
-        }
-    }
-    let field = |name: &str| {
-        js_sys::Reflect::get(&obj, &JsValue::from(name))
-            .map_err(|_| invalid_type(&format!("options.{name}"), "could not read property"))
-    };
-    let secondary_axis = parse_label::<VolSurfaceAxis>(&js_string(
-        &field("secondaryAxis")?,
-        "options.secondaryAxis",
-    )?)?;
-    let quote_type = js_string(&field("quoteType")?, "options.quoteType")?
+    let obj = parse_option_bag(value, "VolSurface", "VolSurfaceOptions", &ALLOWED_KEYS)?;
+    let label = |name: &str| js_string(&option_field(&obj, name)?, &format!("options.{name}"));
+    let secondary_axis = parse_label::<VolSurfaceAxis>(&label("secondaryAxis")?)?;
+    let quote_type = label("quoteType")?
         .parse::<VolQuoteType>()
         .map_err(to_js_err)?;
-    let interpolation_mode = parse_label::<VolInterpolationMode>(&js_string(
-        &field("interpolationMode")?,
-        "options.interpolationMode",
-    )?)?;
-    let displacements = js_opt_f64_seq(Some(&field("displacements")?), "options.displacements")?;
-    let expiry_clock =
-        js_opt_volatility_clock(Some(&field("expiryClock")?), "options.expiryClock")?;
+    let interpolation_mode = parse_label::<VolInterpolationMode>(&label("interpolationMode")?)?;
+    let displacements = js_opt_f64_seq(
+        Some(&option_field(&obj, "displacements")?),
+        "options.displacements",
+    )?;
+    let expiry_clock = js_opt_volatility_clock(
+        Some(&option_field(&obj, "expiryClock")?),
+        "options.expiryClock",
+    )?;
     Ok(ParsedVolSurfaceOptions {
         secondary_axis,
         quote_type,
@@ -810,35 +711,6 @@ impl JsVolSurface {
         .map_err(to_js_err)
     }
 
-    /// Deserialize from the canonical JSON wire form shared with Python `VolSurface.to_json`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical VolSurface JSON text or plain object; unknown
-    ///   fields are rejected and the grid is re-validated.
-    ///
-    /// @returns The validated `VolSurface`.
-    /// @throws `TypeError` if `json` is not a JSON string or plain object;
-    /// `FinstackError` (kind `validation`) if it does not match the schema or
-    /// fails grid validation.
-    /// @param json - Canonical VolSurface JSON text or plain object; unknown fields are rejected and the grid is re-validated.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsVolSurface, JsValue> {
-        from_js_json::<RustVolSurface>(&json, "json")
-            .map(|surface| Self::from_inner(Arc::new(surface)))
-    }
-
-    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
-    ///
-    /// @returns Compact JSON text.
-    /// @throws If serialization fails (not expected for a valid surface).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&*self.inner).map_err(to_js_err)
-    }
-
     /// Surface identifier (the `MarketContext` lookup key).
     #[wasm_bindgen(getter, js_name = id)]
     pub fn id(&self) -> String {
@@ -906,6 +778,8 @@ impl JsVolSurface {
         Box::new([expiries, secondary_values])
     }
 }
+
+json_round_trip!(JsVolSurface, VolSurface, arc);
 
 /// Volatility grid at one fixed option expiry, indexed by underlying tenor and strike.
 ///
@@ -993,38 +867,6 @@ impl JsVolCubeExpirySlice {
         .map_err(to_js_err)
     }
 
-    /// Deserialize from the canonical JSON wire form shared with Python
-    /// `VolCubeExpirySlice.to_json`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical VolCubeExpirySlice JSON text or plain object, such
-    ///   as `toJson()` output; unknown fields are rejected and the grid is
-    ///   re-validated.
-    ///
-    /// @returns The validated `VolCubeExpirySlice`.
-    /// @throws `TypeError` if `json` is not a JSON string or plain object;
-    /// `FinstackError` (kind `validation`) if it does not match the schema or
-    /// fails grid validation.
-    /// @param json - Canonical VolCubeExpirySlice JSON text or plain object, such as `toJson()` output; unknown fields are rejected and the grid is re-validated.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsVolCubeExpirySlice, JsValue> {
-        from_js_json::<RustVolCubeExpirySlice>(&json, "json").map(|slice| Self {
-            inner: Arc::new(slice),
-        })
-    }
-
-    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
-    ///
-    /// @returns Compact JSON text.
-    /// @throws If serialization fails (not expected for a valid slice).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&*self.inner).map_err(to_js_err)
-    }
-
     /// Identifier of the materialized grid.
     #[wasm_bindgen(getter, js_name = id)]
     pub fn id(&self) -> String {
@@ -1074,3 +916,5 @@ impl JsVolCubeExpirySlice {
         Box::new([tenors, strikes])
     }
 }
+
+json_round_trip!(JsVolCubeExpirySlice, VolCubeExpirySlice, arc);

@@ -111,32 +111,9 @@ impl JsFxRateResult {
     pub fn triangulated(&self) -> bool {
         self.inner.triangulated
     }
-
-    /// Serialize to the canonical JSON wire form shared with Python `FxRateResult.to_json`.
-    ///
-    /// @returns Compact JSON text with `rate` and `triangulated`.
-    /// @throws If serialization fails (not expected for a valid result).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
-    /// Deserialize from the canonical JSON wire form produced by `toJson`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical FxRateResult JSON text or plain object; unknown fields are rejected.
-    ///
-    /// @returns The parsed `FxRateResult`.
-    /// @throws If `json` is malformed or has unknown or missing fields.
-    /// @param json - Canonical FxRateResult JSON text or plain object; unknown fields are rejected.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsFxRateResult, JsValue> {
-        from_js_json::<RustFxRateResult>(&json, "json").map(|inner| JsFxRateResult { inner })
-    }
 }
+
+json_round_trip!(JsFxRateResult, FxRateResult);
 
 /// Validated quote metadata for one ordered FX pair.
 ///

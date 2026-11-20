@@ -116,38 +116,9 @@ impl JsSchedule {
     pub fn fixing_dates(&self) -> Box<[i32]> {
         epoch_day_array(self.inner.get_fixing_dates())
     }
-
-    /// Serialize to the canonical JSON wire form shared with Python `Schedule.to_json`.
-    ///
-    /// @returns Compact JSON text with ISO-8601 dates.
-    /// @throws If serialization fails (not expected for a valid schedule).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
-    /// Deserialize from the canonical JSON wire form produced by `toJson`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Schedule JSON text or plain object with ISO `dates`,
-    ///   `payment_dates` and `fixing_dates`.
-    ///
-    /// @returns The parsed `Schedule`.
-    /// @throws `TypeError` if `json` is not a JSON string or plain object;
-    /// `FinstackError` (kind `validation`) if it does not match the schema
-    /// (all three arrays are required) or its shape is invalid: fewer than 2
-    /// or more than 100,000 grid dates, grid dates not strictly increasing,
-    /// not exactly one payment date per period, or a non-empty fixing series
-    /// of the wrong length.
-    /// @param json - Schedule JSON text or plain object with ISO `dates`, `payment_dates` and `fixing_dates`.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsSchedule, JsValue> {
-        from_js_json::<Schedule>(&json, "json").map(|inner| JsSchedule { inner })
-    }
 }
+
+json_round_trip!(JsSchedule, Schedule);
 
 /// Fluent builder for a `Schedule`.
 ///
