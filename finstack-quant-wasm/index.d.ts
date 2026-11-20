@@ -7017,14 +7017,6 @@ export interface MarginNamespace {
    */
   readonly otcMarginSpecCleared: typeof wasm.otcMarginSpecCleared;
   /**
-   * Add an explicit credit classification to an independent OTC margin specification.
-   * @param spec - Native OTC terms holding clearing and CSA settings.
-   * @param classification - Qualifying sector or non-qualifying class on the selected risk basis.
-   * @returns Native margin specification with that classification.
-   * @throws FinstackError if either native document cannot be decoded.
-   */
-  readonly otcMarginSpecWithSimmCreditClassification: typeof wasm.otcMarginSpecWithSimmCreditClassification;
-  /**
    * Compute bilateral XVA: CVA, DVA, FVA, MVA, and the all-in adjustment.
    *
    * All legs are weighted by joint (first-to-default) survival. MVA is computed
@@ -7132,26 +7124,6 @@ export interface MarginNamespace {
    * @throws Error if profile, funding spread, the chosen survival or a curve sample is invalid.
    */
   readonly computeMva: (imProfile: ImProfile | string, fundingSpread: generated.margin.MarginFundingSpread | string, discountCurve: DiscountCurve, ownSurvival: HazardCurve | null) => MvaResult;
-  /**
-   * Cleared status through a named central counterparty.
-   * @param ccp - CCP identifier, for example `"LCH"`, `"CME"`, `"ICE"` or `"JSCC"`.
-   * @returns The `ClearingStatus` value `{ cleared: { ccp } }`.
-   *
-   * # Errors
-   *
-   * Throws a `TypeError` when `ccp` is not a string.
-   */
-  readonly clearingStatusCleared: typeof wasm.clearingStatusCleared;
-  /**
-   * Parse a collateral asset class from its lower-case wire label.
-   * @param s - One of `"cash"`, `"government_bonds"`, `"agency_bonds"`, `"covered_bonds"`, `"corporate_bonds"`, `"equity"`, `"gold"`, `"mutual_funds"`.
-   * @returns The canonical `CollateralAssetClass` wire label.
-   *
-   * # Errors
-   *
-   * Throws a validation error for any other spelling.
-   */
-  readonly collateralAssetClassFromStr: typeof wasm.collateralAssetClassFromStr;
   /**
    * Additional haircut applied when collateral and exposure currencies differ.
    * @param assetClass - `CollateralAssetClass` wire label such as `"government_bonds"`.
@@ -7517,16 +7489,6 @@ export interface MarginNamespace {
    */
   readonly imDecayProfileSqrtTime: typeof wasm.imDecayProfileSqrtTime;
   /**
-   * Parse an initial margin methodology from its lower-case wire label.
-   * @param s - One of `"haircut"`, `"simm"`, `"schedule"`, `"internal_model"`, `"clearing_house"`.
-   * @returns The canonical `ImMethodology` wire label.
-   *
-   * # Errors
-   *
-   * Throws a validation error for any other spelling, including `"SIMM"`.
-   */
-  readonly imMethodologyFromStr: typeof wasm.imMethodologyFromStr;
-  /**
    * Project the opening historical SIMM value over a dated runoff schedule.
    * @param calculator - Elected SIMM parameter version and MPOR.
    * @param sensitivities - Signed risk of the admitted netting set.
@@ -7569,16 +7531,6 @@ export interface MarginNamespace {
    * Throws if `result` is malformed.
    */
   readonly imResultBreakdownKeys: typeof wasm.imResultBreakdownKeys;
-  /**
-   * Parse a margin call type from its lower-case wire label.
-   * @param s - One of `"initial_margin"`, `"variation_margin_post"`, `"variation_margin_collect"`, `"top_up"`, `"substitution"`.
-   * @returns The canonical `MarginCallType` wire label.
-   *
-   * # Errors
-   *
-   * Throws a validation error for any other spelling.
-   */
-  readonly marginCallTypeFromStr: typeof wasm.marginCallTypeFromStr;
   /**
    * Annualized cost of funding posted margin.
    *
@@ -7628,16 +7580,6 @@ export interface MarginNamespace {
    */
   readonly marginFundingCostSpreadRate: typeof wasm.marginFundingCostSpreadRate;
   /**
-   * Parse a margin call frequency from its lower-case wire label.
-   * @param s - One of `"daily"`, `"weekly"`, `"monthly"`, `"on_demand"`.
-   * @returns The canonical `MarginTenor` wire label.
-   *
-   * # Errors
-   *
-   * Throws a validation error for any other spelling.
-   */
-  readonly marginTenorFromStr: typeof wasm.marginTenorFromStr;
-  /**
    * Margin utilization: posted margin against required margin.
    *
    * The wire carries the two amounts; the ratio is derived from them (see
@@ -7682,27 +7624,6 @@ export interface MarginNamespace {
    * Throws if `utilization` is malformed, mixes currencies, or has a non-finite or negative amount.
    */
   readonly marginUtilizationShortfall: typeof wasm.marginUtilizationShortfall;
-  /**
-   * Netting set identifier for a bilateral CSA relationship.
-   * @param counterpartyId - Counterparty identifier.
-   * @param csaId - CSA agreement identifier.
-   * @returns The `NettingSetId` value `{ kind: "bilateral", counterparty_id, csa_id }`.
-   *
-   * # Errors
-   *
-   * Throws a `TypeError` when an argument is not a string.
-   */
-  readonly nettingSetIdBilateral: typeof wasm.nettingSetIdBilateral;
-  /**
-   * Netting set identifier for trades cleared through one CCP.
-   * @param ccpId - CCP identifier; also used as the counterparty id.
-   * @returns The `NettingSetId` value `{ kind: "cleared", ccp_id }`.
-   *
-   * # Errors
-   *
-   * Throws a `TypeError` when `ccp_id` is not a string.
-   */
-  readonly nettingSetIdCleared: typeof wasm.nettingSetIdCleared;
   /**
    * Margined SA-CCR netting-set configuration.
    * @param nettingSetId - `NettingSetId` (object or JSON), bilateral or cleared.

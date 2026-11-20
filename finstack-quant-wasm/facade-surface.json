@@ -1984,8 +1984,6 @@
       "SimmCalculator",
       "SimmSensitivities",
       "VmCalculator",
-      "clearingStatusCleared",
-      "collateralAssetClassFromStr",
       "collateralAssetClassFxAddon",
       "collateralAssetClassStandardHaircut",
       "computeBilateralXva",
@@ -2022,27 +2020,21 @@
       "imDecayProfileFactor",
       "imDecayProfileLinearToMaturity",
       "imDecayProfileSqrtTime",
-      "imMethodologyFromStr",
       "imProfileFromSimm",
       "imProfileValidate",
       "imResultBreakdownAmount",
       "imResultBreakdownKeys",
-      "marginCallTypeFromStr",
       "marginFundingCost",
       "marginFundingCostCostForPeriod",
       "marginFundingCostSpreadBp",
       "marginFundingCostSpreadRate",
-      "marginTenorFromStr",
       "marginUtilization",
       "marginUtilizationIsAdequate",
       "marginUtilizationRatio",
       "marginUtilizationShortfall",
-      "nettingSetIdBilateral",
-      "nettingSetIdCleared",
       "otcMarginSpecBilateralSchedule",
       "otcMarginSpecBilateralSimm",
       "otcMarginSpecCleared",
-      "otcMarginSpecWithSimmCreditClassification",
       "saCcrNettingSetConfigMargined",
       "saCcrNettingSetConfigUnmargined",
       "saCcrNettingSetConfigValidate",
@@ -2062,9 +2054,6 @@
     "kind": "function"
   },
   "margin.otcMarginSpecCleared": {
-    "kind": "function"
-  },
-  "margin.otcMarginSpecWithSimmCreditClassification": {
     "kind": "function"
   },
   "margin.computeBilateralXva": {
@@ -2185,12 +2174,6 @@
   "margin.computeMva": {
     "kind": "function"
   },
-  "margin.clearingStatusCleared": {
-    "kind": "function"
-  },
-  "margin.collateralAssetClassFromStr": {
-    "kind": "function"
-  },
   "margin.collateralAssetClassFxAddon": {
     "kind": "function"
   },
@@ -2304,9 +2287,6 @@
   "margin.imDecayProfileSqrtTime": {
     "kind": "function"
   },
-  "margin.imMethodologyFromStr": {
-    "kind": "function"
-  },
   "margin.imProfileFromSimm": {
     "kind": "function"
   },
@@ -2317,9 +2297,6 @@
     "kind": "function"
   },
   "margin.imResultBreakdownKeys": {
-    "kind": "function"
-  },
-  "margin.marginCallTypeFromStr": {
     "kind": "function"
   },
   "margin.marginFundingCost": {
@@ -2334,9 +2311,6 @@
   "margin.marginFundingCostSpreadRate": {
     "kind": "function"
   },
-  "margin.marginTenorFromStr": {
-    "kind": "function"
-  },
   "margin.marginUtilization": {
     "kind": "function"
   },
@@ -2347,12 +2321,6 @@
     "kind": "function"
   },
   "margin.marginUtilizationShortfall": {
-    "kind": "function"
-  },
-  "margin.nettingSetIdBilateral": {
-    "kind": "function"
-  },
-  "margin.nettingSetIdCleared": {
     "kind": "function"
   },
   "margin.saCcrNettingSetConfigMargined": {

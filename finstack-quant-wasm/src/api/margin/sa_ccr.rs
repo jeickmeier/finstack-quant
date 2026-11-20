@@ -123,7 +123,7 @@ pub fn sa_ccr_netting_set_config_validate(
 /// import init, { margin } from "finstack-quant-wasm";
 /// await init();
 /// const config = margin.saCcrNettingSetConfigUnmargined(
-///   margin.nettingSetIdBilateral("CPTY", "CSA"), 0, "2025-01-15");
+///   { kind: "bilateral", counterparty_id: "CPTY", csa_id: "CSA" }, 0, "2025-01-15");
 /// new margin.SaCcrEngine().calculateEad([{
 ///   trade_id: "t1", asset_class: "interest_rate", notional: 1_000_000,
 ///   start_date: "2025-01-15", end_date: "2030-01-15", underlier: "USD",

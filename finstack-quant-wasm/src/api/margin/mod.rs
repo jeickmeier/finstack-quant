@@ -18,12 +18,21 @@ mod tests;
 
 use crate::api::core::market_discount::JsDiscountCurve;
 use crate::api::core::market_hazard::JsHazardCurve;
-use crate::utils::input::{js_currency, js_f64, opt_json_text};
+use crate::utils::input::{js_currency, js_f64, js_string, opt_json_text};
 use crate::utils::wire::js_date;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use wasm_bindgen::prelude::*;
+
+/// Parse a string enum/label argument using its `FromStr` implementation.
+pub(super) fn parse_label<T>(value: &JsValue, label: &str) -> Result<T, JsValue>
+where
+    T: std::str::FromStr,
+    T::Err: crate::utils::IntoJsError,
+{
+    js_string(value, label)?.parse::<T>().map_err(to_js_err)
+}
 
 /// A numeric amount argument in major units of `currency`.
 fn js_money(value: &JsValue, label: &str, currency: Currency) -> Result<Money, JsValue> {

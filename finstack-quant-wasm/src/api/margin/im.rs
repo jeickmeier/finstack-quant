@@ -5,7 +5,7 @@
 //! `SimmCurvatureSensitivity` are plain JSON values typed by the generated
 //! TypeScript.
 
-use super::{js_currency, js_date};
+use super::{js_currency, js_date, parse_label};
 use crate::api::core::config::JsFinstackConfig;
 use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_opt_uint, js_string};
 use crate::utils::{to_js_err, to_js_value};
@@ -82,11 +82,180 @@ pub struct JsSimmSensitivities {
     pub(crate) inner: fm::types::SimmSensitivities,
 }
 
-fn credit_sector(value: &JsValue, label: &str) -> Result<fm::types::SimmCreditSector, JsValue> {
-    js_string(value, label)?
-        .parse::<fm::types::SimmCreditSector>()
-        .map_err(to_js_err)
+json_round_trip!(JsSimmSensitivities, SimmSensitivities, rust_json fm::types::SimmSensitivities);
+
+macro_rules! simm_adders {
+    (
+        ccy_tenor: [$( $(#[$ccy_doc:meta])* ($ccy_method:ident, $ccy_js:ident) ),* $(,)?],
+        cq: [$( $(#[$cq_doc:meta])* ($cq_method:ident, $cq_js:ident) ),* $(,)?],
+        str_tenor: [$( $(#[$st_doc:meta])* ($st_method:ident, $st_js:ident) ),* $(,)?],
+        str1: [$( $(#[$s1_doc:meta])* ($s1_method:ident, $s1_js:ident, $s1_param:ident) ),* $(,)?] $(,)?
+    ) => {
+        #[finstack_quant_wasm_macros::plain_docs]
+        #[wasm_bindgen(js_class = SimmSensitivities)]
+        impl JsSimmSensitivities {
+            $(
+                $(#[$ccy_doc])*
+                #[wasm_bindgen(js_name = $ccy_js)]
+                pub fn $ccy_method(
+                    &mut self,
+                    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
+                ) -> Result<(), JsValue> {
+                    let currency = js_currency(&currency, "currency")?;
+                    let tenor = js_string(&tenor, "tenor")?;
+                    self.inner.$ccy_method(currency, tenor, js_f64(&amount, "amount")?);
+                    Ok(())
+                }
+            )*
+            $(
+                $(#[$cq_doc])*
+                #[wasm_bindgen(js_name = $cq_js)]
+                pub fn $cq_method(
+                    &mut self,
+                    #[wasm_bindgen(unchecked_param_type = "string")] sector: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
+                ) -> Result<(), JsValue> {
+                    let sector = parse_label(&sector, "sector")?;
+                    let name = js_string(&name, "name")?;
+                    let tenor = js_string(&tenor, "tenor")?;
+                    self.inner.$cq_method(sector, name, tenor, js_f64(&amount, "amount")?);
+                    Ok(())
+                }
+            )*
+            $(
+                $(#[$st_doc])*
+                #[wasm_bindgen(js_name = $st_js)]
+                pub fn $st_method(
+                    &mut self,
+                    #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
+                ) -> Result<(), JsValue> {
+                    let name = js_string(&name, "name")?;
+                    let tenor = js_string(&tenor, "tenor")?;
+                    self.inner.$st_method(name, tenor, js_f64(&amount, "amount")?);
+                    Ok(())
+                }
+            )*
+            $(
+                $(#[$s1_doc])*
+                #[wasm_bindgen(js_name = $s1_js)]
+                pub fn $s1_method(
+                    &mut self,
+                    #[wasm_bindgen(unchecked_param_type = "string")] $s1_param: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
+                ) -> Result<(), JsValue> {
+                    let $s1_param = js_string(&$s1_param, stringify!($s1_param))?;
+                    self.inner.$s1_method($s1_param, js_f64(&amount, "amount")?);
+                    Ok(())
+                }
+            )*
+        }
+    };
 }
+
+simm_adders!(
+    ccy_tenor: [
+        /// Add an interest-rate delta bucket.
+        /// @param currency - ISO-4217 currency risk factor, such as `"USD"`.
+        /// @param tenor - SIMM tenor bucket, such as `"2W"`, `"1Y"`, `"5Y"` or `"30Y"`.
+        /// @param amount - Signed DV01-style amount per 1bp move, in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws if `currency` is not a known currency code.
+        (add_ir_delta, addIrDelta),
+        /// Add an interest-rate vega bucket.
+        /// @param currency - ISO-4217 currency risk factor, such as `"USD"`.
+        /// @param tenor - SIMM tenor bucket of the option expiry.
+        /// @param amount - Signed sigma times dPV/dsigma, in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws if `currency` is not a known currency code.
+        (add_ir_vega, addIrVega),
+    ],
+    cq: [
+        /// Add a qualifying-credit delta for one issuer and tenor.
+        /// @param sector - SIMM credit-qualifying sector label, such as `"sovereign"` or `"financial"`.
+        /// @param name - Issuer or index name.
+        /// @param tenor - SIMM tenor bucket, such as `"5Y"`.
+        /// @param amount - Signed CS01-style amount per 1bp spread move, in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws if `sector` is not a known SIMM credit sector.
+        (add_credit_qualifying_delta, addCreditQualifyingDelta),
+        /// Add a qualifying-credit vega for one issuer and tenor.
+        /// @param sector - SIMM credit-qualifying sector label, such as `"sovereign"` or `"financial"`.
+        /// @param name - Issuer or index name.
+        /// @param tenor - SIMM tenor bucket of the option expiry.
+        /// @param amount - Signed sigma times dPV/dsigma, in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws if `sector` is not a known SIMM credit sector.
+        (add_credit_qualifying_vega, addCreditQualifyingVega),
+    ],
+    str_tenor: [
+        /// Add a non-qualifying-credit delta for one name and tenor.
+        /// @param name - Securitization or issuer name.
+        /// @param tenor - SIMM tenor bucket, such as `"5Y"`.
+        /// @param amount - Signed CS01-style amount per 1bp spread move, in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type.
+        (add_credit_non_qualifying_delta, addCreditNonQualifyingDelta),
+        /// Add a non-qualifying-credit vega for one name and tenor.
+        /// @param name - Securitization or issuer name.
+        /// @param tenor - SIMM tenor bucket of the option expiry.
+        /// @param amount - Signed sigma times dPV/dsigma, in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type.
+        (add_credit_non_qualifying_vega, addCreditNonQualifyingVega),
+    ],
+    str1: [
+        /// Add an equity delta for one underlier.
+        /// @param underlier - Equity or index identifier.
+        /// @param amount - Signed value change for a 1% relative move, in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type.
+        (add_equity_delta, addEquityDelta, underlier),
+        /// Add an equity vega for one underlier.
+        /// @param underlier - Equity or index identifier.
+        /// @param amount - Signed sigma times dPV/dsigma, in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type.
+        (add_equity_vega, addEquityVega, underlier),
+        /// Add a commodity delta for one SIMM commodity bucket.
+        /// @param bucket - SIMM commodity bucket label (one of the 17 ISDA buckets).
+        /// @param amount - Signed value change for a 1% relative price move, in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type.
+        (add_commodity_delta, addCommodityDelta, bucket),
+        /// Add a commodity vega for one SIMM commodity bucket.
+        /// @param bucket - SIMM commodity bucket label (one of the 17 ISDA buckets).
+        /// @param amount - Signed sigma times dPV/dsigma before HVR, VRW and concentration, in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type.
+        (add_commodity_vega, addCommodityVega, bucket),
+    ],
+);
 
 #[wasm_bindgen(js_class = SimmSensitivities)]
 impl JsSimmSensitivities {
@@ -104,211 +273,6 @@ impl JsSimmSensitivities {
         Ok(Self {
             inner: fm::types::SimmSensitivities::new(js_currency(&base_currency, "baseCurrency")?),
         })
-    }
-
-    /// Deserialize sensitivities from the canonical Rust JSON shape.
-    /// @param json - `SimmSensitivities` JSON text or plain object.
-    /// @returns A `SimmSensitivities` handle.
-    ///
-    /// # Errors
-    ///
-    /// Throws if the JSON is malformed, has unknown fields, or carries an
-    /// unknown currency, risk class or credit sector.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "SimmSensitivitiesJson | string")] json: JsValue,
-    ) -> Result<JsSimmSensitivities, JsValue> {
-        let json = crate::utils::input::json_text(&json, "json")?;
-        Ok(Self {
-            inner: fm::types::SimmSensitivities::from_json(&json).map_err(to_js_err)?,
-        })
-    }
-
-    /// Serialize these sensitivities to the canonical Rust JSON shape.
-    /// @returns Compact JSON text accepted by `SimmSensitivities.fromJson`.
-    ///
-    /// # Errors
-    ///
-    /// Throws if serialization fails.
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        self.inner.to_json().map_err(to_js_err)
-    }
-
-    /// Add an interest-rate delta bucket.
-    /// @param currency - ISO-4217 currency risk factor, such as `"USD"`.
-    /// @param tenor - SIMM tenor bucket, such as `"2W"`, `"1Y"`, `"5Y"` or `"30Y"`.
-    /// @param amount - Signed DV01-style amount per 1bp move, in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws if `currency` is not a known currency code.
-    #[wasm_bindgen(js_name = addIrDelta)]
-    pub fn add_ir_delta(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let currency = js_currency(&currency, "currency")?;
-        let tenor = js_string(&tenor, "tenor")?;
-        self.inner
-            .add_ir_delta(currency, tenor, js_f64(&amount, "amount")?);
-        Ok(())
-    }
-
-    /// Add an interest-rate vega bucket.
-    /// @param currency - ISO-4217 currency risk factor, such as `"USD"`.
-    /// @param tenor - SIMM tenor bucket of the option expiry.
-    /// @param amount - Signed sigma times dPV/dsigma, in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws if `currency` is not a known currency code.
-    #[wasm_bindgen(js_name = addIrVega)]
-    pub fn add_ir_vega(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let currency = js_currency(&currency, "currency")?;
-        let tenor = js_string(&tenor, "tenor")?;
-        self.inner
-            .add_ir_vega(currency, tenor, js_f64(&amount, "amount")?);
-        Ok(())
-    }
-
-    /// Add a qualifying-credit delta for one issuer and tenor.
-    /// @param sector - SIMM credit-qualifying sector label, such as `"sovereign"` or `"financial"`.
-    /// @param name - Issuer or index name.
-    /// @param tenor - SIMM tenor bucket, such as `"5Y"`.
-    /// @param amount - Signed CS01-style amount per 1bp spread move, in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws if `sector` is not a known SIMM credit sector.
-    #[wasm_bindgen(js_name = addCreditQualifyingDelta)]
-    pub fn add_credit_qualifying_delta(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] sector: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let sector = credit_sector(&sector, "sector")?;
-        let name = js_string(&name, "name")?;
-        let tenor = js_string(&tenor, "tenor")?;
-        self.inner
-            .add_credit_qualifying_delta(sector, name, tenor, js_f64(&amount, "amount")?);
-        Ok(())
-    }
-
-    /// Add a qualifying-credit vega for one issuer and tenor.
-    /// @param sector - SIMM credit-qualifying sector label, such as `"sovereign"` or `"financial"`.
-    /// @param name - Issuer or index name.
-    /// @param tenor - SIMM tenor bucket of the option expiry.
-    /// @param amount - Signed sigma times dPV/dsigma, in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws if `sector` is not a known SIMM credit sector.
-    #[wasm_bindgen(js_name = addCreditQualifyingVega)]
-    pub fn add_credit_qualifying_vega(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] sector: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let sector = credit_sector(&sector, "sector")?;
-        let name = js_string(&name, "name")?;
-        let tenor = js_string(&tenor, "tenor")?;
-        self.inner
-            .add_credit_qualifying_vega(sector, name, tenor, js_f64(&amount, "amount")?);
-        Ok(())
-    }
-
-    /// Add a non-qualifying-credit delta for one name and tenor.
-    /// @param name - Securitization or issuer name.
-    /// @param tenor - SIMM tenor bucket, such as `"5Y"`.
-    /// @param amount - Signed CS01-style amount per 1bp spread move, in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type.
-    #[wasm_bindgen(js_name = addCreditNonQualifyingDelta)]
-    pub fn add_credit_non_qualifying_delta(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let name = js_string(&name, "name")?;
-        let tenor = js_string(&tenor, "tenor")?;
-        self.inner
-            .add_credit_non_qualifying_delta(name, tenor, js_f64(&amount, "amount")?);
-        Ok(())
-    }
-
-    /// Add a non-qualifying-credit vega for one name and tenor.
-    /// @param name - Securitization or issuer name.
-    /// @param tenor - SIMM tenor bucket of the option expiry.
-    /// @param amount - Signed sigma times dPV/dsigma, in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type.
-    #[wasm_bindgen(js_name = addCreditNonQualifyingVega)]
-    pub fn add_credit_non_qualifying_vega(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let name = js_string(&name, "name")?;
-        let tenor = js_string(&tenor, "tenor")?;
-        self.inner
-            .add_credit_non_qualifying_vega(name, tenor, js_f64(&amount, "amount")?);
-        Ok(())
-    }
-
-    /// Add an equity delta for one underlier.
-    /// @param underlier - Equity or index identifier.
-    /// @param amount - Signed value change for a 1% relative move, in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type.
-    #[wasm_bindgen(js_name = addEquityDelta)]
-    pub fn add_equity_delta(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] underlier: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let underlier = js_string(&underlier, "underlier")?;
-        self.inner
-            .add_equity_delta(underlier, js_f64(&amount, "amount")?);
-        Ok(())
-    }
-
-    /// Add an equity vega for one underlier.
-    /// @param underlier - Equity or index identifier.
-    /// @param amount - Signed sigma times dPV/dsigma, in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type.
-    #[wasm_bindgen(js_name = addEquityVega)]
-    pub fn add_equity_vega(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] underlier: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let underlier = js_string(&underlier, "underlier")?;
-        self.inner
-            .add_equity_vega(underlier, js_f64(&amount, "amount")?);
-        Ok(())
     }
 
     /// Add an FX delta for one currency against the base currency.
@@ -349,44 +313,6 @@ impl JsSimmSensitivities {
         let ccy2 = js_currency(&ccy2, "ccy2")?;
         self.inner
             .add_fx_vega(ccy1, ccy2, js_f64(&amount, "amount")?);
-        Ok(())
-    }
-
-    /// Add a commodity delta for one SIMM commodity bucket.
-    /// @param bucket - SIMM commodity bucket label (one of the 17 ISDA buckets).
-    /// @param amount - Signed value change for a 1% relative price move, in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type.
-    #[wasm_bindgen(js_name = addCommodityDelta)]
-    pub fn add_commodity_delta(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] bucket: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let bucket = js_string(&bucket, "bucket")?;
-        self.inner
-            .add_commodity_delta(bucket, js_f64(&amount, "amount")?);
-        Ok(())
-    }
-
-    /// Add a commodity vega for one SIMM commodity bucket.
-    /// @param bucket - SIMM commodity bucket label (one of the 17 ISDA buckets).
-    /// @param amount - Signed sigma times dPV/dsigma before HVR, VRW and concentration, in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type.
-    #[wasm_bindgen(js_name = addCommodityVega)]
-    pub fn add_commodity_vega(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] bucket: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let bucket = js_string(&bucket, "bucket")?;
-        self.inner
-            .add_commodity_vega(bucket, js_f64(&amount, "amount")?);
         Ok(())
     }
 
@@ -566,9 +492,7 @@ impl JsSimmCalculator {
         #[wasm_bindgen(unchecked_param_type = "string")] version: JsValue,
         config: &JsFinstackConfig,
     ) -> Result<JsSimmCalculator, JsValue> {
-        let version = js_string(&version, "version")?
-            .parse::<fm::SimmVersion>()
-            .map_err(to_js_err)?;
+        let version = parse_label(&version, "version")?;
         let inner =
             fm::calculators::im::SimmCalculator::from_finstack_config(version, &config.inner)
                 .map_err(to_js_err)?;

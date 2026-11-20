@@ -175,44 +175,6 @@ test('constants() is the Rust MarginConstants value Python publishes as CONSTANT
   close(margin.constants(), golden.constants, 'constants');
 });
 
-test('enum-variant literals are the Python wire labels and fromStr validates', () => {
-  // A payload-free Python enum variant has no WASM function: its twin is the
-  // TypeScript string literal, which Rust accepts as the canonical label.
-  const labels = golden.labels;
-  for (const [fromStr, values] of [
-    [margin.imMethodologyFromStr, labels.im_methodology],
-    [margin.marginTenorFromStr, labels.margin_tenor],
-    [margin.marginCallTypeFromStr, labels.margin_call_type],
-    [margin.collateralAssetClassFromStr, labels.collateral_asset_class],
-  ]) {
-    for (const label of values) assert.equal(fromStr(label), label);
-  }
-  assert.deepEqual(labels.im_methodology.slice(0, 5), [
-    'haircut',
-    'simm',
-    'schedule',
-    'internal_model',
-    'clearing_house',
-  ]);
-  assert.equal(margin.imMethodologySimm, undefined);
-  assert.equal(margin.marginTenorDaily, undefined);
-  for (const fromStr of [
-    margin.imMethodologyFromStr,
-    margin.marginTenorFromStr,
-    margin.marginCallTypeFromStr,
-    margin.collateralAssetClassFromStr,
-  ]) {
-    throwsKind(() => fromStr('SIMM!'), 'validation');
-    throwsKind(() => fromStr(5), 'invalid_type');
-  }
-});
-
-test('clearing status and netting-set id factories return the serde values', () => {
-  assert.deepEqual(margin.clearingStatusCleared('LCH'), { cleared: { ccp: 'LCH' } });
-  close(margin.nettingSetIdBilateral('CPTY', 'CSA'), golden.netting_set_id.bilateral, 'bilateral');
-  close(margin.nettingSetIdCleared('LCH'), golden.netting_set_id.cleared, 'cleared');
-});
-
 test('collateral asset class haircuts match Python', () => {
   for (const [label, haircut] of Object.entries(golden.collateral_asset_class.standard_haircut)) {
     close(margin.collateralAssetClassStandardHaircut(label), haircut, `standard_haircut.${label}`);
@@ -711,7 +673,7 @@ test('FrtbSensitivities, FrtbSbaEngine and frtbSbaCharge match Python', () => {
 
 test('SA-CCR configuration twins, SaCcrEngine and saccrEad match Python', () => {
   const expected = golden.saccr;
-  const nettingSet = margin.nettingSetIdBilateral('CPTY', 'CSA');
+  const nettingSet = { kind: 'bilateral', counterparty_id: 'CPTY', csa_id: 'CSA' };
   const unmargined = margin.saCcrNettingSetConfigUnmargined(nettingSet, 0, '2025-01-15');
   const margined = margin.saCcrNettingSetConfigMargined(
     nettingSet,

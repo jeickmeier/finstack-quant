@@ -6,30 +6,13 @@
 //! TypeScript.
 
 use super::types::parse_csa;
-use super::{js_currency, js_date, js_money};
+use super::{js_currency, js_date, js_money, parse_label};
 use crate::api::core::config::JsFinstackConfig;
 use crate::utils::input::{from_js_json, js_bool, js_f64, js_opt_string, js_string};
 use crate::utils::{date_to_iso, parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::money::Money;
 use finstack_quant_margin as fm;
 use wasm_bindgen::prelude::*;
-
-fn collateral_asset_class(
-    value: &JsValue,
-    label: &str,
-) -> Result<fm::types::CollateralAssetClass, JsValue> {
-    js_string(value, label)?
-        .parse::<fm::types::CollateralAssetClass>()
-        .map_err(to_js_err)
-}
-
-fn schedule_asset_class(
-    label: &str,
-) -> Result<fm::calculators::im::schedule::ScheduleAssetClass, JsValue> {
-    label
-        .parse::<fm::calculators::im::schedule::ScheduleAssetClass>()
-        .map_err(to_js_err)
-}
 
 // ---------------------------------------------------------------------------
 // VmResult
@@ -320,7 +303,7 @@ impl JsScheduleImCalculator {
         asset_class: JsValue,
         #[wasm_bindgen(js_name = "maturityYears", unchecked_param_type = "number")] maturity_years: JsValue,
     ) -> Result<f64, JsValue> {
-        let asset_class = schedule_asset_class(&js_string(&asset_class, "assetClass")?)?;
+        let asset_class = parse_label(&asset_class, "assetClass")?;
         self.inner
             .rate(asset_class, js_f64(&maturity_years, "maturityYears")?)
             .map_err(to_js_err)
@@ -349,7 +332,7 @@ impl JsScheduleImCalculator {
     ) -> Result<JsValue, JsValue> {
         let currency = js_currency(&currency, "currency")?;
         let notional = js_money(&notional, "notional", currency)?;
-        let asset_class = schedule_asset_class(&js_string(&asset_class, "assetClass")?)?;
+        let asset_class = parse_label(&asset_class, "assetClass")?;
         let maturity_years = js_f64(&maturity_years, "maturityYears")?;
         let as_of = js_date(&as_of, "asOf")?;
         to_js_value(
@@ -392,7 +375,7 @@ impl JsScheduleImCalculator {
                 Ok((
                     Money::new(mtm, currency).map_err(to_js_err)?,
                     Money::new(notional, currency).map_err(to_js_err)?,
-                    schedule_asset_class(&asset_class)?,
+                    asset_class.parse().map_err(to_js_err)?,
                     maturity,
                 ))
             })
@@ -538,7 +521,7 @@ impl JsHaircutImCalculator {
         #[wasm_bindgen(js_name = "assetClass", unchecked_param_type = "CollateralAssetClass")]
         asset_class: JsValue,
     ) -> Result<f64, JsValue> {
-        let asset_class = collateral_asset_class(&asset_class, "assetClass")?;
+        let asset_class = parse_label(&asset_class, "assetClass")?;
         self.inner.haircut_for(&asset_class).map_err(to_js_err)
     }
 
@@ -568,7 +551,7 @@ impl JsHaircutImCalculator {
     ) -> Result<JsValue, JsValue> {
         let currency = js_currency(&currency, "currency")?;
         let collateral_value = js_money(&collateral_value, "collateralValue", currency)?;
-        let asset_class = collateral_asset_class(&asset_class, "assetClass")?;
+        let asset_class = parse_label(&asset_class, "assetClass")?;
         let currency_mismatch = js_bool(&currency_mismatch, "currencyMismatch")?;
         let as_of = js_date(&as_of, "asOf")?;
         to_js_value(
