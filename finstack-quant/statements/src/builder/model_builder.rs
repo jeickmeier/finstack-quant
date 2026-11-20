@@ -108,7 +108,7 @@ pub fn validate_node_id(node_id: &str) -> Result<()> {
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ModelBuilder {
     id: String,
     pub(crate) periods: Option<PeriodPlan>,
@@ -549,6 +549,35 @@ impl ModelBuilder {
         self
     }
 
+    /// Add the same value observation to every model period.
+    ///
+    /// # Arguments
+    /// * `node_id` - Unique node identifier stored in the model.
+    /// * `value` - A finite unitless scalar or an exact monetary amount in its
+    ///   stated currency, copied to every actual and forecast period.
+    ///
+    /// # Errors
+    /// Rejects a missing period plan or a nonfinite scalar. The standard
+    /// builder validation rejects duplicate node identifiers at build time.
+    pub fn constant(
+        &mut self,
+        node_id: impl Into<NodeId>,
+        value: AmountOrScalar,
+    ) -> Result<&mut Self> {
+        if self.periods_slice().is_empty() {
+            return Err(Error::build("Set model periods before adding a constant"));
+        }
+        if matches!(value, AmountOrScalar::Scalar(value) if !value.is_finite()) {
+            return Err(Error::build("Constant scalar must be finite"));
+        }
+        let observations: Vec<_> = self
+            .periods_slice()
+            .iter()
+            .map(|period| (period.id, value))
+            .collect();
+        Ok(self.value(node_id, &observations))
+    }
+
     /// Add a monetary value node with Money values.
     ///
     /// This is a type-safe way to create value nodes that explicitly represent
@@ -953,6 +982,47 @@ impl ModelBuilder {
     pub fn with_meta(&mut self, key: impl Into<String>, value: serde_json::Value) -> &mut Self {
         self.meta.insert(key.into(), value);
         self
+    }
+
+    /// Set the authored currency of the statement model.
+    ///
+    /// # Arguments
+    ///
+    /// * `currency` - Currency used by statement analytics when interpreting
+    ///   model amounts. Separate from the capital structure reporting currency.
+    pub fn currency(&mut self, currency: finstack_quant_core::currency::Currency) -> &mut Self {
+        self.with_meta("currency", serde_json::Value::String(currency.to_string()))
+    }
+
+    /// Denominate a scalar formula result as an amount of currency.
+    ///
+    /// # Arguments
+    /// * `node_id` - Unique model identifier for the new monetary node.
+    /// * `source` - Scalar DSL expression or source node in units of the selected currency.
+    /// * `currency` - Explicit denomination, or the currency stored in model metadata.
+    ///
+    /// # Errors
+    /// Rejects invalid formula syntax, or absent or invalid model currency when
+    /// an explicit denomination is omitted. Model validation rejects a source
+    /// with monetary or Boolean units.
+    pub fn as_money(
+        &mut self,
+        node_id: impl Into<NodeId>,
+        source: &str,
+        currency: Option<finstack_quant_core::currency::Currency>,
+    ) -> Result<&mut Self> {
+        let currency = match currency {
+            Some(currency) => currency,
+            None => self
+                .meta
+                .get("currency")
+                .and_then(serde_json::Value::as_str)
+                .and_then(|code| code.parse().ok())
+                .ok_or_else(|| {
+                    Error::build("as_money needs an explicit currency or a valid model currency")
+                })?,
+        };
+        self.compute(node_id, format!("as_money(({source}), {currency})"))
     }
 
     /// Attach a where clause to a named node.

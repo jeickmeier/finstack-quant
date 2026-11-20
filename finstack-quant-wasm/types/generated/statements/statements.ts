@@ -7421,14 +7421,14 @@ export interface Materiality {
    */
   reference_label: string;
   /**
-   * The reference (denominator) value used when computing `relative_pct`.
+   * The reference (denominator) value used when computing `relative`.
    */
   reference_value: number;
   /**
-   * Discrepancy as a percentage of the reference value; `None` when the
-   * percentage is undefined (a zero reference) or does not apply.
+   * Discrepancy as a decimal fraction of the reference value (0.025 is 2.5%);
+   * `None` when the fraction is undefined (a zero reference) or does not apply.
    */
-  relative_pct?: number | null;
+  relative?: number | null;
   [k: string]: unknown;
 }
 /**
@@ -8287,6 +8287,10 @@ export interface MonteCarloResults {
    */
   percentiles: number[];
   /**
+   * Identified model, observation cut and valuation date for every retained path.
+   */
+  provenance: RunProvenance;
+  /**
    * The run's exact base seed, a decimal string in JSON: an unsigned
    * 64-bit value does not fit a JavaScript number.
    */
@@ -8376,6 +8380,51 @@ export interface PercentileSeries {
     [k: string]: [number, number][];
   };
   [k: string]: unknown;
+}
+/**
+ * What a result was evaluated from.
+ *
+ * A consumer that is handed a result checks this against the model, period
+ * plan and run it expects before trusting the cells.
+ */
+export interface RunProvenance {
+  /**
+   * The random stream of every stochastic forecast node in a single run,
+   * in model node order: enough to replay its draws.
+   */
+  forecast_streams?: ForecastStream[];
+  /**
+   * Canonical snapshot hash of the market held for an explicitly priced run.
+   * Absent if the supplied provider cannot furnish a coherent capture.
+   */
+  market_content_hash?: string | null;
+  /**
+   * Canonical content hash of the evaluated model
+   * ([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).
+   */
+  model_content_hash: string;
+  /**
+   * Identifier of the evaluated model.
+   */
+  model_id: string;
+  /**
+   * Observations the run was allowed to read.
+   */
+  observation_cutoff: ObservationCutoff;
+  /**
+   * Identity of this evaluation run: the canonical content hash of the
+   * fields above, including the market snapshot identity when it was supplied.
+   */
+  run_id: string;
+  /**
+   * Identity of the source snapshot the model's observations came from.
+   */
+  source_snapshot?: string | null;
+  /**
+   * Valuation date the capital structure was priced at, when the run used
+   * a market.
+   */
+  valuation_date?: DateWire | null;
 }
 /**
  * Financial statement normalization policy and adjustment catalog.
@@ -8483,47 +8532,6 @@ export interface RollupProvenance {
    * by the source periods.
    */
   source_run: RunProvenance;
-}
-/**
- * What a result was evaluated from.
- *
- * A consumer that is handed a result checks this against the model, period
- * plan and run it expects before trusting the cells.
- */
-export interface RunProvenance {
-  /**
-   * The random stream of every stochastic forecast node in a single run,
-   * in model node order: enough to replay its draws.
-   */
-  forecast_streams?: ForecastStream[];
-  /**
-   * Canonical content hash of the evaluated model
-   * ([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).
-   */
-  model_content_hash: string;
-  /**
-   * Identifier of the evaluated model.
-   */
-  model_id: string;
-  /**
-   * Observations the run was allowed to read.
-   */
-  observation_cutoff: ObservationCutoff;
-  /**
-   * Identity of this evaluation run: the canonical content hash of the
-   * fields above. Two runs of the same model content, snapshot, cutoff
-   * and valuation date share it.
-   */
-  run_id: string;
-  /**
-   * Identity of the source snapshot the model's observations came from.
-   */
-  source_snapshot?: string | null;
-  /**
-   * Valuation date the capital structure was priced at, when the run used
-   * a market.
-   */
-  valuation_date?: DateWire | null;
 }
 /**
  * Target frequency and per-node methods for rolling statement results up to coarser periods.

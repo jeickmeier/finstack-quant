@@ -37,7 +37,7 @@
 
 mod types;
 
-pub use types::CommodityForward;
+pub use types::{CommodityForward, CommodityForwardBuilder};
 
 /// Metrics submodule for commodity forward risk measures.
 pub(crate) mod metrics;

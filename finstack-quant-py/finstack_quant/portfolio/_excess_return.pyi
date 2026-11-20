@@ -289,29 +289,29 @@ class ExcessReturnResult:
         ...
 
 def cell_returns_from_reference(
-    reference_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    reference: str | dict[str, Any] | list[Any] | pd.DataFrame,
     base_label: str,
-    config_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    config: str | dict[str, Any] | list[Any] | pd.DataFrame,
 ) -> DurationCellTable:
     """
     Build a duration-cell base-return table from a reference universe.
 
     Binds Rust ``finstack_quant_portfolio::cell_returns_from_reference``
-    (Dynkin, Hyman & Vankudre 1998, Appendix B): buckets ``reference_json``
+    (Dynkin, Hyman & Vankudre 1998, Appendix B): buckets ``reference``
     into fixed-width duration cells and averages each cell's member total
     returns, interpolating interior gaps and flat-extrapolating
     leading/trailing gaps.
 
     Parameters
     ----------
-    reference_json : str | dict | list | pandas.DataFrame
+    reference : str | dict | list | pandas.DataFrame
         JSON array of ``ReferenceReturn`` objects (``duration``,
         ``total_return``, both decimals with duration in years); must be
         non-empty. Unknown fields are rejected.
     base_label : str
         Label identifying the resulting curve (e.g. ``"UST"``), carried
         through to the output's ``base_label`` for policy visibility.
-    config_json : str | dict | list | pandas.DataFrame
+    config : str | dict | list | pandas.DataFrame
         JSON ``CellConfig``; ``width`` is its only field (cell width in
         years, finite and positive) and is required — there is no default.
 
@@ -324,7 +324,7 @@ def cell_returns_from_reference(
     Raises
     ------
     PortfolioError
-        If ``reference_json`` is empty, ``config.width`` is not finite and
+        If ``reference`` is empty, ``config.width`` is not finite and
         positive, any reference entry has a non-finite ``total_return`` or a
         non-finite/negative ``duration``, the width produces two numerically
         distinct cells that collide on their one-decimal label, or the
@@ -356,7 +356,7 @@ def cell_returns_from_curves(
     horizon_years: float,
     max_duration: float,
     base_label: str,
-    config_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    config: str | dict[str, Any] | list[Any] | pd.DataFrame,
 ) -> DurationCellTable:
     """
     Build a duration-cell base-return table from start/end discount curves.
@@ -383,7 +383,7 @@ def cell_returns_from_curves(
     base_label : str
         Label identifying the base curve (e.g. ``"UST"``, ``"USD-SOFR"``),
         stamped into the result purely for policy visibility.
-    config_json : str | dict | list | pandas.DataFrame
+    config : str | dict | list | pandas.DataFrame
         JSON ``CellConfig``; ``width`` is its only field and is required.
 
     Returns
@@ -406,7 +406,7 @@ def cell_returns_from_curves(
         non-positive/non-finite discount factor at a queried time, or the
         width produces colliding one-decimal cell labels.
     ValueError
-        If ``config_json`` is malformed.
+        If ``config`` is malformed.
 
     Sources
     -------
@@ -427,25 +427,25 @@ def cell_returns_from_curves(
     ...
 
 def excess_returns(
-    positions_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    table_json: DurationCellTable | str | dict[str, Any] | list[Any] | pd.DataFrame,
+    positions: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    table: DurationCellTable | str | dict[str, Any] | list[Any] | pd.DataFrame,
 ) -> ExcessReturnResult:
     """
     Compute duration-matched credit excess returns against a base-return table.
 
     Binds Rust ``finstack_quant_portfolio::excess_returns`` (Dynkin, Hyman &
     Vankudre 1998, Appendix B): each position's ``duration`` is matched to
-    its duration cell in ``table_json`` and the position's excess return is
+    its duration cell in ``table`` and the position's excess return is
     ``total_return - cell.base_return``, the credit-specific component of
     performance isolated from the general level/shape move of the base curve.
 
     Parameters
     ----------
-    positions_json : str | dict | list | pandas.DataFrame
+    positions : str | dict | list | pandas.DataFrame
         JSON array of ``ExcessReturnPosition`` objects (``id``, ``weight``,
         ``duration``, ``total_return``); weights must sum to ``1.0`` within
         ``1e-6``.
-    table_json : DurationCellTable | str | dict | list | pandas.DataFrame
+    table : DurationCellTable | str | dict | list | pandas.DataFrame
         Typed ``DurationCellTable`` or its JSON form, as returned by
         :func:`cell_returns_from_reference`,
         :func:`cell_returns_from_curves`, or
@@ -461,7 +461,7 @@ def excess_returns(
     Raises
     ------
     PortfolioError
-        If ``table_json`` has no cells; a cell has an empty or duplicate
+        If ``table`` has no cells; a cell has an empty or duplicate
         label, non-finite bounds or base return, a negative lower bound, a
         non-positive width, non-ascending lower bounds, or overlaps its
         predecessor; a position has a non-finite

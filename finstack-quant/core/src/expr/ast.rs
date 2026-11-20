@@ -49,6 +49,8 @@ pub enum ExprNode {
     },
     /// Literal scalar value using the crate's numeric type alias.
     Literal(f64),
+    /// Exact money literal for typed statement expressions.
+    MoneyLiteral(crate::money::Money),
     /// Call a registered function with positional arguments.
     Call(Function, Vec<Expr>),
     /// Binary operation (arithmetic, comparison, logical).
@@ -210,6 +212,7 @@ impl PartialEq for Expr {
                 // f64 equality via raw bits for deterministic NaN handling
                 (*a).to_bits() == (*b).to_bits()
             }
+            (ExprNode::MoneyLiteral(a), ExprNode::MoneyLiteral(b)) => a == b,
             (ExprNode::Call(f1, a1), ExprNode::Call(f2, a2)) => f1 == f2 && a1 == a2,
             (
                 ExprNode::BinOp {

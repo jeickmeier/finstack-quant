@@ -2,10 +2,12 @@ use super::types::{BoundKind, CovenantSpec, CovenantType, ThresholdTest};
 use finstack_quant_core::dates::Date;
 
 pub(super) struct SpecEvaluation {
+    pub(super) untriggered: bool,
     pub(super) passed: bool,
     pub(super) actual_value: Option<f64>,
     pub(super) threshold: Option<f64>,
     pub(super) headroom: Option<f64>,
+    pub(super) headroom_raw: Option<f64>,
     pub(super) detail: Option<String>,
 }
 
@@ -24,11 +26,21 @@ pub(crate) fn headroom_for(bound: Option<BoundKind>, value: f64, threshold: f64)
         threshold.abs()
     };
 
-    match bound {
-        Some(BoundKind::AtMost) => (threshold - value) / denom,
-        Some(BoundKind::AtLeast) => (value - threshold) / denom,
-        None => 0.0,
-    }
+    bound.map_or(0.0, |bound| {
+        headroom_raw_for(Some(bound), value, threshold).unwrap_or(f64::NAN) / denom
+    })
+}
+
+pub(crate) fn headroom_raw_for(
+    bound: Option<BoundKind>,
+    value: f64,
+    threshold: f64,
+) -> Option<f64> {
+    let difference = match bound? {
+        BoundKind::AtMost => threshold - value,
+        BoundKind::AtLeast => value - threshold,
+    };
+    difference.is_finite().then_some(difference)
 }
 
 /// Whether a springing trigger is met.

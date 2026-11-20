@@ -35,6 +35,11 @@ from finstack_quant.valuations.instruments._bond_quotes import (
     BondQuoteSet as BondQuoteSet,
     compute_quotes as compute_quotes,
 )
+from finstack_quant.valuations.instruments._bond_breakeven import (
+    BondBreakevenLadder as BondBreakevenLadder,
+    BondBreakevenRow as BondBreakevenRow,
+    bond_breakeven_ladder as bond_breakeven_ladder,
+)
 from finstack_quant.valuations.instruments._bond_workout import (
     BondWorkoutLadder as BondWorkoutLadder,
     BondWorkoutRow as BondWorkoutRow,
@@ -55,6 +60,51 @@ from finstack_quant.valuations.instruments._typed_legs import (
     PremiumLegSpec as PremiumLegSpec,
     ProtectionLegSpec as ProtectionLegSpec,
 )
+from finstack_quant.valuations.instruments._typed_interest_rate_future_option import (
+    InterestRateFutureOption as InterestRateFutureOption,
+    InterestRateFutureOptionBuilder as InterestRateFutureOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_equity_future_option import (
+    EquityFutureOption as EquityFutureOption,
+    EquityFutureOptionBuilder as EquityFutureOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fx_future_option import (
+    FxFutureOption as FxFutureOption,
+    FxFutureOptionBuilder as FxFutureOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_volatility_index_future_option import (
+    VolatilityIndexFutureOption as VolatilityIndexFutureOption,
+    VolatilityIndexFutureOptionBuilder as VolatilityIndexFutureOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_interest_rate_future import (
+    InterestRateFuture as InterestRateFuture,
+    InterestRateFutureBuilder as InterestRateFutureBuilder,
+)
+from finstack_quant.valuations.instruments._typed_equity_future import (
+    EquityFuture as EquityFuture,
+    EquityFutureBuilder as EquityFutureBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fx_future import (
+    FxFuture as FxFuture,
+    FxFutureBuilder as FxFutureBuilder,
+)
+from finstack_quant.valuations.instruments._typed_volatility_index_future import (
+    VolatilityIndexFuture as VolatilityIndexFuture,
+    VolatilityIndexFutureBuilder as VolatilityIndexFutureBuilder,
+)
+from finstack_quant.valuations.instruments._typed_bond_future import (
+    BondFuture as BondFuture,
+    BondFutureBuilder as BondFutureBuilder,
+)
+from finstack_quant.valuations.instruments._typed_listed import (
+    FutureOptionTerms as FutureOptionTerms,
+    ListedFutureTerms as ListedFutureTerms,
+)
+from finstack_quant.valuations.instruments._typed_inflation_bond import (
+    InflationLinkedBond as InflationLinkedBond,
+    InflationLinkedBondBuilder as InflationLinkedBondBuilder,
+)
+from finstack_quant.valuations.instruments._typed_deposit import Deposit as Deposit, DepositBuilder as DepositBuilder
 from finstack_quant.valuations.instruments._typed_rates import (
     CapFloor as CapFloor,
     CapFloorBuilder as CapFloorBuilder,
@@ -62,6 +112,10 @@ from finstack_quant.valuations.instruments._typed_rates import (
     InterestRateSwapBuilder as InterestRateSwapBuilder,
     Swaption as Swaption,
     SwaptionBuilder as SwaptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fra import (
+    ForwardRateAgreement as ForwardRateAgreement,
+    ForwardRateAgreementBuilder as ForwardRateAgreementBuilder,
 )
 from finstack_quant.valuations.instruments._typed_credit.cds import (
     CreditDefaultSwap as CreditDefaultSwap,
@@ -99,9 +153,204 @@ from finstack_quant.valuations.instruments._typed_fx import (
     FxOption as FxOption,
     FxOptionBuilder as FxOptionBuilder,
 )
+from finstack_quant.valuations.instruments._typed_repo import (
+    Repo as Repo,
+    RepoBuilder as RepoBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fx_swap import (
+    FxSwap as FxSwap,
+    FxSwapBuilder as FxSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_ndf import (
+    Ndf as Ndf,
+    NdfBuilder as NdfBuilder,
+)
+from finstack_quant.valuations.instruments._typed_quanto_option import (
+    QuantoOption as QuantoOption,
+    QuantoOptionBuilder as QuantoOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fx_digital_option import (
+    FxDigitalOption as FxDigitalOption,
+    FxDigitalOptionBuilder as FxDigitalOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fx_touch_option import (
+    FxTouchOption as FxTouchOption,
+    FxTouchOptionBuilder as FxTouchOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fx_barrier_option import (
+    FxBarrierOption as FxBarrierOption,
+    FxBarrierOptionBuilder as FxBarrierOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_equity_spot import (
+    Equity as Equity,
+    EquityBuilder as EquityBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fx_spot import (
+    FxSpot as FxSpot,
+    FxSpotBuilder as FxSpotBuilder,
+)
+from finstack_quant.valuations.instruments._typed_commodity_forward import (
+    CommodityForward as CommodityForward,
+    CommodityForwardBuilder as CommodityForwardBuilder,
+)
+from finstack_quant.valuations.instruments._typed_commodity_future import (
+    CommodityFuture as CommodityFuture,
+    CommodityFutureBuilder as CommodityFutureBuilder,
+)
+from finstack_quant.valuations.instruments._typed_commodity_asian_option import (
+    CommodityAsianOption as CommodityAsianOption,
+    CommodityAsianOptionBuilder as CommodityAsianOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_commodity_spot_option import (
+    CommoditySpotOption as CommoditySpotOption,
+    CommoditySpotOptionBuilder as CommoditySpotOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_commodity_spread_option import (
+    CommoditySpreadOption as CommoditySpreadOption,
+    CommoditySpreadOptionBuilder as CommoditySpreadOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_commodity_swap import (
+    CommoditySwap as CommoditySwap,
+    CommoditySwapBuilder as CommoditySwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_commodity_swaption import (
+    CommoditySwaption as CommoditySwaption,
+    CommoditySwaptionBuilder as CommoditySwaptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fx_variance_swap import (
+    FxVarianceSwap as FxVarianceSwap,
+    FxVarianceSwapBuilder as FxVarianceSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_variance_swap import (
+    VarianceSwap as VarianceSwap,
+    VarianceSwapBuilder as VarianceSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_equity_total_return_swap import (
+    EquityTotalReturnSwap as EquityTotalReturnSwap,
+    EquityTotalReturnSwapBuilder as EquityTotalReturnSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_equity_total_return_future import (
+    EquityTotalReturnFuture as EquityTotalReturnFuture,
+    EquityTotalReturnFutureBuilder as EquityTotalReturnFutureBuilder,
+)
+from finstack_quant.valuations.instruments._typed_fi_index_total_return_swap import (
+    FiIndexTotalReturnSwap as FiIndexTotalReturnSwap,
+    FiIndexTotalReturnSwapBuilder as FiIndexTotalReturnSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_commodity_future_option import (
+    CommodityFutureOption as CommodityFutureOption,
+    CommodityFutureOptionBuilder as CommodityFutureOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_basis_swap import (
+    BasisSwap as BasisSwap,
+    BasisSwapBuilder as BasisSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_xccy_swap import (
+    XccySwap as XccySwap,
+    XccySwapBuilder as XccySwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_cms_swap import (
+    CmsSwap as CmsSwap,
+    CmsSwapBuilder as CmsSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_cms_option import (
+    CmsOption as CmsOption,
+    CmsOptionBuilder as CmsOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_cms_spread_option import (
+    CmsSpreadOption as CmsSpreadOption,
+    CmsSpreadOptionBuilder as CmsSpreadOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_inflation_swap import (
+    InflationSwap as InflationSwap,
+    InflationSwapBuilder as InflationSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_yoy_inflation_swap import (
+    YoYInflationSwap as YoYInflationSwap,
+    YoYInflationSwapBuilder as YoYInflationSwapBuilder,
+)
+from finstack_quant.valuations.instruments._typed_inflation_cap_floor import (
+    InflationCapFloor as InflationCapFloor,
+    InflationCapFloorBuilder as InflationCapFloorBuilder,
+)
+from finstack_quant.valuations.instruments._typed_bermudan_swaption import (
+    BermudanSwaption as BermudanSwaption,
+    BermudanSwaptionBuilder as BermudanSwaptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_autocallable import (
+    Autocallable as Autocallable,
+    AutocallableBuilder as AutocallableBuilder,
+)
+from finstack_quant.valuations.instruments._typed_cliquet_option import (
+    CliquetOption as CliquetOption,
+    CliquetOptionBuilder as CliquetOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_private_markets_fund import (
+    PrivateMarketsFund as PrivateMarketsFund,
+    PrivateMarketsFundBuilder as PrivateMarketsFundBuilder,
+)
+from finstack_quant.valuations.instruments._typed_asian_option import (
+    AsianOption as AsianOption,
+    AsianOptionBuilder as AsianOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_barrier_option import (
+    BarrierOption as BarrierOption,
+    BarrierOptionBuilder as BarrierOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_lookback_option import (
+    LookbackOption as LookbackOption,
+    LookbackOptionBuilder as LookbackOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_range_accrual import (
+    RangeAccrual as RangeAccrual,
+    RangeAccrualBuilder as RangeAccrualBuilder,
+)
+from finstack_quant.valuations.instruments._typed_tarn import (
+    Tarn as Tarn,
+    TarnBuilder as TarnBuilder,
+)
+from finstack_quant.valuations.instruments._typed_snowball import (
+    Snowball as Snowball,
+    SnowballBuilder as SnowballBuilder,
+)
+from finstack_quant.valuations.instruments._typed_callable_range_accrual import (
+    CallableRangeAccrual as CallableRangeAccrual,
+    CallableRangeAccrualBuilder as CallableRangeAccrualBuilder,
+)
+from finstack_quant.valuations.instruments._typed_agency_tba import (
+    AgencyTba as AgencyTba,
+    AgencyTbaBuilder as AgencyTbaBuilder,
+)
+from finstack_quant.valuations.instruments._typed_agency_mbs_passthrough import (
+    AgencyMbsPassthrough as AgencyMbsPassthrough,
+    AgencyMbsPassthroughBuilder as AgencyMbsPassthroughBuilder,
+)
+from finstack_quant.valuations.instruments._typed_dollar_roll import (
+    DollarRoll as DollarRoll,
+    DollarRollBuilder as DollarRollBuilder,
+)
+from finstack_quant.valuations.instruments._typed_agency_cmo import (
+    AgencyCmo as AgencyCmo,
+    AgencyCmoBuilder as AgencyCmoBuilder,
+)
+from finstack_quant.valuations.instruments._typed_basket import (
+    Basket as Basket,
+    BasketBuilder as BasketBuilder,
+)
+from finstack_quant.valuations.instruments._typed_real_estate_asset import (
+    RealEstateAsset as RealEstateAsset,
+    RealEstateAssetBuilder as RealEstateAssetBuilder,
+)
+from finstack_quant.valuations.instruments._typed_levered_real_estate_equity import (
+    LeveredRealEstateEquity as LeveredRealEstateEquity,
+    LeveredRealEstateEquityBuilder as LeveredRealEstateEquityBuilder,
+)
 from finstack_quant.valuations.instruments._typed_equity import (
     EquityOption as EquityOption,
     EquityOptionBuilder as EquityOptionBuilder,
+)
+from finstack_quant.valuations.instruments._typed_structured_credit.structured_credit_tranche import (
+    StructuredCreditTranche as StructuredCreditTranche,
 )
 from finstack_quant.valuations.instruments._typed_structured_credit.rep_line import RepLine as RepLine
 from finstack_quant.valuations.instruments._typed_structured_credit.asset_pool import AssetPool as AssetPool
@@ -155,6 +404,7 @@ from finstack_quant.valuations.instruments._pricing import (
     InstrumentCashflowEnvelope as InstrumentCashflowEnvelope,
     MarketHistory as MarketHistory,
     MetricPricingOverrides as MetricPricingOverrides,
+    PriceExtras as PriceExtras,
     instrument_cashflows as instrument_cashflows,
     list_models as list_models,
     list_models_grouped as list_models_grouped,
@@ -209,11 +459,55 @@ from finstack_quant.valuations.instruments._typed_structured_credit.tranche_anal
 from finstack_quant.valuations.instruments._var import VarResult as VarResult, calculate_var as calculate_var
 
 __all__ = [
+    "AdvanceRate",
+    "AmortizationEvent",
+    "AssetBackedFacility",
+    "AssetBackedFacilityBuilder",
+    "BalloonSpec",
+    "BorrowingBaseRules",
+    "ConcentrationLimit",
+    "Deposit",
+    "DepositBuilder",
+    "InflationLinkedBond",
+    "InflationLinkedBondBuilder",
+    "BondFuture",
+    "InterestRateFutureOption",
+    "InterestRateFutureOptionBuilder",
+    "EquityFutureOption",
+    "EquityFutureOptionBuilder",
+    "FxFutureOption",
+    "FxFutureOptionBuilder",
+    "VolatilityIndexFutureOption",
+    "VolatilityIndexFutureOptionBuilder",
+    "FutureOptionTerms",
+    "BondFutureBuilder",
+    "InterestRateFuture",
+    "InterestRateFutureBuilder",
+    "EquityFuture",
+    "EquityFutureBuilder",
+    "FxFuture",
+    "FxFutureBuilder",
+    "VolatilityIndexFuture",
+    "VolatilityIndexFutureBuilder",
+    "ListedFutureTerms",
+    "EligibilityRule",
+    "EnhancedMonteCarloResult",
+    "FacilityProjection",
+    "LiquidationSpec",
+    "PrepaymentPenalty",
+    "RevolvingCredit",
+    "RevolvingCreditBuilder",
+    "SimulationDiagnostics",
+    "SpecialServicingSpec",
+    "StochasticPricingResult",
+    "TermOutSpec",
     "AssetPool",
     "BarrierCrossing",
     "Bond",
     "BondBuilder",
     "BondQuoteSet",
+    "BondBreakevenLadder",
+    "BondBreakevenRow",
     "BondWorkoutLadder",
     "BondWorkoutRow",
     "CallAssumption",
@@ -238,10 +532,108 @@ __all__ = [
     "CreditDefaultSwap",
     "CreditDefaultSwapBuilder",
     "EquityMetrics",
+    "Equity",
+    "EquityBuilder",
     "EquityOption",
+    "Autocallable",
+    "AutocallableBuilder",
+    "CliquetOption",
+    "CliquetOptionBuilder",
+    "PrivateMarketsFund",
+    "PrivateMarketsFundBuilder",
+    "AsianOption",
+    "AsianOptionBuilder",
+    "BarrierOption",
+    "BarrierOptionBuilder",
+    "LookbackOption",
+    "LookbackOptionBuilder",
+    "RangeAccrual",
+    "RangeAccrualBuilder",
+    "Tarn",
+    "TarnBuilder",
+    "Snowball",
+    "SnowballBuilder",
+    "CallableRangeAccrual",
+    "CallableRangeAccrualBuilder",
+    "AgencyTba",
+    "AgencyTbaBuilder",
+    "AgencyMbsPassthrough",
+    "AgencyMbsPassthroughBuilder",
+    "DollarRoll",
+    "DollarRollBuilder",
+    "AgencyCmo",
+    "AgencyCmoBuilder",
+    "Basket",
+    "BasketBuilder",
+    "RealEstateAsset",
+    "RealEstateAssetBuilder",
+    "LeveredRealEstateEquity",
+    "LeveredRealEstateEquityBuilder",
+    "BasisSwap",
+    "BasisSwapBuilder",
+    "XccySwap",
+    "XccySwapBuilder",
+    "CmsSwap",
+    "CmsSwapBuilder",
+    "CmsOption",
+    "CmsOptionBuilder",
+    "CmsSpreadOption",
+    "CmsSpreadOptionBuilder",
+    "InflationSwap",
+    "InflationSwapBuilder",
+    "YoYInflationSwap",
+    "YoYInflationSwapBuilder",
+    "InflationCapFloor",
+    "InflationCapFloorBuilder",
+    "BermudanSwaption",
+    "BermudanSwaptionBuilder",
+    "CommodityFutureOption",
+    "CommodityFutureOptionBuilder",
+    "FxSpot",
+    "FxSpotBuilder",
+    "CommodityForward",
+    "CommodityForwardBuilder",
+    "CommodityFuture",
+    "CommodityFutureBuilder",
+    "CommodityAsianOption",
+    "CommodityAsianOptionBuilder",
+    "CommoditySpotOption",
+    "CommoditySpotOptionBuilder",
+    "CommoditySpreadOption",
+    "CommoditySpreadOptionBuilder",
+    "CommoditySwap",
+    "CommoditySwapBuilder",
+    "CommoditySwaption",
+    "CommoditySwaptionBuilder",
+    "FxVarianceSwap",
+    "FxVarianceSwapBuilder",
+    "VarianceSwap",
+    "VarianceSwapBuilder",
+    "EquityTotalReturnSwap",
+    "EquityTotalReturnSwapBuilder",
+    "EquityTotalReturnFuture",
+    "EquityTotalReturnFutureBuilder",
+    "FiIndexTotalReturnSwap",
+    "FiIndexTotalReturnSwapBuilder",
+    "Repo",
+    "RepoBuilder",
+    "FxSwap",
+    "FxSwapBuilder",
+    "Ndf",
+    "NdfBuilder",
+    "QuantoOption",
+    "QuantoOptionBuilder",
+    "FxDigitalOption",
+    "FxDigitalOptionBuilder",
+    "FxTouchOption",
+    "FxTouchOptionBuilder",
+    "FxBarrierOption",
+    "FxBarrierOptionBuilder",
     "EquityOptionBuilder",
     "FixedLegSpec",
     "FloatLegSpec",
+    "ForwardRateAgreement",
+    "ForwardRateAgreementBuilder",
     "FxForward",
     "FxForwardBuilder",
     "FxOption",
@@ -264,12 +656,14 @@ __all__ = [
     "PoolReport",
     "PoolStats",
     "PremiumLegSpec",
+    "PriceExtras",
     "ProtectionLegSpec",
     "RepLine",
     "ScenarioTable",
     "SimulationRun",
     "StandardDealParams",
     "StructuredCredit",
+    "StructuredCreditTranche",
     "StructuredCreditBuilder",
     "Swaption",
     "SwaptionBuilder",
@@ -282,8 +676,8 @@ __all__ = [
     "TrancheStructure",
     "VarResult",
     "Waterfall",
-    "bond_from_cashflows_json",
     "bond_quote_set_field_units",
+    "bond_breakeven_ladder",
     "bond_workout_ladder",
     "calculate_pool_stats",
     "calculate_var",
@@ -316,56 +710,6 @@ __all__ = [
     "validate_instrument_json",
     "validate_typed_instrument_json",
 ]
-
-def bond_from_cashflows_json(
-    instrument_id: str,
-    schedule_json: str,
-    quote_compounding: str,
-    discount_curve_id: str,
-    quoted_clean_price_pct: float | None = None,
-) -> str:
-    """
-    Construct tagged bond instrument JSON from a cashflow schedule.
-
-    Parameters
-    ----------
-    instrument_id : str
-        Identifier for the bond instrument.
-    schedule_json : str
-        JSON-encoded ``CashFlowSchedule``.
-    quote_compounding : str
-        Compounding of the bond's z-spread quotes: ``"continuous"``,
-        ``"simple"``, ``"semi_annual"``, ``"quarterly"``, ``"monthly"`` or
-        ``"periodic(n)"``. Required; never derived from the schedule's
-        coupon frequency.
-    discount_curve_id : str
-        Discount curve ID required for pricing.
-    quoted_clean_price_pct : float, optional
-        Clean quoted price in percent of par (``99.5`` = 99.5%), stored as
-        ``instrument_pricing_overrides.market_quotes.quoted_clean_price_pct``.
-
-    Returns
-    -------
-    str
-        Canonical ``finstack_quant.instrument/1`` envelope containing the bond.
-
-    Raises
-    ------
-    ValueError
-        If the schedule is invalid, ``quote_compounding`` is not a known
-        label, or bond construction fails.
-
-    Examples
-    --------
-    >>> from finstack_quant.valuations.instruments import bond_from_cashflows_json
-    >>> try:
-    ...     bond_from_cashflows_json("B", "{}", "semi_annual", "USD-OIS")
-    ... except ValueError as exc:
-    ...     print("flows" in str(exc))
-    True
-
-    """
-    ...
 
 def validate_instrument_json(
     json: dict[str, Any] | str,

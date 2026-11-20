@@ -26,25 +26,24 @@ pub fn twrr_modified_dietz(
 }
 
 /// Geometrically link TWRR sub-period returns from returns JSON.
-/// @param returnsJson - Numeric return-series JSON.
+/// @param returns - Numeric return-series JSON.
 /// @param horizonYears - Full elapsed horizon in 365-day calendar years; must be finite (`NaN` or `Infinity` throws). Below one year, including zero and negative values, the linked return is not annualised (`annualised` mirrors `cumulative` and `is_annualised` is false).
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `returnsJson` is malformed, `horizonYears`
+/// Throws a JavaScript exception if `returns` is malformed, `horizonYears`
 /// is `NaN` or infinite, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded
 /// growth factor), or the linked result cannot be converted to a JavaScript
 /// value.
 /// @returns Linked time-weighted return object, including the annualized rate over `horizonYears`.
 #[wasm_bindgen(js_name = twrrLinked, unchecked_return_type = "LinkedReturn")]
 pub fn twrr_linked(
-    #[wasm_bindgen(js_name = "returnsJson", unchecked_param_type = "JsonInput")]
-    returns_json: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] returns: JsValue,
     #[wasm_bindgen(js_name = "horizonYears", unchecked_param_type = "number")]
     horizon_years: JsValue,
 ) -> Result<JsValue, JsValue> {
     let horizon_years = js_f64(&horizon_years, "horizonYears")?;
-    let returns: Vec<f64> = from_js_json(&returns_json, "returnsJson")?;
+    let returns: Vec<f64> = from_js_json(&returns, "returns")?;
     let result = finstack_quant_portfolio::performance::twrr_linked(&returns, horizon_years)
         .map_err(to_js_err)?;
     to_js_value(&result)

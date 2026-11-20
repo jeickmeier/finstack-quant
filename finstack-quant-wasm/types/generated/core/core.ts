@@ -2012,6 +2012,43 @@ export interface SabrParameterData {
   shift?: number | null;
 }
 /**
+ * Ordinary least-squares coefficients, residuals and fit diagnostics.
+ */
+export interface OlsResult {
+  /**
+   * Coefficient of determination adjusted for residual degrees of freedom.
+   */
+  adj_r_squared: number;
+  /**
+   * Fitted slope per input feature, in column order.
+   */
+  coefficients: number[];
+  /**
+   * Fitted constant term when the regression includes one.
+   */
+  intercept?: number | null;
+  /**
+   * Number of slope coefficients, excluding the intercept.
+   */
+  n_features: number;
+  /**
+   * Number of observations used in the fit.
+   */
+  n_obs: number;
+  /**
+   * Coefficient of determination, centered when a constant is fitted.
+   */
+  r_squared: number;
+  /**
+   * Residual standard error in response units.
+   */
+  residual_std_error: number;
+  /**
+   * Observed minus fitted response in input row order.
+   */
+  residuals: number[];
+}
+/**
  * A concrete period with start/end dates and actual/forecast flag.
  */
 export interface Period {

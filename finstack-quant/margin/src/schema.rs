@@ -13,10 +13,18 @@ use crate::types::{ConcentrationBreach, ImCollateralResult, RepoMarginSpec};
 use crate::types::{CsaSpec, MarginCall, OtcMarginSpec};
 #[cfg(feature = "json-schema")]
 use crate::{
-    SimmVersion, constants::MarginConstants, metrics::ExcessCollateral, metrics::Haircut01,
-    metrics::MarginFundingCost, metrics::MarginUtilization, types::SimmSensitivitiesJson,
-    xva::mva::ImDecayProfile, xva::mva::MvaResult, xva::types::ExposureProfile,
-    xva::types::FundingConfig, xva::types::XvaResult,
+    SimmVersion,
+    constants::MarginConstants,
+    metrics::ExcessCollateral,
+    metrics::Haircut01,
+    metrics::MarginFundingCost,
+    metrics::MarginUtilization,
+    types::SimmSensitivitiesJson,
+    xva::mva::ImDecayProfile,
+    xva::mva::{ImProjectionSpec, MarginFundingSpread, MvaResult},
+    xva::types::ExposureProfile,
+    xva::types::FundingConfig,
+    xva::types::XvaResult,
 };
 
 /// Stable base URI for margin-owned schemas.
@@ -287,10 +295,15 @@ mod examples {
 
     pub(super) fn exposure_profile() -> Result<Vec<Value>> {
         example_from_json::<crate::xva::types::ExposureProfile>(json!({
+            "as_of": "2025-01-01",
+            "currency": "USD",
+            "basis": {"kind": "external", "source_id": "complete-example", "policy_id": "unsecured"},
+            "dates": ["2025-01-01", "2025-07-01", "2026-01-01"],
             "times": [0.0, 0.5, 1.0],
             "mtm_values": [0.0, 42_000.0, 31_000.0],
             "epe": [0.0, 85_000.0, 64_000.0],
-            "ene": [0.0, -43_000.0, -33_000.0]
+            "ene": [0.0, 43_000.0, 33_000.0],
+            "diagnostics": {"market_roll_failures": 0, "valuation_failures": 0, "total_time_points": 3}
         }))
     }
 
@@ -298,24 +311,24 @@ mod examples {
         example(&crate::regulatory::frtb::FrtbRiskClass::Girr)
     }
 
-    fn frtb_sensitivities_value() -> crate::regulatory::frtb::FrtbSensitivities {
+    fn frtb_sensitivities_value() -> Result<crate::regulatory::frtb::FrtbSensitivities> {
         let mut sensitivities = crate::regulatory::frtb::FrtbSensitivities::new(Currency::USD);
-        sensitivities.add_girr_delta(Currency::USD, "5Y", 12_500.0);
-        sensitivities.add_girr_delta(Currency::USD, "10Y", -8_000.0);
+        sensitivities.add_girr_delta(Currency::USD, "USD-OIS", "5Y", 12_500.0)?;
+        sensitivities.add_girr_delta(Currency::USD, "USD-OIS", "10Y", -8_000.0)?;
         // Equity and FX deltas are P&L per one percent move.
         sensitivities.add_equity_delta("AAPL", 8, 2_500.0);
         sensitivities.add_fx_delta(Currency::EUR, Currency::USD, 4_000.0);
-        sensitivities
+        Ok(sensitivities)
     }
 
     pub(super) fn frtb_sensitivities() -> Result<Vec<Value>> {
-        example(&frtb_sensitivities_value())
+        example(&frtb_sensitivities_value()?)
     }
 
     /// The SBA charge of [`frtb_sensitivities`] across all three scenarios.
     pub(super) fn frtb_sba_result() -> Result<Vec<Value>> {
         example(&crate::regulatory::frtb::frtb_sba_charge(
-            &frtb_sensitivities_value(),
+            &frtb_sensitivities_value()?,
             None,
         )?)
     }
@@ -325,7 +338,7 @@ mod examples {
             funding_spread_bp: 85.0,
             funding_benefit_bp: Some(60.0),
             im_profile: None,
-            margin_funding_spread_bp: None,
+            margin_funding_spread: None,
         })
     }
 
@@ -383,11 +396,30 @@ mod examples {
     }
 
     pub(super) fn mva_result() -> Result<Vec<Value>> {
-        example_from_json::<crate::xva::mva::MvaResult>(json!({
-            "mva": 18_750.0,
-            "average_im": 1_500_000.0,
-            "im_profile": [[0.0, 2_500_000.0], [2.5, 1_250_000.0], [5.0, 0.0]]
+        let profile = serde_json::from_value(json!({
+            "as_of": "2025-01-01",
+            "currency": "USD",
+            "basis": {
+                "kind": "external",
+                "source_id": "teaching-risk-observation",
+                "netting_set": {"kind":"bilateral", "counterparty_id":"bank", "csa_id":"agreement"}
+            },
+            "dates": ["2025-01-01", "2026-01-01"],
+            "im_values": [1000000.0, 1000000.0]
         }))
+        .map_err(|error| finstack_quant_core::Error::Validation(error.to_string()))?;
+        let discount = finstack_quant_core::market_data::term_structures::DiscountCurve::flat(
+            "USD-OIS",
+            time::macros::date!(2025 - 01 - 01),
+            0.0,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )?;
+        example(&crate::xva::mva::compute_mva(
+            &profile,
+            &crate::xva::mva::MarginFundingSpread::Flat { spread_bp: 50.0 },
+            &discount,
+            None,
+        )?)
     }
 
     pub(super) fn repo_margin_spec() -> Result<Vec<Value>> {
@@ -630,6 +662,22 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "Margin utilization result."
     )
     .with_examples(examples::margin_utilization)
+    .with_packager(package_margin_schema),
+    finstack_quant_core::schema_artifact!(
+        ImProjectionSpec,
+        "margin",
+        "im_projection_spec",
+        Input,
+        "Dated admitted SIMM netting scope and deterministic projection election."
+    )
+    .with_packager(package_margin_schema),
+    finstack_quant_core::schema_artifact!(
+        MarginFundingSpread,
+        "margin",
+        "margin_funding_spread",
+        Input,
+        "Explicit flat or dated basis-point funding spread for posted IM."
+    )
     .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         MvaResult,

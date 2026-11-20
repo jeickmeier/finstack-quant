@@ -16,17 +16,15 @@ use finstack_quant_statements::types::{NodeSpec, NodeType};
 /// * `increases` - List of node IDs that increase the balance
 /// * `decreases` - List of node IDs that decrease the balance
 ///
-/// # Returns
-///
-/// Builder with the generated nodes inserted. Existing nodes with the same
-/// identifiers are overwritten; final `build()` validates formulas and references.
+/// Duplicate node identifiers and invalid formulas or references are rejected
+/// when the completed model is built.
 pub fn add_roll_forward(
-    builder: ModelBuilder,
+    builder: &mut ModelBuilder,
     name: &str,
     increases: &[&str],
     decreases: &[&str],
-) -> ModelBuilder {
-    add_roll_forward_with_opening(builder, name, increases, decreases, 0.0)
+) {
+    add_roll_forward_with_opening(builder, name, increases, decreases, 0.0);
 }
 
 /// Add a roll-forward structure to the model with an explicit opening balance.
@@ -42,20 +40,18 @@ pub fn add_roll_forward(
 /// * `name` - Base name for the roll-forward (e.g., "arr")
 /// * `increases` - List of node IDs that increase the balance
 /// * `decreases` - List of node IDs that decrease the balance
-/// * `opening` - Opening balance used in the first period (no prior ending
-///   balance exists); emitted as `coalesce(lag({name}_end, 1), {opening})`
+/// * `opening` - First-period beginning balance, in the same units as the
+///   increase and decrease flows.
 ///
-/// # Returns
-///
-/// Builder with the generated nodes inserted. Existing nodes with the same
-/// identifiers are overwritten; final `build()` validates formulas and references.
+/// Duplicate node identifiers and invalid formulas or references are rejected
+/// when the completed model is built.
 pub fn add_roll_forward_with_opening(
-    mut builder: ModelBuilder,
+    builder: &mut ModelBuilder,
     name: &str,
     increases: &[&str],
     decreases: &[&str],
     opening: f64,
-) -> ModelBuilder {
+) {
     let beg_node_id = format!("{}_beg", name);
     let end_node_id = format!("{}_end", name);
 
@@ -86,6 +82,4 @@ pub fn add_roll_forward_with_opening(
 
     builder.insert_node(beg_node);
     builder.insert_node(end_node);
-
-    builder
 }

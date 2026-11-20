@@ -124,6 +124,26 @@ pub fn apply_lower_triangular(
         .map_err(to_js_err)
 }
 
+/// Apply a shared lower-triangular factor to each row of independent observations.
+/// @param l - Row-major square factor containing n × n numbers; the upper triangle is ignored.
+/// @param n - Number of variables per observation row and dimension of the factor.
+/// @param z - Row-major observations containing n finite inputs per row in factor order.
+/// @returns Row-major Float64Array with the same shape and row order as the input observations.
+/// @throws If inputs have invalid types, incompatible dimensions, non-finite data or overflow.
+#[wasm_bindgen(js_name = applyLowerTriangularMany)]
+pub fn apply_lower_triangular_many(
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] l: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] n: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] z: JsValue,
+) -> Result<Box<[f64]>, JsValue> {
+    let factor = js_f64_seq(&l, "l")?;
+    let draws = js_f64_seq(&z, "z")?;
+    let n = js_uint(&n, "n")?;
+    linalg::apply_lower_triangular_many(&factor, n, &draws)
+        .map(Vec::into_boxed_slice)
+        .map_err(to_js_err)
+}
+
 /// Arithmetic mean over a typed numeric array.
 /// @param data - Finite numeric observations in input order; empty series returns `undefined`.
 /// @returns Arithmetic mean of `data`, or `undefined` when `data` is empty.
@@ -313,6 +333,55 @@ pub fn quantile(
     let mut data = js_f64_seq(&data, "data")?;
     let q = js_f64(&q, "q")?;
     stats::quantile(&mut data, q).map_err(to_js_err)
+}
+
+/// Fit a full-rank linear regression over a rectangular predictor panel.
+/// @param x - Finite observations in rows and one predictor feature per column.
+/// @param y - Finite response with one value per observation.
+/// @param addIntercept - Include a constant term by default. False fits through the origin and uses uncentered R².
+/// @returns Fitted slopes, optional intercept, residuals and fit diagnostics.
+/// @throws TypeError for incompatible host types, or FinstackError for mismatched dimensions, non-finite or rank-deficient inputs, zero response variation or unrepresentable results.
+#[wasm_bindgen(js_name = ols, unchecked_return_type = "generated.core.OlsResult")]
+pub fn ols(
+    #[wasm_bindgen(unchecked_param_type = "readonly (readonly number[] | Float64Array)[]")]
+    x: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "readonly number[] | Float64Array")] y: JsValue,
+    #[wasm_bindgen(
+        js_name = "addIntercept",
+        unchecked_optional_param_type = "boolean | null"
+    )]
+    add_intercept: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let rows = crate::utils::input::js_f64_matrix(&x, "x")?;
+    let n_features = rows.first().map_or(0, Vec::len);
+    if rows.iter().any(|row| row.len() != n_features) {
+        return Err(to_js_err(finstack_quant_core::Error::Validation(
+            "OLS requires a rectangular predictor matrix".into(),
+        )));
+    }
+    let n_obs = rows.len();
+    let data: Vec<_> = rows.into_iter().flatten().collect();
+    let responses = crate::utils::input::js_f64_seq(&y, "y")?;
+    let add_intercept =
+        crate::utils::input::js_opt_bool(add_intercept.as_ref(), "addIntercept")?.unwrap_or(true);
+    let result =
+        stats::ols(&data, n_obs, n_features, &responses, add_intercept).map_err(to_js_err)?;
+    crate::utils::to_js_value(&result)
+}
+
+/// Compute the signed mean of the worst fractional tail of a sample.
+/// @param data - Nonempty finite observations in any order, such as signed simple returns.
+/// @param confidence - Probability strictly between zero and one. The lower tail has mass `1 - confidence`.
+/// @returns Signed lower-tail mean in the observations' units.
+/// @throws `TypeError` for a mistyped argument or `FinstackError` for invalid confidence, empty or nonfinite data, or an unrepresentable result.
+#[wasm_bindgen(js_name = expectedShortfall)]
+pub fn expected_shortfall(
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] data: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] confidence: JsValue,
+) -> Result<f64, JsValue> {
+    let data = js_f64_seq(&data, "data")?;
+    let confidence = js_f64(&confidence, "confidence")?;
+    stats::expected_shortfall(&data, confidence).map_err(to_js_err)
 }
 
 /// Standard normal CDF Φ(x).

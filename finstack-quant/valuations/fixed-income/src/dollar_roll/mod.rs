@@ -54,4 +54,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
-pub use types::DollarRoll;
+pub use types::{DollarRoll, DollarRollBuilder};

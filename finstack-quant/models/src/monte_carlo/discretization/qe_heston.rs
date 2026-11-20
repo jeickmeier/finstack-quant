@@ -182,11 +182,11 @@ impl QeHeston {
         v_t: f64,
         kappa: f64,
         theta: f64,
-        sigma_v: f64,
+        vol_of_vol: f64,
         dt: f64,
         z_v: f64,
     ) -> f64 {
-        qe_step_variance(v_t, kappa, theta, sigma_v, dt, z_v, self.psi_c).expect("QE sample")
+        qe_step_variance(v_t, kappa, theta, vol_of_vol, dt, z_v, self.psi_c).expect("QE sample")
     }
 
     /// Compute integrated variance for spot evolution.
@@ -298,7 +298,7 @@ impl Discretization<HestonProcess> for QeHeston {
                 v_t,
                 params.model.kappa,
                 params.model.theta,
-                params.model.sigma_v,
+                params.model.vol_of_vol,
                 dt,
                 self.psi_c,
                 c.exp_kappa_dt,
@@ -307,7 +307,7 @@ impl Discretization<HestonProcess> for QeHeston {
                 v_t,
                 params.model.kappa,
                 params.model.theta,
-                params.model.sigma_v,
+                params.model.vol_of_vol,
                 dt,
                 self.psi_c,
             ),
@@ -341,8 +341,8 @@ impl Discretization<HestonProcess> for QeHeston {
         let one_minus_rho2 = (1.0 - rho * rho).max(0.0);
         let orthogonal_diffusion = one_minus_rho2.sqrt() * int_var.sqrt() * z[0];
 
-        let log_increment = if params.model.sigma_v.abs() > 1e-10 {
-            let rho_over_sigma = rho / params.model.sigma_v;
+        let log_increment = if params.model.vol_of_vol.abs() > 1e-10 {
+            let rho_over_sigma = rho / params.model.vol_of_vol;
             let a_pre = -0.5 * c2 + rho_over_sigma * (params.model.kappa * c2 + 1.0);
             let a_coeff = a_pre + 0.5 * one_minus_rho2 * c2;
             match regime.exp_moment(a_coeff) {
@@ -407,20 +407,20 @@ impl Discretization<HestonProcess> for QeHeston {
 mod tests {
     use super::super::super::process::heston::HestonProcess;
     use super::*;
-    use crate::closed_form::HestonPricingParams;
+    use crate::monte_carlo::process::heston::HestonProcessParams;
 
     #[test]
     fn test_qe_heston_variance_positive() {
         let qe = QeHeston::new();
         let params =
-            HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
+            HestonProcessParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
 
         for z in [-3.0, -1.0, 0.0, 1.0, 3.0] {
             let v_next = qe.step_variance(
                 0.04,
                 params.model.kappa,
                 params.model.theta,
-                params.model.sigma_v,
+                params.model.vol_of_vol,
                 0.01,
                 z,
             );
@@ -432,14 +432,14 @@ mod tests {
     fn test_qe_heston_mean_reversion() {
         let qe = QeHeston::new();
         let params =
-            HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.1, -0.5, 0.04).expect("valid");
+            HestonProcessParams::new(0.05, 0.02, 2.0, 0.04, 0.1, -0.5, 0.04).expect("valid");
 
         // Starting above theta
         let v_high = qe.step_variance(
             0.08,
             params.model.kappa,
             params.model.theta,
-            params.model.sigma_v,
+            params.model.vol_of_vol,
             0.1,
             0.0,
         );
@@ -450,7 +450,7 @@ mod tests {
             0.02,
             params.model.kappa,
             params.model.theta,
-            params.model.sigma_v,
+            params.model.vol_of_vol,
             0.1,
             0.0,
         );
@@ -459,10 +459,11 @@ mod tests {
 
     #[test]
     fn test_qe_heston_step() {
-        let heston =
-            crate::closed_form::HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04)
-                .map(HestonProcess::new)
-                .expect("valid");
+        let heston = crate::monte_carlo::process::heston::HestonProcessParams::new(
+            0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04,
+        )
+        .map(HestonProcess::new)
+        .expect("valid");
         let qe = QeHeston::new();
 
         let mut x = vec![100.0, 0.04];
@@ -481,10 +482,11 @@ mod tests {
 
     #[test]
     fn test_qe_heston_correlated_shocks() {
-        let heston =
-            crate::closed_form::HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04)
-                .map(HestonProcess::new)
-                .expect("valid");
+        let heston = crate::monte_carlo::process::heston::HestonProcessParams::new(
+            0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04,
+        )
+        .map(HestonProcess::new)
+        .expect("valid");
         let qe = QeHeston::new();
 
         // Negative variance shock should (with neg correlation) give positive spot shock
@@ -627,12 +629,12 @@ mod tests {
             .with_integrated_variance(IntegratedVarianceMethod::MeanReversionAdjusted);
 
         let params =
-            HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
+            HestonProcessParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
         let v = qe.step_variance(
             0.04,
             params.model.kappa,
             params.model.theta,
-            params.model.sigma_v,
+            params.model.vol_of_vol,
             0.1,
             0.0,
         );
@@ -643,14 +645,14 @@ mod tests {
     fn test_with_psi_c() {
         let qe = QeHeston::with_psi_c(2.0).expect("psi_c = 2.0 is the Andersen upper bound");
         let params =
-            HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
+            HestonProcessParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
 
         for z in [-2.0, 0.0, 2.0] {
             let v = qe.step_variance(
                 0.04,
                 params.model.kappa,
                 params.model.theta,
-                params.model.sigma_v,
+                params.model.vol_of_vol,
                 0.1,
                 z,
             );
@@ -671,10 +673,11 @@ mod tests {
 
     #[test]
     fn test_qe_heston_spot_update_uses_k0_star_correction() {
-        let heston =
-            crate::closed_form::HestonPricingParams::new(0.03, 0.01, 1.7, 0.04, 0.6, -0.4, 0.05)
-                .map(HestonProcess::new)
-                .expect("valid");
+        let heston = crate::monte_carlo::process::heston::HestonProcessParams::new(
+            0.03, 0.01, 1.7, 0.04, 0.6, -0.4, 0.05,
+        )
+        .map(HestonProcess::new)
+        .expect("valid");
         let qe = QeHeston::new();
         let dt = 0.1;
         let mut x = vec![100.0, 0.05];
@@ -689,7 +692,7 @@ mod tests {
             v_t,
             params.model.kappa,
             params.model.theta,
-            params.model.sigma_v,
+            params.model.vol_of_vol,
             dt,
             1.5,
         );
@@ -698,7 +701,7 @@ mod tests {
         let int_var = c0 + c1 * v_t + c2 * v_next;
         let rho = params.model.rho;
         let one_minus_rho2 = 1.0 - rho * rho;
-        let a_pre = -0.5 * c2 + rho / params.model.sigma_v * (params.model.kappa * c2 + 1.0);
+        let a_pre = -0.5 * c2 + rho / params.model.vol_of_vol * (params.model.kappa * c2 + 1.0);
         let a_coeff = a_pre + 0.5 * one_minus_rho2 * c2;
         let mgf = regime.exp_moment(a_coeff).expect("finite MGF");
         let k0_star = -mgf.ln() - 0.5 * one_minus_rho2 * (c0 + c1 * v_t);
@@ -728,10 +731,11 @@ mod tests {
         use crate::monte_carlo::rng::philox::PhiloxRng;
         use crate::monte_carlo::traits::RandomStream;
 
-        let heston =
-            crate::closed_form::HestonPricingParams::new(0.05, 0.0, 0.5, 0.04, 1.0, -0.9, 0.04)
-                .map(HestonProcess::new)
-                .expect("valid");
+        let heston = crate::monte_carlo::process::heston::HestonProcessParams::new(
+            0.05, 0.0, 0.5, 0.04, 1.0, -0.9, 0.04,
+        )
+        .map(HestonProcess::new)
+        .expect("valid");
         let qe = QeHeston::new();
         let dt = 0.25; // coarse quarterly step
         let params = heston.params();
@@ -773,10 +777,11 @@ mod tests {
         use crate::monte_carlo::traits::RandomStream;
 
         let r = 0.05;
-        let heston =
-            crate::closed_form::HestonPricingParams::new(r, 0.0, 0.5, 0.04, 1.0, -0.9, 0.04)
-                .map(HestonProcess::new)
-                .expect("valid");
+        let heston = crate::monte_carlo::process::heston::HestonProcessParams::new(
+            r, 0.0, 0.5, 0.04, 1.0, -0.9, 0.04,
+        )
+        .map(HestonProcess::new)
+        .expect("valid");
         let qe = QeHeston::new();
         let t_end = 1.0;
         let n_steps = 12usize; // coarse monthly grid
@@ -814,13 +819,13 @@ mod tests {
 
     #[test]
     fn test_qe_heston_clamps_rho_and_integrated_variance_before_sqrt() {
-        let heston = HestonProcess::new(HestonPricingParams {
+        let heston = HestonProcess::new(HestonProcessParams {
             r: 0.03,
             q: 0.01,
             model: crate::volatility::heston::HestonParams {
                 kappa: 1.5,
                 theta: 0.04,
-                sigma_v: 1.0e-16,
+                vol_of_vol: 1.0e-16,
                 rho: 1.0 + 1.0e-12,
                 v0: 0.04,
             },

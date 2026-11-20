@@ -153,8 +153,8 @@ fn diag_cdx_ig_46_spot_cds_reconciliation() {
     .unwrap();
 
     eprintln!("\n  Hazard knots, before vs after +1bp parallel par bump:");
-    let bumped_knots: Vec<(f64, f64)> = hazard_bumped.knot_points().collect();
-    for (t, lambda) in hazard_curve_base.knot_points() {
+    let bumped_knots: Vec<(f64, f64)> = hazard_bumped.iter_knots().collect();
+    for (t, lambda) in hazard_curve_base.iter_knots() {
         let bumped = bumped_knots
             .iter()
             .find(|(t_b, _)| (t_b - t).abs() < 1e-6)

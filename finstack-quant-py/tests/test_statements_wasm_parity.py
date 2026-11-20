@@ -239,13 +239,24 @@ def analytics_cases() -> dict[str, Any]:
     def evaluated(model: st.FinancialModelSpec, node: str, period: str) -> float | None:
         return st.Evaluator().evaluate(model).get(node, period)
 
-    rolled = sa.add_roll_forward_with_opening(MODEL, "debt", ["revenue"], ["cogs"], 10.0)
-    vintage = sa.add_vintage_buildup(MODEL, "book", "revenue", [1.0, 0.5])
-    noi = sa.add_noi_buildup(MODEL, "total_rev", ["revenue"], "total_exp", ["cogs"], "noi")
-    ncf = sa.add_ncf_buildup(noi, "noi", ["cogs"], "ncf")
+    roll_builder = st.ModelBuilder.from_spec(st.FinancialModelSpec.from_json(MODEL))
+    sa.add_roll_forward_with_opening(roll_builder, "debt", ["revenue"], ["cogs"], 10.0)
+    rolled = roll_builder.build()
+    vintage_builder = st.ModelBuilder.from_spec(st.FinancialModelSpec.from_json(MODEL))
+    sa.add_vintage_buildup(vintage_builder, "book", "revenue", [1.0, 0.5])
+    vintage = vintage_builder.build()
+    model = st.FinancialModelSpec.from_json(MODEL)
+    cash_builder = st.ModelBuilder.from_spec(model)
+    sa.add_noi_buildup(cash_builder, "total_rev", ["revenue"], "total_exp", ["cogs"], "noi")
+    sa.add_ncf_buildup(cash_builder, "noi", ["cogs"], "ncf")
+    ncf = cash_builder.build()
     lease = sa.LeaseSpec.from_json(json.dumps(INPUTS["lease"]))
-    rent_roll = sa.add_rent_roll(MODEL, [lease])
-    property_model = sa.add_property_operating_statement(MODEL, [lease], [], ["cogs"], [])
+    rent_builder = st.ModelBuilder.from_spec(model)
+    sa.add_rent_roll(rent_builder, [lease])
+    rent_roll = rent_builder.build()
+    property_builder = st.ModelBuilder.from_spec(model)
+    sa.add_property_operating_statement(property_builder, [lease], [], ["cogs"], [])
+    property_model = property_builder.build()
 
     exposure = sa.Exposure(
         id="E1",
@@ -323,7 +334,7 @@ def analytics_cases() -> dict[str, Any]:
             "roll_forward.node_ids": rolled.node_ids(),
             "roll_forward.end": [evaluated(rolled, "debt_end", Q1), evaluated(rolled, "debt_end", Q2)],
             "vintage.book": [evaluated(vintage, "book", Q1), evaluated(vintage, "book", Q2)],
-            "noi": [evaluated(noi, "noi", Q1), evaluated(noi, "noi", Q2)],
+            "noi": [evaluated(ncf, "noi", Q1), evaluated(ncf, "noi", Q2)],
             "ncf": [evaluated(ncf, "ncf", Q1), evaluated(ncf, "ncf", Q2)],
             "rent_roll.node_ids": rent_roll.node_ids(),
             "property.node_ids": property_model.node_ids(),
@@ -333,7 +344,14 @@ def analytics_cases() -> dict[str, Any]:
             "stage": sa.classify_stage(exposure).stage.value,
             "single": sa.compute_ecl(exposure, schedule, stage="stage1").ecl,
             "lifetime": sa.compute_ecl(exposure, schedule, stage="stage2").ecl,
-            "weighted": sa.compute_ecl_weighted(exposure, [(0.6, schedule), (0.4, stressed)], stage="stage2").ecl,
+            "weighted": sa.compute_ecl_weighted(
+                exposure,
+                [
+                    sa.EclScenario(id="base", weight="0.6", pd_schedule=schedule),
+                    sa.EclScenario(id="stress", weight="0.4", pd_schedule=stressed),
+                ],
+                stage="stage2",
+            ).ecl,
         },
         "dcf": {
             "enterprise_value": float(dcf.enterprise_value.amount),
@@ -346,7 +364,7 @@ def analytics_cases() -> dict[str, Any]:
         },
         "terminal_specs": [
             doc(sa.TerminalValueSpec.gordon_growth(0.02)),
-            doc(sa.TerminalValueSpec.exit_multiple(8.5, 0.0)),
+            doc(sa.TerminalValueSpec.exit_multiple(8.5)),
             doc(sa.TerminalValueSpec.h_model(0.08, 0.02, 5.0)),
         ],
         "scenario_diff": doc(sa.scenario_diff(scenario_set, scenario_results, "base", "down", ["profit"], [Q2])),
@@ -477,3 +495,42 @@ def test_cashflow_lookup_preserves_currency_guards() -> None:
     cashflows = st.CapitalStructureCashflows.from_json(json.dumps(payload))
     with pytest.raises(RuntimeError, match="Currency mismatch"):
         cashflows.get_component("interest_expense", "TL-A", Q1)
+
+
+def test_dated_dcf_reuses_results_for_grid_and_paths() -> None:
+    """Pin the qualified DCF route and the same rectangular grid used by WASM."""
+    from datetime import date
+
+    day = date(2024, 12, 31)
+    market = MarketContext()
+    builder = st.ModelBuilder("qualified-dcf").periods("2025..2025").currency("USD")
+    builder.source_snapshot("forecast-at-2024-close")
+    builder.value_money("ufcf", [("2025", Money(100, "USD"))])
+    model = builder.build()
+    evaluation = st.Evaluator()
+    results = evaluation.evaluate_with_market(model, market, day, day)
+    request = sa.CorporateDcfRequest(
+        cut=sa.StatementValuationCut(day, day, "USD"),
+        inputs=sa.DcfInputs(wacc=0.10, terminal_value=sa.TerminalValueSpec.gordon_growth(0.02), net_debt_override=50),
+        projection=sa.DcfProjection(
+            terminal_date="2026-01-01",
+            normalized_annual_fcff=sa.TerminalFcffBasis.authored(Money(100, "USD")),
+            stable_growth_ceiling=0.08,
+        ),
+    )
+    base = sa.evaluate_dcf_from_results(model, results, request).enterprise_value.amount
+    assert base == pytest.approx(1249.77910868, abs=1e-7)
+    axes = sa.DcfSensitivityGridSpec([0.09, 0.10], [0.015, 0.02, 0.095])
+    grid = sa.dcf_sensitivity_grid(model, results, request, axes).to_dataframe()
+    assert grid.shape == (2, 3)
+    assert grid.iloc[1, 1] == pytest.approx(base)
+    assert grid.iloc[:, 2].isna().all()
+    config = st.MonteCarloConfig(3, 7, ["ufcf"], [0.5], include_path_data=True)
+    paths = evaluation.evaluate_monte_carlo(model, config, market, day, day)
+    sample = sa.evaluate_dcf_monte_carlo(model, results, paths, request).to_dataframe()
+    assert sample["path_id"].to_list() == [0, 1, 2]
+    assert sample["enterprise_value"].to_list() == pytest.approx([base] * 3)
+    replacement = MarketContext().insert_dividend_yield("NEW-QUOTE", 0.03)
+    other_paths = evaluation.evaluate_monte_carlo(model, config, replacement, day, day)
+    with pytest.raises(ValueError, match="market snapshot"):
+        sa.evaluate_dcf_monte_carlo(model, results, other_paths, request)

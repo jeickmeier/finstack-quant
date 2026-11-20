@@ -173,6 +173,33 @@ pub struct DollarRoll {
 }
 
 impl DollarRoll {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> DollarRollBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .agency(self.agency)
+            .coupon(self.coupon)
+            .term(self.term)
+            .notional(self.notional)
+            .front_settlement_year(self.front_settlement_year)
+            .front_settlement_month(self.front_settlement_month)
+            .back_settlement_year(self.back_settlement_year)
+            .back_settlement_month(self.back_settlement_month)
+            .settlement_class(self.settlement_class)
+            .front_settlement_date_opt(self.front_settlement_date)
+            .back_settlement_date_opt(self.back_settlement_date)
+            .front_price(self.front_price)
+            .back_price(self.back_price)
+            .trade_date_opt(self.trade_date)
+            .prepayment_spec_opt(self.prepayment_spec.clone())
+            .discount_curve_id(self.discount_curve_id.clone())
+            .repo_curve_id_opt(self.repo_curve_id.clone())
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Validate both TBA legs and the chronological roll contract.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         let context = format!("Dollar roll '{}'", self.id.as_str());

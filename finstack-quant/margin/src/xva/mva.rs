@@ -24,11 +24,9 @@
 //!
 //! # Integration convention
 //!
-//! [`compute_mva`](crate::xva::mva::compute_mva) uses the same midpoint/trapezoid style as the CVA engine
-//! (`xva::cva`): per bucket `[tᵢ₋₁, tᵢ]` it multiplies bucket-midpoint values
-//! of spread, IM, DF, and survival by `Δt`. IM is treated as flat
-//! (left-constant) before the first grid point; include a small first grid
-//! point (e.g. `1.0/365.0`) if exact `t = 0` anchoring matters.
+//! Merge dated IM and spread observations, sample each term structure on its
+//! own curve clock and integrate the full product of linearly interpolated
+//! factors with three-point Gauss-Legendre quadrature.
 //!
 //! # Aggregation
 //!
@@ -38,12 +36,10 @@
 //! `CVA − DVA + FVA + MVA` in
 //! [`crate::xva::types::XvaResult::total_xva`].
 //!
-//! # Model Boundaries
+//! # Model boundaries
 //!
-//! **Counterparty-posted IM** is not represented: the caller-supplied
-//! [`crate::xva::types::ExposureProfile`] is taken as the net exposure, so
-//! counterparty-posted SIMM IM does not reduce EPE gap risk and gap risk is
-//! overstated for UMR counterparties.
+//! Credit adjustments use expected exposure measured under the admitted
+//! collateral and close-out terms. The posted-IM profile specifies funding.
 //!
 //! # References
 //!
@@ -54,7 +50,9 @@
 //! - ISDA SIMM v2.6: `docs/REFERENCES.md#isda-simm`
 //! - Green XVA: `docs/REFERENCES.md#green-xva`
 
+use finstack_quant_core::Error;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 
@@ -161,336 +159,622 @@ impl ImDecayProfile {
     }
 }
 
-/// Expected initial-margin profile `E[IM(t)]` on a time grid.
-///
-/// Values are in the aggregation currency chosen when the profile was built
-/// (e.g. the `currency` argument of [`im_profile_from_simm`]).
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+/// Source of the expected posted initial margin on a dated grid.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ImProjectionBasis {
+    /// Qualified expected posted IM from a supplied risk calculation.
+    External {
+        /// Permanent identifier of the supplied evidence and methodology.
+        source_id: String,
+        /// Legal portfolio scope measured by the supplied calculation.
+        netting_set: crate::types::NettingSetId,
+    },
+    /// Deterministic runoff from a single dated, historical SIMM calculation.
+    SimmDecay {
+        /// Fingerprint of the admitted inputs, calculation and projection.
+        source_id: String,
+        /// Legal portfolio scope supplying the opening margin.
+        netting_set: crate::types::NettingSetId,
+        /// Selected historical margin parameter version.
+        version: crate::SimmVersion,
+        /// Elected deterministic approximation applied to the opening margin.
+        decay: ImDecayProfile,
+    },
+}
+
+impl ImProjectionBasis {
+    fn source(&self) -> (&str, &crate::types::NettingSetId) {
+        match self {
+            Self::External {
+                source_id,
+                netting_set,
+            }
+            | Self::SimmDecay {
+                source_id,
+                netting_set,
+                ..
+            } => (source_id, netting_set),
+        }
+    }
+}
+
+/// Complete dated expected posted initial margin in one currency and netting set.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ImProfile {
-    /// Time points in years from the valuation date (strictly increasing, positive).
-    pub times: Vec<f64>,
-    /// Expected IM at each time point (non-negative, finite).
+    /// Reporting date and first observation.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub as_of: Date,
+    /// Currency of the opening and every projected amount.
+    pub currency: Currency,
+    /// Legal scope, source and election for the expected IM.
+    pub basis: ImProjectionBasis,
+    /// Calendar observations starting with the valuation date and ending at the horizon.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+    )]
+    pub dates: Vec<Date>,
+    /// Expected posted IM in major units of the calculation currency, nonnegative.
     pub im_values: Vec<f64>,
 }
 
 impl ImProfile {
-    /// Validate internal consistency.
+    /// Validate the complete observation calendar, amounts and scope.
     ///
     /// # Errors
-    ///
-    /// Returns an error if the profile is empty, lengths differ, times are not
-    /// strictly increasing and positive, or IM values are negative/non-finite.
+    /// Rejects unordered or unanchored dates, absent evidence, invalid terms and
+    /// a non-finite or negative opening or projected amount.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        validate_time_grid(&self.times, "ImProfile: times")?;
-        if self.im_values.len() != self.times.len() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "ImProfile: vector lengths must be equal (times={}, im_values={})",
-                self.times.len(),
-                self.im_values.len()
-            )));
+        let (source_id, scope) = self.basis.source();
+        let valid_scope = matches!(scope, crate::types::NettingSetId::Bilateral { counterparty_id, csa_id }
+            if !counterparty_id.trim().is_empty() && !csa_id.trim().is_empty());
+        if source_id.trim().is_empty() || !valid_scope {
+            return Err(Error::Validation(
+                "IM projection requires identified bilateral scope and calculation evidence".into(),
+            ));
         }
-        for (i, &im) in self.im_values.iter().enumerate() {
-            if !im.is_finite() || im < 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "ImProfile: im_values[{i}] = {im} must be non-negative and finite"
-                )));
-            }
+        if self.dates.len() < 2
+            || self.dates.first() != Some(&self.as_of)
+            || self.dates.windows(2).any(|dates| dates[0] >= dates[1])
+        {
+            return Err(Error::Validation(
+                "IM dates must start at valuation, strictly increase and include the horizon"
+                    .into(),
+            ));
+        }
+        if self.im_values.len() != self.dates.len()
+            || self
+                .im_values
+                .iter()
+                .any(|value| !value.is_finite() || *value < 0.0)
+        {
+            return Err(Error::Validation(
+                "Expected IM values must be finite, nonnegative and aligned with the dates".into(),
+            ));
         }
         Ok(())
     }
+
+    /// Derive observation years from the opening date on ACT/365 Fixed.
+    pub fn times(&self) -> Vec<f64> {
+        self.dates
+            .iter()
+            .map(|&date| elapsed_years(self.as_of, date))
+            .collect()
+    }
 }
 
-/// Build a deterministic IM profile from current SIMM sensitivities:
-/// `IM(t) = SIMM(sensitivities) × decay(t)`.
-///
-/// The base IM is `calculator.calculate_from_sensitivities_parts(sensitivities,
-/// currency)?.0` — the full cross-risk-class ISDA SIMM aggregate.
+fn elapsed_years(as_of: Date, date: Date) -> f64 {
+    (date - as_of).whole_days() as f64 / 365.0
+}
+
+/// Forecast scope and decay election for one dated posted-margin projection.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ImProjectionSpec {
+    /// Day on which opening SIMM and the projected profile are measured.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub as_of: Date,
+    /// Currency for aggregation and all values in the projection.
+    pub currency: Currency,
+    /// Distinct, qualified bilateral netting scope with legal agreement identity.
+    pub netting_set: crate::types::NettingSetId,
+    /// Identity of the admitted margin run or snapshot.
+    pub scope_source: String,
+    /// Dated projection grid, including valuation and horizon and any within-horizon runoff date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+    )]
+    pub dates: Vec<Date>,
+    /// Explicitly elected deterministic margin runoff approximation.
+    pub decay: ImDecayProfile,
+}
+
+/// Funding-spread election in basis points for a dated IM profile.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum MarginFundingSpread {
+    /// Apply one finite nonnegative spread at all dates.
+    Flat {
+        /// Spread in basis points (for example 25 represents 0.25%).
+        spread_bp: f64,
+    },
+    /// Linear interpolation of nonnegative basis-point spreads across a complete dated interval.
+    Dated {
+        /// Calendar dates and spread quotes in basis points. The dates must
+        /// cover the open and close of the admitted IM horizon.
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
+        )]
+        knots: Vec<(Date, f64)>,
+    },
+}
+
+/// Project dated expected posted IM from one admitted historical SIMM calculation.
 ///
 /// # Arguments
-///
-/// * `calculator` - SIMM calculator (fixes version / registry parameters)
-/// * `sensitivities` - Current portfolio sensitivities in SIMM buckets
-/// * `currency` - Aggregation currency for the SIMM total
-/// * `decay` - Deterministic decay profile applied to the base IM
-/// * `time_grid` - Strictly increasing positive year fractions
+/// * `calculator` - Explicit parameter version and margin period of risk.
+/// * `sensitivities` - Original signed SIMM sensitivities of the admitted netting set.
+/// * `spec` - Dated observation grid, reporting currency, admitted scope and decay election.
 ///
 /// # Errors
-///
-/// Returns an error if `decay`, `time_grid`, or `sensitivities` fails validation.
-///
-/// # References
-///
-/// - ISDA SIMM v2.6: `docs/REFERENCES.md#isda-simm`
-/// - Green, A. (2015). *XVA*. Wiley. Chapter 10. `docs/REFERENCES.md#green-xva`
+/// Rejects missing evidence, an invalid clock or decay, a missing within-horizon
+/// runoff node, or a failed SIMM calculation.
 pub fn im_profile_from_simm(
     calculator: &SimmCalculator,
     sensitivities: &SimmSensitivities,
-    currency: Currency,
-    decay: &ImDecayProfile,
-    time_grid: &[f64],
+    spec: &ImProjectionSpec,
 ) -> finstack_quant_core::Result<ImProfile> {
-    decay.validate()?;
-    validate_time_grid(time_grid, "im_profile_from_simm: time_grid")?;
-    let (base_im, _breakdown) =
-        calculator.calculate_from_sensitivities_parts(sensitivities, currency)?;
+    spec.decay.validate()?;
+    let result =
+        calculator.calculate_from_sensitivities(sensitivities, spec.currency, spec.as_of)?;
+    let times = spec
+        .dates
+        .iter()
+        .map(|date| elapsed_years(spec.as_of, *date))
+        .collect::<Vec<_>>();
+    let maturity = match &spec.decay {
+        ImDecayProfile::Constant => None,
+        ImDecayProfile::LinearToMaturity { maturity_years }
+        | ImDecayProfile::SqrtTime { maturity_years } => Some(*maturity_years),
+    };
+    if let Some(maturity) = maturity
+        && times.last().is_some_and(|&horizon| maturity <= horizon)
+        && !times.iter().any(|&time| time.total_cmp(&maturity).is_eq())
+    {
+        return Err(Error::Validation(
+            "The within-horizon IM runoff date must appear on the dated grid".into(),
+        ));
+    }
+    if spec.scope_source.trim().is_empty() {
+        return Err(Error::Validation(
+            "IM projection requires an identified source margin record".into(),
+        ));
+    }
+    let source_id = finstack_quant_core::canonical::content_hash(&(
+        spec,
+        calculator.version(),
+        crate::types::SimmSensitivitiesJson::from(sensitivities),
+        &result,
+    ))?;
     let profile = ImProfile {
-        times: time_grid.to_vec(),
-        im_values: time_grid
+        as_of: spec.as_of,
+        currency: spec.currency,
+        basis: ImProjectionBasis::SimmDecay {
+            source_id,
+            netting_set: spec.netting_set.clone(),
+            version: calculator.version(),
+            decay: spec.decay.clone(),
+        },
+        dates: spec.dates.clone(),
+        im_values: times
             .iter()
-            .map(|&t| base_im * decay.factor(t))
+            .map(|&time| result.amount.amount() * spec.decay.factor(time))
             .collect(),
     };
     profile.validate()?;
     Ok(profile)
 }
 
-fn validate_time_grid(time_grid: &[f64], label: &str) -> finstack_quant_core::Result<()> {
-    if time_grid.is_empty() {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "{label} must not be empty"
-        )));
-    }
-    for (i, &t) in time_grid.iter().enumerate() {
-        if !t.is_finite() || t <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "{label}[{i}] = {t} must be positive and finite"
-            )));
+impl MarginFundingSpread {
+    pub(super) fn add_knots(
+        &self,
+        start: Date,
+        end: Date,
+        dates: &mut Vec<Date>,
+    ) -> finstack_quant_core::Result<()> {
+        let valid_spread = |spread: f64| spread.is_finite() && spread >= 0.0;
+        match self {
+            Self::Flat { spread_bp } if valid_spread(*spread_bp) => Ok(()),
+            Self::Dated { knots }
+                if knots.first().is_some_and(|(date, _)| *date <= start)
+                    && knots.last().is_some_and(|(date, _)| *date >= end)
+                    && knots.windows(2).all(|pair| pair[0].0 < pair[1].0)
+                    && knots.iter().all(|(_, spread)| valid_spread(*spread)) =>
+            {
+                dates.extend(knots.iter().filter_map(|&(date, _)| (start < date && date < end).then_some(date)));
+                Ok(())
+            }
+            _ => Err(Error::Validation("MVA spread must be finite and nonnegative and any dated knots must strictly increase and cover the IM horizon".into())),
         }
-        if i > 0 && t <= time_grid[i - 1] {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "{label} must be strictly increasing at index {i}"
-            )));
+    }
+
+    fn spread_bp_at(&self, date: Date) -> f64 {
+        match self {
+            Self::Flat { spread_bp } => *spread_bp,
+            Self::Dated { knots } => dated_interpolate(knots, date),
         }
     }
-    Ok(())
 }
 
-/// Result of an MVA computation.
-///
-/// All monetary quantities are f64 in the IM profile's currency, matching the
-/// convention of [`crate::xva::types::XvaResult`].
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+// Admitted schedules cover every date passed to this helper.
+fn dated_interpolate(knots: &[(Date, f64)], date: Date) -> f64 {
+    match knots.binary_search_by_key(&date, |&(day, _)| day) {
+        Ok(index) => knots[index].1,
+        Err(upper) => {
+            let (start, lo) = knots[upper - 1];
+            let (end, hi) = knots[upper];
+            let alpha = (date - start).whole_days() as f64 / (end - start).whole_days() as f64;
+            (1.0 - alpha) * lo + alpha * hi
+        }
+    }
+}
+
+/// Full set of observed dated factors at one end of an MVA interval.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct MvaPoint {
+    /// Calendar date at which each curve is sampled on its own clock.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub date: Date,
+    /// Expected posted IM in major units of the result currency.
+    pub expected_im: f64,
+    /// Elected funding spread in basis points.
+    pub spread_bp: f64,
+    /// Risk-free discount factor relative to the valuation date.
+    pub discount_factor: f64,
+    /// Institution's survival probability relative to valuation, or one when excluded.
+    pub own_survival: f64,
+    /// Counterparty survival relative to valuation, or one when excluded.
+    pub counterparty_survival: f64,
+}
+
+impl MvaPoint {
+    fn factors(&self) -> [f64; 5] {
+        [
+            self.expected_im,
+            self.spread_bp / BASIS_POINTS_PER_UNIT,
+            self.discount_factor,
+            self.own_survival,
+            self.counterparty_survival,
+        ]
+    }
+}
+
+/// Replayable interval on the merged IM and funding-spread grid.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct MvaInterval {
+    /// Factors at the start of the interval.
+    pub start: MvaPoint,
+    /// Factors at the end of the interval.
+    pub end: MvaPoint,
+    /// Year fraction of this interval on ACT/365 Fixed.
+    pub years: f64,
+    /// Funding cost contributed by this interval, in profile currency.
+    pub contribution: f64,
+}
+
+/// Posted-margin funding cost, coverage, and arithmetic evidence.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct MvaResult {
-    /// MVA (positive = lifetime funding cost of posting IM).
+    /// Expected funding cost in reporting currency per calculation horizon.
     pub mva: f64,
-    /// Time-weighted average IM over the profile horizon:
-    /// `(1/T) ∫₀ᵀ IM(t) dt` under the same trapezoid convention as `mva`.
+    /// Mean IM weighted only by elapsed time, in reporting currency.
     pub average_im: f64,
-    /// Echo of the IM profile used: `(time, IM(t))` pairs.
-    pub im_profile: Vec<(f64, f64)>,
+    /// Dated and identified expected posted IM used for the cost.
+    pub im_profile: ImProfile,
+    /// Exact merged grid with start and end factors and costs contributed.
+    pub intervals: Vec<MvaInterval>,
 }
 
-/// Compute MVA over an expected-IM profile.
-///
-/// ```text
-/// MVA = Σᵢ s_mid(tᵢ) · IM_mid(tᵢ) · DF_mid(tᵢ) · S_mid(tᵢ) · Δtᵢ
-/// ```
-///
-/// midpoint/trapezoid on the profile grid with a `t = 0` bucket edge
-/// (`DF(0) = 1`, `S(0) = 1`, IM flat-before-first-point per the module docs).
+/// Integrate posted-IM funding with an explicit own-survival election.
 ///
 /// # Arguments
-///
-/// * `im_profile` - Expected IM profile `E[IM(t)]` (from
-///   [`im_profile_from_simm`], or a caller-supplied mean per-path IM)
-/// * `funding_spread_curve` - `(time_years, spread_bp)` pairs, linearly
-///   interpolated with flat extrapolation; a single pair means a flat spread
-/// * `discount_curve` - Risk-free discount curve
-/// * `survival_curve` - Optional bank (own) hazard curve; when `None`, `S ≡ 1`
+/// * `im_profile` - Complete dated IM in the receiving currency, including opening IM.
+/// * `funding_spread` - Explicit flat or bounded dated spread, stated in basis points.
+/// * `discount_curve` - Risk-free curve in the profile currency, sampled on its own calendar clock.
+/// * `own_survival` - Institution's hazard curve, or `None` for no survival weighting.
 ///
 /// # Errors
-///
-/// Returns an error if the profile or spread curve fails validation, or if a
-/// discount or survival curve evaluation fails at an IM grid time.
-///
-/// # Relationship to `compute_bilateral_xva`
-///
-/// This is the **unilateral** form: it conditions only on the bank's own
-/// survival. [`crate::xva::cva::compute_bilateral_xva`] computes MVA itself
-/// whenever [`crate::xva::types::FundingConfig::im_profile`] is set, weights it
-/// by *joint* survival (consistent with its FVA leg), and folds the result into
-/// [`crate::xva::types::XvaResult::total_xva`].
-/// Prefer that entry point for netting-set-level XVA; use this function for
-/// standalone MVA analysis.
-///
-/// # References
-///
-/// - Green, A. (2015). *XVA*. Wiley. Chapter 10, eq. (10.4)-(10.7). `docs/REFERENCES.md#green-xva`
+/// Rejects unsupported input coverage, invalid curve anchors or domains and non-finite arithmetic.
 pub fn compute_mva(
     im_profile: &ImProfile,
-    funding_spread_curve: &[(f64, f64)],
+    funding_spread: &MarginFundingSpread,
     discount_curve: &DiscountCurve,
-    survival_curve: Option<&HazardCurve>,
+    own_survival: Option<&HazardCurve>,
 ) -> finstack_quant_core::Result<MvaResult> {
     compute_mva_internal(
         im_profile,
-        funding_spread_curve,
+        funding_spread,
         discount_curve,
-        survival_curve,
+        own_survival,
         None,
     )
 }
 
-/// Compute MVA with optional joint-survival weighting for the bilateral engine.
-pub(crate) fn compute_mva_internal(
+pub(super) fn compute_mva_internal(
     im_profile: &ImProfile,
-    funding_spread_curve: &[(f64, f64)],
+    funding_spread: &MarginFundingSpread,
     discount_curve: &DiscountCurve,
-    survival_curve: Option<&HazardCurve>,
-    counterparty_survival_curve: Option<&HazardCurve>,
+    own_survival: Option<&HazardCurve>,
+    counterparty_survival: Option<&HazardCurve>,
 ) -> finstack_quant_core::Result<MvaResult> {
+    use finstack_quant_core::math::summation::NeumaierAccumulator;
+
     im_profile.validate()?;
-    validate_spread_curve(funding_spread_curve)?;
-    let spread_interp = if funding_spread_curve.len() >= 2 {
-        let (times, spreads): (Vec<f64>, Vec<f64>) = funding_spread_curve.iter().copied().unzip();
-        Some(finstack_quant_core::math::interp::Interpolator::<
-            finstack_quant_core::math::interp::LinearStrategy,
-        >::new(
-            times.into_boxed_slice(),
-            spreads.into_boxed_slice(),
-            finstack_quant_core::math::interp::ExtrapolationPolicy::Flat,
-        )?)
-    } else {
-        None
-    };
+    let mut dates = im_profile.dates.clone();
+    let as_of = im_profile.as_of;
+    let horizon = dates[dates.len() - 1];
+    funding_spread.add_knots(as_of, horizon, &mut dates)?;
+    dates.sort_unstable();
+    dates.dedup();
 
-    let n = im_profile.times.len();
-    let mut mva = 0.0;
-    let mut im_time_integral = 0.0;
-    let mut prev_t = 0.0;
-    // IM is flat (left-constant) before the first grid point (see module docs).
-    let mut prev_im = im_profile.im_values[0];
-    let mut prev_df = 1.0;
-    let mut prev_own_sp = 1.0;
-    let mut prev_counterparty_sp = 1.0;
+    let currency = im_profile.currency;
+    let discount = super::dated::discount_factors(as_of, currency, &dates, discount_curve)?;
+    let own = super::dated::survival_factors(as_of, currency, &dates, own_survival)?;
+    let counterparty =
+        super::dated::survival_factors(as_of, currency, &dates, counterparty_survival)?;
+    let im_knots: Vec<_> = im_profile
+        .dates
+        .iter()
+        .copied()
+        .zip(im_profile.im_values.iter().copied())
+        .collect();
+    let points = dates
+        .iter()
+        .enumerate()
+        .map(|(i, &date)| MvaPoint {
+            date,
+            expected_im: dated_interpolate(&im_knots, date),
+            spread_bp: funding_spread.spread_bp_at(date),
+            discount_factor: discount[i],
+            own_survival: own[i],
+            counterparty_survival: counterparty[i],
+        })
+        .collect::<Vec<_>>();
 
-    for i in 0..n {
-        let t = im_profile.times[i];
-        let im_t = im_profile.im_values[i];
-
-        let df_t = discount_curve.df(t)?;
-        let own_sp_t = match survival_curve {
-            Some(curve) => curve.sp(t)?,
-            None => 1.0,
+    let mut funding_cost = NeumaierAccumulator::new();
+    let mut time_weighted_im = NeumaierAccumulator::new();
+    let mut intervals = Vec::with_capacity(points.len() - 1);
+    let mut points = points.into_iter();
+    let mut start = points
+        .next()
+        .ok_or_else(|| Error::Validation("MVA requires an opening point".into()))?;
+    for end in points {
+        let years = elapsed_years(start.date, end.date);
+        let contribution = integral_factor_product(start.factors(), end.factors(), years)?;
+        funding_cost.add(contribution)?;
+        time_weighted_im.add((0.5 * start.expected_im + 0.5 * end.expected_im) * years)?;
+        let interval = MvaInterval {
+            start,
+            end,
+            years,
+            contribution,
         };
-        let counterparty_sp_t = match counterparty_survival_curve {
-            Some(curve) => curve.sp(t)?,
-            None => 1.0,
-        };
-
-        let dt = t - prev_t;
-        let im_mid = 0.5 * (prev_im + im_t);
-        let df_mid = 0.5 * (prev_df + df_t);
-        // Product of bucket midpoints, matching the joint-survival convention
-        // used by the FVA leg in `xva::cva`.
-        let sp_mid =
-            0.5 * (prev_own_sp + own_sp_t) * 0.5 * (prev_counterparty_sp + counterparty_sp_t);
-        let spread_bp = match &spread_interp {
-            Some(interp) => interp.interp(0.5 * (prev_t + t))?,
-            None => funding_spread_curve[0].1,
-        };
-        let spread_mid = spread_bp / BASIS_POINTS_PER_UNIT;
-
-        mva += spread_mid * im_mid * df_mid * sp_mid * dt;
-        im_time_integral += im_mid * dt;
-
-        prev_t = t;
-        prev_im = im_t;
-        prev_df = df_t;
-        prev_own_sp = own_sp_t;
-        prev_counterparty_sp = counterparty_sp_t;
+        start = interval.end.clone();
+        intervals.push(interval);
     }
-
-    let horizon = im_profile.times[n - 1];
+    let average_im = time_weighted_im.get_total()? / elapsed_years(as_of, horizon);
+    if !average_im.is_finite() {
+        return Err(Error::Validation("MVA average IM must be finite".into()));
+    }
     Ok(MvaResult {
-        mva,
-        average_im: im_time_integral / horizon,
-        im_profile: im_profile
-            .times
-            .iter()
-            .copied()
-            .zip(im_profile.im_values.iter().copied())
-            .collect(),
+        mva: funding_cost.get_total()?,
+        average_im,
+        im_profile: im_profile.clone(),
+        intervals,
     })
 }
 
-fn validate_spread_curve(curve: &[(f64, f64)]) -> finstack_quant_core::Result<()> {
-    if curve.is_empty() {
+/// Average of the product of five factors linearly interpolated inside a bucket.
+///
+/// Three-point Gauss-Legendre integrates the resulting polynomial (degree at
+/// most five) exactly. Each nonnegative factor retains its curve's dated
+/// endpoint values.
+fn integral_factor_product(
+    start: [f64; 5],
+    end: [f64; 5],
+    years: f64,
+) -> finstack_quant_core::Result<f64> {
+    if !years.is_finite()
+        || years <= 0.0
+        || start
+            .iter()
+            .chain(&end)
+            .any(|value| !value.is_finite() || *value < 0.0)
+    {
         return Err(finstack_quant_core::Error::Validation(
-            "MVA: funding_spread_curve must not be empty".into(),
+            "MVA interval requires finite nonnegative endpoints and positive year fraction".into(),
         ));
     }
-    for (i, &(t, s)) in curve.iter().enumerate() {
-        if !t.is_finite() || t < 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "MVA: funding_spread_curve[{i}] time {t} must be non-negative and finite"
-            )));
-        }
-        if !s.is_finite() || s < 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "MVA: funding_spread_curve[{i}] spread {s} bp must be non-negative and finite"
-            )));
-        }
-        if i > 0 && t <= curve[i - 1].0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "MVA: funding_spread_curve times must be strictly increasing at index {i}"
-            )));
-        }
+    let offset = 0.5 * (3.0_f64 / 5.0).sqrt();
+    let nodes = [0.5 - offset, 0.5, 0.5 + offset];
+    let weights = [5.0 / 18.0, 4.0 / 9.0, 5.0 / 18.0];
+    let mut integral = finstack_quant_core::math::summation::NeumaierAccumulator::new();
+    for (node, weight) in nodes.into_iter().zip(weights) {
+        let product = start.iter().zip(end).fold(1.0, |product, (&lo, hi)| {
+            product * ((1.0 - node) * lo + node * hi)
+        });
+        integral.add(weight * years * product)?;
     }
-    Ok(())
+    integral.get_total()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::SimmVersion;
-    use crate::calculators::im::SimmCalculator;
-    use crate::types::SimmSensitivities;
-    use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::Date;
-    use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
-    use time::Month;
+    use crate::types::NettingSetId;
+    use finstack_quant_core::dates::DayCount;
+    use time::macros::date;
 
-    fn flat_discount_curve(rate: f64) -> DiscountCurve {
-        let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
-        let knots: Vec<(f64, f64)> = (0..=60)
-            .map(|i| {
-                let t = i as f64 * 0.5;
-                (t, (-rate * t).exp())
-            })
-            .collect();
-        DiscountCurve::builder("USD-OIS")
-            .base_date(base)
-            .knots(knots)
-            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-            .build()
-            .expect("DiscountCurve should build")
-    }
+    const AS_OF: Date = date!(2025 - 01 - 01);
+    const END: Date = date!(2026 - 01 - 01);
+    const HALFWAY: Date = date!(2025 - 07 - 02);
 
-    fn flat_hazard_curve(lambda: f64) -> HazardCurve {
-        let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
-        HazardCurve::builder("BANK-SELF")
-            .base_date(base)
-            .knots([(30.0, lambda)])
-            .recovery_rate(0.40)
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .build()
-            .expect("HazardCurve should build")
-    }
-
-    fn constant_im_profile(im: f64, times: &[f64]) -> ImProfile {
+    fn profile(dates: Vec<Date>, im_values: Vec<f64>) -> ImProfile {
         ImProfile {
-            times: times.to_vec(),
-            im_values: vec![im; times.len()],
+            as_of: AS_OF,
+            currency: Currency::USD,
+            basis: ImProjectionBasis::External {
+                source_id: "established-expected-IM".into(),
+                netting_set: NettingSetId::bilateral("dealer", "agreement"),
+            },
+            dates,
+            im_values,
         }
     }
 
+    #[test]
+    fn checked_decay_elects_and_preserves_the_opening_simm_amount() {
+        let calculator = SimmCalculator::new(SimmVersion::V2_6).expect("calculator");
+        let mut sensitivities = SimmSensitivities::new(Currency::USD);
+        sensitivities.add_ir_delta(Currency::USD, "5Y", 50_000.0);
+        let base = calculator
+            .calculate_from_sensitivities(&sensitivities, Currency::USD, AS_OF)
+            .expect("SIMM fixture")
+            .amount
+            .amount();
+        let spec = ImProjectionSpec {
+            as_of: AS_OF,
+            currency: Currency::USD,
+            netting_set: NettingSetId::bilateral("dealer", "agreement"),
+            scope_source: "simm-execution".into(),
+            dates: vec![AS_OF, HALFWAY, END],
+            decay: ImDecayProfile::linear_to_maturity(1.0).expect("one year"),
+        };
+        let projected =
+            im_profile_from_simm(&calculator, &sensitivities, &spec).expect("dated profile");
+        assert!(base > 0.0);
+        assert_eq!(projected.im_values[0], base);
+        assert!((projected.im_values[1] - base * (1.0 - 182.0 / 365.0)).abs() < 1e-9);
+        assert_eq!(projected.im_values[2], 0.0);
+        let bad = ImProjectionSpec {
+            dates: vec![AS_OF, HALFWAY, date!(2027 - 01 - 01)],
+            ..spec
+        };
+        assert!(im_profile_from_simm(&calculator, &sensitivities, &bad).is_err());
+    }
+
+    #[test]
+    fn mva_integrates_crossing_profile_and_spread_as_one_product() {
+        let discount =
+            DiscountCurve::flat("usd", AS_OF, 0.0, DayCount::Act365F).expect("unit discount");
+        // All three observations follow the same linear spread. The interior
+        // funding knot is absent from the IM observations and must split the result.
+        let spread = MarginFundingSpread::Dated {
+            knots: vec![(AS_OF, 0.0), (HALFWAY, 100.0 * 182.0 / 365.0), (END, 100.0)],
+        };
+        let im = profile(vec![AS_OF, END], vec![100.0, 0.0]);
+        let result = compute_mva(&im, &spread, &discount, None).expect("qualified cost");
+        assert!((result.mva - 1.0 / 6.0).abs() < 1e-14);
+        assert!((result.average_im - 50.0).abs() < 1e-12);
+        assert_eq!(result.intervals.len(), 2);
+        assert_eq!(result.intervals[0].end.date, HALFWAY);
+        assert!(
+            (result
+                .intervals
+                .iter()
+                .map(|row| row.contribution)
+                .sum::<f64>()
+                - result.mva)
+                .abs()
+                < 1e-15
+        );
+    }
+
+    #[test]
+    fn mva_curve_sampling_converges_with_a_finer_dated_grid() {
+        let origin = date!(2024 - 12 - 20);
+        let discount =
+            DiscountCurve::flat("usd", origin, 0.04, DayCount::Act365F).expect("discount");
+        let own = HazardCurve::flat("own", origin, 0.07, 0.4, DayCount::Act360).expect("hazard");
+        let spread = MarginFundingSpread::Flat { spread_bp: 50.0 };
+        let coarse = profile(vec![AS_OF, END], vec![10_000.0; 2]);
+        let dense = profile(
+            (0..=365)
+                .map(|days| AS_OF + time::Duration::days(days))
+                .collect(),
+            vec![10_000.0; 366],
+        );
+        let coarse = compute_mva(&coarse, &spread, &discount, Some(&own)).expect("one year");
+        let dense = compute_mva(&dense, &spread, &discount, Some(&own)).expect("daily");
+        let rate: f64 = 0.04 + 0.07 * 365.0 / 360.0;
+        let reference = 50.0 * (-(-rate).exp_m1()) / rate;
+        assert!((dense.mva - reference).abs() < 1e-5);
+        assert!((dense.mva - reference).abs() < (coarse.mva - reference).abs());
+        assert!((dense.average_im - 10_000.0).abs() < 1e-11);
+        assert_eq!(dense.intervals[0].start.discount_factor, 1.0);
+        assert_eq!(dense.intervals[0].start.own_survival, 1.0);
+    }
+
+    #[test]
+    fn mva_rejects_missing_opening_and_spread_coverage() {
+        let discount = DiscountCurve::flat("usd", AS_OF, 0.0, DayCount::Act365F).expect("discount");
+        let short_spread = MarginFundingSpread::Dated {
+            knots: vec![(AS_OF, 10.0), (HALFWAY, 50.0)],
+        };
+        let flat = MarginFundingSpread::Flat { spread_bp: 50.0 };
+        assert!(
+            compute_mva(
+                &profile(vec![HALFWAY, END], vec![2.0, 1.0]),
+                &flat,
+                &discount,
+                None
+            )
+            .is_err()
+        );
+        assert!(
+            compute_mva(
+                &profile(vec![AS_OF, END], vec![2.0, -1.0]),
+                &flat,
+                &discount,
+                None
+            )
+            .is_err()
+        );
+        assert!(
+            compute_mva(
+                &profile(vec![AS_OF, END], vec![2.0, 1.0]),
+                &short_spread,
+                &discount,
+                None
+            )
+            .is_err()
+        );
+    }
     #[test]
     fn decay_factors_match_definitions() {
         assert!((ImDecayProfile::Constant.factor(7.3) - 1.0).abs() < 1e-15);
@@ -524,185 +808,6 @@ mod tests {
             .is_err()
         );
         assert!(ImDecayProfile::Constant.validate().is_ok());
-    }
-
-    #[test]
-    fn im_profile_from_simm_scales_base_im_by_decay() {
-        let calc = SimmCalculator::new(SimmVersion::V2_6).expect("calculator");
-        let mut sens = SimmSensitivities::new(Currency::USD);
-        sens.add_ir_delta(Currency::USD, "5Y", 50_000.0);
-        let (base_im, _) = calc
-            .calculate_from_sensitivities_parts(&sens, Currency::USD)
-            .expect("valid sensitivity fixture");
-        assert!(base_im > 0.0, "SIMM IM must be positive for a nonzero DV01");
-
-        let decay = ImDecayProfile::LinearToMaturity {
-            maturity_years: 4.0,
-        };
-        let grid = [1.0, 2.0, 4.0];
-        let profile = im_profile_from_simm(&calc, &sens, Currency::USD, &decay, &grid)
-            .expect("profile should build");
-
-        assert_eq!(profile.times, grid.to_vec());
-        assert!((profile.im_values[0] - base_im * 0.75).abs() < 1e-9);
-        assert!((profile.im_values[1] - base_im * 0.50).abs() < 1e-9);
-        assert!(profile.im_values[2].abs() < 1e-9);
-    }
-
-    #[test]
-    fn im_profile_from_simm_rejects_bad_grid() {
-        let calc = SimmCalculator::new(SimmVersion::V2_6).expect("calculator");
-        let sens = SimmSensitivities::new(Currency::USD);
-        let decay = ImDecayProfile::Constant;
-        assert!(im_profile_from_simm(&calc, &sens, Currency::USD, &decay, &[]).is_err());
-        assert!(im_profile_from_simm(&calc, &sens, Currency::USD, &decay, &[1.0, 0.5]).is_err());
-        assert!(im_profile_from_simm(&calc, &sens, Currency::USD, &decay, &[0.0, 1.0]).is_err());
-    }
-
-    #[test]
-    fn mva_flat_spread_zero_rates_no_survival() {
-        // IM(t) = 1_000_000 constant, spread 50bp flat, DF = 1, S = 1,
-        // grid [1, 2] with the flat-before-first-point convention:
-        // bucket [0,1]: 0.0050 × 1e6 × 1 × 1 × 1 = 5_000
-        // bucket [1,2]: 0.0050 × 1e6 × 1 × 1 × 1 = 5_000
-        // MVA = 10_000 exactly; average_im = 1e6.
-        let profile = constant_im_profile(1_000_000.0, &[1.0, 2.0]);
-        let discount = flat_discount_curve(0.0);
-        let result =
-            compute_mva(&profile, &[(0.0, 50.0)], &discount, None).expect("MVA should compute");
-        assert!(
-            (result.mva - 10_000.0).abs() < 1e-6,
-            "MVA {} != 10_000",
-            result.mva
-        );
-        assert!((result.average_im - 1_000_000.0).abs() < 1e-6);
-        assert_eq!(
-            result.im_profile,
-            vec![(1.0, 1_000_000.0), (2.0, 1_000_000.0)]
-        );
-    }
-
-    #[test]
-    fn mva_weights_by_bank_survival() {
-        // Same as above with own-survival S(t) = exp(−0.02 t):
-        // S(1) = 0.980198673, S(2) = 0.960789439
-        // bucket1 S_mid = (1 + 0.980198673)/2 = 0.990099337
-        // bucket2 S_mid = (0.980198673 + 0.960789439)/2 = 0.970494056
-        // MVA = 5_000 × (0.990099337 + 0.970494056) = 9_802.96696…
-        let profile = constant_im_profile(1_000_000.0, &[1.0, 2.0]);
-        let discount = flat_discount_curve(0.0);
-        let survival = flat_hazard_curve(0.02);
-        let result = compute_mva(&profile, &[(0.0, 50.0)], &discount, Some(&survival))
-            .expect("MVA should compute");
-        let expected = 5_000.0
-            * (((1.0 + (-0.02f64).exp()) / 2.0) + (((-0.02f64).exp() + (-0.04f64).exp()) / 2.0));
-        assert!(
-            (result.mva - expected).abs() / expected < 1e-9,
-            "MVA {} != {expected}",
-            result.mva
-        );
-        assert!(result.mva < 10_000.0);
-    }
-
-    #[test]
-    fn mva_linear_decay_profile() {
-        // LinearToMaturity T=2 sampled on [1, 2]: IM = [500_000, 0].
-        // Flat-before-first-point convention ⇒ bucket [0,1] uses IM = 5e5:
-        // bucket1: 0.01 × 5e5 × 1 = 5_000
-        // bucket2: 0.01 × (5e5 + 0)/2 × 1 = 2_500
-        // MVA = 7_500; average_im = (5e5·1 + 2.5e5·1)/2 = 375_000.
-        let profile = ImProfile {
-            times: vec![1.0, 2.0],
-            im_values: vec![500_000.0, 0.0],
-        };
-        let discount = flat_discount_curve(0.0);
-        let result =
-            compute_mva(&profile, &[(0.0, 100.0)], &discount, None).expect("MVA should compute");
-        assert!((result.mva - 7_500.0).abs() < 1e-6, "MVA {}", result.mva);
-        assert!((result.average_im - 375_000.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn mva_interpolates_spread_curve() {
-        // Spread curve [(0, 50bp), (2, 150bp)], constant IM 1e6, DF=1, S=1,
-        // grid [1, 2]. Bucket midpoints: t=0.5 → 75bp; t=1.5 → 125bp.
-        // MVA = 0.0075×1e6 + 0.0125×1e6 = 7_500 + 12_500 = 20_000.
-        let profile = constant_im_profile(1_000_000.0, &[1.0, 2.0]);
-        let discount = flat_discount_curve(0.0);
-        let result = compute_mva(&profile, &[(0.0, 50.0), (2.0, 150.0)], &discount, None)
-            .expect("MVA should compute");
-        assert!((result.mva - 20_000.0).abs() < 1e-6, "MVA {}", result.mva);
-    }
-
-    #[test]
-    fn mva_discounting_reduces_value() {
-        let profile = constant_im_profile(1_000_000.0, &[1.0, 2.0]);
-        let flat = flat_discount_curve(0.0);
-        let discounted = flat_discount_curve(0.03);
-        let mva_flat = compute_mva(&profile, &[(0.0, 50.0)], &flat, None)
-            .expect("ok")
-            .mva;
-        let mva_disc = compute_mva(&profile, &[(0.0, 50.0)], &discounted, None)
-            .expect("ok")
-            .mva;
-        assert!(mva_disc < mva_flat);
-        assert!(mva_disc > 0.0);
-    }
-
-    #[test]
-    fn mva_rejects_invalid_inputs() {
-        let discount = flat_discount_curve(0.0);
-        // Empty profile
-        let empty = ImProfile {
-            times: vec![],
-            im_values: vec![],
-        };
-        assert!(compute_mva(&empty, &[(0.0, 50.0)], &discount, None).is_err());
-        // Length mismatch
-        let bad = ImProfile {
-            times: vec![1.0],
-            im_values: vec![1.0, 2.0],
-        };
-        assert!(compute_mva(&bad, &[(0.0, 50.0)], &discount, None).is_err());
-        // Negative IM
-        let neg = ImProfile {
-            times: vec![1.0],
-            im_values: vec![-5.0],
-        };
-        assert!(compute_mva(&neg, &[(0.0, 50.0)], &discount, None).is_err());
-        // Empty / negative spread curve
-        let ok = constant_im_profile(1.0, &[1.0]);
-        assert!(compute_mva(&ok, &[], &discount, None).is_err());
-        assert!(compute_mva(&ok, &[(0.0, -1.0)], &discount, None).is_err());
-        assert!(compute_mva(&ok, &[(1.0, 10.0), (0.5, 10.0)], &discount, None).is_err());
-    }
-
-    #[test]
-    fn mva_serde_round_trip_and_strictness() {
-        let decay = ImDecayProfile::LinearToMaturity {
-            maturity_years: 2.0,
-        };
-        let json = serde_json::to_string(&decay).expect("serialize");
-        let back: ImDecayProfile = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(back, decay);
-
-        // Unknown fields must be rejected on all new inbound types.
-        assert!(
-            serde_json::from_str::<ImProfile>(r#"{"times":[1.0],"im_values":[2.0],"surprise":1}"#)
-                .is_err()
-        );
-        assert!(
-            serde_json::from_str::<MvaResult>(
-                r#"{"mva":1.0,"average_im":1.0,"im_profile":[[1.0,1.0]],"surprise":1}"#
-            )
-            .is_err()
-        );
-        assert!(
-            serde_json::from_str::<ImDecayProfile>(
-                r#"{"linear_to_maturity":{"maturity_years":2.0,"surprise":1}}"#
-            )
-            .is_err()
-        );
     }
 
     #[test]

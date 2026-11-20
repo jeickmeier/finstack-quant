@@ -88,6 +88,54 @@ pub struct FinancialModelSpec {
 }
 
 impl FinancialModelSpec {
+    /// Start an independent builder with this model's periods, nodes, and settings.
+    ///
+    /// # Errors
+    /// Rejects a model with an invalid period timeline or node definition.
+    pub fn to_builder(&self) -> Result<crate::builder::ModelBuilder> {
+        crate::builder::ModelBuilder::from_spec(self.clone())
+    }
+
+    /// Copy the model with one literal metadata key inserted or replaced.
+    ///
+    /// # Arguments
+    /// * `key` - Exact metadata key, including any punctuation in the name.
+    /// * `value` - JSON value stored verbatim, including literal JSON-shaped strings.
+    #[must_use]
+    pub fn with_meta(&self, key: impl Into<String>, value: serde_json::Value) -> Self {
+        let mut next = self.clone();
+        next.meta.insert(key.into(), value);
+        next
+    }
+
+    /// Derive a model whose currency metadata identifies its monetary unit.
+    ///
+    /// # Arguments
+    /// * `currency` - ISO currency recorded for monetary model values.
+    #[must_use]
+    pub fn with_currency(&self, currency: finstack_quant_core::currency::Currency) -> Self {
+        self.with_meta("currency", serde_json::Value::String(currency.to_string()))
+    }
+
+    /// Select the currency used for the model's capital-structure reporting.
+    ///
+    /// # Arguments
+    /// * `currency` - ISO reporting currency of the existing capital-structure specification.
+    ///
+    /// # Errors
+    /// Fails when the model has no capital structure.
+    pub fn with_reporting_currency(
+        &self,
+        currency: finstack_quant_core::currency::Currency,
+    ) -> Result<Self> {
+        let mut next = self.clone();
+        let capital = next.capital_structure.as_mut().ok_or_else(|| {
+            Error::build("Capital-structure reporting currency needs a capital structure")
+        })?;
+        capital.reporting_currency = Some(currency);
+        Ok(next)
+    }
+
     /// Validate changed explicit inputs and infer their types without rebuilding
     /// formulas or the DAG. Only nonempty series contribute inferred types.
     pub(crate) fn validate_explicit_values(

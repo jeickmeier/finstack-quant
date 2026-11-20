@@ -15,7 +15,7 @@ use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
 use finstack_quant_models::monte_carlo::engine::McPricingInputs;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::payoff::vanilla::European;
-use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
+use finstack_quant_models::monte_carlo::process::heston::{HestonProcess, HestonProcessParams};
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
@@ -72,13 +72,17 @@ impl EquityOptionHestonMcPricer {
 
         // Heston parameters: **Audit P3b** — use the strict resolver so a
         // Missing or mistyped HESTON_* scalars fail loudly rather than selecting
-        // representative SPX defaults. The canonical `HestonPricingParams::new`
+        // representative SPX defaults. The canonical `HestonParams::new`
         // enforces positive κ/θ/σᵥ/v₀ and ρ ∈ (−1, 1) for both Monte Carlo and
         // Fourier paths.
         let params = finstack_quant_valuations_core::instruments::pricing::heston_market::heston_params_from_market_strict(
-            market, r, q,
+            market,
         )?;
-        let process = HestonProcess::new(params);
+        let process = HestonProcess::new(HestonProcessParams {
+            r,
+            q,
+            model: params,
+        });
         let discretization = QeHeston::new();
 
         let num_steps = ((t * self.steps_per_year).round() as usize).max(10);
@@ -103,7 +107,7 @@ impl EquityOptionHestonMcPricer {
         let discount_factor = (-r * t).exp();
 
         // Initial state: [spot, v0]
-        let initial_state = [spot, params.model.v0];
+        let initial_state = [spot, params.v0];
 
         let payoff = European::new(inst.option_type, inst.strike, inst.quantity, maturity_step);
         let result = engine.price(McPricingInputs {

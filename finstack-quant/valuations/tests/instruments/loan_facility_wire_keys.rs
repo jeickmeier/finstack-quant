@@ -141,7 +141,7 @@ fn price_case(cases: &Value, ty: &str, extra: &[(Value, Value)]) -> String {
             value.clone(),
         );
     }
-    let parsed = parse_boxed_instrument_from_json(&instrument.to_string(), None)
+    let parsed = parse_boxed_instrument_from_json(&instrument.to_string(), None, None)
         .unwrap_or_else(|e| panic!("{ty}: {e}"));
     let request = &case["request"];
     let result = price_instrument(
@@ -160,6 +160,7 @@ fn price_case(cases: &Value, ty: &str, extra: &[(Value, Value)]) -> String {
         );
     let canonical = parse_boxed_instrument_from_json(
         &serde_json::to_string(&canonical_json).expect("canonical JSON"),
+        None,
         None,
     )
     .expect("roundtrip");

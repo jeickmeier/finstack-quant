@@ -7,6 +7,7 @@ import pickle
 import pytest
 
 from finstack_quant.models import (
+    OptionContractParams,
     bachelier_price,
     black76_implied_vol,
     black76_price,
@@ -28,8 +29,35 @@ from finstack_quant.models.volatility import (
 
 @pytest.mark.parametrize("spot", [math.nan, math.inf, -100.0, 0.0])
 def test_checked_black_scholes_raises_for_invalid_spot(spot: float) -> None:
-    with pytest.raises(ValueError, match="spot"):
-        bs_price(spot, 100.0, 0.05, 0.0, 0.2, 1.0, True)
+    with pytest.raises(ValueError, match="spot" if math.isfinite(spot) else "finite"):
+        bs_price({
+            "spot": spot,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "volatility": 0.2,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        })
+
+
+def test_cos_and_closed_form_share_the_checked_option_contract() -> None:
+    contract = OptionContractParams(
+        spot=100.0,
+        strike=85.0,
+        rate=0.05,
+        dividend_yield=0.02,
+        time_to_expiry=1.0,
+        option_type="call",
+    )
+    market = contract.with_volatility(0.0)
+    assert market.contract() == contract
+    expected = 100.0 * math.exp(-0.02) - 85.0 * math.exp(-0.05)
+    assert bs_price(market) == pytest.approx(expected, abs=1e-12)
+    with pytest.raises(ValueError, match="volatility"):
+        bs_cos_price(market)
+    market_with_vol = contract.with_volatility(0.2)
+    assert bs_cos_price(market_with_vol) == pytest.approx(bs_price(market_with_vol), abs=1e-8)
 
 
 def test_cos_rejects_zero_terms() -> None:
@@ -42,9 +70,9 @@ def test_cos_rejects_zero_terms() -> None:
                 "dividend_yield": 0.0,
                 "time_to_expiry": 1.0,
                 "option_type": "call",
-                "n_terms": 0,
+                "volatility": 0.2,
             },
-            0.2,
+            n_terms=0,
         )
 
 
@@ -53,30 +81,26 @@ def test_cos_rejects_zero_terms() -> None:
 def test_cos_invalid_prices_raise_value_error(invalid: float, is_call: bool) -> None:
     # A non-finite float has no JSON form, so the `market` object itself is rejected.
     finite = math.isfinite(invalid)
-    with pytest.raises(ValueError, match="spot" if finite else "invalid CosMarketParams"):
-        bs_cos_price(
-            {
-                "spot": invalid,
-                "strike": 100.0,
-                "rate": 0.05,
-                "dividend_yield": 0.0,
-                "time_to_expiry": 1.0,
-                "option_type": ("call" if is_call else "put"),
-            },
-            0.2,
-        )
-    with pytest.raises(ValueError, match="strike" if finite else "invalid CosMarketParams"):
-        bs_cos_price(
-            {
-                "spot": 100.0,
-                "strike": invalid,
-                "rate": 0.05,
-                "dividend_yield": 0.0,
-                "time_to_expiry": 1.0,
-                "option_type": ("call" if is_call else "put"),
-            },
-            0.2,
-        )
+    with pytest.raises(ValueError, match="spot" if finite else "invalid OptionMarketParams"):
+        bs_cos_price({
+            "spot": invalid,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "time_to_expiry": 1.0,
+            "option_type": "call" if is_call else "put",
+            "volatility": 0.2,
+        })
+    with pytest.raises(ValueError, match="strike" if finite else "invalid OptionMarketParams"):
+        bs_cos_price({
+            "spot": 100.0,
+            "strike": invalid,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "time_to_expiry": 1.0,
+            "option_type": "call" if is_call else "put",
+            "volatility": 0.2,
+        })
 
 
 def test_cos_rejects_invalid_process_parameters() -> None:
@@ -124,16 +148,16 @@ def test_sabr_diagnostics_accept_uneven_strike_spacing() -> None:
 @pytest.mark.parametrize("forward", [0.0, -100.0, math.nan, math.inf])
 def test_arbitrage_check_rejects_invalid_forwards(forward: float) -> None:
     with pytest.raises(ValueError, match="forward"):
-        check_surface_grid([90.0, 100.0, 110.0], [1.0, 2.0], [[0.3] * 3, [0.1] * 3], [forward])
+        check_surface_grid([1.0, 2.0], [90.0, 100.0, 110.0], [[0.3] * 3, [0.1] * 3], [forward])
 
 
 def test_density_check_requires_one_forward_per_expiry() -> None:
     with pytest.raises(ValueError, match="entries"):
-        check_local_vol_density_grid([90.0, 100.0, 110.0], [1.0, 2.0], [[0.2] * 3] * 2, [100.0])
+        check_local_vol_density_grid([1.0, 2.0], [90.0, 100.0, 110.0], [[0.2] * 3] * 2, [100.0])
     assert (
         check_local_vol_density_grid(
-            [90.0, 100.0, 110.0],
             [1.0, 2.0],
+            [90.0, 100.0, 110.0],
             [[0.2] * 3] * 2,
             [100.0, 100.0],
         )

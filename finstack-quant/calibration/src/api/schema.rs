@@ -367,6 +367,18 @@ pub struct CalibrationEnvelope {
     pub prior_market: Vec<PriorMarketObject>,
 }
 
+/// A calibration step together with the observations for its named quote set.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct StepWithQuotes {
+    /// Typed step containing its parameters and quote-set identifier.
+    pub step: CalibrationStep,
+    /// Inputs to register in the named quote set, in calibration order.
+    /// A later step can pass an empty list to reuse a previously registered set.
+    pub quotes: Vec<MarketDatum>,
+}
+
 impl CalibrationEnvelope {
     /// Create a current-version calibration request envelope.
     ///

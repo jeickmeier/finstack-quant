@@ -69249,7 +69249,11 @@
         "marketJson": "{\"schema_version\":1,\"curves\":[{\"type\":\"discount\",\"id\":\"USD-OIS\",\"base\":\"2025-01-15\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[0.5,0.9801986733067553],[1,0.9607894391523232],[2,0.9231163463866358]],\"interp_style\":\"monotone_convex\",\"extrapolation\":\"extend\",\"rate_calibration\":null,\"fx_policy\":null}],\"fx\":null,\"surfaces\":[],\"prices\":{},\"series\":[],\"inflation_indices\":[],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"hierarchy\":null}",
         "factorsJson": "[{\"id\":\"usd_rates\",\"factor_type\":\"rates\",\"market_mapping\":{\"curve_parallel\":{\"curve_ids\":[\"USD-OIS\"],\"units\":\"rate_bp\"}},\"description\":\"Parallel USD rates shift\"}]",
         "asOf": "2025-01-15",
-        "covarianceJson": "{\"factor_ids\":[\"usd_rates\"],\"n\":1,\"data\":[0.0001]}"
+        "covariance": {
+          "factor_ids": ["usd_rates"],
+          "n": 1,
+          "data": [0.0001]
+        }
       },
       "report": {
         "sensitivities": {
@@ -72878,7 +72882,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
-        "sha256": "8e5be364d8ad95ad981df79bd9994e4643a195df2c753e0fe2823480be01b3cb"
+        "sha256": "aa1c8af3f33873b10e350d50cb104c747a175b7a818930d9b1c247fae434e43f"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
@@ -73300,7 +73304,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/portfolio/margin/cases.json",
-        "sha256": "7e2853476a9c75b2d81678ace0f624d147bd3565466bdcfd5fd6d3e1e45e5f68"
+        "sha256": "116b0e9ecd47cd920dfb34294cbf97a0113ed7ebf4acb99e4e2bf249c63ad1af"
       },
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
@@ -74788,7 +74792,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-        "sha256": "ee07483240389b6904228429fc6c1afafed211c740e81a23ebeebc0b8daed8e0"
+        "sha256": "1ee8f1a1cacc426f446eb7cdc8c021072bc761dbbefa803ecffd6a7005453b4b"
       },
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
@@ -75057,7 +75061,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-        "sha256": "ee07483240389b6904228429fc6c1afafed211c740e81a23ebeebc0b8daed8e0"
+        "sha256": "1ee8f1a1cacc426f446eb7cdc8c021072bc761dbbefa803ecffd6a7005453b4b"
       },
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
@@ -87562,7 +87566,7 @@
     "emptyField": {
       "name": "TypeError",
       "kind": "invalid_type",
-      "message": "returnsJson: returnsJson[1] is NaN, which JSON cannot represent"
+      "message": "returns: returns[1] is NaN, which JSON cannot represent"
     },
     "nonFiniteHorizon": {
       "blank": {
@@ -88060,7 +88064,7 @@
       "metricsJson": "{\"debt_to_ebitda\":6}",
       "asOf": "2026-03-31"
     },
-    "covenantReportsJson": "{\"max_debt_ebitda\":{\"covenant_type\":\"Debt/EBITDA <= 5.00x\",\"covenant_id\":\"max_debt_ebitda\",\"passed\":false,\"actual_value\":6,\"threshold\":5,\"details\":null,\"headroom\":-0.2,\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"version\":\"0.11.0\"}}}"
+    "covenantReportsJson": "{\"max_debt_ebitda\":{\"covenant_type\":\"Debt/EBITDA <= 5.00x\",\"covenant_id\":\"max_debt_ebitda\",\"passed\":false,\"actual_value\":6,\"threshold\":5,\"details\":null,\"headroom\":-0.2,\"headroom_raw\":-1,\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"version\":\"0.11.0\"}}}"
   },
   "irsInstrument": {
     "instrument": {
@@ -89469,6 +89473,10 @@
           "2025Q1": {
             "amount": "208300000",
             "currency": "USD"
+          },
+          "2025Q4": {
+            "amount": "231384660.02999997",
+            "currency": "USD"
           }
         },
         "forecast": {
@@ -89476,6 +89484,13 @@
           "params": {
             "curve": [0.03, 0.035, 0.042]
           }
+        },
+        "availability_dates": {
+          "2024Q1": "2024-04-01",
+          "2024Q2": "2024-07-01",
+          "2024Q3": "2024-10-01",
+          "2024Q4": "2025-01-01",
+          "2025Q1": "2025-04-01"
         }
       },
       "revenue_growth_qoq": {
@@ -89521,7 +89536,14 @@
             "currency": "USD"
           }
         },
-        "formula_text": "revenue * 0.3375"
+        "formula_text": "revenue * 0.3375",
+        "availability_dates": {
+          "2024Q1": "2024-04-01",
+          "2024Q2": "2024-07-01",
+          "2024Q3": "2024-10-01",
+          "2024Q4": "2025-01-01",
+          "2025Q1": "2025-04-01"
+        }
       },
       "gross_profit": {
         "node_id": "gross_profit",
@@ -89583,6 +89605,13 @@
           "params": {
             "rate": 0.022
           }
+        },
+        "availability_dates": {
+          "2024Q1": "2024-04-01",
+          "2024Q2": "2024-07-01",
+          "2024Q3": "2024-10-01",
+          "2024Q4": "2025-01-01",
+          "2025Q1": "2025-04-01"
         }
       },
       "ebitda": {
@@ -89645,6 +89674,13 @@
           "params": {
             "rate": 0.018
           }
+        },
+        "availability_dates": {
+          "2024Q1": "2024-04-01",
+          "2024Q2": "2024-07-01",
+          "2024Q3": "2024-10-01",
+          "2024Q4": "2025-01-01",
+          "2025Q1": "2025-04-01"
         }
       },
       "ebit": {
@@ -89750,6 +89786,13 @@
             "amount": "420000000",
             "currency": "USD"
           }
+        },
+        "availability_dates": {
+          "2024Q1": "2024-04-01",
+          "2024Q2": "2024-07-01",
+          "2024Q3": "2024-10-01",
+          "2024Q4": "2025-01-01",
+          "2025Q1": "2025-04-01"
         }
       },
       "debt_draws": {
@@ -89793,6 +89836,13 @@
               "2025Q4": 30000000
             }
           }
+        },
+        "availability_dates": {
+          "2024Q1": "2024-04-01",
+          "2024Q2": "2024-07-01",
+          "2024Q3": "2024-10-01",
+          "2024Q4": "2025-01-01",
+          "2025Q1": "2025-04-01"
         }
       },
       "debt_repayments": {
@@ -89829,6 +89879,13 @@
         },
         "forecast": {
           "method": "forward_fill"
+        },
+        "availability_dates": {
+          "2024Q1": "2024-04-01",
+          "2024Q2": "2024-07-01",
+          "2024Q3": "2024-10-01",
+          "2024Q4": "2025-01-01",
+          "2025Q1": "2025-04-01"
         }
       },
       "total_debt": {
@@ -89889,6 +89946,13 @@
         },
         "forecast": {
           "method": "forward_fill"
+        },
+        "availability_dates": {
+          "2024Q1": "2024-04-01",
+          "2024Q2": "2024-07-01",
+          "2024Q3": "2024-10-01",
+          "2024Q4": "2025-01-01",
+          "2025Q1": "2025-04-01"
         }
       },
       "ltm_ebitda": {
@@ -90087,7 +90151,8 @@
       "entity": "Acme Software Holdings",
       "currency": "USD",
       "frequency": "quarterly"
-    }
+    },
+    "source_snapshot": "analyst-published-2025Q1"
   },
   "statementChecks": {
     "name": "Acme quarterly review",
@@ -90868,7 +90933,7 @@
             "amount": "231384660.02999997",
             "currency": "USD"
           },
-          "source": "forecast"
+          "source": "value"
         }
       },
       "capex": {
@@ -91902,9 +91967,10 @@
     },
     "provenance": {
       "model_id": "ACME-SOFTWARE-3STMT",
-      "model_content_hash": "sha256:bf5cc381ea4b644301f79af53438eca8a130e7dc0e7da4b593bf97618c04625b",
+      "model_content_hash": "sha256:15f96cf56a9f5f5164d2dd0fc942c36861329029c5f2267a7c8889f66b33614f",
+      "source_snapshot": "analyst-published-2025Q1",
       "observation_cutoff": "full_snapshot",
-      "run_id": "sha256:fe3c1339c4c1cea17a38c25af2b4592bd86d9a8e971ffc4f60ecae3041a96b2c"
+      "run_id": "sha256:5cf9d93e67f0b3fc7c80ca3a9b1eb02215494255ac564f0a628b58bb39f4c033"
     },
     "cs_cashflows": {
       "by_instrument": {
@@ -95378,6 +95444,10 @@
       "amount": "316400000",
       "currency": "USD"
     },
+    "other_equity_claims": {
+      "amount": "0",
+      "currency": "USD"
+    },
     "valuation_discount": {
       "amount": "0",
       "currency": "USD"
@@ -95457,6 +95527,7 @@
   "statementLboConfig": {
     "entry_multiple": 8.5,
     "entry_metric_node": "ebitda",
+    "entry_period": "2024Q1",
     "transaction_fees": 12000000,
     "sources": [
       {
@@ -97301,9 +97372,10 @@
             },
             "provenance": {
               "model_id": "ACME-SOFTWARE-3STMT",
-              "model_content_hash": "sha256:445ad01723dc704b7394c383a1544b71a5bb82c7b9b78d5fee5678a35b225b91",
+              "model_content_hash": "sha256:5c57deb330d51c131ad691f34483541dff91cc4e89ed18b68fe1604b7649861c",
+              "source_snapshot": "analyst-published-2025Q1",
               "observation_cutoff": "full_snapshot",
-              "run_id": "sha256:c68aa7099e0e3d7fa529bef630b58a827f6dc6bfc02bd08fe9c88cddcb473aa6"
+              "run_id": "sha256:f7065fde2a7f15e75d3904dbbcfcfebcd3e35a7f99fa0171a9009164739a968a"
             },
             "cs_cashflows": {
               "by_instrument": {
@@ -102112,9 +102184,10 @@
             },
             "provenance": {
               "model_id": "ACME-SOFTWARE-3STMT",
-              "model_content_hash": "sha256:87f8a50b9986bc24abad0139083ccf09555f68eee4e1afa773d391bea597cc68",
+              "model_content_hash": "sha256:3e79e7835bf5e5c09bc4a0f96bf96d7e1a1ccf1202bc2b28f6901d2f75e57abd",
+              "source_snapshot": "analyst-published-2025Q1",
               "observation_cutoff": "full_snapshot",
-              "run_id": "sha256:4b525032c4a5025cc45a1be6ee3de06ca52501f8cbb67b39d14c5764759ef6e9"
+              "run_id": "sha256:3e09ec218a8049ad15f64937749ca9f55eca38cb404e4c9a235eb0f1b28d3439"
             },
             "cs_cashflows": {
               "by_instrument": {
@@ -105889,7 +105962,7 @@
                     "amount": "231384660.02999997",
                     "currency": "USD"
                   },
-                  "source": "forecast"
+                  "source": "value"
                 }
               },
               "capex": {
@@ -106923,9 +106996,10 @@
             },
             "provenance": {
               "model_id": "ACME-SOFTWARE-3STMT",
-              "model_content_hash": "sha256:5330e840ab836f56c15420a9028440bfa417a211be135af223c898cce66a1d92",
+              "model_content_hash": "sha256:c52103d65aed01b5330a2fa05617e369906cb548a363a24a0eb73ba589a52f25",
+              "source_snapshot": "analyst-published-2025Q1",
               "observation_cutoff": "full_snapshot",
-              "run_id": "sha256:3a9e70067efcc3d8b69391646e41fded6d2a30b5c6c6d64de1582f396cc14c85"
+              "run_id": "sha256:6dec8f492535d3482ee108e8b71a987d6cc99f5c959784e428660f753010dc81"
             },
             "cs_cashflows": {
               "by_instrument": {
@@ -110700,7 +110774,7 @@
                     "amount": "231384660.02999997",
                     "currency": "USD"
                   },
-                  "source": "forecast"
+                  "source": "value"
                 }
               },
               "capex": {
@@ -111734,9 +111808,10 @@
             },
             "provenance": {
               "model_id": "ACME-SOFTWARE-3STMT",
-              "model_content_hash": "sha256:d747cf39fc225f0d90b19fc26a45b883cc0a52cd721ec1222ef9804a971ca148",
+              "model_content_hash": "sha256:bf2c55496f499b2957d5e384fcc178c7b606daf4871dc099c4617497c5b7230f",
+              "source_snapshot": "analyst-published-2025Q1",
               "observation_cutoff": "full_snapshot",
-              "run_id": "sha256:9576804264d2a0ad50f88040efd0bc93b37e5c770a7ada9dd848693bd2da1854"
+              "run_id": "sha256:c7fe46188ad314fa1d0154868ff3b10b8323403482568fcd50563e4154cf537d"
             },
             "cs_cashflows": {
               "by_instrument": {
@@ -115508,7 +115583,7 @@
                 "amount": "231384660.02999997",
                 "currency": "USD"
               },
-              "source": "forecast"
+              "source": "value"
             }
           },
           "capex": {
@@ -116542,9 +116617,10 @@
         },
         "provenance": {
           "model_id": "ACME-SOFTWARE-3STMT",
-          "model_content_hash": "sha256:bf5cc381ea4b644301f79af53438eca8a130e7dc0e7da4b593bf97618c04625b",
+          "model_content_hash": "sha256:15f96cf56a9f5f5164d2dd0fc942c36861329029c5f2267a7c8889f66b33614f",
+          "source_snapshot": "analyst-published-2025Q1",
           "observation_cutoff": "full_snapshot",
-          "run_id": "sha256:fe3c1339c4c1cea17a38c25af2b4592bd86d9a8e971ffc4f60ecae3041a96b2c"
+          "run_id": "sha256:5cf9d93e67f0b3fc7c80ca3a9b1eb02215494255ac564f0a628b58bb39f4c033"
         },
         "cs_cashflows": {
           "by_instrument": {
@@ -119618,18 +119694,69 @@
   "statementGoalSeekRun": {
     "targetNode": "ebitda",
     "targetPeriod": "2025Q4",
-    "targetValue": 70000000,
+    "targetValue": {
+      "amount": "70000000",
+      "currency": "USD"
+    },
     "driverNode": "revenue",
     "driverPeriod": "2025Q4",
-    "bounds": [100000000, 500000000]
+    "bounds": [100000000, 500000000],
+    "targetTolerance": {
+      "amount": "0.01",
+      "currency": "USD"
+    },
+    "driverTolerance": 1e-9,
+    "maxIterations": 100,
+    "asOf": "2025-04-01",
+    "observedThrough": "2025-04-01"
   },
   "statementGoalSeek": {
-    "solved_value": 244390239.98913205,
-    "model": null,
-    "residual": -2.9802322387695312e-8,
-    "tolerance": 0.07,
-    "evaluations": 7,
-    "converged": true
+    "solved_value": {
+      "amount": "244390239.98913205",
+      "currency": "USD"
+    },
+    "target_value": {
+      "amount": "70000000",
+      "currency": "USD"
+    },
+    "achieved_value": {
+      "amount": "69999999.999999973125",
+      "currency": "USD"
+    },
+    "residual": {
+      "amount": "-0.000000026875",
+      "currency": "USD"
+    },
+    "target_tolerance": {
+      "amount": "0.01",
+      "currency": "USD"
+    },
+    "driver_tolerance": 1e-9,
+    "evaluations": 6,
+    "original_run": {
+      "model_id": "ACME-SOFTWARE-3STMT",
+      "model_content_hash": "sha256:15f96cf56a9f5f5164d2dd0fc942c36861329029c5f2267a7c8889f66b33614f",
+      "source_snapshot": "analyst-published-2025Q1",
+      "observation_cutoff": {
+        "through": "2025-04-01"
+      },
+      "valuation_date": "2025-04-01",
+      "market_content_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
+      "run_id": "sha256:3f08445e11f9ee52a9c4b59e1306a7780c6cc831c5ea7195e1f081b063d51936"
+    },
+    "solved_run": {
+      "model_id": "ACME-SOFTWARE-3STMT",
+      "model_content_hash": "sha256:90c4aac5feb3355a545165051a1ab5917a4047ce09198146df263617d05bb10d",
+      "source_snapshot": "analyst-published-2025Q1",
+      "observation_cutoff": {
+        "through": "2025-04-01"
+      },
+      "valuation_date": "2025-04-01",
+      "market_content_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
+      "run_id": "sha256:33728db29ce4c3579e1a4871fbe13e5a04524e41e3f240d6dfa8a59c5e3d810a"
+    },
+    "market_hash": "sha256:3b61d6d907002a1ceb52e85384017f811218f6d652aeef0034a002c03ff53aa7",
+    "model": null
   },
   "statementBridge": {
     "target_metric": "ebitda",
@@ -119696,6 +119823,21 @@
     "percentiles": [0.05, 0.25, 0.5, 0.75, 0.95]
   },
   "statementMonteCarlo": {
+    "provenance": {
+      "model_id": "ACME-SOFTWARE-3STMT",
+      "model_content_hash": "sha256:f89d87e5a0bac9518c5de593133ed027236a2f68a9c208f0c252d87f6db21044",
+      "observation_cutoff": "full_snapshot",
+      "forecast_streams": [
+        {
+          "node_id": "revenue",
+          "stream_version": 1,
+          "seed": "11",
+          "state": "7798539810902042179",
+          "stream": "12348885475910810477"
+        }
+      ],
+      "run_id": "sha256:12762a9c1a6ddf26cdce5ac9a1078d0e221e018bc340836509c09228b33fc835"
+    },
     "percentile_results": {
       "cash": {
         "metric": "cash",
@@ -120607,9 +120749,9 @@
             "period": "2025Q4",
             "metric": "revenue",
             "baseline": 231384660.02999997,
-            "comparison": 196050293.6,
-            "abs_var": -35334366.42999998,
-            "pct_var": -0.1527083360902954
+            "comparison": 231384660.02999997,
+            "abs_var": 0,
+            "pct_var": 0
           },
           {
             "period": "2025Q1",
@@ -120639,9 +120781,9 @@
             "period": "2025Q4",
             "metric": "cogs",
             "baseline": 78092322.760125,
-            "comparison": 66166974.09,
-            "abs_var": -11925348.670124993,
-            "pct_var": -0.1527083360902954
+            "comparison": 78092322.760125,
+            "abs_var": 0,
+            "pct_var": 0
           },
           {
             "period": "2025Q1",
@@ -120671,9 +120813,9 @@
             "period": "2025Q4",
             "metric": "gross_profit",
             "baseline": 153292337.269875,
-            "comparison": 129883319.51,
-            "abs_var": -23409017.759874985,
-            "pct_var": -0.15270833609029538
+            "comparison": 153292337.269875,
+            "abs_var": 0,
+            "pct_var": 0
           },
           {
             "period": "2025Q1",
@@ -120735,9 +120877,9 @@
             "period": "2025Q4",
             "metric": "ebitda",
             "baseline": 61383803.27707497,
-            "comparison": 37974785.51719999,
-            "abs_var": -23409017.759874977,
-            "pct_var": -0.3813549586396767
+            "comparison": 61383803.27707497,
+            "abs_var": 0,
+            "pct_var": 0
           },
           {
             "period": "2025Q1",
@@ -120767,9 +120909,9 @@
             "period": "2025Q4",
             "metric": "net_income",
             "baseline": 30285257.205054354,
-            "comparison": 12377358.618749993,
-            "abs_var": -17907898.58630436,
-            "pct_var": -0.5913074624083325
+            "comparison": 30285257.205054354,
+            "abs_var": 0,
+            "pct_var": 0
           }
         ]
       }
@@ -120808,10 +120950,10 @@
           {
             "period": "2025Q4",
             "metric": "revenue",
-            "baseline": 196050293.6,
-            "comparison": 173010647.2,
-            "abs_var": -23039646.400000006,
-            "pct_var": -0.1175190609354946
+            "baseline": 231384660.02999997,
+            "comparison": 231384660.02999997,
+            "abs_var": 0,
+            "pct_var": 0
           },
           {
             "period": "2025Q1",
@@ -120840,10 +120982,10 @@
           {
             "period": "2025Q4",
             "metric": "cogs",
-            "baseline": 66166974.09,
-            "comparison": 58391093.43,
-            "abs_var": -7775880.660000004,
-            "pct_var": -0.11751906093549462
+            "baseline": 78092322.760125,
+            "comparison": 78092322.760125,
+            "abs_var": 0,
+            "pct_var": 0
           },
           {
             "period": "2025Q1",
@@ -120872,10 +121014,10 @@
           {
             "period": "2025Q4",
             "metric": "gross_profit",
-            "baseline": 129883319.51,
-            "comparison": 114619553.77,
-            "abs_var": -15263765.74000001,
-            "pct_var": -0.11751906093549463
+            "baseline": 153292337.269875,
+            "comparison": 153292337.269875,
+            "abs_var": 0,
+            "pct_var": 0
           },
           {
             "period": "2025Q1",
@@ -120936,10 +121078,10 @@
           {
             "period": "2025Q4",
             "metric": "ebitda",
-            "baseline": 37974785.51719999,
-            "comparison": 17768763.37,
-            "abs_var": -20206022.147199992,
-            "pct_var": -0.5320904877276539
+            "baseline": 61383803.27707497,
+            "comparison": 56441546.86987498,
+            "abs_var": -4942256.407199994,
+            "pct_var": -0.08051401417555663
           },
           {
             "period": "2025Q1",
@@ -120968,10 +121110,10 @@
           {
             "period": "2025Q4",
             "metric": "net_income",
-            "baseline": 12377358.618749993,
-            "comparison": -3080248.323858,
-            "abs_var": -15457606.942607993,
-            "pct_var": -1.2488615235880658
+            "baseline": 30285257.205054354,
+            "comparison": 26504431.05354636,
+            "abs_var": -3780826.1515079923,
+            "pct_var": -0.1248404834705186
           }
         ]
       }
@@ -122874,11 +123016,21 @@
   },
   "waccCalculator": {
     "cases": {
+      "exactComplement": {
+        "inputs": {
+          "equity_weight": "0.6000000000000000000000000001",
+          "cost_of_equity": 0.115,
+          "debt_weight": "0.3999999999999999999999999999",
+          "cost_of_debt": 0.06,
+          "tax_rate": 0.25
+        },
+        "rate": 0.08700000000000001
+      },
       "blended": {
         "inputs": {
-          "equity_weight": 0.6,
+          "equity_weight": "0.6",
           "cost_of_equity": 0.115,
-          "debt_weight": 0.4,
+          "debt_weight": "0.4",
           "cost_of_debt": 0.06,
           "tax_rate": 0.25
         },
@@ -122886,9 +123038,9 @@
       },
       "zero": {
         "inputs": {
-          "equity_weight": 1,
+          "equity_weight": "1",
           "cost_of_equity": 0,
-          "debt_weight": 0,
+          "debt_weight": "0",
           "cost_of_debt": 0,
           "tax_rate": 0
         },
@@ -122896,28 +123048,38 @@
       }
     },
     "errors": {
-      "weights": {
+      "inexact": {
         "inputs": {
-          "equity_weight": 0.6,
+          "equity_weight": "0.6000000000000000000000000001",
           "cost_of_equity": 0.115,
-          "debt_weight": 0.5,
+          "debt_weight": "0.4",
           "cost_of_debt": 0.06,
           "tax_rate": 0.25
         },
-        "message": "Evaluation error: WACC requires capital weights summing to 1.0 within 1e-6, got equity_weight=0.600000 + debt_weight=0.500000 = 1.100000"
+        "message": "Evaluation error: WACC requires capital weights summing exactly to one"
+      },
+      "weights": {
+        "inputs": {
+          "equity_weight": "0.6",
+          "cost_of_equity": 0.115,
+          "debt_weight": "0.5",
+          "cost_of_debt": 0.06,
+          "tax_rate": 0.25
+        },
+        "message": "Evaluation error: WACC requires capital weights summing exactly to one"
       },
       "tax": {
         "inputs": {
-          "equity_weight": 0.6,
+          "equity_weight": "0.6",
           "cost_of_equity": 0.115,
-          "debt_weight": 0.4,
+          "debt_weight": "0.4",
           "cost_of_debt": 0.06,
           "tax_rate": 1.5
         },
-        "message": "Evaluation error: WACC requires a tax_rate in [0, 1] (decimal form), got 1.500000"
+        "message": "Evaluation error: WACC requires a finite tax_rate in [0, 1]"
       },
       "empty": {
-        "message": "inputs: inputs.equity_weight is NaN, which JSON cannot represent"
+        "message": "Validation error: inputs: Validation error: decimal value must be exactly representable as Decimal: invalid decimal \"\", expected [+-]digits[.digits][e[+-]digits] at line 1 column 19"
       }
     }
   },
@@ -126919,7 +127081,18 @@
                 "2025Q1": {
                   "amount": "208300000",
                   "currency": "USD"
+                },
+                "2025Q4": {
+                  "amount": "231384660.02999997",
+                  "currency": "USD"
                 }
+              },
+              "availability_dates": {
+                "2024Q1": "2024-04-01",
+                "2024Q2": "2024-07-01",
+                "2024Q3": "2024-10-01",
+                "2024Q4": "2025-01-01",
+                "2025Q1": "2025-04-01"
               },
               "forecast": {
                 "method": "curve_pct",
@@ -126970,6 +127143,13 @@
                   "amount": "70820000",
                   "currency": "USD"
                 }
+              },
+              "availability_dates": {
+                "2024Q1": "2024-04-01",
+                "2024Q2": "2024-07-01",
+                "2024Q3": "2024-10-01",
+                "2024Q4": "2025-01-01",
+                "2025Q1": "2025-04-01"
               },
               "formula_text": "revenue * 0.3375",
               "tags": ["income_statement"],
@@ -127027,6 +127207,13 @@
                   "amount": "86100000",
                   "currency": "USD"
                 }
+              },
+              "availability_dates": {
+                "2024Q1": "2024-04-01",
+                "2024Q2": "2024-07-01",
+                "2024Q3": "2024-10-01",
+                "2024Q4": "2025-01-01",
+                "2025Q1": "2025-04-01"
               },
               "forecast": {
                 "method": "growth_pct",
@@ -127089,6 +127276,13 @@
                   "amount": "12100000",
                   "currency": "USD"
                 }
+              },
+              "availability_dates": {
+                "2024Q1": "2024-04-01",
+                "2024Q2": "2024-07-01",
+                "2024Q3": "2024-10-01",
+                "2024Q4": "2025-01-01",
+                "2025Q1": "2025-04-01"
               },
               "forecast": {
                 "method": "growth_pct",
@@ -127201,6 +127395,13 @@
                   "currency": "USD"
                 }
               },
+              "availability_dates": {
+                "2024Q1": "2024-04-01",
+                "2024Q2": "2024-07-01",
+                "2024Q3": "2024-10-01",
+                "2024Q4": "2025-01-01",
+                "2025Q1": "2025-04-01"
+              },
               "tags": ["debt"],
               "value_type": {
                 "type": "monetary",
@@ -127233,6 +127434,13 @@
                   "amount": "25000000",
                   "currency": "USD"
                 }
+              },
+              "availability_dates": {
+                "2024Q1": "2024-04-01",
+                "2024Q2": "2024-07-01",
+                "2024Q3": "2024-10-01",
+                "2024Q4": "2025-01-01",
+                "2025Q1": "2025-04-01"
               },
               "forecast": {
                 "method": "override",
@@ -127276,6 +127484,13 @@
                   "amount": "10000000",
                   "currency": "USD"
                 }
+              },
+              "availability_dates": {
+                "2024Q1": "2024-04-01",
+                "2024Q2": "2024-07-01",
+                "2024Q3": "2024-10-01",
+                "2024Q4": "2025-01-01",
+                "2025Q1": "2025-04-01"
               },
               "forecast": {
                 "method": "forward_fill"
@@ -127336,6 +127551,13 @@
                   "amount": "113600000",
                   "currency": "USD"
                 }
+              },
+              "availability_dates": {
+                "2024Q1": "2024-04-01",
+                "2024Q2": "2024-07-01",
+                "2024Q3": "2024-10-01",
+                "2024Q4": "2025-01-01",
+                "2025Q1": "2025-04-01"
               },
               "forecast": {
                 "method": "forward_fill"
@@ -127418,6 +127640,7 @@
               "rollup": "sum"
             }
           },
+          "source_snapshot": "analyst-published-2025Q1",
           "meta": {
             "entity": "Acme Software Holdings",
             "currency": "USD",
@@ -128138,7 +128361,7 @@
                   "amount": "231384660.02999997",
                   "currency": "USD"
                 },
-                "source": "forecast"
+                "source": "value"
               }
             },
             "capex": {
@@ -129172,9 +129395,10 @@
           },
           "provenance": {
             "model_id": "ACME-SOFTWARE-3STMT",
-            "model_content_hash": "sha256:be5c97adf362f37fe7ccb5d2511a4a0bc0104d79ac6611c52e6683c2abbeb8de",
+            "model_content_hash": "sha256:6a6c2dcb3ddfc8be829ea64f72ef27e2a52e3c913542e3a1e573874d21fcc2ba",
+            "source_snapshot": "analyst-published-2025Q1",
             "observation_cutoff": "full_snapshot",
-            "run_id": "sha256:02052a6a02accdc45d005542dca5bf8c59edf47f2af7bd55797462af7a5fae5f"
+            "run_id": "sha256:215b07d4bd15e5145e2f9880141f98631595de29009d0092f5f0b1e5e7ba9103"
           },
           "meta": {
             "num_nodes": 26,
@@ -132659,7 +132883,7 @@
                 "value",
                 "forecast",
                 "forecast",
-                "forecast",
+                "value",
                 "formula",
                 "formula",
                 "formula",
@@ -135059,63 +135283,7 @@
                 "value",
                 "forecast",
                 "forecast",
-                "forecast",
                 "value",
-                "value",
-                "value",
-                "value",
-                "value",
-                "forecast",
-                "forecast",
-                "forecast",
-                "value",
-                "value",
-                "value",
-                "value",
-                "value",
-                "forecast",
-                "forecast",
-                "forecast",
-                "value",
-                "value",
-                "value",
-                "value",
-                "value",
-                "forecast",
-                "forecast",
-                "forecast",
-                "value",
-                "value",
-                "value",
-                "value",
-                "value",
-                "value",
-                "value",
-                "value",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
-                "formula",
                 "value",
                 "value",
                 "value",
@@ -135140,6 +135308,62 @@
                 "forecast",
                 "forecast",
                 "forecast",
+                "value",
+                "value",
+                "value",
+                "value",
+                "value",
+                "value",
+                "value",
+                "value",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "formula",
+                "value",
+                "value",
+                "value",
+                "value",
+                "value",
+                "forecast",
+                "forecast",
+                "forecast",
+                "value",
+                "value",
+                "value",
+                "value",
+                "value",
+                "forecast",
+                "forecast",
+                "forecast",
+                "value",
+                "value",
+                "value",
+                "value",
+                "value",
+                "forecast",
+                "forecast",
+                "value",
                 "formula",
                 "formula",
                 "formula",
@@ -135292,6 +135516,7 @@
           "threshold": 3,
           "details": null,
           "headroom": 0.5003268889511535,
+          "headroom_raw": 1.5009806668534607,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135319,6 +135544,7 @@
           "threshold": 3,
           "details": null,
           "headroom": 0.6415868673050614,
+          "headroom_raw": 1.9247606019151844,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135346,6 +135572,7 @@
           "threshold": 3,
           "details": null,
           "headroom": 0.7025750690546199,
+          "headroom_raw": 2.1077252071638597,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135373,6 +135600,7 @@
           "threshold": 3.5,
           "details": null,
           "headroom": 0.3669437876592175,
+          "headroom_raw": 1.2843032568072612,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135395,6 +135623,7 @@
           "threshold": 3,
           "details": null,
           "headroom": 0.9951378377138663,
+          "headroom_raw": 2.985413513141599,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135422,6 +135651,7 @@
           "threshold": 3.5,
           "details": null,
           "headroom": 0.38113468236377773,
+          "headroom_raw": 1.333971388273222,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135444,6 +135674,7 @@
           "threshold": 3,
           "details": null,
           "headroom": 0.885418100087152,
+          "headroom_raw": 2.6562543002614563,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135471,6 +135702,7 @@
           "threshold": 3.5,
           "details": null,
           "headroom": 0.4221448886217379,
+          "headroom_raw": 1.4775071101760826,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135493,6 +135725,7 @@
           "threshold": 3,
           "details": null,
           "headroom": 0.9751760145918832,
+          "headroom_raw": 2.9255280437756497,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135520,6 +135753,7 @@
           "threshold": 3.5,
           "details": null,
           "headroom": 0.46036515411345463,
+          "headroom_raw": 1.6112780393970911,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135542,6 +135776,7 @@
           "threshold": 3,
           "details": null,
           "headroom": 1.136303167553936,
+          "headroom_raw": 3.4089095026618077,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135569,6 +135804,7 @@
           "threshold": 3.5,
           "details": null,
           "headroom": 0.4517553211312967,
+          "headroom_raw": 1.5811436239595384,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135591,6 +135827,7 @@
           "threshold": 3,
           "details": null,
           "headroom": 1.265921125030453,
+          "headroom_raw": 3.7977633750913586,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -135691,6 +135928,7 @@
         "projected_value": 4.500980666853461,
         "threshold": 5.5,
         "headroom": -0.18163987875391624,
+        "headroom_raw": -0.9990193331465393,
         "breach_probability": 1
       },
       {
@@ -135700,6 +135938,7 @@
         "projected_value": 4.924760601915184,
         "threshold": 5.5,
         "headroom": -0.10458898146996648,
+        "headroom_raw": -0.5752393980848156,
         "breach_probability": 1
       },
       {
@@ -135709,6 +135948,7 @@
         "projected_value": 5.10772520716386,
         "threshold": 5.5,
         "headroom": -0.07132268960657097,
+        "headroom_raw": -0.3922747928361403,
         "breach_probability": 1
       },
       {
@@ -135718,6 +135958,7 @@
         "projected_value": 2.215696743192739,
         "threshold": 2.1,
         "headroom": -0.05509368723463748,
+        "headroom_raw": -0.1156967431927387,
         "breach_probability": 1
       },
       {
@@ -135727,6 +135968,7 @@
         "projected_value": 2.166028611726778,
         "threshold": 2.1,
         "headroom": -0.031442196060370416,
+        "headroom_raw": -0.06602861172677787,
         "breach_probability": 1
       }
     ],
@@ -135738,6 +135980,7 @@
         "projected_value": 4.500980666853461,
         "threshold": 5.5,
         "headroom": -0.18163987875391624,
+        "headroom_raw": -0.9990193331465393,
         "breach_probability": 0.953
       },
       {
@@ -135747,6 +135990,7 @@
         "projected_value": 4.924760601915184,
         "threshold": 5.5,
         "headroom": -0.10458898146996648,
+        "headroom_raw": -0.5752393980848156,
         "breach_probability": 0.763
       },
       {
@@ -135756,6 +136000,7 @@
         "projected_value": 5.10772520716386,
         "threshold": 5.5,
         "headroom": -0.07132268960657097,
+        "headroom_raw": -0.3922747928361403,
         "breach_probability": 0.6705
       },
       {
@@ -135765,6 +136010,7 @@
         "projected_value": 2.215696743192739,
         "threshold": 2.1,
         "headroom": -0.05509368723463748,
+        "headroom_raw": -0.1156967431927387,
         "breach_probability": 0.532
       },
       {
@@ -135774,6 +136020,7 @@
         "projected_value": 5.985413513141599,
         "threshold": 5.5,
         "headroom": 0.08825700238938161,
+        "headroom_raw": 0.48541351314159886,
         "breach_probability": 0.414
       },
       {
@@ -135783,6 +136030,7 @@
         "projected_value": 2.166028611726778,
         "threshold": 2.1,
         "headroom": -0.031442196060370416,
+        "headroom_raw": -0.06602861172677787,
         "breach_probability": 0.487
       },
       {
@@ -135792,6 +136040,7 @@
         "projected_value": 5.656254300261456,
         "threshold": 5.5,
         "headroom": 0.02840987277481023,
+        "headroom_raw": 0.15625430026145626,
         "breach_probability": 0.5185
       },
       {
@@ -135801,6 +136050,7 @@
         "projected_value": 2.0224928898239174,
         "threshold": 2.1,
         "headroom": 0.03690814770289652,
+        "headroom_raw": 0.0775071101760827,
         "breach_probability": 0.4025
       },
       {
@@ -135810,6 +136060,7 @@
         "projected_value": 5.92552804377565,
         "threshold": 5.5,
         "headroom": 0.07736873523193631,
+        "headroom_raw": 0.4255280437756497,
         "breach_probability": 0.465
       },
       {
@@ -135819,6 +136070,7 @@
         "projected_value": 1.8887219606029089,
         "threshold": 2.1,
         "headroom": 0.10060859018909106,
+        "headroom_raw": 0.21127803939709122,
         "breach_probability": 0.316
       },
       {
@@ -135828,6 +136080,7 @@
         "projected_value": 6.408909502661808,
         "threshold": 5.5,
         "headroom": 0.16525627321123776,
+        "headroom_raw": 0.9089095026618077,
         "breach_probability": 0.3865
       },
       {
@@ -135837,6 +136090,7 @@
         "projected_value": 1.9188563760404616,
         "threshold": 2.1,
         "headroom": 0.08625886855216121,
+        "headroom_raw": 0.18114362395953854,
         "breach_probability": 0.336
       },
       {
@@ -135846,6 +136100,7 @@
         "projected_value": 6.797763375091359,
         "threshold": 5.5,
         "headroom": 0.23595697728933793,
+        "headroom_raw": 1.2977633750913586,
         "breach_probability": 0.34
       }
     ]
@@ -137758,6 +138013,165 @@
             }
           },
           "type": "structured_credit"
+        },
+        "schema": "finstack_quant.instrument/1"
+      },
+      "request": {
+        "asOf": "2023-12-28",
+        "model": "discounting",
+        "metrics": [],
+        "metricPricingOverrides": null,
+        "marketHistory": null
+      }
+    },
+    "structured_credit_tranche": {
+      "instrument": {
+        "instrument": {
+          "spec": {
+            "deal": {
+              "attributes": {},
+              "calendar_id": "nyse",
+              "closing_date": "2024-01-01",
+              "deal_metadata": {
+                "manager_id": null,
+                "master_servicer_id": null,
+                "servicer_id": null,
+                "special_servicer_id": null,
+                "trustee_id": null
+              },
+              "deal_type": "clo",
+              "default_spec": {
+                "cdr": 0.02,
+                "curve": "constant"
+              },
+              "discount_curve_id": "USD-OIS",
+              "first_payment_date": "2024-04-01",
+              "frequency": {
+                "count": 3,
+                "unit": "months"
+              },
+              "hedge_swaps": [],
+              "id": "CLO-EXAMPLE",
+              "market_conditions": {
+                "refi_rate": 0.04
+              },
+              "maturity": "2034-01-01",
+              "pool": {
+                "assets": [
+                  {
+                    "acquisition_date": null,
+                    "asset_type": {
+                      "type": "high_yield_bond"
+                    },
+                    "balance": {
+                      "amount": "100000000",
+                      "currency": "USD"
+                    },
+                    "contractual_payment": null,
+                    "day_count": "act_360",
+                    "default_date": null,
+                    "defaulted": false,
+                    "forward_curve_id": null,
+                    "id": "COLLATERAL-1",
+                    "industry": null,
+                    "maturity": "2034-01-01",
+                    "mdr_override": null,
+                    "obligor_id": null,
+                    "origination_date": null,
+                    "purchase_price": null,
+                    "rate": 0.07,
+                    "rating": null,
+                    "recovery_amount": null,
+                    "recovery_rate": null,
+                    "smm_override": null,
+                    "spread_bp": null
+                  }
+                ],
+                "collection_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "cumulative_defaults": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "cumulative_prepayments": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "cumulative_recoveries": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "cumulative_scheduled_amortization": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "currency": "USD",
+                "deal_type": "clo",
+                "excess_spread_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "id": "POOL-1",
+                "reinvestment_period": null,
+                "rep_lines": null,
+                "reserve_account": {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              },
+              "prepayment_spec": {
+                "cpr": 0.2,
+                "curve": "constant"
+              },
+              "recovery_spec": {
+                "rate": 0.6,
+                "recovery_lag": 12
+              },
+              "tranches": {
+                "tranches": [
+                  {
+                    "attach_pct": 0,
+                    "attributes": {},
+                    "coupon": {
+                      "fixed": {
+                        "rate": 0.06
+                      }
+                    },
+                    "current_balance": {
+                      "amount": "100000000",
+                      "currency": "USD"
+                    },
+                    "day_count": "act_360",
+                    "deferred_interest": {
+                      "amount": "0",
+                      "currency": "USD"
+                    },
+                    "detach_pct": 100,
+                    "frequency": {
+                      "count": 3,
+                      "unit": "months"
+                    },
+                    "ic_trigger": null,
+                    "id": "CLONOTES-A",
+                    "maturity": "2034-01-01",
+                    "oc_trigger": null,
+                    "original_balance": {
+                      "amount": "100000000",
+                      "currency": "USD"
+                    },
+                    "pik_enabled": false,
+                    "rating": null,
+                    "seniority": "senior"
+                  }
+                ]
+              }
+            },
+            "id": "STRUCTURED-CREDIT-NOTE-EXAMPLE",
+            "tranche_id": "CLONOTES-A"
+          },
+          "type": "structured_credit_tranche"
         },
         "schema": "finstack_quant.instrument/1"
       },

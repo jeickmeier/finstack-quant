@@ -9,6 +9,7 @@
 //! `0.01` corresponds to **100 basis points**.
 
 mod annuity;
+mod breakeven_ladder;
 mod compute;
 mod spread_price;
 mod types;
@@ -18,6 +19,7 @@ mod yield_price;
 pub use annuity::{
     asset_swap_forward_components, fixed_leg_annuity, par_rate_and_annuity_from_discount,
 };
+pub use breakeven_ladder::{BondBreakevenLadder, BondBreakevenRow, bond_breakeven_ladder};
 pub use compute::compute_quotes;
 pub use spread_price::{price_from_dm, price_from_oas, price_from_z_spread};
 pub use types::{BondQuoteSet, YieldCompounding};

@@ -104,7 +104,7 @@ fn cir_plus_plus() -> ProcessSpec {
 }
 
 fn heston() -> ProcessSpec {
-    ProcessSpec::Heston(HestonPricingParams::new(0.04, 0.01, 2.0, 0.05, 0.3, -0.7, 0.03).unwrap())
+    ProcessSpec::Heston(HestonProcessParams::new(0.04, 0.01, 2.0, 0.05, 0.3, -0.7, 0.03).unwrap())
 }
 
 fn schwartz_smith() -> ProcessSpec {
@@ -138,7 +138,7 @@ fn processes() -> Vec<(ProcessSpec, Vec<f64>)> {
         (hull_white(), vec![0.02]),
         (cir(), vec![0.03]),
         (cir_plus_plus(), vec![0.04]),
-        (heston(), vec![100.0, 0.03]),
+        (heston(), vec![100.0]),
         (schwartz_smith(), vec![0.2, 4.0]),
         (local_vol(), vec![100.0]),
     ]
@@ -327,7 +327,11 @@ fn every_pair_is_either_supported_or_a_named_error() {
 fn every_supported_pair_has_the_documented_shape() {
     for s in supported_specs() {
         let out = simulate_paths(&s).unwrap();
-        let dim = s.initial_state.len();
+        let mut opening = s.initial_state.clone();
+        if let ProcessSpec::Heston(params) = &s.process {
+            opening.push(params.model.v0);
+        }
+        let dim = opening.len();
         assert_eq!(out.num_paths, 9);
         assert_eq!(out.num_simulated_paths, 9);
         assert_eq!(out.dim, dim);
@@ -337,7 +341,7 @@ fn every_supported_pair_has_the_documented_shape() {
         assert_eq!(out.times[6], 1.0);
         assert_eq!(out.values.len(), 9 * 7 * dim);
         for path in out.values.chunks(7 * dim) {
-            assert_eq!(&path[..dim], s.initial_state.as_slice());
+            assert_eq!(&path[..dim], opening.as_slice());
         }
         assert!(out.values.iter().all(|value| value.is_finite()));
     }
@@ -359,7 +363,7 @@ fn factor_names_follow_the_state_layout() {
     assert_eq!(names(hull_white(), &[0.02]), ["short_rate"]);
     assert_eq!(names(cir(), &[0.03]), ["short_rate"]);
     assert_eq!(names(cir_plus_plus(), &[0.04]), ["short_rate"]);
-    assert_eq!(names(heston(), &[100.0, 0.03]), ["spot", "variance"]);
+    assert_eq!(names(heston(), &[100.0]), ["spot", "variance"]);
     assert_eq!(names(schwartz_smith(), &[0.2, 4.0]), ["x", "y"]);
 }
 
@@ -486,12 +490,13 @@ fn single_factor_correlated_and_internally_correlated_arms_match_the_engine() {
         engine_states(&process, &ExactMultiGbm, &[100.0, 50.0], 8)
     );
 
-    let mut s = spec(heston(), &[100.0, 0.03], 6);
+    let mut s = spec(heston(), &[100.0], 6);
     s.num_paths = 8;
-    let process =
-        crate::closed_form::HestonPricingParams::new(0.04, 0.01, 2.0, 0.05, 0.3, -0.7, 0.03)
-            .map(HestonProcess::new)
-            .unwrap();
+    let process = crate::monte_carlo::process::heston::HestonProcessParams::new(
+        0.04, 0.01, 2.0, 0.05, 0.3, -0.7, 0.03,
+    )
+    .map(HestonProcess::new)
+    .unwrap();
     assert_eq!(
         simulate_paths(&s).unwrap().values,
         engine_states(&process, &QeHeston::new(), &[100.0, 0.03], 8)
@@ -706,7 +711,7 @@ fn cir_plus_plus_is_the_cir_factor_plus_the_shift() {
 
 #[test]
 fn heston_qe_forward_and_variance_mean() {
-    let out = simulate_paths(&spec(heston(), &[100.0, 0.03], 50)).unwrap();
+    let out = simulate_paths(&spec(heston(), &[100.0], 50)).unwrap();
     assert_mean(&terminal(&out, 0), 100.0 * 0.03_f64.exp(), "heston forward");
     assert_mean(
         &terminal(&out, 1),
@@ -720,7 +725,7 @@ fn heston_qe_forward_and_variance_mean() {
 fn heston_euler_recovers_the_forward() {
     // The Euler spot recursion multiplies by (1 + (r-q)Δt + √v √Δt z), whose
     // conditional mean is (1 + (r-q)Δt) whatever the variance path does.
-    let mut s = spec(heston(), &[100.0, 0.03], 100);
+    let mut s = spec(heston(), &[100.0], 100);
     s.scheme = SchemeSpec::Euler;
     let out = simulate_paths(&s).unwrap();
     assert_mean(
@@ -825,9 +830,9 @@ fn initial_state_must_lie_in_the_process_domain() {
     rejects(gbm(), &[-1.0]);
     rejects(multi_gbm(), &[100.0, 0.0]);
     rejects(cir(), &[-0.01]);
-    rejects(heston(), &[0.0, 0.03]);
-    // The starting variance must be the v0 parameter.
-    rejects(heston(), &[100.0, 0.04]);
+    rejects(heston(), &[0.0]);
+    // Authored state contains only spot, even when a supplied variance would match v0.
+    rejects(heston(), &[100.0, 0.03]);
     // Short rate below the initial shift leaves a negative CIR factor.
     rejects(cir_plus_plus(), &[0.005]);
 
@@ -1083,7 +1088,7 @@ fn json_spec_uses_defaults_and_rejects_unknown_fields() {
     );
     // Heston flattens its model block; the flat raw struct still denies extras.
     let heston = r#"{"type": "heston", "r": 0.03, "q": 0.0, "v0": 0.04, "kappa": 2.0,
-        "theta": 0.04, "sigma_v": 0.3, "rho": -0.7"#;
+        "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7"#;
     assert!(parse(json(&format!("{heston}}}"), "")).is_ok());
     assert!(parse(json(&format!(r#"{heston}, "sigma": 0.3}}"#), "")).is_err());
     assert!(

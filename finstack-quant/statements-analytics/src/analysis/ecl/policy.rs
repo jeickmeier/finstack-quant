@@ -258,7 +258,6 @@ fn ecl_config_from_policy(policy: &Ifrs9PolicyRecord) -> EclConfig {
         lgd_type: policy.ecl.lgd_type,
         ttc_lgd: None,
         downturn_lgd: None,
-        stage3_time_to_recovery_years: super::engine::DEFAULT_STAGE3_TIME_TO_RECOVERY_YEARS,
     }
 }
 

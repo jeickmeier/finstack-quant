@@ -1,45 +1,26 @@
-//! Model-template bindings: each takes a model, applies one Rust template
-//! through `ModelBuilder::from_spec`, and returns the extended model.
+//! Model templates applied to active builders.
 
+use crate::api::statements::JsModelBuilder;
 use crate::utils::input::{
     from_js_json, js_f64, js_f64_seq, js_opt_string_seq, js_string, js_string_seq,
 };
-use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_statements::builder::ModelBuilder;
+use crate::utils::to_js_err;
 use finstack_quant_statements_analytics::templates::{real_estate, roll_forward, vintage};
 use wasm_bindgen::prelude::*;
-
-fn builder(model: &JsValue) -> Result<ModelBuilder, JsValue> {
-    let model = crate::api::statements::load_model(model, "model")?;
-    ModelBuilder::from_spec(model).map_err(to_js_err)
-}
-
-fn finish(builder: ModelBuilder) -> Result<JsValue, JsValue> {
-    to_js_value(&builder.build().map_err(to_js_err)?)
-}
 
 fn refs(names: &[String]) -> Vec<&str> {
     names.iter().map(String::as_str).collect()
 }
 
-/// Add a vintage (cohort) buildup: each period's new volume decays along a curve.
-///
-/// Twin of Python `add_vintage_buildup` (Rust `add_vintage_buildup`). Adds
-/// the node `name`, the sum over lags of `newVolume[t - lag] * decayCurve[lag]`.
-/// @param model - `FinancialModelSpec` to extend (object or JSON).
+/// Add a vintage buildup to an active builder.
+/// @param builder - ModelBuilder receiving the generated cohort total.
 /// @param name - Identifier of the outstanding-balance node to create.
-/// @param newVolumeNode - Existing node holding each period's new volume.
-/// @param decayCurve - Fraction of a cohort still outstanding `lag` periods after origination, as decimals starting at lag 0 (e.g. `[1.0, 0.8, 0.5]`).
-/// Existing generated node identifiers are replaced.
-/// @returns The extended `FinancialModelSpec` plain object.
-///
-/// # Errors
-///
-/// Throws with kind `validation` if the model is malformed, a node identifier
-/// is invalid, or the generated formula does not compile.
-#[wasm_bindgen(js_name = addVintageBuildup, unchecked_return_type = "generated.statements.FinancialModelSpec")]
+/// @param newVolumeNode - Identifier of the node holding each period's new volume.
+/// @param decayCurve - Finite retention multipliers by elapsed model period, starting at inception.
+/// @throws TypeError for malformed arguments or FinstackError for a consumed builder or invalid coefficient.
+#[wasm_bindgen(js_name = addVintageBuildup)]
 pub fn add_vintage_buildup(
-    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    builder: &mut JsModelBuilder,
     #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
     #[wasm_bindgen(js_name = "newVolumeNode", unchecked_param_type = "string")]
     new_volume_node: JsValue,
@@ -48,107 +29,87 @@ pub fn add_vintage_buildup(
         unchecked_param_type = "number[] | Float64Array"
     )]
     decay_curve: JsValue,
-) -> Result<JsValue, JsValue> {
-    let builder = vintage::add_vintage_buildup(
-        builder(&model)?,
+) -> Result<(), JsValue> {
+    vintage::add_vintage_buildup(
+        builder.builder_mut()?,
         &js_string(&name, "name")?,
         &js_string(&new_volume_node, "newVolumeNode")?,
         &js_f64_seq(&decay_curve, "decayCurve")?,
-    );
-    finish(builder)
+    )
+    .map_err(to_js_err)
 }
 
-/// Add a roll-forward (corkscrew) structure with a zero opening balance.
-///
-/// Twin of Python `add_roll_forward` (Rust `add_roll_forward`). Adds
-/// `<name>_beg` and `<name>_end`, where
-/// `end = beg + sum(increases) - sum(decreases)` and each period's opening
-/// balance is the prior period's close.
-/// @param model - `FinancialModelSpec` to extend (object or JSON).
-/// @param name - Prefix of the generated `<name>_beg` and `<name>_end` nodes.
-/// @param increases - Existing nodes added to the balance each period.
-/// @param decreases - Existing nodes subtracted from the balance each period.
-/// Existing generated node identifiers are replaced.
-/// @returns The extended `FinancialModelSpec` plain object.
-///
-/// # Errors
-///
-/// Throws with kind `validation` if the model is malformed, a node identifier
-/// is invalid, or a generated formula does not compile.
-#[wasm_bindgen(js_name = addRollForward, unchecked_return_type = "generated.statements.FinancialModelSpec")]
+/// Add a roll-forward with a zero opening balance.
+/// @param builder - Active ModelBuilder receiving the beginning and ending balance nodes.
+/// @param name - Prefix for the generated balance node identifiers.
+/// @param increases - Identifiers of flows added to the balance each period.
+/// @param decreases - Identifiers of flows deducted from the balance each period.
+/// @throws If a parameter has the wrong type or the builder has been consumed.
+/// Generated node identifiers, formulas and references are validated by build.
+#[wasm_bindgen(js_name = addRollForward)]
 pub fn add_roll_forward(
-    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    builder: &mut JsModelBuilder,
     #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
     #[wasm_bindgen(unchecked_param_type = "string[]")] increases: JsValue,
     #[wasm_bindgen(unchecked_param_type = "string[]")] decreases: JsValue,
-) -> Result<JsValue, JsValue> {
+) -> Result<(), JsValue> {
     let increases = js_string_seq(&increases, "increases")?;
     let decreases = js_string_seq(&decreases, "decreases")?;
-    let builder = roll_forward::add_roll_forward(
-        builder(&model)?,
+    roll_forward::add_roll_forward(
+        builder.builder_mut()?,
         &js_string(&name, "name")?,
         &refs(&increases),
         &refs(&decreases),
     );
-    finish(builder)
+    Ok(())
 }
 
-/// Add a roll-forward (corkscrew) structure with an explicit opening balance.
-///
-/// Twin of Python `add_roll_forward_with_opening` (Rust
-/// `add_roll_forward_with_opening`).
-/// @param model - `FinancialModelSpec` to extend (object or JSON).
-/// @param name - Prefix of the generated `<name>_beg` and `<name>_end` nodes.
-/// @param increases - Existing nodes added to the balance each period.
-/// @param decreases - Existing nodes subtracted from the balance each period.
-/// @param opening - Opening balance of the first period, in the balance's own units.
-/// Existing generated node identifiers are replaced.
-/// @returns The extended `FinancialModelSpec` plain object.
-///
-/// # Errors
-///
-/// Throws with kind `validation` if the model is malformed, a node identifier
-/// is invalid, or a generated formula does not compile.
-#[wasm_bindgen(js_name = addRollForwardWithOpening, unchecked_return_type = "generated.statements.FinancialModelSpec")]
+/// Add a roll-forward with an explicit opening balance.
+/// @param builder - Active ModelBuilder receiving the beginning and ending balance nodes.
+/// @param name - Prefix for the generated balance node identifiers.
+/// @param increases - Identifiers of flows added to the balance each period.
+/// @param decreases - Identifiers of flows deducted from the balance each period.
+/// @param opening - First-period beginning balance in the flows' own units.
+/// @throws If a parameter has the wrong type or the builder has been consumed.
+/// Generated node identifiers, formulas and references are validated by build.
+#[wasm_bindgen(js_name = addRollForwardWithOpening)]
 pub fn add_roll_forward_with_opening(
-    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    builder: &mut JsModelBuilder,
     #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
     #[wasm_bindgen(unchecked_param_type = "string[]")] increases: JsValue,
     #[wasm_bindgen(unchecked_param_type = "string[]")] decreases: JsValue,
     #[wasm_bindgen(unchecked_param_type = "number")] opening: JsValue,
-) -> Result<JsValue, JsValue> {
+) -> Result<(), JsValue> {
     let increases = js_string_seq(&increases, "increases")?;
     let decreases = js_string_seq(&decreases, "decreases")?;
-    let builder = roll_forward::add_roll_forward_with_opening(
-        builder(&model)?,
+    roll_forward::add_roll_forward_with_opening(
+        builder.builder_mut()?,
         &js_string(&name, "name")?,
         &refs(&increases),
         &refs(&decreases),
         js_f64(&opening, "opening")?,
     );
-    finish(builder)
+    Ok(())
 }
 
 /// Add a net-operating-income buildup: total revenue, total expenses and NOI.
 ///
 /// Twin of Python `add_noi_buildup` (Rust `add_noi_buildup`).
-/// @param model - `FinancialModelSpec` to extend (object or JSON).
+/// @param builder - Active ModelBuilder receiving the generated nodes.
 /// @param totalRevenueNode - Identifier of the total-revenue node to create.
 /// @param revenueNodes - Existing revenue line nodes summed into the total.
 /// @param totalExpensesNode - Identifier of the total-expenses node to create.
 /// @param expenseNodes - Existing operating-expense line nodes summed into the total.
 /// @param noiNode - Identifier of the NOI node to create (`total revenue - total expenses`).
-/// Existing generated node identifiers are replaced.
-/// @returns The extended `FinancialModelSpec` plain object.
 ///
 /// # Errors
 ///
-/// Throws with kind `validation` if the model is malformed, a node list is
+/// Throws with kind `validation` if the builder has been consumed, a node list is
 /// empty, a node identifier is invalid, or a generated formula
 /// does not compile.
-#[wasm_bindgen(js_name = addNoiBuildup, unchecked_return_type = "generated.statements.FinancialModelSpec")]
+#[wasm_bindgen(js_name = addNoiBuildup)]
 pub fn add_noi_buildup(
-    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    builder: &mut JsModelBuilder,
     #[wasm_bindgen(js_name = "totalRevenueNode", unchecked_param_type = "string")]
     total_revenue_node: JsValue,
     #[wasm_bindgen(js_name = "revenueNodes", unchecked_param_type = "string[]")]
@@ -158,107 +119,97 @@ pub fn add_noi_buildup(
     #[wasm_bindgen(js_name = "expenseNodes", unchecked_param_type = "string[]")]
     expense_nodes: JsValue,
     #[wasm_bindgen(js_name = "noiNode", unchecked_param_type = "string")] noi_node: JsValue,
-) -> Result<JsValue, JsValue> {
+) -> Result<(), JsValue> {
     let revenue_nodes = js_string_seq(&revenue_nodes, "revenueNodes")?;
     let expense_nodes = js_string_seq(&expense_nodes, "expenseNodes")?;
-    let builder = real_estate::add_noi_buildup(
-        builder(&model)?,
+    real_estate::add_noi_buildup(
+        builder.builder_mut()?,
         &js_string(&total_revenue_node, "totalRevenueNode")?,
         &refs(&revenue_nodes),
         &js_string(&total_expenses_node, "totalExpensesNode")?,
         &refs(&expense_nodes),
         &js_string(&noi_node, "noiNode")?,
     )
-    .map_err(to_js_err)?;
-    finish(builder)
+    .map_err(to_js_err)
 }
 
 /// Add a net-cash-flow buildup: NOI less capital expenditure.
 ///
 /// Twin of Python `add_ncf_buildup` (Rust `add_ncf_buildup`).
-/// @param model - `FinancialModelSpec` to extend (object or JSON).
+/// @param builder - Active ModelBuilder receiving the generated nodes.
 /// @param noiNode - Existing NOI node.
 /// @param capexNodes - Existing capital-expenditure nodes subtracted from NOI; an empty list makes NCF equal NOI.
 /// @param ncfNode - Identifier of the NCF node to create.
-/// Existing generated node identifiers are replaced.
-/// @returns The extended `FinancialModelSpec` plain object.
 ///
 /// # Errors
 ///
-/// Throws with kind `validation` if the model is malformed, a node identifier
+/// Throws with kind `validation` if the builder has been consumed, a node identifier
 /// is invalid, or the generated formula does not compile.
-#[wasm_bindgen(js_name = addNcfBuildup, unchecked_return_type = "generated.statements.FinancialModelSpec")]
+#[wasm_bindgen(js_name = addNcfBuildup)]
 pub fn add_ncf_buildup(
-    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    builder: &mut JsModelBuilder,
     #[wasm_bindgen(js_name = "noiNode", unchecked_param_type = "string")] noi_node: JsValue,
     #[wasm_bindgen(js_name = "capexNodes", unchecked_param_type = "string[]")] capex_nodes: JsValue,
     #[wasm_bindgen(js_name = "ncfNode", unchecked_param_type = "string")] ncf_node: JsValue,
-) -> Result<JsValue, JsValue> {
+) -> Result<(), JsValue> {
     let capex_nodes = js_string_seq(&capex_nodes, "capexNodes")?;
-    let builder = real_estate::add_ncf_buildup(
-        builder(&model)?,
+    real_estate::add_ncf_buildup(
+        builder.builder_mut()?,
         &js_string(&noi_node, "noiNode")?,
         &refs(&capex_nodes),
         &js_string(&ncf_node, "ncfNode")?,
     )
-    .map_err(to_js_err)?;
-    finish(builder)
+    .map_err(to_js_err)
 }
 
 /// Add a lease-by-lease rent roll: gross rent, free rent, vacancy and effective rent.
 ///
 /// Twin of Python `add_rent_roll` (Rust `add_rent_roll`).
-/// @param model - `FinancialModelSpec` to extend (object or JSON).
+/// @param builder - Active ModelBuilder receiving the generated nodes.
 /// @param leases - Array of `LeaseSpec` objects, at least one (array or JSON).
 /// @param nodes - Optional `RentRollOutputNodes` naming the generated total nodes; omitted uses the Rust default names (object or JSON).
-/// Existing generated node identifiers are replaced.
-/// @returns The extended `FinancialModelSpec` plain object.
 ///
 /// # Errors
 ///
 /// Throws with kind `validation` if an input is malformed, `leases` is empty,
 /// a lease fails validation, or a generated node identifier or formula is
 /// invalid.
-#[wasm_bindgen(js_name = addRentRoll, unchecked_return_type = "generated.statements.FinancialModelSpec")]
+#[wasm_bindgen(js_name = addRentRoll)]
 pub fn add_rent_roll(
-    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    builder: &mut JsModelBuilder,
     #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.LeaseSpec[] | string")]
     leases: JsValue,
     #[wasm_bindgen(
         unchecked_optional_param_type = "generated.statements_analytics.RentRollOutputNodes | string | null"
     )]
     nodes: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
+) -> Result<(), JsValue> {
     let leases: Vec<real_estate::LeaseSpec> = from_js_json(&leases, "leases")?;
     let nodes: real_estate::RentRollOutputNodes =
         crate::utils::wire::js_opt_wire(nodes.as_ref(), "nodes")?.unwrap_or_default();
-    let builder =
-        real_estate::add_rent_roll(builder(&model)?, &leases, &nodes).map_err(to_js_err)?;
-    finish(builder)
+    real_estate::add_rent_roll(builder.builder_mut()?, &leases, &nodes).map_err(to_js_err)
 }
 
 /// Add a full property operating statement: rent roll, other income, EGI, opex, NOI, capex and NCF.
 ///
 /// Twin of Python `add_property_operating_statement` (Rust
 /// `add_property_operating_statement`).
-/// @param model - `FinancialModelSpec` to extend (object or JSON).
+/// @param builder - Active ModelBuilder receiving the generated nodes.
 /// @param leases - Array of `LeaseSpec` objects, at least one (array or JSON).
 /// @param otherIncomeNodes - Existing other-income nodes added to effective rent; omitted means none.
 /// @param opexNodes - Existing operating-expense nodes; omitted means none.
 /// @param capexNodes - Existing capital-expenditure nodes; omitted means none.
 /// @param managementFee - Optional `ManagementFeeSpec` (`rate` as a decimal of its `base`); omitted adds no fee (object or JSON).
 /// @param nodes - Optional `PropertyTemplateNodes` naming the generated nodes; omitted uses the Rust default names (object or JSON).
-/// Existing generated node identifiers are replaced.
-/// @returns The extended `FinancialModelSpec` plain object.
 ///
 /// # Errors
 ///
 /// Throws with kind `validation` if an input is malformed, `leases` is empty,
 /// a lease fails validation, or a generated node identifier or formula is
 /// invalid.
-#[wasm_bindgen(js_name = addPropertyOperatingStatement, unchecked_return_type = "generated.statements.FinancialModelSpec")]
+#[wasm_bindgen(js_name = addPropertyOperatingStatement)]
 pub fn add_property_operating_statement(
-    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    builder: &mut JsModelBuilder,
     #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.LeaseSpec[] | string")]
     leases: JsValue,
     #[wasm_bindgen(
@@ -285,7 +236,7 @@ pub fn add_property_operating_statement(
         unchecked_optional_param_type = "generated.statements_analytics.PropertyTemplateNodes | string | null"
     )]
     nodes: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
+) -> Result<(), JsValue> {
     let leases: Vec<real_estate::LeaseSpec> = from_js_json(&leases, "leases")?;
     let other_income =
         js_opt_string_seq(other_income_nodes.as_ref(), "otherIncomeNodes")?.unwrap_or_default();
@@ -295,8 +246,8 @@ pub fn add_property_operating_statement(
         crate::utils::wire::js_opt_wire(management_fee.as_ref(), "managementFee")?;
     let nodes: real_estate::PropertyTemplateNodes =
         crate::utils::wire::js_opt_wire(nodes.as_ref(), "nodes")?.unwrap_or_default();
-    let builder = real_estate::add_property_operating_statement(
-        builder(&model)?,
+    real_estate::add_property_operating_statement(
+        builder.builder_mut()?,
         &leases,
         &refs(&other_income),
         &refs(&opex),
@@ -304,8 +255,7 @@ pub fn add_property_operating_statement(
         management_fee,
         &nodes,
     )
-    .map_err(to_js_err)?;
-    finish(builder)
+    .map_err(to_js_err)
 }
 
 /// Validate a `LeaseSpec` and return its canonical JSON.

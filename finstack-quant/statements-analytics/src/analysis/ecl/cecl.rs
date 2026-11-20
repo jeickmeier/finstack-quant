@@ -244,7 +244,7 @@ impl<'a> CeclEngine<'a> {
     ///
     /// Returns [`Error::Validation`] when the configuration is invalid, or,
     /// for [`CeclMethodology::PdLgdEad`], when `pd_sources` is empty or its
-    /// scenario weights are not finite, non-negative, and summing to 1.0.
+    /// scenario weights are outside [0, 1] or do not total exactly one.
     ///
     /// # Arguments
     ///
@@ -252,8 +252,7 @@ impl<'a> CeclEngine<'a> {
     ///   historical annual PD, reversion, impairment, and methodology settings.
     /// * `pd_sources` - Authoritative scenario IDs, probability weights, and
     ///   optional LGD overrides paired with current reporting-date PD curves.
-    ///   For PD-LGD-EAD, weights must be finite, non-negative, and sum to 1
-    ///   within `1e-6`; WARM ignores these sources.
+    ///   For PD-LGD-EAD, weights must be in [0, 1] and sum to exactly one; WARM ignores these sources.
     pub fn new(
         config: CeclConfig,
         pd_sources: Vec<(&'a MacroScenario, &'a dyn PdTermStructure)>,
@@ -300,7 +299,12 @@ impl<'a> CeclEngine<'a> {
         let n_buckets = (horizon / dt).ceil() as usize;
         let n_buckets = n_buckets.max(1);
 
-        for (_, pd_source) in &self.pd_sources {
+        let active = || {
+            self.pd_sources
+                .iter()
+                .filter(|(scenario, _)| !scenario.weight.0.is_zero())
+        };
+        for (_, pd_source) in active() {
             if !(0.0..=1.0).contains(&pd_source.cumulative_pd(rating, 0.0)?) {
                 return Err(Error::Validation(
                     "PD source must return finite probabilities in [0, 1]".into(),
@@ -311,11 +315,14 @@ impl<'a> CeclEngine<'a> {
         if self.is_credit_impaired(exposure) {
             let t_recovery = self.config.impaired_time_to_recovery_years;
             let mut weighted_ecl = 0.0;
-            for (scenario, _) in &self.pd_sources {
+            for (scenario, _) in active() {
                 let lgd = scenario.lgd_override.unwrap_or(exposure.lgd);
                 let df = self.discount_factor(exposure, t_recovery);
                 let ead = exposure.ead_at(0.0)?;
-                weighted_ecl += scenario.weight * (ead - (1.0 - lgd) * ead * df);
+                weighted_ecl += super::engine::weighted_allowance(
+                    scenario.weight,
+                    ead - (1.0 - lgd) * ead * df,
+                )?;
             }
             super::engine::validate_finite_ecl(weighted_ecl)?;
             return Ok(CeclResult {
@@ -328,7 +335,7 @@ impl<'a> CeclEngine<'a> {
 
         let mut weighted_ecl = 0.0;
 
-        for (scenario, pd_source) in &self.pd_sources {
+        for (scenario, pd_source) in active() {
             let mut scenario_ecl = 0.0;
             let mut survival = 1.0_f64;
             for i in 0..n_buckets {
@@ -359,7 +366,7 @@ impl<'a> CeclEngine<'a> {
                 let df = self.discount_factor(exposure, t_mid);
                 scenario_ecl += uncond_mpd * lgd * exposure.ead_at(t_mid)? * df;
             }
-            weighted_ecl += scenario.weight * scenario_ecl;
+            weighted_ecl += super::engine::weighted_allowance(scenario.weight, scenario_ecl)?;
         }
 
         super::engine::validate_finite_ecl(weighted_ecl)?;
@@ -568,7 +575,7 @@ mod tests {
         let curve = make_pd_curve();
         let scenario = MacroScenario {
             id: "base".into(),
-            weight: 1.0,
+            weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
             lgd_override: None,
         };
         let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> =
@@ -592,7 +599,7 @@ mod tests {
         let curve = make_pd_curve();
         let scenario = MacroScenario {
             id: "base".into(),
-            weight: 1.0,
+            weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
             lgd_override: None,
         };
         let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> =
@@ -616,7 +623,7 @@ mod tests {
         let curve = make_pd_curve();
         let scenario = MacroScenario {
             id: "base".into(),
-            weight: 1.0,
+            weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
             lgd_override: None,
         };
         let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> =
@@ -668,7 +675,7 @@ mod tests {
         let curve = make_pd_curve();
         let scenario = MacroScenario {
             id: "base".into(),
-            weight: 0.8,
+            weight: finstack_quant_core::wire::DecimalWire("0.8".parse().unwrap()),
             lgd_override: None,
         };
         assert!(CeclEngine::new(CeclConfig::default(), vec![(&scenario, &curve)]).is_err());
@@ -679,7 +686,7 @@ mod tests {
         let curve = RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 0.20)]).unwrap();
         let scenario = MacroScenario {
             id: "downside".into(),
-            weight: 1.0,
+            weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
             lgd_override: Some(0.90),
         };
         let config = CeclConfig {
@@ -708,7 +715,7 @@ mod tests {
         // CECL with R&S covering full maturity
         let cecl_scenario = MacroScenario {
             id: "base".into(),
-            weight: 1.0,
+            weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
             lgd_override: None,
         };
         let cecl_pd: Vec<(&MacroScenario, &dyn PdTermStructure)> =

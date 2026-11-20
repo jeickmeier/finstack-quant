@@ -424,8 +424,8 @@ class GridCarinoLinkedResult:
         ...
 
 def grid_attribution(
-    portfolio_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    benchmark_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    portfolio: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    benchmark: str | dict[str, Any] | list[Any] | pd.DataFrame,
 ) -> GridAttributionResult:
     """
     Compute a single-period hierarchical duration-cell x sector grid attribution.
@@ -437,11 +437,11 @@ def grid_attribution(
 
     Parameters
     ----------
-    portfolio_json : str | dict | list | pandas.DataFrame
+    portfolio : str | dict | list | pandas.DataFrame
         JSON array of ``GridPosition`` objects (``cell``, ``sector``,
         ``weight``, ``total_return``) for the portfolio side; weights must
         sum to ``1.0`` within ``1e-6``.
-    benchmark_json : str | dict | list | pandas.DataFrame
+    benchmark : str | dict | list | pandas.DataFrame
         JSON array of ``GridPosition`` objects for the benchmark side; same
         weight-sum requirement.
 
@@ -484,7 +484,7 @@ def grid_attribution(
     """
     ...
 
-def grid_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> GridCarinoLinkedResult:
+def grid_carino_link(periods: str | dict[str, Any] | list[Any] | pd.DataFrame) -> GridCarinoLinkedResult:
     """
     Carino-link multi-period hierarchical grid attribution results.
 
@@ -498,7 +498,7 @@ def grid_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFra
 
     Parameters
     ----------
-    periods_json : str | dict | list | pandas.DataFrame
+    periods : str | dict | list | pandas.DataFrame
         Chronological list of typed ``GridAttributionResult`` objects (as
         returned by :func:`grid_attribution`) or their JSON form, each the
         wire output of :func:`grid_attribution` (or
@@ -513,7 +513,7 @@ def grid_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFra
     Raises
     ------
     PortfolioError
-        If ``periods_json`` is empty; any consumed return or top-level effect
+        If ``periods`` is empty; any consumed return or top-level effect
         is non-finite; ``active_return`` disagrees with the portfolio-minus-
         benchmark return; the three effect totals do not reconcile to
         ``active_return`` within an overflow-safe scaled-L1 tolerance; a
@@ -521,7 +521,7 @@ def grid_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFra
         per-period or compounded return is at or below -100% (outside the
         Carino domain).
     ValueError
-        If ``periods_json`` is malformed or does not match the
+        If ``periods`` is malformed or does not match the
         ``GridAttributionResult`` schema.
 
     Sources

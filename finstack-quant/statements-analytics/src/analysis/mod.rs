@@ -54,11 +54,16 @@ mod reports;
 pub use backtesting::{ForecastMetrics, backtest_forecast};
 pub use credit::{
     CapitalStructureSummary, CapitalStructureSummaryConfig, CapitalStructureTranche,
-    CreditContextMetrics, CreditNumeratorNodes, DebtInstrumentKind, MaturityWallBucket,
-    StatementsAdapter, capital_structure_summary, compute_credit_context, evaluate_covenants,
-    forecast_breaches,
+    CovenantObservationBinding, CovenantStatementUnit, CreditContextMetrics, CreditContextReport,
+    CreditContextSpec, CreditMeasure, CreditMeasureCoverage, CreditMeasureRow, CreditMeasureValue,
+    CreditNumeratorNodes, CreditReferenceValue, CreditScoringModel, DebtInstrumentKind,
+    MaturityWallBucket, StatementCovenantAssessment, StatementCovenantForecast,
+    StatementCovenantPeriod, StatementCovenantSpec, StatementScoringMapping, StatementsAdapter,
+    assess_statement_covenants, capital_structure_summary, compute_credit_context,
+    evaluate_covenants, evaluate_credit_context, forecast_breaches, forecast_statement_covenants,
+    score_statement, score_statement_series,
 };
-pub use goal_seek::{GoalSeekResult, GoalSeekSpec, goal_seek};
+pub use goal_seek::{GoalSeekCell, GoalSeekResult, GoalSeekSearch, GoalSeekSpec, goal_seek};
 pub use introspection::{
     DependencyTracer, DependencyTree, Explanation, ExplanationStep, explain_formula,
     render_tree_ascii, render_tree_detailed,
@@ -73,10 +78,18 @@ pub use scenarios::{
     run_sensitivity, run_variance, variance_bridge,
 };
 pub use valuation::{
-    CorporateAnalysis, CorporateAnalysisBuilder, CorporateAnalysisOptions,
-    CorporateValuationResult, DEFAULT_UFCF_NODE, DcfInputs, DcfOptions, DcfPeriodRow,
-    DcfSensitivityResult, ExitMultipleBump, LboCheckMappings, LboConfig, LboResult, LboTranche,
-    WaccInputs, dcf_sensitivity, evaluate_dcf, evaluate_lbo, run_corporate_analysis, wacc,
+    CorporateAnalysis, CorporateAnalysisBuilder, CorporateAnalysisOptions, CorporateDcfRequest,
+    CorporateValuationResult, DEFAULT_UFCF_NODE, DatedLboRequest, DatedLboResult,
+    DcfDistributionResult, DcfInputs, DcfMultipleShocks, DcfOptions, DcfPathQuantile, DcfPathValue,
+    DcfPeriodRow, DcfProjection, DcfRateShocks, DcfSensitivityEndpoint, DcfSensitivityGridResult,
+    DcfSensitivityGridSpec, DcfSensitivityPair, DcfSensitivityResult, DcfSensitivityShocks,
+    DcfShockReport, DcfTerminalShocks, ExitMultipleBump, LboAcquisition, LboCheckMappings,
+    LboConfig, LboDebtFunding, LboEarnings, LboEarningsBasis, LboExitBridge, LboFunding,
+    LboFundingResult, LboQualification, LboResult, LboTranche, StatementValuationCut,
+    TerminalFcffBasis, WaccInputs, dcf_sensitivity, dcf_sensitivity_grid,
+    dcf_sensitivity_on_results, evaluate_corporate_dcf, evaluate_dated_lbo, evaluate_dcf,
+    evaluate_dcf_from_results, evaluate_dcf_monte_carlo, evaluate_lbo, run_corporate_analysis,
+    wacc,
 };
 
 pub use checks::{
@@ -89,10 +102,14 @@ pub use checks::{
 
 pub use ecl::{
     CeclConfig, CeclEngine, CeclMethodology, CeclResult, DEFAULT_REVOLVER_CCF, EclBucket,
-    EclConfig, EclConfigBuilder, EclResult, Exposure, LgdType, MacroScenario, PdTermStructure,
-    QualitativeFlags, RatingPdMap, RawPdCurve, ReversionMethod, Stage, StageResult, StagingConfig,
-    StagingTrigger, WeightedEclResult, classify_stage, classify_stage_from_curves, compute_ecl,
-    compute_ecl_from_curve, compute_ecl_weighted, compute_ecl_weighted_from_curves,
+    EclConfig, EclConfigBuilder, EclResult, EclScenario, EclScenarioMeasurement,
+    EclScenarioOutcome, Exposure, ImpairedEclMeasurement, ImpairedEclOutcome, ImpairedEclResult,
+    ImpairedEclScenario, ImpairedExposure, LgdType, MacroScenario, PdTermStructure,
+    QualitativeFlags, RatingPdMap, RawPdCurve, RecoveryEvidence, ReversionMethod, Stage,
+    StageResult, StagingConfig, StagingTrigger, WeightedEclResult, WeightedImpairedEclResult,
+    classify_stage, classify_stage_from_curves, compute_ecl, compute_ecl_from_curve,
+    compute_ecl_weighted, compute_ecl_weighted_from_curves, compute_impaired_ecl,
+    compute_impaired_ecl_weighted,
 };
 
 pub use comps::{

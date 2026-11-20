@@ -18,6 +18,10 @@ ClearingStatus = _margin.ClearingStatus
 CollateralAssetClass = _margin.CollateralAssetClass
 NettingSetId = _margin.NettingSetId
 CsaSpec = _margin.CsaSpec
+CsaSpecBuilder = _margin.CsaSpecBuilder
+DrcPosition = _margin.DrcPosition
+OtcMarginSpec = _margin.OtcMarginSpec
+SimmCreditClassification = _margin.SimmCreditClassification
 EligibleCollateralSchedule = _margin.EligibleCollateralSchedule
 CONSTANTS = _margin.CONSTANTS
 VmResult = _margin.VmResult
@@ -35,6 +39,8 @@ ExposureProfile = _margin.ExposureProfile
 XvaResult = _margin.XvaResult
 ImDecayProfile = _margin.ImDecayProfile
 ImProfile = _margin.ImProfile
+ImProjectionSpec = _margin.ImProjectionSpec
+MarginFundingSpread = _margin.MarginFundingSpread
 MvaResult = _margin.MvaResult
 compute_mva = _margin.compute_mva
 compute_bilateral_xva = _margin.compute_bilateral_xva
@@ -59,6 +65,8 @@ __all__: list[str] = [
     "ClearingStatus",
     "CollateralAssetClass",
     "CsaSpec",
+    "CsaSpecBuilder",
+    "DrcPosition",
     "EadResult",
     "EligibleCollateralSchedule",
     "ExcessCollateral",
@@ -74,18 +82,22 @@ __all__: list[str] = [
     "ImDecayProfile",
     "ImMethodology",
     "ImProfile",
+    "ImProjectionSpec",
     "ImResult",
     "MarginCallType",
     "MarginFundingCost",
+    "MarginFundingSpread",
     "MarginTenor",
     "MarginUtilization",
     "MvaResult",
     "NettingSetId",
+    "OtcMarginSpec",
     "SaCcrEngine",
     "SaCcrNettingSetConfig",
     "SaCcrTrade",
     "ScheduleImCalculator",
     "SimmCalculator",
+    "SimmCreditClassification",
     "SimmCurvatureSensitivity",
     "SimmSensitivities",
     "VmCalculator",

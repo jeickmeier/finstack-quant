@@ -17,14 +17,74 @@
 #[macro_use]
 pub(crate) mod macros;
 
+pub mod bond_future;
+pub mod equity_future;
+pub mod equity_future_option;
+pub mod fx_future;
+pub mod fx_future_option;
+pub mod interest_rate_future;
+pub mod interest_rate_future_option;
+pub mod volatility_index_future;
+pub mod volatility_index_future_option;
+
+pub mod agency_cmo;
+pub mod agency_mbs_passthrough;
+pub mod agency_tba;
+pub mod asian_option;
+pub mod autocallable;
+pub mod barrier_option;
+pub mod basis_swap;
+pub mod basket;
+pub mod bermudan_swaption;
+pub mod callable_range_accrual;
 pub mod cds_option;
+pub mod cliquet_option;
+pub mod cms_option;
+pub mod cms_spread_option;
+pub mod cms_swap;
+pub mod commodity_asian_option;
+pub mod commodity_forward;
+pub mod commodity_future;
+pub mod commodity_future_option;
+pub mod commodity_spot_option;
+pub mod commodity_spread_option;
+pub mod commodity_swap;
+pub mod commodity_swaption;
 pub mod credit;
 pub mod data;
+pub mod dollar_roll;
 pub mod equity;
+pub mod equity_spot;
+pub mod equity_total_return_future;
+pub mod equity_total_return_swap;
+pub mod fi_index_total_return_swap;
 pub mod fixed_income;
 pub mod fx;
+pub mod fx_barrier_option;
+pub mod fx_digital_option;
+pub mod fx_spot;
+pub mod fx_swap;
+pub mod fx_touch_option;
+pub mod fx_variance_swap;
+pub mod inflation_bond;
+pub mod inflation_cap_floor;
+pub mod inflation_swap;
+pub mod levered_real_estate_equity;
+pub mod listed;
+pub mod lookback_option;
+pub mod ndf;
+pub mod private_markets_fund;
+pub mod quanto_option;
+pub mod range_accrual;
 pub mod rates;
+pub mod real_estate_asset;
+pub mod repo;
+pub mod snowball;
 pub mod structured;
+pub mod tarn;
+pub mod variance_swap;
+pub mod xccy_swap;
+pub mod yoy_inflation_swap;
 
 use crate::api::core::currency::JsCurrency;
 use crate::api::core::dates::{JsDayCount, JsTenor};
@@ -136,12 +196,25 @@ pub(super) mod get {
 /// calls `utils::input` / `utils::wire` directly.
 pub(super) mod arg {
     use super::*;
-    pub(crate) use crate::utils::input::{from_js_json, js_bool, js_f64, js_string, js_uint};
+    pub(crate) use crate::utils::input::{
+        from_js_json, js_bool, js_f64, js_int, js_string, js_uint,
+    };
     pub(crate) use crate::utils::wire::{js_date, js_wire};
 
     /// A string identifier (instrument, curve, calendar or price id).
     pub(crate) fn id<T: From<String>>(value: &JsValue, label: &str) -> Result<T, JsValue> {
         js_string(value, label).map(T::from)
+    }
+
+    /// An optional identifier that preserves every supplied string literally.
+    pub(crate) fn optional_id<T: From<String>>(
+        value: &JsValue,
+        label: &str,
+    ) -> Result<Option<T>, JsValue> {
+        if value.is_null() || value.is_undefined() {
+            return Ok(None);
+        }
+        id(value, label).map(Some)
     }
 
     /// An array of ISO-8601 date strings.
@@ -150,6 +223,11 @@ pub(super) mod arg {
             .iter()
             .map(|text| parse_iso_date(text))
             .collect()
+    }
+
+    /// Contractual exact decimal, encoded as a string.
+    pub(crate) fn exact_decimal(value: &JsValue, label: &str) -> Result<Decimal, JsValue> {
+        crate::utils::wire::js_decimal(value, label).map(|value| value.0)
     }
 
     /// A JavaScript number stored as an exact `Decimal`.
@@ -201,9 +279,10 @@ pub(super) fn metric_value(
     model: Option<&JsValue>,
     metric_id: &str,
 ) -> Result<f64, JsValue> {
-    let instrument =
-        finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(instrument, None)
-            .map_err(to_js_err)?;
+    let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
+        instrument, None, None,
+    )
+    .map_err(to_js_err)?;
     let market = super::pricing::parse_market(market_json)?;
     let as_of = js_string(as_of, "asOf")?;
     let model = crate::utils::input::js_opt_string(model, "model")?;
@@ -229,9 +308,10 @@ pub(super) fn option_greeks(
     as_of: &str,
     model: Option<&str>,
 ) -> Js {
-    let instrument =
-        finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(instrument, None)
-            .map_err(to_js_err)?;
+    let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
+        instrument, None, None,
+    )
+    .map_err(to_js_err)?;
     let market: MarketContext = serde_json::from_str(market_json).map_err(to_js_err)?;
     let pairs = finstack_quant_valuations::pricer::present_standard_option_greeks(
         &instrument,

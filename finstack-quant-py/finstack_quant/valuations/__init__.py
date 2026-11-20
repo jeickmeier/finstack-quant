@@ -26,6 +26,7 @@ from finstack_quant.finstack_quant import valuations as _valuations
 __doc__ = _valuations.__doc__
 
 ValuationResult = _valuations.ValuationResult
+calculate_simm = _valuations.calculate_simm
 # The submodules are compiled modules with no pure-Python shim; the extension
 # registers each under its public path (`finstack_quant.valuations.instruments`
 # and so on), and the stubs beside them carry the types and docstrings.
@@ -37,6 +38,7 @@ schema = _valuations.schema
 
 __all__: list[str] = [
     "ValuationResult",
+    "calculate_simm",
     "composite",
     "instruments",
     "market",

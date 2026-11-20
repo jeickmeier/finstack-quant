@@ -7,6 +7,144 @@ from finstack_quant.models.factor.risk._budget import RiskBudgetResult
 from finstack_quant.models.factor.risk._contributions import PositionRiskDecomposition
 from finstack_quant.models.factor.risk._stress import StressAttribution
 
+class PositionRiskSource:
+    """Prepare the inputs to a normal or empirical loss distribution.
+
+    Examples
+    --------
+    >>> from finstack_quant.models.factor.risk import PositionRiskSource
+    >>> source = PositionRiskSource.parametric([100.0], [[0.04]])
+    """
+
+    @staticmethod
+    def parametric(
+        weights: list[float], covariance: list[list[float]], *, compute_incremental: bool = False
+    ) -> PositionRiskSource:
+        """Use a covariance-based Euler decomposition.
+
+        Parameters
+        ----------
+        weights : list[float]
+            Signed position exposures in portfolio currency, in position order.
+        covariance : list[list[float]]
+            Symmetric positive semidefinite position-return covariance with
+            both axes in position order.
+        compute_incremental : bool, default False
+            Request leave-one-out incremental VaR for each position.
+
+        Returns
+        -------
+        PositionRiskSource
+            Prepared parametric source. The report validates dimensions and covariance.
+
+        Raises
+        ------
+        TypeError
+            If an argument has an incompatible Python type.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.factor.risk import PositionRiskSource
+        >>> source = PositionRiskSource.parametric([100.0], [[0.04]], compute_incremental=True)
+        """
+        ...
+
+    @staticmethod
+    def historical(pnls: list[list[float]]) -> PositionRiskSource:
+        """Use jointly observed scenario P&L across all positions.
+
+        Parameters
+        ----------
+        pnls : list[list[float]]
+            One row per position and one column per shared scenario, in
+            portfolio currency. Losses have negative signs.
+
+        Returns
+        -------
+        PositionRiskSource
+            Prepared historical source. The report validates dimensions and tail coverage.
+
+        Raises
+        ------
+        TypeError
+            If the matrix cannot be converted to nested numeric sequences.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.factor.risk import PositionRiskSource
+        >>> source = PositionRiskSource.historical([[-2.0, 1.0, 0.0]])
+        """
+        ...
+
+class PositionRiskBudget:
+    """Optional VaR contribution targets to evaluate against the report.
+
+    Examples
+    --------
+    >>> from finstack_quant.models.factor.risk import PositionRiskBudget
+    >>> budget = PositionRiskBudget([0.6, 0.4], utilization_threshold=1.2)
+    """
+
+    def __init__(self, targets: list[float], *, utilization_threshold: float | None = None) -> None:
+        """Store VaR contribution targets and an optional breach threshold.
+
+        Parameters
+        ----------
+        targets : list[float]
+            Position-ordered fractions in [0, 1] summing to one.
+        utilization_threshold : float, optional
+            Actual-to-target utilization ratio above which to report a breach.
+            None uses the native default.
+
+        Raises
+        ------
+        TypeError
+            If an argument has an incompatible Python type. The report
+            validates the financial inputs when it evaluates the budget.
+        """
+        ...
+
+class PositionRiskRequest:
+    """Prepared inputs for a single position risk calculation.
+
+    Examples
+    --------
+    >>> from finstack_quant.models.factor.risk import PositionRiskRequest, PositionRiskSource, position_risk_report
+    >>> request = PositionRiskRequest(["bond"], PositionRiskSource.parametric([100.0], [[0.04]]))
+    >>> position_risk_report(request).decomposition.portfolio_var < 0
+    True
+    """
+
+    def __init__(
+        self,
+        position_ids: list[str],
+        source: PositionRiskSource,
+        *,
+        confidence: float | None = None,
+        budget: PositionRiskBudget | None = None,
+    ) -> None:
+        """Store ordered positions, a source and optional tail and budget controls.
+
+        Parameters
+        ----------
+        position_ids : list[str]
+            Unique identifiers ordered to match the source rows.
+        source : PositionRiskSource
+            Parametric covariance inputs or historical scenario P&Ls.
+        confidence : float, optional
+            One-sided loss confidence as a decimal strictly between 0.5 and 1.
+            None uses the native default of 0.95.
+        budget : PositionRiskBudget, optional
+            Target contribution fractions by position. None skips evaluation.
+
+        Raises
+        ------
+        TypeError
+            If an argument has an incompatible Python type. The report
+            validates the financial inputs when it prices the loss distribution.
+        """
+        ...
+
 class PositionRiskReport:
     """
     Position VaR/ES decomposition with its optional risk budget and tail stress
@@ -133,14 +271,14 @@ class PositionRiskReport:
         """
         ...
 
-def position_risk_report(request: str | dict[str, Any]) -> PositionRiskReport:
+def position_risk_report(request: PositionRiskRequest | str | dict[str, Any]) -> PositionRiskReport:
     """
     Decompose position VaR/ES from a parametric or historical source, with an
     optional risk budget and, for scenario P&L, the tail stress attribution.
 
     Parameters
     ----------
-    request : str | dict[str, Any]
+    request : PositionRiskRequest | str | dict[str, Any]
         ``PositionRiskRequest`` as a dict or JSON text with ``position_ids``,
         an optional ``confidence`` (decimal strictly inside ``(0.5, 1)``,
         default ``0.95``), a ``source`` tagged by ``kind`` and an optional

@@ -24,8 +24,8 @@ fn sample_sensitivities(reverse: bool) -> FrtbSensitivities {
     insert_entries(
         &mut sensitivities.girr_delta,
         [
-            ((Currency::USD, "10Y".to_string()), 125.0),
-            ((Currency::EUR, "2Y".to_string()), -40.0),
+            ((Currency::USD, "USD-OIS".into(), "10Y".to_string()), 125.0),
+            ((Currency::EUR, "EUR-ESTR".into(), "2Y".to_string()), -40.0),
         ],
         reverse,
     );

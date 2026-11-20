@@ -2,7 +2,7 @@
 
 use super::super::DiscountCurve;
 use super::super::common::factor::{
-    dated_points_to_factors, df_between_admitted_factors,
+    dated_points_to_knots, df_between_admitted_factors,
     instantaneous_forward as factor_instantaneous_forward, simple_rate_from_factors,
     zero_rate_points_to_factors,
 };
@@ -137,7 +137,7 @@ impl ForwardCurve {
     ) -> crate::Result<Self> {
         let id: CurveId = id.into();
         let calendar = validate_curve_clock("ForwardCurve", id.as_str(), day_count, None)?;
-        let knots = dated_points_to_factors(
+        let knots = dated_points_to_knots(
             "ForwardCurve",
             base_date,
             points,

@@ -340,6 +340,80 @@ impl JsFinstackConfig {
             .map_err(to_js_err)
     }
 
+    /// Copy the configuration with a different rounding mode.
+    /// @param mode - Exact lowercase rounding label, such as bankers. Null clears the mode.
+    /// @returns An independent copy with the selected mode.
+    /// @throws TypeError for a mistyped argument or FinstackError for an unknown rounding label.
+    #[wasm_bindgen(js_name = withRoundingMode)]
+    pub fn with_rounding_mode(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string | null")] mode: JsValue,
+    ) -> Result<JsFinstackConfig, JsValue> {
+        let mode = js_opt_string(Some(&mode), "mode")?
+            .map(|name| name.parse())
+            .transpose()
+            .map_err(to_js_err)?;
+        Ok(Self {
+            inner: self.inner.with_rounding_mode(mode),
+        })
+    }
+
+    /// Copy the configuration with one currency-specific output scale.
+    /// @param currency - ISO-4217 alphabetic currency code.
+    /// @param scale - Number of output decimal places from 0 through 28.
+    /// @returns An independent copy with one updated output scale.
+    /// @throws TypeError for mistyped arguments or FinstackError for invalid currency codes or scales.
+    #[wasm_bindgen(js_name = withOutputScale)]
+    pub fn with_output_scale(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] scale: JsValue,
+    ) -> Result<JsFinstackConfig, JsValue> {
+        self.inner
+            .with_output_scale(
+                js_currency(&currency, "currency")?,
+                js_uint(&scale, "scale")?,
+            )
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Copy the configuration with one currency-specific ingest scale.
+    /// @param currency - ISO-4217 alphabetic currency code.
+    /// @param scale - Number of ingest decimal places from 0 through 28. Applying the override also requires a rounding mode.
+    /// @returns An independent copy with one updated ingest scale.
+    /// @throws TypeError for mistyped arguments or FinstackError for invalid currency codes or scales.
+    #[wasm_bindgen(js_name = withIngestScale)]
+    pub fn with_ingest_scale(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] scale: JsValue,
+    ) -> Result<JsFinstackConfig, JsValue> {
+        self.inner
+            .with_ingest_scale(
+                js_currency(&currency, "currency")?,
+                js_uint(&scale, "scale")?,
+            )
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Update a versioned extension with JSON merge-patch semantics.
+    /// @param key - Versioned extension key such as core.rating_scales.v1.
+    /// @param patch - Native JSON data. Object members merge recursively and null members remove fields. Other patches replace the section value. Strings are literal.
+    /// @throws TypeError for mistyped or unrepresentable data or FinstackError for an invalid extension key.
+    #[wasm_bindgen(js_name = patchExtension)]
+    pub fn patch_extension(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] key: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "unknown")] patch: JsValue,
+    ) -> Result<(), JsValue> {
+        let key = js_string(&key, "key")?;
+        self.inner
+            .patch_extension(&key, js_json_value(&patch, "patch")?)
+            .map_err(to_js_err)
+    }
+
     /// Per-currency output-scale overrides.
     ///
     /// @returns A plain object mapping ISO-4217 code to decimal places; empty

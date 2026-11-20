@@ -16,8 +16,8 @@ use wasm_bindgen::prelude::*;
 /// among accepted inputs, the reconciliation residual grows the closer any
 /// bucket's net weight sits to the near-zero-net-weight rejection boundary
 /// (see the Rust module docs for measured magnitudes).
-/// @param portfolioJson - Canonical JSON array of `GridPosition` objects (`cell`, `sector`, `weight`, `total_return`) for the portfolio side; weights must sum to 1.
-/// @param benchmarkJson - Canonical JSON array of `GridPosition` objects for the benchmark side; same weight-sum requirement.
+/// @param portfolio - Canonical JSON array of `GridPosition` objects (`cell`, `sector`, `weight`, `total_return`) for the portfolio side; weights must sum to 1.
+/// @param benchmark - Canonical JSON array of `GridPosition` objects for the benchmark side; same weight-sum requirement.
 ///
 /// # Errors
 ///
@@ -28,15 +28,13 @@ use wasm_bindgen::prelude::*;
 /// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
 #[wasm_bindgen(js_name = gridAttribution, unchecked_return_type = "GridAttributionResult")]
 pub fn grid_attribution(
-    #[wasm_bindgen(js_name = "portfolioJson", unchecked_param_type = "JsonInput")]
-    portfolio_json: JsValue,
-    #[wasm_bindgen(js_name = "benchmarkJson", unchecked_param_type = "JsonInput")]
-    benchmark_json: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] portfolio: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] benchmark: JsValue,
 ) -> Result<JsValue, JsValue> {
     let portfolio: Vec<finstack_quant_portfolio::grid_attribution::GridPosition> =
-        from_js_json(&portfolio_json, "portfolioJson")?;
+        from_js_json(&portfolio, "portfolio")?;
     let benchmark: Vec<finstack_quant_portfolio::grid_attribution::GridPosition> =
-        from_js_json(&benchmark_json, "benchmarkJson")?;
+        from_js_json(&benchmark, "benchmark")?;
     let result =
         finstack_quant_portfolio::grid_attribution::grid_attribution(&portfolio, &benchmark)
             .map_err(to_js_err)?;
@@ -52,21 +50,20 @@ pub fn grid_attribution(
 /// return. Only the three top-level effects are linked; per-cell /
 /// per-(cell, sector) multi-period linking is out of scope. Returns a structured
 /// `GridCarinoLinkedResult` object.
-/// @param periodsJson - Canonical JSON array of `GridAttributionResult` objects, in chronological order; `JSON.stringify` the structured results returned by `gridAttribution`.
+/// @param periods - Canonical JSON array of `GridAttributionResult` objects, in chronological order; `JSON.stringify` the structured results returned by `gridAttribution`.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `periodsJson` is malformed, the sequence is
+/// Throws a JavaScript exception if `periods` is malformed, the sequence is
 /// empty, a consumed value is non-finite or inconsistent, a return is at most
 /// `-1`, or the linked result cannot be converted to a JavaScript value.
 /// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
 #[wasm_bindgen(js_name = gridCarinoLink, unchecked_return_type = "GridCarinoLinkedResult")]
 pub fn grid_carino_link(
-    #[wasm_bindgen(js_name = "periodsJson", unchecked_param_type = "JsonInput")]
-    periods_json: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] periods: JsValue,
 ) -> Result<JsValue, JsValue> {
     let periods: Vec<finstack_quant_portfolio::grid_attribution::GridAttributionResult> =
-        from_js_json(&periods_json, "periodsJson")?;
+        from_js_json(&periods, "periods")?;
     let result = finstack_quant_portfolio::grid_attribution::grid_carino_link(&periods)
         .map_err(to_js_err)?;
     to_js_value(&result)

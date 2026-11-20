@@ -94,14 +94,15 @@ pub(crate) fn extract_value_series(
 ) -> PyResult<Vec<(PeriodId, AmountOrScalar)>> {
     extract_period_pairs(values)?
         .into_iter()
-        .map(|(period, value)| {
-            let amount = match value.extract::<PyRef<'_, PyMoney>>() {
-                Ok(money) => AmountOrScalar::Amount(money.inner),
-                _ => AmountOrScalar::scalar(value.extract::<f64>()?),
-            };
-            Ok((parse_period_id(&period)?, amount))
-        })
+        .map(|(period, value)| Ok((parse_period_id(&period)?, extract_amount_or_scalar(&value)?)))
         .collect()
+}
+
+fn extract_amount_or_scalar(value: &Bound<'_, PyAny>) -> PyResult<AmountOrScalar> {
+    match value.extract::<PyRef<'_, PyMoney>>() {
+        Ok(money) => Ok(AmountOrScalar::Amount(money.inner)),
+        _ => Ok(AmountOrScalar::scalar(value.extract::<f64>()?)),
+    }
 }
 
 /// Render a JSON value as a Python literal (``None`` / ``True`` / ``'text'``

@@ -167,3 +167,16 @@ def test_statistics_keep_empty_and_non_finite_policies_in_rust() -> None:
         stats.mean(np.array([1.0, np.nan]))
     with pytest.raises(ValueError, match="finite"):
         stats.realized_variance(np.array([1.0, np.nan]))
+
+
+def test_expected_shortfall_weights_the_boundary_and_preserves_input() -> None:
+    data = np.array([1.0, -4.0, -1.0, 2.0])
+    assert stats.expected_shortfall(data, 0.625) == pytest.approx(-3.0)
+    np.testing.assert_array_equal(data, [1.0, -4.0, -1.0, 2.0])
+    for sample, confidence, message in [
+        ([], 0.625, "nonempty"),
+        ([1.0, float("nan")], 0.625, "finite"),
+        ([1.0], 1.0, "confidence"),
+    ]:
+        with pytest.raises(ValueError, match=message):
+            stats.expected_shortfall(sample, confidence)

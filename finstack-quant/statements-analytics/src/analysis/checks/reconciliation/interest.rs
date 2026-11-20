@@ -84,7 +84,7 @@ impl Check for InterestExpenseReconciliation {
                         period: Some(*pid),
                         materiality: Some(Materiality {
                             absolute: diff,
-                            relative_pct: Some(relative * 100.0),
+                            relative: Some(relative),
                             reference_value: cs_interest,
                             reference_label: "cs_interest".to_string(),
                         }),
@@ -166,7 +166,7 @@ impl Check for InterestExpenseReconciliation {
                         period: Some(*pid),
                         materiality: Some(Materiality {
                             absolute: diff,
-                            relative_pct: Some(relative * 100.0),
+                            relative: Some(relative),
                             reference_value: total_implied_interest,
                             reference_label: "implied_interest".to_string(),
                         }),

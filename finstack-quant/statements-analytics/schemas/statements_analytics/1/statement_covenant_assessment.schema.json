@@ -1,0 +1,2062 @@
+{
+  "$defs": {
+    "AmountOrScalar": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Money",
+          "description": "Currency-aware amount"
+        },
+        {
+          "description": "Unitless scalar (ratio, percentage, count, etc.)",
+          "format": "double",
+          "type": "number"
+        }
+      ],
+      "description": "Value that can be currency-aware or unitless.\n\nUsed for node values that can represent:\n- **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)\n- **Scalar**: Unitless values (e.g., ratios, percentages, counts)"
+    },
+    "Covenant": {
+      "additionalProperties": false,
+      "description": "Financial covenant specification with test frequency and consequences.",
+      "properties": {
+        "consequences": {
+          "description": "Actions taken if covenant is breached",
+          "items": {
+            "$ref": "#/$defs/CovenantConsequence"
+          },
+          "type": "array"
+        },
+        "covenant_type": {
+          "$ref": "#/$defs/CovenantType",
+          "description": "Type of covenant (leverage, coverage, etc.)"
+        },
+        "cure_period_days": {
+          "description": "Optional cure period in days before default",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "is_active": {
+          "description": "Whether the covenant is currently active",
+          "type": "boolean"
+        },
+        "label": {
+          "description": "Optional instance label disambiguating covenants of the same type.\n\n[`CovenantType::covenant_id`] is discriminant-only, so two covenants of\nthe same type (e.g. a senior and a total leverage test, or two baskets)\nwould collide in compliance reports and breach tracking without a\ndistinct label. Waivers and breaches key off it.",
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/CovenantScope",
+          "description": "Whether the covenant is maintenance or incurrence."
+        },
+        "springing_condition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SpringingCondition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional activation condition for springing covenants."
+        },
+        "test_frequency": {
+          "$ref": "#/$defs/Tenor",
+          "description": "How frequently the covenant is tested.\n\nDescriptive metadata only: the engine does **not** enforce this\nschedule. Callers control test dates by choosing when to invoke\n[`super::CovenantEngine::evaluate`]."
+        }
+      },
+      "required": [
+        "covenant_type",
+        "test_frequency",
+        "consequences",
+        "is_active",
+        "scope",
+        "label"
+      ],
+      "type": "object"
+    },
+    "CovenantAssessment": {
+      "additionalProperties": false,
+      "description": "Evidence for an explicitly selected covenant on one observation date.",
+      "properties": {
+        "covenant_id": {
+          "description": "Stable covenant instance key.",
+          "type": "string"
+        },
+        "effective_threshold": {
+          "description": "Threshold after the active schedule and lender amendments, when applicable.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "missing_metric": {
+          "description": "Missing metric identifier when the assessment could not complete.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "report": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CovenantReport"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Report produced by the engine for an assessed test."
+        },
+        "state": {
+          "$ref": "#/$defs/CovenantAssessmentState",
+          "description": "Applicability and evidence state of the test."
+        },
+        "terms": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CovenantSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Effective terms selected on the observation date when applicable."
+        }
+      },
+      "required": [
+        "covenant_id",
+        "state"
+      ],
+      "type": "object"
+    },
+    "CovenantAssessmentState": {
+      "description": "Availability and contractual applicability of an individual test.",
+      "oneOf": [
+        {
+          "const": "inactive",
+          "description": "The selected test is outside the effective window or was made inactive.",
+          "type": "string"
+        },
+        {
+          "const": "waived",
+          "description": "The lender waived the test without a replacement threshold.",
+          "type": "string"
+        },
+        {
+          "const": "untriggered",
+          "description": "The specified springing condition was assessed and was not met.",
+          "type": "string"
+        },
+        {
+          "const": "assessed",
+          "description": "The applicable covenant was evaluated on the supplied metric observations.",
+          "type": "string"
+        },
+        {
+          "const": "incomplete",
+          "description": "The test is applicable but required metric evidence is absent.",
+          "type": "string"
+        }
+      ]
+    },
+    "CovenantConsequence": {
+      "description": "Consequence of covenant breach",
+      "oneOf": [
+        {
+          "const": "default",
+          "description": "Event of default",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Interest rate margin increase",
+          "properties": {
+            "rate_increase": {
+              "additionalProperties": false,
+              "properties": {
+                "bp_increase": {
+                  "description": "Increase in basis points",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "bp_increase"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "rate_increase"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Mandatory cash sweep of excess cash flow",
+          "properties": {
+            "cash_sweep": {
+              "additionalProperties": false,
+              "properties": {
+                "sweep_percentage": {
+                  "description": "Percentage of cash flow to sweep",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "sweep_percentage"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "cash_sweep"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "block_distributions",
+          "description": "Block distributions to equity holders",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Require additional collateral",
+          "properties": {
+            "require_collateral": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "description": "Description of collateral requirement",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "description"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "require_collateral"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Accelerate loan maturity date",
+          "properties": {
+            "accelerate_maturity": {
+              "additionalProperties": false,
+              "properties": {
+                "new_maturity": {
+                  "$ref": "#/$defs/DateWire",
+                  "description": "New accelerated maturity date"
+                }
+              },
+              "required": [
+                "new_maturity"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "accelerate_maturity"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "CovenantReport": {
+      "additionalProperties": false,
+      "description": "Covenant check result.",
+      "properties": {
+        "actual_value": {
+          "description": "Actual value of the metric",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "covenant_id": {
+          "description": "Stable machine-readable covenant instance identifier.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "covenant_type": {
+          "description": "Type of covenant being checked",
+          "type": "string"
+        },
+        "details": {
+          "description": "Details or explanation",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "headroom": {
+          "description": "Cushion relative to threshold (positive => passing buffer)",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "headroom_raw": {
+          "description": "Signed cushion in the covenant metric's own units when numerically meaningful.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "meta": {
+          "$ref": "#/$defs/ResultsMeta",
+          "default": {
+            "fx_policy_applied": null,
+            "numeric_mode": "f64",
+            "rounding": {
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "version": "0.11.0"
+          },
+          "description": "Audit stamp: numeric mode, rounding context, and FX policy in force."
+        },
+        "passed": {
+          "description": "Whether the covenant passed",
+          "type": "boolean"
+        },
+        "threshold": {
+          "description": "Required threshold",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "covenant_type",
+        "passed"
+      ],
+      "type": "object"
+    },
+    "CovenantScope": {
+      "description": "Whether a covenant is tested periodically or only upon an action.",
+      "oneOf": [
+        {
+          "const": "maintenance",
+          "description": "Tested on a schedule (e.g., quarterly leverage tests).",
+          "type": "string"
+        },
+        {
+          "const": "incurrence",
+          "description": "Tested only upon specific actions (e.g., incurrence of debt).",
+          "type": "string"
+        }
+      ]
+    },
+    "CovenantSpec": {
+      "additionalProperties": false,
+      "description": "Covenant evaluation specification.",
+      "properties": {
+        "covenant": {
+          "$ref": "#/$defs/Covenant",
+          "description": "The covenant to evaluate"
+        },
+        "denominator_metric_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Earnings denominator used to validate a leverage ratio. Required for net\ndebt/EBITDA, where a negative ratio can mean net cash or negative earnings.\nValues must be finite and in the same reporting-period convention as the\nratio. A non-positive denominator makes the test a breach with no headroom."
+        },
+        "metric_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Metric ID to use for evaluation (for financial covenants), conventionally\na statements node ID such as `debt_to_ebitda`, `ebitda`,\n`interest_coverage`, or `dscr`."
+        },
+        "threshold_schedule": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ThresholdSchedule"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Time-varying threshold schedule that overrides the static threshold in\n[`CovenantType`] when present. Enables leverage step-down schedules."
+        }
+      },
+      "required": [
+        "covenant"
+      ],
+      "type": "object"
+    },
+    "CovenantType": {
+      "description": "Type of financial or operational covenant",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Maximum debt-to-EBITDA ratio",
+          "properties": {
+            "max_debt_to_ebitda": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Maximum allowed ratio",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "max_debt_to_ebitda"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Minimum interest coverage ratio (EBIT/Interest)",
+          "properties": {
+            "min_interest_coverage": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Minimum required ratio",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "min_interest_coverage"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Minimum fixed charge coverage ratio",
+          "properties": {
+            "min_fixed_charge_coverage": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Minimum required coverage",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "min_fixed_charge_coverage"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Maximum total leverage ratio",
+          "properties": {
+            "max_total_leverage": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Maximum allowed leverage",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "max_total_leverage"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Maximum senior leverage ratio",
+          "properties": {
+            "max_senior_leverage": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Maximum allowed senior leverage",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "max_senior_leverage"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Minimum asset coverage ratio",
+          "properties": {
+            "min_asset_coverage": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Minimum required coverage",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "min_asset_coverage"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Negative covenant (prohibition)",
+          "properties": {
+            "negative": {
+              "additionalProperties": false,
+              "properties": {
+                "restriction": {
+                  "description": "Description of restriction",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "restriction"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "negative"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Affirmative covenant (requirement)",
+          "properties": {
+            "affirmative": {
+              "additionalProperties": false,
+              "properties": {
+                "requirement": {
+                  "description": "Description of requirement",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "requirement"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "affirmative"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Custom covenant with metric and threshold test",
+          "properties": {
+            "custom": {
+              "additionalProperties": false,
+              "properties": {
+                "metric": {
+                  "description": "Name of metric to test",
+                  "type": "string"
+                },
+                "test": {
+                  "$ref": "#/$defs/ThresholdTest",
+                  "description": "Threshold test (min or max)"
+                }
+              },
+              "required": [
+                "metric",
+                "test"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "custom"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Basket tracking covenant (e.g., available debt baskets)",
+          "properties": {
+            "basket": {
+              "additionalProperties": false,
+              "properties": {
+                "limit": {
+                  "description": "Maximum allowed utilization of the basket",
+                  "format": "double",
+                  "type": "number"
+                },
+                "name": {
+                  "description": "Basket identifier/metric name",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "limit"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "basket"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Minimum debt service coverage ratio (EBITDA / Debt Service)",
+          "properties": {
+            "min_dscr": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Minimum required coverage",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "min_dscr"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Maximum net debt to EBITDA ratio (net of cash)",
+          "properties": {
+            "max_net_debt_to_ebitda": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Maximum allowed ratio",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "max_net_debt_to_ebitda"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Maximum capital expenditure",
+          "properties": {
+            "max_capex": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Maximum allowed capex amount",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "max_capex"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Minimum liquidity (cash + available revolver)",
+          "properties": {
+            "min_liquidity": {
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "description": "Minimum required liquidity",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "min_liquidity"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Currency": {
+      "description": "ISO 4217 currency enumeration",
+      "oneOf": [
+        {
+          "const": "AED",
+          "description": "UAE Dirham (784)",
+          "type": "string"
+        },
+        {
+          "const": "AFN",
+          "description": "Afghani (971)",
+          "type": "string"
+        },
+        {
+          "const": "ALL",
+          "description": "Lek (8)",
+          "type": "string"
+        },
+        {
+          "const": "AMD",
+          "description": "Armenian Dram (51)",
+          "type": "string"
+        },
+        {
+          "const": "ANG",
+          "description": "Netherlands Antillean Guilder (532)",
+          "type": "string"
+        },
+        {
+          "const": "AOA",
+          "description": "Kwanza (973)",
+          "type": "string"
+        },
+        {
+          "const": "ARS",
+          "description": "Argentine Peso (32)",
+          "type": "string"
+        },
+        {
+          "const": "AUD",
+          "description": "Australian Dollar (36)",
+          "type": "string"
+        },
+        {
+          "const": "AWG",
+          "description": "Aruban Florin (533)",
+          "type": "string"
+        },
+        {
+          "const": "AZN",
+          "description": "Azerbaijan Manat (944)",
+          "type": "string"
+        },
+        {
+          "const": "BAM",
+          "description": "Convertible Mark (977)",
+          "type": "string"
+        },
+        {
+          "const": "BBD",
+          "description": "Barbados Dollar (52)",
+          "type": "string"
+        },
+        {
+          "const": "BDT",
+          "description": "Taka (50)",
+          "type": "string"
+        },
+        {
+          "const": "BGN",
+          "description": "Bulgarian Lev (975)",
+          "type": "string"
+        },
+        {
+          "const": "BHD",
+          "description": "Bahraini Dinar (48)",
+          "type": "string"
+        },
+        {
+          "const": "BIF",
+          "description": "Burundi Franc (108)",
+          "type": "string"
+        },
+        {
+          "const": "BMD",
+          "description": "Bermudian Dollar (60)",
+          "type": "string"
+        },
+        {
+          "const": "BND",
+          "description": "Brunei Dollar (96)",
+          "type": "string"
+        },
+        {
+          "const": "BOB",
+          "description": "Boliviano (68)",
+          "type": "string"
+        },
+        {
+          "const": "BRL",
+          "description": "Brazilian Real (986)",
+          "type": "string"
+        },
+        {
+          "const": "BSD",
+          "description": "Bahamian Dollar (44)",
+          "type": "string"
+        },
+        {
+          "const": "BTN",
+          "description": "Ngultrum (64)",
+          "type": "string"
+        },
+        {
+          "const": "BWP",
+          "description": "Pula (72)",
+          "type": "string"
+        },
+        {
+          "const": "BYN",
+          "description": "Belarusian Ruble (933)",
+          "type": "string"
+        },
+        {
+          "const": "BZD",
+          "description": "Belize Dollar (84)",
+          "type": "string"
+        },
+        {
+          "const": "CAD",
+          "description": "Canadian Dollar (124)",
+          "type": "string"
+        },
+        {
+          "const": "CDF",
+          "description": "Congolese Franc (976)",
+          "type": "string"
+        },
+        {
+          "const": "CHF",
+          "description": "Swiss Franc (756)",
+          "type": "string"
+        },
+        {
+          "const": "CLF",
+          "description": "Unidad de Fomento (990)",
+          "type": "string"
+        },
+        {
+          "const": "CLP",
+          "description": "Chilean Peso (152)",
+          "type": "string"
+        },
+        {
+          "const": "CNY",
+          "description": "Yuan Renminbi (156)",
+          "type": "string"
+        },
+        {
+          "const": "COP",
+          "description": "Colombian Peso (170)",
+          "type": "string"
+        },
+        {
+          "const": "CRC",
+          "description": "Costa Rican Colon (188)",
+          "type": "string"
+        },
+        {
+          "const": "CUC",
+          "description": "Peso Convertible (931)",
+          "type": "string"
+        },
+        {
+          "const": "CUP",
+          "description": "Cuban Peso (192)",
+          "type": "string"
+        },
+        {
+          "const": "CVE",
+          "description": "Cabo Verde Escudo (132)",
+          "type": "string"
+        },
+        {
+          "const": "CZK",
+          "description": "Czech Koruna (203)",
+          "type": "string"
+        },
+        {
+          "const": "DJF",
+          "description": "Djibouti Franc (262)",
+          "type": "string"
+        },
+        {
+          "const": "DKK",
+          "description": "Danish Krone (208)",
+          "type": "string"
+        },
+        {
+          "const": "DOP",
+          "description": "Dominican Peso (214)",
+          "type": "string"
+        },
+        {
+          "const": "DZD",
+          "description": "Algerian Dinar (12)",
+          "type": "string"
+        },
+        {
+          "const": "EGP",
+          "description": "Egyptian Pound (818)",
+          "type": "string"
+        },
+        {
+          "const": "ERN",
+          "description": "Nakfa (232)",
+          "type": "string"
+        },
+        {
+          "const": "ETB",
+          "description": "Ethiopian Birr (230)",
+          "type": "string"
+        },
+        {
+          "const": "EUR",
+          "description": "Euro (978)",
+          "type": "string"
+        },
+        {
+          "const": "FJD",
+          "description": "Fiji Dollar (242)",
+          "type": "string"
+        },
+        {
+          "const": "FKP",
+          "description": "Falkland Islands Pound (238)",
+          "type": "string"
+        },
+        {
+          "const": "GBP",
+          "description": "Pound Sterling (826)",
+          "type": "string"
+        },
+        {
+          "const": "GEL",
+          "description": "Lari (981)",
+          "type": "string"
+        },
+        {
+          "const": "GHS",
+          "description": "Ghana Cedi (936)",
+          "type": "string"
+        },
+        {
+          "const": "GIP",
+          "description": "Gibraltar Pound (292)",
+          "type": "string"
+        },
+        {
+          "const": "GMD",
+          "description": "Dalasi (270)",
+          "type": "string"
+        },
+        {
+          "const": "GNF",
+          "description": "Guinean Franc (324)",
+          "type": "string"
+        },
+        {
+          "const": "GTQ",
+          "description": "Quetzal (320)",
+          "type": "string"
+        },
+        {
+          "const": "GYD",
+          "description": "Guyana Dollar (328)",
+          "type": "string"
+        },
+        {
+          "const": "HKD",
+          "description": "Hong Kong Dollar (344)",
+          "type": "string"
+        },
+        {
+          "const": "HNL",
+          "description": "Lempira (340)",
+          "type": "string"
+        },
+        {
+          "const": "HRK",
+          "description": "Kuna (191)",
+          "type": "string"
+        },
+        {
+          "const": "HTG",
+          "description": "Gourde (332)",
+          "type": "string"
+        },
+        {
+          "const": "HUF",
+          "description": "Forint (348)",
+          "type": "string"
+        },
+        {
+          "const": "IDR",
+          "description": "Rupiah (360)",
+          "type": "string"
+        },
+        {
+          "const": "ILS",
+          "description": "New Israeli Sheqel (376)",
+          "type": "string"
+        },
+        {
+          "const": "INR",
+          "description": "Indian Rupee (356)",
+          "type": "string"
+        },
+        {
+          "const": "IQD",
+          "description": "Iraqi Dinar (368)",
+          "type": "string"
+        },
+        {
+          "const": "IRR",
+          "description": "Iranian Rial (364)",
+          "type": "string"
+        },
+        {
+          "const": "ISK",
+          "description": "Iceland Krona (352)",
+          "type": "string"
+        },
+        {
+          "const": "JMD",
+          "description": "Jamaican Dollar (388)",
+          "type": "string"
+        },
+        {
+          "const": "JOD",
+          "description": "Jordanian Dinar (400)",
+          "type": "string"
+        },
+        {
+          "const": "JPY",
+          "description": "Yen (392)",
+          "type": "string"
+        },
+        {
+          "const": "KES",
+          "description": "Kenyan Shilling (404)",
+          "type": "string"
+        },
+        {
+          "const": "KGS",
+          "description": "Som (417)",
+          "type": "string"
+        },
+        {
+          "const": "KHR",
+          "description": "Riel (116)",
+          "type": "string"
+        },
+        {
+          "const": "KMF",
+          "description": "Comorian Franc (174)",
+          "type": "string"
+        },
+        {
+          "const": "KPW",
+          "description": "North Korean Won (408)",
+          "type": "string"
+        },
+        {
+          "const": "KRW",
+          "description": "Won (410)",
+          "type": "string"
+        },
+        {
+          "const": "KWD",
+          "description": "Kuwaiti Dinar (414)",
+          "type": "string"
+        },
+        {
+          "const": "KYD",
+          "description": "Cayman Islands Dollar (136)",
+          "type": "string"
+        },
+        {
+          "const": "KZT",
+          "description": "Tenge (398)",
+          "type": "string"
+        },
+        {
+          "const": "LAK",
+          "description": "Lao Kip (418)",
+          "type": "string"
+        },
+        {
+          "const": "LBP",
+          "description": "Lebanese Pound (422)",
+          "type": "string"
+        },
+        {
+          "const": "LKR",
+          "description": "Sri Lanka Rupee (144)",
+          "type": "string"
+        },
+        {
+          "const": "LRD",
+          "description": "Liberian Dollar (430)",
+          "type": "string"
+        },
+        {
+          "const": "LSL",
+          "description": "Loti (426)",
+          "type": "string"
+        },
+        {
+          "const": "LYD",
+          "description": "Libyan Dinar (434)",
+          "type": "string"
+        },
+        {
+          "const": "MAD",
+          "description": "Moroccan Dirham (504)",
+          "type": "string"
+        },
+        {
+          "const": "MDL",
+          "description": "Moldovan Leu (498)",
+          "type": "string"
+        },
+        {
+          "const": "MGA",
+          "description": "Malagasy Ariary (969)",
+          "type": "string"
+        },
+        {
+          "const": "MKD",
+          "description": "Denar (807)",
+          "type": "string"
+        },
+        {
+          "const": "MMK",
+          "description": "Kyat (104)",
+          "type": "string"
+        },
+        {
+          "const": "MNT",
+          "description": "Tugrik (496)",
+          "type": "string"
+        },
+        {
+          "const": "MOP",
+          "description": "Pataca (446)",
+          "type": "string"
+        },
+        {
+          "const": "MRU",
+          "description": "Ouguiya (929)",
+          "type": "string"
+        },
+        {
+          "const": "MUR",
+          "description": "Mauritius Rupee (480)",
+          "type": "string"
+        },
+        {
+          "const": "MVR",
+          "description": "Rufiyaa (462)",
+          "type": "string"
+        },
+        {
+          "const": "MWK",
+          "description": "Malawi Kwacha (454)",
+          "type": "string"
+        },
+        {
+          "const": "MXN",
+          "description": "Mexican Peso (484)",
+          "type": "string"
+        },
+        {
+          "const": "MYR",
+          "description": "Malaysian Ringgit (458)",
+          "type": "string"
+        },
+        {
+          "const": "MZN",
+          "description": "Mozambique Metical (943)",
+          "type": "string"
+        },
+        {
+          "const": "NAD",
+          "description": "Namibia Dollar (516)",
+          "type": "string"
+        },
+        {
+          "const": "NGN",
+          "description": "Naira (566)",
+          "type": "string"
+        },
+        {
+          "const": "NIO",
+          "description": "Cordoba Oro (558)",
+          "type": "string"
+        },
+        {
+          "const": "NOK",
+          "description": "Norwegian Krone (578)",
+          "type": "string"
+        },
+        {
+          "const": "NPR",
+          "description": "Nepalese Rupee (524)",
+          "type": "string"
+        },
+        {
+          "const": "NZD",
+          "description": "New Zealand Dollar (554)",
+          "type": "string"
+        },
+        {
+          "const": "OMR",
+          "description": "Rial Omani (512)",
+          "type": "string"
+        },
+        {
+          "const": "PAB",
+          "description": "Balboa (590)",
+          "type": "string"
+        },
+        {
+          "const": "PEN",
+          "description": "Sol (604)",
+          "type": "string"
+        },
+        {
+          "const": "PGK",
+          "description": "Kina (598)",
+          "type": "string"
+        },
+        {
+          "const": "PHP",
+          "description": "Philippine Peso (608)",
+          "type": "string"
+        },
+        {
+          "const": "PKR",
+          "description": "Pakistan Rupee (586)",
+          "type": "string"
+        },
+        {
+          "const": "PLN",
+          "description": "Zloty (985)",
+          "type": "string"
+        },
+        {
+          "const": "PYG",
+          "description": "Guarani (600)",
+          "type": "string"
+        },
+        {
+          "const": "QAR",
+          "description": "Qatari Rial (634)",
+          "type": "string"
+        },
+        {
+          "const": "RON",
+          "description": "Romanian Leu (946)",
+          "type": "string"
+        },
+        {
+          "const": "RSD",
+          "description": "Serbian Dinar (941)",
+          "type": "string"
+        },
+        {
+          "const": "RUB",
+          "description": "Russian Ruble (643)",
+          "type": "string"
+        },
+        {
+          "const": "RWF",
+          "description": "Rwanda Franc (646)",
+          "type": "string"
+        },
+        {
+          "const": "SAR",
+          "description": "Saudi Riyal (682)",
+          "type": "string"
+        },
+        {
+          "const": "SBD",
+          "description": "Solomon Islands Dollar (90)",
+          "type": "string"
+        },
+        {
+          "const": "SCR",
+          "description": "Seychelles Rupee (690)",
+          "type": "string"
+        },
+        {
+          "const": "SDG",
+          "description": "Sudanese Pound (938)",
+          "type": "string"
+        },
+        {
+          "const": "SEK",
+          "description": "Swedish Krona (752)",
+          "type": "string"
+        },
+        {
+          "const": "SGD",
+          "description": "Singapore Dollar (702)",
+          "type": "string"
+        },
+        {
+          "const": "SHP",
+          "description": "Saint Helena Pound (654)",
+          "type": "string"
+        },
+        {
+          "const": "SLE",
+          "description": "Leone (925)",
+          "type": "string"
+        },
+        {
+          "const": "SLL",
+          "description": "Leone (694)",
+          "type": "string"
+        },
+        {
+          "const": "SOS",
+          "description": "Somali Shilling (706)",
+          "type": "string"
+        },
+        {
+          "const": "SRD",
+          "description": "Surinam Dollar (968)",
+          "type": "string"
+        },
+        {
+          "const": "SSP",
+          "description": "South Sudanese Pound (728)",
+          "type": "string"
+        },
+        {
+          "const": "STN",
+          "description": "Dobra (930)",
+          "type": "string"
+        },
+        {
+          "const": "SYP",
+          "description": "Syrian Pound (760)",
+          "type": "string"
+        },
+        {
+          "const": "SZL",
+          "description": "Lilangeni (748)",
+          "type": "string"
+        },
+        {
+          "const": "THB",
+          "description": "Baht (764)",
+          "type": "string"
+        },
+        {
+          "const": "TJS",
+          "description": "Somoni (972)",
+          "type": "string"
+        },
+        {
+          "const": "TMT",
+          "description": "Turkmenistan New Manat (934)",
+          "type": "string"
+        },
+        {
+          "const": "TND",
+          "description": "Tunisian Dinar (788)",
+          "type": "string"
+        },
+        {
+          "const": "TOP",
+          "description": "Pa'anga (776)",
+          "type": "string"
+        },
+        {
+          "const": "TRY",
+          "description": "Turkish Lira (949)",
+          "type": "string"
+        },
+        {
+          "const": "TTD",
+          "description": "Trinidad and Tobago Dollar (780)",
+          "type": "string"
+        },
+        {
+          "const": "TWD",
+          "description": "New Taiwan Dollar (901)",
+          "type": "string"
+        },
+        {
+          "const": "TZS",
+          "description": "Tanzanian Shilling (834)",
+          "type": "string"
+        },
+        {
+          "const": "UAH",
+          "description": "Hryvnia (980)",
+          "type": "string"
+        },
+        {
+          "const": "UGX",
+          "description": "Uganda Shilling (800)",
+          "type": "string"
+        },
+        {
+          "const": "USD",
+          "description": "US Dollar (840)",
+          "type": "string"
+        },
+        {
+          "const": "UYU",
+          "description": "Peso Uruguayo (858)",
+          "type": "string"
+        },
+        {
+          "const": "UZS",
+          "description": "Uzbekistan Sum (860)",
+          "type": "string"
+        },
+        {
+          "const": "VED",
+          "description": "Bolívar Soberano (926)",
+          "type": "string"
+        },
+        {
+          "const": "VES",
+          "description": "Bolívar Soberano (928)",
+          "type": "string"
+        },
+        {
+          "const": "VND",
+          "description": "Dong (704)",
+          "type": "string"
+        },
+        {
+          "const": "VUV",
+          "description": "Vatu (548)",
+          "type": "string"
+        },
+        {
+          "const": "WST",
+          "description": "Tala (882)",
+          "type": "string"
+        },
+        {
+          "const": "XAF",
+          "description": "CFA Franc BEAC (950)",
+          "type": "string"
+        },
+        {
+          "const": "XCD",
+          "description": "East Caribbean Dollar (951)",
+          "type": "string"
+        },
+        {
+          "const": "XCG",
+          "description": "Caribbean Guilder (532)",
+          "type": "string"
+        },
+        {
+          "const": "XOF",
+          "description": "CFA Franc BCEAO (952)",
+          "type": "string"
+        },
+        {
+          "const": "XPF",
+          "description": "CFP Franc (953)",
+          "type": "string"
+        },
+        {
+          "const": "YER",
+          "description": "Yemeni Rial (886)",
+          "type": "string"
+        },
+        {
+          "const": "ZAR",
+          "description": "Rand (710)",
+          "type": "string"
+        },
+        {
+          "const": "ZMW",
+          "description": "Zambian Kwacha (967)",
+          "type": "string"
+        },
+        {
+          "const": "ZWG",
+          "description": "Zimbabwe Gold (924)",
+          "type": "string"
+        },
+        {
+          "const": "ZWL",
+          "description": "Zimbabwe Dollar (932)",
+          "type": "string"
+        }
+      ]
+    },
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "DecimalWire": {
+      "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
+      "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+      "type": "string"
+    },
+    "ForecastStream": {
+      "additionalProperties": false,
+      "description": "Replay provenance of one stochastic forecast node in a single run.\n\nThe generator is the shared PCG64 started at `state` on stream `stream`\n(`Pcg64Rng::new_with_stream(state, stream)`). Both are derived from the\nversioned key: the key version, the configured seed, the node and the\nsingle-run mode. Unsigned 64-bit values are decimal strings in JSON.",
+      "properties": {
+        "node_id": {
+          "description": "The stochastic forecast node.",
+          "type": "string"
+        },
+        "seed": {
+          "description": "The forecast method's exact configured seed.",
+          "type": "string"
+        },
+        "state": {
+          "description": "Effective PCG64 starting state.",
+          "type": "string"
+        },
+        "stream": {
+          "description": "Effective PCG64 stream selector.",
+          "type": "string"
+        },
+        "stream_version": {
+          "description": "Version of the mapping from the key to the stream.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node_id",
+        "stream_version",
+        "seed",
+        "state",
+        "stream"
+      ],
+      "type": "object"
+    },
+    "Id": {
+      "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
+      "type": "string"
+    },
+    "Money": {
+      "additionalProperties": false,
+      "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
+      "properties": {
+        "amount": {
+          "$ref": "#/$defs/DecimalWire",
+          "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not."
+        },
+        "currency": {
+          "$ref": "#/$defs/Currency",
+          "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion."
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "type": "object"
+    },
+    "ObservationCutoff": {
+      "description": "Which explicit observations an evaluation may read.\n\nOn the wire: `\"full_snapshot\"`, or `{\"through\": \"2025-04-25\"}`.",
+      "oneOf": [
+        {
+          "const": "full_snapshot",
+          "description": "Read every observation in the model's snapshot, with no publication\ncutoff.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Read an observation only when its availability date is on or before\nthis date, inclusive through the end of the day.",
+          "properties": {
+            "through": {
+              "$ref": "#/$defs/DateWire"
+            }
+          },
+          "required": [
+            "through"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PeriodId": {
+      "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
+      "type": "string"
+    },
+    "PositiveF64Wire": {
+      "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
+      "exclusiveMinimum": 0.0,
+      "format": "double",
+      "type": "number"
+    },
+    "ResultsMeta": {
+      "description": "Metadata bundle that accompanies valuation outputs.\n\nThe metadata is intentionally small so it can be attached to reports and\ndownstream data stores for reproducibility and audit trails.\n\n# Examples\n```rust\nuse finstack_quant_core::config::{results_meta, FinstackConfig, NUMERIC_MODE_F64};\n\nlet meta = results_meta(&FinstackConfig::default());\nassert_eq!(meta.numeric_mode, NUMERIC_MODE_F64);\nassert!(meta.timestamp.is_none()); // deterministic by default\n```",
+      "properties": {
+        "fx_policy_applied": {
+          "default": null,
+          "description": "Optional FX policy applied by the computing layer (human-readable key).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "numeric_mode": {
+          "description": "Numeric engine mode used to produce the results.\n\nAlways [`NUMERIC_MODE_F64`] today; a plain string so result\nenvelopes stay wire-compatible across host languages.",
+          "type": "string"
+        },
+        "parallel": {
+          "description": "Whether the producing computation ran in parallel.\n\nSerial results omit the field entirely so existing payloads and golden\nfiles stay byte-identical.",
+          "type": "boolean"
+        },
+        "rounding": {
+          "$ref": "#/$defs/RoundingContext",
+          "description": "Rounding context snapshot applied to IO boundaries."
+        },
+        "timestamp": {
+          "description": "Timestamp when result was computed (ISO 8601 format).\nUseful for audit trails and reproducibility.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "description": "Finstack Quant library version used to produce the result.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "numeric_mode",
+        "rounding"
+      ],
+      "type": "object"
+    },
+    "RoundingContext": {
+      "description": "Snapshot of active rounding settings used for result stamping.\n\nInstances are produced from a [`FinstackConfig`] via `RoundingContext::from` and persisted\nalongside valuation results.",
+      "properties": {
+        "ingest_scale_by_currency": {
+          "additionalProperties": {
+            "maximum": 28,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": "Validated ingest scale snapshot by currency code, with values in `0..=28`.",
+          "type": "object"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoundingMode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Explicitly selected rounding mode; absent when none was selected."
+        },
+        "output_scale_by_currency": {
+          "additionalProperties": {
+            "maximum": 28,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": "Validated output scale snapshot by currency code, with values in `0..=28`.",
+          "type": "object"
+        },
+        "tolerances": {
+          "$ref": "#/$defs/ToleranceConfig",
+          "default": {
+            "generic_epsilon": 1e-10
+          },
+          "description": "Tolerance settings snapshot for floating-point comparisons."
+        },
+        "version": {
+          "description": "Schema version for forward compatibility.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ingest_scale_by_currency",
+        "output_scale_by_currency",
+        "version"
+      ],
+      "type": "object"
+    },
+    "RoundingMode": {
+      "description": "Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).\n\nThere is no default mode: every financial rounding names one explicitly.\n\n# Examples\n```rust\nuse finstack_quant_core::config::{FinstackConfig, RoundingMode};\n\nlet mut cfg = FinstackConfig::default();\nassert_eq!(cfg.rounding.mode, None);\ncfg.rounding.mode = Some(RoundingMode::TowardZero);\nassert_eq!(cfg.rounding.mode, Some(RoundingMode::TowardZero));\n```",
+      "oneOf": [
+        {
+          "const": "bankers",
+          "description": "Nearest; an exact midpoint goes to the even coefficient.",
+          "type": "string"
+        },
+        {
+          "const": "midpoint_away_from_zero",
+          "description": "Nearest; an exact midpoint increases absolute magnitude. Other\nfractions round to nearest (`1.1` -> `1`), not away from zero.",
+          "type": "string"
+        },
+        {
+          "const": "toward_zero",
+          "description": "Round toward zero (truncate).",
+          "type": "string"
+        },
+        {
+          "const": "floor",
+          "description": "Round toward negative infinity.",
+          "type": "string"
+        },
+        {
+          "const": "ceil",
+          "description": "Round toward positive infinity.",
+          "type": "string"
+        }
+      ]
+    },
+    "RunProvenance": {
+      "additionalProperties": false,
+      "description": "What a result was evaluated from.\n\nA consumer that is handed a result checks this against the model, period\nplan and run it expects before trusting the cells.",
+      "properties": {
+        "forecast_streams": {
+          "description": "The random stream of every stochastic forecast node in a single run,\nin model node order: enough to replay its draws.",
+          "items": {
+            "$ref": "#/$defs/ForecastStream"
+          },
+          "type": "array"
+        },
+        "market_content_hash": {
+          "description": "Canonical snapshot hash of the market held for an explicitly priced run.\nAbsent if the supplied provider cannot furnish a coherent capture.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model_content_hash": {
+          "description": "Canonical content hash of the evaluated model\n([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).",
+          "type": "string"
+        },
+        "model_id": {
+          "description": "Identifier of the evaluated model.",
+          "type": "string"
+        },
+        "observation_cutoff": {
+          "$ref": "#/$defs/ObservationCutoff",
+          "description": "Observations the run was allowed to read."
+        },
+        "run_id": {
+          "description": "Identity of this evaluation run: the canonical content hash of the\nfields above, including the market snapshot identity when it was supplied.",
+          "type": "string"
+        },
+        "source_snapshot": {
+          "description": "Identity of the source snapshot the model's observations came from.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "valuation_date": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DateWire"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Valuation date the capital structure was priced at, when the run used\na market."
+        }
+      },
+      "required": [
+        "model_id",
+        "model_content_hash",
+        "observation_cutoff",
+        "run_id"
+      ],
+      "type": "object"
+    },
+    "SpringingCondition": {
+      "additionalProperties": false,
+      "description": "Optional activation condition for springing covenants.",
+      "properties": {
+        "metric_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Metric that controls activation (e.g., revolver utilization), named by\nits statements node ID."
+        },
+        "test": {
+          "$ref": "#/$defs/ThresholdTest",
+          "description": "Threshold test applied to the metric."
+        }
+      },
+      "required": [
+        "metric_id",
+        "test"
+      ],
+      "type": "object"
+    },
+    "StatementCovenantPeriod": {
+      "additionalProperties": false,
+      "description": "Covenant results over one verified statement reporting interval.",
+      "properties": {
+        "assessments": {
+          "description": "Individual effective terms, status and reports from the covenant owner.",
+          "items": {
+            "$ref": "#/$defs/CovenantAssessment"
+          },
+          "type": "array"
+        },
+        "date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Last included day of the stored fiscal or calendar interval."
+        },
+        "is_actual": {
+          "description": "Whether observations in this period are historical actuals.",
+          "type": "boolean"
+        },
+        "observations": {
+          "additionalProperties": {
+            "$ref": "#/$defs/AmountOrScalar"
+          },
+          "description": "Available typed observations by contractual metric identity.",
+          "type": "object"
+        },
+        "period": {
+          "$ref": "#/$defs/PeriodId",
+          "description": "Stored reporting period selected by the caller."
+        }
+      },
+      "required": [
+        "period",
+        "date",
+        "is_actual",
+        "assessments",
+        "observations"
+      ],
+      "type": "object"
+    },
+    "Tenor": {
+      "additionalProperties": false,
+      "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_quant_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months).expect(\"valid tenor fixture\");\nassert_eq!(tenor.count(), 3);\nassert_eq!(tenor.unit(), TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count(), 6);\nassert_eq!(parsed.unit(), TenorUnit::Months);\n# Ok(())\n# }\n```",
+      "properties": {
+        "count": {
+          "description": "Number of `unit` periods in the tenor. Must be at least 1; `0` is\nrejected because a zero-length period makes schedule generation loop.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unit": {
+          "$ref": "#/$defs/TenorUnit",
+          "description": "Calendar unit the count is expressed in, such as days, weeks, months,\nor years."
+        }
+      },
+      "required": [
+        "count",
+        "unit"
+      ],
+      "type": "object"
+    },
+    "TenorUnit": {
+      "description": "Unit of a tenor period.",
+      "oneOf": [
+        {
+          "const": "days",
+          "description": "Days (D)",
+          "type": "string"
+        },
+        {
+          "const": "weeks",
+          "description": "Weeks (W)",
+          "type": "string"
+        },
+        {
+          "const": "months",
+          "description": "Months (M)",
+          "type": "string"
+        },
+        {
+          "const": "years",
+          "description": "Years (Y)",
+          "type": "string"
+        }
+      ]
+    },
+    "ThresholdSchedule": {
+      "description": "Piecewise-constant threshold schedule for covenants.\n\nEntries are stored sorted by date ascending. The effective threshold for a\ntest date is the last entry with date <= test_date. If no entry applies,\n[`ThresholdSchedule::threshold_for`] returns `None`.",
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "$ref": "#/$defs/DateWire"
+          },
+          {
+            "format": "double",
+            "type": "number"
+          }
+        ],
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "ThresholdTest": {
+      "description": "Threshold test type (maximum or minimum bound)",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Maximum allowed value",
+          "properties": {
+            "maximum": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "maximum"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Minimum required value",
+          "properties": {
+            "minimum": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "minimum"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ToleranceConfig": {
+      "additionalProperties": false,
+      "description": "Numerical tolerance configuration for floating-point comparisons.\n\nProvides the configurable epsilon for generic floating-point zero-checks.\nThe default is chosen to balance numerical stability with practical\nprecision requirements.\n\n# Examples\n```rust\nuse finstack_quant_core::config::ToleranceConfig;\n\nlet mut tol = ToleranceConfig::default();\nassert_eq!(tol.generic_epsilon, 1e-10);\n\n// Customize for stricter comparisons\ntol.generic_epsilon = 1e-12;\n```",
+      "properties": {
+        "generic_epsilon": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "default": 1e-10,
+          "description": "Epsilon for generic floating-point comparisons (default: 1e-10).\n\nUsed for general numerical comparisons where higher tolerance is acceptable."
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/statement_covenant_assessment.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Effective covenant terms and available evidence by dated period.",
+  "properties": {
+    "periods": {
+      "description": "Historical and projected observations in request order.",
+      "items": {
+        "$ref": "#/$defs/StatementCovenantPeriod"
+      },
+      "type": "array"
+    },
+    "provenance": {
+      "$ref": "#/$defs/RunProvenance",
+      "description": "Run identity of the admitted statement."
+    },
+    "scope": {
+      "$ref": "#/$defs/CovenantScope",
+      "description": "Maintenance or incurrence selection."
+    }
+  },
+  "required": [
+    "provenance",
+    "scope",
+    "periods"
+  ],
+  "title": "StatementCovenantAssessment",
+  "type": "object"
+}

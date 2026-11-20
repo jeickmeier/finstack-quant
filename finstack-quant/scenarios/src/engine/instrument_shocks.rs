@@ -93,25 +93,38 @@ fn apply_correlation_shock(
     let mut warnings = Vec::new();
 
     for (index, inst) in instruments.iter_mut().enumerate() {
-        let Some(sc) = inst.as_any_mut().downcast_mut::<StructuredCredit>() else {
+        use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCreditTranche;
+        let instrument_id = inst.id().to_owned();
+        let deal = inst
+            .as_any()
+            .downcast_ref::<StructuredCredit>()
+            .or_else(|| {
+                inst.as_any()
+                    .downcast_ref::<StructuredCreditTranche>()
+                    .map(StructuredCreditTranche::deal)
+            });
+        let Some(corr) = deal.and_then(|deal| deal.credit_model.correlation_structure.as_ref())
+        else {
             continue;
         };
-        let Some(ref corr) = sc.credit_model.correlation_structure else {
-            continue;
-        };
-
         let (new_corr, clamp_info) = match kind {
             CorrelationKind::Asset => corr.bump_asset(delta_pts),
             CorrelationKind::PrepayDefault => corr.bump_prepay_default(delta_pts),
         };
-
         if let Some(info) = clamp_info {
             warnings.push(Warning::CorrelationClamped {
-                instrument_id: sc.id.to_string(),
+                instrument_id,
                 detail: info,
             });
         }
-        sc.credit_model.correlation_structure = Some(new_corr);
+        match inst.as_any_mut().downcast_mut::<StructuredCreditTranche>() {
+            Some(note) => note.set_correlation(new_corr),
+            None => {
+                if let Some(deal) = inst.as_any_mut().downcast_mut::<StructuredCredit>() {
+                    deal.credit_model.correlation_structure = Some(new_corr);
+                }
+            }
+        }
         changed_indices.push(index);
     }
 

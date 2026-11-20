@@ -217,10 +217,6 @@ export type CorrelationStructure =
  */
 export type CorrelationWire = number;
 /**
- * Option payoff direction used by analytical and numerical model engines.
- */
-export type OptionType = "call" | "put";
-/**
  * Strategy for assembling the factor covariance matrix.
  */
 export type CovarianceStrategy =
@@ -986,6 +982,10 @@ export type FbmSpec =
     };
 export type Interpolation = "linear" | "constant_intervals";
 /**
+ * Option payoff direction used by analytical and numerical model engines.
+ */
+export type OptionType = "call" | "put";
+/**
  * Factor model specification for configuration and serialization.
  */
 export type LatentFactorSpec =
@@ -1506,10 +1506,6 @@ export type ProcessSpec =
        */
       rho: number;
       /**
-       * Vol-of-vol.
-       */
-      sigma_v: number;
-      /**
        * Long-run variance.
        */
       theta: number;
@@ -1518,6 +1514,10 @@ export type ProcessSpec =
        * Initial variance.
        */
       v0: number;
+      /**
+       * Vol-of-vol.
+       */
+      vol_of_vol: number;
     }
   | {
       /**
@@ -1655,10 +1655,6 @@ export type ProcessSpec =
        */
       rho: number;
       /**
-       * Volatility of variance — vol-of-vol (σᵥ > 0).
-       */
-      sigma_v: number;
-      /**
        * Long-run variance level (θ > 0).
        */
       theta: number;
@@ -1667,6 +1663,10 @@ export type ProcessSpec =
        * Initial variance (v₀ > 0).
        */
       v0: number;
+      /**
+       * Volatility of variance — vol-of-vol (σᵥ > 0).
+       */
+      vol_of_vol: number;
     }
   | (CheyetteRoughVolParams & {
       type: "cheyette_rough";
@@ -2609,40 +2609,6 @@ export interface CosConfig {
    */
   truncation_l: number;
   [k: string]: unknown;
-}
-/**
- * Option and market inputs of the COS Fourier pricers.
- */
-export interface CosMarketParams {
-  /**
-   * Continuous dividend yield (decimal, annualized).
-   */
-  dividend_yield: number;
-  /**
-   * Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to
-   * [`CosConfig::default`].
-   */
-  n_terms?: number | null;
-  /**
-   * Call or put payoff.
-   */
-  option_type: OptionType;
-  /**
-   * Continuously-compounded risk-free rate.
-   */
-  rate: number;
-  /**
-   * Current spot price of the underlying.
-   */
-  spot: number;
-  /**
-   * Option strike.
-   */
-  strike: number;
-  /**
-   * Time to expiry in years.
-   */
-  time_to_expiry: number;
 }
 /**
  * Configuration for the deterministic credit factor-model calibrator.
@@ -3967,6 +3933,37 @@ export interface ExecutionTrajectory {
   time_points: number[];
 }
 /**
+ * Continuation-regression diagnostics for one interior exercise date.
+ */
+export interface ExerciseBoundaryPoint {
+  /**
+   * Fitted weights in basis order, empty when the regression was skipped.
+   */
+  continuation_coeffs: number[];
+  /**
+   * Strike-adjacent exercise boundary within the observed in-the-money spots.
+   * Absent if a crossing cannot be established or the fit was skipped.
+   */
+  critical_spot?: number | null;
+  /**
+   * Number of those paths selected for immediate exercise at this step by
+   * the backward regression, before any decision at an earlier step.
+   */
+  exercised_paths: number;
+  /**
+   * Number of training paths in the money before this regression.
+   */
+  itm_paths: number;
+  /**
+   * Index on the uniform simulation grid, excluding inception and expiry.
+   */
+  step: number;
+  /**
+   * Years from simulation inception.
+   */
+  time: number;
+}
+/**
  * Contribution of a single factor to portfolio risk.
  *
  * See [`RiskDecomposition`] for the sign convention applied to each field.
@@ -4167,6 +4164,23 @@ export interface RatingScale {
   labels: string[];
 }
 /**
+ * Numerical settings for Heston Fourier integration.
+ */
+export interface HestonFourierSettings {
+  /**
+   * Gauss-Legendre order per panel (default: 16)
+   */
+  gl_order: number;
+  /**
+   * Number of panels for composite Gauss-Legendre (default: 100)
+   */
+  panels: number;
+  /**
+   * Upper limit for Fourier integral (default: 100)
+   */
+  u_max: number;
+}
+/**
  * Monte Carlo run settings of the Heston European pricer.
  */
 export interface HestonMcSettings {
@@ -4201,10 +4215,6 @@ export interface HestonParams {
    */
   rho: number;
   /**
-   * Vol-of-vol.
-   */
-  sigma_v: number;
-  /**
    * Long-run variance.
    */
   theta: number;
@@ -4212,39 +4222,10 @@ export interface HestonParams {
    * Initial variance.
    */
   v0: number;
-}
-/**
- * Market inputs for closed-form Heston pricing.
- */
-export interface HestonPricingParams {
-  /**
-   * Mean reversion speed.
-   */
-  kappa: number;
-  /**
-   * Continuously compounded dividend or foreign yield as an annual decimal.
-   */
-  q: number;
-  /**
-   * Continuously compounded risk-free rate as an annual decimal.
-   */
-  r: number;
-  /**
-   * Spot-variance correlation.
-   */
-  rho: number;
   /**
    * Vol-of-vol.
    */
-  sigma_v: number;
-  /**
-   * Long-run variance.
-   */
-  theta: number;
-  /**
-   * Initial variance.
-   */
-  v0: number;
+  vol_of_vol: number;
 }
 /**
  * Validated Hull-White one-factor process parameters.
@@ -4752,6 +4733,19 @@ export interface Money {
   currency: Currency;
 }
 /**
+ * Least-squares Monte Carlo price estimate and fitted exercise diagnostics.
+ */
+export interface LsmcResult {
+  /**
+   * Price in the specified currency, with sampling error and confidence interval.
+   */
+  estimate: MoneyEstimate;
+  /**
+   * Diagnostics from the training paths, ordered by ascending step.
+   */
+  exercise_boundary: ExerciseBoundaryPoint[];
+}
+/**
  * Scalar Bangia LVaR outputs for an isolated position where relative spread statistics are already known.
  */
 export interface LvarBangiaScalar {
@@ -5238,6 +5232,35 @@ export interface OptionCalculationResult {
   price: number;
 }
 /**
+ * Spot, strike, carry, expiry and direction shared by option pricing models.
+ */
+export interface OptionContractParams {
+  /**
+   * Continuous dividend yield or cost of carry as a decimal.
+   */
+  dividend_yield: number;
+  /**
+   * Call or put payoff direction.
+   */
+  option_type: OptionType;
+  /**
+   * Continuously compounded annual risk-free rate as a decimal.
+   */
+  rate: number;
+  /**
+   * Current spot or forward price in the instrument's quote units.
+   */
+  spot: number;
+  /**
+   * Strike price in the same quote units as `spot`.
+   */
+  strike: number;
+  /**
+   * Time to expiry in years.
+   */
+  time_to_expiry: number;
+}
+/**
  * Spot, strike, rates, volatility, expiry and payoff direction of an option model call.
  */
 export interface OptionMarketParams {
@@ -5287,7 +5310,8 @@ export interface PathSimulationSpec {
   fbm?: FbmSpec | null;
   /**
    * State at time zero, in the layout documented on the [`ProcessSpec`]
-   * variant. Its length must equal the process dimension.
+   * variant. Heston and rough Heston take only spot here and use their
+   * own `v0` for the starting variance.
    */
   initial_state: number[];
   /**
@@ -6058,10 +6082,6 @@ export interface RoughHestonFourierParams {
    */
   rho: number;
   /**
-   * Vol-of-vol.
-   */
-  sigma_v: number;
-  /**
    * Long-run variance.
    */
   theta: number;
@@ -6069,6 +6089,10 @@ export interface RoughHestonFourierParams {
    * Initial variance.
    */
   v0: number;
+  /**
+   * Vol-of-vol.
+   */
+  vol_of_vol: number;
 }
 /**
  * Rough Heston model parameters.
@@ -6095,10 +6119,6 @@ export interface RoughHestonParams {
    */
   rho: number;
   /**
-   * Volatility of variance — vol-of-vol (σᵥ > 0).
-   */
-  sigma_v: number;
-  /**
    * Long-run variance level (θ > 0).
    */
   theta: number;
@@ -6106,6 +6126,10 @@ export interface RoughHestonParams {
    * Initial variance (v₀ > 0).
    */
   v0: number;
+  /**
+   * Volatility of variance — vol-of-vol (σᵥ > 0).
+   */
+  vol_of_vol: number;
 }
 /**
  * Calibrated SABR parameters and deterministic solver diagnostics.

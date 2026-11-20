@@ -28,7 +28,7 @@
 //!
 //! Total ECL = sum of bucket ECLs over the appropriate horizon:
 //! - Stage 1: min(1 year, remaining maturity)
-//! - Stage 2/3: remaining maturity
+//! - Stage 2: remaining maturity
 //!
 //! # References
 //!
@@ -36,6 +36,7 @@
 //! - IFRS 9 B5.5.44 -- Discount rate (effective interest rate) `docs/REFERENCES.md#ifrs-9-impairment`
 //! - IFRS 9 B5.5.42 -- Probability-weighted scenarios `docs/REFERENCES.md#ifrs-9-impairment`
 
+use finstack_quant_core::wire::DecimalWire;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::credit::lgd::DownturnLgd;
 use serde::{Deserialize, Serialize};
@@ -55,8 +56,8 @@ pub struct MacroScenario {
     /// Scenario identifier (e.g., "base", "upside", "downside").
     pub id: String,
 
-    /// Probability weight in \[0, 1\]. All scenario weights must sum to 1.0.
-    pub weight: f64,
+    /// Exact decimal probability in [0, 1]. The scenario set sums to exactly one.
+    pub weight: DecimalWire,
 
     /// Optional LGD override for this scenario (downturn LGD).
     pub lgd_override: Option<f64>,
@@ -147,26 +148,11 @@ pub struct EclConfig {
     /// Downturn LGD adjuster applied when `lgd_type == `[`LgdType::Downturn`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub downturn_lgd: Option<DownturnLgd>,
-
-    /// Assumed time (in years) from the reporting date to recovery
-    /// realisation for Stage 3 (credit-impaired) exposures. Used to
-    /// discount expected recoveries `(1 - LGD) x EAD` at the EIR.
-    /// The allowance is current EAD less those discounted recoveries.
-    /// Default: 1.0 year, a common practical recovery-lag assumption.
-    #[serde(default = "default_stage3_time_to_recovery_years")]
-    pub stage3_time_to_recovery_years: f64,
-}
-
-/// Default Stage 3 time-to-recovery assumption in years.
-pub const DEFAULT_STAGE3_TIME_TO_RECOVERY_YEARS: f64 = 1.0;
-
-fn default_stage3_time_to_recovery_years() -> f64 {
-    DEFAULT_STAGE3_TIME_TO_RECOVERY_YEARS
 }
 
 impl EclConfig {
     /// Validate staging thresholds, finite bucket width, LGD methodology
-    /// parameters, and Stage 3 recovery time. Scenario weights are validated
+    /// parameters. Scenario weights are validated
     /// where PD sources are supplied.
     ///
     /// `EclConfig` exposes public fields and can be constructed directly
@@ -232,14 +218,6 @@ impl EclConfig {
                     ));
                 }
             }
-        }
-        if !self.stage3_time_to_recovery_years.is_finite()
-            || self.stage3_time_to_recovery_years < 0.0
-        {
-            return Err(Error::Validation(format!(
-                "stage3_time_to_recovery_years must be finite and non-negative, got {}",
-                self.stage3_time_to_recovery_years
-            )));
         }
         Ok(())
     }
@@ -358,21 +336,6 @@ impl EclConfigBuilder {
         self
     }
 
-    /// Set the Stage 3 time-to-recovery assumption in years.
-    ///
-    /// # Arguments
-    ///
-    /// * `years` - Time from reporting date to expected recovery realisation
-    ///   used to discount Stage 3 recoveries (default 1.0).
-    ///
-    /// # Returns
-    ///
-    /// The updated builder.
-    pub fn stage3_time_to_recovery(mut self, years: f64) -> Self {
-        self.config.stage3_time_to_recovery_years = years;
-        self
-    }
-
     /// Validate and build the configuration.
     ///
     /// # Returns
@@ -437,19 +400,56 @@ pub struct EclResult {
     pub meta: finstack_quant_core::config::ResultsMeta,
 }
 
-/// Probability-weighted ECL result across scenarios.
+/// One admissible macro-scenario row and its measured or missing allowance.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct EclScenarioOutcome {
+    /// Explicit scenario identity in the portfolio policy's declared order.
+    pub id: String,
+    /// Exact scenario probability as supplied, including any zero-weight rows.
+    pub weight: DecimalWire,
+    /// Elected scenario LGD override as a decimal fraction.
+    pub lgd_override: Option<f64>,
+    /// Underlying reserve calculation and status.
+    pub measurement: EclScenarioMeasurement,
+}
+
+/// Availability of one scenario allowance.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
+pub enum EclScenarioMeasurement {
+    /// Weight was exactly zero. No forecast or repricing was run.
+    ZeroWeight,
+    /// Positive-weight scenario with measured allowance and bucket detail.
+    Measured {
+        /// Complete same-basis allowance from the admitted PD and LGD.
+        result: Box<EclResult>,
+        /// Weighted contribution to the total on the same basis.
+        weighted_allowance: f64,
+    },
+    /// Positive-weight scenario whose measurement evidence is incomplete.
+    Unavailable {
+        /// Explanation of the required source evidence that is missing.
+        reason: String,
+    },
+}
+
+/// Probability-weighted allowance and completeness evidence across named scenarios.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct WeightedEclResult {
     /// Exposure identifier.
     pub exposure_id: String,
-    /// Assigned IFRS 9 stage.
+    /// Assigned impairment stage.
     pub stage: Stage,
-    /// Probability-weighted ECL.
-    pub ecl: f64,
-    /// Per-scenario breakdown: (scenario_id, weight, result).
-    pub scenario_breakdown: Vec<(String, f64, EclResult)>,
-    /// Audit stamp: numeric mode, rounding context, and FX policy in force.
+    /// Aggregate allowance, absent when any positive-probability scenario is missing.
+    pub ecl: Option<f64>,
+    /// Elected scenarios in caller order, including zero-weight entries.
+    pub scenario_breakdown: Vec<EclScenarioOutcome>,
+    /// Numeric and reporting provenance of the complete or partial calculation.
     #[serde(default)]
     pub meta: finstack_quant_core::config::ResultsMeta,
 }
@@ -479,27 +479,14 @@ fn effective_lgd(config: &EclConfig, base_lgd: f64) -> Result<f64> {
 /// appropriate horizon (12 months for Stage 1, remaining maturity for
 /// Stage 2).
 ///
-/// # Stage 3 (credit-impaired)
-///
-/// For Stage 3 exposures the obligor has already defaulted, so the
-/// performing PD curve does not apply: the allowance is measured as the
-/// current carrying exposure less discounted recoveries with PD ≡ 1, i.e.
-/// `ECL = EAD - (1 - LGD) x EAD x DF(t_recovery)` where `t_recovery` is
-/// [`EclConfig::stage3_time_to_recovery_years`]. This matches IFRS 9
-/// 5.5.33 / B5.5.33 (allowance = gross carrying amount − PV of expected
-/// recoveries discounted at the EIR). The result carries a single bucket
-/// with `marginal_pd = 1.0`. Note this also means a Stage 3 exposure with
-/// zero remaining maturity still carries a positive allowance.
-///
 /// # Arguments
 ///
 /// * `exposure` - Validated credit exposure providing EAD, LGD, EIR, maturity,
 ///   rating, and any EAD schedule for the expected-loss calculation.
-/// * `stage` - Assigned IFRS 9 stage that selects the 12-month, lifetime, or
-///   credit-impaired calculation horizon.
+/// * `stage` - Stage 1 selects the 12-month horizon and Stage 2 selects the remaining lifetime.
 /// * `pd_source` - Term structure supplying cumulative default probabilities
 ///   for the exposure's current rating.
-/// * `config` - ECL bucketing, LGD methodology, and Stage 3 recovery-time policy.
+/// * `config` - ECL bucketing and LGD methodology.
 ///
 /// # Returns
 ///
@@ -557,60 +544,54 @@ pub fn compute_ecl_from_curve(
     exposure.validate()?;
     config.validate()?;
 
-    // Stage 3: current carrying exposure less the present value of recoveries.
-    // LGD is the undiscounted fraction lost at recovery. The PD curve is still
-    // validated for the exposure rating so invalid curve/rating mappings are
-    // not silently hidden by the shortcut.
-    if stage == Stage::Stage3 {
-        let rating = exposure.current_rating.as_deref().unwrap_or("NR");
-        if !(0.0..=1.0).contains(&pd_source.cumulative_pd(rating, 0.0)?) {
-            return Err(Error::Validation(
-                "PD source must return finite probabilities in [0, 1]".into(),
-            ));
-        }
-        let t_recovery = config.stage3_time_to_recovery_years;
-        let lgd = effective_lgd(config, exposure.lgd)?;
-        let ead = exposure.ead_at(0.0)?;
-        let df = 1.0 / (1.0 + exposure.eir).powf(t_recovery);
-        let ecl = ead - (1.0 - lgd) * ead * df;
-        validate_finite_ecl(ecl)?;
-        return Ok(EclResult {
-            exposure_id: exposure.id.clone(),
-            stage,
-            ecl,
-            horizon: t_recovery,
-            buckets: vec![EclBucket {
-                t_start: 0.0,
-                t_end: t_recovery,
-                marginal_pd: 1.0,
-                lgd,
-                ead,
-                discount_factor: df,
-                ecl,
-            }],
-            meta: finstack_quant_core::config::results_meta(
-                &finstack_quant_core::config::FinstackConfig::default(),
-            ),
-        });
-    }
-
     let horizon = match stage {
         Stage::Stage1 => 1.0_f64.min(exposure.remaining_maturity_years),
-        Stage::Stage2 | Stage::Stage3 => exposure.remaining_maturity_years,
+        Stage::Stage2 => exposure.remaining_maturity_years,
+        Stage::Stage3 => return Err(Error::Validation(
+            "Stage 3 requires dated carrying and recovery evidence through compute_impaired_ecl"
+                .into(),
+        )),
     };
 
     let rating = exposure.current_rating.as_deref().unwrap_or("NR");
-    let dt = config.bucket_width_years;
-    let n_buckets = (horizon / dt).ceil() as usize;
-    let n_buckets = n_buckets.max(1); // At least one bucket
+    let width = config.bucket_width_years;
+    let regular_count = (horizon / width).ceil() as usize;
+    let mut edges = Vec::with_capacity(regular_count + 1);
+    edges.push(0.0);
+    edges.extend(
+        (1..regular_count)
+            .map(|i| i as f64 * width)
+            .filter(|&time| time < horizon),
+    );
+    for knots in [pd_source.knots(rating), exposure.ead_schedule.as_deref()]
+        .into_iter()
+        .flatten()
+    {
+        edges.extend(
+            knots
+                .iter()
+                .map(|&(time, _)| time)
+                .filter(|&time| time > 0.0 && time < horizon),
+        );
+    }
+    edges.push(horizon);
+    edges.sort_unstable_by(f64::total_cmp);
+    edges.dedup_by(|next, previous| {
+        // A published knot and a generated edge can represent the same date.
+        // Retain the exact final horizon when they differ by rounding only.
+        if (*next - *previous).abs() <= 8.0 * f64::EPSILON * next.abs().max(previous.abs()) {
+            *previous = *next;
+            true
+        } else {
+            false
+        }
+    });
 
     let lgd = effective_lgd(config, exposure.lgd)?;
-    let mut ecl = 0.0;
-    let mut bucket_details = Vec::with_capacity(n_buckets);
-
-    for i in 0..n_buckets {
-        let t_start = i as f64 * dt;
-        let t_end = ((i + 1) as f64 * dt).min(horizon);
+    let mut ecl = finstack_quant_core::math::summation::NeumaierAccumulator::new();
+    let mut bucket_details = Vec::with_capacity(edges.len() - 1);
+    for edge in edges.windows(2) {
+        let [t_start, t_end] = [edge[0], edge[1]];
         let t_mid = (t_start + t_end) / 2.0;
 
         // Use the unconditional bucket default probability
@@ -631,7 +612,7 @@ pub fn compute_ecl_from_curve(
         let df = 1.0 / (1.0 + exposure.eir).powf(t_mid);
 
         let bucket_ecl = uncond_mpd * lgd * ead * df;
-        ecl += bucket_ecl;
+        ecl.add(bucket_ecl)?;
 
         bucket_details.push(EclBucket {
             t_start,
@@ -644,7 +625,7 @@ pub fn compute_ecl_from_curve(
         });
     }
 
-    validate_finite_ecl(ecl)?;
+    let ecl = ecl.get_total()?;
     Ok(EclResult {
         exposure_id: exposure.id.clone(),
         stage,
@@ -673,7 +654,7 @@ pub fn compute_ecl_from_curve(
 ///   and reporting-date PD curve. Weights must be finite, non-negative, and
 ///   sum to 1 within `1e-6`.
 /// * `config` - Integration bucket width in years, LGD methodology, staging
-///   policy, and Stage 3 recovery horizon in years.
+///   policy.
 ///
 /// # LGD methodology interaction
 ///
@@ -724,7 +705,7 @@ pub fn compute_ecl_from_curve(
 ///     ccf: 0.75,
 /// };
 /// let pd_curve = RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 0.02)])?;
-/// let scenario = MacroScenario { id: "base".to_string(), weight: 1.0, lgd_override: None };
+/// let scenario = MacroScenario { id: "base".to_string(), weight: finstack_quant_core::wire::DecimalWire("1.0".parse()?), lgd_override: None };
 /// let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> =
 ///     vec![(&scenario, &pd_curve)];
 ///
@@ -743,77 +724,147 @@ pub fn compute_ecl_weighted_from_curves(
     pd_sources: &[(&MacroScenario, &dyn PdTermStructure)],
     config: &EclConfig,
 ) -> Result<WeightedEclResult> {
+    let available = pd_sources
+        .iter()
+        .map(|&(scenario, source)| (scenario, Some(source)))
+        .collect::<Vec<_>>();
+    measure_weighted(exposure, stage, &available, config)
+}
+
+pub(super) fn measure_weighted(
+    exposure: &Exposure,
+    stage: Stage,
+    pd_sources: &[(&MacroScenario, Option<&dyn PdTermStructure>)],
+    config: &EclConfig,
+) -> Result<WeightedEclResult> {
+    use finstack_quant_core::math::summation::NeumaierAccumulator;
     if pd_sources.is_empty() {
         return Err(Error::Validation(
-            "At least one PD source is required for weighted ECL".to_string(),
+            "At least one impairment scenario is required".into(),
         ));
     }
     validate_scenario_weights(pd_sources.iter().map(|(scenario, _)| *scenario))?;
     config.validate()?;
+    exposure.validate()?;
 
-    let mut weighted_ecl = 0.0;
-    let mut scenario_results = Vec::with_capacity(pd_sources.len());
-
-    for (scenario, pd_source) in pd_sources {
-        if config.lgd_type == LgdType::ThroughTheCycle && scenario.lgd_override.is_some() {
-            return Err(Error::Validation(format!(
-                "scenario '{}' has lgd_override but lgd_type = ThroughTheCycle pins the LGD",
-                scenario.id
-            )));
-        }
-        let lgd_adj = scenario.lgd_override.unwrap_or(exposure.lgd);
-        let adj_exposure = Exposure {
-            lgd: lgd_adj,
-            ..exposure.clone()
+    let mut total = NeumaierAccumulator::new();
+    let mut complete = true;
+    let mut scenario_breakdown = Vec::with_capacity(pd_sources.len());
+    for &(scenario, source) in pd_sources {
+        let measurement = if scenario.weight.0.is_zero() {
+            EclScenarioMeasurement::ZeroWeight
+        } else if let Some(source) = source {
+            if config.lgd_type == LgdType::ThroughTheCycle && scenario.lgd_override.is_some() {
+                return Err(Error::Validation(format!(
+                    "Scenario '{}' cannot override the elected through-the-cycle LGD",
+                    scenario.id
+                )));
+            }
+            let adjusted = Exposure {
+                lgd: scenario.lgd_override.unwrap_or(exposure.lgd),
+                ..exposure.clone()
+            };
+            let result = compute_ecl_from_curve(&adjusted, stage, source, config)?;
+            let weighted_allowance = weighted_allowance(scenario.weight, result.ecl)?;
+            total.add(weighted_allowance)?;
+            EclScenarioMeasurement::Measured {
+                result: Box::new(result),
+                weighted_allowance,
+            }
+        } else {
+            complete = false;
+            EclScenarioMeasurement::Unavailable {
+                reason: "missing reporting-date cumulative default curve".into(),
+            }
         };
-        let result = compute_ecl_from_curve(&adj_exposure, stage, *pd_source, config)?;
-        weighted_ecl += scenario.weight * result.ecl;
-        scenario_results.push((scenario.id.clone(), scenario.weight, result));
+        scenario_breakdown.push(EclScenarioOutcome {
+            id: scenario.id.clone(),
+            weight: scenario.weight,
+            lgd_override: scenario.lgd_override,
+            measurement,
+        });
     }
 
-    validate_finite_ecl(weighted_ecl)?;
     Ok(WeightedEclResult {
         exposure_id: exposure.id.clone(),
         stage,
-        ecl: weighted_ecl,
-        scenario_breakdown: scenario_results,
+        ecl: if complete {
+            Some(total.get_total()?)
+        } else {
+            None
+        },
+        scenario_breakdown,
         meta: finstack_quant_core::config::results_meta(
             &finstack_quant_core::config::FinstackConfig::default(),
         ),
     })
 }
 
-/// Validate that scenario weights are finite, non-negative, and sum to 1.0.
-///
-/// Shared by the IFRS 9 weighted path and the CECL engine so both apply the
-/// same checks to the `pd_sources` weights actually used in pricing.
+/// Admit ordered, distinct scenario probabilities without rounding their sum.
 pub(crate) fn validate_scenario_weights<'a>(
     scenarios: impl IntoIterator<Item = &'a MacroScenario>,
 ) -> Result<()> {
-    let mut total_weight = 0.0;
+    use rust_decimal::Decimal;
+
+    let mut ids = std::collections::BTreeSet::new();
+    let mut remaining = Decimal::ONE;
     for scenario in scenarios {
-        if !scenario.weight.is_finite() || scenario.weight < 0.0 {
+        if scenario.id.trim().is_empty() || !ids.insert(scenario.id.as_str()) {
             return Err(Error::Validation(format!(
-                "scenario '{}' weight must be finite and non-negative",
+                "Expected one nonempty and unique impairment scenario ID, got '{}'",
                 scenario.id
             )));
         }
+        let weight = scenario.weight.0;
+        if weight < Decimal::ZERO || weight > Decimal::ONE {
+            return Err(Error::Validation(format!(
+                "Scenario '{}' probability must be in [0, 1]",
+                scenario.id
+            )));
+        }
+        if weight > remaining {
+            return Err(Error::Validation(
+                "Scenario probabilities exceed exactly one".into(),
+            ));
+        }
+        // Each accepted subtraction remains in [0, 1] and preserves the
+        // maximum input scale, including 28 fractional digits.
+        remaining = remaining.checked_sub(weight).ok_or_else(|| {
+            Error::Validation("Scenario probability arithmetic overflowed".into())
+        })?;
         if scenario
             .lgd_override
             .is_some_and(|lgd| !(0.0..=1.0).contains(&lgd))
         {
-            return Err(Error::Validation(
-                "scenario LGD must be finite and in [0, 1]".into(),
-            ));
+            return Err(Error::Validation(format!(
+                "Scenario '{}' LGD must be finite and in [0, 1]",
+                scenario.id
+            )));
         }
-        total_weight += scenario.weight;
     }
-    if (total_weight - 1.0).abs() > 1e-6 {
+    if remaining != Decimal::ZERO {
         return Err(Error::Validation(format!(
-            "scenario weights must sum to 1.0, got {total_weight:.6}"
+            "Scenario probabilities must sum to exactly one; remainder is {remaining}"
         )));
     }
     Ok(())
+}
+
+pub(super) fn weighted_allowance(weight: DecimalWire, allowance: f64) -> Result<f64> {
+    use rust_decimal::prelude::ToPrimitive;
+    let decimal = weight.0;
+    let scalar = decimal.to_f64().ok_or_else(|| {
+        Error::Validation(
+            "Impairment scenario probability cannot cross the numerical solver boundary".into(),
+        )
+    })?;
+    let product = scalar * allowance;
+    if !product.is_finite() || (product == 0.0 && !decimal.is_zero() && allowance != 0.0) {
+        return Err(Error::Validation(
+            "Weighted allowance exceeds the representable numeric domain".into(),
+        ));
+    }
+    Ok(product)
 }
 
 /// Reject arithmetic overflow before publishing an allowance.
@@ -848,7 +899,7 @@ mod tests {
         let config = EclConfig::default();
         let scenario = MacroScenario {
             id: "base".into(),
-            weight: 1.0,
+            weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
             lgd_override: None,
         };
         let stage_result = classify_stage_from_curves(
@@ -907,7 +958,7 @@ mod tests {
     fn weighted_ecl_rejects_invalid_scenario_weights() {
         let scenario = MacroScenario {
             id: "base".into(),
-            weight: 0.8,
+            weight: finstack_quant_core::wire::DecimalWire("0.8".parse().unwrap()),
             lgd_override: None,
         };
         let curve = make_pd_curve();
@@ -955,51 +1006,28 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_ecl_stage3_is_carrying_value_less_pv_recovery() {
-        let exposure = make_exposure();
-        let curve = make_pd_curve();
-        let config = EclConfig::default();
-
-        let result = compute_ecl_from_curve(&exposure, Stage::Stage3, &curve, &config).unwrap();
-
-        // PD ≡ 1: ECL = EAD - (1 - LGD) x EAD x DF(t_recovery), default t_recovery = 1.0
-        let expected = 1_000_000.0 - 0.55 * 1_000_000.0 / 1.05_f64;
-        assert!(
-            (result.ecl - expected).abs() < 1e-6,
-            "Stage 3 ECL {} vs expected {}",
-            result.ecl,
-            expected
-        );
-        assert_eq!(result.buckets.len(), 1);
-        assert!((result.buckets[0].marginal_pd - 1.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn test_stage3_zero_maturity_still_has_allowance() {
+    fn performing_grid_splits_at_known_knots_and_exact_maturity() {
         let mut exposure = make_exposure();
+        exposure.remaining_maturity_years = 0.75;
+        exposure.eir = 0.0;
+        exposure.lgd = 0.5;
+        exposure.ead_schedule = Some(vec![(0.0, 100.0), (0.4, 60.0), (0.75, 60.0)]);
+        let rating = exposure.current_rating.as_deref().unwrap_or("NR");
+        let curve = RawPdCurve::new(rating, vec![(0.0, 0.0), (0.3, 0.03), (0.75, 0.06)]).unwrap();
+        let config = EclConfigBuilder::new().bucket_width(0.5).build().unwrap();
+        let result = compute_ecl_from_curve(&exposure, Stage::Stage1, &curve, &config).unwrap();
+        let ends = result
+            .buckets
+            .iter()
+            .map(|bucket| bucket.t_end)
+            .collect::<Vec<_>>();
+        assert_eq!(ends, [0.3, 0.4, 0.5, 0.75]);
+        let expected = 0.5 * (0.03 * 85.0 + 0.03 / 0.45 * (0.1 * 65.0 + 0.35 * 60.0));
+        assert!((result.ecl - expected).abs() < 1e-12);
         exposure.remaining_maturity_years = 0.0;
-        let curve = make_pd_curve();
-        let config = EclConfig::default();
-
-        let result = compute_ecl_from_curve(&exposure, Stage::Stage3, &curve, &config).unwrap();
-        assert!(
-            result.ecl > 0.0,
-            "Stage 3 with zero remaining maturity must not produce ECL = 0"
-        );
-    }
-
-    #[test]
-    fn test_stage3_time_to_recovery_configurable() {
-        let exposure = make_exposure();
-        let curve = make_pd_curve();
-        let config = EclConfigBuilder::new()
-            .stage3_time_to_recovery(2.0)
-            .build()
-            .unwrap();
-
-        let result = compute_ecl_from_curve(&exposure, Stage::Stage3, &curve, &config).unwrap();
-        let expected = 1_000_000.0 - 0.55 * 1_000_000.0 / 1.05_f64.powi(2);
-        assert!((result.ecl - expected).abs() < 1e-6);
+        let result = compute_ecl_from_curve(&exposure, Stage::Stage1, &curve, &config).unwrap();
+        assert!(result.buckets.is_empty());
+        assert_eq!(result.ecl, 0.0);
     }
 
     #[test]
@@ -1150,27 +1178,6 @@ mod tests {
     }
 
     #[test]
-    fn downturn_applies_to_stage3_shortcut() {
-        // Stage 3, eir 0: ECL = LGD_eff × EAD = 0.53 × 100,000 = 53,000.
-        let adjuster =
-            finstack_quant_models::credit::lgd::DownturnLgd::regulatory_floor(0.08, 0.25).unwrap();
-        let config = EclConfigBuilder::new()
-            .lgd_type(LgdType::Downturn)
-            .downturn_lgd(adjuster)
-            .build()
-            .unwrap();
-        let ecl = compute_ecl_from_curve(
-            &lgd_test_exposure(),
-            Stage::Stage3,
-            &one_year_2pct_curve(),
-            &config,
-        )
-        .unwrap()
-        .ecl;
-        assert!((ecl - 53_000.0).abs() < 1e-9, "got {ecl}");
-    }
-
-    #[test]
     fn downturn_stress_applies_on_top_of_scenario_lgd_override() {
         // Documented precedence (see LgdType::Downturn docs above): a
         // scenario `lgd_override` sets the *base* LGD, and the Downturn
@@ -1194,7 +1201,7 @@ mod tests {
             .unwrap();
         let scenario = MacroScenario {
             id: "base".to_string(),
-            weight: 1.0,
+            weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
             lgd_override: Some(0.30),
         };
         let curve = one_year_2pct_curve();
@@ -1206,7 +1213,11 @@ mod tests {
             &config,
         )
         .unwrap();
-        assert!((result.ecl - 760.0).abs() < 1e-9, "got {}", result.ecl);
+        assert!(
+            (result.ecl.unwrap() - 760.0).abs() < 1e-9,
+            "got {:?}",
+            result.ecl
+        );
     }
 
     #[test]
@@ -1291,7 +1302,7 @@ mod tests {
             .unwrap();
         let scenario = MacroScenario {
             id: "base".to_string(),
-            weight: 1.0,
+            weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
             lgd_override: Some(0.60),
         };
         let curve = one_year_2pct_curve();
@@ -1390,7 +1401,7 @@ mod tests {
 
         let scenario = MacroScenario {
             id: "base".into(),
-            weight: 1.0,
+            weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
             lgd_override: None,
         };
         let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> =
@@ -1400,10 +1411,10 @@ mod tests {
                 .unwrap();
 
         assert!(
-            (single.ecl - weighted.ecl).abs() < 1e-10,
+            (single.ecl - weighted.ecl.unwrap()).abs() < 1e-10,
             "Single-scenario weighted ECL should equal unweighted: {} vs {}",
             single.ecl,
-            weighted.ecl
+            weighted.ecl.unwrap()
         );
     }
 
@@ -1413,12 +1424,12 @@ mod tests {
         let curve = make_pd_curve();
         let base_scenario = MacroScenario {
             id: "base".into(),
-            weight: 0.6,
+            weight: finstack_quant_core::wire::DecimalWire("0.6".parse().unwrap()),
             lgd_override: None,
         };
         let down_scenario = MacroScenario {
             id: "downside".into(),
-            weight: 0.4,
+            weight: finstack_quant_core::wire::DecimalWire("0.4".parse().unwrap()),
             lgd_override: Some(0.60), // Higher LGD in downside
         };
         let config = EclConfig::default();
@@ -1433,14 +1444,18 @@ mod tests {
                 .unwrap();
 
         // Verify manual calculation
-        let base_ecl = result.scenario_breakdown[0].2.ecl;
-        let down_ecl = result.scenario_breakdown[1].2.ecl;
+        let measured = |index: usize| match &result.scenario_breakdown[index].measurement {
+            EclScenarioMeasurement::Measured { result, .. } => result.ecl,
+            other => panic!("expected a measured scenario, got {other:?}"),
+        };
+        let base_ecl = measured(0);
+        let down_ecl = measured(1);
         let expected = 0.6 * base_ecl + 0.4 * down_ecl;
 
         assert!(
-            (result.ecl - expected).abs() < 1e-6,
+            (result.ecl.unwrap() - expected).abs() < 1e-6,
             "Weighted ECL mismatch: {} vs expected {}",
-            result.ecl,
+            result.ecl.unwrap(),
             expected
         );
 
@@ -1493,7 +1508,7 @@ mod tests {
         let exposure = lgd_test_exposure();
         let scenario = MacroScenario {
             id: "downside".into(),
-            weight: 1.0,
+            weight: finstack_quant_core::wire::DecimalWire("1.0".parse().unwrap()),
             lgd_override: Some(0.90),
         };
         let result = compute_ecl_weighted_from_curves(
@@ -1504,8 +1519,8 @@ mod tests {
         )
         .unwrap();
         let expected = exposure.ead * 0.02 * 0.90;
-        assert!((result.ecl - expected).abs() < 1e-9);
-        assert_eq!(result.scenario_breakdown[0].0, "downside");
+        assert!((result.ecl.unwrap() - expected).abs() < 1e-9);
+        assert_eq!(result.scenario_breakdown[0].id, "downside");
     }
 
     #[test]
@@ -1522,14 +1537,14 @@ mod tests {
         };
         let result = stage_and_measure(&exposure, &current, &origination, 0.0);
         assert_eq!(result.stage_result.stage, Stage::Stage2);
-        assert!((result.ecl_result.ecl - 8.0).abs() < 1e-12);
+        assert!((result.ecl_result.ecl.unwrap() - 8.0).abs() < 1e-12);
 
         // A second origination cohort with the same rating but unchanged risk
         // must retain its own initial-recognition snapshot on the same engine.
         let higher_origination_risk = &current;
         let unchanged = stage_and_measure(&exposure, &current, higher_origination_risk, 0.0);
         assert_eq!(unchanged.stage_result.stage, Stage::Stage1);
-        assert!((unchanged.ecl_result.ecl - 1.6).abs() < 1e-12);
+        assert!((unchanged.ecl_result.ecl.unwrap() - 1.6).abs() < 1e-12);
     }
 
     #[test]
@@ -1551,7 +1566,7 @@ mod tests {
         // not the original first-two-year PD of 10%.
         let result = stage_and_measure(&exposure, &current, &origination, 3.0);
         assert_eq!(result.stage_result.stage, Stage::Stage2);
-        assert!((result.ecl_result.ecl - 2.0).abs() < 1e-12);
+        assert!((result.ecl_result.ecl.unwrap() - 2.0).abs() < 1e-12);
         let expected_delta = 0.05 - (0.16 - 0.14) / (1.0 - 0.14);
         assert!(result.stage_result.triggers.iter().any(|trigger| matches!(
             trigger,

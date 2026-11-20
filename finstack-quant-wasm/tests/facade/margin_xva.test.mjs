@@ -59,12 +59,32 @@ const hazardOptions = (knots, recoveryRate, id = 'HZ') => ({
 const flatHazard = (lambda) =>
   new core.HazardCurve(hazardOptions([1.0, lambda, 30.0, lambda], 0.4));
 
-const exposureJson = JSON.stringify({
-  times: [1.0, 2.0],
-  mtm_values: [1e6, 1e6],
-  epe: [1e6, 1e6],
-  ene: [0.0, 0.0],
-});
+const exposure = {
+  as_of: '2025-01-01',
+  currency: 'USD',
+  basis: { kind: 'external', source_id: 'xva-test', policy_id: 'unsecured' },
+  dates: ['2025-01-01', '2026-01-01', '2027-01-01'],
+  times: [0, 1, 2],
+  mtm_values: [1e6, 1e6, 1e6],
+  epe: [1e6, 1e6, 1e6],
+  ene: [0, 0, 0],
+  diagnostics: { market_roll_failures: 0, valuation_failures: 0, total_time_points: 3 },
+};
+const exposureJson = JSON.stringify(exposure);
+
+function expectedIm(dates, imValues) {
+  return {
+    as_of: exposure.as_of,
+    currency: exposure.currency,
+    basis: {
+      kind: 'external',
+      source_id: 'xva-im-fixture',
+      netting_set: { kind: 'bilateral', counterparty_id: 'bank', csa_id: 'agreement' },
+    },
+    dates,
+    im_values: imValues,
+  };
+}
 
 test('margin namespace exports computeBilateralXva as a live function', () => {
   assert.equal(typeof margin.computeBilateralXva, 'function');
@@ -136,7 +156,8 @@ test('computeBilateralXva folds MVA into total_xva', () => {
     JSON.stringify({
       funding_spread_bp: 50.0,
       funding_benefit_bp: 30.0,
-      im_profile: { times: [1.0, 2.0], im_values: [1e6, 1e6] },
+      im_profile: expectedIm(exposure.dates, [1e6, 1e6, 1e6]),
+      margin_funding_spread: { kind: 'flat', spread_bp: 50 },
     })
   );
 
@@ -151,12 +172,12 @@ test('computeBilateralXva folds MVA into total_xva', () => {
   );
 });
 
-test('computeBilateralXva nets posted IM from bilateral DVA', () => {
+test('computeBilateralXva uses the exposed ENE when IM funding is selected', () => {
   const negativeExposureJson = JSON.stringify({
-    times: [1.0, 2.0],
-    mtm_values: [-1e6, -1e6],
-    epe: [0.0, 0.0],
-    ene: [1e6, 1e6],
+    ...exposure,
+    mtm_values: [-1e6, -1e6, -1e6],
+    epe: [0, 0, 0],
+    ene: [1e6, 1e6, 1e6],
   });
   const args = [negativeExposureJson, flatHazard(0.0), flatHazard(0.03), flatDiscount(), 0.4, 0.4];
 
@@ -166,12 +187,13 @@ test('computeBilateralXva nets posted IM from bilateral DVA', () => {
     JSON.stringify({
       funding_spread_bp: 0.0,
       funding_benefit_bp: 0.0,
-      im_profile: { times: [1.0, 2.0], im_values: [400_000.0, 400_000.0] },
+      im_profile: expectedIm(exposure.dates, [400_000, 400_000, 400_000]),
+      margin_funding_spread: { kind: 'flat', spread_bp: 0 },
     })
   );
 
   assert.ok(withoutIm.dva > 0.0);
-  assert.ok(withIm.dva > 0.0 && withIm.dva < withoutIm.dva);
+  assert.equal(withIm.dva, withoutIm.dva);
 });
 
 test('computeBilateralXva rejects an IM/exposure horizon mismatch', () => {
@@ -186,7 +208,8 @@ test('computeBilateralXva rejects an IM/exposure horizon mismatch', () => {
         0.4,
         JSON.stringify({
           funding_spread_bp: 50.0,
-          im_profile: { times: [1.0, 3.0], im_values: [1e6, 1e6] },
+          im_profile: expectedIm(['2025-01-01', '2026-01-01', '2028-01-01'], [1e6, 1e6, 1e6]),
+          margin_funding_spread: { kind: 'flat', spread_bp: 50 },
         })
       ),
     /horizon/
@@ -225,15 +248,17 @@ test('computeBilateralXva throws on an out-of-range recovery rate', () => {
 });
 
 test('computeBilateralXva throws on a malformed exposure payload', () => {
-  assert.throws(() =>
-    margin.computeBilateralXva(
-      '{"times":[1.0],"mtm_values":[1.0],"epe":[1.0,2.0],"ene":[0.0]}',
-      flatHazard(0.02),
-      flatHazard(0.02),
-      flatDiscount(),
-      0.4,
-      0.4
-    )
+  assert.throws(
+    () =>
+      margin.computeBilateralXva(
+        { ...exposure, epe: [1, 2] },
+        flatHazard(0.02),
+        flatHazard(0.02),
+        flatDiscount(),
+        0.4,
+        0.4
+      ),
+    /vector lengths must be equal/
   );
 });
 
@@ -253,7 +278,7 @@ test('computeBilateralXva rejects unknown funding fields', () => {
 
 test('computeBilateralXva rejects unknown exposure-profile fields', () => {
   const profile = JSON.parse(exposureJson);
-  const diagnostics = { market_roll_failures: 3, valuation_failures: 0, total_time_points: 2 };
+  const diagnostics = { market_roll_failures: 3, valuation_failures: 0, total_time_points: 3 };
   const run = (p) =>
     margin.computeBilateralXva(
       JSON.stringify(p),
@@ -264,7 +289,7 @@ test('computeBilateralXva rejects unknown exposure-profile fields', () => {
       0.4
     );
   // A correctly spelled `diagnostics` with failures trips the XVA validity gate ...
-  assert.throws(() => run({ ...profile, diagnostics }), /not valid for XVA/);
+  assert.throws(() => run({ ...profile, diagnostics }), /diagnostics must reconcile/);
   // ... and a misspelled key can no longer bypass it.
   assert.throws(() => run({ ...profile, diagnostic: diagnostics }), /unknown field `diagnostic`/);
   assert.throws(() => run({ ...profile, bogus: 1 }), /unknown field `bogus`/);
@@ -326,7 +351,8 @@ test('HazardCurve JSON round trip and members pass through Rust', () => {
   });
   const back = core.HazardCurve.fromJson(hz.toJson());
   assert.equal(back.toJson(), hz.toJson());
-  assert.deepEqual([...hz.knotPoints], [1.0, 0.02, 5.0, 0.03]);
+  assert.deepEqual([...hz.knots], [1.0, 5.0]);
+  assert.deepEqual([...hz.hazardRates], [0.02, 0.03]);
   assert.equal(hz.dayCount, 'act_365f');
   assert.equal(hz.calendarId, undefined);
   assert.equal(hz.issuer, 'ACME');

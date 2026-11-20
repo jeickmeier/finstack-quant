@@ -114,7 +114,7 @@ fn original_public_call(
     spot: f64,
     strike: f64,
     time: f64,
-    params: &HestonPricingParams,
+    params: &HestonProcessParams,
     settings: Option<&HestonFourierSettings>,
 ) -> Result<f64> {
     validate_heston_inputs(spot, time, params)?;
@@ -136,7 +136,7 @@ fn original_public_call(
             HestonFourierSettings::for_maturity(time, params.model.v0.min(params.model.theta));
         let c_inf = (1.0 - params.model.rho * params.model.rho).sqrt()
             * (params.model.v0 + params.model.kappa * params.model.theta * time)
-            / params.model.sigma_v;
+            / params.model.vol_of_vol;
         grid.u_max = grid.u_max.max(HESTON_TAIL_LOG_TARGET / c_inf);
         grid.panels = grid.u_max.ceil() as usize;
         grid
@@ -279,7 +279,7 @@ fn record_probe(label: &str, pricer: &HestonStripPricer, strike: f64) -> Value {
         pricer.params.q,
         pricer.params.model.kappa,
         pricer.params.model.theta,
-        pricer.params.model.sigma_v,
+        pricer.params.model.vol_of_vol,
         pricer.params.model.rho,
         pricer.params.model.v0,
     ]
@@ -291,7 +291,7 @@ fn record_probe(label: &str, pricer: &HestonStripPricer, strike: f64) -> Value {
         "strike_bits": bits(strike),
         "fixture_hash": fingerprint([pricer.spot, pricer.time, strike, pricer.params.r,
             pricer.params.q, pricer.params.model.kappa, pricer.params.model.theta,
-            pricer.params.model.sigma_v, pricer.params.model.rho, pricer.params.model.v0]),
+            pricer.params.model.vol_of_vol, pricer.params.model.rho, pricer.params.model.v0]),
         "params_bits": params_bits,
         "grid_nodes": pricer.grid.len(),
         "grid_hash": fingerprint(pricer.grid.iter().flat_map(|&(phi, weight)| [phi, weight])),
@@ -313,7 +313,7 @@ fn record_probe(label: &str, pricer: &HestonStripPricer, strike: f64) -> Value {
 struct PanelCase {
     name: &'static str,
     time: f64,
-    params: HestonPricingParams,
+    params: HestonProcessParams,
     strikes: Vec<f64>,
     settings: HestonFourierSettings,
     public_settings: Option<HestonFourierSettings>,
@@ -322,7 +322,7 @@ struct PanelCase {
 
 fn panel_case(
     name: &'static str,
-    params: HestonPricingParams,
+    params: HestonProcessParams,
     time: f64,
     strikes: &[f64],
     settings: HestonFourierSettings,
@@ -339,9 +339,9 @@ fn panel_case(
 }
 
 fn panel_cases() -> Vec<PanelCase> {
-    let benchmark = HestonPricingParams::new(0.03, 0.01, 1.5, 0.04, 0.3, -0.6, 0.04)
+    let benchmark = HestonProcessParams::new(0.03, 0.01, 1.5, 0.04, 0.3, -0.6, 0.04)
         .expect("benchmark parameters");
-    let ordinary = HestonPricingParams::new(0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04)
+    let ordinary = HestonProcessParams::new(0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04)
         .expect("ordinary parameters");
     let mut cases = vec![panel_case(
         "ordinary_default",
@@ -375,21 +375,21 @@ fn panel_cases() -> Vec<PanelCase> {
     }
     cases.push(panel_case(
         "low_variance",
-        HestonPricingParams::new(0.02, 0.0, 1.5, 0.0016, 0.2, -0.5, 0.0016).expect("low variance"),
+        HestonProcessParams::new(0.02, 0.0, 1.5, 0.0016, 0.2, -0.5, 0.0016).expect("low variance"),
         2.0,
         &[105.0],
         HestonFourierSettings::new(2000.0, 2000, 16).expect("reference grid"),
     ));
     cases.push(panel_case(
         "legitimate_underflow",
-        HestonPricingParams::new(0.03, 0.0, 3.0, 0.09, 0.2, -0.6, 0.04).expect("long maturity"),
+        HestonProcessParams::new(0.03, 0.0, 3.0, 0.09, 0.2, -0.6, 0.04).expect("long maturity"),
         15.0,
         &[100.0],
         HestonFourierSettings::for_maturity(15.0, 0.04),
     ));
     cases.push(panel_case(
         "near_deterministic",
-        HestonPricingParams::new(0.05, 0.0, 2.0, 0.09, 1e-12, -0.5, 0.01)
+        HestonProcessParams::new(0.05, 0.0, 2.0, 0.09, 1e-12, -0.5, 0.01)
             .expect("near deterministic"),
         1.0,
         &[100.0],
@@ -397,7 +397,7 @@ fn panel_cases() -> Vec<PanelCase> {
     ));
     let mut positive = panel_case(
         "positive_correlation",
-        HestonPricingParams::new(0.05, 0.0, 0.1, 0.04, 1.0, 0.9, 0.04)
+        HestonProcessParams::new(0.05, 0.0, 0.1, 0.04, 1.0, 0.9, 0.04)
             .expect("positive correlation"),
         1.0,
         &[100.0],
@@ -412,7 +412,7 @@ fn panel_cases() -> Vec<PanelCase> {
     cases.push(unresolved);
     let mut corrupted = panel_case(
         "corruption",
-        HestonPricingParams::new(0.05, 0.0, 10.0, 100.0, 90.0, 0.99, 90.0)
+        HestonProcessParams::new(0.05, 0.0, 10.0, 100.0, 90.0, 0.99, 90.0)
             .expect("corruption parameters"),
         30.0,
         &[100.0],
@@ -591,13 +591,21 @@ fn ccm_heston_probability_panel() -> std::result::Result<(), Box<dyn std::error:
             .expect("valid cache construction");
         for strike in case.strikes {
             let mut record = record_probe(case.name, &pricer, strike);
-            let actual = heston_call_price_fourier(
-                100.0,
-                strike,
-                case.time,
-                &case.params,
-                case.public_settings.as_ref(),
-            );
+            let actual = {
+                let dynamics = &case.params;
+                heston_call_price_fourier(
+                    &crate::types::OptionContractParams {
+                        spot: 100.0,
+                        strike,
+                        rate: dynamics.r,
+                        dividend_yield: dynamics.q,
+                        time_to_expiry: case.time,
+                        option_type: crate::types::OptionType::Call,
+                    },
+                    &dynamics.model,
+                    case.public_settings.as_ref(),
+                )
+            };
             let reference = original_public_call(
                 100.0,
                 strike,
@@ -615,7 +623,7 @@ fn ccm_heston_probability_panel() -> std::result::Result<(), Box<dyn std::error:
             records.push(record);
         }
     }
-    let params = HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04)
+    let params = HestonProcessParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04)
         .expect("synthetic-probe base parameters");
     let base = HestonStripPricer::new(100.0, 1.0, &params, &HestonFourierSettings::default())
         .expect("synthetic-probe base cache");

@@ -8,7 +8,7 @@ use super::capital_structure::PyWaterfallSpec;
 use super::registry::PyRegistry;
 use super::types::{PyFinancialModelSpec, PyForecastSpec, PyNodeSpec};
 use super::{PERIOD_GRAMMAR, extract_money_series, extract_scalar_series, extract_value_series};
-use crate::bindings::core::currency::PyCurrency;
+use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::dates::periods::PyPeriodPlan;
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::pydoc::pydoc;
@@ -24,6 +24,12 @@ use pyo3::prelude::*;
 #[pyclass(name = "ModelBuilder", module = "finstack_quant.statements")]
 pub struct PyModelBuilder {
     inner: Option<ModelBuilder>,
+}
+
+impl PyModelBuilder {
+    pub(crate) fn from_inner(inner: ModelBuilder) -> Self {
+        Self { inner: Some(inner) }
+    }
 }
 
 #[doc = pydoc!("finstack_quant.statements._builder", "MixedNodeBuilder")]
@@ -165,6 +171,19 @@ impl PyModelBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         slf.builder_mut()?
             .periods_explicit(plan.inner.clone())
+            .map_err(statements_to_py)?;
+        Ok(slf)
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.constant")]
+    fn constant<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        node_id: &str,
+        value: &Bound<'py, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let value = super::extract_amount_or_scalar(value)?;
+        slf.builder_mut()?
+            .constant(node_id, value)
             .map_err(statements_to_py)?;
         Ok(slf)
     }
@@ -376,6 +395,34 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.currency")]
+    #[pyo3(text_signature = "($self, currency)")]
+    fn currency<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        currency: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let currency = extract_currency(currency)?;
+        slf.builder_mut()?.currency(currency);
+        Ok(slf)
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.as_money")]
+    #[pyo3(signature = (node_id, source, currency=None))]
+    fn as_money<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        node_id: &str,
+        source: &str,
+        currency: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let currency = currency
+            .map(crate::bindings::core::currency::extract_currency)
+            .transpose()?;
+        slf.builder_mut()?
+            .as_money(node_id, source, currency)
+            .map_err(statements_to_py)?;
+        Ok(slf)
+    }
+
     #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.with_meta")]
     #[pyo3(text_signature = "($self, key, value)")]
     fn with_meta<'py>(
@@ -384,7 +431,7 @@ impl PyModelBuilder {
         key: &str,
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let value = crate::bindings::module_utils::py_to_json_value(py, value, "meta value")?;
+        let value = crate::bindings::module_utils::py_to_serde(py, value, "meta value")?;
         slf.builder_mut()?.with_meta(key, value);
         Ok(slf)
     }
@@ -430,9 +477,9 @@ impl PyModelBuilder {
     #[pyo3(text_signature = "($self, currency)")]
     fn reporting_currency<'py>(
         mut slf: PyRefMut<'py, Self>,
-        currency: PyRef<'_, PyCurrency>,
+        currency: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let ccy = currency.inner;
+        let ccy = extract_currency(currency)?;
         slf.builder_mut()?.reporting_currency(ccy);
         Ok(slf)
     }
@@ -502,7 +549,7 @@ impl PyModelBuilder {
 
     /// Mutable access to the builder without taking ownership, so a
     /// fallible Rust call cannot leave the wrapper empty.
-    fn builder_mut(&mut self) -> PyResult<&mut ModelBuilder> {
+    pub(crate) fn builder_mut(&mut self) -> PyResult<&mut ModelBuilder> {
         self.inner.as_mut().ok_or_else(Self::consumed_error)
     }
 }

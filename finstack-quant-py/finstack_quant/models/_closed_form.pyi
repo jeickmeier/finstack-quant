@@ -1,7 +1,353 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/models/closed_form.rs``."""
 
-from typing import Any
+from collections.abc import Mapping, Sequence
+from typing import Any, Literal
+import numpy as np
+import numpy.typing as npt
 import pandas as pd
+
+class OptionMarketParams:
+    """Immutable market inputs for a vanilla option or option model.
+
+    Examples
+    --------
+    >>> from finstack_quant.models import OptionMarketParams, bs_greeks
+    >>> market = OptionMarketParams(
+    ...     spot=100.0,
+    ...     strike=100.0,
+    ...     rate=0.05,
+    ...     dividend_yield=0.0,
+    ...     volatility=0.2,
+    ...     time_to_expiry=1.0,
+    ...     option_type="call",
+    ... )
+    >>> round(bs_greeks(market).delta, 4)
+    0.6368
+    """
+
+    def __init__(
+        self,
+        *,
+        spot: float,
+        strike: float,
+        rate: float,
+        dividend_yield: float,
+        volatility: float,
+        time_to_expiry: float,
+        option_type: Literal["call", "put"],
+    ) -> None:
+        """Validate and store the market inputs.
+
+        Parameters
+        ----------
+        spot : float
+            Underlying spot price, in the same units as strike.
+        strike : float
+            Exercise price in the same units as spot.
+        rate : float
+            Continuously compounded annual risk-free rate as a decimal.
+        dividend_yield : float
+            Continuous annual dividend yield or foreign-rate carry as a decimal.
+        volatility : float
+            Annualized volatility as a decimal. Zero is permitted by this input container.
+        time_to_expiry : float
+            Time remaining until expiry, in years.
+        option_type : {"call", "put"}
+            Direction of the option payoff.
+
+        Raises
+        ------
+        TypeError
+            If an argument has an incompatible Python type.
+        ValueError
+            If a number is non-finite, spot or strike is nonpositive,
+            volatility or expiry is negative, or the option type is unknown.
+        """
+        ...
+
+    @property
+    def spot(self) -> float:
+        """Read the option's spot.
+
+        Returns
+        -------
+        float
+            Underlying spot price, in the same units as strike.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def strike(self) -> float:
+        """Read the option's strike.
+
+        Returns
+        -------
+        float
+            Exercise price in the same units as spot.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def rate(self) -> float:
+        """Read the option's rate.
+
+        Returns
+        -------
+        float
+            Continuously compounded annual risk-free rate as a decimal.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def dividend_yield(self) -> float:
+        """Read the option's dividend yield.
+
+        Returns
+        -------
+        float
+            Continuous annual dividend yield or foreign-rate carry as a decimal.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def volatility(self) -> float:
+        """Read the option's volatility.
+
+        Returns
+        -------
+        float
+            Annualized volatility as a decimal. Zero is permitted by this input container.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def time_to_expiry(self) -> float:
+        """Read the option's time to expiry.
+
+        Returns
+        -------
+        float
+            Time remaining until expiry, in years.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def option_type(self) -> str:
+        """Read the option's option type.
+
+        Returns
+        -------
+        str
+            Payoff direction, call or put.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    def contract(self) -> OptionContractParams:
+        """Read the model-independent option inputs.
+
+        Returns
+        -------
+        OptionContractParams
+            Underlier, payoff and continuously compounded carry used by this option.
+
+        Raises
+        ------
+        This method does not raise.
+        """
+        ...
+
+class OptionContractParams:
+    """Spot, strike, expiry, continuous carry and payoff direction shared by option models.
+
+    Examples
+    --------
+    >>> from finstack_quant.models import OptionContractParams
+    >>> contract = OptionContractParams(
+    ...     spot=100.0,
+    ...     strike=105.0,
+    ...     rate=0.03,
+    ...     dividend_yield=0.01,
+    ...     time_to_expiry=2.0,
+    ...     option_type="call",
+    ... )
+    >>> contract.with_volatility(0.2).volatility
+    0.2
+    """
+
+    def __init__(
+        self,
+        *,
+        spot: float,
+        strike: float,
+        rate: float,
+        dividend_yield: float,
+        time_to_expiry: float,
+        option_type: Literal["call", "put"],
+    ) -> None:
+        """Validate and store the market inputs.
+
+        Parameters
+        ----------
+        spot : float
+            Underlying spot price, in the same units as strike.
+        strike : float
+            Exercise price in the same units as spot.
+        rate : float
+            Continuously compounded annual risk-free rate as a decimal.
+        dividend_yield : float
+            Continuous annual dividend yield or foreign-rate carry as a decimal.
+        time_to_expiry : float
+            Time remaining until expiry, in years.
+        option_type : {"call", "put"}
+            Direction of the option payoff.
+
+        Raises
+        ------
+        TypeError
+            If an argument has an incompatible Python type.
+        ValueError
+            If a number is non-finite, spot or strike is nonpositive,
+            volatility or expiry is negative, or the option type is unknown.
+        """
+        ...
+
+    @property
+    def spot(self) -> float:
+        """Read the option's spot.
+
+        Returns
+        -------
+        float
+            Underlying spot price, in the same units as strike.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def strike(self) -> float:
+        """Read the option's strike.
+
+        Returns
+        -------
+        float
+            Exercise price in the same units as spot.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def rate(self) -> float:
+        """Read the option's rate.
+
+        Returns
+        -------
+        float
+            Continuously compounded annual risk-free rate as a decimal.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def dividend_yield(self) -> float:
+        """Read the option's dividend yield.
+
+        Returns
+        -------
+        float
+            Continuous annual dividend yield or foreign-rate carry as a decimal.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def time_to_expiry(self) -> float:
+        """Read the option's time to expiry.
+
+        Returns
+        -------
+        float
+            Time remaining until expiry, in years.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def option_type(self) -> str:
+        """Read the option's option type.
+
+        Returns
+        -------
+        str
+            Payoff direction, call or put.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    def with_volatility(self, volatility: float) -> OptionMarketParams:
+        """Add constant annual volatility to the option inputs.
+
+        Parameters
+        ----------
+        volatility : float
+            Finite nonnegative annualized volatility in decimal units.
+
+        Returns
+        -------
+        OptionMarketParams
+            The same contract with the specified volatility.
+
+        Raises
+        ------
+        ValueError
+            If volatility is negative or nonfinite.
+        """
+        ...
 
 class BsGreeks:
     """
@@ -553,68 +899,157 @@ def option_calculation(request: str | dict[str, Any]) -> OptionCalculationResult
     ...     "expiry": 1.0,
     ...     "is_call": True,
     ... }
-    >>> price = bs_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True)
+    >>> price = bs_price(
+    ...     dict(
+    ...         spot=100.0,
+    ...         strike=100.0,
+    ...         rate=0.05,
+    ...         dividend_yield=0.0,
+    ...         volatility=0.2,
+    ...         time_to_expiry=1.0,
+    ...         option_type="call",
+    ...     )
+    ... )
     >>> solved = option_calculation({"model": model, "solve": {"kind": "implied_vol", "price": price}})
     >>> round(solved.implied_vol, 8)
     0.2
     """
     ...
 
-def bs_price(
-    spot: float,
-    strike: float,
-    rate: float,
-    div_yield: float,
-    vol: float,
-    expiry: float,
-    is_call: bool,
-) -> float:
-    """
-    Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.
-
-    All rates are continuously compounded decimals; ``vol`` is annualized
-    vol; ``expiry`` is years to expiry. Pass ``is_call=False`` for puts.
+def bs_price_many(
+    market: OptionMarketParams | Mapping[str, Any] | str,
+    spots: float | Sequence[float] | npt.NDArray[np.float64] | pd.Series | None = None,
+    strikes: float | Sequence[float] | npt.NDArray[np.float64] | pd.Series | None = None,
+) -> npt.NDArray[np.float64]:
+    """Price BSM options with paired spot and strike coordinates.
 
     Parameters
     ----------
-    spot : float
-        Spot price of the underlying.
-    strike : float
-        Option strike.
-    rate : float
-        Continuously compounded risk-free rate (decimal).
-    div_yield : float
-        Continuous dividend/borrow yield (decimal).
-    vol : float
-        Annualized volatility (decimal); must be non-negative.
-    expiry : float
-        Time to expiry in years.
-    is_call : bool
-        ``True`` for a call, ``False`` for a put.
+    market : OptionMarketParams or Mapping[str, Any] or str
+        Reference rates, carry, expiry, volatility and call or put direction.
+    spots : float or array-like or None
+        Positive spot quotes. A scalar or singleton broadcasts. None uses market.spot.
+    strikes : float or array-like or None
+        Positive strikes in the same quote units. None uses market.strike.
+
+    Returns
+    -------
+    numpy.ndarray
+        One float64 price per input pair in original order, in quote units.
+
+    Raises
+    ------
+    TypeError
+        If an input axis cannot be converted to numeric values.
+    ValueError
+        If axes are empty, multidimensional, incompatible in length or contain invalid quotes.
+
+    Examples
+    --------
+    >>> from finstack_quant.models import bs_price_many
+    >>> market = dict(
+    ...     spot=100.0,
+    ...     strike=100.0,
+    ...     rate=0.03,
+    ...     volatility=0.2,
+    ...     time_to_expiry=1.0,
+    ...     dividend_yield=0.0,
+    ...     option_type="call",
+    ... )
+    >>> bs_price_many(market, spots=[90.0, 100.0, 110.0]).shape
+    (3,)
+    """
+    ...
+
+def bs_greeks_many(
+    market: OptionMarketParams | Mapping[str, Any] | str,
+    spots: float | Sequence[float] | npt.NDArray[np.float64] | pd.Series | None = None,
+    strikes: float | Sequence[float] | npt.NDArray[np.float64] | pd.Series | None = None,
+    theta_days_per_year: float = 365.0,
+) -> list[BsGreeks]:
+    """Compute BSM Greeks for paired spot and strike coordinates.
+
+    Parameters
+    ----------
+    market : OptionMarketParams or Mapping[str, Any] or str
+        Reference rates, carry, expiry, volatility and call or put direction.
+    spots : float or array-like or None
+        Positive spot quotes. A scalar or singleton broadcasts. None uses market.spot.
+    strikes : float or array-like or None
+        Positive strikes in spot quote units. None uses market.strike.
+    theta_days_per_year : float
+        Positive divisor for converting annual theta to theta per calendar day.
+
+    Returns
+    -------
+    list[BsGreeks]
+        One result per pair in the supplied order, in the scalar bs_greeks units.
+
+    Raises
+    ------
+    TypeError
+        If an input axis cannot be converted to numeric values.
+    ValueError
+        If the axes cannot be paired or a Greek input fails validation.
+
+    Examples
+    --------
+    >>> from finstack_quant.models import bs_greeks_many
+    >>> market = dict(
+    ...     spot=100.0,
+    ...     strike=100.0,
+    ...     rate=0.03,
+    ...     volatility=0.2,
+    ...     time_to_expiry=1.0,
+    ...     dividend_yield=0.0,
+    ...     option_type="call",
+    ... )
+    >>> len(bs_greeks_many(market, strikes=[90.0, 100.0]))
+    2
+    """
+    ...
+
+def bs_price(market: OptionMarketParams | dict[str, Any] | str) -> float:
+    """Price a vanilla European option with Black-Scholes or Garman-Kohlhagen.
+
+    Parameters
+    ----------
+    market : OptionMarketParams | dict[str, Any] | str
+        Typed market inputs or their canonical dictionary or JSON. Spot and
+        strike share units; the domestic risk-free rate and dividend yield or
+        foreign rate use continuous annual decimal rates. Volatility is an
+        annualized decimal and expiry is in years. The payoff direction is
+        ``"call"`` or ``"put"``.
 
     Returns
     -------
     float
-        Per-unit option price.
+        Price per unit of underlying, in the same units as spot. Zero expiry
+        gives the intrinsic value, and zero volatility gives the discounted
+        deterministic payoff.
 
     Raises
     ------
+    TypeError
+        If market has an incompatible Python type.
     ValueError
-        If spot or strike is non-positive, volatility or expiry is negative,
-        any numerical input is non-finite, or discounted legs or price overflow.
+        If fields are missing or invalid, or a discounted leg or price is
+        non-finite.
 
     Examples
     --------
-    >>> from finstack_quant.models import bs_price
-    >>> round(bs_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True), 4)
+    >>> from finstack_quant.models import OptionMarketParams, bs_price
+    >>> market = OptionMarketParams(
+    ...     spot=100.0,
+    ...     strike=100.0,
+    ...     rate=0.05,
+    ...     dividend_yield=0.0,
+    ...     volatility=0.20,
+    ...     time_to_expiry=1.0,
+    ...     option_type="call",
+    ... )
+    >>> round(bs_price(market), 4)
     10.4506
-
-    Sources
-    -------
-    - Black-Scholes (1973): see docs/REFERENCES.md#black-scholes-1973
-    - Merton (1973): see docs/REFERENCES.md#merton-1973
-    - Garman-Kohlhagen (1983): see docs/REFERENCES.md#garman-kohlhagen-1983
-
     """
     ...
 
@@ -653,7 +1088,7 @@ def vanilla_expiry_payoff(spot: float, strike: float, is_call: bool) -> float:
     ...
 
 def bs_greeks(
-    market: dict[str, Any] | str,
+    market: OptionMarketParams | dict[str, Any] | str,
     theta_days_per_year: float = 365.0,
 ) -> BsGreeks:
     """
@@ -665,7 +1100,7 @@ def bs_greeks(
     Parameters
     ----------
     market : dict or str
-        Serde form of the Rust ``OptionMarketParams``, as a dict or JSON text.
+        Typed option market, dictionary, or canonical JSON text.
         Every key is required: ``spot`` and ``strike`` (float, the same price
         units); ``rate`` (continuously compounded risk-free rate, decimal);
         ``dividend_yield`` (continuous dividend, borrow or foreign yield,
@@ -758,7 +1193,17 @@ def bs_implied_vol(
     Examples
     --------
     >>> from finstack_quant.models import bs_implied_vol, bs_price
-    >>> price = bs_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True)
+    >>> price = bs_price(
+    ...     dict(
+    ...         spot=100.0,
+    ...         strike=100.0,
+    ...         rate=0.05,
+    ...         dividend_yield=0.0,
+    ...         volatility=0.2,
+    ...         time_to_expiry=1.0,
+    ...         option_type="call",
+    ...     )
+    ... )
     >>> round(bs_implied_vol(100.0, 100.0, 0.05, 0.0, 1.0, price, True), 6)
     0.2
 
@@ -1114,71 +1559,225 @@ def black_shifted_vega(
     """
     ...
 
-def heston_price(
-    spot: float,
-    strike: float,
-    expiry: float,
-    params: dict[str, Any] | str,
-    is_call: bool = True,
-) -> float:
-    """
-    Closed-form (Fourier) Heston price of a European option.
+class HestonParams:
+    """Validated stochastic variance dynamics for Fourier and Monte Carlo pricing.
 
-    Semi-analytical Heston (1993) price via the stable characteristic-function
-    branch with adaptive quadrature; puts use put-call parity.
+    Examples
+    --------
+    >>> from finstack_quant.models import HestonParams
+    >>> heston = HestonParams(v0=0.04, kappa=2.0, theta=0.04, vol_of_vol=0.3, rho=-0.7)
+    >>> heston.satisfies_feller()
+    True
+    """
+
+    def __init__(self, *, v0: float, kappa: float, theta: float, vol_of_vol: float, rho: float) -> None:
+        """Construct Heston variance dynamics with finite inputs.
+
+        Parameters
+        ----------
+        v0 : float
+            Positive opening instantaneous variance in squared-volatility units.
+        kappa : float
+            Positive annual mean-reversion speed of variance.
+        theta : float
+            Positive long-run variance in squared-volatility units.
+        vol_of_vol : float
+            Positive annualized volatility of the variance process.
+        rho : float
+            Spot/variance Brownian shock correlation in the open interval (-1, 1).
+
+        Raises
+        ------
+        ValueError
+            If any input is non-finite or outside its domain.
+        """
+
+    @property
+    def v0(self) -> float:
+        """Opening instantaneous variance in squared-volatility units.
+
+        Returns
+        -------
+        float
+            Opening instantaneous variance in squared-volatility units.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    @property
+    def kappa(self) -> float:
+        """Mean-reversion speed of the variance process per year.
+
+        Returns
+        -------
+        float
+            Mean-reversion speed of the variance process per year.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    @property
+    def theta(self) -> float:
+        """Long-run variance in squared-volatility units.
+
+        Returns
+        -------
+        float
+            Long-run variance in squared-volatility units.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    @property
+    def vol_of_vol(self) -> float:
+        """Annualized volatility of the instantaneous variance process.
+
+        Returns
+        -------
+        float
+            Annualized volatility of the instantaneous variance process.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    @property
+    def rho(self) -> float:
+        """Instantaneous correlation of spot and variance shocks in (-1, 1).
+
+        Returns
+        -------
+        float
+            Instantaneous correlation of spot and variance shocks in (-1, 1).
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+
+    def satisfies_feller(self) -> bool:
+        """Check whether twice the speed times long-run variance covers vol-of-vol squared.
+
+        Returns
+        -------
+        bool
+            True at equality or when twice kappa times theta is greater.
+
+        Notes
+        -----
+        This check does not raise.
+        """
+
+    def to_json(self) -> str:
+        """Serialize the variance dynamics to canonical JSON text.
+
+        Returns
+        -------
+        str
+            Document with opening variance, speed, long-run variance, vol-of-vol and correlation.
+
+        Raises
+        ------
+        ValueError
+            If the native values cannot be serialized.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> HestonParams:
+        """Restore validated variance dynamics using the canonical JSON schema.
+
+        Parameters
+        ----------
+        json : str
+            Structured JSON with all five dynamics parameters.
+
+        Returns
+        -------
+        HestonParams
+            Restored immutable parameters.
+
+        Raises
+        ------
+        ValueError
+            If the text is malformed or contains unknown, missing or invalid values.
+
+        Examples
+        --------
+        >>> from finstack_quant.models import HestonParams
+        >>> heston = HestonParams(v0=0.04, kappa=2.0, theta=0.04, vol_of_vol=0.3, rho=-0.7)
+        >>> HestonParams.from_json(heston.to_json()) == heston
+        True
+        """
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct the Heston dynamics for pickle through canonical JSON.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound from_json method and the serialized variance parameters.
+
+        Raises
+        ------
+        ValueError
+            If the parameters cannot be serialized and restored.
+        """
+
+def heston_price(
+    contract: OptionContractParams | dict[str, Any] | str,
+    heston: HestonParams | dict[str, Any] | str,
+    settings: dict[str, Any] | str | None = None,
+) -> float:
+    """Price a European option by Heston Fourier inversion.
 
     Parameters
     ----------
-    spot : float
-        Spot price of the underlying.
-    strike : float
-        Option strike.
-    expiry : float
-        Time to expiry in years; ``expiry <= 0`` returns intrinsic value.
-    params : dict or str
-        Serde form of the Rust ``HestonPricingParams``, as a dict or JSON text.
-        Every key is required: ``r`` (continuously compounded risk-free rate,
-        decimal); ``q`` (continuous dividend / foreign yield, decimal);
-        ``v0`` (initial instantaneous variance, not volatility; positive);
-        ``kappa`` (variance mean-reversion speed per year, positive);
-        ``theta`` (long-run variance, positive); ``sigma_v`` (volatility of
-        variance, positive); ``rho`` (spot/variance correlation in
-        ``[-1, 1]``).
-    is_call : bool, default True
-        ``True`` for a call, ``False`` for a put.
+    contract : OptionContractParams or dict or str
+        Option payoff, with positive spot and strike, finite annual continuously
+        compounded rates, and nonnegative expiry in years. At expiry, the price
+        equals the intrinsic payoff.
+    heston : HestonParams or dict or str
+        Validated variance parameters or their canonical structured form.
+    settings : dict or str, optional
+        Fourier quadrature with positive upper frequency u_max, positive
+        composite panel count panels, and Gauss-Legendre order gl_order in
+        {2, 4, 8, 16}. Omission selects a grid from maturity and variance.
 
     Returns
     -------
     float
-        Present-value per-unit option price.
+        Present value per unit of the underlying in the spot quote currency.
 
     Raises
     ------
     ValueError
-        If ``params`` has an unknown or missing key or a wrongly typed value,
-        or a Heston parameter or rate is non-finite or outside its domain.
+        If any structured input is malformed or an input or discount factor is invalid.
     RuntimeError
-        If the Fourier integration fails to produce a finite price.
+        If integration or put-call parity cannot resolve a finite price.
 
     Examples
     --------
-    >>> from finstack_quant.models import heston_price
-    >>> params = {"r": 0.05, "q": 0.02, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.3, "rho": -0.7}
-    >>> p = heston_price(100.0, 100.0, 1.0, params)
-    >>> 5.0 < p < 15.0
+    >>> from finstack_quant.models import HestonParams, OptionContractParams, heston_price
+    >>> contract = OptionContractParams(
+    ...     spot=100, strike=100, rate=0.05, dividend_yield=0.02, time_to_expiry=1, option_type="call"
+    ... )
+    >>> heston = HestonParams(v0=0.04, kappa=2.0, theta=0.04, vol_of_vol=0.3, rho=-0.7)
+    >>> 5.0 < heston_price(contract, heston) < 15.0
     True
-
-    Sources
-    -------
-    - Heston (1993): see docs/REFERENCES.md#heston-1993
-    - Albrecher et al. (2007): see docs/REFERENCES.md#albrecher-2007-little-heston-trap
     """
     ...
 
 # Closed-form exotics
 
 def barrier_option_price(
-    market: dict[str, Any] | str,
+    market: OptionMarketParams | dict[str, Any] | str,
     barrier: float,
     direction: str,
     knock: str,
@@ -1191,7 +1790,7 @@ def barrier_option_price(
     Parameters
     ----------
     market : dict or str
-        Serde form of the Rust ``OptionMarketParams``, as a dict or JSON text.
+        Typed option market, dictionary, or canonical JSON text.
         Every key is required: ``spot`` and ``strike`` (float, the same price
         units); ``rate`` (continuously compounded risk-free rate, decimal);
         ``dividend_yield`` (continuous dividend, borrow or foreign yield,
@@ -1241,7 +1840,7 @@ def barrier_option_price(
     ...
 
 def asian_option_price(
-    market: dict[str, Any] | str,
+    market: OptionMarketParams | dict[str, Any] | str,
     num_fixings: int,
     averaging: str | None = None,
 ) -> float:
@@ -1251,7 +1850,7 @@ def asian_option_price(
     Parameters
     ----------
     market : dict or str
-        Serde form of the Rust ``OptionMarketParams``, as a dict or JSON text.
+        Typed option market, dictionary, or canonical JSON text.
         Every key is required: ``spot`` and ``strike`` (float, the same price
         units); ``rate`` (continuously compounded risk-free rate, decimal);
         ``dividend_yield`` (continuous dividend, borrow or foreign yield,
@@ -1299,7 +1898,7 @@ def asian_option_price(
     ...
 
 def lookback_option_price(
-    market: dict[str, Any] | str,
+    market: OptionMarketParams | dict[str, Any] | str,
     extremum: float,
     strike_type: str = "fixed",
 ) -> float:
@@ -1312,7 +1911,7 @@ def lookback_option_price(
     Parameters
     ----------
     market : dict or str
-        Serde form of the Rust ``OptionMarketParams``, as a dict or JSON text.
+        Typed option market, dictionary, or canonical JSON text.
         Every key is required: ``spot`` and ``strike`` (float, the same price
         units); ``rate`` (continuously compounded risk-free rate, decimal);
         ``dividend_yield`` (continuous dividend, borrow or foreign yield,
@@ -1358,7 +1957,7 @@ def lookback_option_price(
     ...
 
 def quanto_option_price(
-    market: dict[str, Any] | str,
+    market: OptionMarketParams | dict[str, Any] | str,
     rate_foreign: float,
     vol_fx: float,
     correlation: float,

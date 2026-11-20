@@ -1,13 +1,18 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/statements_analytics/valuation.rs``."""
 
 from __future__ import annotations
+from decimal import Decimal
 
-from collections.abc import Mapping
-from typing import Any
+import datetime
+from collections.abc import Mapping, Sequence
+from typing import Any, Literal, TypedDict
 import pandas as pd
-from finstack_quant.statements import CheckReport, StatementResult
+from finstack_quant.statements import CheckReport, FinancialModelSpec, MonteCarloResults, StatementResult
+from finstack_quant.core.currency import Currency
+from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.statements_analytics._checks import CreditMapping, ThreeStatementMapping
+from finstack_quant.statements_analytics._credit_context import CreditContextMetrics
 from finstack_quant.statements_analytics._typed import TornadoEntry
 
 class CorporateAnalysis:
@@ -21,8 +26,8 @@ class CorporateAnalysis:
     >>> _ = b.periods("2024Q1..Q2", None)
     >>> _ = b.value("revenue", [("2024Q1", 1.0), ("2024Q2", 2.0)])
     >>> analysis = run_corporate_analysis(b.build())
-    >>> analysis.equity is None, analysis.ev_suppressed_non_positive
-    (True, False)
+    >>> analysis.equity is None
+    True
     """
     @property
     def statement(self) -> StatementResult:
@@ -49,30 +54,17 @@ class CorporateAnalysis:
             DCF valuation, or ``None`` when no ``wacc`` was configured.
         """
     @property
-    def credit(self) -> Any:
-        """
-                Per-instrument credit metrics as ``{instrument_id: CreditContextMetrics dict}``
-        (serde form, including ``dscr_incl_fees`` / ``dscr_incl_fees_min``).
-
-                This property does not raise.
-
-                Returns
-                -------
-                Any
-                    Per-instrument credit metrics as ``{instrument_id: CreditContextMetrics dict}`` (serde form, including ``dscr_incl_fees`` / ``dscr_incl_fees_min``).
-        """
-    @property
-    def ev_suppressed_non_positive(self) -> bool:
-        """
-        Whether a non-positive DCF enterprise value was excluded from LTV.
+    def credit(self) -> dict[str, CreditContextMetrics]:
+        """Get the per-instrument credit coverage and leverage observations.
 
         This property does not raise.
 
         Returns
         -------
-        bool
-            Whether a non-positive DCF enterprise value was excluded from LTV.
+        dict[str, CreditContextMetrics]
+            Instrument IDs mapped to their typed period series and minima.
         """
+        ...
     def to_dataframe(self) -> pd.DataFrame:
         """
         Export the per-instrument credit metrics as a long pandas ``DataFrame``.
@@ -146,7 +138,7 @@ class CorporateValuationResult:
     >>> from finstack_quant.statements_analytics import CorporateValuationResult
     >>> r = CorporateValuationResult.from_json(
     ...     '{"equity_value":{"amount":"90","currency":"USD"},"enterprise_value":{"amount":"100","currency":"USD"},'
-    ...     '"net_debt":{"amount":"10","currency":"USD"},"valuation_discount":{"amount":"0","currency":"USD"},'
+    ...     '"net_debt":{"amount":"10","currency":"USD"},"other_equity_claims":{"amount":"0","currency":"USD"},"valuation_discount":{"amount":"0","currency":"USD"},'
     ...     '"terminal_value_pv":{"amount":"60","currency":"USD"},'
     ...     '"equity_value_per_share":null,"diluted_shares":null}'
     ... )
@@ -180,21 +172,34 @@ class CorporateValuationResult:
     @property
     def net_debt(self) -> Money:
         """
-        Net debt (or effective bridge amount) subtracted from EV.
+        Interest-bearing debt less cash in model currency.
 
         This property does not raise.
 
         Returns
         -------
         Money
-            Net debt (or effective bridge amount) subtracted from EV.
+            Interest-bearing debt less cash in model currency.
+        """
+    @property
+    def other_equity_claims(self) -> Money:
+        """Return net non-debt claims deducted from enterprise value.
+
+        This property does not raise.
+
+        Returns
+        -------
+        Money
+            Net preferred, minority and other claims after non-operating
+            assets and named adjustments in model currency. A negative
+            amount increases common equity.
         """
     @property
     def valuation_discount(self) -> Money:
         """
         Total valuation discount (DLOM, DLOC, other) deducted after the
         EV-to-equity bridge; zero without ``valuation_discounts``.
-        ``enterprise_value - net_debt - valuation_discount`` equals
+        ``enterprise_value - net_debt - other_equity_claims - valuation_discount`` equals
         ``equity_value``.
 
         This property does not raise.
@@ -345,7 +350,7 @@ class CorporateValuationResult:
         Export as a single-row pandas ``DataFrame``.
 
         Columns: ``currency``, ``equity_value``, ``enterprise_value``,
-        ``net_debt``, ``valuation_discount``, ``terminal_value_pv`` (float
+        ``net_debt``, ``other_equity_claims``, ``valuation_discount``, ``terminal_value_pv`` (float
         amounts in ``currency``), ``equity_value_per_share``,
         ``diluted_shares`` (``None`` when absent), then the DCF working:
         ``wacc`` (decimal), ``pv_explicit``, ``terminal_value``,
@@ -356,7 +361,7 @@ class CorporateValuationResult:
         Returns
         -------
         pd.DataFrame
-            One row with columns ``currency``, ``equity_value``, ``enterprise_value``, ``net_debt``, ``valuation_discount``, ``terminal_value_pv``, ``equity_value_per_share``, ``diluted_shares``, ``wacc``, ``pv_explicit``, ``terminal_value``, ``total_debt``, ``cash``, ``terminal_discount_years``.
+            One row with columns ``currency``, ``equity_value``, ``enterprise_value``, ``net_debt``, ``other_equity_claims``, ``valuation_discount``, ``terminal_value_pv``, ``equity_value_per_share``, ``diluted_shares``, ``wacc``, ``pv_explicit``, ``terminal_value``, ``total_debt``, ``cash``, ``terminal_discount_years``.
 
         Raises
         ------
@@ -870,14 +875,14 @@ class LboResult:
     @property
     def entry_metric(self) -> float:
         """
-        Entry metric read from the model's first period.
+        Entry metric read from the explicitly selected entry period.
 
         This property does not raise.
 
         Returns
         -------
         float
-            Entry metric read from the model's first period.
+            Entry metric read from the explicitly selected entry period.
         """
     @property
     def debt_total(self) -> Money:
@@ -1115,7 +1120,7 @@ class TerminalValueSpec:
         'gordon_growth'
         """
     @staticmethod
-    def exit_multiple(multiple: float, terminal_metric: float) -> TerminalValueSpec:
+    def exit_multiple(multiple: float, terminal_metric: float | None = None) -> TerminalValueSpec:
         """
         Exit multiple: ``TV = terminal_metric * multiple``.
 
@@ -1125,11 +1130,11 @@ class TerminalValueSpec:
         ----------
         multiple : float
             Exit multiple in turns (``9.0`` = 9.0x).
-        terminal_metric : float
+        terminal_metric : float or None
             Terminal-year metric (EBITDA, revenue, ...) in model currency.
-            Required, as in the Rust wire form. Pass ``0.0`` when
+            Omit when
             ``DcfOptions.exit_multiple_metric_node`` supplies the metric from
-            the statement model; without that node ``evaluate_dcf`` raises
+            the statement model. Without that node, ``evaluate_dcf`` raises
             ``ValueError`` unless the metric is positive and finite.
         Returns
         -------
@@ -1418,7 +1423,7 @@ def dcf_sensitivity(
     >>> b = ModelBuilder("dcf")
     >>> _ = b.periods("2025..2026")
     >>> _ = b.value_money("ufcf", [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))])
-    >>> _ = b.with_meta("currency", '"USD"')
+    >>> _ = b.with_meta("currency", "USD")
     >>> sens = dcf_sensitivity(
     ...     b.build(),
     ...     0.10,
@@ -1513,7 +1518,7 @@ def evaluate_dcf(
     >>> b = ModelBuilder("dcf")
     >>> _ = b.periods("2025..2026")
     >>> _ = b.value_money("ufcf", [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))])
-    >>> _ = b.with_meta("currency", '"USD"')
+    >>> _ = b.with_meta("currency", "USD")
     >>> inputs = {
     ...     "wacc": 0.10,
     ...     "terminal_value": TerminalValueSpec.gordon_growth(0.02),
@@ -1527,7 +1532,7 @@ def evaluate_dcf(
 def evaluate_lbo(model: Any, config: Mapping[str, Any] | str) -> LboResult:
     """Evaluate a leveraged-buyout transaction against a statement model.
 
-    Entry enterprise value is priced at the model's first period, the sponsor
+    Entry enterprise value is priced at the explicitly selected entry period, the sponsor
     equity check is the sources-and-uses residual, and exit proceeds are the
     exit enterprise value less modelled net debt at ``exit_period``. IRR is out
     of scope: pair ``exit_equity_proceeds`` with the equity outflow at close and
@@ -1541,7 +1546,7 @@ def evaluate_lbo(model: Any, config: Mapping[str, Any] | str) -> LboResult:
     config : dict | str
         The Rust ``LboConfig`` serde form (the document WASM ``evaluateLbo``
         takes as ``configJson``): ``entry_multiple`` (turns, ``8.5`` = 8.5x),
-        ``entry_metric_node`` (monetary node read at the first period),
+        ``entry_metric_node`` (monetary node read at the selected entry period),
         ``transaction_fees`` (model currency), ``sources``
         (``[{"name": ..., "amount": ...}]`` funded at close, model currency),
         ``exit_multiple``, ``exit_metric_node``, ``exit_net_debt_node``,
@@ -1573,13 +1578,14 @@ def evaluate_lbo(model: Any, config: Mapping[str, Any] | str) -> LboResult:
     >>> from finstack_quant.statements_analytics import evaluate_lbo
     >>> b = ModelBuilder("m")
     >>> _ = b.periods("2025Q1..2026Q1", None)
-    >>> _ = b.with_meta("currency", '"USD"')
+    >>> _ = b.with_meta("currency", "USD")
     >>> quarters = ["2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1"]
     >>> _ = b.value_money("ebitda", [(q, Money(v, "USD")) for q, v in zip(quarters, [100.0] * 4 + [120.0])])
     >>> _ = b.value_money("net_debt", [(q, Money(v, "USD")) for q, v in zip(quarters, [300.0] * 4 + [200.0])])
     >>> config = {
     ...     "entry_multiple": 8.0,
     ...     "entry_metric_node": "ebitda",
+     "entry_period": "2025Q1",
     ...     "transaction_fees": 0.0,
     ...     "sources": [{"name": "debt", "amount": 500.0}],
     ...     "exit_multiple": 9.0,
@@ -1628,9 +1634,7 @@ def run_corporate_analysis(
         * ``ltv_value_node`` (str): monetary statement node supplying a
           per-period LTV denominator in reporting currency; scalar,
           foreign-currency or non-finite values are rejected. Missing or
-          non-positive values do not supply a denominator. When omitted, a
-          positive DCF enterprise value is broadcast as a constant
-          denominator.
+          non-positive values or an omitted node leave LTV unavailable.
     market : MarketContext | str | None
         Market context for statement evaluation and instrument pricing (not
         WACC discounting); requires ``options["as_of"]``.
@@ -1640,7 +1644,7 @@ def run_corporate_analysis(
     CorporateAnalysis
         ``statement`` (``StatementResult``), ``equity``
         (``CorporateValuationResult`` or ``None``), ``credit`` (per-instrument
-        metrics) and ``ev_suppressed_non_positive``.
+        metrics).
 
     Raises
     ------
@@ -1663,12 +1667,14 @@ def run_corporate_analysis(
     """
 
 class WaccInputs:
-    """Capital-structure inputs of a WACC calculation, all decimals.
+    """Capital-structure inputs with exact capital weights and annual effective costs.
 
     Examples
     --------
     >>> from finstack_quant.statements_analytics import WaccInputs
-    >>> inputs = WaccInputs(equity_weight=0.6, cost_of_equity=0.10, debt_weight=0.4, cost_of_debt=0.05, tax_rate=0.25)
+    >>> inputs = WaccInputs(
+    ...     equity_weight="0.6", cost_of_equity=0.10, debt_weight="0.4", cost_of_debt=0.05, tax_rate=0.25
+    ... )
     >>> WaccInputs.from_json(inputs.to_json()) == inputs
     True
     """
@@ -1676,9 +1682,9 @@ class WaccInputs:
     def __init__(
         self,
         *,
-        equity_weight: float,
+        equity_weight: Decimal | str | int,
         cost_of_equity: float,
-        debt_weight: float,
+        debt_weight: Decimal | str | int,
         cost_of_debt: float,
         tax_rate: float,
     ) -> None:
@@ -1686,11 +1692,11 @@ class WaccInputs:
 
         Parameters
         ----------
-        equity_weight : float
+        equity_weight : Decimal or str or int
             Equity share of total capital as a decimal fraction; non-negative.
         cost_of_equity : float
             Required return on equity in decimal form (``0.115`` = 11.5%).
-        debt_weight : float
+        debt_weight : Decimal or str or int
             Debt share of total capital as a decimal fraction; non-negative and
             summing with ``equity_weight`` to ``1.0``.
         cost_of_debt : float
@@ -1698,21 +1704,24 @@ class WaccInputs:
         tax_rate : float
             Marginal corporate tax rate as a decimal in ``[0, 1]``.
 
-        Notes
-        -----
-        This constructor does not raise; :func:`wacc` validates the inputs.
+        Raises
+        ------
+        TypeError
+            If either capital weight is not supplied as an exact decimal.
+        ValueError
+            If either weight cannot be represented exactly.
         """
 
     @property
-    def equity_weight(self) -> float:
+    def equity_weight(self) -> Decimal:
         """Equity share of total capital as a decimal fraction.
 
         This property does not raise.
 
         Returns
         -------
-        float
-            The equity weight.
+        Decimal
+            The exact equity weight.
         """
 
     @property
@@ -1728,15 +1737,15 @@ class WaccInputs:
         """
 
     @property
-    def debt_weight(self) -> float:
+    def debt_weight(self) -> Decimal:
         """Debt share of total capital as a decimal fraction.
 
         This property does not raise.
 
         Returns
         -------
-        float
-            The debt weight.
+        Decimal
+            The exact debt weight.
         """
 
     @property
@@ -1785,9 +1794,9 @@ class WaccInputs:
         Examples
         --------
         >>> from finstack_quant.statements_analytics import WaccInputs
-        >>> text = '{"equity_weight": 1.0, "cost_of_equity": 0.1, "debt_weight": 0.0, "cost_of_debt": 0.05, "tax_rate": 0.25}'
-        >>> WaccInputs.from_json(text).equity_weight
-        1.0
+        >>> text = '{"equity_weight": "1", "cost_of_equity": 0.1, "debt_weight": "0", "cost_of_debt": 0.05, "tax_rate": 0.25}'
+        >>> str(WaccInputs.from_json(text).equity_weight)
+        '1'
         """
 
     def to_json(self) -> str:
@@ -1812,7 +1821,8 @@ def wacc(inputs: WaccInputs) -> float:
     Parameters
     ----------
     inputs : WaccInputs
-        Capital weights, cost of equity, pre-tax cost of debt and tax rate.
+        Exact nonnegative market-value weights summing to one, annual effective
+        equity and pre-tax debt costs above -100%, and a tax rate in [0, 1].
 
     Returns
     -------
@@ -1822,13 +1832,718 @@ def wacc(inputs: WaccInputs) -> float:
     Raises
     ------
     ValueError
-        If an input is not finite, a weight is negative, the weights do not
-        sum to ``1.0``, or the tax rate is outside ``[0, 1]``.
+        If weights are negative or fail to sum exactly to one, an annual
+        effective cost or the result is nonfinite or at or below -100%,
+        or the tax rate falls outside ``[0, 1]``.
 
     Examples
     --------
     >>> from finstack_quant.statements_analytics import WaccInputs, wacc
-    >>> inputs = WaccInputs(equity_weight=0.6, cost_of_equity=0.10, debt_weight=0.4, cost_of_debt=0.05, tax_rate=0.25)
+    >>> inputs = WaccInputs(
+    ...     equity_weight="0.6", cost_of_equity=0.10, debt_weight="0.4", cost_of_debt=0.05, tax_rate=0.25
+    ... )
     >>> round(wacc(inputs), 4)
     0.075
     """
+
+class DcfInputs:
+    """Authored operating cash-flow and terminal-value assumptions for a DCF.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import DcfInputs, TerminalValueSpec
+    >>> isinstance(DcfInputs(wacc=0.10, terminal_value=TerminalValueSpec.gordon_growth(0.02)), DcfInputs)
+    True
+    """
+
+    def __init__(
+        self,
+        *,
+        wacc: float,
+        terminal_value: TerminalValueSpec,
+        ufcf_node: str = "ufcf",
+        net_debt_override: float | None = None,
+    ) -> None:
+        """Construct and validate assumptions that do not depend on statement data.
+
+        Parameters
+        ----------
+        wacc : float
+            Annual effective rate above −100%, expressed as a decimal fraction.
+        terminal_value : TerminalValueSpec
+            Gordon growth, H-model, or enterprise exit multiple method.
+        ufcf_node : str
+            Exact statement node for signed monetary cash flows. Defaults to "ufcf".
+        net_debt_override : float or None
+            Authored signed net debt in model currency. None reads the admitted debt and cash balances.
+
+        Raises
+        ------
+        ValueError
+            For an invalid WACC, empty cash-flow node, or nonfinite net debt.
+        """
+        ...
+
+class DcfOptions:
+    """Additional company valuation terms and timing controls.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import DcfOptions
+    >>> isinstance(DcfOptions(mid_year_convention=True), DcfOptions)
+    True
+    """
+
+    def __init__(
+        self,
+        *,
+        mid_year_convention: bool = False,
+        equity_bridge: EquityBridge | None = None,
+        shares_outstanding: float | None = None,
+        valuation_discounts: ValuationDiscounts | None = None,
+        exit_multiple_metric_node: str | None = None,
+    ) -> None:
+        """Resolve authored options to Rust valuation settings.
+
+        Parameters
+        ----------
+        mid_year_convention : bool
+            Use each forecast period's elapsed midpoint when True. The default uses close dates.
+        equity_bridge : EquityBridge or None
+            Authored claims and cash in the valuation currency. None uses the explicit inputs and model balances.
+        shares_outstanding : float or None
+            Positive basic share count. None omits per-share valuation.
+        valuation_discounts : ValuationDiscounts or None
+            Separately elected discounts applied after the enterprise-to-equity bridge.
+        exit_multiple_metric_node : str or None
+            Named additive terminal earnings node. None uses the explicit metric supplied with the multiple.
+
+        Raises
+        ------
+        ValueError
+            For an unknown field or a value that violates the Rust wire type.
+        """
+        ...
+
+class StatementValuationCut:
+    """Statement information cutoff and effective valuation date in one currency.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import StatementValuationCut
+    >>> isinstance(StatementValuationCut("2024-12-31", "2024-12-30", "USD"), StatementValuationCut)
+    True
+    """
+
+    def __init__(
+        self,
+        as_of: datetime.date | str,
+        observed_through: datetime.date | str,
+        currency: Currency | str,
+    ) -> None:
+        """Capture the requested reporting currency and observation window.
+
+        Parameters
+        ----------
+        as_of : datetime.date or str
+            Effective valuation day in ISO format or as a calendar date.
+        observed_through : datetime.date or str
+            Last eligible publication date, on or before valuation.
+        currency : Currency or str
+            ISO reporting currency shared by the valuation and underlying model.
+
+        Raises
+        ------
+        ValueError
+            For an invalid date or currency.
+        TypeError
+            For an input outside the supported host types.
+        """
+        ...
+
+class TerminalFcffBasis:
+    """Amount basis for annual free cash flow at a growth terminal.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import TerminalFcffBasis
+    >>> isinstance(TerminalFcffBasis.trailing_additive(), TerminalFcffBasis)
+    True
+    """
+
+    @staticmethod
+    def authored(amount: Money) -> TerminalFcffBasis:
+        """Elect explicitly authored annual FCFF at the terminal horizon.
+
+        Parameters
+        ----------
+        amount : Money
+            Signed annual cash-flow amount in the valuation currency.
+
+        This method does not raise.
+
+        Returns
+        -------
+        TerminalFcffBasis
+            Literal annual amount basis.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.money import Money
+        >>> from finstack_quant.statements_analytics import TerminalFcffBasis
+        >>> isinstance(TerminalFcffBasis.authored(Money(100, "USD")), TerminalFcffBasis)
+        True
+        """
+        ...
+
+    @staticmethod
+    def trailing_additive() -> TerminalFcffBasis:
+        """Elect a complete twelve-month sum of the named additive forecast cash flows.
+
+        This method does not raise.
+
+        Returns
+        -------
+        TerminalFcffBasis
+            Terminal-period basis that validates contiguous coverage during valuation.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements_analytics import TerminalFcffBasis
+        >>> isinstance(TerminalFcffBasis.trailing_additive(), TerminalFcffBasis)
+        True
+        """
+        ...
+
+class DcfProjection:
+    """Explicit projection horizon and annual terminal cash-flow basis.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import DcfProjection, TerminalFcffBasis
+    >>> projection = DcfProjection(
+    ...     terminal_date="2028-12-31", normalized_annual_fcff=TerminalFcffBasis.trailing_additive()
+    ... )
+    >>> isinstance(projection, DcfProjection)
+    True
+    """
+
+    def __init__(
+        self,
+        *,
+        terminal_date: datetime.date | str,
+        normalized_annual_fcff: TerminalFcffBasis | None = None,
+        forward_remainder_node: str | None = None,
+        stable_growth_ceiling: float | None = None,
+    ) -> None:
+        """Author the terminal date and any extra forecast evidence.
+
+        Parameters
+        ----------
+        terminal_date : datetime.date or str
+            The terminal valuation date, no earlier than the final forecast receipt.
+        normalized_annual_fcff : TerminalFcffBasis or None
+            Same-currency annual FCFF election. Required for Gordon growth or H-model.
+        forward_remainder_node : str or None
+            Exact node for the forward part of a forecast period crossing the valuation date.
+        stable_growth_ceiling : float or None
+            Optional elected upper bound on stable growth as an annual decimal rate.
+
+        Raises
+        ------
+        ValueError
+            For an invalid terminal date.
+        """
+        ...
+
+class CorporateDcfRequest:
+    """Complete corporate DCF terms on an explicitly selected valuation cut.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import CorporateDcfRequest, DcfInputs, DcfProjection
+    >>> from finstack_quant.statements_analytics import StatementValuationCut, TerminalValueSpec
+    >>> request = CorporateDcfRequest(
+    ...     cut=StatementValuationCut("2024-12-31", "2024-12-31", "USD"),
+    ...     inputs=DcfInputs(wacc=0.10, terminal_value=TerminalValueSpec.exit_multiple(10.0, 8.0)),
+    ...     projection=DcfProjection(terminal_date="2025-12-31"),
+    ... )
+    >>> isinstance(request, CorporateDcfRequest)
+    True
+    """
+
+    def __init__(
+        self,
+        *,
+        cut: StatementValuationCut,
+        inputs: DcfInputs,
+        projection: DcfProjection,
+        options: DcfOptions | None = None,
+    ) -> None:
+        """Combine the explicit statement date, pricing terms and projection.
+
+        This constructor does not raise.
+
+        Parameters
+        ----------
+        cut : StatementValuationCut
+            Effective date, information cutoff and reporting currency.
+        inputs : DcfInputs
+            Cash-flow node and terminal and discounting assumptions.
+        projection : DcfProjection
+            Terminal month and authorized forecast basis.
+        options : DcfOptions or None
+            Optional timing, equity bridge and share terms. None uses Rust defaults.
+        """
+        ...
+
+def evaluate_corporate_dcf(
+    model: FinancialModelSpec | str,
+    request: CorporateDcfRequest,
+    market: MarketContext | None = None,
+) -> CorporateValuationResult:
+    """Evaluate a statement model at its information cutoff and value its forecast.
+
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        Model or serialized model with a source snapshot and dated publication metadata.
+    request : CorporateDcfRequest
+        Effective valuation date, information cutoff, currency and valuation terms.
+    market : MarketContext or None
+        Market inputs for capital-structure-linked statement nodes. None supplies no external curves.
+
+    Returns
+    -------
+    CorporateValuationResult
+        Enterprise value, cash flow and terminal timing, and equity bridge in the stated currency.
+
+    Raises
+    ------
+    ValueError
+        For an invalid cut, inconsistent currency, incomplete assumptions or an inadmissible valuation.
+    KeyError
+        If a required model observation cannot be read.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.statements import ModelBuilder
+    >>> from finstack_quant.statements_analytics import CorporateDcfRequest, DcfInputs, DcfProjection
+    >>> from finstack_quant.statements_analytics import StatementValuationCut, TerminalFcffBasis, TerminalValueSpec
+    >>> from finstack_quant.statements_analytics import evaluate_corporate_dcf
+    >>> builder = ModelBuilder("qualified-dcf")
+    >>> _ = builder.periods("2025..2025")
+    >>> _ = builder.source_snapshot("forecast-2024-12-31")
+    >>> _ = builder.currency("USD")
+    >>> _ = builder.value_money("ufcf", [("2025", Money(100, "USD"))])
+    >>> request = CorporateDcfRequest(
+    ...     cut=StatementValuationCut("2024-12-31", "2024-12-31", "USD"),
+    ...     inputs=DcfInputs(wacc=0.10, terminal_value=TerminalValueSpec.gordon_growth(0.02), net_debt_override=50.0),
+    ...     projection=DcfProjection(
+    ...         terminal_date="2026-01-01", normalized_annual_fcff=TerminalFcffBasis.authored(Money(100, "USD"))
+    ...     ),
+    ... )
+    >>> round(evaluate_corporate_dcf(builder.build(), request).enterprise_value.amount, 2)
+    1249.78
+    """
+    ...
+
+def evaluate_dcf_from_results(
+    model: FinancialModelSpec | str,
+    results: StatementResult | str,
+    request: CorporateDcfRequest,
+) -> CorporateValuationResult:
+    """Reprice a company from a verified statement snapshot already in memory.
+
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        Unchanged source model used to generate results.
+    results : StatementResult or str
+        Evaluated observations with a matching run hash, cutoff and effective date.
+    request : CorporateDcfRequest
+        The authorized statement cut, forecast selection and pricing terms.
+
+    Returns
+    -------
+    CorporateValuationResult
+        Same-currency enterprise and common-equity values from the reused snapshot.
+
+    Raises
+    ------
+    ValueError
+        If the statement provenance differs from the requested model or cut, or valuation fails.
+    KeyError
+        If an admitted required model observation is absent.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import evaluate_dcf_from_results
+    >>> from datetime import date
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.statements import Evaluator, ModelBuilder
+    >>> from finstack_quant.statements_analytics import CorporateDcfRequest, DcfInputs, DcfProjection
+    >>> from finstack_quant.statements_analytics import StatementValuationCut, TerminalFcffBasis, TerminalValueSpec
+    >>> as_of = date(2024, 12, 31)
+    >>> market = MarketContext()
+    >>> b = ModelBuilder("qualified-dcf").periods("2025..2025").currency("USD")
+    >>> _ = b.source_snapshot("forecast-at-2024-close")
+    >>> _ = b.value_money("ufcf", [("2025", Money(100, "USD"))])
+    >>> model = b.build()
+    >>> evaluator = Evaluator()
+    >>> results = evaluator.evaluate_with_market(model, market, as_of, as_of)
+    >>> request = CorporateDcfRequest(
+    ...     cut=StatementValuationCut(as_of, as_of, "USD"),
+    ...     inputs=DcfInputs(wacc=0.10, terminal_value=TerminalValueSpec.gordon_growth(0.02), net_debt_override=50),
+    ...     projection=DcfProjection(
+    ...         terminal_date="2026-01-01", normalized_annual_fcff=TerminalFcffBasis.authored(Money(100, "USD"))
+    ...     ),
+    ... )
+    >>> round(evaluate_dcf_from_results(model, results, request).enterprise_value.amount, 2)
+    1249.78
+    """
+    ...
+
+class DcfSensitivityGridSpec:
+    """Two explicit ordered parameter axes for an enterprise-value grid.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import DcfSensitivityGridSpec
+    >>> isinstance(DcfSensitivityGridSpec([0.09, 0.11], [0.01, 0.02, 0.03]), DcfSensitivityGridSpec)
+    True
+    """
+
+    def __init__(self, wacc_values: Sequence[float], terminal_values: Sequence[float]) -> None:
+        """Validate two finite, nonempty axes with distinct levels.
+
+        Parameters
+        ----------
+        wacc_values : Sequence of float
+            Annual effective WACC decimal rates in row order.
+        terminal_values : Sequence of float
+            Stable growth decimal rates or enterprise exit multiple turns in column order.
+
+        Raises
+        ------
+        ValueError
+            For an empty axis, a nonfinite level or duplicate represented levels.
+        """
+        ...
+
+class DcfSensitivityGridResult:
+    """Rectangular native DCF results with marked unavailable endpoints.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import DcfSensitivityGridResult
+    >>> hasattr(DcfSensitivityGridResult, "to_dataframe")
+    True
+    """
+
+    @property
+    def baseline_enterprise_value(self) -> Money:
+        """Get the enterprise value at the original statement DCF assumptions.
+
+        This method does not raise.
+
+        Returns
+        -------
+        Money
+            Baseline enterprise value in model currency.
+        """
+        ...
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """Present enterprise value as WACC rows and terminal-level columns.
+
+        Returns
+        -------
+        pd.DataFrame
+            Requested row and column order. Values are decimal currency amounts
+            with missing cells for levels outside the admitted DCF domain.
+
+        Raises
+        ------
+        ImportError
+            If pandas is unavailable.
+        """
+        ...
+
+def dcf_sensitivity_grid(
+    model: FinancialModelSpec | str,
+    results: StatementResult | str,
+    request: CorporateDcfRequest,
+    axes: DcfSensitivityGridSpec,
+) -> DcfSensitivityGridResult:
+    """Reprice a rectangular grid using one verified statement snapshot.
+
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        Unchanged source model used to generate results.
+    results : StatementResult or str
+        The same statement run at the requested observation and valuation dates.
+    request : CorporateDcfRequest
+        Baseline assumptions and valuation horizon.
+    axes : DcfSensitivityGridSpec
+        WACC decimal rates as rows and stable growth rates or exit multiples as columns.
+
+    Returns
+    -------
+    DcfSensitivityGridResult
+        Enterprise values and signed changes against the baseline with unavailable cells.
+
+    Raises
+    ------
+    ValueError
+        If provenance, baseline or axes are invalid, or pricing an admitted endpoint fails.
+    KeyError
+        If an applicable baseline observation is absent.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import dcf_sensitivity_grid
+    >>> from datetime import date
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.statements import Evaluator, ModelBuilder
+    >>> from finstack_quant.statements_analytics import CorporateDcfRequest, DcfInputs, DcfProjection
+    >>> from finstack_quant.statements_analytics import StatementValuationCut, TerminalFcffBasis, TerminalValueSpec
+    >>> as_of = date(2024, 12, 31)
+    >>> market = MarketContext()
+    >>> b = ModelBuilder("qualified-dcf").periods("2025..2025").currency("USD")
+    >>> _ = b.source_snapshot("forecast-at-2024-close")
+    >>> _ = b.value_money("ufcf", [("2025", Money(100, "USD"))])
+    >>> model = b.build()
+    >>> evaluator = Evaluator()
+    >>> results = evaluator.evaluate_with_market(model, market, as_of, as_of)
+    >>> request = CorporateDcfRequest(
+    ...     cut=StatementValuationCut(as_of, as_of, "USD"),
+    ...     inputs=DcfInputs(wacc=0.10, terminal_value=TerminalValueSpec.gordon_growth(0.02), net_debt_override=50),
+    ...     projection=DcfProjection(
+    ...         terminal_date="2026-01-01", normalized_annual_fcff=TerminalFcffBasis.authored(Money(100, "USD"))
+    ...     ),
+    ... )
+    >>> from finstack_quant.statements_analytics import DcfSensitivityGridSpec
+    >>> axes = DcfSensitivityGridSpec([0.09, 0.10], [0.015, 0.02, 0.025])
+    >>> dcf_sensitivity_grid(model, results, request, axes).to_dataframe().shape
+    (2, 3)
+    """
+    ...
+
+class DcfDistributionResult:
+    """Same-currency company values repriced from coherent statement samples.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import DcfDistributionResult
+    >>> hasattr(DcfDistributionResult, "quantiles_to_dataframe")
+    True
+    """
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """Present one enterprise and equity valuation per retained path.
+
+        Returns
+        -------
+        pd.DataFrame
+            Zero-based path ID, float presentation values in model currency,
+            and the common ISO currency code in original path order.
+
+        Raises
+        ------
+        ImportError
+            If pandas is unavailable.
+        """
+        ...
+
+    def quantiles_to_dataframe(self) -> pd.DataFrame:
+        """Present R-7 sample quantiles of enterprise and common-equity value.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per requested probability, with both monetary values
+            expressed as floats in the reported ISO currency.
+
+        Raises
+        ------
+        ImportError
+            If pandas is unavailable.
+        """
+        ...
+
+def evaluate_dcf_monte_carlo(
+    model: FinancialModelSpec | str,
+    results: StatementResult | str,
+    paths: MonteCarloResults,
+    request: CorporateDcfRequest,
+) -> DcfDistributionResult:
+    """Reprice retained monetary forecasts using one complete sample at a time.
+
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        The original model with the same identity as the baseline and simulation.
+    results : StatementResult or str
+        Verified baseline with the matching information cutoff and opening balances.
+    paths : MonteCarloResults
+        Simulation that retained full samples for each selected forecast cash-flow node.
+    request : CorporateDcfRequest
+        Common valuation cutoff, reporting currency, WACC and terminal basis.
+
+    Returns
+    -------
+    DcfDistributionResult
+        Same-currency per-path returns and quantiles in the simulation's requested order.
+
+    Raises
+    ------
+    ValueError
+        If the statement run or cut differs, required paths are missing, or a path cannot price.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import evaluate_dcf_monte_carlo
+    >>> from datetime import date
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.statements import Evaluator, ModelBuilder
+    >>> from finstack_quant.statements_analytics import CorporateDcfRequest, DcfInputs, DcfProjection
+    >>> from finstack_quant.statements_analytics import StatementValuationCut, TerminalFcffBasis, TerminalValueSpec
+    >>> as_of = date(2024, 12, 31)
+    >>> market = MarketContext()
+    >>> b = ModelBuilder("qualified-dcf").periods("2025..2025").currency("USD")
+    >>> _ = b.source_snapshot("forecast-at-2024-close")
+    >>> _ = b.value_money("ufcf", [("2025", Money(100, "USD"))])
+    >>> model = b.build()
+    >>> evaluator = Evaluator()
+    >>> results = evaluator.evaluate_with_market(model, market, as_of, as_of)
+    >>> request = CorporateDcfRequest(
+    ...     cut=StatementValuationCut(as_of, as_of, "USD"),
+    ...     inputs=DcfInputs(wacc=0.10, terminal_value=TerminalValueSpec.gordon_growth(0.02), net_debt_override=50),
+    ...     projection=DcfProjection(
+    ...         terminal_date="2026-01-01", normalized_annual_fcff=TerminalFcffBasis.authored(Money(100, "USD"))
+    ...     ),
+    ... )
+    >>> from finstack_quant.statements import MonteCarloConfig
+    >>> config = MonteCarloConfig(3, 7, ["ufcf"], [0.5], include_path_data=True)
+    >>> samples = evaluator.evaluate_monte_carlo(model, config, market, as_of, as_of)
+    >>> len(evaluate_dcf_monte_carlo(model, results, samples, request).to_dataframe())
+    3
+    """
+    ...
+
+class _RateShocks(TypedDict):
+    low: str | Decimal
+    high: str | Decimal
+
+class _MultipleShocks(_RateShocks):
+    kind: Literal["absolute", "relative"]
+
+class _StableGrowthShock(TypedDict):
+    parameter: Literal["stable_growth"]
+    shocks: _RateShocks
+
+class _ExitMultipleShock(TypedDict):
+    parameter: Literal["exit_multiple"]
+    shocks: _MultipleShocks
+
+class _SensitivityShocks(TypedDict):
+    wacc: _RateShocks
+    terminal: _StableGrowthShock | _ExitMultipleShock
+
+class _MoneyWire(TypedDict):
+    amount: str
+    currency: str
+
+class _PricedEndpoint(TypedDict):
+    status: Literal["priced"]
+    level: float
+    enterprise_value: _MoneyWire
+    change: _MoneyWire
+
+class _UnavailableEndpoint(TypedDict):
+    status: Literal["unavailable"]
+    level: float
+    reason: str
+
+class _ShockPair(TypedDict):
+    parameter_id: str
+    low: _PricedEndpoint | _UnavailableEndpoint
+    high: _PricedEndpoint | _UnavailableEndpoint
+
+class _DcfShockReport(TypedDict):
+    baseline_enterprise_value: _MoneyWire
+    pairs: list[_ShockPair]
+
+def dcf_sensitivity_on_results(
+    model: FinancialModelSpec,
+    results: StatementResult,
+    request: CorporateDcfRequest,
+    shocks: _SensitivityShocks,
+) -> _DcfShockReport:
+    """Reprice independent changes in discount rate and terminal assumptions.
+
+    Parameters
+    ----------
+    model : FinancialModelSpec
+        Original model whose identity appears in the dated run.
+    results : StatementResult
+        Dated statement run with forecast cash and opening balances.
+    request : CorporateDcfRequest
+        Baseline assumptions, reporting currency and valuation cut.
+    shocks : mapping
+        Positive independent low and high distances. WACC and growth use
+        decimal rates. Exit multiple shocks use turns for absolute shocks
+        or decimal fractions of a positive baseline for relative shocks.
+
+    Returns
+    -------
+    dict
+        Baseline enterprise value and ranked pairs of requested endpoints.
+        Each endpoint reports a signed change in the baseline currency or
+        the reason the requested parameter level is outside its domain.
+
+    Raises
+    ------
+    ValueError
+        If the baseline is invalid or the shocks disagree with the terminal method.
+    RuntimeError
+        If an admissible repricing cannot be evaluated.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import dcf_sensitivity_on_results
+    >>> from datetime import date
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.statements import Evaluator, ModelBuilder
+    >>> from finstack_quant.statements_analytics import CorporateDcfRequest, DcfInputs, DcfProjection
+    >>> from finstack_quant.statements_analytics import StatementValuationCut, TerminalFcffBasis, TerminalValueSpec
+    >>> as_of = date(2024, 12, 31)
+    >>> market = MarketContext()
+    >>> b = ModelBuilder("qualified-dcf").periods("2025..2025").currency("USD")
+    >>> _ = b.source_snapshot("forecast-at-2024-close")
+    >>> _ = b.value_money("ufcf", [("2025", Money(100, "USD"))])
+    >>> model = b.build()
+    >>> evaluator = Evaluator()
+    >>> results = evaluator.evaluate_with_market(model, market, as_of, as_of)
+    >>> request = CorporateDcfRequest(
+    ...     cut=StatementValuationCut(as_of, as_of, "USD"),
+    ...     inputs=DcfInputs(wacc=0.10, terminal_value=TerminalValueSpec.gordon_growth(0.02), net_debt_override=50),
+    ...     projection=DcfProjection(
+    ...         terminal_date="2026-01-01", normalized_annual_fcff=TerminalFcffBasis.authored(Money(100, "USD"))
+    ...     ),
+    ... )
+    >>> shocks = {
+    ...     "wacc": {"low": "0.01", "high": "0.02"},
+    ...     "terminal": {"parameter": "stable_growth", "shocks": {"low": "0.005", "high": "0.01"}},
+    ... }
+    >>> len(dcf_sensitivity_on_results(model, results, request, shocks)["pairs"])
+    2
+    """
+    ...

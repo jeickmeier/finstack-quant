@@ -20,7 +20,7 @@ use finstack_quant_valuations_core::results::ValuationResult;
 use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::payoff::asian::Asian;
-use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
+use finstack_quant_models::monte_carlo::process::heston::{HestonProcess, HestonProcessParams};
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 
 /// Asian option Heston Monte Carlo pricer.
@@ -92,10 +92,14 @@ impl AsianOptionHestonMcPricer {
 
         let heston_params =
             finstack_quant_valuations_core::instruments::pricing::heston_market::heston_params_from_market_strict(
-                market, r, q,
+                market,
             )?;
-        let v0 = heston_params.model.v0;
-        let process = HestonProcess::new(heston_params);
+        let v0 = heston_params.v0;
+        let process = HestonProcess::new(HestonProcessParams {
+            r,
+            q,
+            model: heston_params,
+        });
         let discretization = QeHeston::new();
 
         // Insert each fixing time exactly and retain repeated observations at

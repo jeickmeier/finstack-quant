@@ -137,9 +137,9 @@ def test_cell_returns_from_reference_accepts_keyword_arguments() -> None:
     reference = [_ref(0.25, 0.01), _ref(2.25, 0.05)]
     table = json.loads(
         cell_returns_from_reference(
-            reference_json=json.dumps(reference),
+            reference=json.dumps(reference),
             base_label="UST",
-            config_json=json.dumps({"width": 0.5}),
+            config=json.dumps({"width": 0.5}),
         ).to_json()
     )
     assert table["base_label"] == "UST"
@@ -252,7 +252,7 @@ def test_cell_returns_from_curves_accepts_keyword_arguments() -> None:
             horizon_years=0.25,
             max_duration=2.0,
             base_label="UST",
-            config_json=json.dumps({"width": 1.0}),
+            config=json.dumps({"width": 1.0}),
         ).to_json()
     )
     assert len(table["cells"]) == 2
@@ -310,7 +310,7 @@ def test_excess_returns_accepts_keyword_arguments() -> None:
     """The advertised ``text_signature`` names are the real keyword names."""
     table_json = _lehman_b1_table_json()
     positions = [{"id": "Colombia", "weight": 1.0, "duration": 5.16, "total_return": 0.0225}]
-    result = json.loads(excess_returns(positions_json=json.dumps(positions), table_json=table_json).to_json())
+    result = json.loads(excess_returns(positions=json.dumps(positions), table=table_json).to_json())
     assert result["positions"][0]["id"] == "Colombia"
 
 
@@ -399,8 +399,8 @@ def test_grid_attribution_accepts_keyword_arguments() -> None:
     """The advertised ``text_signature`` names are the real keyword names."""
     result = json.loads(
         grid_attribution(
-            portfolio_json=json.dumps(_grid_golden_portfolio()),
-            benchmark_json=json.dumps(_grid_golden_benchmark()),
+            portfolio=json.dumps(_grid_golden_portfolio()),
+            benchmark=json.dumps(_grid_golden_benchmark()),
         ).to_json()
     )
     assert result["active_return"] == pytest.approx(0.0048, abs=1e-12)
@@ -503,7 +503,7 @@ def test_grid_carino_link_reconstructs_compounded_active_return() -> None:
 def test_grid_carino_link_accepts_keyword_arguments() -> None:
     """The advertised ``text_signature`` name is the real keyword name."""
     period = json.loads(_grid_golden_period_json())
-    linked = json.loads(grid_carino_link(periods_json=json.dumps([period, period])).to_json())
+    linked = json.loads(grid_carino_link(periods=json.dumps([period, period])).to_json())
     assert len(linked["periods"]) == 2
 
 
@@ -558,7 +558,7 @@ def test_factor_brinson_attribution_matches_binary_golden() -> None:
 def test_factor_brinson_attribution_accepts_keyword_arguments() -> None:
     """The advertised ``text_signature`` names are the real keyword names."""
     input_json = json.dumps(_factor_brinson_binary_input())
-    result = json.loads(factor_brinson_attribution(input_json=input_json, factor_returns=[0.02, 0.31 / 7.0]).to_json())
+    result = json.loads(factor_brinson_attribution(input=input_json, factor_returns=[0.02, 0.31 / 7.0]).to_json())
     assert result["allocation"] == pytest.approx(0.0145714285714286, abs=1e-12)
 
 

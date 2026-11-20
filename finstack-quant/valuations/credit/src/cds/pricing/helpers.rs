@@ -171,7 +171,7 @@ pub(super) fn isda_standard_model_boundaries(
     boundaries.push(t_start);
     boundaries.push(t_end);
     boundaries.extend(
-        surv.knot_points()
+        surv.iter_knots()
             .map(|(t, _)| t)
             .filter(|&t| t > t_start && t < t_end),
     );

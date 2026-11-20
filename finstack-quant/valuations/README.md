@@ -383,8 +383,7 @@ let option = EquityOption::european(
     OptionType::Call,
 )?;
 
-// `european` binds the standard ids: USD-OIS, EQUITY-SPOT,
-// EQUITY-VOL, and EQUITY-DIVYIELD.
+// `european` binds USD-OIS, SPX-SPOT, and SPX-VOL.
 let market = MarketContext::new()
     .try_insert(
         DiscountCurve::builder("USD-OIS")
@@ -392,10 +391,9 @@ let market = MarketContext::new()
             .knots([(0.0, 1.0), (5.0, 0.80)])
             .build()?,
     )?
-    .insert_price("EQUITY-SPOT", MarketScalar::unitless(4500.0)?)
-    .insert_price("EQUITY-DIVYIELD", MarketScalar::unitless(0.015)?)
+    .insert_price("SPX-SPOT", MarketScalar::unitless(4500.0)?)
     .insert_surface(
-        VolSurface::builder("EQUITY-VOL")
+        VolSurface::builder("SPX-VOL")
             .expiries(&[0.25, 0.5, 1.0])
             .strikes(&[4000.0, 4500.0, 5000.0])
             .row(&[0.20, 0.20, 0.20])
@@ -452,10 +450,9 @@ let market = MarketContext::new()
             .knots([(0.0, 1.0), (5.0, 0.80)])
             .build()?,
     )?
-    .insert_price("EQUITY-SPOT", MarketScalar::unitless(4500.0)?)
-    .insert_price("EQUITY-DIVYIELD", MarketScalar::unitless(0.015)?)
+    .insert_price("SPX-SPOT", MarketScalar::unitless(4500.0)?)
     .insert_surface(
-        VolSurface::builder("EQUITY-VOL")
+        VolSurface::builder("SPX-VOL")
             .expiries(&[0.25, 0.5, 1.0])
             .strikes(&[4000.0, 4500.0, 5000.0])
             .row(&[0.20, 0.20, 0.20])

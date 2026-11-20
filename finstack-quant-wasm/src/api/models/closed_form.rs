@@ -11,20 +11,21 @@
 //! default). `bsGreeks` and the barrier, Asian, lookback and quanto prices
 //! take the shared `OptionMarketParams` object (`market`: `spot`, `strike`,
 //! `rate`, `dividend_yield`, `volatility`, `time_to_expiry`, `option_type`);
-//! `hestonPrice` takes `HestonPricingParams` (`params`).
+//! `hestonPrice` takes an option contract and the Heston variance dynamics.
 //!
 //! Named-model sources: `docs/REFERENCES.md#black-scholes-1973`,
 //! `docs/REFERENCES.md#merton-1973`, `docs/REFERENCES.md#garman-kohlhagen-1983`,
 //! `docs/REFERENCES.md#black-1976`.
 
 use crate::utils::input::{
-    from_js_json, js_bool, js_f64, js_opt_bool, js_opt_f64, js_opt_string, js_string, js_uint,
+    from_js_json, from_js_json_exact, js_bool, js_f64, js_opt_f64, js_opt_string, js_string,
+    js_uint, opt_from_js_json,
 };
 use crate::utils::to_js_err;
 use finstack_quant_core::wire::serde_parse;
 use finstack_quant_models::closed_form::{
     DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE, DEFAULT_THETA_DAYS_PER_YEAR,
-    HestonPricingParams, OptionCalculation, asian_option_price as asian_option_price_core,
+    HestonFourierSettings, OptionCalculation, asian_option_price as asian_option_price_core,
     bachelier_greeks as bachelier_greeks_core, bachelier_price as bachelier_price_core,
     barrier_option_price as barrier_option_price_core,
     black_shifted_price as black_shifted_price_core, black_shifted_vega as black_shifted_vega_core,
@@ -36,7 +37,8 @@ use finstack_quant_models::closed_form::{
     vanilla_expiry_payoff as vanilla_expiry_payoff_core,
 };
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
-use finstack_quant_models::types::{OptionMarketParams, OptionType};
+use finstack_quant_models::types::{OptionContractParams, OptionMarketParams, OptionType};
+use finstack_quant_models::volatility::heston::HestonParams;
 use wasm_bindgen::prelude::*;
 
 /// Price a closed-form option or invert its price, with Greeks at the
@@ -84,68 +86,160 @@ pub fn option_calculation(
     crate::utils::to_js_value(&result)
 }
 
-/// Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.
-///
-/// Black-Scholes (1973): see docs/REFERENCES.md#black-scholes-1973.
-/// Merton (1973): see docs/REFERENCES.md#merton-1973.
-/// Garman-Kohlhagen (1983): see docs/REFERENCES.md#garman-kohlhagen-1983.
-///
-/// @param spot - Spot price of the underlying.
-/// @param strike - Strike of the option.
-/// @param rate - Risk-free rate, **decimal** continuously compounded
-/// (e.g. `0.05` for 5%).
-/// @param divYield - Continuous dividend yield (or foreign rate for FX),
-/// **decimal** continuously compounded.
-/// @param vol - Annualized volatility, **decimal**
-/// (e.g. `0.20` for 20%).
-/// @param expiry - Time to expiry in **years**.
-/// @param isCall - `true` for a call, `false` for a put.
-/// @returns Per-unit option price.
-///
+/// Validate an option's market inputs and return the canonical object.
+/// @param market - Positive spot and strike in matching units; continuous annual decimal rate and carry; nonnegative annualized decimal volatility and expiry in years; and call or put payoff direction.
+/// @returns Validated option market object. Individual pricers may require strictly positive volatility or expiry.
+/// @throws `TypeError` if market has the wrong host type, or `FinstackError` for invalid or non-finite parameters.
+#[wasm_bindgen(js_name = optionMarketParams, unchecked_return_type = "generated.models.OptionMarketParams")]
+pub fn option_market_params(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionMarketParams")] market: JsValue,
+) -> Result<JsValue, JsValue> {
+    let market: OptionMarketParams = from_js_json_exact(&market, "market")?;
+    market.validate_allow_zero_vol().map_err(to_js_err)?;
+    crate::utils::to_js_value(&market)
+}
+
+/// Validate model-independent option inputs.
+/// @param contract - Positive matching spot and strike, finite annual continuous decimal discount and carry rates, nonnegative expiry in years and payoff direction.
+/// @returns Validated model-independent contract.
+/// @throws FinstackError if its shape or values fail validation.
+#[wasm_bindgen(js_name = optionContractParams, unchecked_return_type = "generated.models.OptionContractParams")]
+pub fn option_contract_params(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionContractParams")]
+    contract: JsValue,
+) -> Result<JsValue, JsValue> {
+    let contract: finstack_quant_models::types::OptionContractParams =
+        from_js_json_exact(&contract, "contract")?;
+    contract.validate().map_err(to_js_err)?;
+    crate::utils::to_js_value(&contract)
+}
+
+/// Read the model-independent portion of constant-volatility option inputs.
+/// @param market - Spot, strike, continuous decimal rate and carry, annualized decimal volatility, expiry in years and direction.
+/// @returns The same contract inputs without its volatility assumption.
+/// @throws FinstackError when the inputs cannot be read as an option market.
+#[wasm_bindgen(js_name = optionMarketParamsContract, unchecked_return_type = "generated.models.OptionContractParams")]
+pub fn option_market_params_contract(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionMarketParams")] market: JsValue,
+) -> Result<JsValue, JsValue> {
+    let market: OptionMarketParams = from_js_json_exact(&market, "market")?;
+    crate::utils::to_js_value(&market.contract())
+}
+
+/// Combine a model-independent contract with annualized constant volatility.
+/// @param contract - Positive matching spot and strike, continuous decimal carrying rates, expiry in years and payoff direction.
+/// @param volatility - Nonnegative finite annualized volatility as a decimal.
+/// @returns Validated option inputs for a constant-volatility model.
+/// @throws FinstackError when the contract or volatility fail validation.
+#[wasm_bindgen(js_name = optionContractParamsWithVolatility, unchecked_return_type = "generated.models.OptionMarketParams")]
+pub fn option_contract_params_with_volatility(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionContractParams")]
+    contract: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] volatility: JsValue,
+) -> Result<JsValue, JsValue> {
+    let contract: finstack_quant_models::types::OptionContractParams =
+        from_js_json_exact(&contract, "contract")?;
+    let volatility = js_f64(&volatility, "volatility")?;
+    crate::utils::to_js_value(&contract.with_volatility(volatility).map_err(to_js_err)?)
+}
+
+/// Per-unit Black-Scholes or Garman-Kohlhagen price of a European option.
+/// @param market - Canonical option inputs as an object or JSON text. Spot and strike share units; rate and dividend yield are continuously compounded decimal rates (foreign rate for FX); volatility is annualized decimal; time to expiry is in years; option type is call or put.
+/// @returns Price per unit. At zero expiry this is the intrinsic value; at zero volatility it is the discounted deterministic payoff.
+/// @throws `TypeError` if the market input is mistyped, or `FinstackError` when the contract is malformed, inputs fail validation or the discounted legs or price are non-finite.
 /// @example
-/// ```javascript
+/// ```typescript
 /// import init, { models } from "finstack-quant-wasm";
 /// await init();
-/// const price = models.bsPrice(
-///   100,    // spot
-///   100,    // strike (ATM)
-///   0.05,   // rate = 5%
-///   0.0,    // divYield = 0
-///   0.20,   // vol = 20%
-///   1.0,    // expiry = 1 year
-///   true,   // call
-/// );
-/// // price ≈ 10.45
+/// const price = models.bsPrice({
+///   spot: 100, strike: 100, rate: 0.05, dividend_yield: 0,
+///   volatility: 0.2, time_to_expiry: 1, option_type: "call",
+/// });
 /// ```
-///
-/// @throws If spot or strike is non-positive, volatility or expiry is negative, any numerical input is non-finite, or discounted legs or price overflow.
 #[wasm_bindgen(js_name = bsPrice)]
 pub fn bs_price(
-    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
-    #[wasm_bindgen(js_name = "divYield", unchecked_param_type = "number")] div_yield: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
-    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionMarketParams | string")]
+    market: JsValue,
 ) -> Result<f64, JsValue> {
-    let spot = js_f64(&spot, "spot")?;
-    let strike = js_f64(&strike, "strike")?;
-    let rate = js_f64(&rate, "rate")?;
-    let div_yield = js_f64(&div_yield, "divYield")?;
-    let vol = js_f64(&vol, "vol")?;
-    let expiry = js_f64(&expiry, "expiry")?;
-    let is_call = js_bool(&is_call, "isCall")?;
-    bs_price_core(
-        spot,
-        strike,
-        rate,
-        div_yield,
-        vol,
-        expiry,
-        OptionType::from(is_call),
+    bs_price_core(&from_js_json_exact(&market, "market")?).map_err(to_js_err)
+}
+
+fn option_axis(value: Option<&JsValue>, field: &str) -> Result<Option<Vec<f64>>, JsValue> {
+    let Some(value) = value.filter(|value| !value.is_null() && !value.is_undefined()) else {
+        return Ok(None);
+    };
+    if value.as_f64().is_some() {
+        return js_f64(value, field).map(|x| Some(vec![x]));
+    }
+    crate::utils::input::js_f64_seq(value, field).map(Some)
+}
+
+/// Price BSM options at paired spot and strike coordinates.
+/// @param market - Reference BSM market fields in the same units as bsPrice.
+/// @param spots - Positive spot quotes. Scalar and singleton inputs broadcast. Omit to use market.spot.
+/// @param strikes - Positive strikes in spot quote units. Omit to use market.strike.
+/// @returns Float64Array of prices in quote units and input order.
+/// @throws TypeError for invalid input types or FinstackError for invalid or incompatible axes.
+#[wasm_bindgen(js_name = bsPriceMany)]
+pub fn bs_price_many(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionMarketParams | string")]
+    market: JsValue,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "number | readonly number[] | Float64Array | null"
+    )]
+    spots: Option<JsValue>,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "number | readonly number[] | Float64Array | null"
+    )]
+    strikes: Option<JsValue>,
+) -> Result<js_sys::Float64Array, JsValue> {
+    let market = from_js_json_exact(&market, "market")?;
+    let spots = option_axis(spots.as_ref(), "spots")?;
+    let strikes = option_axis(strikes.as_ref(), "strikes")?;
+    let values = finstack_quant_models::closed_form::bs_price_many(
+        &market,
+        spots.as_deref(),
+        strikes.as_deref(),
     )
-    .map_err(to_js_err)
+    .map_err(to_js_err)?;
+    Ok(js_sys::Float64Array::from(values.as_slice()))
+}
+
+/// Evaluate BSM Greeks for paired spot and strike coordinates.
+/// @param market - Reference BSM market fields in the same units as bsGreeks.
+/// @param spots - Positive spot quotes. Scalar and singleton inputs broadcast. Omit to use market.spot.
+/// @param strikes - Positive strikes in spot quote units. Omit to use market.strike.
+/// @param thetaDaysPerYear - Positive divisor for annual theta. Omitted uses 365 calendar days.
+/// @returns One fixed-shape BsGreeks row per pair, in input order.
+/// @throws TypeError for invalid input types or FinstackError for invalid or incompatible axes.
+#[wasm_bindgen(js_name = bsGreeksMany, unchecked_return_type = "BsGreeks[]")]
+pub fn bs_greeks_many(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionMarketParams | string")]
+    market: JsValue,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "number | readonly number[] | Float64Array | null"
+    )]
+    spots: Option<JsValue>,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "number | readonly number[] | Float64Array | null"
+    )]
+    strikes: Option<JsValue>,
+    #[wasm_bindgen(js_name = "thetaDaysPerYear", unchecked_optional_param_type = "number")]
+    theta_days_per_year: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let market = from_js_json_exact(&market, "market")?;
+    let spots = option_axis(spots.as_ref(), "spots")?;
+    let strikes = option_axis(strikes.as_ref(), "strikes")?;
+    let theta = js_opt_f64(theta_days_per_year.as_ref(), "thetaDaysPerYear")?
+        .unwrap_or(DEFAULT_THETA_DAYS_PER_YEAR);
+    let rows = finstack_quant_models::closed_form::bs_greeks_many(
+        &market,
+        spots.as_deref(),
+        strikes.as_deref(),
+        theta,
+    )
+    .map_err(to_js_err)?;
+    crate::utils::to_js_value(&rows)
 }
 
 /// Vanilla option payoff at expiry: `max(±(spot - strike), 0)`.
@@ -662,48 +756,60 @@ pub fn quanto_option_price(
     quanto_option_price_core(&market, rate_foreign, vol_fx, correlation).map_err(to_js_err)
 }
 
-/// Closed-form (Fourier) Heston price of a European option.
-///
-/// Heston (1993): see docs/REFERENCES.md#heston-1993.
-/// Albrecher et al. (2007): see docs/REFERENCES.md#albrecher-2007-little-heston-trap.
-/// @param spot - Current spot price in the same units as the strike.
-/// @param strike - Option strike price.
-/// @param expiry - Time to expiry in years; a non-positive value returns intrinsic.
-/// @param params - `HestonPricingParams` object or JSON text, every key required: `r` (continuously compounded risk-free rate, decimal), `q` (continuous dividend yield or foreign rate, decimal), `v0` (initial instantaneous variance, not volatility), `kappa` (variance mean-reversion speed per year), `theta` (long-run variance), `sigma_v` (volatility of variance) and `rho` (spot/variance correlation in `[-1, 1]`).
-/// @param isCall - Whether to value a call (`true`, default) or put (`false`).
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if `params` does not match
-/// `HestonPricingParams` or a parameter is non-finite or outside its domain,
-/// or the Fourier integration fails to produce a finite price.
-/// @returns Present-value per-unit option price.
-///
+/// Construct checked Heston stochastic variance dynamics.
+/// @param heston - Positive opening variance v0, mean-reversion speed kappa per year, positive long-run variance theta, positive annualized vol_of_vol, and spot/variance correlation rho in (-1, 1).
+/// @returns Canonical validated variance parameters usable by Heston pricing.
+/// @throws TypeError for a non-JSON host argument and FinstackError for invalid dynamics.
+#[wasm_bindgen(js_name = hestonParams, unchecked_return_type = "generated.models.HestonParams")]
+pub fn heston_params(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.HestonParams")] heston: JsValue,
+) -> Result<JsValue, JsValue> {
+    let heston: HestonParams = from_js_json_exact(&heston, "heston")?;
+    crate::utils::to_js_value(&heston)
+}
+
+/// Check the inclusive Feller condition for canonical Heston dynamics.
+/// @param heston - Validated variance dynamics or the corresponding JSON document.
+/// @returns Whether twice kappa times theta is at least vol-of-vol squared.
+/// @throws TypeError for a non-JSON host argument and FinstackError for invalid dynamics.
+#[wasm_bindgen(js_name = hestonParamsSatisfiesFeller)]
+pub fn heston_params_satisfies_feller(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.HestonParams | string")]
+    heston: JsValue,
+) -> Result<bool, JsValue> {
+    let heston: HestonParams = from_js_json(&heston, "heston")?;
+    Ok(heston.satisfies_feller())
+}
+
+/// Price a European option by Heston Fourier inversion.
+/// @param contract - Positive spot and strike in quote units, finite annual continuous rates, nonnegative expiry in years, and call or put payoff. A zero expiry returns intrinsic value.
+/// @param heston - Checked opening variance, mean reversion, long-run variance, vol-of-vol and spot/variance correlation.
+/// @param settings - Optional integration settings with positive upper frequency u_max, positive panel count panels and Gauss–Legendre order gl_order in {2, 4, 8, 16}. Omission selects a grid using maturity and variance.
+/// @returns Present value per unit of the underlying in its quote currency.
+/// @throws TypeError for non-JSON inputs and FinstackError for invalid parameters or unresolved integration.
 /// @example
-/// ```javascript
-/// const price = models.hestonPrice(100, 100, 1.0, {
-///   r: 0.03, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, sigma_v: 0.3, rho: -0.7,
-/// });
-/// // price ≈ 9.24
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const contract = models.optionContractParams({ spot: 100, strike: 100, rate: 0.03, dividend_yield: 0, time_to_expiry: 1, option_type: "call" });
+/// const heston = models.hestonParams({ v0: 0.04, kappa: 2, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 });
+/// console.log(models.hestonPrice(contract, heston));
 /// ```
 #[wasm_bindgen(js_name = hestonPrice)]
 pub fn heston_price(
-    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "generated.models.HestonPricingParams | string")]
-    params: JsValue,
-    #[wasm_bindgen(js_name = "isCall", unchecked_optional_param_type = "boolean")] is_call: Option<
-        JsValue,
-    >,
+    #[wasm_bindgen(unchecked_param_type = "generated.models.OptionContractParams | string")]
+    contract: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.models.HestonParams | string")]
+    heston: JsValue,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "generated.models.HestonFourierSettings | string | null"
+    )]
+    settings: Option<JsValue>,
 ) -> Result<f64, JsValue> {
-    let spot = js_f64(&spot, "spot")?;
-    let strike = js_f64(&strike, "strike")?;
-    let expiry = js_f64(&expiry, "expiry")?;
-    let params: HestonPricingParams = from_js_json(&params, "params")?;
-    let is_call = js_opt_bool(is_call.as_ref(), "isCall")?;
-    let option_type = OptionType::from(is_call.unwrap_or(true));
-    heston_price_core(spot, strike, expiry, &params, option_type, None).map_err(to_js_err)
+    let contract: OptionContractParams = from_js_json(&contract, "contract")?;
+    let heston: HestonParams = from_js_json(&heston, "heston")?;
+    let settings: Option<HestonFourierSettings> = opt_from_js_json(settings.as_ref(), "settings")?;
+    heston_price_core(&contract, &heston, settings.as_ref()).map_err(to_js_err)
 }
 
 /// Whether a set of Black-Scholes Greeks is internally consistent: gamma and

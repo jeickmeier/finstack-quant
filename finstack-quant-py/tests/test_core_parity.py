@@ -732,6 +732,14 @@ class TestFxMatrixParity:
         result = fx.rate(usd, eur, date(2024, 1, 1), FxConversionPolicy.CASHFLOW_DATE)
         assert result.rate == pytest.approx(1.0 / 1.10, abs=1e-8)
 
+    def test_direct_matrix_does_not_infer_a_pivot(self) -> None:
+        matrix = FxMatrix.direct()
+        matrix.set_quotes([("EUR", "USD", 1.1), ("GBP", "USD", 1.25)])
+        as_of = date(2024, 1, 1)
+        assert matrix.rate("USD", "EUR", as_of, "cashflow_date").rate == pytest.approx(1 / 1.1)
+        with pytest.raises(KeyError):
+            matrix.rate("EUR", "GBP", as_of, "cashflow_date")
+
     def test_same_currency_unity(self) -> None:
         """Same-currency rate is 1.0."""
         fx = FxMatrix(None)
@@ -1428,3 +1436,73 @@ def test_market_preserves_inflation_series_basis() -> None:
     market = MarketContext().insert_inflation_index(InflationIndex.from_json(json.dumps(payload)))
     restored = MarketContext.from_json(market.to_json()).get_inflation_index("US-CPI")
     assert json.loads(restored.to_json())["series"] == series
+
+
+def test_ols_rectangular_design_and_strided_numpy_predictors() -> None:
+    import numpy as np
+    import pytest
+
+    from finstack_quant.core.math.stats import ols
+
+    panel = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=float)
+    y = np.array([5, 7, 2, 4], dtype=float)
+    fitted = ols(panel[::-1], y[::-1])
+    assert fitted.coefficients == pytest.approx([2.0, -3.0])
+    assert fitted.intercept == pytest.approx(5.0)
+    assert fitted.residuals == pytest.approx([0.0] * 4)
+    assert (fitted.n_obs, fitted.n_features) == (4, 2)
+    with pytest.raises(ValueError, match="rank deficient"):
+        ols([[0, 0], [1, 2], [2, 4], [3, 6]], [5, 7, 2, 4])
+    with pytest.raises(ValueError, match=r"rectangular|ragged"):
+        ols([[0, 0], [1], [2, 4], [3, 6]], [5, 7, 2, 4])
+    with pytest.raises(ValueError, match="finite"):
+        ols([[0], [1], [2]], [5, float("nan"), 2])
+
+
+def test_dated_price_curve_preserves_signed_levels_on_leap_year_clock() -> None:
+    from finstack_quant.core.market_data import PriceCurve
+
+    points = [("2024-01-01", -25.0), ("2025-01-01", 10.0)]
+    args = ("WTI", "2024-01-01", points, "price", "act_365f", "linear", "flat")
+    curve = PriceCurve.from_dates(*args)
+    assert curve.price("2024-01-01") == -25.0
+    assert curve.price("2025-01-01") == 10.0
+    assert curve.price(366.0 / 365.0) == 10.0
+    with pytest.raises(ValueError, match="precedes base date"):
+        PriceCurve.from_dates("WTI", "2024-01-02", points, "price", "act_365f", "linear", "flat")
+
+
+def test_dated_hazard_and_inflation_use_the_native_act365f_clock() -> None:
+    from finstack_quant.core.market_data import HazardCurve, InflationCurve
+
+    hazard = HazardCurve.from_dates(
+        "ABC", "2024-01-01", [("2025-01-01", 0.02)], day_count="act_365f", recovery_rate=0.4
+    )
+    assert hazard.knots == [366.0 / 365.0]
+    assert hazard.hazard_rates == [0.02]
+    with pytest.raises(ValueError, match="strictly positive"):
+        HazardCurve.from_dates("ABC", "2024-01-01", [("2024-01-01", 0.02)], day_count="act_365f", recovery_rate=0.4)
+    inflation = InflationCurve.from_dates(
+        "CPI",
+        "2024-01-01",
+        [("2024-01-01", 300.0), ("2025-01-01", 306.0)],
+        day_count="act_365f",
+        interp="log_linear",
+        extrapolation="flat",
+    )
+    assert inflation.cpi(366.0 / 365.0) == pytest.approx(306.0)
+    assert inflation.cpi("2025-01-01") == pytest.approx(306.0)
+
+
+def test_apply_lower_triangular_many_keeps_non_square_draw_axes() -> None:
+    import numpy as np
+
+    from finstack_quant.core.math import linalg
+
+    lower = [[2.0, 999.0], [1.0, 3.0]]
+    draws = np.array([[1.0, 2.0], [-1.0, 1.0], [0.5, 0.0]])[::-1]
+    result = linalg.apply_lower_triangular_many(lower, draws)
+    assert result.shape == (3, 2)
+    np.testing.assert_allclose(result, [[1.0, 0.5], [-2.0, 2.0], [2.0, 7.0]])
+    with pytest.raises(ValueError, match="row"):
+        linalg.apply_lower_triangular_many(lower, np.ones((2, 3)))

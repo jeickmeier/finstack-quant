@@ -49,7 +49,7 @@ fn hazard_total_variation(
 ) -> f64 {
     let mut total = 0.0;
     let mut prev: Option<f64> = None;
-    for (_t, lambda) in curve.knot_points() {
+    for (_t, lambda) in curve.iter_knots() {
         if let Some(last) = prev {
             total += (lambda - last).abs();
         }
@@ -163,7 +163,7 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
     let ctx = MarketContext::try_from(result.result.final_market).expect("restore context");
     let curve = ctx.get_hazard(hazard_id.as_str()).expect("hazard curve");
 
-    for (_t, lambda) in curve.knot_points() {
+    for (_t, lambda) in curve.iter_knots() {
         assert!(lambda > 0.0, "hazard rate should be positive, got {lambda}");
     }
 
@@ -312,8 +312,8 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
     )
     .expect("zero-shock replay");
     assert_eq!(
-        zero.knot_points().collect::<Vec<_>>(),
-        curve.knot_points().collect::<Vec<_>>(),
+        zero.iter_knots().collect::<Vec<_>>(),
+        curve.iter_knots().collect::<Vec<_>>(),
         "zero-shock replay must be identical"
     );
 
@@ -365,13 +365,13 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
                 .expect("valid direct bump");
         let provided = replay(&bump).expect("valid provider bump");
         assert_eq!(
-            direct.knot_points().collect::<Vec<_>>(),
-            provided.knot_points().collect::<Vec<_>>()
+            direct.iter_knots().collect::<Vec<_>>(),
+            provided.iter_knots().collect::<Vec<_>>()
         );
         if bump.is_zero() {
             assert_eq!(
-                direct.knot_points().collect::<Vec<_>>(),
-                curve.knot_points().collect::<Vec<_>>()
+                direct.iter_knots().collect::<Vec<_>>(),
+                curve.iter_knots().collect::<Vec<_>>()
             );
         } else {
             assert!(
@@ -737,7 +737,7 @@ fn hazard_calibration_handles_extreme_high_spread() {
     let curve = ctx.get_hazard(hazard_id.as_str()).expect("hazard curve");
 
     // Verify hazard rates are high (consistent with distressed spreads)
-    for (_t, lambda) in curve.knot_points() {
+    for (_t, lambda) in curve.iter_knots() {
         assert!(
             lambda > 0.10,
             "hazard rate for distressed credit should be high, got {lambda}"

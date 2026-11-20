@@ -10,7 +10,7 @@ const fixture = data.capitalStructureReport;
 const resultJson = JSON.stringify(fixture.result);
 const modelJson = JSON.stringify(fixture.model);
 const nodeIds = Object.keys(fixture.model.nodes);
-const periodIds = fixture.model.periods.map((period) => period.id);
+const periodIds = fixture.model.periods.periods.map((period) => period.id);
 const start = fixture.cases.full.config;
 function Live({ density }: ExampleProps) {
   const [configJson, setConfigJson] = useState(() => JSON.stringify(start));

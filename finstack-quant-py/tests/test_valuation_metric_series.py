@@ -60,6 +60,17 @@ def test_portfolio_metrics_series_preserves_aggregated_metric_payloads() -> None
     assert series == [(["USD-OIS", "10y"], -1.0, {"FUND_Z": -0.25, "FUND_A": -0.75})]
     assert list(series[0][2]) == ["FUND_Z", "FUND_A"]
 
+    buckets = metrics.bucketed_dataframe("bucketed_dv01")
+    assert list(buckets.columns) == ["components", "total", "by_entity"]
+    assert list(buckets.itertuples(index=False, name=None)) == series
+    assert list(buckets.iloc[0]["by_entity"]) == ["FUND_Z", "FUND_A"]
+
+    empty = metrics.bucketed_dataframe("dv01")
+    assert empty.empty
+    assert list(empty.columns) == list(buckets.columns)
+    with pytest.raises(ValueError, match="noncanonical"):
+        metrics.bucketed_dataframe("custom_xray")
+
 
 @pytest.mark.parametrize("location", ["aggregated", "by_position"])
 def test_portfolio_metric_maps_reject_noncanonical_keys(location: str) -> None:
@@ -104,3 +115,25 @@ def test_metric_series_uses_canonical_custom_base_keys() -> None:
     for values in [result, metrics]:
         with pytest.raises(ValueError, match="noncanonical"):
             values.metric_series("custom_xray")
+
+
+def test_valuation_concat_unions_metrics_and_preserves_row_order() -> None:
+    first_wire = {
+        **json.loads((DATA / "instrument_bond_result.json").read_text()),
+        "instrument_id": "BOND-1",
+        "measures": {"dv01": 20.0},
+    }
+    second_wire = {
+        **first_wire,
+        "instrument_id": "BOND-2",
+        "measures": {"cs01": 3.5},
+    }
+    first = ValuationResult.from_json(json.dumps(first_wire))
+    second = ValuationResult.from_json(json.dumps(second_wire))
+    table = ValuationResult.concat([second, first])
+    assert list(table.columns) == ["instrument_id", "as_of_date", "pv", "currency", "cs01", "dv01"]
+    assert table["instrument_id"].tolist() == ["BOND-2", "BOND-1"]
+    assert table["cs01"].iloc[0] == 3.5
+    assert table["dv01"].iloc[1] == 20.0
+    assert table["cs01"].isna().tolist() == [False, True]
+    assert list(ValuationResult.concat([]).columns) == list(table.columns[:4])

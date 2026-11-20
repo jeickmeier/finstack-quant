@@ -1299,6 +1299,17 @@ export const importHarnesses = {
       name: "contract-revolving-credit",
       modules: modules.length,
     })),
+  "contract-structured-credit-tranche": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/structured_credit_tranche.json"),
+      import("@/lib/finstack/generated/types/structured_credit_tranche"),
+      import("@/lib/finstack/generated/meta/structured_credit_tranche"),
+      import("@/lib/finstack/generated/instrument/structured_credit_tranche"),
+      import("@/lib/finstack/generated/examples/structured_credit_tranche.json"),
+    ]).then((modules) => ({
+      name: "contract-structured-credit-tranche",
+      modules: modules.length,
+    })),
   "contract-structured-credit": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/structured_credit.json"),

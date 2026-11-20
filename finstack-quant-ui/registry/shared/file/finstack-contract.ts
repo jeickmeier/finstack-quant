@@ -301,7 +301,7 @@ export interface PlSummaryReportRequest {
 /** Rust TerminalValueSpec as the facade takes it: Gordon growth, exit multiple or H-model. */
 export type TerminalValueSpec =
   statementsAnalyticsWire.DcfInputs["terminal_value"];
-/** Rust WaccInputs: both capital weights, both costs and the tax rate, each a decimal; Rust rejects weights that do not sum to one. */
+/** Rust WaccInputs: exact decimal text for capital weights and decimal numbers for annual effective costs and the tax rate. Rust checks that the weights sum exactly to one. */
 export type WaccRequest = statementsAnalyticsWire.WaccInputs;
 /** DCF assumptions for one statement model; an omitted optional argument stays unset so Rust applies its default. */
 export interface DcfSensitivityRequest {
@@ -377,19 +377,27 @@ export interface StatementSensitivity {
   readonly result: SensitivityResult;
   readonly tornado: TornadoEntry[] | null;
 }
-/** statements_analytics.goalSeek arguments; `bounds` stays unset unless supplied. */
+/** Dated goal-seek arguments authored by the desk. */
 export interface GoalSeekRequest {
   readonly modelJson: string;
+  readonly marketJson?: string;
   readonly targetNode: string;
   readonly targetPeriod: string;
-  /** Value the target node must reach, in its own units. */
-  readonly targetValue: number;
+  /** Value in the target's native units. */
+  readonly targetValue:
+    number | { readonly amount: string; readonly currency: string };
+  /** Absolute acceptance tolerance in the target's native units. */
+  readonly targetTolerance:
+    number | { readonly amount: string; readonly currency: string };
   readonly driverNode: string;
   readonly driverPeriod: string;
-  /** Whether the result carries the model with the solved driver written in. */
+  readonly driverTolerance: number;
+  readonly maxIterations: number;
+  readonly asOf: string;
+  readonly observedThrough: string;
   readonly updateModel: boolean;
-  /** `[lower, upper]` search bracket in the driver node's units. */
-  readonly bounds?: readonly [number, number];
+  /** Explicit increasing bracket in driver units. */
+  readonly bounds: readonly [number, number];
 }
 /** Two evaluated StatementResults compared under a Rust VarianceConfig. */
 export interface RunVarianceRequest {
@@ -776,12 +784,12 @@ export interface FactorSensitivitiesRequest {
 }
 /** A factor risk decomposition request; an omitted risk measure is left to Rust (variance). */
 export interface DecomposeFactorsRequest {
-  /** Sensitivity-matrix JSON, usually computeFactorSensitivities' result serialized. */
-  readonly sensitivitiesJson: string;
-  /** FactorCovarianceMatrix JSON aligned with the sensitivities' factor ids. */
-  readonly covarianceJson: string;
-  /** RiskMeasure JSON ("variance", "volatility", {"var": {"confidence": 0.99}}, ...). */
-  readonly riskMeasureJson?: string | null;
+  /** Matrix in the position and factor order returned by computeFactorSensitivities. */
+  readonly sensitivities: SensitivityMatrixJson;
+  /** Covariance aligned to the sensitivity factor axis. */
+  readonly covariance: modelsWire.FactorCovarianceMatrix;
+  /** Parametric risk measure. Rust defaults to variance. */
+  readonly riskMeasure?: modelsWire.RiskMeasure | null;
 }
 /** A portfolio valuation request; omitted options are left to Rust. */
 export interface PortfolioValuationRequest {

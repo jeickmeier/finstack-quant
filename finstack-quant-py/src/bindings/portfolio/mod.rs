@@ -11,6 +11,7 @@ mod brinson;
 pub(crate) mod cashflows;
 pub(crate) mod container;
 mod excess_return;
+mod exposure;
 mod factor_brinson;
 pub(crate) mod factor_model;
 mod fi_attribution;
@@ -84,6 +85,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     grid_attribution::register(py, &m)?;
     factor_brinson::register(py, &m)?;
     margin::register(py, &m)?;
+    exposure::register(&m)?;
 
     let exports = vec![
         "PortfolioError",
@@ -94,20 +96,29 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "ContractLimitExceededError",
         "Portfolio",
         "PortfolioBuilder",
+        "Position",
         "PositionValue",
         "ReconciliationReport",
         "InstrumentArtifactCache",
         "MaterializationReport",
         "PortfolioValuation",
+        "ScenarioAttributionView",
+        "ScenarioRevalueView",
         "ScenarioPnl",
         "ScenarioPnlBatchItem",
         "PortfolioResult",
         "PortfolioMetrics",
+        "PortfolioCashflowPositionSummary",
         "PortfolioCashflows",
         "PortfolioAttribution",
         "BrinsonPeriodResult",
         "CarinoLinkedAttribution",
         "FiAttributionResult",
+        "FiAttributionConfig",
+        "FiPositionSnapshot",
+        "FiQuote",
+        "FiQuoteLeg",
+        "FiReportingBasis",
         "FiCarinoLinkedResult",
         "DurationCellTable",
         "ExcessReturnResult",
@@ -115,7 +126,12 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "GridCarinoLinkedResult",
         "FactorBrinsonResult",
         "LinkedReturn",
+        "ReplayConfig",
         "ReplayResult",
+        "ReplayStep",
+        "ReplaySummary",
+        "StrategyAllocationInput",
+        "WeightAllocationSpec",
         "WeightAllocationResult",
         "parse_portfolio_spec_json",
         "aggregate_metrics",
@@ -123,6 +139,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "aggregate_full_cashflows",
         "net_in_currency_by_date",
         "apply_scenario_and_revalue",
+        "attribute_scenario_pnl",
         "scenario_pnl",
         "scenario_pnl_batch",
         "attribute_portfolio_pnl",
@@ -180,6 +197,20 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "PortfolioOptimizationSpec",
         "PortfolioOptimizationResult",
         // portfolio margin aggregation
+        "CsrQuoteClassification",
+        "CsrQuoteSource",
+        "PortfolioFrtbConfig",
+        "PortfolioFrtbSensitivitiesResult",
+        "ExposureCashVm",
+        "ExposureSimulationConfig",
+        "CsrQuoteDelta",
+        "portfolio_frtb_sensitivities",
+        "portfolio_exposure_profile",
+        "instrument_exposure_profile",
+        "csr_quote_delta",
+        "GirrQuoteDelta",
+        "GirrQuoteTarget",
+        "girr_quote_delta",
         "NettingSetMargin",
         "PortfolioMarginResult",
         "portfolio_margin",

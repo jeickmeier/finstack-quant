@@ -14,13 +14,19 @@ True
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 import datetime as dt
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from . import format as fmt
+from .tables import data_table
 from .theme import Theme
+
+if TYPE_CHECKING:
+    from pandas import DataFrame
 
 __all__ = [
     "KPI",
@@ -103,6 +109,62 @@ class Section:
     body: str
     subtitle: str | None = None
 
+    @classmethod
+    def from_dataframe(
+        cls,
+        title: str,
+        df: DataFrame,
+        *,
+        columns: list[str] | None = None,
+        formats: dict[str, Callable[[Any], str]] | None = None,
+        neg_columns: set[str] | None = None,
+        subtitle: str | None = None,
+    ) -> Section:
+        """Render a DataFrame as a report section.
+
+        Parameters
+        ----------
+        title : str
+            Heading displayed above the table.
+        df : pandas.DataFrame
+            Rows to display in their current order. Reset the index to display it.
+        columns : list[str] or None
+            Column names in display order. Omit to use the frame's column order.
+        formats : dict[str, Callable[[Any], str]] or None
+            Per-column formatters that return display-ready HTML.
+        neg_columns : set[str] or None
+            Columns where negative numbers receive the negative-value style.
+        subtitle : str or None
+            Optional note associated with the section.
+
+        Returns:
+        -------
+        Section
+            Section containing the formatted data table.
+
+        Raises:
+        ------
+        KeyError
+            If a requested column is absent.
+        ValueError
+            If selected columns contain duplicate labels.
+
+        Examples:
+        --------
+        >>> import pandas as pd
+        >>> from finstack_quant.reporting import Section
+        >>> section = Section.from_dataframe("Positions", pd.DataFrame({"PnL": [-5]}), neg_columns={"PnL"})
+        >>> 'class="neg"' in section.body
+        True
+        """
+        selected = df if columns is None else df.loc[:, columns]
+        if not selected.columns.is_unique:
+            raise ValueError("Report table columns must have unique labels")
+        body = data_table(
+            selected.to_dict("records"), columns=list(selected.columns), formats=formats, neg_columns=neg_columns
+        )
+        return cls(title, body, subtitle)
+
 
 @dataclass
 class TearSheet:
@@ -126,6 +188,33 @@ class TearSheet:
     generated: dt.date | None = None
     footer_left: str = ""
     footer_right: str = "finstack-quant"
+
+    def add_section(self, section: Section) -> TearSheet:
+        """Append a section to this report in display order.
+
+        Parameters
+        ----------
+        section : Section
+            The prepared report section to append.
+
+        Returns:
+        -------
+        TearSheet
+            This report, with the new section at the end.
+
+        Notes:
+        -----
+        Appending a prepared section does not raise.
+
+        Examples:
+        --------
+        >>> from finstack_quant.reporting import INSTITUTIONAL, Section, TearSheet
+        >>> report = TearSheet(INSTITUTIONAL, "Demo", [])
+        >>> report.add_section(Section("Summary", "<p>Ready</p>")) is report
+        True
+        """
+        self.sections.append(section)
+        return self
 
     def _header_html(self) -> str:
         meta = list(self.meta_lines)

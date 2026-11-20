@@ -84,9 +84,9 @@ fn every_period_reconciles_from_the_explicit_opening() {
         (
             materiality.absolute,
             materiality.reference_value,
-            materiality.relative_pct
+            materiality.relative
         ),
-        (100.0, 400.0, Some(25.0))
+        (100.0, 400.0, Some(0.25))
     );
 }
 

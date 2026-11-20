@@ -179,6 +179,21 @@ pub struct XccySwap {
 }
 
 impl XccySwap {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> XccySwapBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .leg1(self.leg1.clone())
+            .leg2(self.leg2.clone())
+            .notional_exchange(self.notional_exchange)
+            .reporting_currency(self.reporting_currency)
+            .allow_calendar_fallback(self.allow_calendar_fallback)
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Convenience constructor.
     ///
     /// Dates and stub conventions are now owned by each leg.

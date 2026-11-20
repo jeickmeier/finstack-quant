@@ -99,7 +99,7 @@ it("shows Rust's rejection of a tax rate out of range", async () => {
   );
 });
 
-it("submits an empty field as NaN, which Rust rejects, never as zero", async () => {
+it("forwards an empty capital weight for native validation", async () => {
   renderLive(cases.blended.inputs);
   enter("equity_weight", "");
   calculate();
@@ -124,7 +124,11 @@ it("labels each input as a decimal and starts empty without defaults", () => {
   expect(screen.getByText(/every value as a decimal/)).toBeTruthy();
   calculate();
   const [submitted] = onSubmit.mock.calls[0]!;
-  expect(Object.values(submitted).every(Number.isNaN)).toBe(true);
+  expect(submitted.equity_weight).toBe("");
+  expect(submitted.debt_weight).toBe("");
+  expect(Number.isNaN(submitted.cost_of_equity)).toBe(true);
+  expect(Number.isNaN(submitted.cost_of_debt)).toBe(true);
+  expect(Number.isNaN(submitted.tax_rate)).toBe(true);
 });
 
 it("offers apply only with the prop, and passes the rate on the click alone", () => {

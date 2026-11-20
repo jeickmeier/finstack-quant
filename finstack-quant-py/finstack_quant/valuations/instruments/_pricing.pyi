@@ -11,21 +11,27 @@ from finstack_quant.core.market_data import MarketContext
 from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.composite import CompositeInstrument
 from finstack_quant.valuations.instruments._instruments import Bond, TermLoan
+from finstack_quant.valuations.instruments._typed_asset_backed_facility.facility import AssetBackedFacility
 from finstack_quant.valuations.instruments._typed_convertible import ConvertibleBond
 from finstack_quant.valuations.instruments._typed_credit.cds import CreditDefaultSwap
 from finstack_quant.valuations.instruments._typed_credit.cds_index import CdsIndex
+from finstack_quant.valuations.instruments._typed_credit.cds_option import CdsOption
 from finstack_quant.valuations.instruments._typed_credit.cds_tranche import CdsTranche
 from finstack_quant.valuations.instruments._typed_equity import EquityOption
 from finstack_quant.valuations.instruments._typed_fx import FxForward, FxOption
+from finstack_quant.valuations.instruments._typed_deposit import Deposit
+from finstack_quant.valuations.instruments._typed_fra import ForwardRateAgreement
 from finstack_quant.valuations.instruments._typed_rates import CapFloor, InterestRateSwap, Swaption
 from finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit import RevolvingCredit
 from finstack_quant.valuations.instruments._typed_structured_credit.structured_credit import StructuredCredit
 
-def price_instrument(
-    instrument: str
+_InstrumentInput = (
+    str
     | dict[str, Any]
     | Bond
     | TermLoan
+    | Deposit
+    | ForwardRateAgreement
     | InterestRateSwap
     | Swaption
     | CapFloor
@@ -38,24 +44,92 @@ def price_instrument(
     | EquityOption
     | StructuredCredit
     | RevolvingCredit
-    | CompositeInstrument,
+    | AssetBackedFacility
+    | CdsOption
+    | CompositeInstrument
+)
+
+class PriceExtras:
+    """Call-time pricing patches, historical scenarios and trace controls.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import PriceExtras
+    >>> PriceExtras(explain=True).explain
+    True
+    """
+
+    def __init__(
+        self,
+        *,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | None = None,
+        instrument_pricing_overrides: dict[str, Any] | None = None,
+        market_history: MarketHistory | None = None,
+        explain: bool = False,
+    ) -> None:
+        """Build transient pricing inputs for the instrument pricing entry points.
+
+        Parameters
+        ----------
+        metric_pricing_overrides : MetricPricingOverrides or dict, optional
+            Metric controls such as the theta horizon, risk basis and bump sizes.
+            A dictionary describes a patch in which absent fields retain their
+            stored values and explicit null leaves clear optional controls.
+        instrument_pricing_overrides : dict, optional
+            Instrument-specific mark and model control patch. Supply values in
+            the same units as the instrument specification. Omitted fields
+            retain stored values and explicit nulls clear nullable controls.
+        market_history : MarketHistory, optional
+            Historical market scenarios required by historical VaR and
+            expected shortfall. Omitting it supplies no history.
+        explain : bool, default False
+            Attach the native valuation trace to the result when true.
+
+        Raises
+        ------
+        TypeError
+            If an argument has an incompatible Python type.
+        ValueError
+            If a supplied patch is not a finite JSON-compatible object.
+            The merged controls are validated at pricing time.
+        """
+        ...
+
+    @property
+    def explain(self) -> bool:
+        """Read whether the valuation trace was requested.
+
+        Returns
+        -------
+        bool
+            True when pricing should attach the trace.
+
+        Notes
+        -----
+        This property does not raise.
+        """
+        ...
+
+def price_instrument(
+    instrument: _InstrumentInput,
     market: MarketContext | str,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     model: str = "default",
     metrics: list[str] | None = None,
-    extras: dict[str, Any] | str | None = None,
+    extras: PriceExtras | dict[str, Any] | str | None = None,
 ) -> ValuationResult:
     """
     Price one instrument and compute explicit risk metric requests.
 
     Parameters
     ----------
-    instrument : str or dict[str, Any] or Bond or TermLoan or InterestRateSwap or Swaption or CapFloor or CreditDefaultSwap or CdsIndex or FxForward or FxOption or CdsTranche or ConvertibleBond or EquityOption or StructuredCredit or CompositeInstrument
+    instrument : typed instrument, dict or str
         Typed instrument instance (:class:`Bond`, :class:`TermLoan`,
         :class:`InterestRateSwap`, :class:`Swaption`, :class:`CapFloor`,
         :class:`CreditDefaultSwap`, :class:`CdsIndex`, :class:`FxForward`,
         :class:`FxOption`, :class:`CdsTranche`, :class:`ConvertibleBond`,
-        :class:`EquityOption`, :class:`StructuredCredit`,
+        :class:`EquityOption`, :class:`StructuredCredit`, :class:`RevolvingCredit`,
+        :class:`AssetBackedFacility`, :class:`CdsOption`,
         :class:`~finstack_quant.valuations.composite.CompositeInstrument`) or a
         canonical ``finstack_quant.instrument/1`` envelope, as the dict
         :func:`instrument_envelope_from_spec` returns or as JSON text.
@@ -85,7 +159,7 @@ def price_instrument(
         Roll specialness is in basis points against the forward curve
         ``repo_curve_id``, or the discount curve when absent; implied
         financing is an ACT/360 decimal rate.
-    extras : dict[str, Any] or str, optional
+    extras : PriceExtras or dict[str, Any] or str, optional
         The rarer pricing inputs, as a dict or JSON text in the shape of the
         Rust ``PriceExtras``; every key is optional and an unknown key raises
         ``ValueError``.
@@ -110,6 +184,9 @@ def price_instrument(
         entries. Other models get one ``computation_step`` entry saying no
         per-flow decomposition exists.
         ``None`` (the default) means no extras.
+        ``instrument_pricing_overrides`` optionally patches stored quote or model
+        fields for this call. Absent fields keep stored values, and an explicit
+        ``None`` clears a nullable field.
 
     Returns
     -------
@@ -1235,7 +1312,7 @@ class MarketHistory:
         ...
 
 def instrument_cashflows(
-    instrument: Any,
+    instrument: _InstrumentInput,
     market: MarketContext | str,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     model: str,
@@ -1252,8 +1329,8 @@ def instrument_cashflows(
 
     Parameters
     ----------
-    instrument : Bond | TermLoan | InterestRateSwap | CdsOption | ... | dict | str
-        Typed instrument instance or a canonical
+    instrument : typed instrument, dict or str
+        Typed instrument supported by :func:`price_instrument` or a canonical
         ``finstack_quant.instrument/1`` envelope, as the dict
         :func:`instrument_envelope_from_spec` returns or as JSON text.
     market : MarketContext | str

@@ -35,6 +35,7 @@ from finstack_quant.margin import (
 SENSITIVITY_COLUMNS = ["risk_class", "bucket", "tenor", "issuer", "kind", "amount"]
 FRTB_SENSITIVITY_COLUMNS = [
     *SENSITIVITY_COLUMNS,
+    "curve_id",
     "sector",
     "seniority",
     "maturity_years",
@@ -293,12 +294,13 @@ def test_margin_funding_cost_to_dataframe() -> None:
         "margin_posted",
         "funding_rate",
         "collateral_rate",
-        "spread",
+        "spread_rate",
         "annual_cost",
         "currency",
     ]
     row = df.iloc[0]
-    assert row["spread"] == pytest.approx(0.02)
+    assert row["spread_rate"] == pytest.approx(0.02)
+    assert metric.spread_bp() == pytest.approx(200.0)
     assert row["annual_cost"] == pytest.approx(20_000.0)
     assert row["currency"] == "USD"
 
@@ -315,8 +317,8 @@ def test_frtb_sensitivities_to_dataframe_keeps_schema_when_empty() -> None:
 
 def test_frtb_sensitivities_to_dataframe_is_long_and_sorted() -> None:
     sens = FrtbSensitivities("USD")
-    sens.add_girr_delta("USD", "5Y", 12_000.0)
-    sens.add_girr_delta("USD", "2Y", 8_000.0)
+    sens.add_girr_delta("USD", "USD-OIS", "5Y", 12_000.0)
+    sens.add_girr_delta("USD", "USD-OIS", "2Y", 8_000.0)
     sens.add_csr_nonsec_delta("ACME", 3, "5Y", "bond", 4_000.0)
     sens.add_equity_delta("AAPL", 1, 25_000.0)
     sens.add_fx_delta("EUR", "USD", 9_000.0)
@@ -337,6 +339,7 @@ def test_frtb_sensitivities_to_dataframe_is_long_and_sorted() -> None:
     assert len(girr_delta) == 2
     assert set(girr_delta["tenor"]) == {"2Y", "5Y"}
     assert set(girr_delta["issuer"]) == {"USD"}
+    assert set(girr_delta["curve_id"]) == {"USD-OIS"}
 
     curvature = df[df["kind"].isin(["curvature_up", "curvature_down"])]
     assert len(curvature) == 2
@@ -368,7 +371,7 @@ def test_frtb_sensitivities_row_order_ignores_the_insertion_order() -> None:
     def build(order: tuple[str, ...]) -> FrtbSensitivities:
         sens = FrtbSensitivities("USD")
         for tenor in order:
-            sens.add_girr_delta("USD", tenor, amounts[tenor])
+            sens.add_girr_delta("USD", "USD-OIS", tenor, amounts[tenor])
             sens.add_equity_delta(f"NAME_{tenor}", 1, 2.0 * amounts[tenor])
         return sens
 

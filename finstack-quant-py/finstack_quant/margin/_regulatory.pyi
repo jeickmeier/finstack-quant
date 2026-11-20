@@ -2,10 +2,74 @@
 
 from __future__ import annotations
 
+from typing import Literal, NotRequired, TypedDict, Unpack
+
 import datetime
 from typing import Any
 import pandas as pd
 from finstack_quant.margin._types import NettingSetId
+
+class _DrcPositionFields(TypedDict):
+    """Input fields for an issuer's non-securitisation default exposure."""
+
+    issuer: str
+    maturity_years: float
+    jtd_amount: float
+    rating_bucket: int
+    sector: Literal["sovereign", "corporate", "local_government"]
+    seniority: Literal["covered_bond", "senior_unsecured", "subordinated", "equity"]
+    pnl_adjustment: NotRequired[float]
+
+class DrcPosition:
+    """Default-risk position in FRTB reporting currency, before the LGD adjustment.
+
+    Examples
+    --------
+    >>> from finstack_quant.margin import DrcPosition
+    >>> trade = DrcPosition(
+    ...     issuer="ACME",
+    ...     maturity_years=2,
+    ...     jtd_amount=100000,
+    ...     rating_bucket=4,
+    ...     sector="corporate",
+    ...     seniority="senior_unsecured",
+    ... )
+    >>> trade.to_dict()["issuer"]
+    'ACME'
+    """
+
+    def __init__(self, **fields: Unpack[_DrcPositionFields]) -> None:
+        """Validate a non-securitisation position for the Default Risk Charge.
+
+        Parameters
+        ----------
+        fields : _DrcPositionFields
+            Nonempty issuer, nonnegative residual maturity in years, signed
+            reporting-currency JTD basis before LGD, bucket 1 through 9,
+            sector and seniority. P&L adjustment is signed in reporting
+            currency and defaults to zero. Equity uses the corporate sector.
+
+        Raises
+        ------
+        ValueError
+            If fields are unknown, malformed or violate the native domains.
+        """
+        ...
+
+    def to_dict(self) -> _DrcPositionFields:
+        """Return the native position fields and the effective P&L adjustment.
+
+        Returns
+        -------
+        _DrcPositionFields
+            Independent copy using regulatory wire names.
+
+        Raises
+        ------
+        ValueError
+            If the native position cannot be exported.
+        """
+        ...
 
 class FrtbSensitivities:
     """
@@ -32,7 +96,7 @@ class FrtbSensitivities:
     Examples
     --------
     >>> sens = FrtbSensitivities("USD")
-    >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
+    >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
     """
 
     def __init__(self, base_currency: str) -> None:
@@ -77,7 +141,7 @@ class FrtbSensitivities:
         --------
         >>> from finstack_quant.margin import FrtbSensitivities
         >>> original = FrtbSensitivities("USD")
-        >>> original.add_girr_delta("USD", "5Y", 100_000.0)
+        >>> original.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
         >>> restored = FrtbSensitivities.from_json(original.to_json())
         >>> restored.base_currency
         'USD'
@@ -114,7 +178,8 @@ class FrtbSensitivities:
         ----------
         frame : pd.DataFrame
             Columns ``risk_class``, ``kind``, ``issuer``, ``bucket``,
-            ``tenor``, ``amount`` (plus ``sector``, ``seniority``,
+            ``tenor``, ``amount`` (plus ``curve_id`` required on ordinary GIRR
+            delta, and DRC columns ``sector``, ``seniority``,
             ``maturity_years``, ``pnl_adjustment`` on ``drc``
             rows) encoded as ``to_dataframe`` documents.
             ``curvature_up`` / ``curvature_down`` rows are recombined into
@@ -143,7 +208,7 @@ class FrtbSensitivities:
         Examples
         --------
         >>> original = FrtbSensitivities("USD")
-        >>> original.add_girr_delta("USD", "5Y", 100_000.0)
+        >>> original.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
         >>> original.add_drc_position({
         ...     "issuer": "ACME",
         ...     "jtd_amount": 1_000_000.0,
@@ -180,28 +245,33 @@ class FrtbSensitivities:
         Examples
         --------
         >>> sens = FrtbSensitivities("USD")
-        >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
+        >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
         >>> sens.validate()
         """
         ...
 
-    def add_girr_delta(self, currency: str, tenor: str, amount: float) -> None:
-        """
-        Add a GIRR delta sensitivity (currency P&L per 1 percentage-point move).
+    def add_girr_delta(self, currency: str, curve_id: str, tenor: str, amount: float) -> None:
+        """Add an ordinary GIRR yield delta at one qualified curve vertex.
 
         Parameters
         ----------
-        tenor : str
-            GIRR tenor bucket, such as ``"5Y"``.
-        amount : float
-            Signed sensitivity amount per 1 percentage-point move (``100 * DV01``).
         currency : str
-            Currency code; identifies the shocked risk factor.
+            ISO-4217 risk currency used to select the GIRR currency bucket.
+        curve_id : str
+            Exact yield curve identifier, such as USD-OIS or USD-SOFR-3M.
+        tenor : str
+            Case-sensitive regulatory yield vertex such as 5Y.
+        amount : float
+            Signed reporting-currency P&L from the upward one-basis-point
+            reprice, multiplied by 100. Matching vertices accumulate.
 
         Raises
         ------
+        TypeError
+            If an argument has an incompatible Python type.
         ValueError
-            If ``currency`` is not a recognized ISO currency code.
+            If currency, curve identifier, tenor, amount or its sum is invalid.
+            Invalid contributions leave existing sensitivities unchanged.
         """
         ...
 
@@ -782,7 +852,7 @@ class FrtbSensitivities:
         """
         ...
 
-    def add_drc_position(self, position: dict[str, Any]) -> None:
+    def add_drc_position(self, position: DrcPosition | dict[str, Any]) -> None:
         """Add the canonical Rust DrcPosition object.
 
         Parameters
@@ -854,7 +924,7 @@ class FrtbSensitivities:
         ``DataFrame``.
 
         Columns: ``risk_class``, ``bucket``, ``tenor``, ``issuer``, ``kind``,
-        ``amount``, then the DRC columns ``sector``, ``seniority``,
+        ``amount``, the ordinary GIRR ``curve_id``, then the DRC columns ``sector``, ``seniority``,
         ``maturity_years``, ``pnl_adjustment`` (``None`` /
         ``NaN`` on non-DRC rows). One row per populated bucket; an empty
         container still carries all ten columns. Long format is used
@@ -924,7 +994,7 @@ class FrtbSbaEngine:
     --------
     >>> from finstack_quant.margin import FrtbSbaEngine, FrtbSensitivities
     >>> sensitivities = FrtbSensitivities("USD")
-    >>> sensitivities.add_girr_delta("USD", "5Y", 100_000.0)
+    >>> sensitivities.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
     >>> round(FrtbSbaEngine(scenarios=["medium"]).calculate(sensitivities).total, 2)
     110000.0
     """
@@ -1020,7 +1090,7 @@ class FrtbSbaEngine:
         Examples
         --------
         >>> sens = FrtbSensitivities("USD")
-        >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
+        >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
         >>> FrtbSbaEngine().calculate(sens).binding_scenario
         'low'
         """
@@ -1039,7 +1109,7 @@ class FrtbSbaResult:
     --------
     >>> from finstack_quant.margin import FrtbSensitivities, frtb_sba_charge
     >>> sens = FrtbSensitivities("USD")
-    >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
+    >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
     >>> result = frtb_sba_charge(sens)
     >>> result.total > 0.0
     True
@@ -1245,7 +1315,7 @@ class FrtbSbaResult:
         Examples
         --------
         >>> sens = FrtbSensitivities("USD")
-        >>> sens.add_girr_delta("USD", "5Y", 1.0)
+        >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 1.0)
         >>> result = frtb_sba_charge(sens)
         >>> sorted(result.scenario_breakdown) == sorted(result.scenario_charges)
         True
@@ -1271,14 +1341,14 @@ class FrtbSbaResult:
         Examples
         --------
         >>> sens = FrtbSensitivities("USD")
-        >>> sens.add_girr_delta("USD", "5Y", 1.0)
+        >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 1.0)
         >>> result = frtb_sba_charge(sens)
         >>> "numeric_mode" in result.meta
         True
         """
         ...
 
-    def to_dataframe(self) -> Any:
+    def to_dataframe(self) -> pd.DataFrame:
         """
         Export the headline charge as a single-row pandas ``DataFrame``.
 
@@ -1294,7 +1364,7 @@ class FrtbSbaResult:
         """
         ...
 
-    def to_breakdown_dataframe(self) -> Any:
+    def to_breakdown_dataframe(self) -> pd.DataFrame:
         """
         Export the per-risk-class breakdown as a long-format ``DataFrame``.
 
@@ -1332,7 +1402,7 @@ class FrtbSbaResult:
         Examples
         --------
         >>> sens = FrtbSensitivities("USD")
-        >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
+        >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
         >>> frtb_sba_charge(sens).to_scenario_dataframe()["scenario"].tolist()
         ['low', 'medium', 'high']
         """
@@ -1367,7 +1437,7 @@ class EadResult:
     --------
     >>> from finstack_quant.margin import NettingSetId, SaCcrEngine, SaCcrNettingSetConfig
     >>> config = SaCcrNettingSetConfig.unmargined(NettingSetId.bilateral("CPTY", "CSA"), 0.0, "2025-01-15")
-    >>> SaCcrEngine().calculate_ead(config, []).ead
+    >>> SaCcrEngine().calculate_ead([], config).ead
     0.0
     """
 
@@ -1566,7 +1636,7 @@ class EadResult:
         Examples
         --------
         >>> config = SaCcrNettingSetConfig.unmargined(NettingSetId.bilateral("CPTY", "CSA"), 0.0, "2025-01-15")
-        >>> result = SaCcrEngine().calculate_ead(config, [])
+        >>> result = SaCcrEngine().calculate_ead([], config)
         >>> "numeric_mode" in result.meta
         True
         """
@@ -2702,7 +2772,7 @@ class SaCcrEngine:
     --------
     >>> from finstack_quant.margin import NettingSetId, SaCcrEngine, SaCcrNettingSetConfig
     >>> config = SaCcrNettingSetConfig.unmargined(NettingSetId.bilateral("CPTY", "CSA"), 0.0, "2025-01-15")
-    >>> SaCcrEngine().calculate_ead(config, []).ead
+    >>> SaCcrEngine().calculate_ead([], config).ead
     0.0
     """
 
@@ -2744,7 +2814,7 @@ class SaCcrEngine:
         """
         ...
 
-    def calculate_ead(self, config: SaCcrNettingSetConfig, trades: list[SaCcrTrade]) -> EadResult:
+    def calculate_ead(self, trades: list[SaCcrTrade], config: SaCcrNettingSetConfig) -> EadResult:
         """
         Calculate SA-CCR EAD for a netting set and trade list.
 
@@ -2785,7 +2855,7 @@ class SaCcrEngine:
         ...     mtm=0.0,
         ...     is_option=False,
         ... )
-        >>> round(SaCcrEngine().calculate_ead(config, [trade]).ead, 2)
+        >>> round(SaCcrEngine().calculate_ead([trade], config).ead, 2)
         30982.83
         """
         ...
@@ -2821,7 +2891,7 @@ def frtb_sba_charge(sensitivities: FrtbSensitivities, correlation_scenario: str 
     Examples
     --------
     >>> sens = FrtbSensitivities("USD")
-    >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
+    >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
     >>> result = frtb_sba_charge(sens)
     >>> result.total > 0.0
     True

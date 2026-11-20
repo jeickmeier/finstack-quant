@@ -141,7 +141,7 @@ fn stochastic_two_estimators(sc: &StructuredCredit, market: &MarketContext) -> V
         Box::new(sc.clone()),
     )))
     .expect("instrument envelope JSON");
-    let instrument = parse_boxed_instrument_from_json(&json, None).expect("parse envelope");
+    let instrument = parse_boxed_instrument_from_json(&json, None, None).expect("parse envelope");
     price_instrument(
         &instrument,
         market,

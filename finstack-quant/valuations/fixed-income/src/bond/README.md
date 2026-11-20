@@ -23,7 +23,7 @@ Import path: `finstack_quant_valuations::instruments::fixed_income::bond`
 | `ReturnFloorSpec`, `ReturnFloorKind`, `IssuePrice`, `ProtectionWindow` | Guaranteed minimum MOIC/XIRR call protection. |
 | `BondSettlementConvention` | Settlement days and ex-coupon days. |
 | `AccrualMethod` | `Linear` (default) or `Compounded` (ICMA Rule 251). |
-| `bond_from_cashflows_json` | Build a `Bond` from an explicit cashflow list. |
+| `Bond::from_cashflows` | Build a `Bond` from an explicit cashflow list. |
 | `pricing::{discount, hazard, tree, merton_mc}` | Pricing engines and their registry adapters. |
 | `pricing::quote_conversions`, `pricing::ytm_solver` | Price ↔ yield ↔ spread conversions and the YTM root finder. |
 
@@ -42,7 +42,6 @@ bond/
 │   ├── pricing.rs           # Instrument::base_value and quote-override precedence
 │   └── traits.rs            # Instrument / CashflowProvider / CashflowScheduleSource impls
 ├── cashflow_spec.rs         # CashflowSpec
-├── json.rs                  # bond_from_cashflows_json
 ├── pricing/
 │   ├── mod.rs               # the model-preserving BondPricer adapter
 │   ├── discount.rs          # Discounting kernel: PV = Σ CF_i × DF_i
@@ -169,14 +168,14 @@ use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, FloatingB
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, Tenor};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{Bps, CurveId, InstrumentId};
+use finstack_quant_core::types::{CurveId, InstrumentId};
 use time::macros::date;
 
 let frn = Bond::floating(FloatingBondParams {
     id: InstrumentId::new("FRN-001"),
     notional: Money::new(1_000_000.0, Currency::USD)?,
     forward_curve_id: CurveId::new("USD-SOFR-3M"),
-    spread_bp: Bps::new(200),
+    spread_bp: 200.into(),
     issue_date: date!(2025 - 01 - 01),
     maturity: date!(2030 - 01 - 01),
     frequency: Tenor::quarterly(),
@@ -391,7 +390,7 @@ the unit tests in `pricing/return_floor.rs` and by
 - **WASM**: `valuations.instruments.Bond`, plus the JSON-envelope entry points
   `valuations.instruments.priceInstrument`,
   `valuations.instruments.instrumentCashflows` and
-  `valuations.instruments.bondFromCashflowsJson`.
+  `valuations.instruments.Bond.fromCashflows`.
 
 Both paths use the canonical `finstack_quant.instrument/1` envelope with
 `InstrumentJson::Bond`; unknown fields are rejected on deserialize.

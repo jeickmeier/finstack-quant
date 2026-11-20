@@ -14,8 +14,7 @@
 //!
 //! - Percent shocks use percentage-point inputs (`5.0 = +5%`).
 //! - Curve and spread shocks quoted in `bp` use additive basis points
-//!   (1 bp = 1e-4), except [`CurveKind::Commodity`] where `bp` is percent of
-//!   the price-curve forward (`5.0` = +5%).
+//!   (1 bp = 1e-4). Commodity shocks quoted in `pct` scale forward prices.
 //! - Vol-index `Pts` are index points (`1.0` on 18.5 → 19.5).
 //! - Correlation / base-corr `Pts` are decimal correlation (`0.02` = +0.02).
 //! - Time-roll operations distinguish business-day-aware, calendar-day, and
@@ -254,9 +253,7 @@ impl ScenarioSpec {
 /// applied to market data, instruments, statements, or the valuation horizon.
 /// Units are encoded in the variant name and field docs:
 /// - `Pct` fields use percentage points (`5.0 = +5%`)
-/// - `Bp` fields use additive basis points (1 bp = 1e-4), except
-///   [`CurveKind::Commodity`] where `bp` is percent of the price-curve
-///   forward
+/// - `Bp` fields use additive rate basis points (1 bp = 1e-4)
 /// - Vol-index `Pts` are **index points** (`1.0` on 18.5 → 19.5)
 /// - Correlation / base-corr `Pts` are **decimal correlation** (`0.02` = +0.02)
 ///
@@ -347,18 +344,10 @@ pub enum OperationSpec {
         pct: f64,
     },
 
-    /// Parallel shift to a curve (additive in basis points, except commodity).
-    ///
-    /// For rate-style curves ([`CurveKind::Discount`], [`CurveKind::Forward`],
-    /// [`CurveKind::ParCDS`], [`CurveKind::Inflation`]), `bp` uses the standard
-    /// fixed-income convention where `1 bp = 0.0001` in fractional rate space.
-    /// For [`CurveKind::Commodity`], `bp` is **percent of the price-curve
-    /// forward** (`5.0` = +5%); the id must name a [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve),
-    /// not a discount curve.
-    ///
-    /// **Volatility index curves use a separate variant.** Use
-    /// [`OperationSpec::VolIndexParallelPts`] for VIX/VSTOXX-style curves where
-    /// shocks are quoted in absolute index points.
+    /// Parallel additive shift in rate basis points for a discount, forward,
+    /// par CDS or inflation curve. One basis point is 0.0001 in decimal rate space.
+    /// Commodity curves use [`OperationSpec::CommodityCurveParallelPct`].
+    /// Volatility index curves use [`OperationSpec::VolIndexParallelPts`].
     ///
     /// # Example
     /// ```rust
@@ -372,7 +361,7 @@ pub enum OperationSpec {
     /// };
     /// ```
     CurveParallelBp {
-        /// Type of curve (Discount, Forward, ParCDS, Inflation, Commodity).
+        /// Rate curve family (Discount, Forward, ParCDS or Inflation).
         curve_kind: CurveKind,
         /// Curve identifier.
         curve_id: CurveId,
@@ -382,19 +371,14 @@ pub enum OperationSpec {
         /// curves could match or you need deterministic selection.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         discount_curve_id: Option<CurveId>,
-        /// Basis point shift (additive), or percent of the price-curve forward
-        /// when `curve_kind` is [`CurveKind::Commodity`].
+        /// Additive rate shift in basis points.
         bp: f64,
     },
 
-    /// Node-specific basis point shifts for curve shaping.
+    /// Node-specific additive rate shifts in basis points.
     ///
-    /// For rate-style curves, `bp` values use the standard fixed-income
-    /// convention where `1 bp = 0.0001` in fractional rate space. For
-    /// [`CurveKind::Commodity`], each `bp` is percent of the price-curve
-    /// forward (`10.0` = +10% on that tenor); looking up a discount curve
-    /// under that id is an error. Use [`OperationSpec::VolIndexNodePts`] for
-    /// vol-index curves.
+    /// One basis point is 0.0001 in decimal rate space.
+    /// Commodity curves use [`OperationSpec::CommodityCurveNodePct`].
     ///
     /// # Example
     /// ```rust
@@ -412,7 +396,7 @@ pub enum OperationSpec {
     /// };
     /// ```
     CurveNodeBp {
-        /// Type of curve (Discount, Forward, ParCDS, Inflation, Commodity).
+        /// Rate curve family (Discount, Forward, ParCDS or Inflation).
         curve_kind: CurveKind,
         /// Curve identifier.
         curve_id: CurveId,
@@ -422,10 +406,28 @@ pub enum OperationSpec {
         /// curves could match or you need deterministic selection.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         discount_curve_id: Option<CurveId>,
-        /// Vector of `(tenor, shift)` pairs. Shift is rate bp except for
-        /// [`CurveKind::Commodity`], where it is percent of the forward.
+        /// Vector of `(tenor, shift)` pairs where shift is in rate basis points.
         nodes: Vec<(String, f64)>,
         /// How to handle tenors not in the curve.
+        #[serde(default)]
+        match_mode: TenorMatchMode,
+    },
+
+    /// Parallel relative price shock to a commodity forward curve.
+    CommodityCurveParallelPct {
+        /// Identifier of the commodity price curve.
+        curve_id: CurveId,
+        /// Percentage change, such that `5.0` raises prices by five percent.
+        pct: f64,
+    },
+
+    /// Node-specific relative price shocks to a commodity forward curve.
+    CommodityCurveNodePct {
+        /// Identifier of the commodity price curve.
+        curve_id: CurveId,
+        /// Pairs of tenor and percentage price change; `5.0` raises price by five percent.
+        nodes: Vec<(String, f64)>,
+        /// Policy for requested tenors between curve pillars.
         #[serde(default)]
         match_mode: TenorMatchMode,
     },
@@ -508,10 +510,8 @@ pub enum OperationSpec {
     /// Parallel percent shift to a volatility surface.
     ///
     /// Shocks are **sticky-strike** multiplicative grid moves: each stored
-    /// `(expiry, secondary_value)` vol is multiplied by `1 + pct/100`. This is
-    /// not a sticky-delta re-mark. The post-shock fixed-strike calendar-spread
-    /// check applies only to `Strike`-axis `BlackLognormal` surfaces and is a
-    /// heuristic screen, not a no-arbitrage certificate.
+    /// `(expiry, secondary_value)` quote is multiplied by `(100 + pct) / 100`.
+    /// Run surface diagnostics separately on the shocked artifact.
     ///
     /// `pct` must satisfy `pct >= -100` (`-100%` collapses vols to `0.0`;
     /// `pct < -100` fails validation).
@@ -538,9 +538,7 @@ pub enum OperationSpec {
     /// [`OperationSpec::VolSurfaceParallelPct`], restricted to the selected
     /// expiry/strike buckets (`pct >= -100`). Tenor selection requires an
     /// explicit `expiry_clock` on the target surface anchored at the execution
-    /// date; strike filtering requires a `Strike` secondary axis. The
-    /// calendar-spread check applies only to `Strike`-axis `BlackLognormal`
-    /// surfaces and is not a no-arbitrage certificate.
+    /// date; strike filtering requires a `Strike` secondary axis.
     ///
     /// # Example
     /// ```rust
@@ -764,12 +762,11 @@ pub enum OperationSpec {
     /// hierarchy operations reach the same curve, [`ScenarioSpec::resolution_mode`]
     /// determines whether they accumulate or only the most specific match survives.
     HierarchyCurveParallelBp {
-        /// Type of curve (Discount, Forward, ParCDS, Inflation, Commodity).
+        /// Rate curve family (Discount, Forward, ParCDS or Inflation).
         curve_kind: CurveKind,
         /// Hierarchy target to resolve to curves.
         target: HierarchyTarget,
-        /// Basis point shift (additive), or percent of the price-curve forward
-        /// when `curve_kind` is [`CurveKind::Commodity`].
+        /// Additive rate shift in basis points.
         bp: f64,
         /// Optional discount curve for hazard-curve recalibration.
         ///
@@ -777,6 +774,14 @@ pub enum OperationSpec {
         /// If `None`, the adapter applies heuristic resolution.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         discount_curve_id: Option<CurveId>,
+    },
+
+    /// Apply a relative price shock to every commodity curve matching the hierarchy target.
+    HierarchyCommodityCurveParallelPct {
+        /// Predicate identifying the target commodity curves.
+        target: HierarchyTarget,
+        /// Percentage change, such that `5.0` raises prices by five percent.
+        pct: f64,
     },
 
     /// Hierarchy-targeted vol-surface parallel shift.
@@ -903,27 +908,35 @@ impl OperationSpec {
     ///
     /// * `curve_kind` - Curve family every generated operation targets.
     /// * `curve_ids` - Curve identifiers, one operation each, in the given order.
-    /// * `bp` - Additive shift in basis points (1 bp = 1e-4); for
-    ///   [`CurveKind::Commodity`] this is percent of the forward instead.
+    /// * `bp` - Additive rate shift in basis points (1 bp is 0.0001).
     /// * `discount_curve_id` - Optional discount curve used when re-bootstrapping
     ///   ParCDS quotes; copied onto every generated operation.
+    ///
+    /// # Errors
+    /// Rejects a commodity curve kind or another invalid operation input.
     pub fn parallel_bp_many<I, S>(
         curve_kind: CurveKind,
         curve_ids: I,
         bp: f64,
         discount_curve_id: Option<CurveId>,
-    ) -> Vec<Self>
+    ) -> crate::error::Result<Vec<Self>>
     where
         I: IntoIterator<Item = S>,
         S: Into<CurveId>,
     {
+        check_rate_curve_kind(curve_kind)?;
+        check_finite(bp, "bp")?;
         curve_ids
             .into_iter()
-            .map(|curve_id| Self::CurveParallelBp {
-                curve_kind,
-                curve_id: curve_id.into(),
-                discount_curve_id: discount_curve_id.clone(),
-                bp,
+            .map(|curve_id| {
+                let op = Self::CurveParallelBp {
+                    curve_kind,
+                    curve_id: curve_id.into(),
+                    discount_curve_id: discount_curve_id.clone(),
+                    bp,
+                };
+                op.validate()?;
+                Ok(op)
             })
             .collect()
     }
@@ -963,6 +976,7 @@ impl OperationSpec {
         matches!(
             self,
             Self::HierarchyCurveParallelBp { .. }
+                | Self::HierarchyCommodityCurveParallelPct { .. }
                 | Self::HierarchyVolSurfaceParallelPct { .. }
                 | Self::HierarchyEquityPricePct { .. }
                 | Self::HierarchyBaseCorrParallelPts { .. }
@@ -1021,10 +1035,8 @@ pub enum CurveKind {
     Inflation,
     /// Commodity forward [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve).
     ///
-    /// `bp` on parallel/node ops is percent of the price-curve forward
-    /// (`5.0` = +5%), not a rate basis-point shock. Looking up a
-    /// [`DiscountCurve`](finstack_quant_core::market_data::term_structures::DiscountCurve)
-    /// under this id is an error.
+    /// Price shocks use [`OperationSpec::CommodityCurveParallelPct`] or
+    /// [`OperationSpec::CommodityCurveNodePct`].
     Commodity,
 }
 
@@ -1196,6 +1208,46 @@ impl RateBindingSpec {
     }
 }
 
+/// Structural validation diagnostics for a scenario specification.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioValidationReport {
+    /// Whether the specification passed all structural checks.
+    pub valid: bool,
+    /// Failures in specification and operation order.
+    pub errors: Vec<String>,
+    /// Advisory diagnostics associated with the specification.
+    pub warnings: Vec<String>,
+    /// Whether at least one operation needs an instrument inventory.
+    pub requires_instruments: bool,
+    /// Whether applying the scenario can modify instrument state.
+    pub mutates_instruments: bool,
+    /// Number of operations in the submitted specification.
+    pub operation_count: usize,
+}
+
+/// Check a scenario's structure and report diagnostics without applying shocks.
+///
+/// # Arguments
+/// * `spec` - Scenario whose identifiers, timing and operations are checked.
+///   Market and instrument lookups occur only when the scenario is applied.
+#[must_use]
+pub fn validate_scenario_spec(spec: &ScenarioSpec) -> ScenarioValidationReport {
+    let errors: Vec<_> = spec
+        .validation_errors()
+        .map(|error| error.to_string())
+        .collect();
+    ScenarioValidationReport {
+        valid: errors.is_empty(),
+        errors,
+        warnings: Vec::new(),
+        requires_instruments: spec.requires_instruments(),
+        mutates_instruments: spec.mutates_instruments(),
+        operation_count: spec.operations.len(),
+    }
+}
+
 impl ScenarioSpec {
     /// Parse a scenario specification from JSON and validate it.
     ///
@@ -1247,26 +1299,36 @@ impl ScenarioSpec {
     /// more than one time-roll operation is present, or any contained operation
     /// is invalid.
     pub fn validate(&self) -> crate::error::Result<()> {
-        if self.id.trim().is_empty() {
-            return Err(crate::error::Error::Validation(
-                "Scenario ID cannot be empty".into(),
-            ));
-        }
+        self.validation_errors().next().map_or(Ok(()), Err)
+    }
+
+    fn validation_errors(&self) -> impl Iterator<Item = crate::error::Error> + '_ {
+        use crate::error::Error;
+
+        let id_error = self
+            .id
+            .trim()
+            .is_empty()
+            .then(|| Error::Validation("Scenario ID cannot be empty".into()));
         let time_roll_count = self
             .operations
             .iter()
             .filter(|op| matches!(op, OperationSpec::TimeRollForward { .. }))
             .count();
-        if time_roll_count > 1 {
-            return Err(crate::error::Error::Validation(format!(
+        let roll_error = (time_roll_count > 1).then(|| {
+            Error::Validation(format!(
                 "Scenario contains {time_roll_count} TimeRollForward operations; at most one is allowed"
-            )));
-        }
-        for (i, op) in self.operations.iter().enumerate() {
+            ))
+        });
+        let operation_errors = self.operations.iter().enumerate().filter_map(|(i, op)| {
             op.validate()
-                .map_err(|e| crate::error::Error::Validation(format!("Operation {i}: {e}")))?;
-        }
-        Ok(())
+                .err()
+                .map(|error| Error::Validation(format!("Operation {i}: {error}")))
+        });
+        id_error
+            .into_iter()
+            .chain(roll_error)
+            .chain(operation_errors)
     }
 }
 
@@ -1330,8 +1392,9 @@ impl OperationSpec {
                 curve_id,
                 discount_curve_id,
                 bp,
-                ..
+                curve_kind,
             } => {
+                check_rate_curve_kind(*curve_kind)?;
                 check_id(curve_id.as_str(), "curve_id")?;
                 if let Some(discount_curve_id) = discount_curve_id {
                     check_id(discount_curve_id.as_str(), "discount_curve_id")?;
@@ -1342,19 +1405,28 @@ impl OperationSpec {
                 curve_id,
                 discount_curve_id,
                 nodes,
+                curve_kind,
                 ..
             } => {
+                check_rate_curve_kind(*curve_kind)?;
                 check_id(curve_id.as_str(), "curve_id")?;
                 if let Some(discount_curve_id) = discount_curve_id {
                     check_id(discount_curve_id.as_str(), "discount_curve_id")?;
                 }
                 check_nodes(nodes)?;
             }
+            OperationSpec::CommodityCurveParallelPct { curve_id, pct } => {
+                check_id(curve_id.as_str(), "curve_id")?;
+                check_finite(*pct, "pct")?;
+            }
             OperationSpec::VolIndexParallelPts { curve_id, points } => {
                 check_id(curve_id.as_str(), "curve_id")?;
                 check_finite(*points, "points")?;
             }
             OperationSpec::VolIndexNodePts {
+                curve_id, nodes, ..
+            }
+            | OperationSpec::CommodityCurveNodePct {
                 curve_id, nodes, ..
             } => {
                 check_id(curve_id.as_str(), "curve_id")?;
@@ -1418,8 +1490,9 @@ impl OperationSpec {
                 target,
                 bp,
                 discount_curve_id,
-                ..
+                curve_kind,
             } => {
+                check_rate_curve_kind(*curve_kind)?;
                 target
                     .validate()
                     .map_err(|err| crate::error::Error::Validation(err.to_string()))?;
@@ -1427,6 +1500,12 @@ impl OperationSpec {
                 if let Some(dcid) = discount_curve_id {
                     check_id(dcid.as_str(), "discount_curve_id")?;
                 }
+            }
+            OperationSpec::HierarchyCommodityCurveParallelPct { target, pct } => {
+                target
+                    .validate()
+                    .map_err(|err| crate::error::Error::Validation(err.to_string()))?;
+                check_finite(*pct, "pct")?;
             }
             OperationSpec::HierarchyVolSurfaceParallelPct { target, pct, .. }
             | OperationSpec::HierarchyEquityPricePct { target, pct } => {
@@ -1457,6 +1536,15 @@ impl OperationSpec {
         }
         Ok(())
     }
+}
+
+fn check_rate_curve_kind(kind: CurveKind) -> crate::error::Result<()> {
+    if kind == CurveKind::Commodity {
+        return Err(crate::error::Error::Validation(
+            "Commodity price curves use commodity_curve_parallel_pct, commodity_curve_node_pct or hierarchy_commodity_curve_parallel_pct".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn check_finite(val: f64, name: &str) -> crate::error::Result<()> {

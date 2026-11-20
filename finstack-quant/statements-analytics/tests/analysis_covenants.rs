@@ -86,7 +86,7 @@ const COVERAGE: [f64; 4] = [4.5, 4.9, 5.1, 6.0];
 #[test]
 fn window_keeps_early_non_finite_leverage_out_of_the_evaluation() {
     let results = results([f64::NAN, f64::NAN, 2.2, 3.9], COVERAGE);
-    let series = evaluate_covenants(&results, &engine(date!(2024 - 07 - 01))).unwrap();
+    let series = evaluate_covenants(&engine(date!(2024 - 07 - 01)), &results, None).unwrap();
 
     let dates: Vec<Date> = series.iter().map(|row| row.as_of).collect();
     assert_eq!(
@@ -111,9 +111,10 @@ fn window_keeps_early_non_finite_leverage_out_of_the_evaluation() {
 
     // The breach forecast reads the same periods under the same window rule.
     let breaches = forecast_breaches(
-        &results,
         &engine(date!(2024 - 07 - 01)),
+        &results,
         CovenantForecastConfig::default(),
+        None,
     )
     .unwrap();
     assert_eq!(breaches.len(), 1);
@@ -125,16 +126,17 @@ fn window_keeps_early_non_finite_leverage_out_of_the_evaluation() {
 fn a_required_non_finite_metric_fails_the_evaluation() {
     // The window opens in 2024Q2, where leverage is still NaN.
     let results = results([f64::NAN, f64::NAN, 2.2, 3.9], COVERAGE);
-    let err = evaluate_covenants(&results, &engine(date!(2024 - 04 - 01))).unwrap_err();
+    let err = evaluate_covenants(&engine(date!(2024 - 04 - 01)), &results, None).unwrap_err();
     assert!(matches!(err, Error::Validation(_)), "{err:?}");
     assert!(err.to_string().contains("'leverage'"), "{err}");
     assert!(err.to_string().contains("2024Q2"), "{err}");
     // The forecast fails on the same input.
     assert!(
         forecast_breaches(
-            &results,
             &engine(date!(2024 - 04 - 01)),
-            CovenantForecastConfig::default()
+            &results,
+            CovenantForecastConfig::default(),
+            None,
         )
         .is_err()
     );
@@ -148,7 +150,7 @@ fn a_missing_required_metric_is_not_found() {
         .get_mut("leverage")
         .unwrap()
         .shift_remove(&quarters()[3]);
-    let err = evaluate_covenants(&results, &engine(date!(2024 - 07 - 01))).unwrap_err();
+    let err = evaluate_covenants(&engine(date!(2024 - 07 - 01)), &results, None).unwrap_err();
     assert!(
         matches!(&err, Error::Input(InputError::NotFound { id }) if id.contains("leverage") && id.contains("2024Q4")),
         "{err:?}"
@@ -165,7 +167,7 @@ fn only_the_result_periods_are_tested() {
             6.1,
         )
         .unwrap();
-    let series = evaluate_covenants(&results, &engine(date!(2024 - 07 - 01))).unwrap();
+    let series = evaluate_covenants(&engine(date!(2024 - 07 - 01)), &results, None).unwrap();
     assert_eq!(series.len(), 4);
     assert_eq!(series[3].as_of, date!(2024 - 12 - 31));
 }
@@ -192,14 +194,42 @@ fn finite_results_match_the_engine_series_over_period_end_rows() {
         .collect();
 
     assert_eq!(
-        evaluate_covenants(&results, &engine).unwrap(),
+        evaluate_covenants(&engine, &results, None).unwrap(),
         engine.evaluate_series(&rows).unwrap()
     );
 }
 
 #[test]
 fn empty_results_evaluate_to_an_empty_series() {
-    let series =
-        evaluate_covenants(&StatementResult::default(), &engine(date!(2024 - 07 - 01))).unwrap();
+    let series = evaluate_covenants(
+        &engine(date!(2024 - 07 - 01)),
+        &StatementResult::default(),
+        None,
+    )
+    .unwrap();
     assert!(series.is_empty());
+}
+
+#[test]
+fn explicit_node_mapping_changes_the_observation_and_preserves_original_unit_cushion() {
+    let results = results([0.0; 4], [2.5, 3.0, 4.0, 5.0]);
+    let mut engine = CovenantEngine::new();
+    engine.add_spec(leverage_spec());
+    let mapping = std::collections::BTreeMap::from([(
+        "leverage".to_string(),
+        "interest_coverage".to_string(),
+    )]);
+    let reports =
+        evaluate_covenants(&engine, &results, Some(&mapping)).expect("explicit mapped series");
+    let report = &reports[2].reports["max_debt_to_ebitda"];
+    assert_eq!(report.actual_value, Some(4.0));
+    assert_eq!(report.threshold, Some(3.5));
+    assert_eq!(report.headroom_raw, Some(-0.5));
+    assert!(
+        report
+            .headroom
+            .is_some_and(|value| (value + 0.5 / 3.5).abs() < 1e-15)
+    );
+    let missing = std::collections::BTreeMap::from([("leverage".into(), "absent".into())]);
+    assert!(evaluate_covenants(&engine, &results, Some(&missing)).is_err());
 }

@@ -287,10 +287,16 @@ impl MarginFundingCost {
         })
     }
 
-    /// Get the funding spread (funding rate - collateral rate).
+    /// Get the annualized funding spread as a decimal rate.
     #[must_use]
-    pub fn spread(&self) -> f64 {
+    pub fn spread_rate(&self) -> f64 {
         self.funding_rate - self.collateral_rate
+    }
+
+    /// Get the annualized funding spread in basis points.
+    #[must_use]
+    pub fn spread_bp(&self) -> f64 {
+        self.spread_rate() * finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT
     }
 
     /// Calculate cost for a specific period.
@@ -415,7 +421,8 @@ mod tests {
 
         let cost = MarginFundingCost::calculate(margin, funding_rate, collateral_rate).unwrap();
 
-        assert!((cost.spread() - 0.002).abs() < 1e-10); // 20bp
+        assert!((cost.spread_rate() - 0.002).abs() < 1e-10); // 20bp
+        assert!((cost.spread_bp() - 20.0).abs() < 1e-10);
         assert!((cost.annual_cost.amount() - 100_000.0).abs() < 0.01); // 50M × 0.2%
     }
 

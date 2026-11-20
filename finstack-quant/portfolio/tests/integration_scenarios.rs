@@ -78,7 +78,7 @@ fn apply_scenario_and_revalue_succeeds() {
         valuation: shocked_valuation,
         report,
     } = finstack_quant_portfolio::scenarios::apply_scenario_and_revalue(
-        &portfolio, &scenario, &market, &config,
+        &portfolio, &scenario, &market, &config, None,
     )
     .unwrap();
     assert!(report.operations_applied > 0);
@@ -194,7 +194,7 @@ fn scenario_pnl_reconciles_end_to_end() {
         valuation: stressed,
         report: _,
     } = finstack_quant_portfolio::scenarios::apply_scenario_and_revalue(
-        &portfolio, &scenario, &market, &config,
+        &portfolio, &scenario, &market, &config, None,
     )
     .unwrap();
     let expected = stressed.total_base_currency.amount() - base.total_base_currency.amount();

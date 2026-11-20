@@ -42,9 +42,9 @@ fn operation(value: &JsValue) -> Result<OperationSpec, JsValue> {
 }
 
 /// Expand a parallel shift into one operation per curve identifier.
-/// @param curveKind - Canonical discount, forward, par_cds, inflation or commodity family label.
+/// @param curveKind - Canonical discount, forward, par_cds or inflation family label.
 /// @param curveIds - Ordered array of curve identifiers; empty input returns an empty array.
-/// @param bp - Additive basis points; percent of forward for commodity curves.
+/// @param bp - Additive rate basis points.
 /// @param discountCurveId - Optional ParCDS discount curve copied onto every operation.
 /// @returns An array of operations preserving identifier order.
 ///
@@ -60,12 +60,14 @@ pub fn parallel_bp_many(
     discount_curve_id: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let ids = js_string_seq(&curve_ids, "curveIds")?;
-    to_js_value(&OperationSpec::parallel_bp_many(
+    let operations = OperationSpec::parallel_bp_many(
         label(&curve_kind, "curveKind")?,
         ids,
         js_f64(&bp, "bp")?,
         opt_curve_id(discount_curve_id.as_ref(), "discountCurveId")?,
-    ))
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&operations)
 }
 
 /// Build a time-roll operation moving the valuation horizon forward.

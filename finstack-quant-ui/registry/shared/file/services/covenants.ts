@@ -33,8 +33,8 @@ export function createCovenantsService(
         );
         try {
           return native.statements_analytics.evaluateCovenants(
-            request.resultsJson,
             engine,
+            request.resultsJson,
           );
         } finally {
           engine.free();
@@ -49,8 +49,8 @@ export function createCovenantsService(
         try {
           // The config crosses as JSON text, which keeps a uint64 random_seed exact.
           return native.statements_analytics.forecastBreaches(
-            request.resultsJson,
             engine,
+            request.resultsJson,
             request.configJson,
           );
         } finally {

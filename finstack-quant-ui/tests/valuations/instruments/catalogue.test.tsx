@@ -56,7 +56,7 @@ async function select(type: string) {
 }
 it("reconciles all instrument tags with positive encoding and pricing coverage", () => {
   const types = instruments.map((entry) => entry.type).sort();
-  expect(types).toHaveLength(78);
+  expect(types).toHaveLength(79);
   expect(inventory.map((entry) => entry.type).sort()).toEqual(types);
   expect(pricing.cases.map((entry) => entry.type).sort()).toEqual(types);
   expect(encodings.instruments.map((entry) => entry.type).sort()).toEqual(

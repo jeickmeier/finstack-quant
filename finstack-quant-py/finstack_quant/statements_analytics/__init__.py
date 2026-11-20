@@ -33,8 +33,30 @@ scenario_diff = _sa.scenario_diff
 variance_bridge = _sa.variance_bridge
 backtest_forecast = _sa.backtest_forecast
 goal_seek = _sa.goal_seek
+DcfInputs = _sa.DcfInputs
+DcfOptions = _sa.DcfOptions
+StatementValuationCut = _sa.StatementValuationCut
+TerminalFcffBasis = _sa.TerminalFcffBasis
+DcfProjection = _sa.DcfProjection
+CorporateDcfRequest = _sa.CorporateDcfRequest
+DcfSensitivityGridSpec = _sa.DcfSensitivityGridSpec
+DcfSensitivityGridResult = _sa.DcfSensitivityGridResult
+evaluate_corporate_dcf = _sa.evaluate_corporate_dcf
+evaluate_dcf_from_results = _sa.evaluate_dcf_from_results
+dcf_sensitivity_grid = _sa.dcf_sensitivity_grid
+dcf_sensitivity_on_results = _sa.dcf_sensitivity_on_results
+DcfDistributionResult = _sa.DcfDistributionResult
+evaluate_dcf_monte_carlo = _sa.evaluate_dcf_monte_carlo
 evaluate_dcf = _sa.evaluate_dcf
 dcf_sensitivity = _sa.dcf_sensitivity
+LboEarnings = _sa.LboEarnings
+LboDebtFunding = _sa.LboDebtFunding
+LboFunding = _sa.LboFunding
+DatedLboRequest = _sa.DatedLboRequest
+LboFundingResult = _sa.LboFundingResult
+LboExitBridge = _sa.LboExitBridge
+DatedLboResult = _sa.DatedLboResult
+evaluate_dated_lbo = _sa.evaluate_dated_lbo
 evaluate_lbo = _sa.evaluate_lbo
 WaccInputs = _sa.WaccInputs
 wacc = _sa.wacc
@@ -44,6 +66,11 @@ credit_assessment = _sa.credit_assessment
 DependencyTracer = _sa.DependencyTracer
 DependencyTree = _sa.DependencyTree
 explain_formula = _sa.explain_formula
+StatementCovenantSpec = _sa.StatementCovenantSpec
+StatementCovenantAssessment = _sa.StatementCovenantAssessment
+StatementCovenantForecast = _sa.StatementCovenantForecast
+assess_statement_covenants = _sa.assess_statement_covenants
+forecast_statement_covenants = _sa.forecast_statement_covenants
 evaluate_covenants = _sa.evaluate_covenants
 forecast_breaches = _sa.forecast_breaches
 run_checks = _sa.run_checks
@@ -119,6 +146,15 @@ RelativeValueReport = _sa.RelativeValueReport
 CompanyMetrics = _sa.CompanyMetrics
 CorporateAnalysis = _sa.CorporateAnalysis
 CorporateValuationResult = _sa.CorporateValuationResult
+CreditContextSpec = _sa.CreditContextSpec
+CreditContextReport = _sa.CreditContextReport
+CreditContextMetrics = _sa.CreditContextMetrics
+CreditMeasureRow = _sa.CreditMeasureRow
+evaluate_credit_context = _sa.evaluate_credit_context
+StatementScoringMapping = _sa.StatementScoringMapping
+CreditScoringModel = _sa.CreditScoringModel
+score_statement = _sa.score_statement
+score_statement_series = _sa.score_statement_series
 CreditAssessment = _sa.CreditAssessment
 CreditAssessmentPoint = _sa.CreditAssessmentPoint
 CreditMapping = _sa.CreditMapping
@@ -131,6 +167,7 @@ Explanation = _sa.Explanation
 ExplanationStep = _sa.ExplanationStep
 ForecastMetrics = _sa.ForecastMetrics
 GoalSeekResult = _sa.GoalSeekResult
+GoalSeekSpec = _sa.GoalSeekSpec
 LboCheckMappings = _sa.LboCheckMappings
 LboResult = _sa.LboResult
 PLSummaryReport = _sa.PLSummaryReport
@@ -148,6 +185,15 @@ StagingConfig = _sa.StagingConfig
 TerminalValueSpec = _sa.TerminalValueSpec
 ThreeStatementMapping = _sa.ThreeStatementMapping
 ValuationDiscounts = _sa.ValuationDiscounts
+ImpairedEclScenario = _sa.ImpairedEclScenario
+WeightedImpairedEclResult = _sa.WeightedImpairedEclResult
+compute_impaired_ecl_weighted = _sa.compute_impaired_ecl_weighted
+ImpairedExposure = _sa.ImpairedExposure
+RecoveryEvidence = _sa.RecoveryEvidence
+ImpairedEclResult = _sa.ImpairedEclResult
+compute_impaired_ecl = _sa.compute_impaired_ecl
+EclScenario = _sa.EclScenario
+EclScenarioOutcome = _sa.EclScenarioOutcome
 WeightedEclResult = _sa.WeightedEclResult
 pl_summary_report = _sa.pl_summary_report
 
@@ -163,17 +209,33 @@ __all__: list[str] = [
     "CorkscrewExtension",
     "CorkscrewReport",
     "CorporateAnalysis",
+    "CorporateDcfRequest",
     "CorporateValuationResult",
     "CreditAssessment",
     "CreditAssessmentPoint",
+    "CreditContextMetrics",
+    "CreditContextReport",
+    "CreditContextSpec",
     "CreditMapping",
+    "CreditMeasureRow",
     "CreditScorecardExtension",
+    "CreditScoringModel",
+    "DatedLboRequest",
+    "DatedLboResult",
+    "DcfDistributionResult",
+    "DcfInputs",
+    "DcfOptions",
+    "DcfProjection",
+    "DcfSensitivityGridResult",
+    "DcfSensitivityGridSpec",
     "DcfSensitivityResult",
     "DependencyTracer",
     "DependencyTree",
     "DimensionScore",
     "EclBucket",
     "EclResult",
+    "EclScenario",
+    "EclScenarioOutcome",
     "EquityBridge",
     "Explanation",
     "ExplanationStep",
@@ -181,7 +243,16 @@ __all__: list[str] = [
     "ForecastMetrics",
     "FreeRentWindowSpec",
     "GoalSeekResult",
+    "GoalSeekSpec",
+    "ImpairedEclResult",
+    "ImpairedEclScenario",
+    "ImpairedExposure",
     "LboCheckMappings",
+    "LboDebtFunding",
+    "LboEarnings",
+    "LboExitBridge",
+    "LboFunding",
+    "LboFundingResult",
     "LboResult",
     "LeaseGrowthConvention",
     "LeaseSpec",
@@ -195,6 +266,7 @@ __all__: list[str] = [
     "PeerStats",
     "PropertyTemplateNodes",
     "QualitativeFlags",
+    "RecoveryEvidence",
     "RegressionResult",
     "RelativeValueCompany",
     "RelativeValueDimension",
@@ -217,6 +289,12 @@ __all__: list[str] = [
     "Stage",
     "StageResult",
     "StagingConfig",
+    "StatementCovenantAssessment",
+    "StatementCovenantForecast",
+    "StatementCovenantSpec",
+    "StatementScoringMapping",
+    "StatementValuationCut",
+    "TerminalFcffBasis",
     "TerminalValueSpec",
     "ThreeStatementMapping",
     "TornadoEntry",
@@ -226,6 +304,7 @@ __all__: list[str] = [
     "VarianceRow",
     "WaccInputs",
     "WeightedEclResult",
+    "WeightedImpairedEclResult",
     "add_ncf_buildup",
     "add_noi_buildup",
     "add_property_operating_statement",
@@ -233,22 +312,33 @@ __all__: list[str] = [
     "add_roll_forward",
     "add_roll_forward_with_opening",
     "add_vintage_buildup",
+    "assess_statement_covenants",
     "backtest_forecast",
     "capital_structure_summary",
     "classify_stage",
     "compute_ecl",
     "compute_ecl_weighted",
+    "compute_impaired_ecl",
+    "compute_impaired_ecl_weighted",
     "compute_multiple",
     "credit_assessment",
     "credit_assessment_report_text",
     "dcf_sensitivity",
+    "dcf_sensitivity_grid",
+    "dcf_sensitivity_on_results",
+    "evaluate_corporate_dcf",
     "evaluate_covenants",
+    "evaluate_credit_context",
+    "evaluate_dated_lbo",
     "evaluate_dcf",
+    "evaluate_dcf_from_results",
+    "evaluate_dcf_monte_carlo",
     "evaluate_lbo",
     "evaluate_scenario_set",
     "evaluate_scenario_set_with_market",
     "explain_formula",
     "forecast_breaches",
+    "forecast_statement_covenants",
     "generate_tornado_entries",
     "goal_seek",
     "peer_stats",
@@ -266,6 +356,8 @@ __all__: list[str] = [
     "run_variance",
     "scenario_diff",
     "score_relative_value",
+    "score_statement",
+    "score_statement_series",
     "variance_bridge",
     "wacc",
     "z_score",

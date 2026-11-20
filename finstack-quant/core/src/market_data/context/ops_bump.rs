@@ -379,7 +379,7 @@ impl MarketContext {
                             "volatility bucket bump percentage must be finite, got {pct}"
                         )));
                     }
-                    let factor = 1.0 + pct / 100.0;
+                    let factor = (100.0 + pct) / 100.0;
                     if !factor.is_finite() || factor < 0.0 {
                         return Err(crate::Error::Validation(format!(
                             "volatility bucket bump percentage must be at least -100%, got {pct}"

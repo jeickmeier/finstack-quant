@@ -10,8 +10,8 @@
 //! - Exposure times are year fractions.
 //! - Adjustments are positive when they cost the desk and compose as
 //!   `total_xva = CVA − DVA + FVA + MVA`. `cva::compute_bilateral_xva`
-//!   computes MVA and reduces DVA by posted IM whenever
-//!   `types::FundingConfig::im_profile` is set.
+//!   uses the supplied exposure basis for credit legs and expected posted IM
+//!   for MVA when `types::FundingConfig::im_profile` is set.
 //!
 //! # Exposure profiles
 //!
@@ -26,8 +26,9 @@
 //! - ISDA 2002 Master Agreement: `docs/REFERENCES.md#isda-2002-master-agreement`
 //! - BCBS 279 SA-CCR: `docs/REFERENCES.md#bcbs-279-saccr`
 
-/// CVA, DVA, FVA, MVA aggregation, and bilateral-XVA integration formulas.
 pub mod cva;
+/// CVA, DVA, FVA, MVA aggregation, and bilateral-XVA integration formulas.
+mod dated;
 /// Margin Valuation Adjustment (MVA) on SIMM-based IM profiles.
 pub mod mva;
 /// Shared XVA configuration and result container types.

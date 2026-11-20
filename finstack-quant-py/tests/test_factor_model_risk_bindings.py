@@ -174,6 +174,15 @@ def test_canonical_nested_sensitivity_json_roundtrips_and_reconciles_risk() -> N
     assert json.loads(matrix.to_json()) == payload
     assert (matrix.n_positions, matrix.n_factors) == (2, 1)
     assert matrix.delta(1, 0) == 3.0
+    assert matrix.delta(position_idx="B", factor_idx="F") == 3.0
+    assert matrix.delta("A", 0) == 2.0
+    assert matrix.delta(1, "F") == 3.0
+    with pytest.raises(KeyError, match="unknown"):
+        matrix.delta("unknown", "F")
+    with pytest.raises(KeyError, match="unknown"):
+        matrix.delta("B", "unknown")
+    with pytest.raises(ValueError, match="out of bounds"):
+        matrix.delta(2, "F")
     assert matrix.position_deltas(0) == [2.0]
     assert matrix.factor_deltas(0) == [2.0, 3.0]
     assert json.loads(pickle.loads(pickle.dumps(matrix)).to_json()) == payload  # noqa: S301
@@ -213,3 +222,34 @@ def test_sensitivity_json_requires_currency_and_preserves_zero_factor_rows() -> 
     matrix = SensitivityMatrix.from_json(json.dumps(payload))
     assert matrix.position_deltas(0) == []
     assert json.loads(matrix.to_json()) == payload
+
+
+def test_typed_position_risk_matches_wire_with_budget() -> None:
+    from finstack_quant.models.factor.risk import (
+        PositionRiskBudget,
+        PositionRiskRequest,
+        PositionRiskSource,
+        position_risk_report,
+    )
+
+    covariance = [[0.04, 0.01], [0.01, 0.09]]
+    weights = [100.0, 200.0]
+    source = PositionRiskSource.parametric(weights, covariance, compute_incremental=True)
+    budget = PositionRiskBudget([0.4, 0.6], utilization_threshold=1.2)
+    typed = PositionRiskRequest(["A", "B"], source, confidence=0.975, budget=budget)
+    wire = {
+        "position_ids": ["A", "B"],
+        "source": {
+            "kind": "parametric",
+            "weights": weights,
+            "covariance": covariance,
+            "compute_incremental": True,
+        },
+        "confidence": 0.975,
+        "budget": {"targets": [0.4, 0.6], "utilization_threshold": 1.2},
+    }
+    assert position_risk_report(typed).to_json() == position_risk_report(wire).to_json()
+
+    invalid = PositionRiskRequest(["A", "B"], source, confidence=0.5)
+    with pytest.raises(ValueError, match="confidence"):
+        position_risk_report(invalid)

@@ -4,7 +4,6 @@
 //! Recovery01 measures the change in PV for a 1% (100bp) change in recovery rate.
 
 use super::effective_recovery;
-use crate::structured_credit::StructuredCredit;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
@@ -16,9 +15,8 @@ pub(crate) struct Recovery01Calculator;
 
 impl MetricCalculator for Recovery01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let instrument = context
-            .instrument_as::<StructuredCredit>()?
-            .resolved_for_pricing()?;
+        let instrument =
+            crate::structured_credit::metrics::metric_deal(context)?.resolved_for_pricing()?;
         let as_of = context.as_of;
 
         use finstack_quant_cashflows::builder::RecoveryModelSpec;

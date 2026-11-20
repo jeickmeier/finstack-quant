@@ -1,6 +1,7 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/valuations/typed_asset_backed_facility/facility.rs``."""
 
 from __future__ import annotations
+from finstack_quant.valuations.instruments._pricing import PriceExtras
 
 import datetime
 from typing import Any
@@ -169,7 +170,7 @@ class AssetBackedFacility:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        extras: dict[str, Any] | str | None = None,
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price the lender's projected flows (interest, principal and commitment fees) and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -189,7 +190,7 @@ class AssetBackedFacility:
             Metric identifiers to compute alongside the value (for example
             ``"abf_borrowing_base_cushion"``, ``"abf_facility_irr"`` or
             ``"dv01"``).
-        extras : dict[str, Any] or str, optional
+        extras : PriceExtras or dict[str, Any] or str, optional
             The rarer pricing inputs, as a dict or JSON text in the shape of the
             Rust ``PriceExtras``; every key is optional and an unknown key raises
             ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``

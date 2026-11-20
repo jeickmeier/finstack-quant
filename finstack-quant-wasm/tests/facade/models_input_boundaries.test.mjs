@@ -101,11 +101,11 @@ test('models reject fractional, non-finite and wrapped counts before the WASM AB
               dividend_yield: 0,
               time_to_expiry: 1,
               option_type: 'call',
-              n_terms: count,
+              volatility: 0.2,
             },
-            0.2
+            count
           ),
-        invalidObjectCount('market')
+        invalidCount('nTerms')
       );
       assert.throws(
         () =>
@@ -117,13 +117,13 @@ test('models reject fractional, non-finite and wrapped counts before the WASM AB
               dividend_yield: 0,
               time_to_expiry: 1,
               option_type: 'call',
-              n_terms: count,
             },
             0.2,
             -0.1,
-            0.2
+            0.2,
+            count
           ),
-        invalidObjectCount('market')
+        invalidCount('nTerms')
       );
       assert.throws(
         () =>
@@ -135,23 +135,27 @@ test('models reject fractional, non-finite and wrapped counts before the WASM AB
               dividend_yield: 0,
               time_to_expiry: 1,
               option_type: 'call',
-              n_terms: count,
             },
             0.2,
             -0.1,
             0.1,
-            0.1
+            0.1,
+            count
           ),
-        invalidObjectCount('market')
+        invalidCount('nTerms')
       );
       for (const isCall of [true, false]) {
         const price = (settings) =>
           models.monteCarlo.priceHeston(
-            100,
-            100,
-            1,
-            { r: 0.05, q: 0, v0: 0.04, kappa: 2, theta: 0.04, sigma_v: 0.3, rho: -0.7 },
-            isCall,
+            {
+              spot: 100,
+              strike: 100,
+              rate: 0.05,
+              dividend_yield: 0,
+              time_to_expiry: 1,
+              option_type: isCall ? 'call' : 'put',
+            },
+            { v0: 0.04, kappa: 2, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 },
             settings
           );
         assert.throws(
@@ -172,11 +176,15 @@ test('models reject fractional, non-finite and wrapped counts before the WASM AB
       assert.throws(() => calibrator.withMaxIterations(count), invalidCount('maxIterations'));
     }
     const estimate = models.monteCarlo.priceHeston(
-      100,
-      100,
-      1,
-      { r: 0.05, q: 0, v0: 0.04, kappa: 2, theta: 0.04, sigma_v: 0.3, rho: -0.7 },
-      true,
+      {
+        spot: 100,
+        strike: 100,
+        rate: 0.05,
+        dividend_yield: 0,
+        time_to_expiry: 1,
+        option_type: 'call',
+      },
+      { v0: 0.04, kappa: 2, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 },
       { num_paths: 2, seed: 42n, num_steps: 1 }
     );
     assert.equal(estimate.num_paths, 2);

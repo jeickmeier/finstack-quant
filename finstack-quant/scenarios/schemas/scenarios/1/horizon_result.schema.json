@@ -1406,7 +1406,7 @@
         },
         {
           "const": "commodity",
-          "description": "Commodity forward [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve).\n\n`bp` on parallel/node ops is percent of the price-curve forward\n(`5.0` = +5%), not a rate basis-point shock. Looking up a\n[`DiscountCurve`](finstack_quant_core::market_data::term_structures::DiscountCurve)\nunder this id is an error.",
+          "description": "Commodity forward [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve).\n\nPrice shocks use [`OperationSpec::CommodityCurveParallelPct`] or\n[`OperationSpec::CommodityCurveNodePct`].",
           "type": "string"
         }
       ]
@@ -1917,6 +1917,11 @@
         {
           "const": "asset_backed_facility",
           "description": "Asset-backed facility (warehouse line against a collateral pool).",
+          "type": "string"
+        },
+        {
+          "const": "structured_credit_tranche",
+          "description": "Single note owned by a structured-credit waterfall.",
           "type": "string"
         }
       ]
@@ -3240,29 +3245,6 @@
           "type": "object"
         },
         {
-          "description": "A commodity price-curve shock was outside the typical percent-of-forward\nstress range (approximately `[-80, +200]` percent).",
-          "properties": {
-            "curve_id": {
-              "description": "Curve identifier.",
-              "type": "string"
-            },
-            "detail": {
-              "description": "Detail describing whether the trigger was a parallel or node shock\nand which knot(s) were extreme.",
-              "type": "string"
-            },
-            "kind": {
-              "const": "commodity_shock_outside_range",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "curve_id",
-            "detail"
-          ],
-          "type": "object"
-        },
-        {
           "description": "Equity identifier was missing from the market context; no bump applied.",
           "properties": {
             "id": {
@@ -3565,29 +3547,6 @@
           "type": "object"
         },
         {
-          "description": "Vol-surface arbitrage warning detected post-shock.",
-          "properties": {
-            "detail": {
-              "description": "Free-text from `ArbitrageViolation` Display.",
-              "type": "string"
-            },
-            "kind": {
-              "const": "vol_surface_arbitrage",
-              "type": "string"
-            },
-            "vol_surface_id": {
-              "description": "Volatility-surface identifier.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "vol_surface_id",
-            "detail"
-          ],
-          "type": "object"
-        },
-        {
           "description": "Vol-surface bucket shock selected zero grid points (no-op).",
           "properties": {
             "kind": {
@@ -3602,35 +3561,6 @@
           "required": [
             "kind",
             "vol_surface_id"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "Vol-surface negative bucket shock that may produce non-positive vols.",
-          "properties": {
-            "bucket": {
-              "description": "Whether this was a parallel (`false`) or bucket (`true`) shock.",
-              "type": "boolean"
-            },
-            "kind": {
-              "const": "vol_surface_large_negative_shock",
-              "type": "string"
-            },
-            "pct": {
-              "description": "Percent shock value.",
-              "format": "double",
-              "type": "number"
-            },
-            "vol_surface_id": {
-              "description": "Volatility-surface identifier.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "vol_surface_id",
-            "pct",
-            "bucket"
           ],
           "type": "object"
         },

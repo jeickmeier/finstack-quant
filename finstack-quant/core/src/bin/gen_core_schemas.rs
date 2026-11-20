@@ -5,9 +5,10 @@ use std::path::Path;
 use finstack_quant_core::schema::{ARTIFACTS, SchemaGenerationCommand, run_schema_generator};
 
 /// Schema families owned by core; each is regenerated (and pruned) on its own.
-const ROOTS: [&str; 4] = [
+const ROOTS: [&str; 5] = [
     "schemas/dates",
     "schemas/market_data",
+    "schemas/math",
     "schemas/rating_scales",
     "schemas/table",
 ];

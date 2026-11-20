@@ -178,7 +178,8 @@ pub fn allocate_weights(spec: &WeightAllocationSpec) -> Result<WeightAllocationR
     })
 }
 
-fn default_money_decimal_places() -> u32 {
+/// Default number of decimal places for allocation rounding.
+pub const fn default_money_decimal_places() -> u32 {
     10
 }
 

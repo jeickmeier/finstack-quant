@@ -83,7 +83,7 @@ fn extract_vector(vec_obj: &Bound<'_, PyAny>, label: &str) -> PyResult<Vec<f64>>
 /// Shape mismatches (1-D numeric list, wrong array dimensionality, or ragged
 /// rows) raise `ValueError`; non-sequence containers, strings, `bool` values,
 /// and non-numeric entries raise `TypeError`.
-fn extract_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize, usize)> {
+pub(super) fn extract_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize, usize)> {
     if let Ok(untyped) = matrix.cast::<PyUntypedArray>() {
         let kind = untyped.dtype().kind();
         if !matches!(kind, b'f' | b'i' | b'u') {
@@ -259,6 +259,28 @@ fn apply_lower_triangular(
         .map_err(core_to_py)
 }
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.core.math.linalg", "apply_lower_triangular_many")]
+#[pyfunction]
+fn apply_lower_triangular_many<'py>(
+    py: Python<'py>,
+    l: &Bound<'_, PyAny>,
+    z: &Bound<'_, PyAny>,
+) -> PyResult<Bound<'py, numpy::PyArray2<f64>>> {
+    let (factor, n) = square_matrix(l)?;
+    let (draws, rows, cols) = extract_matrix(z)?;
+    if cols != n {
+        return Err(crate::errors::value_error(format!(
+            "each observation row must have {n} entries, got {cols}"
+        )));
+    }
+    let transformed = py
+        .detach(|| linalg::apply_lower_triangular_many(&factor, n, &draws))
+        .map_err(core_to_py)?;
+    let array = numpy::ndarray::Array2::from_shape_vec((rows, cols), transformed)
+        .map_err(|error| crate::errors::value_error(error.to_string()))?;
+    Ok(numpy::PyArray2::from_owned_array(py, array))
+}
+
 /// Symmetric eigendecomposition of a square matrix.
 ///
 /// Returns ``(eigenvalues, eigenvectors)`` where ``eigenvectors[i][k]`` is the
@@ -333,6 +355,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
 
     m.add_function(wrap_pyfunction!(apply_lower_triangular, &m)?)?;
+    m.add_function(wrap_pyfunction!(apply_lower_triangular_many, &m)?)?;
     m.add_function(wrap_pyfunction!(cholesky_decomposition, &m)?)?;
     m.add_function(wrap_pyfunction!(cholesky_solve, &m)?)?;
     m.add_function(wrap_pyfunction!(ledoit_wolf_shrinkage, &m)?)?;
@@ -345,6 +368,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         [
             "CholeskyError",
             "apply_lower_triangular",
+            "apply_lower_triangular_many",
             "cholesky_decomposition",
             "cholesky_solve",
             "ledoit_wolf_shrinkage",

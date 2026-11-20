@@ -28,13 +28,15 @@ fn bs_call_reference(spot: f64, strike: f64, rate: f64, vol: f64) -> f64 {
     // 2024 is a leap year; the pricers day-count the 1Y expiry on Act365F.
     let t = 366.0 / 365.0;
     finstack_quant_models::closed_form::bs_price(
-        spot,
-        strike,
-        rate,
-        0.0,
-        vol,
-        t,
-        finstack_quant_models::types::OptionType::Call,
+        &finstack_quant_models::types::OptionMarketParams {
+            spot,
+            strike,
+            rate,
+            dividend_yield: 0.0,
+            volatility: vol,
+            time_to_expiry: t,
+            option_type: finstack_quant_models::types::OptionType::Call,
+        },
     )
     .expect("valid Black-Scholes inputs")
         * 100.0
@@ -45,7 +47,7 @@ fn with_heston_scalars(
     market: MarketContext,
     kappa: f64,
     theta: f64,
-    sigma_v: f64,
+    vol_of_vol: f64,
     rho: f64,
     v0: f64,
 ) -> MarketContext {
@@ -60,7 +62,7 @@ fn with_heston_scalars(
         )
         .insert_price(
             "HESTON_SIGMA_V",
-            MarketScalar::unitless(sigma_v).expect("valid scalar"),
+            MarketScalar::unitless(vol_of_vol).expect("valid scalar"),
         )
         .insert_price(
             "HESTON_RHO",
@@ -185,7 +187,7 @@ fn heston_fourier_collapses_to_black_scholes() {
         build_standard_market(as_of, spot, vol, rate, 0.0),
         1.0,  // kappa
         var,  // theta
-        1e-4, // sigma_v -> 0
+        1e-4, // vol_of_vol -> 0
         0.0,  // rho
         var,  // v0
     );
@@ -341,7 +343,7 @@ fn pde_adi2d_matches_heston_fourier() {
         build_standard_market(as_of, spot, vol, rate, 0.0),
         2.0,  // kappa
         0.06, // theta
-        0.4,  // sigma_v
+        0.4,  // vol_of_vol
         -0.5, // rho
         0.06, // v0
     );
@@ -363,7 +365,7 @@ fn with_rough_heston_scalars(
     hurst: f64,
     kappa: f64,
     theta: f64,
-    sigma_v: f64,
+    vol_of_vol: f64,
     rho: f64,
     v0: f64,
 ) -> MarketContext {
@@ -382,7 +384,7 @@ fn with_rough_heston_scalars(
         )
         .insert_price(
             "ROUGH_HESTON_SIGMA_V",
-            MarketScalar::unitless(sigma_v).expect("valid scalar"),
+            MarketScalar::unitless(vol_of_vol).expect("valid scalar"),
         )
         .insert_price(
             "ROUGH_HESTON_RHO",
@@ -415,7 +417,7 @@ fn rough_heston_fourier_collapses_to_black_scholes() {
         0.3,  // hurst (rough; inert in the σ_v→0 limit)
         1.8,  // kappa
         var,  // theta
-        1e-4, // sigma_v -> 0
+        1e-4, // vol_of_vol -> 0
         -0.6, // rho (inert in the limit, but distinct for wiring detection)
         var,  // v0
     );

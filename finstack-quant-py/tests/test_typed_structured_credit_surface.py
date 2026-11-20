@@ -1031,3 +1031,32 @@ def test_pool_report_is_one_native_call_over_the_pool_analytics() -> None:
 
     assert PoolReport.from_json(report.to_json()).to_dict() == report.to_dict()
     assert pickle.loads(pickle.dumps(report)).to_dict() == report.to_dict()  # noqa: S301
+
+
+def test_standalone_tranche_prices_the_same_cashflows_inside_a_portfolio() -> None:
+    from finstack_quant.portfolio import Portfolio, Position, value_portfolio
+    from finstack_quant.valuations.instruments import StructuredCreditTranche
+
+    deal = _clo()
+    market = _market()
+    note = StructuredCreditTranche.from_deal(deal, "B")
+    assert note.id != deal.id
+    assert note.tranche_id == "B"
+    price = note.price(market, CLOSE, metrics=["wal", "dv01"])
+    standalone = tranche_metrics(deal, "B", market, CLOSE, metrics=["wal", "dv01"])
+    flows = deal.tranche_cashflows("B", market, CLOSE).cashflows
+    curve = market.get_discount("USD-OIS")
+    expected = math.fsum(
+        money.amount * curve.df_between_dates(CLOSE, payment_date)
+        for payment_date, money in flows
+        if payment_date > CLOSE
+    )
+    assert price.value.amount == pytest.approx(expected, abs=0.01)
+    assert price.value.amount < standalone.pv  # The active call shortens the selected note.
+    assert price.metrics["wal"] == pytest.approx(standalone.metrics["wal"])
+    assert price_instrument(note.to_json(), market, CLOSE).value == price.value
+    book = Portfolio.builder("NOTE", USD, CLOSE).build().with_position(Position("B", note, -2.0))
+    priced = value_portfolio(book, market, metrics=[])
+    assert priced.total_value == pytest.approx(-2.0 * expected, abs=0.01)
+    with pytest.raises(KeyError):
+        StructuredCreditTranche.from_deal(deal, "unknown")

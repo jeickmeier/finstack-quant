@@ -3,7 +3,7 @@
 use finstack_quant_core::{currency::Currency, market_data::surfaces::VolSurface};
 use finstack_quant_models::closed_form::bs_price;
 use finstack_quant_models::correlation::PortfolioLossResult;
-use finstack_quant_models::fourier::cos::{CosMarketParams, bs_cos_price};
+use finstack_quant_models::fourier::cos::bs_cos_price;
 use finstack_quant_models::monte_carlo::{
     pricer::{
         basis::PolynomialBasis,
@@ -25,38 +25,88 @@ fn checked_black_scholes_rejects_invalid_inputs_without_masking_nan() {
         for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             let mut p = valid;
             p[i] = invalid;
-            assert!(bs_price(p[0], p[1], p[2], p[3], p[4], p[5], OptionType::Call).is_err());
+            assert!(
+                bs_price(&finstack_quant_models::types::OptionMarketParams {
+                    spot: p[0],
+                    strike: p[1],
+                    rate: p[2],
+                    dividend_yield: p[3],
+                    volatility: p[4],
+                    time_to_expiry: p[5],
+                    option_type: OptionType::Call
+                })
+                .is_err()
+            );
         }
     }
     for i in [0, 1, 4, 5] {
         let mut p = valid;
         p[i] = -1.0;
-        assert!(bs_price(p[0], p[1], p[2], p[3], p[4], p[5], OptionType::Call).is_err());
+        assert!(
+            bs_price(&finstack_quant_models::types::OptionMarketParams {
+                spot: p[0],
+                strike: p[1],
+                rate: p[2],
+                dividend_yield: p[3],
+                volatility: p[4],
+                time_to_expiry: p[5],
+                option_type: OptionType::Call
+            })
+            .is_err()
+        );
     }
-    assert!(bs_price(100.0, 100.0, -1000.0, -1000.0, 0.0, 1.0, OptionType::Call).is_err());
+    assert!(
+        bs_price(&finstack_quant_models::types::OptionMarketParams {
+            spot: 100.0,
+            strike: 100.0,
+            rate: -1000.0,
+            dividend_yield: -1000.0,
+            volatility: 0.0,
+            time_to_expiry: 1.0,
+            option_type: OptionType::Call
+        })
+        .is_err()
+    );
     assert_eq!(
-        bs_price(120.0, 100.0, 0.05, 0.0, 0.2, 0.0, OptionType::Call).unwrap(),
+        bs_price(&finstack_quant_models::types::OptionMarketParams {
+            spot: 120.0,
+            strike: 100.0,
+            rate: 0.05,
+            dividend_yield: 0.0,
+            volatility: 0.2,
+            time_to_expiry: 0.0,
+            option_type: OptionType::Call
+        })
+        .unwrap(),
         20.0
     );
-    let deterministic = bs_price(50.0, 100.0, 0.2, 0.0, 0.0, 1.0, OptionType::Put).unwrap();
+    let deterministic = bs_price(&finstack_quant_models::types::OptionMarketParams {
+        spot: 50.0,
+        strike: 100.0,
+        rate: 0.2,
+        dividend_yield: 0.0,
+        volatility: 0.0,
+        time_to_expiry: 1.0,
+        option_type: OptionType::Put,
+    })
+    .unwrap();
     assert!((deterministic - (100.0 * (-0.2_f64).exp() - 50.0)).abs() < 1e-12);
 }
 
 #[test]
 fn cos_requires_a_nonempty_expansion_and_reconciles_to_black_scholes() {
-    let mut market = CosMarketParams {
+    let market = finstack_quant_models::types::OptionMarketParams {
         spot: 100.0,
         strike: 100.0,
         rate: 0.05,
         dividend_yield: 0.0,
+        volatility: 0.2,
         time_to_expiry: 1.0,
         option_type: OptionType::Call,
-        n_terms: Some(0),
     };
-    assert!(bs_cos_price(market, 0.2).is_err());
-    market.n_terms = Some(128);
-    let exact = bs_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, OptionType::Call).unwrap();
-    assert!((bs_cos_price(market, 0.2).unwrap() - exact).abs() < 1e-8);
+    assert!(bs_cos_price(&market, Some(0)).is_err());
+    let exact = bs_price(&market).unwrap();
+    assert!((bs_cos_price(&market, Some(128)).unwrap() - exact).abs() < 1e-8);
 }
 
 #[test]
@@ -127,7 +177,7 @@ fn empirical_es_has_exact_tail_mass_and_is_invariant_to_replication() {
     assert_eq!(tied.expected_shortfall, 15.0);
     let tranche = PortfolioLossResult::from_losses(losses, 0.75)
         .unwrap()
-        .tranche_loss_statistics(0.0, 1.0, 100.0)
+        .tranche_loss_statistics(0.0, 100.0, 100.0)
         .unwrap();
     assert!((tranche.expected_shortfall_amount - 20.0).abs() < 1e-12);
 }
@@ -138,8 +188,8 @@ fn local_density_uses_log_moneyness_derivatives_and_is_price_scale_invariant() {
     let mut magnitudes = Vec::new();
     for scale in [1.0, 0.01, 100.0] {
         let violations = check_local_vol_density_grid(
-            &[98.0 * scale, 100.0 * scale, 102.0 * scale],
             &[1.0, 2.0],
+            &[98.0 * scale, 100.0 * scale, 102.0 * scale],
             &vols,
             vec![100.0 * scale; 2],
         )
@@ -179,20 +229,20 @@ fn arbitrage_checks_reject_missing_or_invalid_forwards_and_tolerance() {
         .unwrap();
     assert!(check_surface(&surface, &ArbitrageCheckConfig::default()).is_err());
     for forward in [0.0, -1.0, f64::NAN, f64::INFINITY] {
-        assert!(check_surface_grid(&strikes, &expiries, &vols, vec![forward], 1e-10).is_err());
+        assert!(check_surface_grid(&expiries, &strikes, &vols, vec![forward], 1e-10).is_err());
         assert!(
-            check_local_vol_density_grid(&strikes, &expiries, &vols, vec![forward; 2]).is_err()
+            check_local_vol_density_grid(&expiries, &strikes, &vols, vec![forward; 2]).is_err()
         );
     }
     for tolerance in [-1.0, f64::NAN, f64::INFINITY] {
-        assert!(check_surface_grid(&strikes, &expiries, &vols, vec![100.0], tolerance).is_err());
+        assert!(check_surface_grid(&expiries, &strikes, &vols, vec![100.0], tolerance).is_err());
     }
     assert!(
-        !check_surface_grid(&strikes, &expiries, &vols, vec![100.0], 1e-10)
+        !check_surface_grid(&expiries, &strikes, &vols, vec![100.0], 1e-10)
             .unwrap()
             .passed
     );
-    assert!(check_local_vol_density_grid(&strikes, &expiries, &vols, vec![100.0]).is_err());
+    assert!(check_local_vol_density_grid(&expiries, &strikes, &vols, vec![100.0]).is_err());
 }
 
 #[test]

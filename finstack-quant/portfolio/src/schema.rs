@@ -5,6 +5,12 @@
 //! definition. Render an entry with
 //! [`SchemaArtifact::generate`](finstack_quant_core::schema::SchemaArtifact::generate).
 
+use crate::fi_attribution::FiPositionSnapshot;
+use crate::margin::{
+    CsrQuoteClassification, CsrQuoteDelta, CsrQuoteSource, GirrQuoteDelta, GirrQuoteTarget,
+};
+use crate::margin::{ExposureCashVm, ExposureSimulationConfig};
+use crate::margin::{PortfolioFrtbConfig, PortfolioFrtbSensitivitiesResult};
 use crate::{
     PortfolioResult, allocation::WeightAllocationResult, allocation::WeightAllocationSpec,
     attribution::ReconciliationReport, brinson::CarinoLinkedAttribution, brinson::SectorPeriod,
@@ -21,7 +27,8 @@ use crate::{
     optimization::PortfolioOptimizationResult, optimization::PortfolioOptimizationSpec,
     performance::DatedCashflow, performance::LinkedReturn, performance::TwrrPeriod,
     primitive::PortfolioPrimitiveExposureReport, replay::ReplayConfig, replay::ReplayResult,
-    scenarios::ScenarioPnlBatchItem, scenarios::ScenarioRevalueView, sensitivity::FactorPnlProfile,
+    scenarios::ScenarioAttributionView, scenarios::ScenarioPnlBatchItem,
+    scenarios::ScenarioRevalueView, sensitivity::FactorPnlProfile,
     sensitivity::SensitivityMatrixJson,
 };
 use finstack_quant_core::Result;
@@ -342,6 +349,15 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     .with_packager(package_materialization_schema)
     .with_examples(examples::fi_attribution_config),
     finstack_quant_core::schema_artifact!(
+        FiPositionSnapshot,
+        "portfolio",
+        "fi_position_snapshot",
+        Input,
+        "Dated position inputs with exact signed weight and matched Campisi quote experiments."
+    )
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::fi_position_snapshot),
+    finstack_quant_core::schema_artifact!(
         FiCarinoLinkedResult,
         "portfolio",
         "fi_carino_linked_result",
@@ -395,6 +411,43 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     )
     .with_packager(package_materialization_schema)
     .with_examples(examples::portfolio_cashflows),
+
+    finstack_quant_core::schema_artifact!(
+        ExposureCashVm, "portfolio", "exposure_cash_vm", Input,
+        "Cash variation margin terms and signed settled balance at exposure valuation."
+    ),
+    finstack_quant_core::schema_artifact!(
+        ExposureSimulationConfig, "portfolio", "exposure_simulation_config", Input,
+        "Dated simulated market states, factor mappings, legal scope and optional cash collateral."
+    ),
+    finstack_quant_core::schema_artifact!(
+        PortfolioFrtbConfig, "portfolio", "portfolio_frtb_config", Input,
+        "Exact sources for ordinary portfolio GIRR yield and single-name CDS CSR delta."
+    ),
+    finstack_quant_core::schema_artifact!(
+        PortfolioFrtbSensitivitiesResult, "portfolio", "portfolio_frtb_sensitivities_result", Output,
+        "Qualified ordinary portfolio delta grids, evidence and position coverage."
+    ),
+    finstack_quant_core::schema_artifact!(
+        CsrQuoteClassification, "portfolio", "csr_quote_classification", Input,
+        "Dated issuer identity and approved ordinary CSR risk bucket."
+    ),
+    finstack_quant_core::schema_artifact!(
+        CsrQuoteSource, "portfolio", "csr_quote_source", Input,
+        "Qualified issuer curve and binding for each of five non-securitisation CSR vertices."
+    ),
+    finstack_quant_core::schema_artifact!(
+        CsrQuoteDelta, "portfolio", "csr_quote_delta", Output,
+        "Ordinary non-securitisation CSR sensitivities and signed issuer CDS quote reprices."
+    ),
+    finstack_quant_core::schema_artifact!(
+        GirrQuoteTarget, "portfolio", "girr_quote_target", Input,
+        "Exact ordinary GIRR quote mapping at one regulatory vertex."
+    ),
+    finstack_quant_core::schema_artifact!(
+        GirrQuoteDelta, "portfolio", "girr_quote_delta", Output,
+        "Ordinary GIRR regulatory inputs and their signed position-level quote reprices."
+    ),
     finstack_quant_core::schema_artifact!(
         PortfolioMarginResult,
         "portfolio",
@@ -485,6 +538,15 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     )
     .with_packager(package_materialization_schema)
     .with_examples(examples::scenario_pnl_batch_item),
+    finstack_quant_core::schema_artifact!(
+        ScenarioAttributionView,
+        "portfolio",
+        "scenario_attribution_view",
+        Output,
+        "Ordered portfolio scenario attribution and stressed revaluation."
+    )
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::scenario_attribution_view),
     finstack_quant_core::schema_artifact!(
         ScenarioRevalueView,
         "portfolio",

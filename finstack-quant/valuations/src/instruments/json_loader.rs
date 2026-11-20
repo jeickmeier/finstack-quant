@@ -48,7 +48,7 @@ use super::fixed_income::fi_trs::FiIndexTotalReturnSwap;
 use super::fixed_income::inflation_linked_bond::InflationLinkedBond;
 use super::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use super::fixed_income::revolving_credit::RevolvingCredit;
-use super::fixed_income::structured_credit::StructuredCredit;
+use super::fixed_income::structured_credit::{StructuredCredit, StructuredCreditTranche};
 use super::fixed_income::tba::AgencyTba;
 use super::fixed_income::term_loan::TermLoan;
 use super::fx::fx_barrier_option::FxBarrierOption;
@@ -258,6 +258,8 @@ macro_rules! with_instrument_json_registry {
                 "Exchange-traded bond future with a deliverable basket and CTD.";
             boxed: StructuredCredit(StructuredCredit) => "structured_credit" @ "fixed_income" = StructuredCredit::example();
                 "ABS/CLO/RMBS/CMBS deal: collateral pool, tranches and waterfall.";
+            boxed: StructuredCreditTranche(StructuredCreditTranche) => "structured_credit_tranche" @ "fixed_income" = StructuredCreditTranche::example();
+                "Individual note priced on its originating collateral waterfall.";
             boxed: AssetBackedFacility(AssetBackedFacility) => "asset_backed_facility" @ "fixed_income" = AssetBackedFacility::example();
                 "Warehouse line against a collateral pool: advance rates, concentration limits, borrowing base.";
             boxed: LeveredRealEstateEquity(crate::instruments::equity::real_estate::LeveredRealEstateEquity) => "levered_real_estate_equity" @ "equity" = crate::instruments::equity::real_estate::LeveredRealEstateEquity::example();

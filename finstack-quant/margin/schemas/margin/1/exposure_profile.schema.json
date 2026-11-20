@@ -1,5 +1,86 @@
 {
   "$defs": {
+    "ExposureBasis": {
+      "description": "Provenance and basis of all observations in an XVA exposure profile.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "External complete exposure observations, supplied on a documented common basis.",
+          "properties": {
+            "kind": {
+              "const": "external",
+              "type": "string"
+            },
+            "policy_id": {
+              "description": "Identifier of the common netting, collateral and model-time policy.",
+              "type": "string"
+            },
+            "source_id": {
+              "description": "Stable identifier of the source data and its completeness attestation.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "source_id",
+            "policy_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A portfolio repriced on every path and date before taking positive and negative parts.",
+          "properties": {
+            "kind": {
+              "const": "simulated_uncollateralized",
+              "type": "string"
+            },
+            "path_count": {
+              "description": "Number of complete simulated paths including any antithetic partners.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source_id": {
+              "description": "Fingerprint of the pricing, market, portfolio and process inputs.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "source_id",
+            "path_count"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Repriced paths with elected contractual cash variation margin.",
+          "properties": {
+            "kind": {
+              "const": "simulated_cash_vm",
+              "type": "string"
+            },
+            "path_count": {
+              "description": "Number of complete paths including antithetic partners.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source_id": {
+              "description": "Fingerprint of the market, priced book, simulation and CSA.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "source_id",
+            "path_count"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "ExposureDiagnostics": {
       "additionalProperties": false,
       "description": "Diagnostics from exposure simulation capturing data quality metrics.\n\nPopulated by the exposure computation engine to let callers distinguish\ngenuine zero exposure from missing data.",
@@ -37,10 +118,27 @@
   "description": "Exposure profile computed at each time grid point.",
   "examples": [
     {
+      "as_of": "2025-01-01",
+      "basis": {
+        "kind": "external",
+        "policy_id": "unsecured",
+        "source_id": "complete-example"
+      },
+      "currency": "USD",
+      "dates": [
+        "2025-01-01",
+        "2025-07-01",
+        "2026-01-01"
+      ],
+      "diagnostics": {
+        "market_roll_failures": 0,
+        "total_time_points": 3,
+        "valuation_failures": 0
+      },
       "ene": [
         0.0,
-        -43000.0,
-        -33000.0
+        43000.0,
+        33000.0
       ],
       "epe": [
         0.0,
@@ -60,19 +158,31 @@
     }
   ],
   "properties": {
+    "as_of": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Valuation cut and required opening observation date."
+    },
+    "basis": {
+      "$ref": "#/$defs/ExposureBasis",
+      "description": "Provenance of the exposure model and the complete observation grid."
+    },
+    "currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "Reporting currency shared by all marks, exposures and adjustments."
+    },
+    "dates": {
+      "description": "Strictly increasing calendar observations starting on the valuation cut.",
+      "items": {
+        "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+      },
+      "type": "array"
+    },
     "diagnostics": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/ExposureDiagnostics"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "Simulation quality diagnostics (populated by the exposure engine)."
+      "$ref": "#/$defs/ExposureDiagnostics",
+      "description": "Completeness counters for the admitted grid. Failed points or valuations invalidate it."
     },
     "ene": {
-      "description": "Expected Negative Exposure at each time point: max(-V(t), 0).",
+      "description": "Expected positive part of the negated exposed mark at each date,\nafter any settled collateral in the elected basis.",
       "items": {
         "format": "double",
         "type": "number"
@@ -80,7 +190,7 @@
       "type": "array"
     },
     "epe": {
-      "description": "Expected Positive Exposure at each time point: max(V(t), 0).",
+      "description": "Expected positive part of the exposed mark at each date, after any\nsettled collateral in the elected basis.",
       "items": {
         "format": "double",
         "type": "number"
@@ -96,7 +206,7 @@
       "type": "array"
     },
     "times": {
-      "description": "Nonnegative time points in years from valuation date. An explicit zero\nnode supplies opening exposure; before the first node exposure is held\nflat at that node, consistently across CVA, DVA, FVA and MVA.",
+      "description": "Aligned model year fractions, starting at zero and strictly increasing.",
       "items": {
         "format": "double",
         "type": "number"
@@ -105,10 +215,15 @@
     }
   },
   "required": [
+    "as_of",
+    "currency",
+    "basis",
+    "dates",
     "times",
     "mtm_values",
     "epe",
-    "ene"
+    "ene",
+    "diagnostics"
   ],
   "title": "ExposureProfile",
   "type": "object"

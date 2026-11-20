@@ -34,3 +34,17 @@ test('applyScenarioAndRevalue rejects an invalid scenario spec', () => {
     invalidSpec
   );
 });
+
+test('scenario attribution uses the ordered native valuation and validates inputs', () => {
+  const book = portfolio.Portfolio.fromSpec(PORTFOLIO);
+  const result = portfolio.attributeScenarioPnl(
+    book,
+    { id: 'base', operations: [] },
+    MARKET,
+    'parallel'
+  );
+  assert.equal(result.revaluation.report.operations_applied, 0);
+  assert.equal(result.mark_pnl.total.amount, '0');
+  assert.equal(result.total_pnl.currency, 'USD');
+  assert.throws(() => portfolio.attributeScenarioPnl(book, BLANK_ID, MARKET), invalidSpec);
+});

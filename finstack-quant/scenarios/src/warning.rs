@@ -28,16 +28,6 @@ pub enum Warning {
         reason: String,
     },
 
-    /// A commodity price-curve shock was outside the typical percent-of-forward
-    /// stress range (approximately `[-80, +200]` percent).
-    CommodityShockOutsideRange {
-        /// Curve identifier.
-        curve_id: String,
-        /// Detail describing whether the trigger was a parallel or node shock
-        /// and which knot(s) were extreme.
-        detail: String,
-    },
-
     /// Equity identifier was missing from the market context; no bump applied.
     EquityNotFound {
         /// Equity price identifier.
@@ -154,28 +144,10 @@ pub enum Warning {
         detail: String,
     },
 
-    /// Vol-surface arbitrage warning detected post-shock.
-    VolSurfaceArbitrage {
-        /// Volatility-surface identifier.
-        vol_surface_id: String,
-        /// Free-text from `ArbitrageViolation` Display.
-        detail: String,
-    },
-
     /// Vol-surface bucket shock selected zero grid points (no-op).
     VolSurfaceBucketEmptySelection {
         /// Volatility-surface identifier.
         vol_surface_id: String,
-    },
-
-    /// Vol-surface negative bucket shock that may produce non-positive vols.
-    VolSurfaceLargeNegativeShock {
-        /// Volatility-surface identifier.
-        vol_surface_id: String,
-        /// Percent shock value.
-        pct: f64,
-        /// Whether this was a parallel (`false`) or bucket (`true`) shock.
-        bucket: bool,
     },
 
     /// An instrument's valuation failed while computing carry during a
@@ -193,8 +165,7 @@ impl fmt::Display for Warning {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Warning::DiscountCurveHeuristic { reason, .. } => f.write_str(reason),
-            Warning::CommodityShockOutsideRange { detail, .. }
-            | Warning::FxTriangulationInconsistent { detail }
+            Warning::FxTriangulationInconsistent { detail }
             | Warning::TenorExtrapolated { detail, .. }
             | Warning::InterpolatedNodeBumpFirstOrder { detail, .. } => f.write_str(detail),
             Warning::EquityNotFound { id } => write!(f, "Equity {id}: not found in market data"),
@@ -241,27 +212,9 @@ impl fmt::Display for Warning {
                 instrument_id,
                 detail,
             } => write!(f, "Correlation bump for '{instrument_id}': {detail}"),
-            Warning::VolSurfaceArbitrage {
-                vol_surface_id,
-                detail,
-            } => write!(
-                f,
-                "Vol surface '{vol_surface_id}' post-shock arbitrage warning: {detail}"
-            ),
             Warning::VolSurfaceBucketEmptySelection { vol_surface_id } => write!(
                 f,
                 "Vol surface '{vol_surface_id}': bucket shock matched zero grid points (empty selector)"
-            ),
-            Warning::VolSurfaceLargeNegativeShock {
-                vol_surface_id,
-                pct,
-                bucket,
-            } => write!(
-                f,
-                "Vol surface '{vol_surface_id}': Large negative {kind}shock ({pct:.1}%) may produce \
-                 non-positive vols or calendar spread arbitrage. Consider using check_arbitrage() \
-                 to validate post-shock surface.",
-                kind = if *bucket { "bucket " } else { "" },
             ),
             Warning::TimeRollInstrumentFailed {
                 instrument_id,

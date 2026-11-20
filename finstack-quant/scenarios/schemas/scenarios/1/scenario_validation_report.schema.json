@@ -1,0 +1,50 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario_validation_report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Structural validation diagnostics without scenario application.",
+  "properties": {
+    "errors": {
+      "description": "Failures in specification and operation order.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "mutates_instruments": {
+      "description": "Whether applying the scenario can modify instrument state.",
+      "type": "boolean"
+    },
+    "operation_count": {
+      "description": "Number of operations in the submitted specification.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "requires_instruments": {
+      "description": "Whether at least one operation needs an instrument inventory.",
+      "type": "boolean"
+    },
+    "valid": {
+      "description": "Whether the specification passed all structural checks.",
+      "type": "boolean"
+    },
+    "warnings": {
+      "description": "Advisory diagnostics associated with the specification.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "valid",
+    "errors",
+    "warnings",
+    "requires_instruments",
+    "mutates_instruments",
+    "operation_count"
+  ],
+  "title": "ScenarioValidationReport",
+  "type": "object"
+}

@@ -78,21 +78,29 @@ def _section_coverage(coverage: Any) -> Section | None:
         tables.data_table(
             rows,
             columns=["Instrument", "DSCR", "Int. Cov.", "LTV"],
-            formats={"DSCR": fmt.ratio, "Int. Cov.": fmt.ratio, "LTV": fmt.pct},
+            formats={
+                "DSCR": fmt.ratio,
+                "Int. Cov.": fmt.ratio,
+                "LTV": lambda value: fmt.pct(value * 100 if value is not None else None),
+            },
         ),
     )
 
 
 def _section_covenants(covenants: Any) -> Section | None:
+    if hasattr(covenants, "columns") and hasattr(covenants, "to_dict"):
+        if "as_of" in covenants.columns:
+            covenants = covenants[covenants["as_of"] == covenants["as_of"].max()]
+        covenants = covenants.to_dict("records")
     if not covenants:
         return None
     rows = [
         {
             "Covenant": r.get("covenant"),
             "Threshold": r.get("threshold"),
-            "Current": r.get("current"),
+            "Current": r.get("actual_value", r.get("current")),
             "Headroom": r.get("headroom"),
-            "Status": r.get("status"),
+            "Status": ("Pass" if r["passed"] else "Breach") if "passed" in r else r.get("status"),
         }
         for r in covenants
         if isinstance(r, dict)
@@ -143,8 +151,9 @@ def credit_tearsheet(
     results : StatementResult | str | dict, optional
         Statement results for the EBITDA-build section.
     coverage : list[dict], optional
-        Per-instrument rows (``instrument``/``dscr``/``interest_coverage``/``ltv``).
-    covenants : list[dict], optional
+        Per-instrument rows (``instrument``/``dscr``/``interest_coverage``/``ltv``). LTV is a decimal ratio, such as 0.55 for 55%.
+    covenants : pandas.DataFrame or list[dict], optional
+        Native covenant report frames with an as-of column use the latest date.
         Covenant rows (``covenant``/``threshold``/``current``/``headroom``/``status``).
     title : str, optional
         Optional main report heading; defaults derive from the assessment.

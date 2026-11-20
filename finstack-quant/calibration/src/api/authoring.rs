@@ -8,7 +8,10 @@
 //! only restate the struct (`CdsQuote::CdsUpfront`, [`crate::quotes::CdsTrancheQuote`]) are
 //! built as literals (or deserialized) and checked with their `validate()`.
 
-use crate::api::schema::CalibrationStep;
+use crate::api::market_datum::MarketDatum;
+use crate::api::prior_market::PriorMarketObject;
+use crate::api::schema::{CalibrationEnvelope, CalibrationPlan, CalibrationStep, StepWithQuotes};
+use crate::config::CalibrationConfig;
 use crate::quotes::CdsQuote;
 use crate::quotes::InflationQuote;
 use crate::quotes::RateQuote;
@@ -25,7 +28,227 @@ use finstack_quant_valuations_core::market::conventions::ids::{
     CdsConventionKey, CdsDocClause, InflationSwapConventionId, IrFutureContractId,
     SwaptionConventionId, XccyConventionId,
 };
+use indexmap::IndexMap;
 use serde_json::{Map, Value};
+use std::collections::HashSet;
+
+impl CalibrationEnvelope {
+    /// Author a calibration envelope from ordered steps with inline inputs.
+    ///
+    /// Each quote appears once in the envelope. A later step can reference an
+    /// already registered quote set by supplying the same set identifier and
+    /// an empty quote list. The normal calibration validator checks that each
+    /// step receives the required market inputs and dependencies.
+    ///
+    /// # Arguments
+    /// * `id` - Nonempty identifier for the new calibration plan.
+    /// * `steps` - Ordered native steps with inline market inputs.
+    /// * `settings` - Global solver and validation policy for the plan.
+    /// * `prior_market` - Previously calibrated objects available as dependencies.
+    ///
+    /// # Errors
+    /// Rejects blank plan, step, set or input identifiers, duplicate steps or
+    /// market input identifiers, and duplicate definitions of a quote set.
+    pub fn from_steps(
+        id: impl Into<String>,
+        steps: Vec<StepWithQuotes>,
+        settings: CalibrationConfig,
+        prior_market: Vec<PriorMarketObject>,
+    ) -> Result<Self> {
+        let id = id.into();
+        if id.trim().is_empty() {
+            return Err(Error::Validation(
+                "Calibration plan id must be nonempty".into(),
+            ));
+        }
+        let mut plan = CalibrationPlan {
+            id,
+            description: None,
+            quote_sets: IndexMap::new(),
+            steps: Vec::with_capacity(steps.len()),
+            settings,
+        };
+        let mut step_ids = HashSet::new();
+        let mut datum_ids = HashSet::new();
+        let mut market_data = Vec::new();
+        for entry in steps {
+            append_step(
+                &mut plan,
+                &mut market_data,
+                &mut step_ids,
+                &mut datum_ids,
+                entry,
+            )?;
+        }
+        Ok(Self::new(plan, market_data, prior_market))
+    }
+
+    /// Derive an envelope with one more step at the end of the execution order.
+    ///
+    /// # Arguments
+    /// * `entry` - Step and inline market inputs. An empty list references an
+    ///   existing quote set when the step names that set.
+    ///
+    /// # Errors
+    /// Rejects blank or duplicate step and quote identifiers, and duplicate
+    /// quote-set definitions. The original envelope stays available on error.
+    pub fn with_step(&self, entry: StepWithQuotes) -> Result<Self> {
+        let mut next = self.clone();
+        let mut step_ids = next.plan.steps.iter().map(|step| step.id.clone()).collect();
+        let mut datum_ids = next
+            .market_data
+            .iter()
+            .map(|datum| datum.id().to_owned())
+            .collect();
+        append_step(
+            &mut next.plan,
+            &mut next.market_data,
+            &mut step_ids,
+            &mut datum_ids,
+            entry,
+        )?;
+        Ok(next)
+    }
+
+    /// Derive an envelope with one quoted observation and all its set references removed.
+    ///
+    /// # Arguments
+    /// * `quote_id` - Stable identifier of a calibration quote, not a market snapshot.
+    ///
+    /// # Errors
+    /// Rejects unknown quote IDs and IDs that refer to non-quote market data.
+    pub fn without_quote(&self, quote_id: &str) -> Result<Self> {
+        let mut next = self.clone();
+        let index = next
+            .market_data
+            .iter()
+            .position(|datum| datum.id() == quote_id && datum.is_quote())
+            .ok_or_else(|| Error::Validation(format!("Unknown calibration quote '{quote_id}'")))?;
+        next.market_data.remove(index);
+        for ids in next.plan.quote_sets.values_mut() {
+            ids.retain(|id| id.as_str() != quote_id);
+        }
+        Ok(next)
+    }
+
+    /// Derive an envelope with an additive rate or spread shock on selected quotes.
+    ///
+    /// # Arguments
+    /// * `quote_set` - Optional named set. An omitted set selects every quote once,
+    ///   excluding independent observations such as fixings and spot prices.
+    /// * `bp` - Finite signed basis points. One basis point adds 0.0001 to decimal
+    ///   rates, subtracts 0.01 from rate-futures prices, or adds 1 to spreads
+    ///   expressed in basis points.
+    ///
+    /// # Errors
+    /// Rejects unknown sets, unresolved set references, invalid bumped quotes,
+    /// and selected quotes without a rate or spread basis, such as volatility,
+    /// upfront CDS and tranche quotes.
+    pub fn bump_quotes_bp(&self, quote_set: Option<&str>, bp: f64) -> Result<Self> {
+        if !bp.is_finite() {
+            return Err(Error::Validation(
+                "Calibration quote bump must be finite".into(),
+            ));
+        }
+        let mut next = self.clone();
+        if let Some(name) = quote_set {
+            let ids = self.plan.quote_sets.get(name).ok_or_else(|| {
+                Error::Validation(format!("Unknown calibration quote set '{name}'"))
+            })?;
+            let mut pending: HashSet<_> = ids.iter().map(QuoteId::as_str).collect();
+            for datum in &mut next.market_data {
+                if pending.remove(datum.id()) {
+                    bump_quote(datum, bp)?;
+                }
+            }
+            if !pending.is_empty() {
+                return Err(Error::Validation(format!(
+                    "Unresolved quote in set '{name}'"
+                )));
+            }
+        } else {
+            for datum in &mut next.market_data {
+                if datum.is_quote() {
+                    bump_quote(datum, bp)?;
+                }
+            }
+        }
+        Ok(next)
+    }
+}
+
+fn bump_quote(datum: &mut MarketDatum, bp: f64) -> Result<()> {
+    match datum {
+        MarketDatum::RateQuote(quote) => {
+            *quote = quote.bump_rate_bp(bp);
+            quote.validate()
+        }
+        MarketDatum::CdsQuote(quote @ CdsQuote::CdsParSpread { .. }) => {
+            if let CdsQuote::CdsParSpread { spread_bp, .. } = quote {
+                *spread_bp += bp;
+            }
+            quote.validate()
+        }
+        MarketDatum::InflationQuote(quote) => {
+            match quote {
+                InflationQuote::InflationSwap { rate, .. }
+                | InflationQuote::YoYInflationSwap { rate, .. } => *rate += bp / 10_000.0,
+            }
+            quote.validate()
+        }
+        MarketDatum::XccyQuote(quote) => {
+            quote.basis_spread_bp += bp;
+            quote.validate()
+        }
+        _ => Err(Error::Validation(format!(
+            "Calibration input '{}' does not have a rate or spread bump basis",
+            datum.id()
+        ))),
+    }
+}
+
+fn append_step(
+    plan: &mut CalibrationPlan,
+    market_data: &mut Vec<MarketDatum>,
+    step_ids: &mut HashSet<String>,
+    datum_ids: &mut HashSet<String>,
+    entry: StepWithQuotes,
+) -> Result<()> {
+    let StepWithQuotes { step, quotes } = entry;
+    if step.id.trim().is_empty() || step.quote_set.trim().is_empty() {
+        return Err(Error::Validation(
+            "Calibration steps require nonempty step and quote set ids".into(),
+        ));
+    }
+    if !step_ids.insert(step.id.clone()) {
+        return Err(Error::Validation(format!(
+            "Duplicate calibration step '{}'",
+            step.id
+        )));
+    }
+    if !quotes.is_empty() || !plan.quote_sets.contains_key(&step.quote_set) {
+        if plan.quote_sets.contains_key(&step.quote_set) {
+            return Err(Error::Validation(format!(
+                "Duplicate definition of calibration quote set '{}'",
+                step.quote_set
+            )));
+        }
+        let mut ids = Vec::with_capacity(quotes.len());
+        for quote in quotes {
+            let id = quote.id();
+            if id.trim().is_empty() || !datum_ids.insert(id.to_owned()) {
+                return Err(Error::Validation(format!(
+                    "Invalid or duplicate calibration market input '{id}'"
+                )));
+            }
+            ids.push(QuoteId::from(id));
+            market_data.push(quote);
+        }
+        plan.quote_sets.insert(step.quote_set.clone(), ids);
+    }
+    plan.steps.push(step);
+    Ok(())
+}
 
 /// Step kinds whose produced object is identified by `curve_id`.
 const CURVE_ID_KINDS: [&str; 6] = [
@@ -456,6 +679,34 @@ impl XccyQuote {
 }
 
 impl CalibrationStep {
+    /// Build a calibration step from its native, kind-specific parameters.
+    ///
+    /// # Arguments
+    /// * `id` - Nonempty stable identifier for step selection and fit reporting.
+    /// * `params` - Native curve, surface or model parameters including explicit output identifiers.
+    /// * `quote_set` - Optional nonempty named quote set. Omit it to use the step ID.
+    ///
+    /// # Errors
+    /// Rejects blank step or quote-set identifiers. Calibration validates
+    /// dependencies and financial parameters against its quote universe.
+    pub fn new(
+        id: &str,
+        params: crate::api::schema::StepParams,
+        quote_set: Option<&str>,
+    ) -> Result<Self> {
+        let quote_set = quote_set.unwrap_or(id);
+        if id.trim().is_empty() || quote_set.trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(
+                "Calibration step and quote-set IDs must be nonempty".into(),
+            ));
+        }
+        Ok(Self {
+            id: id.into(),
+            params,
+            quote_set: quote_set.into(),
+        })
+    }
+
     /// Seniority label of a hazard step authored without one.
     pub const DEFAULT_HAZARD_SENIORITY: &'static str = "senior";
     /// Parametric family label of a `parametric` step authored without one.

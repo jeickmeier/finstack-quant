@@ -354,8 +354,13 @@ impl PyFloatingRateSpec {
         text_signature = "(*, index_id, forward_curve_id, spread_bp, reset_frequency, gearing='1', gearing_includes_spread=True, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints='daily', index_tenor=None, reset_lag_days=2, fixing_calendar_id=None, compounding=None, overnight_basis=None, fallback='error')"
     )]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
-        let inner: FloatingRateSpec =
-            crate::bindings::module_utils::fields_from_py(py, fields, "FloatingRateSpec")?;
+        let inner: FloatingRateSpec = fields_with_decimal_from_py(
+            py,
+            fields,
+            "FloatingRateSpec",
+            "spread_bp",
+            decimal_bps_from_any,
+        )?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
     }
@@ -365,7 +370,7 @@ impl PyFloatingRateSpec {
     #[pyo3(text_signature = "(spread_bp)")]
     fn sofr(spread_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            inner: FloatingRateSpec::sofr(decimal_from_any(spread_bp)?),
+            inner: FloatingRateSpec::sofr(decimal_bps_from_any(spread_bp)?),
         })
     }
 
@@ -374,7 +379,7 @@ impl PyFloatingRateSpec {
     #[pyo3(text_signature = "(spread_bp)")]
     fn sonia(spread_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            inner: FloatingRateSpec::sonia(decimal_from_any(spread_bp)?),
+            inner: FloatingRateSpec::sonia(decimal_bps_from_any(spread_bp)?),
         })
     }
 
@@ -383,7 +388,7 @@ impl PyFloatingRateSpec {
     #[pyo3(text_signature = "(spread_bp)")]
     fn euribor_3m(spread_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            inner: FloatingRateSpec::euribor_3m(decimal_from_any(spread_bp)?),
+            inner: FloatingRateSpec::euribor_3m(decimal_bps_from_any(spread_bp)?),
         })
     }
 

@@ -123,7 +123,7 @@ fn imbalanced_fails_with_materiality() {
 
     let mat = q1_findings[0].materiality.as_ref().unwrap();
     assert!((mat.absolute - 100.0).abs() < 0.01);
-    assert!((mat.relative_pct.unwrap() - 10.0).abs() < 0.01); // 100/1000 * 100 = 10%
+    assert!((mat.relative.unwrap() - 0.10).abs() < 0.0001); // 10% of the reference
     assert!((mat.reference_value - 1000.0).abs() < 0.01);
     assert_eq!(mat.reference_label, "total_assets");
 
@@ -515,7 +515,7 @@ fn a_three_statement_model_satisfies_all_three_identities() {
     );
     let materiality = report.results[0].findings[0].materiality.as_ref().unwrap();
     assert_eq!(materiality.absolute, 1.0);
-    assert!((materiality.relative_pct.unwrap() - 100.0 / 281.0).abs() < 1e-12);
+    assert!((materiality.relative.unwrap() - 1.0 / 281.0).abs() < 1e-12);
 }
 
 /// Large balances that cancel are compared on one compensated sum, so a

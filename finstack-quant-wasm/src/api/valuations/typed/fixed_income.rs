@@ -52,6 +52,50 @@ instrument_class!(
 
 #[wasm_bindgen(js_class = Bond)]
 impl JsBond {
+    /// Construct a typed bond from an explicit cashflow schedule.
+    /// @param id - Stable bond identifier used for pricing and metric keys.
+    /// @param schedule - Validated principal and coupon schedule, copied into the bond.
+    /// @param quoteCompounding - Spread quote compounding. Use "continuous", "simple" or an object with periodic payments per year.
+    /// @param discountCurveId - Identifier of the market discount curve for the scheduled cashflows.
+    /// @param quotedCleanPricePct - Optional clean price in percent of par (99.5 means 99.5%).
+    /// @returns A bond ready to price against the discount curve.
+    /// @throws FinstackWasmError if the schedule, quote compounding or bond terms are invalid.
+    #[wasm_bindgen(js_name = fromCashflows)]
+    pub fn from_cashflows(
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        schedule: &crate::api::cashflows::schedule::JsCashFlowSchedule,
+        #[wasm_bindgen(
+            js_name = "quoteCompounding",
+            unchecked_param_type = "generated.valuations.Bond['quote_compounding']"
+        )]
+        quote_compounding: JsValue,
+        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
+        discount_curve_id: JsValue,
+        #[wasm_bindgen(
+            js_name = "quotedCleanPricePct",
+            unchecked_optional_param_type = "number | null"
+        )]
+        quoted_clean_price_pct: Option<JsValue>,
+    ) -> Result<JsBond, JsValue> {
+        let id = js_string(&id, "id")?;
+        let quote_compounding =
+            crate::utils::input::from_js_json(&quote_compounding, "quoteCompounding")?;
+        let discount_curve_id = js_string(&discount_curve_id, "discountCurveId")?;
+        let quoted_clean_price_pct = crate::utils::input::js_opt_f64(
+            quoted_clean_price_pct.as_ref(),
+            "quotedCleanPricePct",
+        )?;
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::from_cashflows(
+            id,
+            schedule.inner.clone(),
+            quote_compounding,
+            discount_curve_id,
+            quoted_clean_price_pct,
+        )
+        .map(|inner| JsBond { inner })
+        .map_err(to_js_err)
+    }
+
     /// Create a US corporate fixed-rate bond (semi-annual, 30/360, T+1).
     ///
     /// Mirrors Rust `Bond::fixed` and requires an explicit stub policy.
@@ -183,8 +227,8 @@ impl JsBond {
     /// required: `id`; `notional` - Money wire object
     /// `{ amount: "1000000", currency: "USD" }` (decimal string amount), the
     /// coupon and redemption currency; `forward_curve_id` - index projection curve
-    /// (e.g. `"USD-SOFR-3M"`); `spread_bp` - spread over the index in whole
-    /// basis points (an integer; use `Bond.fromJson` for sub-bp margins);
+    /// (e.g. `"USD-SOFR-3M"`); `spread_bp` - exact basis-point spread over
+    /// the index, as a decimal string such as `"25.125"`;
     /// `issue_date` / `maturity` - ISO-8601 dates; `frequency` - coupon tenor
     /// object (e.g. `{ count: 3, unit: "months" }`); `day_count` - accrual day
     /// count label (e.g. `"act_360"`);
@@ -214,7 +258,7 @@ impl JsBond {
     /// `forward index + spread_bp`.
     /// @param params - `FloatingBondParams` (plain object or JSON text) with the
     /// same keys as `Bond.floating`: `id`, `notional` (Money wire object),
-    /// `forward_curve_id`, `spread_bp` (integer basis points), `issue_date`,
+    /// `forward_curve_id`, `spread_bp` (basis points as a decimal string), `issue_date`,
     /// `maturity`, `frequency`, `day_count` and `discount_curve_id`.
     /// @param convention - Bond convention preset: `us_treasury`, `us_agency`,
     /// `german_bund`, `uk_gilt`, `french_oat`, `jgb`, `us_corporate`, or
@@ -1474,6 +1518,55 @@ handle_setters!(JsAssetBackedFacilityBuilder, "AssetBackedFacilityBuilder", {
         /// @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
         day_count as dayCount => JsDayCount,
 });
+
+/// Measure carry and signed basis-point breakeven across the supplied horizons.
+/// @param bond - Typed bond whose native terms and price settings govern every row.
+/// @param market - Market context supplying the required prices, curves and risk inputs.
+/// @param asOf - ISO valuation date from which calendar horizons are measured.
+/// @param horizons - Nonempty list of positive calendar tenors in the desired row order, such as ["1M", "1Y"].
+/// @param config - Yield or spread target and solve mode. Iterative OAS is unsupported.
+/// @returns Ordered rows with native currency amounts and signed breakeven shifts in basis points.
+/// @throws TypeError for invalid input types or FinstackError for missing pricing or risk inputs, invalid horizons, or unsupported targets or modes.
+#[wasm_bindgen(js_name = bondBreakevenLadder, unchecked_return_type = "generated.valuations.BondBreakevenLadder")]
+pub fn bond_breakeven_ladder(
+    bond: &JsBond,
+    market: &crate::api::core::market_context::JsMarketContext,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "readonly string[]")] horizons: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.BreakevenConfig")] config: JsValue,
+) -> Result<JsValue, JsValue> {
+    use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions;
+    let as_of = js_date(&as_of, "asOf")?;
+    let horizons = crate::utils::input::js_string_seq(&horizons, "horizons")?
+        .iter()
+        .map(|tenor| tenor.parse().map_err(to_js_err))
+        .collect::<Result<Vec<_>, _>>()?;
+    let config = crate::utils::input::from_js_json(&config, "config")?;
+    let result = quote_conversions::bond_breakeven_ladder(
+        &bond.inner,
+        market.inner(),
+        as_of,
+        &horizons,
+        config,
+        finstack_quant_calibration::recalibration::pricing_options(),
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&result)
+}
+
+/// Export a breakeven ladder to ordered columns.
+/// @param ladder - Native ladder returned by bondBreakevenLadder.
+/// @returns Horizon, carry, signed sensitivity, signed basis-point breakeven and currency columns.
+/// @throws FinstackError for invalid ladder data.
+#[wasm_bindgen(js_name = bondBreakevenLadderTable, unchecked_return_type = "TableEnvelope")]
+pub fn bond_breakeven_ladder_table(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.BondBreakevenLadder")]
+    ladder: JsValue,
+) -> Result<JsValue, JsValue> {
+    use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::BondBreakevenLadder;
+    let ladder: BondBreakevenLadder = crate::utils::input::from_js_json(&ladder, "ladder")?;
+    to_js_value(&ladder.to_table())
+}
 
 /// Yield and I-spread to every call, put and maturity exit of a bond at one market price, with the worst marked (mirrors Rust `bond_workout_ladder`).
 ///

@@ -30,8 +30,8 @@ use super::results::valuation_result_json;
 use super::results::valuation_result_value;
 use crate::api::core::market_context::JsMarketContext;
 use crate::utils::input::{
-    js_opt_f64, js_opt_string, js_opt_string_seq, js_string, js_string_seq, json_text,
-    opt_from_js_json, opt_json_text,
+    js_opt_string, js_opt_string_seq, js_string, js_string_seq, json_text, opt_from_js_json,
+    opt_json_text,
 };
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -52,6 +52,7 @@ pub(super) fn parse_pricing_instrument_json(
     finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
         instrument_json,
         metric_pricing_overrides,
+        None,
     )
     .map_err(to_js_err)
 }
@@ -126,54 +127,6 @@ pub fn validate_instrument_json(
     .map_err(to_js_err)
 }
 
-/// Construct a canonical bond instrument envelope from a cashflow schedule.
-/// @param instrumentId - Stable instrument identifier used for pricing and metric keys.
-/// @param scheduleJson - Canonical cashflow-schedule JSON used to construct the fixed-income instrument.
-/// @param quoteCompounding - Compounding of the bond's z-spread quotes, in `Compounding` wire form (`"continuous"`, `"simple"` or `{ periodic: n }`); required, never derived from the schedule's coupon frequency.
-/// @param discountCurveId - Market-context discount-curve identifier for the instrument currency.
-/// @param quotedCleanPricePct - Optional observed clean bond price in percent of par (99.5 = 99.5%), stored as `instrument_pricing_overrides.market_quotes.quoted_clean_price_pct`.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if `scheduleJson` is malformed or violates
-/// cash-flow invariants, bond construction fails, or the canonical bond
-/// envelope cannot be serialized.
-/// @returns Canonical bond instrument envelope JSON.
-#[wasm_bindgen(js_name = bondFromCashflowsJson)]
-pub fn bond_from_cashflows_json(
-    #[wasm_bindgen(js_name = "instrumentId", unchecked_param_type = "string")]
-    instrument_id: JsValue,
-    #[wasm_bindgen(js_name = "scheduleJson", unchecked_param_type = "JsonInput")]
-    schedule_json: JsValue,
-    #[wasm_bindgen(
-        js_name = "quoteCompounding",
-        unchecked_param_type = "generated.valuations.Bond['quote_compounding']"
-    )]
-    quote_compounding: JsValue,
-    #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")] discount_curve_id: JsValue,
-    #[wasm_bindgen(
-        js_name = "quotedCleanPricePct",
-        unchecked_optional_param_type = "number | null"
-    )]
-    quoted_clean_price_pct: Option<JsValue>,
-) -> Result<String, JsValue> {
-    let quoted_clean_price_pct =
-        js_opt_f64(quoted_clean_price_pct.as_ref(), "quotedCleanPricePct")?;
-    let instrument_id: &str = &js_string(&instrument_id, "instrumentId")?;
-    let schedule_json: &str = &json_text(&schedule_json, "scheduleJson")?;
-    let discount_curve_id: &str = &js_string(&discount_curve_id, "discountCurveId")?;
-    let quote_compounding: finstack_quant_core::math::Compounding =
-        crate::utils::input::from_js_json(&quote_compounding, "quoteCompounding")?;
-    finstack_quant_valuations::instruments::fixed_income::bond_from_cashflows_json(
-        instrument_id,
-        schedule_json,
-        quote_compounding,
-        discount_curve_id,
-        quoted_clean_price_pct,
-    )
-    .map_err(to_js_err)
-}
-
 /// Price an instrument from its canonical envelope and return a ValuationResult object.
 ///
 /// Returns a plain JavaScript object (`instrument_id`, `as_of`, `value`,
@@ -210,6 +163,9 @@ pub fn bond_from_cashflows_json(
 /// (`{}` preserves them), supplied `bump_config` fields merge into the stored
 /// object, and an explicit `null` clears a nullable field to its Rust fallback.
 /// Omitted keeps the envelope configuration.
+/// `instrument_pricing_overrides` - a patch for instrument-owned market quotes
+/// and model parameters. Omitted fields keep their stored values, and an
+/// explicit `null` clears a nullable parameter for this pricing request.
 /// `market_history` - a `MarketHistory` object (base date, window and daily
 /// risk-factor shifts) required by historical risk metrics such as `"hvar"` and
 /// `"expected_shortfall"`. Omitted prices without history.
@@ -263,6 +219,8 @@ pub(super) struct PriceRequest {
     /// Metric-pricing override patch (`extras.metric_pricing_overrides`) as
     /// JSON text, merged into the envelope when the instrument is parsed.
     pub(super) metric_pricing_overrides: Option<String>,
+    /// Call-time patch for stored instrument market quotes and model settings.
+    instrument_pricing_overrides: Option<serde_json::Value>,
     /// Market history (`extras.market_history`) for historical risk metrics.
     pub(super) market_history: Option<MarketHistory>,
     /// Whether to attach the per-flow step trace as `result.explanation`
@@ -290,6 +248,7 @@ impl PriceRequest {
             model,
             metrics,
             metric_pricing_overrides: extras.metric_pricing_overrides_json(),
+            instrument_pricing_overrides: extras.instrument_pricing_overrides,
             market_history: extras.market_history,
             explain: extras.explain,
         })
@@ -300,7 +259,12 @@ impl PriceRequest {
         &self,
         instrument_json: &str,
     ) -> Result<finstack_quant_valuations::pricer::ParsedInstrument, JsValue> {
-        parse_pricing_instrument_json(instrument_json, self.metric_pricing_overrides.as_deref())
+        finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
+            instrument_json,
+            self.metric_pricing_overrides.as_deref(),
+            self.instrument_pricing_overrides.as_ref(),
+        )
+        .map_err(to_js_err)
     }
 
     /// Prepare a native Rust instrument with this request's metric-pricing overrides.
@@ -311,6 +275,7 @@ impl PriceRequest {
         finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
             instrument,
             self.metric_pricing_overrides.as_deref(),
+            self.instrument_pricing_overrides.as_ref(),
         )
         .map_err(to_js_err)
     }
@@ -687,6 +652,9 @@ pub fn list_models_grouped() -> Result<JsValue, JsValue> {
 /// (`{}` preserves them), supplied `bump_config` fields merge into the stored
 /// object, and an explicit `null` clears a nullable field to its Rust fallback.
 /// Omitted keeps the envelope configuration.
+/// `instrument_pricing_overrides` - a patch for instrument-owned market quotes
+/// and model parameters. Omitted fields keep their stored values, and an
+/// explicit `null` clears a nullable parameter for this pricing request.
 /// `market_history` - a `MarketHistory` object (base date, window and daily
 /// risk-factor shifts) required by historical risk metrics such as `"hvar"` and
 /// `"expected_shortfall"`. Omitted prices without history.
@@ -825,6 +793,7 @@ pub(super) mod tests {
             model: Some("not-a-model".to_string()),
             metrics: Vec::new(),
             metric_pricing_overrides: None,
+            instrument_pricing_overrides: None,
             market_history: None,
             explain: false,
         }

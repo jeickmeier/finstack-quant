@@ -238,6 +238,28 @@ pub fn quantile_checked(sorted: &[f64], p: f64) -> crate::Result<f64> {
     rational_to_f64(&quantile_rational(sorted, p)?, true)
 }
 
+/// Return the signed mean of the worst fractional tail of an empirical sample.
+///
+/// # Arguments
+/// * `data` - Nonempty finite observations in any order, such as signed
+///   simple returns. The result has the observations' units.
+/// * `confidence` - Probability strictly between zero and one. The lower
+///   tail contains exactly `1 - confidence` of the empirical mass.
+///
+/// # Errors
+/// Returns a validation error for invalid confidence, empty data or nonfinite
+/// observations, or a computation error for an unrepresentable result.
+pub fn expected_shortfall(data: &[f64], confidence: f64) -> crate::Result<f64> {
+    if !(confidence > 0.0 && confidence < 1.0) {
+        return Err(crate::Error::Validation(
+            "Expected shortfall confidence must be in (0, 1)".into(),
+        ));
+    }
+    let mut sorted = data.to_vec();
+    sorted.sort_unstable_by(f64::total_cmp);
+    empirical_tail_mean(&sorted, 1.0 - confidence)
+}
+
 /// Mean of exactly the lowest `p` mass of an equal-weight empirical sample.
 ///
 /// With `mass = p * sorted.len()`, the calculation includes every observation

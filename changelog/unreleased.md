@@ -2,6 +2,56 @@
 
 ## Itemized changes
 
+### DCF: dated receipts and terminal horizon
+
+DCF instruments carry signed cash flows in their own currency, an authored
+receipt-date or midpoint timing election, a separately discounted terminal
+date, and a normalized annual cash-flow amount for growth terminals.
+Statement reports distinguish net debt, other claims, and valuation discounts.
+
+### Statements: covenant templates and metric-unit headroom
+
+Build a covenant engine directly from a standard package. Evaluate and
+forecast statement covenants using explicit metric-to-node aliases. Reports
+and forecasts carry the signed distance to the threshold in metric units
+alongside normalized headroom.
+
+### Margin: dated posted-IM funding
+
+Initial-margin projections include the opening date and amount, reporting
+currency, and netting evidence. MVA merges the IM and funding spread dates,
+samples each curve on its own clock, and reports the contribution of each
+interval. Bilateral DVA uses the supplied collateral-aware ENE.
+
+### Portfolio: dated Monte Carlo exposure
+
+The portfolio and standalone instrument exposure APIs reprice admitted
+positions in their contractual direction on each dated Philox path.
+The result records the reporting currency and hashes the netting scope into its source
+identity. An elected cash variation-margin agreement reduces exposure
+as calls settle and collateral interest accrues.
+
+### Margin: dated exposure grids for CVA, DVA and FVA
+
+Exposure profiles carry an opening date, calendar observation dates, the
+reporting currency, and completeness provenance. Credit and funding legs
+sample each curve on its own date axis and normalize factors at the
+valuation cut. Effective EPE uses the right-endpoint running maximum.
+
+### Portfolio: ordinary FRTB delta grids
+
+`portfolio_frtb_sensitivities` / `portfolioFrtbSensitivities` combine the
+qualified GIRR and single-name CDS CSR quote grids. Each result preserves
+its exact repricing evidence and identifies positions outside those grids.
+
+### Portfolio: exact ordinary CDS spread delta
+
+`csr_quote_delta` / `csrQuoteDelta` rebuild the original single-name CDS
+calibration for each ordinary non-securitisation CSR vertex. The source
+carries dated issuer, seniority, currency and bucket evidence with exact
+executed quote bindings. The signed reprices report native P&L per basis
+point and reporting-currency P&L per percentage point.
+
 ### Python: data-class constructors are keyword-only and read by Rust
 
 A data-class constructor that builds one Rust serde struct now takes its
@@ -186,7 +236,7 @@ JSON boundary instead of a Rust `validation` error. Results are unchanged.
 Old → new:
 
 - Rust `evaluate_dcf(model, wacc, terminal_value, ufcf_node, net_debt_override, options, market, as_of)` → `evaluate_dcf(model, &DcfInputs { .. }, options, market, as_of)`; Python `evaluate_dcf(model, wacc, terminal_value, ufcf_node="ufcf", net_debt_override=None, options=None, market=None, as_of=None)` → `evaluate_dcf(model, inputs, options=None, market=None, as_of=None)`; WASM `evaluateDcf(model, wacc, terminalValue, ufcfNode?, netDebtOverride?, options?, market?, asOf?)` → `evaluateDcf(model, inputs, options?, market?, asOf?)`
-- Rust `goal_seek(model, target_node, target_period, target_value, driver_node, driver_period, update_model, bounds)` → `goal_seek(model, &GoalSeekSpec { .. })`; Python `goal_seek(model, target_node, target_period, target_value, driver_node, driver_period, update_model, bounds=None)` → `goal_seek(model, spec)`; WASM `goalSeek(modelJson, targetNode, targetPeriod, targetValue, driverNode, driverPeriod, updateModel, bounds?)` → `goalSeek(modelJson, spec)`
+- Goal seek now takes a dated `GoalSeekSpec` naming the target and tolerances, an editable forecast cell, and the search policy. Rust takes the held market explicitly. Python `goal_seek` and WASM `goalSeek` accept an optional market and return the verified achieved value, signed residual and explicitly elected solved model.
 - Python `run_corporate_analysis(model, wacc=None, terminal_value=None, net_debt_override=None, cfads_node=None, interest_coverage_node=None, check_suite=None, market=None, as_of=None, ltv_value_node=None)` → `run_corporate_analysis(model, options=None, market=None)`
 
 ### Attribution: Python P&L attribution takes the `AttributionInputs` object
@@ -235,18 +285,20 @@ inputs (for the quanto, `rate` is the domestic rate and `volatility` the asset
 volatility); `geometric_asian_price_times` and
 `arithmetic_asian_tw_price_times` take the new `AsianFixingSchedule`
 (expiry, discount factor, fixing times). `OptionMarketParams`,
-`CosMarketParams`, `GbmEuropeanFdSpec` and `HestonMcSettings` are serde types
-with JSON schemas (`option_market_params`, `cos_market_params`,
-`gbm_european_fd_spec`, `heston_mc_settings`).
+`OptionContractParams`, `GbmEuropeanFdSpec` and `HestonMcSettings` have
+published JSON schemas.
 
 Python passes them as a dict or JSON text, WASM as the schema-typed object or
 JSON text. The `market` keys are `spot, strike, rate, dividend_yield,
 volatility, time_to_expiry, option_type` (`"call"`/`"put"`, replacing `is_call`);
 the finite-difference Greek `spec` takes the same keys plus optional
-`num_paths, seed, num_steps, bump_size, currency`; the COS `market` takes
-them without `volatility` (each COS model passes its own) plus optional
-`n_terms`; Heston `params` are `r, q, v0, kappa, theta,
-sigma_v, rho`. A non-finite number inside one of these objects is rejected
+`num_paths, seed, num_steps, bump_size, currency`. Black–Scholes COS uses
+`OptionMarketParams`. Variance Gamma and Merton COS share
+`OptionContractParams` and take model dynamics separately. COS term counts
+are optional arguments. Heston and rough Heston simulations take only opening
+spot in `initial_state`; both derive opening variance from `v0`. Heston
+pricing uses `OptionContractParams` and separate `HestonParams` with
+`v0, kappa, theta, vol_of_vol, rho`. A non-finite number inside one of these objects is rejected
 when the object is read (Python `ValueError`, WASM `TypeError`). Prices are
 unchanged. Old → new (WASM: the camelCase twin with the same arguments):
 
@@ -255,11 +307,11 @@ unchanged. Old → new (WASM: the camelCase twin with the same arguments):
 - `asian_option_price(spot, strike, rate, div_yield, vol, expiry, num_fixings, averaging, is_call)` → `asian_option_price(market, num_fixings, averaging)`
 - `lookback_option_price(spot, strike, rate, div_yield, vol, expiry, extremum, strike_type, is_call)` → `lookback_option_price(market, extremum, strike_type)`
 - `quanto_option_price(spot, strike, expiry, rate_domestic, rate_foreign, div_yield, vol_asset, vol_fx, correlation, is_call)` → `quanto_option_price(market, rate_foreign, vol_fx, correlation)`
-- `heston_price(spot, strike, expiry, rate, div_yield, kappa, theta, sigma_v, rho, v0, is_call)` → `heston_price(spot, strike, expiry, params, is_call)`
-- `bs_cos_price(spot, strike, rate, div_yield, vol, expiry, is_call, n_terms)` → `bs_cos_price(market, vol)`
-- `vg_cos_price(spot, strike, rate, div_yield, sigma, theta, nu, expiry, is_call, n_terms)` → `vg_cos_price(market, sigma, theta, nu)`
-- `merton_jump_cos_price(spot, strike, rate, div_yield, sigma, mu_jump, sigma_jump, lambda_, expiry, is_call, n_terms)` → `merton_jump_cos_price(market, sigma, mu_jump, sigma_jump, lambda_)` (WASM `lambda`)
-- `monte_carlo.price_heston(spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, is_call, num_paths, seed, num_steps, currency)` → `price_heston(spot, strike, expiry, params, is_call, settings)` (`settings`: optional `num_paths`, `seed`, `num_steps`, `currency`)
+- `heston_price(spot, strike, expiry, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, is_call)` → `heston_price(contract, heston, settings)`
+- `bs_cos_price(spot, strike, rate, div_yield, vol, expiry, is_call, n_terms)` → `bs_cos_price(market, n_terms)`
+- `vg_cos_price(spot, strike, rate, div_yield, sigma, theta, nu, expiry, is_call, n_terms)` → `vg_cos_price(contract, sigma, theta, nu, n_terms)`
+- `merton_jump_cos_price(spot, strike, rate, div_yield, sigma, mu_jump, sigma_jump, lambda_, expiry, is_call, n_terms)` → `merton_jump_cos_price(contract, sigma, mu_jump, sigma_jump, lambda_, n_terms)` (WASM `lambda`)
+- `monte_carlo.price_heston(spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, is_call, num_paths, seed, num_steps, currency)` → `price_heston(contract, heston, settings)` (`settings`: optional `num_paths`, `seed`, `num_steps`, `currency`)
 - `monte_carlo.finite_diff_delta` / `finite_diff_gamma(spot, strike, rate, div_yield, vol, expiry, is_call, num_paths, seed, num_steps, bump_size, currency)` → `finite_diff_delta(spec)` / `finite_diff_gamma(spec)`
 - `EuropeanPricer.price_gbm`, `PathDependentPricer.price_asian` and `price_with_lrm_greeks(spot, strike, rate, div_yield, vol, expiry, is_call, num_steps, currency)` → `(market, num_steps, currency)`
 - `LsmcPricer.price_american(spot, …, is_call, currency, num_steps, basis, basis_degree)` → `price_american(market, currency, num_steps, basis, basis_degree)`
@@ -272,7 +324,7 @@ and `price_with_capture` take `engine::McPricingInputs`;
 `engine::simulate_path_fractional` takes `engine::FractionalPath`;
 `LsmcEngine::{price, fit_exercise_policy, price_with_policy, price_unbiased}`
 take `pricer::lsmc::LsmcInputs`; `pricer::heston::price_heston` takes
-`HestonPricingParams` and `HestonMcSettings`; `EuropeanPricer::price_gbm` and
+`OptionContractParams`, `HestonParams` and optional `HestonMcSettings`; `EuropeanPricer::price_gbm` and
 `PathDependentPricer::{price_asian, price_with_lrm_greeks}` take
 `OptionMarketParams`; `EuropeanPricer::price`, `PathDependentPricer::price` and
 `price_with_lrm_greeks_from_payoff` take a `TimeGrid` (the latter reads its
@@ -325,7 +377,7 @@ Renamed or reshaped public APIs:
 
 - `RollupSpec::default_for` is `RollupSpec::declared_methods` (Python `RollupSpec.declared_methods`, WASM `statements.rollupSpecDeclaredMethods`).
 - `EvaluationContext::new` and `PeriodHistory::from_named_maps` take the model's periods explicitly; `ttm()` no longer derives Gregorian periods from history keys.
-- `evaluate_covenants(results, covenants)` and `forecast_breaches(results, covenants, config)` drop the `model` argument and test every period of `StatementResult::periods` (Python and WASM `statements_analytics.evaluateCovenants` / `forecastBreaches` likewise; the UI covenant requests drop `modelJson`). `StatementsAdapter::new` takes only the results. `CreditAssessment::compute` also spans `StatementResult::periods`.
+- `evaluate_covenants(covenants, results)` and `forecast_breaches(covenants, results, config)` drop the `model` argument and test every period of `StatementResult::periods` (Python and WASM `statements_analytics.evaluateCovenants` / `forecastBreaches` likewise; the UI covenant requests drop `modelJson`). `StatementsAdapter::new` takes only the results. `CreditAssessment::compute` also spans `StatementResult::periods`.
 - `finstack_quant_covenants::evaluate_series_generic` is `evaluate_series_from_model`.
 - `PeerSet::from_universe` returns `(PeerSet, excluded_count)`; the Python and WASM constructors still return the peer set.
 - `PnlBucketShare::field` is the `PnlBucket` enum and `MertonReport::errors` is keyed by `MertonReportMeasure`; both serialize to the same snake-case strings as before.

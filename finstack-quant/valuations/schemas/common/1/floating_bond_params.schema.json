@@ -54,7 +54,7 @@
       "quote_compounding": {
         "periodic": 4
       },
-      "spread_bp": 200
+      "spread_bp": "200"
     }
   ],
   "properties": {
@@ -95,9 +95,8 @@
       "description": "Quote compounding of the z-spread, stated independently of\n`frequency` (O6); the regional convention does not supply it."
     },
     "spread_bp": {
-      "description": "Spread over the index in integer basis points (200 = 2%).",
-      "format": "int32",
-      "type": "integer"
+      "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+      "description": "Exact spread over the index in basis points (200 = 2%)."
     }
   },
   "required": [

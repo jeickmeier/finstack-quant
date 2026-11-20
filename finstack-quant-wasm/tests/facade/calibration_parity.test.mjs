@@ -301,6 +301,39 @@ test('a plan built from the step and quote twins calibrates', () => {
   assert.equal(calibration.calibrate(envelope).result.report.success, true);
 });
 
+test('inline quotes produce the same envelope as explicit calibration inputs', () => {
+  const { plan, market_data: quotes } = GOLDEN.envelope;
+  const step = calibration.calibrationStepDiscount('USD-OIS', RATES);
+  const authored = calibration.calibrationEnvelopeFromSteps(plan.id, [{ step, quotes }]);
+  assert.deepEqual(plain(authored.plan.quote_sets), plan.quote_sets);
+  assert.deepEqual(plain(authored.market_data), quotes);
+  assert.equal(calibration.calibrate(authored).result.report.success, true);
+  const next = calibration.calibrationStepDiscount('USD-OIS-2', RATES, 'USD-OIS');
+  const entry = { step: next, quotes: [] };
+  const extended = calibration.calibrationEnvelopeWithStep(authored, entry);
+  assert.deepEqual(
+    plain(extended),
+    plain(calibration.calibrationEnvelopeFromSteps(plan.id, [{ step, quotes }, entry]))
+  );
+  assert.equal(authored.plan.steps.length, 1);
+  const shifted = calibration.calibrationEnvelopeBumpQuotesBp(extended, 'USD-OIS', 2.5);
+  assert.ok(Math.abs(shifted.market_data[0].rate - quotes[0].rate - 0.00025) < 1e-12);
+  assert.equal(extended.market_data[0].rate, quotes[0].rate);
+  const removed = calibration.calibrationEnvelopeWithoutQuote(extended, quotes[0].id);
+  assert.ok(!removed.market_data.some((quote) => quote.id === quotes[0].id));
+  assert.ok(!removed.plan.quote_sets['USD-OIS'].includes(quotes[0].id));
+
+  assert.throws(
+    () => calibration.calibrationEnvelopeWithStep(authored, { step: next, quotes }),
+    /Duplicate definition of calibration quote set/
+  );
+  assert.throws(
+    () =>
+      calibration.calibrationEnvelopeFromSteps(plan.id, [{ step, quotes: [quotes[0], quotes[0]] }]),
+    /duplicate calibration market input/
+  );
+});
+
 test('validateCalibration returns the validated envelope object', () => {
   const validated = calibration.validateCalibration(GOLDEN.envelope);
   assert.equal(validated.plan.id, 'parity');
@@ -704,3 +737,19 @@ for (const [enabled, limit] of [
     }
   });
 }
+
+test('native step constructor keeps the output, step and quote-set identities distinct', () => {
+  const step = calibration.calibrationStep(
+    'discount-front',
+    { ...RATES, kind: 'discount', curve_id: 'USD-OIS' },
+    'on-the-run'
+  );
+  assert.equal(step.kind, 'discount');
+  assert.equal(step.curve_id, 'USD-OIS');
+  assert.equal(step.id, 'discount-front');
+  assert.equal(step.quote_set, 'on-the-run');
+  assert.throws(
+    () => calibration.calibrationStep('discount-front', { ...RATES, kind: 'discount' }),
+    /curve_id/
+  );
+});

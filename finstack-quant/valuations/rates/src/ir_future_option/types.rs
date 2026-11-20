@@ -59,6 +59,17 @@ pub struct InterestRateFutureOption {
 }
 
 impl InterestRateFutureOption {
+    /// Copy the terms and overrides into an independent contract builder.
+    pub fn to_builder(&self) -> InterestRateFutureOptionBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .terms(self.terms.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+            .attributes(self.attributes.clone())
+    }
+
     /// Create a neutral schema and serialization example.
     pub fn example() -> finstack_quant_core::Result<Self> {
         Ok(Self {

@@ -1,5 +1,6 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/calibration/envelope.rs``."""
 
+from collections.abc import Sequence
 from typing import Any
 from finstack_quant.calibration._config import CalibrationConfig
 from finstack_quant.calibration._quotes import (
@@ -12,6 +13,8 @@ from finstack_quant.calibration._quotes import (
     VolQuote,
     XccyQuote,
 )
+
+from finstack_quant.calibration._step_params import StepParams
 
 class CalibrationStep:
     """One calibration step: a target kind, parameters, and a named quote set.
@@ -29,6 +32,28 @@ class CalibrationStep:
     'usd_ois'
 
     """
+
+    def __init__(self, id: str, params: StepParams, quote_set: str | None = None) -> None:
+        """Construct a step from a typed calibration parameter object.
+
+        Parameters
+        ----------
+        id : str
+            Nonempty stable step and fit-report identifier.
+        params : StepParams
+            Native kind-specific parameters, including any produced curve
+            or surface identifiers. The parameter class selects the solver.
+        quote_set : str or None
+            Name of the quotes in the parent plan. Omit to use the step ID.
+
+        Raises
+        ------
+        TypeError
+            If params is not a typed calibration parameter object.
+        ValueError
+            If the step or quote-set identifier is blank.
+        """
+        ...
 
     @staticmethod
     def discount(id: str, params: dict[str, Any] | str, quote_set: str | None = None) -> CalibrationStep:
@@ -1114,6 +1139,52 @@ class CalibrationPlan:
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
 
+class StepWithQuotes:
+    """One typed calibration step and its inline quote inputs.
+
+    Examples
+    --------
+    >>> from finstack_quant.calibration import CalibrationStep, StepWithQuotes
+    >>> step = CalibrationStep.discount("USD-OIS", {"base_date": "2025-01-15", "currency": "USD"})
+    >>> StepWithQuotes(step, []).step.id
+    'USD-OIS'
+    """
+
+    def __init__(self, step: CalibrationStep, quotes: Sequence[object]) -> None:
+        """Pair a step with observations for its named quote set.
+
+        Parameters
+        ----------
+        step : CalibrationStep
+            The step defining the calibrated object and its quote-set identifier.
+        quotes : Sequence[object]
+            Typed quote values or canonical market-datum dictionaries. Use an
+            empty sequence to reuse a quote set already supplied to the plan.
+
+        Raises
+        ------
+        TypeError
+            If the step or quote iterable has an incompatible type.
+        ValueError
+            If a market-datum dictionary cannot be parsed.
+        """
+        ...
+
+    @property
+    def step(self) -> CalibrationStep:
+        """Read the stored calibration step.
+
+        Returns
+        -------
+        CalibrationStep
+            Copy of the step, including its parameter variant and quote-set id.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
 class CalibrationEnvelope:
     """A calibration plan together with its market data and optional prior market.
 
@@ -1128,6 +1199,116 @@ class CalibrationEnvelope:
 
     """
 
+    @staticmethod
+    def from_steps(
+        id: str,
+        steps: Sequence[StepWithQuotes],
+        *,
+        settings: CalibrationConfig | dict[str, object] | None = None,
+        prior_market: Sequence[dict[str, object]] | None = None,
+    ) -> CalibrationEnvelope:
+        """Build a calibration request from ordered steps with inline inputs.
+
+        Parameters
+        ----------
+        id : str
+            Nonempty identifier used to name the plan and its execution report.
+        steps : Sequence[StepWithQuotes]
+            Typed steps in dependency order. The first reference to a quote
+            set defines its quotes, and later steps can reuse it.
+        settings : CalibrationConfig | dict[str, object] | None
+            Solver and validation config, a shallow settings override, or None
+            for Rust defaults.
+        prior_market : Sequence[dict[str, object]] | None
+            Previously built curves or surfaces as canonical market objects.
+
+        Returns
+        -------
+        CalibrationEnvelope
+            A request with quote IDs wired into the plan and market inputs
+            registered once. Calibration checks its financial dependencies.
+
+        Raises
+        ------
+        TypeError
+            If a parameter has the wrong Python type.
+        ValueError
+            If an identifier is blank or repeated or settings and prior objects
+            cannot be parsed.
+
+        Examples
+        --------
+        >>> from finstack_quant.calibration import CalibrationEnvelope
+        >>> CalibrationEnvelope.from_steps("empty", []).plan.id
+        'empty'
+        """
+        ...
+
+    def with_step(self, entry: StepWithQuotes) -> CalibrationEnvelope:
+        """Append one step to a new calibration envelope in execution order.
+
+        Parameters
+        ----------
+        entry : StepWithQuotes
+            Native step and its inline quotes. An empty list can reference
+            a quote set already registered on this envelope.
+
+        Returns
+        -------
+        CalibrationEnvelope
+            Independent envelope with the appended step and existing settings.
+
+        Raises
+        ------
+        ValueError
+            If step or market input identifiers are blank or duplicated, or
+            the entry tries to define an existing quote set again.
+        """
+        ...
+    def without_quote(self, quote_id: str) -> CalibrationEnvelope:
+        """Remove a quote and every reference to it from a derived envelope.
+
+        Parameters
+        ----------
+        quote_id : str
+            Exact identifier of a quoted calibration observation.
+
+        Returns
+        -------
+        CalibrationEnvelope
+            Independent envelope with matching quote-set references removed.
+
+        Raises
+        ------
+        ValueError
+            If the ID is unknown or names a non-quote market observation.
+        """
+        ...
+    def bump_quotes_bp(self, bp: float, *, quote_set: str | None = None) -> CalibrationEnvelope:
+        """Apply signed basis points to rates and spreads in a derived envelope.
+
+        Parameters
+        ----------
+        bp : float
+            Finite shock in basis points. A positive basis point adds 0.0001
+            to a decimal rate, subtracts 0.01 from a rate-futures price, or
+            adds one to a spread already quoted in basis points.
+        quote_set : str, optional
+            Exact name of a quote set. The default selects all quotes once.
+
+        Returns
+        -------
+        CalibrationEnvelope
+            Independent envelope with the selected quotes shifted.
+
+        Raises
+        ------
+        ValueError
+            For nonfinite shocks, unknown sets or references, or selected
+            entries without a rate or spread bump basis, such as volatility
+            and upfront credit quotes.
+        """
+        ...
     def __init__(
         self,
         plan: CalibrationPlan,

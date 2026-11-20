@@ -3,7 +3,6 @@
 pub(crate) mod prices;
 pub(crate) mod wal;
 
-use crate::structured_credit::StructuredCredit;
 use crate::structured_credit::types::DealAccruals;
 use crate::structured_credit::types::TrancheCashflows;
 use finstack_quant_core::Result;
@@ -23,7 +22,7 @@ pub(crate) struct AccruedCalculator;
 impl MetricCalculator for AccruedCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let settlement = super::quote::settlement_date(
-            context.instrument_as::<StructuredCredit>()?,
+            crate::structured_credit::metrics::metric_deal(context)?,
             context.as_of,
         )?;
         accrued_at(context, settlement)
@@ -41,7 +40,7 @@ pub(crate) fn accrued_at(
             .try_fold(0.0, |sum, period| Ok(sum + period.accrued(settlement)?));
     }
     if context.ext::<DealAccruals>().is_none() {
-        let deal = context.instrument_as::<StructuredCredit>()?;
+        let deal = crate::structured_credit::metrics::metric_deal(context)?;
         let results = deal
             .run_simulation(&context.curves, context.as_of)?
             .tranches;

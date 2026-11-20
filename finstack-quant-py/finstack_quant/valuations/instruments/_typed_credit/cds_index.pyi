@@ -1,6 +1,8 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/valuations/typed_credit/cds_index.rs``."""
 
 from __future__ import annotations
+from finstack_quant.margin import OtcMarginSpec
+from finstack_quant.valuations.instruments._pricing import PriceExtras
 
 import datetime
 from typing import Any, Literal
@@ -125,7 +127,7 @@ class CdsIndex:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        extras: dict[str, Any] | str | None = None,
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -142,7 +144,7 @@ class CdsIndex:
             Model key (``"hazard_rate"`` is the native model).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        extras : dict[str, Any] or str, optional
+        extras : PriceExtras or dict[str, Any] or str, optional
             The rarer pricing inputs, as a dict or JSON text in the shape of the
             Rust ``PriceExtras``; every key is optional and an unknown key raises
             ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
@@ -1089,7 +1091,7 @@ class CdsIndexBuilder:
             If ``value`` is not a ``(date, Money)`` pair.
         """
         ...
-    def margin_spec(self, value: dict[str, object] | str) -> CdsIndexBuilder:
+    def margin_spec(self, value: OtcMarginSpec | dict[str, object] | str) -> CdsIndexBuilder:
         """
         Set the OTC margin (CSA / initial-margin) specification.
 

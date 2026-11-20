@@ -33,7 +33,7 @@ fn consumed() -> JsValue {
 
 /// Any JSON value: a string is stored as a string, other primitives as
 /// themselves, and arrays or plain objects through the strict JSON walker.
-fn meta_value(value: &JsValue) -> Result<serde_json::Value, JsValue> {
+pub(super) fn meta_value(value: &JsValue) -> Result<serde_json::Value, JsValue> {
     if let Some(text) = value.as_string() {
         return Ok(serde_json::Value::String(text));
     }
@@ -76,13 +76,17 @@ pub struct JsModelBuilder {
 }
 
 impl JsModelBuilder {
+    pub(super) fn from_inner(inner: ModelBuilder) -> Self {
+        Self { inner: Some(inner) }
+    }
+
     fn take(&mut self) -> Result<ModelBuilder, JsValue> {
         self.inner.take().ok_or_else(consumed)
     }
 
     /// Mutable access without taking ownership, so a failed setter call
     /// leaves the builder usable.
-    fn builder_mut(&mut self) -> Result<&mut ModelBuilder, JsValue> {
+    pub(crate) fn builder_mut(&mut self) -> Result<&mut ModelBuilder, JsValue> {
         self.inner.as_mut().ok_or_else(consumed)
     }
 }
@@ -161,6 +165,27 @@ impl JsModelBuilder {
         let plan: finstack_quant_core::dates::PeriodPlan = from_js_json(&plan, "plan")?;
         self.builder_mut()?
             .periods_explicit(plan)
+            .map_err(to_js_err)?;
+        Ok(())
+    }
+
+    /// Broadcast a scalar or monetary observation across the model timeline.
+    /// @param nodeId - Unique node identifier stored in the model.
+    /// @param value - Finite unitless number or exact Money wire object, copied to each actual and forecast period.
+    /// @throws Validation error if the builder was consumed, periods are unset or the value is invalid.
+    pub fn constant(
+        &mut self,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.statements.AmountOrScalar")]
+        value: JsValue,
+    ) -> Result<(), JsValue> {
+        let node_id = js_string(&node_id, "nodeId")?;
+        let value = match value.as_f64() {
+            Some(value) => AmountOrScalar::scalar(value),
+            None => from_js_json(&value, "value")?,
+        };
+        self.builder_mut()?
+            .constant(node_id, value)
             .map_err(to_js_err)?;
         Ok(())
     }
@@ -450,6 +475,44 @@ impl JsModelBuilder {
     ) -> Result<(), JsValue> {
         let snapshot_id = js_string(&snapshot_id, "snapshotId")?;
         self.builder_mut()?.source_snapshot(snapshot_id);
+        Ok(())
+    }
+
+    /// Set the authored statement model currency used by statement analytics.
+    ///
+    /// @param currency - ISO 4217 currency code for the model's amounts.
+    /// @throws Error with kind `validation` for an invalid currency code or if the builder was consumed.
+    pub fn currency(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+    ) -> Result<(), JsValue> {
+        let currency = crate::utils::input::js_currency(&currency, "currency")?;
+        self.builder_mut()?.currency(currency);
+        Ok(())
+    }
+
+    /// Define a monetary node from a scalar expression without currency conversion.
+    /// @param nodeId - Unique identifier for the new calculated node.
+    /// @param source - Scalar formula or source node in units of the selected currency.
+    /// @param currency - Explicit ISO denomination. An omitted value uses model currency metadata.
+    /// @throws `FinstackError` for invalid identifiers, expression syntax or currency, or on a consumed builder. Build rejects a source with money or Boolean units.
+    #[wasm_bindgen(js_name = asMoney)]
+    pub fn as_money(
+        &mut self,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] source: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] currency: Option<JsValue>,
+    ) -> Result<(), JsValue> {
+        let node_id = js_string(&node_id, "nodeId")?;
+        let source = js_string(&source, "source")?;
+        let currency = currency
+            .as_ref()
+            .filter(|value| !value.is_null() && !value.is_undefined())
+            .map(|value| crate::utils::input::js_currency(value, "currency"))
+            .transpose()?;
+        self.builder_mut()?
+            .as_money(node_id, &source, currency)
+            .map_err(to_js_err)?;
         Ok(())
     }
 

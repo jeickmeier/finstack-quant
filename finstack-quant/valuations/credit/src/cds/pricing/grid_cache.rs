@@ -28,7 +28,7 @@ impl CachedTopology {
             && self
                 .knot_times
                 .iter()
-                .zip(curve.knot_points())
+                .zip(curve.iter_knots())
                 .all(|(&saved, (t, _))| saved == t.to_bits())
     }
 }
@@ -52,7 +52,7 @@ impl IsdaWindowCache {
         let last = cached.get_or_insert_with(|| CachedTopology {
             base_date: grid.surv.base_date(),
             day_count: grid.surv.day_count(),
-            knot_times: grid.surv.knot_points().map(|(t, _)| t.to_bits()).collect(),
+            knot_times: grid.surv.knots().iter().map(|t| t.to_bits()).collect(),
             grids: FxHashMap::default(),
         });
         let key = (grid.t_start.to_bits(), grid.t_end.to_bits());

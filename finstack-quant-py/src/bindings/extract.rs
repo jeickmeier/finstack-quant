@@ -23,16 +23,78 @@ use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::valuations::composite::PyCompositeInstrument;
 use crate::bindings::valuations::convert::serialize_typed_instrument_json;
 use crate::bindings::valuations::instruments::{PyBond, PyTermLoan};
+use crate::bindings::valuations::typed_agency_cmo::PyAgencyCmo;
+use crate::bindings::valuations::typed_agency_mbs_passthrough::PyAgencyMbsPassthrough;
+use crate::bindings::valuations::typed_agency_tba::PyAgencyTba;
+use crate::bindings::valuations::typed_asian_option::PyAsianOption;
 use crate::bindings::valuations::typed_asset_backed_facility::PyAssetBackedFacility;
+use crate::bindings::valuations::typed_autocallable::PyAutocallable;
+use crate::bindings::valuations::typed_barrier_option::PyBarrierOption;
+use crate::bindings::valuations::typed_basis_swap::PyBasisSwap;
+use crate::bindings::valuations::typed_basket::PyBasket;
+use crate::bindings::valuations::typed_bermudan_swaption::PyBermudanSwaption;
+use crate::bindings::valuations::typed_bond_future::PyBondFuture;
+use crate::bindings::valuations::typed_callable_range_accrual::PyCallableRangeAccrual;
+use crate::bindings::valuations::typed_cliquet_option::PyCliquetOption;
+use crate::bindings::valuations::typed_cms_option::PyCmsOption;
+use crate::bindings::valuations::typed_cms_spread_option::PyCmsSpreadOption;
+use crate::bindings::valuations::typed_cms_swap::PyCmsSwap;
+use crate::bindings::valuations::typed_commodity_asian_option::PyCommodityAsianOption;
+use crate::bindings::valuations::typed_commodity_forward::PyCommodityForward;
+use crate::bindings::valuations::typed_commodity_future::PyCommodityFuture;
+use crate::bindings::valuations::typed_commodity_future_option::PyCommodityFutureOption;
+use crate::bindings::valuations::typed_commodity_spot_option::PyCommoditySpotOption;
+use crate::bindings::valuations::typed_commodity_spread_option::PyCommoditySpreadOption;
+use crate::bindings::valuations::typed_commodity_swap::PyCommoditySwap;
+use crate::bindings::valuations::typed_commodity_swaption::PyCommoditySwaption;
 use crate::bindings::valuations::typed_convertible::PyConvertibleBond;
 use crate::bindings::valuations::typed_credit::{
     PyCdsIndex, PyCdsOption, PyCdsTranche, PyCreditDefaultSwap,
 };
+use crate::bindings::valuations::typed_deposit::PyDeposit;
+use crate::bindings::valuations::typed_dollar_roll::PyDollarRoll;
 use crate::bindings::valuations::typed_equity::PyEquityOption;
+use crate::bindings::valuations::typed_equity_future::PyEquityFuture;
+use crate::bindings::valuations::typed_equity_future_option::PyEquityFutureOption;
+use crate::bindings::valuations::typed_equity_spot::PyEquity;
+use crate::bindings::valuations::typed_equity_total_return_future::PyEquityTotalReturnFuture;
+use crate::bindings::valuations::typed_equity_total_return_swap::PyEquityTotalReturnSwap;
+use crate::bindings::valuations::typed_fi_index_total_return_swap::PyFiIndexTotalReturnSwap;
+use crate::bindings::valuations::typed_fra::PyForwardRateAgreement;
 use crate::bindings::valuations::typed_fx::{PyFxForward, PyFxOption};
+use crate::bindings::valuations::typed_fx_barrier_option::PyFxBarrierOption;
+use crate::bindings::valuations::typed_fx_digital_option::PyFxDigitalOption;
+use crate::bindings::valuations::typed_fx_future::PyFxFuture;
+use crate::bindings::valuations::typed_fx_future_option::PyFxFutureOption;
+use crate::bindings::valuations::typed_fx_spot::PyFxSpot;
+use crate::bindings::valuations::typed_fx_swap::PyFxSwap;
+use crate::bindings::valuations::typed_fx_touch_option::PyFxTouchOption;
+use crate::bindings::valuations::typed_fx_variance_swap::PyFxVarianceSwap;
+use crate::bindings::valuations::typed_inflation_bond::PyInflationLinkedBond;
+use crate::bindings::valuations::typed_inflation_cap_floor::PyInflationCapFloor;
+use crate::bindings::valuations::typed_inflation_swap::PyInflationSwap;
+use crate::bindings::valuations::typed_interest_rate_future::PyInterestRateFuture;
+use crate::bindings::valuations::typed_interest_rate_future_option::PyInterestRateFutureOption;
+use crate::bindings::valuations::typed_levered_real_estate_equity::PyLeveredRealEstateEquity;
+use crate::bindings::valuations::typed_lookback_option::PyLookbackOption;
+use crate::bindings::valuations::typed_ndf::PyNdf;
+use crate::bindings::valuations::typed_private_markets_fund::PyPrivateMarketsFund;
+use crate::bindings::valuations::typed_quanto_option::PyQuantoOption;
+use crate::bindings::valuations::typed_range_accrual::PyRangeAccrual;
 use crate::bindings::valuations::typed_rates::{PyCapFloor, PyInterestRateSwap, PySwaption};
+use crate::bindings::valuations::typed_real_estate_asset::PyRealEstateAsset;
+use crate::bindings::valuations::typed_repo::PyRepo;
 use crate::bindings::valuations::typed_revolving_credit::PyRevolvingCredit;
-use crate::bindings::valuations::typed_structured_credit::PyStructuredCredit;
+use crate::bindings::valuations::typed_snowball::PySnowball;
+use crate::bindings::valuations::typed_structured_credit::{
+    PyStructuredCredit, PyStructuredCreditTranche,
+};
+use crate::bindings::valuations::typed_tarn::PyTarn;
+use crate::bindings::valuations::typed_variance_swap::PyVarianceSwap;
+use crate::bindings::valuations::typed_volatility_index_future::PyVolatilityIndexFuture;
+use crate::bindings::valuations::typed_volatility_index_future_option::PyVolatilityIndexFutureOption;
+use crate::bindings::valuations::typed_xccy_swap::PyXccySwap;
+use crate::bindings::valuations::typed_yoy_inflation_swap::PyYoYInflationSwap;
 use crate::errors::{display_to_py as to_py, portfolio_to_py};
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::pricer::ParsedInstrument;
@@ -60,18 +122,24 @@ impl InstrumentArg {
     ///
     /// * `metric_pricing_overrides` - Optional `MetricPricingOverrides` JSON
     ///   patch merged before validation; `None` keeps stored controls.
+    /// * `instrument_pricing_overrides` - Optional patch for instrument-owned
+    ///   quotes and models, applied to the owned pricing copy.
     pub fn into_parsed(
         self,
         metric_pricing_overrides: Option<&str>,
+        instrument_pricing_overrides: Option<&serde_json::Value>,
     ) -> finstack_quant_core::Result<ParsedInstrument> {
         match self {
-            Self::Typed(instrument) => {
-                ParsedInstrument::from_instrument_json(*instrument, metric_pricing_overrides)
-            }
+            Self::Typed(instrument) => ParsedInstrument::from_instrument_json(
+                *instrument,
+                metric_pricing_overrides,
+                instrument_pricing_overrides,
+            ),
             Self::Envelope(json) => {
                 finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
                     &json,
                     metric_pricing_overrides,
+                    instrument_pricing_overrides,
                 )
             }
         }
@@ -123,6 +191,18 @@ pub fn extract_instrument(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentArg> {
         PyRevolvingCredit,
         PyAssetBackedFacility,
         PyInterestRateSwap,
+        PyDeposit,
+        PyInflationLinkedBond,
+        PyBondFuture,
+        PyInterestRateFuture,
+        PyEquityFuture,
+        PyFxFuture,
+        PyVolatilityIndexFuture,
+        PyInterestRateFutureOption,
+        PyEquityFutureOption,
+        PyFxFutureOption,
+        PyVolatilityIndexFutureOption,
+        PyForwardRateAgreement,
         PySwaption,
         PyCapFloor,
         PyCreditDefaultSwap,
@@ -132,8 +212,57 @@ pub fn extract_instrument(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentArg> {
         PyCdsOption,
         PyCdsTranche,
         PyConvertibleBond,
+        PyEquity,
         PyEquityOption,
+        PyAutocallable,
+        PyCliquetOption,
+        PyPrivateMarketsFund,
+        PyAsianOption,
+        PyBarrierOption,
+        PyLookbackOption,
+        PyRangeAccrual,
+        PyTarn,
+        PySnowball,
+        PyCallableRangeAccrual,
+        PyAgencyTba,
+        PyAgencyMbsPassthrough,
+        PyDollarRoll,
+        PyAgencyCmo,
+        PyBasket,
+        PyRealEstateAsset,
+        PyLeveredRealEstateEquity,
+        PyBasisSwap,
+        PyXccySwap,
+        PyCmsSwap,
+        PyCmsOption,
+        PyCmsSpreadOption,
+        PyInflationSwap,
+        PyYoYInflationSwap,
+        PyInflationCapFloor,
+        PyBermudanSwaption,
+        PyCommodityFutureOption,
+        PyFxSpot,
+        PyCommodityForward,
+        PyCommodityFuture,
+        PyCommodityAsianOption,
+        PyCommoditySpotOption,
+        PyCommoditySpreadOption,
+        PyCommoditySwap,
+        PyCommoditySwaption,
+        PyFxVarianceSwap,
+        PyVarianceSwap,
+        PyEquityTotalReturnSwap,
+        PyEquityTotalReturnFuture,
+        PyFiIndexTotalReturnSwap,
+        PyRepo,
+        PyFxSwap,
+        PyNdf,
+        PyQuantoOption,
+        PyFxDigitalOption,
+        PyFxTouchOption,
+        PyFxBarrierOption,
         PyStructuredCredit,
+        PyStructuredCreditTranche,
     );
     envelope_json_text(obj).map(InstrumentArg::Envelope).map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(

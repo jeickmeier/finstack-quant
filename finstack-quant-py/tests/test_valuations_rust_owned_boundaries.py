@@ -52,34 +52,13 @@ def _frn(spread_bp: float | Bps) -> Bond:
     })
 
 
-def _spread_bp(bond: Bond) -> object:
-    """The serialized ``spread_bp`` wherever the floating leg nests it."""
-
-    def find(node: object) -> object:
-        if isinstance(node, dict):
-            if "spread_bp" in node:
-                return node["spread_bp"]
-            for value in node.values():
-                found = find(value)
-                if found is not None:
-                    return found
-        if isinstance(node, list):
-            for value in node:
-                found = find(value)
-                if found is not None:
-                    return found
-        return None
-
-    return find(json.loads(bond.to_json()))
-
-
-def test_bond_floating_rejects_fractional_basis_points_like_wasm_bps() -> None:
-    # `spread_bp` is the Rust `Bps` wire form: an integer basis-point quote.
-    with pytest.raises(ValueError, match=r"FloatingBondParams"):
-        _frn(125.4)
-    assert float(_spread_bp(_frn(125))) == 125.0
-    # A Bps object hands over its exact Rust value (no decimal round trip).
-    assert float(_spread_bp(_frn(Bps(29)))) == 29.0
+def test_bond_floating_preserves_fractional_spread_in_its_exact_wire_form() -> None:
+    for quote, expected in [(125.4, "125.4"), (125, "125"), (Bps(29), "29")]:
+        payload = json.loads(_frn(quote).to_json())
+        cashflow = payload["instrument"]["spec"]["cashflow_spec"]["floating"]
+        assert cashflow["rate_spec"]["spread_bp"] == expected
+    with pytest.raises(ValueError, match="Non-finite value"):
+        _frn(float("inf"))
 
 
 def test_typed_from_json_reports_the_rust_type_mismatch() -> None:

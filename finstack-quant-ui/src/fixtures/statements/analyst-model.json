@@ -85,6 +85,10 @@
         "2025Q1": {
           "amount": "208300000",
           "currency": "USD"
+        },
+        "2025Q4": {
+          "amount": "231384660.02999997",
+          "currency": "USD"
         }
       },
       "forecast": {
@@ -92,6 +96,13 @@
         "params": {
           "curve": [0.03, 0.035, 0.042]
         }
+      },
+      "availability_dates": {
+        "2024Q1": "2024-04-01",
+        "2024Q2": "2024-07-01",
+        "2024Q3": "2024-10-01",
+        "2024Q4": "2025-01-01",
+        "2025Q1": "2025-04-01"
       }
     },
     "revenue_growth_qoq": {
@@ -137,7 +148,14 @@
           "currency": "USD"
         }
       },
-      "formula_text": "revenue * 0.3375"
+      "formula_text": "revenue * 0.3375",
+      "availability_dates": {
+        "2024Q1": "2024-04-01",
+        "2024Q2": "2024-07-01",
+        "2024Q3": "2024-10-01",
+        "2024Q4": "2025-01-01",
+        "2025Q1": "2025-04-01"
+      }
     },
     "gross_profit": {
       "node_id": "gross_profit",
@@ -199,6 +217,13 @@
         "params": {
           "rate": 0.022
         }
+      },
+      "availability_dates": {
+        "2024Q1": "2024-04-01",
+        "2024Q2": "2024-07-01",
+        "2024Q3": "2024-10-01",
+        "2024Q4": "2025-01-01",
+        "2025Q1": "2025-04-01"
       }
     },
     "ebitda": {
@@ -261,6 +286,13 @@
         "params": {
           "rate": 0.018
         }
+      },
+      "availability_dates": {
+        "2024Q1": "2024-04-01",
+        "2024Q2": "2024-07-01",
+        "2024Q3": "2024-10-01",
+        "2024Q4": "2025-01-01",
+        "2025Q1": "2025-04-01"
       }
     },
     "ebit": {
@@ -366,6 +398,13 @@
           "amount": "420000000",
           "currency": "USD"
         }
+      },
+      "availability_dates": {
+        "2024Q1": "2024-04-01",
+        "2024Q2": "2024-07-01",
+        "2024Q3": "2024-10-01",
+        "2024Q4": "2025-01-01",
+        "2025Q1": "2025-04-01"
       }
     },
     "debt_draws": {
@@ -409,6 +448,13 @@
             "2025Q4": 30000000
           }
         }
+      },
+      "availability_dates": {
+        "2024Q1": "2024-04-01",
+        "2024Q2": "2024-07-01",
+        "2024Q3": "2024-10-01",
+        "2024Q4": "2025-01-01",
+        "2025Q1": "2025-04-01"
       }
     },
     "debt_repayments": {
@@ -445,6 +491,13 @@
       },
       "forecast": {
         "method": "forward_fill"
+      },
+      "availability_dates": {
+        "2024Q1": "2024-04-01",
+        "2024Q2": "2024-07-01",
+        "2024Q3": "2024-10-01",
+        "2024Q4": "2025-01-01",
+        "2025Q1": "2025-04-01"
       }
     },
     "total_debt": {
@@ -505,6 +558,13 @@
       },
       "forecast": {
         "method": "forward_fill"
+      },
+      "availability_dates": {
+        "2024Q1": "2024-04-01",
+        "2024Q2": "2024-07-01",
+        "2024Q3": "2024-10-01",
+        "2024Q4": "2025-01-01",
+        "2025Q1": "2025-04-01"
       }
     },
     "ltm_ebitda": {
@@ -606,7 +666,9 @@
               "count": 3,
               "unit": "months"
             },
-            "quote_compounding": { "periodic": 4 },
+            "quote_compounding": {
+              "periodic": 4
+            },
             "id": "TLB",
             "issue_date": "2024-01-01",
             "maturity": "2030-01-01",
@@ -661,7 +723,9 @@
               "count": 3,
               "unit": "months"
             },
-            "quote_compounding": { "periodic": 4 },
+            "quote_compounding": {
+              "periodic": 4
+            },
             "id": "RCF",
             "issue_date": "2024-01-01",
             "lc": null,
@@ -699,5 +763,6 @@
     "entity": "Acme Software Holdings",
     "currency": "USD",
     "frequency": "quarterly"
-  }
+  },
+  "source_snapshot": "analyst-published-2025Q1"
 }

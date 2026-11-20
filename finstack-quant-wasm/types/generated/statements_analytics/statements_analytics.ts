@@ -386,9 +386,10 @@ export type TerminalValueSpec =
        */
       multiple: number;
       /**
-       * Terminal metric value (e.g., EBITDA)
+       * Terminal metric in major currency units (for example, EBITDA).
+       * Required for standalone pricing. A statement DCF can resolve it from a metric node.
        */
-      terminal_metric: number;
+      terminal_metric?: number | null;
       type: "exit_multiple";
       [k: string]: unknown;
     }
@@ -421,6 +422,546 @@ export type ExitMultipleBump =
     }
   | {
       relative: number;
+    };
+/**
+ * Explicit source of normalized annual FCFF for a perpetual-growth terminal.
+ */
+export type TerminalFcffBasis =
+  | {
+      /**
+       * Signed FCFF per year, measured on a nominal currency basis.
+       */
+      amount: Money;
+      kind: "authored";
+    }
+  | {
+      kind: "trailing_additive";
+    };
+/**
+ * Consequence of covenant breach
+ */
+export type CovenantConsequence =
+  | "default"
+  | {
+      rate_increase: {
+        /**
+         * Increase in basis points
+         */
+        bp_increase: number;
+      };
+    }
+  | {
+      cash_sweep: {
+        /**
+         * Percentage of cash flow to sweep
+         */
+        sweep_percentage: number;
+      };
+    }
+  | "block_distributions"
+  | {
+      require_collateral: {
+        /**
+         * Description of collateral requirement
+         */
+        description: string;
+      };
+    }
+  | {
+      accelerate_maturity: {
+        /**
+         * New accelerated maturity date
+         */
+        new_maturity: DateWire;
+      };
+    };
+/**
+ * Type of financial or operational covenant
+ */
+export type CovenantType =
+  | {
+      max_debt_to_ebitda: {
+        /**
+         * Maximum allowed ratio
+         */
+        threshold: number;
+      };
+    }
+  | {
+      min_interest_coverage: {
+        /**
+         * Minimum required ratio
+         */
+        threshold: number;
+      };
+    }
+  | {
+      min_fixed_charge_coverage: {
+        /**
+         * Minimum required coverage
+         */
+        threshold: number;
+      };
+    }
+  | {
+      max_total_leverage: {
+        /**
+         * Maximum allowed leverage
+         */
+        threshold: number;
+      };
+    }
+  | {
+      max_senior_leverage: {
+        /**
+         * Maximum allowed senior leverage
+         */
+        threshold: number;
+      };
+    }
+  | {
+      min_asset_coverage: {
+        /**
+         * Minimum required coverage
+         */
+        threshold: number;
+      };
+    }
+  | {
+      negative: {
+        /**
+         * Description of restriction
+         */
+        restriction: string;
+      };
+    }
+  | {
+      affirmative: {
+        /**
+         * Description of requirement
+         */
+        requirement: string;
+      };
+    }
+  | {
+      custom: {
+        /**
+         * Name of metric to test
+         */
+        metric: string;
+        /**
+         * Threshold test (min or max)
+         */
+        test: ThresholdTest;
+      };
+    }
+  | {
+      basket: {
+        /**
+         * Maximum allowed utilization of the basket
+         */
+        limit: number;
+        /**
+         * Basket identifier/metric name
+         */
+        name: string;
+      };
+    }
+  | {
+      min_dscr: {
+        /**
+         * Minimum required coverage
+         */
+        threshold: number;
+      };
+    }
+  | {
+      max_net_debt_to_ebitda: {
+        /**
+         * Maximum allowed ratio
+         */
+        threshold: number;
+      };
+    }
+  | {
+      max_capex: {
+        /**
+         * Maximum allowed capex amount
+         */
+        threshold: number;
+      };
+    }
+  | {
+      min_liquidity: {
+        /**
+         * Minimum required liquidity
+         */
+        threshold: number;
+      };
+    };
+/**
+ * Threshold test type (maximum or minimum bound)
+ */
+export type ThresholdTest =
+  | {
+      maximum: number;
+    }
+  | {
+      minimum: number;
+    };
+/**
+ * Whether a covenant is tested periodically or only upon an action.
+ */
+export type CovenantScope = "maintenance" | "incurrence";
+/**
+ * Unit of a tenor period.
+ */
+export type TenorUnit = "days" | "weeks" | "months" | "years";
+/**
+ * Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
+ *
+ * There is no default mode: every financial rounding names one explicitly.
+ */
+export type RoundingMode = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
+/**
+ * Finite JSON number that is strictly greater than zero.
+ *
+ * This type is used by serde field adapters so runtime deserialization and
+ * generated schemas enforce the same positive-number contract.
+ */
+export type PositiveF64Wire = number;
+/**
+ * Availability and contractual applicability of an individual test.
+ */
+export type CovenantAssessmentState = "inactive" | "waived" | "untriggered" | "assessed" | "incomplete";
+/**
+ * Piecewise-constant threshold schedule for covenants.
+ *
+ * Entries are stored sorted by date ascending. The effective threshold for a
+ * test date is the last entry with date <= test_date. If no entry applies,
+ * [`ThresholdSchedule::threshold_for`] returns `None`.
+ */
+export type ThresholdSchedule = [DateWire, number][];
+/**
+ * Comparable units of the elected statement observation.
+ */
+export type CovenantStatementUnit =
+  | {
+      kind: "ratio";
+    }
+  | {
+      /**
+       * Expected consistent ISO reporting currency.
+       */
+      currency: Currency;
+      kind: "money";
+    };
+/**
+ * The measure to calculate for an identified borrowing and reporting period.
+ */
+export type CreditMeasure =
+  | "cash_dscr"
+  | "cash_and_pik_dscr"
+  | "cash_dscr_with_fees"
+  | "interest_coverage"
+  | "loan_to_value"
+  | "debt_to_enterprise_value";
+/**
+ * Typed result for one measure and period, retaining reasons for missing or zero debt service.
+ */
+export type CreditMeasureValue =
+  | {
+      /**
+       * Positive denominator in reporting currency.
+       */
+      denominator: Money;
+      /**
+       * Signed numerator in reporting currency.
+       */
+      numerator: Money;
+      /**
+       * Unitless ratio, where 1.5 represents 1.5x or 150%.
+       */
+      ratio: number;
+      status: "measured";
+    }
+  | {
+      status: "inapplicable";
+    }
+  | {
+      /**
+       * Specific input or exposure admission evidence that is missing.
+       */
+      reason: string;
+      status: "unavailable";
+    };
+/**
+ * Which explicit observations an evaluation may read.
+ *
+ * On the wire: `"full_snapshot"`, or `{"through": "2025-04-25"}`.
+ */
+export type ObservationCutoff =
+  | "full_snapshot"
+  | {
+      through: DateWire;
+    };
+/**
+ * Elected statistical credit model and any matching market-equity observation.
+ */
+export type CreditScoringModel =
+  | {
+      /**
+       * Date of market capitalization, matching the selected financial close.
+       */
+      as_of: DateWire;
+      /**
+       * Dated equity market capitalization in the statement currency.
+       */
+      market_equity: Money;
+      model: "altman_z";
+    }
+  | {
+      model: "altman_z_prime";
+    }
+  | {
+      model: "altman_z_double_prime";
+    }
+  | {
+      model: "altman_em";
+    }
+  | {
+      model: "zmijewski";
+    };
+/**
+ * How a matched earnings observation is read.
+ */
+export type LboEarningsBasis = "as_observed" | "trailing_additive";
+/**
+ * Economic form of the seller consideration at close.
+ */
+export type LboAcquisition =
+  | {
+      kind: "cash_free_debt_free";
+    }
+  | {
+      /**
+       * Cash contributed to transaction reserves at close.
+       */
+      closing_reserves: Money;
+      kind: "seller_and_refinancing";
+      /**
+       * Cash required at close to refinance resolved obligations.
+       */
+      refinancing: Money;
+      /**
+       * Agreed nonnegative purchase consideration paid to the seller.
+       */
+      seller_consideration: Money;
+    };
+/**
+ * Supported day-count conventions with industry-standard definitions.
+ *
+ * Each variant implements a specific day count convention as defined by
+ * ISDA, ICMA, or local market conventions. The conventions determine how
+ * interest accrues between payment dates.
+ *
+ * The variant docs are deliberately short: they are published verbatim as the
+ * `description` of each wire value in the `common/1/day_count` JSON Schema,
+ * which every instrument contract inlines. Each one carries the convention
+ * name, its defining rule and its standards citation. Formulas, market usage
+ * and worked examples live in the sections below.
+ *
+ * # Standards References
+ *
+ * Implementations follow:
+ * - **ISDA**: 2006 ISDA Definitions, Section 4.16.
+ *   `docs/REFERENCES.md#isda-2006-definitions`
+ * - **ICMA**: ICMA Rule Book, Rule 251. `docs/REFERENCES.md#icma-rule-book`
+ * - **ISMA** (1999). "Recommendations for Accrued Interest Calculations."
+ * - **SIA/PSA**: Standard Securities Calculation Methods (SIA Standard Formulas)
+ * - **ISO**: ISO 20022 Day Count Fraction Codes
+ *
+ * # Formulas
+ *
+ * The 30/360 family shares one day-count formula and differs only in how the
+ * day-of-month values are adjusted:
+ *
+ * ```text
+ * Days = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')
+ * year_fraction = Days / 360
+ *
+ * Thirty360 (fixed US 30U/360 EOM):
+ *   D₁' = 30   if D₁ is 31 or last day of February
+ *   D₂' = 30   if D₂ is 31 and D₁' = 30
+ *   D₂' = 30   if D₂ is last day of Feb and D₁ is last day of Feb
+ *
+ * Thirty360Isda (ISDA bond basis, §4.16(f)):
+ *   D₁' = min(D₁, 30)
+ *   D₂' = 30   if D₂ is 31 and D₁' = 30
+ *
+ * ThirtyE360 (ISDA §4.16(g)):
+ *   D₁' = min(D₁, 30)
+ *   D₂' = min(D₂, 30)
+ *
+ * ThirtyE360Isda (ISDA §4.16(h)):
+ *   D₁' = 30   if D₁ is the last day of its month (incl. end of February)
+ *   D₂' = 30   if D₂ is 31, or if D₂ is the last day of February and the
+ *              period does not end on the termination (maturity) date
+ *
+ * Thirty360It (QuantLib `Thirty360::Italian`):
+ *   D₁' = 30   if D₁ is 31 or (month is February and D₁ > 27)
+ *   D₂' = 30   if D₂ is 31 or (month is February and D₂ > 27)
+ * ```
+ *
+ * - **`Thirty360` versus `Thirty360Isda`**: `Thirty360` is the fixed US
+ *   30U/360 EOM algorithm with its paired February month-end rule (QuantLib
+ *   `Thirty360::USA`); it is not `30/360 PSA`, which lacks the paired end
+ *   adjustment. `Thirty360Isda` is ISDA 2006 §4.16(f) bond basis without any
+ *   February rule (QuantLib `Thirty360::BondBasis`). They differ for periods
+ *   that start or end on the last day of February.
+ * - **`ThirtyE360Isda` termination-date exception**: ISDA §4.16(h) keeps D₂
+ *   unadjusted when the period ends on the termination date and that date is
+ *   the last day of February. [`DayCountContext::end_is_termination_date`]
+ *   must be explicit for this convention: `Some(true)` when the
+ *   chronologically later endpoint is the contractual termination date,
+ *   `Some(false)` otherwise. QuantLib's `Thirty360::ISDA` is this convention.
+ * - **`Thirty360It`** is distinct from US 30U/360 EOM (February EOM only when both
+ *   ends are February EOM) and from 30E/360 (no February-after-27 rule).
+ *
+ * The actual-day conventions:
+ *
+ * - **`Act365L`** (ISDA, A009): requires the enclosing calculation period
+ *   `coupon_period` in [`DayCountContext`]; no frequency is needed. The
+ *   denominator is 366 if that period's end date is in a leap year, else
+ *   365, for every coupon frequency. Partial accrual keeps the enclosing
+ *   coupon's denominator.
+ *   Accrual dates outside that coupon are rejected; sum separate coupon
+ *   slices for calculations spanning multiple coupon periods. This is **not**
+ *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
+ *   [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
+ * - **`Nl365`**: counts the actual calendar days in `(start, end]` and removes
+ *   every February 29 that falls in the period, so a full leap year still
+ *   yields exactly 1.0.
+ * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
+ *   (days in segment) / (days in that year) for each segment, and sum.
+ * - **`ActActIsma`** (ICMA): single-period contained ICMA fraction
+ *   `actual_days(start, end) / (coupons_per_year * actual_days(coupon_period))`.
+ *   Requires both `frequency` (`1M`, `2M`, `3M`, `4M`, `6M`, `12M` or `1Y`)
+ *   and the enclosing unadjusted nominal `coupon_period` in
+ *   [`DayCountContext`]; spans crossing nominal coupon boundaries must be
+ *   sliced by the schedule builder before calling `year_fraction`.
+ * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
+ *   **backwards from `end`** until the candidate is before `start`; each
+ *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
+ *   leap year is bumped to 29 February. The residual fraction is
+ *   `days(start, residual_end) / den`, where `den` is 366 if 29 February lies
+ *   in `[start, residual_end)`, else 365. No [`DayCountContext`] is required.
+ * - **`Bus252`**: requires `calendar` in [`DayCountContext`] and counts its
+ *   business days in `[start, end)` through
+ *   [`HolidayCalendar::count_business_days`](crate::dates::HolidayCalendar::count_business_days).
+ *   Built-in calendars answer from a cached per-year prefix count; custom
+ *   calendars scan each calendar day unless they override the count. A count
+ *   outside `0..=elapsed days` is an error.
+ * - **`OneOne`**: inflation fixed legs compound across annual periods using
+ *   this convention. Empty intervals return zero and reversed intervals are
+ *   rejected, as for all day counts in this API.
+ *
+ * # Usage
+ *
+ * | Convention | Standard for |
+ * | --- | --- |
+ * | `Act360` | USD and EUR money markets, short-term rate derivatives (SOFR, €STR), FX swaps and forwards |
+ * | `Act365F` | GBP money markets (SONIA), cable (GBP/USD) FX, some Commonwealth bond markets |
+ * | `Act365L` | GBP floating-rate notes, some European bond markets |
+ * | `Thirty360` | US corporate bonds, US municipal bonds, US agency debt |
+ * | `ThirtyE360` | Eurobonds, international bonds, some interest rate swaps |
+ * | `Nl365` | Some Canadian money-market and mortgage instruments, legacy systems that ignore leap days |
+ * | `ActAct` | US Treasury bonds, USD and EUR swap fixed legs, government bonds in many markets |
+ * | `ActActIsma` | International bonds with regular coupons, Eurobonds, ICMA-governed securities |
+ * | `Bus252` | BRL-denominated instruments (ANBIMA), some equity derivatives and variance swaps |
+ */
+export type DayCount =
+  | "one_one"
+  | "act_360"
+  | "act_365f"
+  | "act_365l"
+  | "30_360"
+  | "30_360_isda"
+  | "30e_360"
+  | "30e_360_isda"
+  | "30_360_it"
+  | "nl_365"
+  | "act_act"
+  | "act_act_isma"
+  | "act_act_afb"
+  | "bus_252";
+/**
+ * Explicit low and high directions for an enterprise exit multiple.
+ */
+export type DcfMultipleShocks =
+  | {
+      /**
+       * Difference from baseline to the higher multiple in turns.
+       */
+      high: DecimalWire;
+      kind: "absolute";
+      /**
+       * Difference from baseline to the lower multiple in turns.
+       */
+      low: DecimalWire;
+    }
+  | {
+      /**
+       * Proportion of baseline added to it.
+       */
+      high: DecimalWire;
+      kind: "relative";
+      /**
+       * Proportion of baseline subtracted from it.
+       */
+      low: DecimalWire;
+    };
+/**
+ * An explicitly requested corporate DCF sensitivity endpoint.
+ */
+export type DcfSensitivityEndpoint =
+  | {
+      /**
+       * Signed difference from baseline enterprise value in the same currency.
+       */
+      change: Money;
+      /**
+       * Repriced enterprise value in the baseline model currency.
+       */
+      enterprise_value: Money;
+      /**
+       * Requested parameter level, in decimal rates or multiple turns.
+       */
+      level: number;
+      status: "priced";
+    }
+  | {
+      /**
+       * Requested parameter level, in decimal rates or multiple turns.
+       */
+      level: number;
+      /**
+       * Reason the requested level cannot be valued.
+       */
+      reason: string;
+      status: "unavailable";
+    };
+/**
+ * Terminal dimension selected for fixed-statement DCF sensitivity.
+ */
+export type DcfTerminalShocks =
+  | {
+      parameter: "stable_growth";
+      shocks: DcfRateShocks;
+    }
+  | {
+      parameter: "exit_multiple";
+      shocks: DcfMultipleShocks;
     };
 /**
  * Why a configured dimension contributes no signal to the composite score.
@@ -511,19 +1052,6 @@ export type DownturnMethod =
  */
 export type LgdType = "point_in_time" | "through_the_cycle" | "downturn";
 /**
- * Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
- *
- * There is no default mode: every financial rounding names one explicitly.
- */
-export type RoundingMode = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
-/**
- * Finite JSON number that is strictly greater than zero.
- *
- * This type is used by serde field adapters so runtime deserialization and
- * generated schemas enforce the same positive-number contract.
- */
-export type PositiveF64Wire = number;
-/**
  * IFRS 9 impairment stage for a credit exposure.
  *
  * Under IFRS 9, financial instruments are classified into three stages that
@@ -538,6 +1066,31 @@ export type PositiveF64Wire = number;
  * IFRS 9 Financial Instruments, Section 5.5 -- Impairment. `docs/REFERENCES.md#ifrs-9-impairment`
  */
 export type Stage = "stage1" | "stage2" | "stage3";
+/**
+ * Availability of one scenario allowance.
+ */
+export type EclScenarioMeasurement =
+  | {
+      status: "zero_weight";
+    }
+  | {
+      /**
+       * Complete same-basis allowance from the admitted PD and LGD.
+       */
+      result: EclResult;
+      status: "measured";
+      /**
+       * Weighted contribution to the total on the same basis.
+       */
+      weighted_allowance: number;
+    }
+  | {
+      /**
+       * Explanation of the required source evidence that is missing.
+       */
+      reason: string;
+      status: "unavailable";
+    };
 /**
  * An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,
  * otherwise one of the strings `"inf"`, `"-inf"` or `"nan"`.
@@ -635,6 +1188,93 @@ export type ForecastFadeShape = "linear" | "geometric" | "exponential";
  * - **Mixed**: Value OR Forecast OR Formula (precedence: Value > Forecast > Formula)
  */
 export type NodeType = "value" | "calculated" | "mixed";
+/**
+ * Caller-elected policy for finding the root bracket in driver units.
+ */
+export type GoalSeekSearch =
+  | {
+      kind: "bracket";
+      /**
+       * Lower end of the driver range.
+       */
+      lower: number;
+      /**
+       * Upper end of the driver range.
+       */
+      upper: number;
+    }
+  | {
+      /**
+       * Initial positive bracket half-width in driver units.
+       */
+      initial_half_width: number;
+      kind: "bounded";
+      /**
+       * Lowest driver value the solver may evaluate.
+       */
+      lower: number;
+      /**
+       * Maximum number of bracket expansions.
+       */
+      max_expansions: number;
+      /**
+       * Starting driver value in the admitted domain.
+       */
+      start: number;
+      /**
+       * Highest driver value the solver may evaluate.
+       */
+      upper: number;
+    };
+/**
+ * Dated credit-impaired measurement for one elected scenario.
+ */
+export type ImpairedEclOutcome =
+  | {
+      /**
+       * Scenario identity, preserved in caller order.
+       */
+      id: string;
+      /**
+       * Exact elected scenario probability.
+       */
+      weight: DecimalWire;
+      /**
+       * Sourced result before scenario weighting.
+       */
+      result: ImpairedEclResult;
+      status: "measured";
+      /**
+       * Nonnegative same-currency contribution at the exact scenario weight.
+       */
+      weighted_allowance: Money;
+    }
+  | {
+      /**
+       * Scenario identity, preserved in caller order.
+       */
+      id: string;
+      /**
+       * Exact elected scenario probability.
+       */
+      weight: DecimalWire;
+      /**
+       * Explanation of the unavailable scenario.
+       */
+      reason: string;
+      status: "unavailable";
+    }
+  | {
+      /**
+       * Scenario identity, preserved in caller order.
+       */
+      id: string;
+      /**
+       * Exact elected scenario probability.
+       */
+      weight: DecimalWire;
+      status: "zero_weight";
+    };
 /**
  * Convention that determines how `growth_rate` compounds in a lease.
  *
@@ -1626,14 +2266,14 @@ export interface Materiality {
    */
   reference_label: string;
   /**
-   * The reference (denominator) value used when computing `relative_pct`.
+   * The reference (denominator) value used when computing `relative`.
    */
   reference_value: number;
   /**
-   * Discrepancy as a percentage of the reference value; `None` when the
-   * percentage is undefined (a zero reference) or does not apply.
+   * Discrepancy as a decimal fraction of the reference value (0.025 is 2.5%);
+   * `None` when the fraction is undefined (a zero reference) or does not apply.
    */
-  relative_pct?: number | null;
+  relative?: number | null;
   [k: string]: unknown;
 }
 /**
@@ -2029,12 +2669,6 @@ export interface CorporateAnalysis {
    */
   equity?: CorporateValuationResult | null;
   /**
-   * `true` when a DCF enterprise value was computed but suppressed as the
-   * LTV reference because it was non-positive. Credit metrics are then
-   * computed without an enterprise-value reference.
-   */
-  ev_suppressed_non_positive: boolean;
-  /**
    * Full statement evaluation (all nodes, all periods)
    */
   statement: statements.StatementResult;
@@ -2098,13 +2732,8 @@ export interface CreditContextMetrics {
    */
   interest_coverage_min?: number | null;
   /**
-   * LTV by period: `debt_balance[t] / reference_value[t]`.
-   *
-   * A scalar DCF enterprise value is broadcast as the same denominator
-   * on every requested period (current valuation versus forward debt,
-   * not a rolled enterprise-value path). A per-period statement node
-   * supplies a varying value path; a missing period omits LTV for that
-   * period only.
+   * LTV by period: current debt face divided by the selected same-date collateral value.
+   * A missing value leaves LTV unavailable for that period.
    */
   ltv: [PeriodId, number][];
   /**
@@ -2134,18 +2763,9 @@ export interface CorporateValuationResult {
    */
   enterprise_value: Money;
   /**
-   * EV-to-equity bridge whose net adjustment is
-   * [`net_debt`](Self::net_debt): gross debt (`total_debt`) and `cash`
-   * separately, plus preferred equity, minority interest, non-operating
-   * assets and other adjustments, all in the model currency.
-   *
-   * `net_debt = total_debt - cash + preferred_equity + minority_interest -
-   * non_operating_assets - Σ other_adjustments`, so `total_debt - cash`
-   * equals `net_debt` whenever the remaining components are zero (always
-   * the case unless `DcfOptions::equity_bridge` supplies them). Under a
-   * flat `net_debt_override` the override is reported as `total_debt` with
-   * `cash` zero. `None` only for a result deserialized from JSON written
-   * before this field existed.
+   * Gross debt, cash, preferred equity, minority interest, non-operating
+   * assets and named adjustments, in model currency.
+   * An authored flat net debt amount is recorded as debt with zero cash.
    */
   equity_bridge?: EquityBridge | null;
   /**
@@ -2157,9 +2777,14 @@ export interface CorporateValuationResult {
    */
   equity_value_per_share?: number | null;
   /**
-   * Net debt (or effective bridge amount) used in calculation
+   * Interest-bearing debt less cash in model currency.
    */
   net_debt: Money;
+  /**
+   * Net non-debt claims to deduct from enterprise value in model currency.
+   * A negative balance increases common equity.
+   */
+  other_equity_claims: Money;
   /**
    * One row per explicit forecast period that was discounted, in date
    * order: the free cash flow, its discounting tenor and factor, and its
@@ -2209,7 +2834,7 @@ export interface CorporateValuationResult {
    * Total valuation discount (DLOM, DLOC, other) deducted after the
    * EV-to-equity bridge; zero when `DcfOptions::valuation_discounts` is unset.
    *
-   * `enterprise_value - net_debt - valuation_discount` equals
+   * `enterprise_value - net_debt - other_equity_claims - valuation_discount` equals
    * `equity_value`, so a bridge built from these three steps reconciles to
    * the reported equity value.
    */
@@ -2324,8 +2949,8 @@ export interface CorporateAnalysisOptions {
    */
   interest_coverage_node?: string | null;
   /**
-   * Statement node supplying a per-period LTV denominator; `None`
-   * broadcasts a positive DCF enterprise value instead.
+   * Same-date monetary collateral value for each LTV observation.
+   * Omitting the node leaves LTV unavailable.
    */
   ltv_value_node?: string | null;
   /**
@@ -2345,151 +2970,52 @@ export interface CorporateAnalysisOptions {
   wacc?: number | null;
 }
 /**
- * Flags periods where a coverage ratio (e.g.
+ * Named cash-flow and terminal assumptions on an explicit statement valuation cut.
  */
-export interface CoverageFloorCheck {
+export interface CorporateDcfRequest {
   /**
-   * Denominator node (e.g. interest expense, total debt service).
+   * Explicit effective valuation date, observation cutoff and currency.
    */
-  denominator_node: Id;
+  cut: StatementValuationCut;
   /**
-   * Minimum ratio before an error is issued.
+   * WACC, terminal method and explicitly named operating cashflow.
    */
-  min_error: number;
+  inputs: DcfInputs;
   /**
-   * Minimum ratio before a warning is issued.
+   * Additional equity bridge, dilution and timing assumptions.
    */
-  min_warning: number;
+  options: DcfOptions;
   /**
-   * Numerator node (e.g. EBITDA, cash flow available for debt service).
+   * Projection selection and normalized annual terminal basis.
    */
-  numerator_node: Id;
-  [k: string]: unknown;
+  projection: DcfProjection;
 }
 /**
- * Structured credit assessment: leverage, interest coverage, and free cash flow at a `period` plus a per-period series for trend display.
+ * Explicit timing basis for a point-in-time corporate valuation.
  */
-export interface CreditAssessment {
+export interface StatementValuationCut {
   /**
-   * Free cash flow at `period`.
+   * Effective calendar date from which projected cash receipts are discounted.
    */
-  free_cash_flow?: number | null;
+  as_of: DateWire;
   /**
-   * Interest coverage at `period`.
+   * Single reporting currency shared by authored cashflows, bridges and the model.
    */
-  interest_coverage?: number | null;
+  currency: Currency;
   /**
-   * Leverage ratio at `period`.
+   * Latest publication date eligible for the statement run, inclusive.
    */
-  leverage_ratio?: number | null;
-  /**
-   * Assessment period rendered as a string (e.g. `"2025Q4"`).
-   */
-  period: string;
-  /**
-   * Per-period series (ascending) for trend display.
-   */
-  series: CreditAssessmentPoint[];
-  [k: string]: unknown;
+  observed_through: DateWire;
 }
 /**
- * One period's structured credit metrics. Each metric is `None` when it
- * cannot be computed for that period (e.g. an incomplete TTM window, mixed
- * scalar/monetary representations, or different input currencies).
- */
-export interface CreditAssessmentPoint {
-  /**
-   * Free cash flow at this period.
-   */
-  free_cash_flow?: number | null;
-  /**
-   * TTM EBITDA / TTM interest expense.
-   */
-  interest_coverage?: number | null;
-  /**
-   * Total debt / TTM EBITDA.
-   */
-  leverage_ratio?: number | null;
-  /**
-   * Period identifier rendered as a string (e.g. `"2025Q4"`).
-   */
-  period: string;
-  [k: string]: unknown;
-}
-/**
- * Maps node IDs for credit underwriting analysis.
+ * Headline DCF assumptions of [`evaluate_dcf`]: discount rate, terminal value,
+ * cash-flow node and optional net-debt override.
  *
- * Used by [`super::suites::credit_underwriting_checks`] to build leverage,
- * coverage, cash-flow, and trend checks. Unknown JSON keys are rejected, so
- * a misspelled optional key fails instead of silently disabling its check.
- */
-export interface CreditMapping {
-  /**
-   * Monthly cash burn node (for liquidity runway).
-   */
-  cash_burn_node?: Id | null;
-  /**
-   * Cash / liquidity node.
-   */
-  cash_node?: Id | null;
-  /**
-   * Comparison and reporting policy of the suite. Identities are compared
-   * exactly unless a tolerance is stated here.
-   */
-  config?: CheckConfig;
-  /**
-   * Minimum coverage ratio that triggers a warning; defaults to `1.5`.
-   */
-  coverage_min_warn?: number | null;
-  /**
-   * Total debt node.
-   */
-  debt_node: Id;
-  /**
-   * EBITDA node.
-   */
-  ebitda_node: Id;
-  /**
-   * Free cash flow node.
-   */
-  fcf_node?: Id | null;
-  /**
-   * Interest expense node.
-   */
-  interest_expense_node: Id;
-  /**
-   * `(min, max)` leverage warning range; defaults to `(0.0, 6.0)`.
-   *
-   * @minItems 2
-   * @maxItems 2
-   */
-  leverage_warn?: [number, number] | null;
-}
-/**
- * Parameters of [`ForecastSpec::CurvePct`].
- */
-export interface CurvePctParams {
-  /**
-   * Growth rate per forecast period as decimals, one per period in order.
-   */
-  curve: number[];
-  /**
-   * Upper bound clamped onto generated values, in the line's base units.
-   */
-  max?: number | null;
-  /**
-   * Lower bound clamped onto generated values, in the line's base units.
-   */
-  min?: number | null;
-  /**
-   * Level at the opening of the forecast suffix, in the series' own units.
-   * When omitted, the value of the slot immediately before the suffix is
-   * the base.
-   */
-  start?: number | null;
-}
-/**
- * Headline DCF assumptions: decimal WACC, terminal value, unlevered free cash flow node and optional net-debt override.
+ * The serde form is the host input of `evaluate_dcf`: `wacc` and
+ * `terminal_value` are required, `ufcf_node` defaults to
+ * [`DEFAULT_UFCF_NODE`] and `net_debt_override` to `None`; an unknown field
+ * is rejected. For example
+ * `{"wacc": 0.10, "terminal_value": {"type": "gordon_growth", "stable_growth_rate": 0.02}}`.
  */
 export interface DcfInputs {
   /**
@@ -2514,6 +3040,14 @@ export interface DcfInputs {
 }
 /**
  * Optional configuration for DCF valuation beyond the core WACC/terminal parameters.
+ *
+ * Percentage-style inputs use decimal form, so `0.10` means `10%`.
+ * [`Default`] caps perpetual stable growth at 5%.
+ *
+ * The serde form is the host input for DCF options: every field is optional
+ * and a missing field takes its [`Default`] value, while an unknown field is
+ * rejected. For example `{"exit_multiple_bump": {"relative": 0.10}}` keeps
+ * every other default and shocks the exit multiple by ±10%.
  */
 export interface DcfOptions {
   /**
@@ -2612,6 +3146,1004 @@ export interface ValuationDiscounts {
   other_discount?: number | null;
 }
 /**
+ * Authored terminal horizon and optional normalized annual FCFF election.
+ */
+export interface DcfProjection {
+  /**
+   * Exact monetary node for the forward portion of the one forecast period
+   * straddling the cut. Its modeled receipt is the end of that period.
+   */
+  forward_remainder_node?: string | null;
+  /**
+   * Required for a growth terminal and absent for an exit multiple.
+   */
+  normalized_annual_fcff?: TerminalFcffBasis | null;
+  /**
+   * Elected maximum annual stable growth as a decimal rate; absent means no ceiling.
+   */
+  stable_growth_ceiling?: number | null;
+  /**
+   * Terminal value is discounted to the same cut on its own ACT/365.25 tenor.
+   */
+  terminal_date: DateWire;
+}
+/**
+ * Financial covenant specification with test frequency and consequences.
+ */
+export interface Covenant {
+  /**
+   * Actions taken if covenant is breached
+   */
+  consequences: CovenantConsequence[];
+  /**
+   * Type of covenant (leverage, coverage, etc.)
+   */
+  covenant_type: CovenantType;
+  /**
+   * Optional cure period in days before default
+   */
+  cure_period_days?: number | null;
+  /**
+   * Whether the covenant is currently active
+   */
+  is_active: boolean;
+  /**
+   * Optional instance label disambiguating covenants of the same type.
+   *
+   * [`CovenantType::covenant_id`] is discriminant-only, so two covenants of
+   * the same type (e.g. a senior and a total leverage test, or two baskets)
+   * would collide in compliance reports and breach tracking without a
+   * distinct label. Waivers and breaches key off it.
+   */
+  label: string;
+  /**
+   * Whether the covenant is maintenance or incurrence.
+   */
+  scope: CovenantScope;
+  /**
+   * Optional activation condition for springing covenants.
+   */
+  springing_condition?: SpringingCondition | null;
+  /**
+   * How frequently the covenant is tested.
+   *
+   * Descriptive metadata only: the engine does **not** enforce this
+   * schedule. Callers control test dates by choosing when to invoke
+   * [`super::CovenantEngine::evaluate`].
+   */
+  test_frequency: Tenor;
+}
+/**
+ * Optional activation condition for springing covenants.
+ */
+export interface SpringingCondition {
+  /**
+   * Metric that controls activation (e.g., revolver utilization), named by
+   * its statements node ID.
+   */
+  metric_id: Id;
+  /**
+   * Threshold test applied to the metric.
+   */
+  test: ThresholdTest;
+}
+/**
+ * A parsed tenor representing a time period.
+ *
+ * Tenors are commonly used in financial markets to specify maturities,
+ * payment frequencies, and rate fixing periods.
+ */
+export interface Tenor {
+  /**
+   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
+   * rejected because a zero-length period makes schedule generation loop.
+   */
+  count: number;
+  /**
+   * Calendar unit the count is expressed in, such as days, weeks, months,
+   * or years.
+   */
+  unit: TenorUnit;
+}
+/**
+ * Evidence for an explicitly selected covenant on one observation date.
+ */
+export interface CovenantAssessment {
+  /**
+   * Stable covenant instance key.
+   */
+  covenant_id: string;
+  /**
+   * Threshold after the active schedule and lender amendments, when applicable.
+   */
+  effective_threshold?: number | null;
+  /**
+   * Missing metric identifier when the assessment could not complete.
+   */
+  missing_metric?: string | null;
+  /**
+   * Report produced by the engine for an assessed test.
+   */
+  report?: CovenantReport | null;
+  /**
+   * Applicability and evidence state of the test.
+   */
+  state: CovenantAssessmentState;
+  /**
+   * Effective terms selected on the observation date when applicable.
+   */
+  terms?: CovenantSpec | null;
+}
+/**
+ * Covenant check result.
+ */
+export interface CovenantReport {
+  /**
+   * Actual value of the metric
+   */
+  actual_value?: number | null;
+  /**
+   * Stable machine-readable covenant instance identifier.
+   */
+  covenant_id?: string | null;
+  /**
+   * Type of covenant being checked
+   */
+  covenant_type: string;
+  /**
+   * Details or explanation
+   */
+  details?: string | null;
+  /**
+   * Cushion relative to threshold (positive => passing buffer)
+   */
+  headroom?: number | null;
+  /**
+   * Signed cushion in the covenant metric's own units when numerically meaningful.
+   */
+  headroom_raw?: number | null;
+  /**
+   * Audit stamp: numeric mode, rounding context, and FX policy in force.
+   */
+  meta?: ResultsMeta;
+  /**
+   * Whether the covenant passed
+   */
+  passed: boolean;
+  /**
+   * Required threshold
+   */
+  threshold?: number | null;
+}
+/**
+ * Metadata bundle that accompanies valuation outputs.
+ *
+ * The metadata is intentionally small so it can be attached to reports and
+ * downstream data stores for reproducibility and audit trails.
+ */
+export interface ResultsMeta {
+  /**
+   * Optional FX policy applied by the computing layer (human-readable key).
+   */
+  fx_policy_applied?: string | null;
+  /**
+   * Numeric engine mode used to produce the results.
+   *
+   * Always [`NUMERIC_MODE_F64`] today; a plain string so result
+   * envelopes stay wire-compatible across host languages.
+   */
+  numeric_mode: string;
+  /**
+   * Whether the producing computation ran in parallel.
+   *
+   * Serial results omit the field entirely so existing payloads and golden
+   * files stay byte-identical.
+   */
+  parallel?: boolean;
+  /**
+   * Rounding context snapshot applied to IO boundaries.
+   */
+  rounding: RoundingContext;
+  /**
+   * Timestamp when result was computed (ISO 8601 format).
+   * Useful for audit trails and reproducibility.
+   */
+  timestamp?: string | null;
+  /**
+   * Finstack Quant library version used to produce the result.
+   */
+  version?: string | null;
+  [k: string]: unknown;
+}
+/**
+ * Snapshot of active rounding settings used for result stamping.
+ *
+ * Instances are produced from a [`FinstackConfig`] via `RoundingContext::from` and persisted
+ * alongside valuation results.
+ */
+export interface RoundingContext {
+  /**
+   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
+   */
+  ingest_scale_by_currency: {
+    [k: string]: number;
+  };
+  /**
+   * Explicitly selected rounding mode; absent when none was selected.
+   */
+  mode?: RoundingMode | null;
+  /**
+   * Validated output scale snapshot by currency code, with values in `0..=28`.
+   */
+  output_scale_by_currency: {
+    [k: string]: number;
+  };
+  /**
+   * Tolerance settings snapshot for floating-point comparisons.
+   */
+  tolerances?: ToleranceConfig;
+  /**
+   * Schema version for forward compatibility.
+   */
+  version: number;
+  [k: string]: unknown;
+}
+/**
+ * Numerical tolerance configuration for floating-point comparisons.
+ *
+ * Provides the configurable epsilon for generic floating-point zero-checks.
+ * The default is chosen to balance numerical stability with practical
+ * precision requirements.
+ */
+export interface ToleranceConfig {
+  /**
+   * Epsilon for generic floating-point comparisons (default: 1e-10).
+   *
+   * Used for general numerical comparisons where higher tolerance is acceptable.
+   */
+  generic_epsilon?: PositiveF64Wire;
+}
+/**
+ * Covenant evaluation specification.
+ */
+export interface CovenantSpec {
+  /**
+   * The covenant to evaluate
+   */
+  covenant: Covenant;
+  /**
+   * Earnings denominator used to validate a leverage ratio. Required for net
+   * debt/EBITDA, where a negative ratio can mean net cash or negative earnings.
+   * Values must be finite and in the same reporting-period convention as the
+   * ratio. A non-positive denominator makes the test a breach with no headroom.
+   */
+  denominator_metric_id?: Id | null;
+  /**
+   * Metric ID to use for evaluation (for financial covenants), conventionally
+   * a statements node ID such as `debt_to_ebitda`, `ebitda`,
+   * `interest_coverage`, or `dscr`.
+   */
+  metric_id?: Id | null;
+  /**
+   * Time-varying threshold schedule that overrides the static threshold in
+   * [`CovenantType`] when present. Enables leverage step-down schedules.
+   */
+  threshold_schedule?: ThresholdSchedule | null;
+}
+/**
+ * Bind one contractual metric, denominator or springing trigger to a named node.
+ */
+export interface CovenantObservationBinding {
+  /**
+   * Exact statement node identifier, with no name fallback.
+   */
+  node: string;
+  /**
+   * Expected monetary or ratio units.
+   */
+  unit: CovenantStatementUnit;
+}
+/**
+ * Flags periods where a coverage ratio (e.g.
+ */
+export interface CoverageFloorCheck {
+  /**
+   * Denominator node (e.g. interest expense, total debt service).
+   */
+  denominator_node: Id;
+  /**
+   * Minimum ratio before an error is issued.
+   */
+  min_error: number;
+  /**
+   * Minimum ratio before a warning is issued.
+   */
+  min_warning: number;
+  /**
+   * Numerator node (e.g. EBITDA, cash flow available for debt service).
+   */
+  numerator_node: Id;
+  [k: string]: unknown;
+}
+/**
+ * Structured credit assessment: leverage, interest coverage, and free cash flow at a `period` plus a per-period series for trend display.
+ */
+export interface CreditAssessment {
+  /**
+   * Free cash flow at `period`.
+   */
+  free_cash_flow?: number | null;
+  /**
+   * Interest coverage at `period`.
+   */
+  interest_coverage?: number | null;
+  /**
+   * Leverage ratio at `period`.
+   */
+  leverage_ratio?: number | null;
+  /**
+   * Assessment period rendered as a string (e.g. `"2025Q4"`).
+   */
+  period: string;
+  /**
+   * Per-period series (ascending) for trend display.
+   */
+  series: CreditAssessmentPoint[];
+  [k: string]: unknown;
+}
+/**
+ * One period's structured credit metrics. Each metric is `None` when it
+ * cannot be computed for that period (e.g. an incomplete TTM window, mixed
+ * scalar/monetary representations, or different input currencies).
+ */
+export interface CreditAssessmentPoint {
+  /**
+   * Free cash flow at this period.
+   */
+  free_cash_flow?: number | null;
+  /**
+   * TTM EBITDA / TTM interest expense.
+   */
+  interest_coverage?: number | null;
+  /**
+   * Total debt / TTM EBITDA.
+   */
+  leverage_ratio?: number | null;
+  /**
+   * Period identifier rendered as a string (e.g. `"2025Q4"`).
+   */
+  period: string;
+  [k: string]: unknown;
+}
+/**
+ * Borrower credit observations and available minima on selected periods.
+ */
+export interface CreditContextReport {
+  /**
+   * Borrowing whose obligations and balance were measured.
+   */
+  borrowing_id: string;
+  /**
+   * Coverage counts and minima in requested measure order.
+   */
+  coverage: CreditMeasureCoverage[];
+  /**
+   * Same currency for all reported monetary operands.
+   */
+  currency: Currency;
+  /**
+   * All elected period and measure pairs, including unavailable rows.
+   */
+  rows: CreditMeasureRow[];
+  /**
+   * Verified statement run that produced both cash flows and period metadata.
+   */
+  run: RunProvenance;
+}
+/**
+ * Coverage summary for one elected measure.
+ */
+export interface CreditMeasureCoverage {
+  /**
+   * Minimum of the eligible path, present only when every applicable period is measured.
+   */
+  full_path_minimum?: number | null;
+  /**
+   * Number of verified periods where the measure had zero debt service.
+   */
+  inapplicable: number;
+  /**
+   * Elected measure summarized.
+   */
+  measure: CreditMeasure;
+  /**
+   * Number of measured periods.
+   */
+  measured: number;
+  /**
+   * Minimum among the available observed periods.
+   */
+  observed_minimum?: number | null;
+  /**
+   * Number of requested periods where applicable coverage could not be verified.
+   */
+  unavailable: number;
+}
+/**
+ * Per-period calculation evidence for one of the elected credit measures.
+ */
+export interface CreditMeasureRow {
+  /**
+   * Contractual reporting date that closes the period.
+   */
+  date: DateWire;
+  /**
+   * Elected measure for this row.
+   */
+  measure: CreditMeasure;
+  /**
+   * Elected reporting period.
+   */
+  period: PeriodId;
+  /**
+   * Source valuation identifier for a collateral or enterprise denominator.
+   */
+  reference_source_id?: string | null;
+  /**
+   * Ratio, absence or explicit inapplicability.
+   */
+  value: CreditMeasureValue;
+}
+/**
+ * What a result was evaluated from.
+ *
+ * A consumer that is handed a result checks this against the model, period
+ * plan and run it expects before trusting the cells.
+ */
+export interface RunProvenance {
+  /**
+   * The random stream of every stochastic forecast node in a single run,
+   * in model node order: enough to replay its draws.
+   */
+  forecast_streams?: ForecastStream[];
+  /**
+   * Canonical snapshot hash of the market held for an explicitly priced run.
+   * Absent if the supplied provider cannot furnish a coherent capture.
+   */
+  market_content_hash?: string | null;
+  /**
+   * Canonical content hash of the evaluated model
+   * ([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).
+   */
+  model_content_hash: string;
+  /**
+   * Identifier of the evaluated model.
+   */
+  model_id: string;
+  /**
+   * Observations the run was allowed to read.
+   */
+  observation_cutoff: ObservationCutoff;
+  /**
+   * Identity of this evaluation run: the canonical content hash of the
+   * fields above, including the market snapshot identity when it was supplied.
+   */
+  run_id: string;
+  /**
+   * Identity of the source snapshot the model's observations came from.
+   */
+  source_snapshot?: string | null;
+  /**
+   * Valuation date the capital structure was priced at, when the run used
+   * a market.
+   */
+  valuation_date?: DateWire | null;
+}
+/**
+ * Replay provenance of one stochastic forecast node in a single run.
+ *
+ * The generator is the shared PCG64 started at `state` on stream `stream`
+ * (`Pcg64Rng::new_with_stream(state, stream)`). Both are derived from the
+ * versioned key: the key version, the configured seed, the node and the
+ * single-run mode. Unsigned 64-bit values are decimal strings in JSON.
+ */
+export interface ForecastStream {
+  /**
+   * The stochastic forecast node.
+   */
+  node_id: string;
+  /**
+   * The forecast method's exact configured seed.
+   */
+  seed: string;
+  /**
+   * Effective PCG64 starting state.
+   */
+  state: string;
+  /**
+   * Effective PCG64 stream selector.
+   */
+  stream: string;
+  /**
+   * Version of the mapping from the key to the stream.
+   */
+  stream_version: number;
+}
+/**
+ * Explicit same-run borrowing, ratio selections and reference valuations.
+ */
+export interface CreditContextSpec {
+  /**
+   * Exact borrowing identifier carried by the verified capital result.
+   */
+  borrowing_id: string;
+  /**
+   * Named cash-fee amount required by the fee-inclusive measure.
+   */
+  cash_fees_node?: string | null;
+  /**
+   * Same-currency cash-flow numerator for every requested DSCR.
+   */
+  cfads_node?: string | null;
+  /**
+   * Reporting currency for all financial operands.
+   */
+  currency: Currency;
+  /**
+   * Same-currency earnings numerator used for interest coverage.
+   */
+  earnings_node?: string | null;
+  /**
+   * Explicit nonempty list of distinct measures in reporting order.
+   */
+  measures: CreditMeasure[];
+  /**
+   * Explicit unique reporting periods from that statement run.
+   */
+  periods: PeriodId[];
+  /**
+   * Verified recognized interest including PIK on the same borrowing and period basis.
+   */
+  recognized_interest_node?: string | null;
+  /**
+   * Explicit borrowing-scoped valuations, at most one date for each elected reference basis.
+   */
+  reference_values: CreditReferenceValue[];
+  /**
+   * Expected statement and capital run identity.
+   */
+  run_id: string;
+}
+/**
+ * Identified collateral or enterprise value matched to a particular closing date and debt scope.
+ */
+export interface CreditReferenceValue {
+  /**
+   * Positive value of the specified collateral or enterprise in reporting currency.
+   */
+  amount: Money;
+  /**
+   * Reported calendar close matched to an exact model period.
+   */
+  date: DateWire;
+  /**
+   * Basis supported by the evidence. Use LoanToValue for collateral and DebtToEnterpriseValue for enterprise value.
+   */
+  measure: CreditMeasure;
+  /**
+   * Identifier of the underlying valuation and its direct scope evidence.
+   */
+  source_id: string;
+}
+/**
+ * Maps node IDs for credit underwriting analysis.
+ *
+ * Used by [`super::suites::credit_underwriting_checks`] to build leverage,
+ * coverage, cash-flow, and trend checks. Unknown JSON keys are rejected, so
+ * a misspelled optional key fails instead of silently disabling its check.
+ */
+export interface CreditMapping {
+  /**
+   * Monthly cash burn node (for liquidity runway).
+   */
+  cash_burn_node?: Id | null;
+  /**
+   * Cash / liquidity node.
+   */
+  cash_node?: Id | null;
+  /**
+   * Comparison and reporting policy of the suite. Identities are compared
+   * exactly unless a tolerance is stated here.
+   */
+  config?: CheckConfig;
+  /**
+   * Minimum coverage ratio that triggers a warning; defaults to `1.5`.
+   */
+  coverage_min_warn?: number | null;
+  /**
+   * Total debt node.
+   */
+  debt_node: Id;
+  /**
+   * EBITDA node.
+   */
+  ebitda_node: Id;
+  /**
+   * Free cash flow node.
+   */
+  fcf_node?: Id | null;
+  /**
+   * Interest expense node.
+   */
+  interest_expense_node: Id;
+  /**
+   * `(min, max)` leverage warning range; defaults to `(0.0, 6.0)`.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  leverage_warn?: [number, number] | null;
+}
+/**
+ * Parameters of [`ForecastSpec::CurvePct`].
+ */
+export interface CurvePctParams {
+  /**
+   * Growth rate per forecast period as decimals, one per period in order.
+   */
+  curve: number[];
+  /**
+   * Upper bound clamped onto generated values, in the line's base units.
+   */
+  max?: number | null;
+  /**
+   * Lower bound clamped onto generated values, in the line's base units.
+   */
+  min?: number | null;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
+}
+/**
+ * Acquisition and exit dates, recognized funding and projected exit assumptions.
+ */
+export interface DatedLboRequest {
+  /**
+   * Optional report and decision policy for statement checks.
+   */
+  checks?: LboQualification | null;
+  /**
+   * Valuation date, reporting currency and entry observation cut.
+   */
+  cut: StatementValuationCut;
+  /**
+   * Earnings basis and matching purchase multiple on the entry date.
+   */
+  entry: LboEarnings;
+  /**
+   * Projected earnings basis and exit multiple at the elected exit date.
+   */
+  exit: LboEarnings;
+  /**
+   * Exact projected cash node eligible in the exit equity bridge.
+   */
+  exit_cash_node: string;
+  /**
+   * Exact projected non-debt claims or selling costs payable ahead of equity.
+   */
+  exit_claims_node?: string | null;
+  /**
+   * Exact projected closing debt node, measured as financing face.
+   */
+  exit_debt_node: string;
+  /**
+   * Exit date in the verified projected statement.
+   */
+  exit_valuation_date: DateWire;
+  /**
+   * Date, actual closing uses and named admissible cash sources.
+   */
+  funding: LboFunding;
+}
+/**
+ * Optional statement check suite and its effect on the LBO qualification.
+ */
+export interface LboQualification {
+  /**
+   * Require a passing suite before publishing a funded return.
+   */
+  required: boolean;
+  /**
+   * Checks run on the same statement result used for the transaction.
+   */
+  suite: CheckSuiteSpec;
+}
+/**
+ * Authored earnings observation and timing for one transaction multiple.
+ */
+export interface LboEarnings {
+  /**
+   * Earnings dimension matched to the multiple's convention.
+   */
+  basis: LboEarningsBasis;
+  /**
+   * Price divided by earnings, in positive multiple turns.
+   */
+  multiple: DecimalWire;
+  /**
+   * Exact node name supplying the elected earnings amount in transaction currency.
+   */
+  node: string;
+  /**
+   * Existing statement period containing the closing observation.
+   */
+  period: PeriodId;
+}
+/**
+ * Dated transaction funding assumptions authored on one currency basis.
+ */
+export interface LboFunding {
+  /**
+   * Purchase consideration and refinancing election.
+   */
+  acquisition: LboAcquisition;
+  /**
+   * Separate nonnegative credit against otherwise required closing uses.
+   */
+  closing_credits: Money;
+  /**
+   * Effective investment and refinancing date.
+   */
+  date: DateWire;
+  /**
+   * Admitted cash debt sources and their separately identified opening face.
+   */
+  debt: LboDebtFunding[];
+  /**
+   * Actual sponsor cash committed at entry, or absent for a sizing case.
+   */
+  sponsor_commitment?: Money | null;
+  /**
+   * Nonnegative adviser, financing, and transaction expenses paid at close.
+   */
+  transaction_fees: Money;
+}
+/**
+ * Cash proceeds and opening contractual face of one named debt source.
+ */
+export interface LboDebtFunding {
+  /**
+   * Actual cash proceeds credited at closing, in transaction currency.
+   */
+  cash_proceeds: Money;
+  /**
+   * Unique identity matching the source debt instrument.
+   */
+  name: string;
+  /**
+   * Contractual face outstanding immediately after closing.
+   */
+  opening_face: Money;
+}
+/**
+ * Reconciled sources and uses and qualified sponsor returns.
+ */
+export interface DatedLboResult {
+  /**
+   * Verdict and evidence from the elected statement checks.
+   */
+  checks?: CheckReport | null;
+  /**
+   * Effective closing date used for the initial funding bridge.
+   */
+  entry_date: DateWire;
+  /**
+   * Resolved reported entry earnings in the transaction currency.
+   */
+  entry_earnings: Money;
+  /**
+   * Entry enterprise value from the elected purchase multiple.
+   */
+  entry_enterprise_value: Money;
+  /**
+   * Signed exit residual and applicable sponsor returns.
+   */
+  exit: LboExitBridge;
+  /**
+   * Projected earnings in the same currency.
+   */
+  exit_earnings: Money;
+  /**
+   * Projected exit date used for the common-equity bridge.
+   */
+  exit_valuation_date: DateWire;
+  /**
+   * Reconciled initial uses, cash proceeds, opening face and funding gap.
+   */
+  funding: LboFundingResult;
+  /**
+   * Accepted statement run for all financial inputs and checks.
+   */
+  run: RunProvenance;
+}
+/**
+ * Dated and reconciled sponsor economics on the same numeraire as entry.
+ */
+export interface LboExitBridge {
+  /**
+   * Enterprise value less debt and claims, before the equity option floor.
+   */
+  common_equity_residual: Money;
+  /**
+   * Enterprise value at the elected exit date.
+   */
+  enterprise_value: Money;
+  /**
+   * Proceeds over actual cash only when the commitment reconciles the uses.
+   */
+  funded_moic?: number | null;
+  /**
+   * Debt less admitted cash at exit, which may be negative.
+   */
+  net_debt: Money;
+  /**
+   * Other signed claims deducted ahead of common equity.
+   */
+  other_claims: Money;
+  /**
+   * Proceeds over implied required cash, when required cash is positive.
+   */
+  sized_moic?: number | null;
+  /**
+   * Common equity distribution floored at zero.
+   */
+  sponsor_proceeds: Money;
+}
+/**
+ * Reconciled signed funding residual and its separately reported cash and face.
+ */
+export interface LboFundingResult {
+  /**
+   * Total transaction cash uses after separately authored credits.
+   */
+  cash_uses: Money;
+  /**
+   * Total explicitly committed cash sources when a sponsor commitment is supplied.
+   */
+  committed_cash_sources?: Money | null;
+  /**
+   * Cash proceeds from all admitted debt sources.
+   */
+  debt_cash_proceeds: Money;
+  /**
+   * Uses less committed cash sources. A positive amount is a shortage.
+   */
+  funding_gap?: Money | null;
+  /**
+   * Contractual face outstanding at entry, separate from proceeds.
+   */
+  opening_debt_face: Money;
+  /**
+   * Uses less debt cash proceeds, before applying sponsor cash.
+   */
+  required_sponsor_cash: Money;
+  [k: string]: unknown;
+}
+/**
+ * Coherent repriced Monte Carlo enterprise and equity values by path and quantile.
+ */
+export interface DcfDistributionResult {
+  /**
+   * One enterprise and equity result per retained path.
+   */
+  paths: DcfPathValue[];
+  /**
+   * Unchanged model and statement information cutoff shared by the samples.
+   */
+  provenance: RunProvenance;
+  /**
+   * Derived valuation quantiles in the simulation's requested probability order.
+   */
+  quantiles: DcfPathQuantile[];
+}
+/**
+ * One sampled company valuation, with the original Monte Carlo path identity.
+ */
+export interface DcfPathValue {
+  /**
+   * Enterprise value in reporting currency.
+   */
+  enterprise_value: Money;
+  /**
+   * Common equity value after bridge and discounts.
+   */
+  equity_value: Money;
+  /**
+   * Zero-based path identity shared by all sampled cash flows.
+   */
+  path_id: number;
+}
+/**
+ * Same-currency values at an elected Monte Carlo quantile.
+ */
+export interface DcfPathQuantile {
+  /**
+   * R-7 enterprise-value sample quantile.
+   */
+  enterprise_value: Money;
+  /**
+   * R-7 common-equity sample quantile.
+   */
+  equity_value: Money;
+  /**
+   * Requested probability as a fraction between zero and one.
+   */
+  probability: number;
+}
+/**
+ * Decimal-rate distances in the low and high directions from an admitted rate.
+ */
+export interface DcfRateShocks {
+  /**
+   * Positive difference from the baseline to the requested higher rate.
+   */
+  high: DecimalWire;
+  /**
+   * Positive difference from the baseline to the requested lower rate.
+   */
+  low: DecimalWire;
+}
+/**
+ * Rectangular enterprise-value results and unavailable endpoints.
+ */
+export interface DcfSensitivityGridResult {
+  /**
+   * Row and column axes as requested, including economically unavailable levels.
+   */
+  axes: DcfSensitivityGridSpec;
+  /**
+   * Reused verified baseline enterprise value before discounts.
+   */
+  baseline_enterprise_value: Money;
+  /**
+   * Rows indexed by WACC and columns indexed by the terminal parameter.
+   */
+  cells: DcfSensitivityEndpoint[][];
+}
+/**
+ * Explicit axes for an enterprise-value sensitivity grid.
+ */
+export interface DcfSensitivityGridSpec {
+  /**
+   * Stable growth decimal rates or exit multiple turns, in column order.
+   */
+  terminal_values: number[];
+  /**
+   * Annual effective WACC decimal rates, in row order.
+   */
+  wacc_values: number[];
+}
+/**
+ * The two independent directions for a named corporate DCF parameter.
+ */
+export interface DcfSensitivityPair {
+  /**
+   * Endpoint at the requested higher parameter level.
+   */
+  high: DcfSensitivityEndpoint;
+  /**
+   * Endpoint at the requested lower parameter level.
+   */
+  low: DcfSensitivityEndpoint;
+  /**
+   * Canonical name of the parameter changed by this pair.
+   */
+  parameter_id: string;
+}
+/**
  * Enterprise-value tornado for the headline DCF assumptions.
  */
 export interface DcfSensitivityResult {
@@ -2667,6 +4199,33 @@ export interface TornadoEntry {
    */
   upside: number;
   [k: string]: unknown;
+}
+/**
+ * Independent WACC and terminal value assumption shocks.
+ */
+export interface DcfSensitivityShocks {
+  /**
+   * Low and high terminal shocks in the compatible terminal dimension.
+   */
+  terminal: DcfTerminalShocks;
+  /**
+   * Positive low and high WACC distances in decimal rate units.
+   */
+  wacc: DcfRateShocks;
+}
+/**
+ * Ranked DCF sensitivity pairs preserving unavailable endpoints.
+ */
+export interface DcfShockReport {
+  /**
+   * Enterprise value at the original WACC and terminal assumptions.
+   */
+  baseline_enterprise_value: Money;
+  /**
+   * Complete pairs ranked by absolute swing, then identifier.
+   * Pairs with an unavailable endpoint follow complete pairs.
+   */
+  pairs: DcfSensitivityPair[];
 }
 /**
  * Hierarchical dependency tree structure.
@@ -2885,14 +4444,6 @@ export interface EclConfig {
    */
   lgd_type: LgdType;
   /**
-   * Assumed time (in years) from the reporting date to recovery
-   * realisation for Stage 3 (credit-impaired) exposures. Used to
-   * discount expected recoveries `(1 - LGD) x EAD` at the EIR.
-   * The allowance is current EAD less those discounted recoveries.
-   * Default: 1.0 year, a common practical recovery-lag assumption.
-   */
-  stage3_time_to_recovery_years?: number;
-  /**
    * Staging configuration for IFRS 9.
    */
   staging: StagingConfig;
@@ -3021,92 +4572,48 @@ export interface EclResult {
   [k: string]: unknown;
 }
 /**
- * Metadata bundle that accompanies valuation outputs.
- *
- * The metadata is intentionally small so it can be attached to reports and
- * downstream data stores for reproducibility and audit trails.
+ * Named cumulative-PD and LGD assumptions with an exact scenario probability.
  */
-export interface ResultsMeta {
+export interface EclScenario {
   /**
-   * Optional FX policy applied by the computing layer (human-readable key).
+   * Nonempty scenario identifier, distinct within one scenario set.
    */
-  fx_policy_applied?: string | null;
+  id: string;
   /**
-   * Numeric engine mode used to produce the results.
-   *
-   * Always [`NUMERIC_MODE_F64`] today; a plain string so result
-   * envelopes stay wire-compatible across host languages.
+   * Elected nonnegative loss fraction in [0, 1] for this scenario.
    */
-  numeric_mode: string;
+  lgd_override?: number | null;
   /**
-   * Whether the producing computation ran in parallel.
-   *
-   * Serial results omit the field entirely so existing payloads and golden
-   * files stay byte-identical.
+   * Ordered year and cumulative PD observations from valuation.
+   * Omit when the scenario evidence is missing. An explicitly present
+   * schedule must cover the measurement horizon.
    */
-  parallel?: boolean;
+  pd_schedule?: [number, number][] | null;
   /**
-   * Rounding context snapshot applied to IO boundaries.
+   * Exact decimal probability in [0, 1]; the admitted set sums to one.
    */
-  rounding: RoundingContext;
-  /**
-   * Timestamp when result was computed (ISO 8601 format).
-   * Useful for audit trails and reproducibility.
-   */
-  timestamp?: string | null;
-  /**
-   * Finstack Quant library version used to produce the result.
-   */
-  version?: string | null;
-  [k: string]: unknown;
+  weight: DecimalWire;
 }
 /**
- * Snapshot of active rounding settings used for result stamping.
- *
- * Instances are produced from a [`FinstackConfig`] via `RoundingContext::from` and persisted
- * alongside valuation results.
+ * A scenario weight and its measured or unavailable allowance.
  */
-export interface RoundingContext {
+export interface EclScenarioOutcome {
   /**
-   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
+   * Explicit scenario identity in the portfolio policy's declared order.
    */
-  ingest_scale_by_currency: {
-    [k: string]: number;
-  };
+  id: string;
   /**
-   * Explicitly selected rounding mode; absent when none was selected.
+   * Elected scenario LGD override as a decimal fraction.
    */
-  mode?: RoundingMode | null;
+  lgd_override?: number | null;
   /**
-   * Validated output scale snapshot by currency code, with values in `0..=28`.
+   * Underlying reserve calculation and status.
    */
-  output_scale_by_currency: {
-    [k: string]: number;
-  };
+  measurement: EclScenarioMeasurement;
   /**
-   * Tolerance settings snapshot for floating-point comparisons.
+   * Exact scenario probability as supplied, including any zero-weight rows.
    */
-  tolerances?: ToleranceConfig;
-  /**
-   * Schema version for forward compatibility.
-   */
-  version: number;
-  [k: string]: unknown;
-}
-/**
- * Numerical tolerance configuration for floating-point comparisons.
- *
- * Provides the configurable epsilon for generic floating-point zero-checks.
- * The default is chosen to balance numerical stability with practical
- * precision requirements.
- */
-export interface ToleranceConfig {
-  /**
-   * Epsilon for generic floating-point comparisons (default: 1e-10).
-   *
-   * Used for general numerical comparisons where higher tolerance is acceptable.
-   */
-  generic_epsilon?: PositiveF64Wire;
+  weight: DecimalWire;
 }
 /**
  * Verifies that the effective tax rate (tax expense / pretax income) falls within an expected range.
@@ -3626,89 +5133,146 @@ export interface FreeRentWindowSpec {
   start: PeriodId;
 }
 /**
+ * A projected covenant breach.
+ */
+export interface FutureBreach {
+  /**
+   * Date of the breach
+   */
+  breach_date: DateWire;
+  /**
+   * Probability of breach (if stochastic)
+   */
+  breach_probability: number;
+  /**
+   * Human-readable covenant description.
+   */
+  covenant_description: string;
+  /**
+   * Stable covenant instance identifier.
+   */
+  covenant_id: string;
+  /**
+   * Headroom (negative means breach), if meaningful and finite.
+   */
+  headroom?: number | null;
+  /**
+   * Signed cushion in the metric's own units when numerically meaningful.
+   */
+  headroom_raw?: number | null;
+  /**
+   * Projected value, if finite.
+   */
+  projected_value?: number | null;
+  /**
+   * Threshold value
+   */
+  threshold: number;
+}
+/**
+ * Explicit cell address for the goal-seek driver or target.
+ */
+export interface GoalSeekCell {
+  /**
+   * Exact node identifier in the prepared financial statement.
+   */
+  node: string;
+  /**
+   * Existing row of the statement forecast.
+   */
+  period: PeriodId;
+}
+/**
  * Outcome of a `goal_seek` solve.
  */
 export interface GoalSeekResult {
   /**
-   * Whether `|residual| <= tolerance`.
-   *
-   * [`goal_seek`] returns an error instead of a result when the residual
-   * check fails, so every result it produces has `converged == true`;
-   * `false` only for a result read from JSON written before this field
-   * existed.
+   * Target observed in a fresh run at the returned driver.
    */
-  converged?: boolean;
+  achieved_value: AmountOrScalar;
   /**
-   * Number of model evaluations the solve used: every objective probe by
-   * the root finder (bracket search and Brent iterations, including a
-   * widened second attempt when the sign-constrained one fails) plus the
-   * final residual check. Zero only for a result read from JSON written
-   * before this field existed.
+   * Root tolerance in driver units.
    */
-  evaluations?: number;
+  driver_tolerance: number;
   /**
-   * Copy of the input model with `solved_value` written into the driver
-   * node at the driver period, re-validated; `None` when `update_model`
-   * was `false`.
+   * Total statement evaluations, including original admission and fresh verification.
+   */
+  evaluations: number;
+  /**
+   * Fingerprint of the held market used for all evaluation calls.
+   */
+  market_hash: string;
+  /**
+   * Verified runnable copy when requested.
    */
   model?: statements.FinancialModelSpec | null;
   /**
-   * Signed residual at `solved_value`: the target node's value in the
-   * target period minus the requested target, in the target node's units.
-   *
-   * Re-evaluated on the model after the solver returned, so it is the
-   * residual of the reported driver value, not the solver's last iterate.
+   * Provenance for the input statement run.
    */
-  residual?: number;
+  original_run: RunProvenance;
   /**
-   * Driver value, in the driver node's own units (the currency amount for
-   * a monetary node), that brings the target node to the target value
-   * within tolerance.
+   * Achieved target less requested target, in target units.
    */
-  solved_value: number;
+  residual: AmountOrScalar;
   /**
-   * Absolute acceptance tolerance on `residual`, in the target node's
-   * units: `1e-9 * max(|target_value|, 1)`.
+   * Provenance for the fresh run at the reported typed driver.
    */
-  tolerance?: number;
+  solved_run: RunProvenance;
+  /**
+   * Exact reported driver in its original scalar or monetary type.
+   */
+  solved_value: AmountOrScalar;
+  /**
+   * Elected absolute tolerance in target units.
+   */
+  target_tolerance: AmountOrScalar;
+  /**
+   * Requested amount or scalar in target units.
+   */
+  target_value: AmountOrScalar;
 }
 /**
  * Target node, period and value, driver node and period, model write-back flag and optional bracket of a `goal_seek` solve.
  */
 export interface GoalSeekSpec {
   /**
-   * Optional `(lower, upper)` bracket, in the driver node's units, that
-   * constrains the search; both ends must be finite and `lower < upper`.
-   * `None` (the default) searches outward from the driver's current value.
-   *
-   * @minItems 2
-   * @maxItems 2
+   * Market pricing day for all trial and final statement evaluations.
    */
-  bounds?: [number, number] | null;
+  as_of: DateWire;
   /**
-   * Node identifier of the driver input the solve varies.
+   * Editable, selected explicit assumption in a forecast period.
    */
-  driver_node: string;
+  driver: GoalSeekCell;
   /**
-   * Period whose driver value the solve varies.
+   * Finite positive root tolerance in the driver cell's units.
    */
-  driver_period: PeriodId;
+  driver_tolerance: number;
   /**
-   * Node identifier of the target metric.
+   * Budget for the Brent iterations following the bracket check or search.
    */
-  target_node: string;
+  max_iterations: number;
   /**
-   * Period in which the target is evaluated.
+   * Inclusive publication cutoff held fixed throughout the solve.
    */
-  target_period: PeriodId;
+  observed_through: DateWire;
   /**
-   * Desired value of the target metric, in the target node's units; must
-   * be finite.
+   * Selected range or bounded search in the driver dimension.
    */
-  target_value: number;
+  search: GoalSeekSearch;
   /**
-   * When `true`, [`GoalSeekResult::model`] holds a copy of the model with
-   * the solved driver value written in; when `false` it is `None`.
+   * Target cell in the same or a later forecast period.
+   */
+  target: GoalSeekCell;
+  /**
+   * Absolute residual tolerance in the exact type and units of the target.
+   */
+  target_tolerance: AmountOrScalar;
+  /**
+   * Desired amount or scalar, in the target cell's native units.
+   */
+  target_value: AmountOrScalar;
+  /**
+   * Return the validated trial model with the verified driver installed.
    */
   update_model: boolean;
 }
@@ -3733,6 +5297,102 @@ export interface GrowthRateConsistency {
    */
   scope: PeriodScope;
   [k: string]: unknown;
+}
+/**
+ * Signed recovery shortfall and nonnegative credit-impaired allowance.
+ */
+export interface ImpairedEclResult {
+  /**
+   * Nonnegative reported allowance on the same currency basis.
+   */
+  allowance: Money;
+  /**
+   * Present value discount factor at the annual effective original EIR.
+   */
+  discount_factor: number;
+  /**
+   * Admitted carrying value, date, rate and source.
+   */
+  exposure: ImpairedExposure;
+  /**
+   * Dated recovery cash discounted once to the reporting date.
+   */
+  present_value_recovery: Money;
+  /**
+   * Approved estimated cash recovery and its receipt date.
+   */
+  recovery: RecoveryEvidence;
+  /**
+   * Carrying amount less discounted recovery before the nonnegative allowance floor.
+   */
+  signed_shortfall: Money;
+  /**
+   * Year fraction between the reporting and recovery dates on the elected clock.
+   */
+  time_to_recovery_years: number;
+}
+/**
+ * Same-currency carrying exposure and annual effective interest policy at the reporting cut.
+ */
+export interface ImpairedExposure {
+  /**
+   * Nonnegative carrying value in reporting currency.
+   */
+  carrying_amount: Money;
+  /**
+   * Approved source observation or subledger position.
+   */
+  carrying_amount_source: string;
+  /**
+   * Elected annual effective original EIR as an exact decimal rate, above -100%.
+   */
+  effective_interest_rate: DecimalWire;
+  /**
+   * Exposure identity from the approved reporting population.
+   */
+  exposure_id: string;
+  /**
+   * Year-fraction convention used to discount dated recovery cash.
+   */
+  recovery_day_count: DayCount;
+  /**
+   * Effective reporting date for the carrying amount and discounting.
+   */
+  reporting_date: DateWire;
+}
+/**
+ * Dated expected recovery assessed on the same exposure and currency basis.
+ */
+export interface RecoveryEvidence {
+  /**
+   * Nonnegative expected cash recovery in the exposure currency.
+   */
+  amount: Money;
+  /**
+   * Date when the recovery cash is expected to be received.
+   */
+  date: DateWire;
+  /**
+   * Approved recovery estimate or sourced cash-recovery record.
+   */
+  source_id: string;
+}
+/**
+ * Exact scenario probability and its scoped dated expected recovery.
+ */
+export interface ImpairedEclScenario {
+  /**
+   * Unique named economic scenario.
+   */
+  id: string;
+  /**
+   * Dated expected recovery for this scenario, or None if unavailable.
+   */
+  recovery?: RecoveryEvidence | null;
+  /**
+   * Exact probability in [0, 1].
+   */
+  weight: DecimalWire;
 }
 /**
  * Reconciles interest expense against debt balances or the capital-structure interest schedule.
@@ -3916,7 +5576,7 @@ export interface LboConfig {
   check_mappings?: LboCheckMappings | null;
   /**
    * Node id supplying the entry valuation metric (typically `"ebitda"`),
-   * read at the model's first period.
+   * read at the explicitly selected entry period.
    */
   entry_metric_node: string;
   /**
@@ -3924,6 +5584,10 @@ export interface LboConfig {
    * for 8.5x EBITDA.
    */
   entry_multiple: number;
+  /**
+   * Explicit statement observation period used to size the acquisition.
+   */
+  entry_period: PeriodId;
   /**
    * Node id supplying the exit valuation metric, read at `exit_period`.
    */
@@ -3987,7 +5651,7 @@ export interface LboResult {
    */
   entry_enterprise_value: Money;
   /**
-   * Entry metric value read from the model at the first period.
+   * Entry metric value read from the explicitly selected period.
    */
   entry_metric: number;
   /**
@@ -5047,6 +6711,139 @@ export interface StageResult {
   [k: string]: unknown;
 }
 /**
+ * Effective covenant terms and available evidence by dated period.
+ */
+export interface StatementCovenantAssessment {
+  /**
+   * Historical and projected observations in request order.
+   */
+  periods: StatementCovenantPeriod[];
+  /**
+   * Run identity of the admitted statement.
+   */
+  provenance: RunProvenance;
+  /**
+   * Maintenance or incurrence selection.
+   */
+  scope: CovenantScope;
+}
+/**
+ * Covenant results over one verified statement reporting interval.
+ */
+export interface StatementCovenantPeriod {
+  /**
+   * Individual effective terms, status and reports from the covenant owner.
+   */
+  assessments: CovenantAssessment[];
+  /**
+   * Last included day of the stored fiscal or calendar interval.
+   */
+  date: DateWire;
+  /**
+   * Whether observations in this period are historical actuals.
+   */
+  is_actual: boolean;
+  /**
+   * Available typed observations by contractual metric identity.
+   */
+  observations: {
+    [k: string]: AmountOrScalar;
+  };
+  /**
+   * Stored reporting period selected by the caller.
+   */
+  period: PeriodId;
+}
+/**
+ * Qualified forecast, breach evidence and per-period coverage.
+ */
+export interface StatementCovenantForecast {
+  /**
+   * Evidence and availability for every elected projected period.
+   */
+  assessment: StatementCovenantAssessment;
+  /**
+   * Native breach probabilities or deterministic breaches from assessed dates.
+   */
+  breaches: FutureBreach[];
+  /**
+   * Elected stochastic reference date.
+   */
+  reference_date: DateWire;
+}
+/**
+ * Named covenants, result periods, publication cutoff and units.
+ */
+export interface StatementCovenantSpec {
+  /**
+   * Named metric aliases and their admitted native units.
+   */
+  bindings: {
+    [k: string]: CovenantObservationBinding;
+  };
+  /**
+   * Existing covenant instance IDs, unique and in presentation order.
+   */
+  covenant_ids: string[];
+  /**
+   * Inclusive publication cutoff agreed with the evaluated statement run.
+   */
+  observed_through: DateWire;
+  /**
+   * Existing period IDs, unique and in model timeline order.
+   */
+  periods: PeriodId[];
+  /**
+   * Analysis scope applied to all selected contracts.
+   */
+  scope: CovenantScope;
+}
+/**
+ * Annual monetary statement sources for a canonical credit score.
+ */
+export interface StatementScoringMapping {
+  /**
+   * Closing book equity for the book-value Altman models.
+   */
+  book_equity?: string | null;
+  /**
+   * Closing current assets for Zmijewski.
+   */
+  current_assets?: string | null;
+  /**
+   * Closing current liabilities for Zmijewski.
+   */
+  current_liabilities?: string | null;
+  /**
+   * Full-year EBIT used by the Altman models.
+   */
+  ebit?: string | null;
+  /**
+   * Full-year net income for Zmijewski.
+   */
+  net_income?: string | null;
+  /**
+   * Closing retained earnings used by the Altman models.
+   */
+  retained_earnings?: string | null;
+  /**
+   * Full-year sales used by the manufacturing Altman models.
+   */
+  sales?: string | null;
+  /**
+   * Closing total assets, a positive same-currency monetary observation.
+   */
+  total_assets: string;
+  /**
+   * Closing total liabilities in statement currency.
+   */
+  total_liabilities: string;
+  /**
+   * Closing net working capital used by the Altman models.
+   */
+  working_capital?: string | null;
+}
+/**
  * Flags a metric that has been deteriorating for `lookback_periods` consecutive periods.
  */
 export interface TrendCheck {
@@ -5112,12 +6909,12 @@ export interface WaccInputs {
    * Debt share of total capital as a decimal fraction (`0.4` means 40%
    * debt-funded); non-negative, and sums with `equity_weight` to `1.0`.
    */
-  debt_weight: number;
+  debt_weight: DecimalWire;
   /**
    * Equity share of total capital as a decimal fraction (`0.6` means 60%
    * equity-funded); non-negative.
    */
-  equity_weight: number;
+  equity_weight: DecimalWire;
   /**
    * Marginal corporate tax rate as a decimal fraction in `[0, 1]` (`0.25`
    * means `25%`).
@@ -5129,26 +6926,42 @@ export interface WaccInputs {
  */
 export interface WeightedEclResult {
   /**
-   * Probability-weighted ECL.
+   * Aggregate allowance, absent when any positive-probability scenario is missing.
    */
-  ecl: number;
+  ecl?: number | null;
   /**
    * Exposure identifier.
    */
   exposure_id: string;
   /**
-   * Audit stamp: numeric mode, rounding context, and FX policy in force.
+   * Numeric and reporting provenance of the complete or partial calculation.
    */
   meta?: ResultsMeta;
   /**
-   * Per-scenario breakdown: (scenario_id, weight, result).
+   * Elected scenarios in caller order, including zero-weight entries.
    */
-  scenario_breakdown: [string, number, EclResult][];
+  scenario_breakdown: EclScenarioOutcome[];
   /**
-   * Assigned IFRS 9 stage.
+   * Assigned impairment stage.
    */
   stage: Stage;
-  [k: string]: unknown;
+}
+/**
+ * Weighted impairment and dated recovery scenario contributions.
+ */
+export interface WeightedImpairedEclResult {
+  /**
+   * Sum of measured scenario contributions, or None for missing positive-weight evidence.
+   */
+  allowance?: Money | null;
+  /**
+   * Common carrying exposure, date, currency and original effective interest policy.
+   */
+  exposure: ImpairedExposure;
+  /**
+   * Measures and coverage in exact scenario input order.
+   */
+  outcomes: ImpairedEclOutcome[];
 }
 /**
  * Verifies that the change in working capital on the cash flow statement equals the negative delta of net working capital on the balance sheet.

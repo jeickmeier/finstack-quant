@@ -54,45 +54,10 @@
 //! - BCBS 279 SA-CCR: `docs/REFERENCES.md#bcbs-279-saccr`
 
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 
 use super::mva;
 use super::types::{CreditXvaRow, ExposureProfile, FundingConfig, FundingXvaRow, XvaResult};
-
-fn validate_exposure_profile_lengths(
-    exposure_profile: &ExposureProfile,
-    label: &str,
-) -> finstack_quant_core::Result<usize> {
-    exposure_profile.validate()?;
-    if exposure_profile.times.is_empty() {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "{label}: exposure profile must not be empty"
-        )));
-    }
-
-    let n = exposure_profile.times.len();
-    Ok(n)
-}
-
-fn horizons_match(lhs: f64, rhs: f64) -> bool {
-    let scale = lhs.abs().max(rhs.abs()).max(1.0);
-    (lhs - rhs).abs() <= 1.0e-12 * scale
-}
-
-fn im_at(profile: &mva::ImProfile, t: f64) -> f64 {
-    if t <= profile.times[0] {
-        return profile.im_values[0];
-    }
-    for i in 1..profile.times.len() {
-        if t <= profile.times[i] {
-            let t0 = profile.times[i - 1];
-            let t1 = profile.times[i];
-            let im0 = profile.im_values[i - 1];
-            let im1 = profile.im_values[i];
-            return im0 + (im1 - im0) * (t - t0) / (t1 - t0);
-        }
-    }
-    profile.im_values[profile.im_values.len() - 1]
-}
 
 fn compute_cva_internal(
     exposure_profile: &ExposureProfile,
@@ -101,7 +66,8 @@ fn compute_cva_internal(
     recovery_rate: f64,
     own_survival_curve: Option<&HazardCurve>,
 ) -> finstack_quant_core::Result<XvaResult> {
-    let n = validate_exposure_profile_lengths(exposure_profile, "CVA")?;
+    exposure_profile.validate()?;
+    let n = exposure_profile.times.len();
 
     if !(0.0..=1.0).contains(&recovery_rate) {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -109,9 +75,28 @@ fn compute_cva_internal(
         )));
     }
 
+    let counterparty = super::dated::survival_factors(
+        exposure_profile.as_of,
+        exposure_profile.currency,
+        &exposure_profile.dates,
+        Some(counterparty_hazard_curve),
+    )?;
+    let own_survival = super::dated::survival_factors(
+        exposure_profile.as_of,
+        exposure_profile.currency,
+        &exposure_profile.dates,
+        own_survival_curve,
+    )?;
+    let discount = super::dated::discount_factors(
+        exposure_profile.as_of,
+        exposure_profile.currency,
+        &exposure_profile.dates,
+        discount_curve,
+    )?;
+
     let lgd = 1.0 - recovery_rate;
 
-    let mut cva = 0.0;
+    let mut cva = NeumaierAccumulator::new();
     let mut cva_rows = Vec::with_capacity(n);
     let mut epe_profile = Vec::with_capacity(n);
     let mut ene_profile = Vec::with_capacity(n);
@@ -133,22 +118,17 @@ fn compute_cva_internal(
         let epe_t = exposure_profile.epe[i];
         let ene_t = exposure_profile.ene[i];
 
-        let survival_t = counterparty_hazard_curve.sp(t)?;
+        let survival_t = counterparty[i];
+        let own_survival_t = own_survival[i];
+        let df_t = discount[i];
 
-        let own_survival_t = match own_survival_curve {
-            Some(curve) => curve.sp(t)?,
-            None => 1.0,
-        };
-
-        let df_t = discount_curve.df(t)?;
-
-        let marginal_pd = (prev_survival - survival_t).max(0.0);
-        let epe_mid = 0.5 * (prev_epe + epe_t);
-        let df_mid = 0.5 * (prev_df + df_t);
-        let own_survival_mid = 0.5 * (prev_own_survival + own_survival_t);
+        let marginal_pd = prev_survival - survival_t;
+        let epe_mid = 0.5 * prev_epe + 0.5 * epe_t;
+        let df_mid = 0.5 * prev_df + 0.5 * df_t;
+        let own_survival_mid = 0.5 * prev_own_survival + 0.5 * own_survival_t;
 
         let contribution = lgd * epe_mid * marginal_pd * df_mid * own_survival_mid;
-        cva += contribution;
+        cva.add(contribution)?;
         cva_rows.push(CreditXvaRow {
             time: t,
             discount_factor: df_t,
@@ -188,11 +168,13 @@ fn compute_cva_internal(
         effective_epe_running
     };
 
+    let cva = cva.get_total()?;
     Ok(XvaResult {
         cva,
         dva: None,
         fva: None,
         mva: None,
+        mva_detail: None,
         total_xva: cva,
         epe_profile,
         ene_profile,
@@ -214,9 +196,9 @@ fn compute_dva_internal(
     discount_curve: &DiscountCurve,
     own_recovery_rate: f64,
     counterparty_survival_curve: Option<&HazardCurve>,
-    posted_im: Option<&mva::ImProfile>,
 ) -> finstack_quant_core::Result<(f64, Vec<CreditXvaRow>)> {
-    let n = validate_exposure_profile_lengths(exposure_profile, "DVA")?;
+    exposure_profile.validate()?;
+    let n = exposure_profile.times.len();
 
     if !(0.0..=1.0).contains(&own_recovery_rate) {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -224,37 +206,49 @@ fn compute_dva_internal(
         )));
     }
 
+    let own_survival = super::dated::survival_factors(
+        exposure_profile.as_of,
+        exposure_profile.currency,
+        &exposure_profile.dates,
+        Some(own_hazard_curve),
+    )?;
+    let counterparty_survival = super::dated::survival_factors(
+        exposure_profile.as_of,
+        exposure_profile.currency,
+        &exposure_profile.dates,
+        counterparty_survival_curve,
+    )?;
+    let discount = super::dated::discount_factors(
+        exposure_profile.as_of,
+        exposure_profile.currency,
+        &exposure_profile.dates,
+        discount_curve,
+    )?;
+
     let lgd_own = 1.0 - own_recovery_rate;
-    let mut dva = 0.0;
+    let mut dva = NeumaierAccumulator::new();
     let mut rows = Vec::with_capacity(n);
     let mut prev_survival = 1.0;
     let mut prev_counterparty_survival = 1.0;
-    let mut prev_ene =
-        (exposure_profile.ene[0] - posted_im.map_or(0.0, |profile| im_at(profile, 0.0))).max(0.0);
+    let mut prev_ene = exposure_profile.ene[0];
     let mut prev_df: f64 = 1.0;
 
     for i in 0..n {
         let t = exposure_profile.times[i];
-        let im_t = posted_im.map_or(0.0, |profile| im_at(profile, t));
-        let ene_t = (exposure_profile.ene[i] - im_t).max(0.0);
+        let ene_t = exposure_profile.ene[i];
 
-        let survival_t = own_hazard_curve.sp(t)?;
+        let survival_t = own_survival[i];
+        let counterparty_survival_t = counterparty_survival[i];
+        let df_t = discount[i];
 
-        let counterparty_survival_t = match counterparty_survival_curve {
-            Some(curve) => curve.sp(t)?,
-            None => 1.0,
-        };
-
-        let df_t = discount_curve.df(t)?;
-
-        let marginal_pd = (prev_survival - survival_t).max(0.0);
-        let ene_mid = 0.5 * (prev_ene + ene_t);
-        let df_mid = 0.5 * (prev_df + df_t);
+        let marginal_pd = prev_survival - survival_t;
+        let ene_mid = 0.5 * prev_ene + 0.5 * ene_t;
+        let df_mid = 0.5 * prev_df + 0.5 * df_t;
         let counterparty_survival_mid =
-            0.5 * (prev_counterparty_survival + counterparty_survival_t);
+            0.5 * prev_counterparty_survival + 0.5 * counterparty_survival_t;
 
         let contribution = lgd_own * ene_mid * marginal_pd * df_mid * counterparty_survival_mid;
-        dva += contribution;
+        dva.add(contribution)?;
         rows.push(CreditXvaRow {
             time: t,
             discount_factor: df_t,
@@ -273,7 +267,7 @@ fn compute_dva_internal(
         prev_df = df_t;
     }
 
-    Ok((dva, rows))
+    Ok((dva.get_total()?, rows))
 }
 
 fn compute_fva_internal(
@@ -284,12 +278,32 @@ fn compute_fva_internal(
     counterparty_hazard_curve: Option<&HazardCurve>,
     own_hazard_curve: Option<&HazardCurve>,
 ) -> finstack_quant_core::Result<(f64, Vec<FundingXvaRow>)> {
-    let n = validate_exposure_profile_lengths(exposure_profile, "FVA")?;
+    exposure_profile.validate()?;
+    let n = exposure_profile.times.len();
+
+    let counterparty_survival = super::dated::survival_factors(
+        exposure_profile.as_of,
+        exposure_profile.currency,
+        &exposure_profile.dates,
+        counterparty_hazard_curve,
+    )?;
+    let own_survival = super::dated::survival_factors(
+        exposure_profile.as_of,
+        exposure_profile.currency,
+        &exposure_profile.dates,
+        own_hazard_curve,
+    )?;
+    let discount = super::dated::discount_factors(
+        exposure_profile.as_of,
+        exposure_profile.currency,
+        &exposure_profile.dates,
+        discount_curve,
+    )?;
 
     let spread_cost = funding_spread_bp / 10_000.0;
     let spread_benefit = funding_benefit_bp / 10_000.0;
 
-    let mut fva = 0.0;
+    let mut fva = NeumaierAccumulator::new();
     let mut rows = Vec::with_capacity(n);
     let mut prev_counterparty_survival = 1.0;
     let mut prev_own_survival = 1.0;
@@ -303,30 +317,22 @@ fn compute_fva_internal(
         let epe_t = exposure_profile.epe[i];
         let ene_t = exposure_profile.ene[i];
 
-        let counterparty_survival_t = match counterparty_hazard_curve {
-            Some(curve) => curve.sp(t)?,
-            None => 1.0,
-        };
-
-        let own_survival_t = match own_hazard_curve {
-            Some(curve) => curve.sp(t)?,
-            None => 1.0,
-        };
-
-        let df_t = discount_curve.df(t)?;
+        let counterparty_survival_t = counterparty_survival[i];
+        let own_survival_t = own_survival[i];
+        let df_t = discount[i];
 
         let dt = t - prev_t;
-        let epe_mid = 0.5 * (prev_epe + epe_t);
-        let ene_mid = 0.5 * (prev_ene + ene_t);
-        let df_mid = 0.5 * (prev_df + df_t);
+        let epe_mid = 0.5 * prev_epe + 0.5 * epe_t;
+        let ene_mid = 0.5 * prev_ene + 0.5 * ene_t;
+        let df_mid = 0.5 * prev_df + 0.5 * df_t;
         let counterparty_survival_mid =
-            0.5 * (prev_counterparty_survival + counterparty_survival_t);
-        let own_survival_mid = 0.5 * (prev_own_survival + own_survival_t);
+            0.5 * prev_counterparty_survival + 0.5 * counterparty_survival_t;
+        let own_survival_mid = 0.5 * prev_own_survival + 0.5 * own_survival_t;
         let joint_survival_mid = counterparty_survival_mid * own_survival_mid;
 
         let contribution =
             (epe_mid * spread_cost - ene_mid * spread_benefit) * df_mid * dt * joint_survival_mid;
-        fva += contribution;
+        fva.add(contribution)?;
         rows.push(FundingXvaRow {
             time: t,
             dt,
@@ -348,7 +354,7 @@ fn compute_fva_internal(
         prev_t = t;
     }
 
-    Ok((fva, rows))
+    Ok((fva.get_total()?, rows))
 }
 
 /// Compute **unilateral** Credit Valuation Adjustment (CVA).
@@ -416,11 +422,21 @@ fn compute_fva_internal(
 ///     .build()?;
 ///
 /// let profile = ExposureProfile {
-///     times: vec![1.0, 2.0, 3.0],
+///     as_of,
+///     currency: finstack_quant_core::currency::Currency::USD,
+///     basis: finstack_quant_margin::xva::types::ExposureBasis::External {
+///         source_id: "verified-path-mean".into(),
+///         policy_id: "netting-set-A-unsecured".into(),
+///     },
+///     dates: vec![as_of, time::macros::date!(2026-01-01), time::macros::date!(2027-01-01)],
+///     times: vec![0.0, 1.0, 2.0],
 ///     mtm_values: vec![1_000_000.0; 3],
 ///     epe: vec![1_000_000.0; 3],
 ///     ene: vec![0.0; 3],
-///     diagnostics: None,
+///     diagnostics: finstack_quant_margin::xva::types::ExposureDiagnostics {
+///         total_time_points: 3,
+///         ..Default::default()
+///     },
 /// };
 ///
 /// let result = compute_cva(&profile, &hazard_curve, &discount_curve, 0.40)?;
@@ -495,7 +511,6 @@ pub fn compute_dva(
         own_hazard_curve,
         discount_curve,
         own_recovery_rate,
-        None,
         None,
     )
     .map(|(dva, _)| dva)
@@ -635,16 +650,14 @@ pub fn compute_bilateral_xva(
         Some(own_hazard_curve),
     )?;
 
-    let posted_im = funding.and_then(|fc| fc.im_profile.as_ref());
-    if let Some(im_profile) = posted_im {
-        let exposure_horizon = exposure_profile.times[exposure_profile.times.len() - 1];
-        let im_horizon = im_profile.times[im_profile.times.len() - 1];
-        if !horizons_match(exposure_horizon, im_horizon) {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Bilateral XVA: IM profile horizon {im_horizon} must match exposure profile \
-                 horizon {exposure_horizon}"
-            )));
-        }
+    if let Some(im_profile) = funding.and_then(|fc| fc.im_profile.as_ref())
+        && (im_profile.as_of != exposure_profile.as_of
+            || im_profile.currency != exposure_profile.currency
+            || im_profile.dates.last() != exposure_profile.dates.last())
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "Bilateral XVA: IM and exposure profiles must share the valuation cut, currency and horizon".into(),
+        ));
     }
 
     let (dva, dva_rows) = compute_dva_internal(
@@ -653,7 +666,6 @@ pub fn compute_bilateral_xva(
         discount_curve,
         own_recovery_rate,
         Some(counterparty_hazard_curve),
-        posted_im,
     )?;
     result.dva = Some(dva);
     result.dva_rows = Some(dva_rows);
@@ -677,16 +689,21 @@ pub fn compute_bilateral_xva(
 
     let mva = match funding.and_then(|fc| fc.im_profile.as_ref().map(|im| (fc, im))) {
         Some((fc, im_profile)) => {
-            let mva_val = mva::compute_mva_internal(
+            let detail = mva::compute_mva_internal(
                 im_profile,
-                &[(0.0, fc.effective_margin_spread_bp())],
+                fc.margin_funding_spread.as_ref().ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "Bilateral XVA requires an explicit posted-margin funding spread".into(),
+                    )
+                })?,
                 discount_curve,
                 Some(own_hazard_curve),
                 Some(counterparty_hazard_curve),
-            )?
-            .mva;
-            result.mva = Some(mva_val);
-            mva_val
+            )?;
+            let mva_value = detail.mva;
+            result.mva = Some(mva_value);
+            result.mva_detail = Some(detail);
+            mva_value
         }
         None => {
             result.mva = None;
@@ -694,7 +711,11 @@ pub fn compute_bilateral_xva(
         }
     };
 
-    result.total_xva = result.cva - dva + fva + mva;
+    let mut total = NeumaierAccumulator::new();
+    for leg in [result.cva, -dva, fva, mva] {
+        total.add(leg)?;
+    }
+    result.total_xva = total.get_total()?;
 
     Ok(result)
 }
@@ -702,9 +723,76 @@ pub fn compute_bilateral_xva(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::xva::mva::ImProfile;
+    use crate::xva::mva::{ImProfile, ImProjectionBasis, MarginFundingSpread};
+    use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use time::Month;
+
+    fn exposure_fixture(
+        times: &[f64],
+        mut mtm_values: Vec<f64>,
+        mut epe: Vec<f64>,
+        mut ene: Vec<f64>,
+    ) -> ExposureProfile {
+        let as_of = time::macros::date!(2025 - 01 - 01);
+        let mut times = times.to_vec();
+        if times.first().is_some_and(|time| *time > 0.0) {
+            times.insert(0, 0.0);
+            for observations in [&mut mtm_values, &mut epe, &mut ene] {
+                if let Some(&first) = observations.first() {
+                    observations.insert(0, first);
+                }
+            }
+        }
+        ExposureProfile {
+            as_of,
+            dates: times
+                .iter()
+                .map(|&t| as_of + time::Duration::days((360.0 * t).round() as i64))
+                .collect(),
+            currency: finstack_quant_core::currency::Currency::USD,
+            basis: crate::xva::types::ExposureBasis::External {
+                source_id: "test-grid".into(),
+                policy_id: "test-unsecured-act360".into(),
+            },
+            diagnostics: crate::xva::types::ExposureDiagnostics {
+                total_time_points: times.len(),
+                ..Default::default()
+            },
+            times,
+            mtm_values,
+            epe,
+            ene,
+        }
+    }
+
+    #[test]
+    fn dated_curves_normalize_at_the_cut_and_effective_epe_uses_right_endpoints() {
+        let mut profile = exposure_fixture(
+            &[0.0, 0.5, 1.5],
+            vec![20.0, 40.0, 80.0],
+            vec![20.0, 40.0, 80.0],
+            vec![0.0; 3],
+        );
+        let hazard = flat_hazard_curve(0.02);
+        let discount = DiscountCurve::builder("usd")
+            .base_date(time::macros::date!(2024 - 01 - 01))
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .knots([(0.0, 1.0), (4.0, (-0.12_f64).exp())])
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Error)
+            .build()
+            .expect("ACT/365F discount curve");
+        let result = compute_cva(&profile, &hazard, &discount, 0.4).expect("aligned dated curves");
+        assert_eq!(result.effective_epe, 60.0);
+        assert_eq!(result.cva_rows[0].discount_factor, 1.0);
+        assert!(
+            (result.cva_rows[1].discount_factor - (-0.03_f64 * 180.0 / 365.0).exp()).abs() < 1e-13
+        );
+        assert!((result.cva_rows[1].survival_probability - (-0.02_f64 * 0.5).exp()).abs() < 1e-13);
+        profile.diagnostics.total_time_points = 2;
+        assert!(compute_cva(&profile, &hazard, &discount, 0.4).is_err());
+    }
 
     /// Helper: build a flat hazard rate curve.
     fn flat_hazard_curve(lambda: f64) -> HazardCurve {
@@ -713,7 +801,7 @@ mod tests {
             .base_date(base)
             .knots([(30.0, lambda)])
             .recovery_rate(0.40)
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .day_count(finstack_quant_core::dates::DayCount::Act360)
             .build()
             .expect("HazardCurve should build")
     }
@@ -732,20 +820,19 @@ mod tests {
             .base_date(base)
             .knots(knots)
             .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .day_count(finstack_quant_core::dates::DayCount::Act360)
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("DiscountCurve should build")
     }
 
     fn uniform_profile(epe_value: f64, times: &[f64]) -> ExposureProfile {
-        ExposureProfile {
-            times: times.to_vec(),
-            mtm_values: times.iter().map(|_| epe_value).collect(),
-            epe: times.iter().map(|_| epe_value).collect(),
-            ene: times.iter().map(|_| 0.0).collect(),
-            diagnostics: None,
-        }
+        exposure_fixture(
+            times,
+            times.iter().map(|_| epe_value).collect(),
+            times.iter().map(|_| epe_value).collect(),
+            times.iter().map(|_| 0.0).collect(),
+        )
     }
 
     #[test]
@@ -886,8 +973,8 @@ mod tests {
         let result =
             compute_cva(&profile, &hazard, &discount, 0.40).expect("CVA computation should work");
 
-        assert_eq!(result.epe_profile.len(), times.len());
-        assert_eq!(result.ene_profile.len(), times.len());
+        assert_eq!(result.epe_profile.len(), profile.times.len());
+        assert_eq!(result.ene_profile.len(), profile.times.len());
     }
 
     #[test]
@@ -896,19 +983,18 @@ mod tests {
         let hazard = flat_hazard_curve(0.02);
         let discount = flat_discount_curve(0.03);
         let times = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        let profile = ExposureProfile {
-            times,
-            mtm_values: vec![100.0, 200.0, 50.0, 150.0, 80.0],
-            epe: vec![100.0, 200.0, 50.0, 150.0, 80.0],
-            ene: vec![0.0; 5],
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(
+            &times,
+            vec![100.0, 200.0, 50.0, 150.0, 80.0],
+            vec![100.0, 200.0, 50.0, 150.0, 80.0],
+            vec![0.0; 5],
+        );
 
         let result =
             compute_cva(&profile, &hazard, &discount, 0.40).expect("CVA computation should work");
 
         // Profile should be non-decreasing
-        assert_eq!(result.effective_epe_profile.len(), 5);
+        assert_eq!(result.effective_epe_profile.len(), 6);
         for i in 1..result.effective_epe_profile.len() {
             assert!(
                 result.effective_epe_profile[i].1 >= result.effective_epe_profile[i - 1].1,
@@ -942,13 +1028,12 @@ mod tests {
         let hazard = flat_hazard_curve(0.02);
         let discount = flat_discount_curve(0.03);
         let times = vec![1.0, 2.0, 3.0];
-        let profile = ExposureProfile {
-            times,
-            mtm_values: vec![100.0, 300.0, 200.0],
-            epe: vec![100.0, 300.0, 200.0],
-            ene: vec![0.0; 3],
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(
+            &times,
+            vec![100.0, 300.0, 200.0],
+            vec![100.0, 300.0, 200.0],
+            vec![0.0; 3],
+        );
 
         let result =
             compute_cva(&profile, &hazard, &discount, 0.40).expect("CVA computation should work");
@@ -964,13 +1049,7 @@ mod tests {
     fn cva_rejects_empty_profile() {
         let hazard = flat_hazard_curve(0.02);
         let discount = flat_discount_curve(0.03);
-        let profile = ExposureProfile {
-            times: vec![],
-            mtm_values: vec![],
-            epe: vec![],
-            ene: vec![],
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(&[], vec![], vec![], vec![]);
 
         let result = compute_cva(&profile, &hazard, &discount, 0.40);
         assert!(result.is_err(), "Should reject empty profile");
@@ -1032,13 +1111,12 @@ mod tests {
     fn cva_rejects_mismatched_epe_length() {
         let hazard = flat_hazard_curve(0.02);
         let discount = flat_discount_curve(0.03);
-        let profile = ExposureProfile {
-            times: vec![1.0, 2.0, 3.0],
-            mtm_values: vec![100.0, 200.0, 300.0],
-            epe: vec![100.0, 200.0], // one short
-            ene: vec![0.0, 0.0, 0.0],
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(
+            &[1.0, 2.0, 3.0],
+            vec![100.0, 200.0, 300.0],
+            vec![100.0, 200.0],
+            vec![0.0, 0.0, 0.0],
+        );
         assert!(
             compute_cva(&profile, &hazard, &discount, 0.40).is_err(),
             "Should reject profile with mismatched EPE length"
@@ -1049,13 +1127,12 @@ mod tests {
     fn cva_rejects_mismatched_ene_length() {
         let hazard = flat_hazard_curve(0.02);
         let discount = flat_discount_curve(0.03);
-        let profile = ExposureProfile {
-            times: vec![1.0, 2.0],
-            mtm_values: vec![100.0, 200.0],
-            epe: vec![100.0, 200.0],
-            ene: vec![0.0], // one short
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(
+            &[1.0, 2.0],
+            vec![100.0, 200.0],
+            vec![100.0, 200.0],
+            vec![0.0],
+        );
         assert!(
             compute_cva(&profile, &hazard, &discount, 0.40).is_err(),
             "Should reject profile with mismatched ENE length"
@@ -1103,13 +1180,12 @@ mod tests {
     }
 
     fn uniform_ene_profile(ene_value: f64, times: &[f64]) -> ExposureProfile {
-        ExposureProfile {
-            times: times.to_vec(),
-            mtm_values: times.iter().map(|_| -ene_value).collect(),
-            epe: times.iter().map(|_| 0.0).collect(),
-            ene: times.iter().map(|_| ene_value).collect(),
-            diagnostics: None,
-        }
+        exposure_fixture(
+            times,
+            times.iter().map(|_| -ene_value).collect(),
+            times.iter().map(|_| 0.0).collect(),
+            times.iter().map(|_| ene_value).collect(),
+        )
     }
 
     #[test]
@@ -1313,13 +1389,12 @@ mod tests {
         let times: Vec<f64> = (1..=20).map(|i| i as f64 * 0.5).collect();
 
         // Profile with both EPE and ENE
-        let profile = ExposureProfile {
-            times: times.clone(),
-            mtm_values: times.iter().map(|_| 500_000.0).collect(),
-            epe: times.iter().map(|_| 800_000.0).collect(),
-            ene: times.iter().map(|_| 300_000.0).collect(),
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(
+            &times,
+            times.iter().map(|_| 500_000.0).collect(),
+            times.iter().map(|_| 800_000.0).collect(),
+            times.iter().map(|_| 300_000.0).collect(),
+        );
 
         let result = compute_bilateral_xva(
             &profile,
@@ -1359,13 +1434,12 @@ mod tests {
         let discount = flat_discount_curve(0.04);
         let times: Vec<f64> = (1..=20).map(|i| i as f64 * 0.5).collect();
 
-        let profile = ExposureProfile {
-            times: times.clone(),
-            mtm_values: times.iter().map(|_| 500_000.0).collect(),
-            epe: times.iter().map(|_| 800_000.0).collect(),
-            ene: times.iter().map(|_| 300_000.0).collect(),
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(
+            &times,
+            times.iter().map(|_| 500_000.0).collect(),
+            times.iter().map(|_| 800_000.0).collect(),
+            times.iter().map(|_| 300_000.0).collect(),
+        );
 
         let funding = FundingConfig {
             funding_spread_bp: 50.0,
@@ -1409,13 +1483,12 @@ mod tests {
         let own_hazard = flat_hazard_curve(0.03);
         let discount = flat_discount_curve(0.04);
         let times: Vec<f64> = (1..=20).map(|i| i as f64 * 0.5).collect();
-        let profile = ExposureProfile {
-            times: times.clone(),
-            mtm_values: times.iter().map(|t| 500_000.0 - 20_000.0 * t).collect(),
-            epe: times.iter().map(|t| 800_000.0 - 30_000.0 * t).collect(),
-            ene: times.iter().map(|t| 300_000.0 + 10_000.0 * t).collect(),
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(
+            &times,
+            times.iter().map(|t| 500_000.0 - 20_000.0 * t).collect(),
+            times.iter().map(|t| 800_000.0 - 30_000.0 * t).collect(),
+            times.iter().map(|t| 300_000.0 + 10_000.0 * t).collect(),
+        );
         let funding = FundingConfig {
             funding_spread_bp: 50.0,
             funding_benefit_bp: Some(30.0),
@@ -1425,11 +1498,11 @@ mod tests {
         // Unilateral CVA: rows only for the CVA leg, unit survival weight.
         let unilateral = compute_cva(&profile, &counterparty_hazard, &discount, 0.40)
             .expect("CVA should compute");
-        assert_eq!(unilateral.cva_rows.len(), times.len());
+        assert_eq!(unilateral.cva_rows.len(), profile.times.len());
         assert!(unilateral.dva_rows.is_none() && unilateral.fva_rows.is_none());
         assert!(unilateral.cva_rows.iter().all(|r| r.survival_weight == 1.0));
         let sum: f64 = unilateral.cva_rows.iter().map(|r| r.contribution).sum();
-        assert_eq!(sum, unilateral.cva);
+        assert!((sum - unilateral.cva).abs() <= 1.0e-12 * unilateral.cva);
 
         let result = compute_bilateral_xva(
             &profile,
@@ -1452,10 +1525,10 @@ mod tests {
             ),
         ];
         for (rows, reported, hazard, lgd) in credit_legs {
-            assert_eq!(rows.len(), times.len());
+            assert_eq!(rows.len(), profile.times.len());
             let mut total = 0.0;
             let mut prev_survival = 1.0;
-            for (row, t) in rows.iter().zip(&times) {
+            for (row, t) in rows.iter().zip(&profile.times) {
                 assert_eq!(row.time, *t);
                 assert_eq!(
                     row.discount_factor,
@@ -1467,7 +1540,12 @@ mod tests {
                     (prev_survival - row.survival_probability).max(0.0)
                 );
                 assert!((row.loss_given_default - lgd).abs() < 1e-15);
-                assert!(row.survival_weight < 1.0);
+                if *t == 0.0 {
+                    assert_eq!(row.survival_weight, 1.0);
+                    assert_eq!(row.contribution, 0.0);
+                } else {
+                    assert!(row.survival_weight < 1.0);
+                }
                 assert_eq!(
                     row.contribution,
                     row.loss_given_default
@@ -1479,11 +1557,11 @@ mod tests {
                 total += row.contribution;
                 prev_survival = row.survival_probability;
             }
-            assert_eq!(total, reported);
+            assert!((total - reported).abs() <= 1.0e-12 * reported.abs());
         }
 
         let fva_rows = result.fva_rows.as_ref().expect("FVA rows");
-        assert_eq!(fva_rows.len(), times.len());
+        assert_eq!(fva_rows.len(), profile.times.len());
         let mut total = 0.0;
         for row in fva_rows {
             assert_eq!(row.funding_spread, 0.005);
@@ -1497,13 +1575,42 @@ mod tests {
             );
             total += row.contribution;
         }
-        assert_eq!(total, result.fva.expect("FVA"));
+        let fva = result.fva.expect("FVA");
+        assert!((total - fva).abs() <= 1.0e-12 * fva.abs());
 
         let json = serde_json::to_string(&result).expect("serialize");
         let back: XvaResult = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(back.cva_rows.len(), times.len());
-        assert_eq!(back.dva_rows.map(|rows| rows.len()), Some(times.len()));
-        assert_eq!(back.fva_rows.map(|rows| rows.len()), Some(times.len()));
+        assert_eq!(back.cva_rows.len(), profile.times.len());
+        assert_eq!(
+            back.dva_rows.map(|rows| rows.len()),
+            Some(profile.times.len())
+        );
+        assert_eq!(
+            back.fva_rows.map(|rows| rows.len()),
+            Some(profile.times.len())
+        );
+    }
+
+    fn external_im_profile(times: &[f64], values: &[f64]) -> ImProfile {
+        let as_of = time::macros::date!(2025 - 01 - 01);
+        ImProfile {
+            as_of,
+            currency: Currency::USD,
+            basis: ImProjectionBasis::External {
+                source_id: "synthetic-im-profile".into(),
+                netting_set: crate::types::NettingSetId::bilateral("test-dealer", "test-agreement"),
+            },
+            dates: std::iter::once(as_of)
+                .chain(
+                    times
+                        .iter()
+                        .map(|time| as_of + time::Duration::days((360.0 * time).round() as i64)),
+                )
+                .collect(),
+            im_values: std::iter::once(values[0])
+                .chain(values.iter().copied())
+                .collect(),
+        }
     }
 
     #[test]
@@ -1514,15 +1621,12 @@ mod tests {
         let times: Vec<f64> = (1..=20).map(|i| i as f64 * 0.5).collect();
         let profile = uniform_profile(1_000_000.0, &times);
 
-        let im_profile = ImProfile {
-            times: times.clone(),
-            im_values: vec![2_000_000.0; times.len()],
-        };
+        let im_profile = external_im_profile(&times, &vec![2_000_000.0; times.len()]);
         let funding = FundingConfig {
             funding_spread_bp: 50.0,
             funding_benefit_bp: Some(30.0),
             im_profile: Some(im_profile),
-            margin_funding_spread_bp: None,
+            margin_funding_spread: Some(MarginFundingSpread::Flat { spread_bp: 50.0 }),
         };
 
         let result = compute_bilateral_xva(
@@ -1565,15 +1669,12 @@ mod tests {
         let times: Vec<f64> = (1..=10).map(|i| i as f64).collect();
         let profile = uniform_profile(1_000_000.0, &times);
 
-        let im_profile = ImProfile {
-            times: times.clone(),
-            im_values: vec![5_000_000.0; times.len()],
-        };
+        let im_profile = external_im_profile(&times, &vec![5_000_000.0; times.len()]);
         let funding = FundingConfig {
             funding_spread_bp: 80.0,
             funding_benefit_bp: None,
             im_profile: Some(im_profile.clone()),
-            margin_funding_spread_bp: None,
+            margin_funding_spread: Some(MarginFundingSpread::Flat { spread_bp: 80.0 }),
         };
 
         let bilateral_mva = compute_bilateral_xva(
@@ -1589,10 +1690,14 @@ mod tests {
         .mva
         .expect("MVA");
 
-        let standalone_mva =
-            crate::xva::mva::compute_mva(&im_profile, &[(0.0, 80.0)], &discount, Some(&own_hazard))
-                .expect("standalone MVA")
-                .mva;
+        let standalone_mva = crate::xva::mva::compute_mva(
+            &im_profile,
+            &MarginFundingSpread::Flat { spread_bp: 80.0 },
+            &discount,
+            Some(&own_hazard),
+        )
+        .expect("standalone MVA")
+        .mva;
 
         assert!(
             bilateral_mva < standalone_mva,
@@ -1603,23 +1708,20 @@ mod tests {
     }
 
     #[test]
-    fn bilateral_xva_margin_spread_defaults_to_funding_spread() {
+    fn bilateral_xva_uses_the_elected_margin_spread() {
         let counterparty_hazard = flat_hazard_curve(0.02);
         let own_hazard = flat_hazard_curve(0.03);
         let discount = flat_discount_curve(0.02);
         let times: Vec<f64> = (1..=8).map(|i| i as f64 * 0.5).collect();
         let profile = uniform_profile(500_000.0, &times);
-        let im_profile = ImProfile {
-            times: times.clone(),
-            im_values: vec![1_000_000.0; times.len()],
-        };
+        let im_profile = external_im_profile(&times, &vec![1_000_000.0; times.len()]);
 
-        let mva_of = |margin_spread: Option<f64>| {
+        let mva_of = |spread_bp: f64| {
             let funding = FundingConfig {
                 funding_spread_bp: 40.0,
                 funding_benefit_bp: None,
                 im_profile: Some(im_profile.clone()),
-                margin_funding_spread_bp: margin_spread,
+                margin_funding_spread: Some(MarginFundingSpread::Flat { spread_bp }),
             };
             compute_bilateral_xva(
                 &profile,
@@ -1635,17 +1737,10 @@ mod tests {
             .expect("MVA")
         };
 
-        let implicit = mva_of(None);
-        let explicit_same = mva_of(Some(40.0));
-        let explicit_half = mva_of(Some(20.0));
-
-        assert!(
-            (implicit - explicit_same).abs() < 1e-12,
-            "absent margin spread ({implicit}) should fall back to funding_spread_bp \
-             ({explicit_same})"
-        );
-        // MVA is linear in the spread.
-        assert!((explicit_half * 2.0 - implicit).abs() / implicit < 1e-12);
+        let full = mva_of(40.0);
+        let half = mva_of(20.0);
+        assert!(full > 0.0);
+        assert!((half - 0.5 * full).abs() < 1e-9);
     }
 
     #[test]
@@ -1659,11 +1754,8 @@ mod tests {
         let funding = FundingConfig {
             funding_spread_bp: 40.0,
             funding_benefit_bp: None,
-            im_profile: Some(ImProfile {
-                times: vec![1.0, 2.0],
-                im_values: vec![-1.0, 2.0],
-            }),
-            margin_funding_spread_bp: None,
+            im_profile: Some(external_im_profile(&[1.0, 2.0], &[-1.0, 2.0])),
+            margin_funding_spread: Some(MarginFundingSpread::Flat { spread_bp: 40.0 }),
         };
 
         assert!(
@@ -1715,10 +1807,8 @@ mod tests {
         let profile = uniform_profile(500_000.0, &[1.0, 2.0]);
         let funding = FundingConfig {
             funding_spread_bp: 40.0,
-            im_profile: Some(ImProfile {
-                times: vec![1.0, 3.0],
-                im_values: vec![100_000.0, 0.0],
-            }),
+            im_profile: Some(external_im_profile(&[1.0, 3.0], &[100_000.0, 0.0])),
+            margin_funding_spread: Some(MarginFundingSpread::Flat { spread_bp: 40.0 }),
             ..Default::default()
         };
 
@@ -1738,68 +1828,7 @@ mod tests {
     }
 
     #[test]
-    fn bilateral_xva_accepts_im_horizon_within_scale_aware_tolerance() {
-        let counterparty_hazard = flat_hazard_curve(0.02);
-        let own_hazard = flat_hazard_curve(0.03);
-        let discount = flat_discount_curve(0.02);
-        let horizon = 2.0_f64;
-        let tolerance = 1.0e-12 * horizon;
-        let profile = uniform_profile(500_000.0, &[1.0, horizon]);
-        let funding = FundingConfig {
-            funding_spread_bp: 40.0,
-            im_profile: Some(ImProfile {
-                times: vec![1.0, horizon + 0.99 * tolerance],
-                im_values: vec![100_000.0, 0.0],
-            }),
-            ..Default::default()
-        };
-
-        compute_bilateral_xva(
-            &profile,
-            &counterparty_hazard,
-            &own_hazard,
-            &discount,
-            0.40,
-            0.40,
-            Some(&funding),
-        )
-        .expect("a terminal mismatch within the scale-aware tolerance must be accepted");
-    }
-
-    #[test]
-    fn bilateral_xva_rejects_im_horizon_just_outside_scale_aware_tolerance() {
-        let counterparty_hazard = flat_hazard_curve(0.02);
-        let own_hazard = flat_hazard_curve(0.03);
-        let discount = flat_discount_curve(0.02);
-        let horizon = 2.0_f64;
-        let tolerance = 1.0e-12 * horizon;
-        let profile = uniform_profile(500_000.0, &[1.0, horizon]);
-        let funding = FundingConfig {
-            funding_spread_bp: 40.0,
-            im_profile: Some(ImProfile {
-                times: vec![1.0, horizon + 1.01 * tolerance],
-                im_values: vec![100_000.0, 0.0],
-            }),
-            ..Default::default()
-        };
-
-        assert!(
-            compute_bilateral_xva(
-                &profile,
-                &counterparty_hazard,
-                &own_hazard,
-                &discount,
-                0.40,
-                0.40,
-                Some(&funding),
-            )
-            .is_err(),
-            "a terminal mismatch just outside the scale-aware tolerance must be rejected"
-        );
-    }
-
-    #[test]
-    fn bilateral_dva_is_reduced_by_posted_im() {
+    fn bilateral_dva_uses_exposed_ene_with_or_without_im_funding() {
         let counterparty_hazard = flat_hazard_curve(0.02);
         let own_hazard = flat_hazard_curve(0.03);
         let discount = flat_discount_curve(0.02);
@@ -1820,10 +1849,8 @@ mod tests {
 
         let funding = FundingConfig {
             funding_spread_bp: 40.0,
-            im_profile: Some(ImProfile {
-                times: vec![1.0, 3.0],
-                im_values: vec![250_000.0, 750_000.0],
-            }),
+            im_profile: Some(external_im_profile(&[1.0, 3.0], &[250_000.0, 750_000.0])),
+            margin_funding_spread: Some(MarginFundingSpread::Flat { spread_bp: 40.0 }),
             ..Default::default()
         };
         let with_im = compute_bilateral_xva(
@@ -1839,97 +1866,12 @@ mod tests {
         .dva
         .expect("DVA");
 
-        assert!(
-            with_im > 0.0 && with_im < without_im,
-            "posted IM should reduce bilateral DVA: with_im={with_im}, without_im={without_im}"
-        );
+        assert!(without_im > 0.0);
+        assert_eq!(with_im, without_im);
     }
 
     #[test]
-    fn bilateral_dva_linearly_interpolates_im_onto_exposure_grid() {
-        let counterparty_hazard = flat_hazard_curve(0.02);
-        let own_hazard = flat_hazard_curve(0.03);
-        let discount = flat_discount_curve(0.02);
-        let profile = uniform_ene_profile(900_000.0, &[1.0, 2.0, 3.0]);
-
-        let dva_for_im = |im_profile: ImProfile| {
-            let funding = FundingConfig {
-                funding_spread_bp: 0.0,
-                im_profile: Some(im_profile),
-                ..Default::default()
-            };
-            compute_bilateral_xva(
-                &profile,
-                &counterparty_hazard,
-                &own_hazard,
-                &discount,
-                0.40,
-                0.40,
-                Some(&funding),
-            )
-            .expect("bilateral XVA")
-            .dva
-            .expect("DVA")
-        };
-
-        let coarse_grid_dva = dva_for_im(ImProfile {
-            times: vec![1.0, 3.0],
-            im_values: vec![100_000.0, 500_000.0],
-        });
-        let explicit_grid_dva = dva_for_im(ImProfile {
-            times: vec![1.0, 2.0, 3.0],
-            im_values: vec![100_000.0, 300_000.0, 500_000.0],
-        });
-
-        assert!(
-            (coarse_grid_dva - explicit_grid_dva).abs() < 1.0e-12,
-            "linear interpolation must reproduce explicit exposure-grid IM: \
-             coarse={coarse_grid_dva}, explicit={explicit_grid_dva}"
-        );
-    }
-
-    #[test]
-    fn bilateral_dva_zero_floors_overcollateralized_ene() {
-        let counterparty_hazard = flat_hazard_curve(0.02);
-        let own_hazard = flat_hazard_curve(0.03);
-        let discount = flat_discount_curve(0.02);
-        let profile = ExposureProfile {
-            times: vec![1.0, 2.0, 3.0],
-            mtm_values: vec![-100_000.0, -250_000.0, -400_000.0],
-            epe: vec![0.0; 3],
-            ene: vec![100_000.0, 250_000.0, 400_000.0],
-            diagnostics: None,
-        };
-        let funding = FundingConfig {
-            funding_spread_bp: 0.0,
-            im_profile: Some(ImProfile {
-                times: vec![1.0, 3.0],
-                im_values: vec![500_000.0, 500_000.0],
-            }),
-            ..Default::default()
-        };
-
-        let dva = compute_bilateral_xva(
-            &profile,
-            &counterparty_hazard,
-            &own_hazard,
-            &discount,
-            0.40,
-            0.40,
-            Some(&funding),
-        )
-        .expect("bilateral XVA")
-        .dva
-        .expect("DVA");
-
-        assert!(
-            dva.abs() < 1.0e-12,
-            "max(ENE - IM, 0) must zero-floor overcollateralized exposure, got {dva}"
-        );
-    }
-
-    #[test]
-    fn unilateral_compute_dva_remains_unadjusted_by_im() {
+    fn bilateral_dva_with_surviving_counterparty_matches_unilateral() {
         let no_counterparty_default = flat_hazard_curve(0.0);
         let own_hazard = flat_hazard_curve(0.03);
         let discount = flat_discount_curve(0.02);
@@ -1952,13 +1894,14 @@ mod tests {
 
         let funding = FundingConfig {
             funding_spread_bp: 0.0,
-            im_profile: Some(ImProfile {
-                times: vec![1.0, 3.0],
-                im_values: vec![1_000_000.0, 1_000_000.0],
-            }),
+            im_profile: Some(external_im_profile(
+                &[1.0, 3.0],
+                &[1_000_000.0, 1_000_000.0],
+            )),
+            margin_funding_spread: Some(MarginFundingSpread::Flat { spread_bp: 0.0 }),
             ..Default::default()
         };
-        let im_adjusted_bilateral = compute_bilateral_xva(
+        let funded_bilateral = compute_bilateral_xva(
             &profile,
             &no_counterparty_default,
             &own_hazard,
@@ -1971,15 +1914,8 @@ mod tests {
         .dva
         .expect("DVA");
 
-        assert!(unilateral > 0.0);
-        assert!(
-            (unilateral - no_im_bilateral).abs() < 1.0e-12,
-            "with no counterparty default, unadjusted bilateral DVA must equal public unilateral DVA"
-        );
-        assert!(
-            im_adjusted_bilateral.abs() < 1.0e-12,
-            "posted IM must affect bilateral DVA only"
-        );
+        assert_eq!(no_im_bilateral, unilateral);
+        assert_eq!(funded_bilateral, unilateral);
     }
 
     #[test]
@@ -2079,13 +2015,12 @@ mod tests {
         let discount = flat_discount_curve(0.03);
         let times: Vec<f64> = (1..=20).map(|i| i as f64 * 0.5).collect();
 
-        let profile = ExposureProfile {
-            times: times.clone(),
-            mtm_values: times.iter().map(|_| 250_000.0).collect(),
-            epe: times.iter().map(|_| 800_000.0).collect(),
-            ene: times.iter().map(|_| 500_000.0).collect(),
-            diagnostics: None,
-        };
+        let profile = exposure_fixture(
+            &times,
+            times.iter().map(|_| 250_000.0).collect(),
+            times.iter().map(|_| 800_000.0).collect(),
+            times.iter().map(|_| 500_000.0).collect(),
+        );
 
         let funding = FundingConfig {
             funding_spread_bp: 60.0,

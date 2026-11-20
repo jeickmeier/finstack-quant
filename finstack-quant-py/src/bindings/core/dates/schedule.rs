@@ -223,6 +223,18 @@ impl PySchedule {
         crate::bindings::pandas_utils::dict_to_dataframe(py, &columns, None)
     }
 
+    /// Render the first twelve accrual periods as an HTML table for Jupyter.
+    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
+        self.to_dataframe(py)
+            .ok()?
+            .call_method1("head", (12,))
+            .ok()?
+            .call_method0("_repr_html_")
+            .ok()?
+            .extract()
+            .ok()
+    }
+
     /// Iterate over the unadjusted accrual dates.
     fn __iter__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyIterator>> {
         PyList::new(py, self.dates(py)?)?.into_any().try_iter()

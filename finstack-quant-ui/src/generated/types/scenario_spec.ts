@@ -8,9 +8,7 @@
  * applied to market data, instruments, statements, or the valuation horizon.
  * Units are encoded in the variant name and field docs:
  * - `Pct` fields use percentage points (`5.0 = +5%`)
- * - `Bp` fields use additive basis points (1 bp = 1e-4), except
- *   [`CurveKind::Commodity`] where `bp` is percent of the price-curve
- *   forward
+ * - `Bp` fields use additive rate basis points (1 bp = 1e-4)
  * - Vol-index `Pts` are **index points** (`1.0` on 18.5 → 19.5)
  * - Correlation / base-corr `Pts` are **decimal correlation** (`0.02` = +0.02)
  *
@@ -383,8 +381,7 @@ export type D_4A1Bd77A72C86Da677De =
     }
   | {
       /**
-       * Basis point shift (additive), or percent of the price-curve forward
-       * when `curve_kind` is [`CurveKind::Commodity`].
+       * Additive rate shift in basis points.
        */
       bp: number;
       /**
@@ -392,7 +389,7 @@ export type D_4A1Bd77A72C86Da677De =
        */
       curve_id: string;
       /**
-       * Type of curve (Discount, Forward, ParCDS, Inflation, Commodity).
+       * Rate curve family (Discount, Forward, ParCDS or Inflation).
        */
       curve_kind: "discount" | "forward" | "par_cds" | "inflation" | "commodity";
       /**
@@ -447,7 +444,7 @@ export type D_4A1Bd77A72C86Da677De =
        */
       curve_id: string;
       /**
-       * Type of curve (Discount, Forward, ParCDS, Inflation, Commodity).
+       * Rate curve family (Discount, Forward, ParCDS or Inflation).
        */
       curve_kind: "discount" | "forward" | "par_cds" | "inflation" | "commodity";
       /**
@@ -463,8 +460,107 @@ export type D_4A1Bd77A72C86Da677De =
        */
       match_mode?: "exact" | "interpolate";
       /**
-       * Vector of `(tenor, shift)` pairs. Shift is rate bp except for
-       * [`CurveKind::Commodity`], where it is percent of the forward.
+       * Vector of `(tenor, shift)` pairs where shift is in rate basis points.
+       */
+      nodes: [string, number][];
+    }
+  | {
+      /**
+       * A phantom-typed identifier that prevents mixing different kinds of IDs.
+       *
+       * This type wraps a string identifier with a phantom type parameter to ensure
+       * type safety at compile time. Different `Id<T>` types with different `T`
+       * cannot be compared or mixed accidentally, preventing entire classes of bugs.
+       *
+       * # Type Parameters
+       *
+       * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
+       *
+       * # Invariants
+       *
+       * - Storage uses `Arc<str>` for efficient cloning
+       * - The phantom marker has zero size and runtime cost
+       * - Two `Id<T>` values are equal if their string values are equal
+       * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
+       *
+       * # Examples
+       *
+       * ```rust
+       * use finstack_quant_core::types::{CurveId, InstrumentId};
+       *
+       * // Create IDs with different type tags
+       * let curve = CurveId::from("USD-SOFR");
+       * let bond = InstrumentId::from("ISIN:US912828XG60");
+       *
+       * // Can compare IDs of the same type
+       * assert_eq!(curve, CurveId::from("USD-SOFR"));
+       * assert_ne!(curve, CurveId::from("EUR-ESTR"));
+       *
+       * // Cannot compare IDs of different types (compile error):
+       * // let _ = curve == bond;  // Error: mismatched types
+       * ```
+       *
+       * # Thread Safety
+       *
+       * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
+       * safely share and clone IDs with minimal synchronization overhead.
+       */
+      curve_id: string;
+      kind: "commodity_curve_parallel_pct";
+      /**
+       * Percentage change, such that `5.0` raises prices by five percent.
+       */
+      pct: number;
+    }
+  | {
+      /**
+       * A phantom-typed identifier that prevents mixing different kinds of IDs.
+       *
+       * This type wraps a string identifier with a phantom type parameter to ensure
+       * type safety at compile time. Different `Id<T>` types with different `T`
+       * cannot be compared or mixed accidentally, preventing entire classes of bugs.
+       *
+       * # Type Parameters
+       *
+       * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
+       *
+       * # Invariants
+       *
+       * - Storage uses `Arc<str>` for efficient cloning
+       * - The phantom marker has zero size and runtime cost
+       * - Two `Id<T>` values are equal if their string values are equal
+       * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
+       *
+       * # Examples
+       *
+       * ```rust
+       * use finstack_quant_core::types::{CurveId, InstrumentId};
+       *
+       * // Create IDs with different type tags
+       * let curve = CurveId::from("USD-SOFR");
+       * let bond = InstrumentId::from("ISIN:US912828XG60");
+       *
+       * // Can compare IDs of the same type
+       * assert_eq!(curve, CurveId::from("USD-SOFR"));
+       * assert_ne!(curve, CurveId::from("EUR-ESTR"));
+       *
+       * // Cannot compare IDs of different types (compile error):
+       * // let _ = curve == bond;  // Error: mismatched types
+       * ```
+       *
+       * # Thread Safety
+       *
+       * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
+       * safely share and clone IDs with minimal synchronization overhead.
+       */
+      curve_id: string;
+      kind: "commodity_curve_node_pct";
+      /**
+       * Policy for requested tenors between curve pillars.
+       */
+      match_mode?: "exact" | "interpolate";
+      /**
+       * Pairs of tenor and percentage price change; `5.0` raises price by five percent.
        */
       nodes: [string, number][];
     }
@@ -925,12 +1021,11 @@ export type D_4A1Bd77A72C86Da677De =
     }
   | {
       /**
-       * Basis point shift (additive), or percent of the price-curve forward
-       * when `curve_kind` is [`CurveKind::Commodity`].
+       * Additive rate shift in basis points.
        */
       bp: number;
       /**
-       * Type of curve (Discount, Forward, ParCDS, Inflation, Commodity).
+       * Rate curve family (Discount, Forward, ParCDS or Inflation).
        */
       curve_kind: "discount" | "forward" | "par_cds" | "inflation" | "commodity";
       /**
@@ -944,12 +1039,20 @@ export type D_4A1Bd77A72C86Da677De =
       target: D_3D218202D529576E2F82;
     }
   | {
+      kind: "hierarchy_commodity_curve_parallel_pct";
+      /**
+       * Percentage change, such that `5.0` raises prices by five percent.
+       */
+      pct: number;
+      target: D_3D218202D529576E2F821;
+    }
+  | {
       kind: "hierarchy_vol_surface_parallel_pct";
       /**
        * Percentage change in volatility.
        */
       pct: number;
-      target: D_3D218202D529576E2F821;
+      target: D_3D218202D529576E2F822;
     }
   | {
       kind: "hierarchy_equity_price_pct";
@@ -957,7 +1060,7 @@ export type D_4A1Bd77A72C86Da677De =
        * Percentage price change.
        */
       pct: number;
-      target: D_3D218202D529576E2F822;
+      target: D_3D218202D529576E2F823;
     }
   | {
       kind: "hierarchy_base_corr_parallel_pts";
@@ -965,7 +1068,7 @@ export type D_4A1Bd77A72C86Da677De =
        * Absolute shift in decimal correlation (`0.02` = +0.02).
        */
       points: number;
-      target: D_3D218202D529576E2F823;
+      target: D_3D218202D529576E2F824;
     }
   | {
       /**
@@ -1322,7 +1425,8 @@ export type DFb65F54B2B8A66E8C994 =
   | "fx_future_option"
   | "commodity_future_option"
   | "volatility_index_future_option"
-  | "asset_backed_facility";
+  | "asset_backed_facility"
+  | "structured_credit_tranche";
 /**
  * A predicate for filtering nodes by their tags.
  */
@@ -1522,7 +1626,7 @@ export interface D_50465A01513B845F41C6 {
   predicates: DE939Dec829E78A9C8Ed9[];
 }
 /**
- * Hierarchy target to resolve to surfaces.
+ * Predicate identifying the target commodity curves.
  */
 export interface D_3D218202D529576E2F821 {
   /**
@@ -1536,7 +1640,7 @@ export interface D_3D218202D529576E2F821 {
   tag_filter?: D_50465A01513B845F41C6 | null;
 }
 /**
- * Hierarchy target to resolve to equity IDs.
+ * Hierarchy target to resolve to surfaces.
  */
 export interface D_3D218202D529576E2F822 {
   /**
@@ -1550,9 +1654,23 @@ export interface D_3D218202D529576E2F822 {
   tag_filter?: D_50465A01513B845F41C6 | null;
 }
 /**
- * Hierarchy target to resolve to surfaces.
+ * Hierarchy target to resolve to equity IDs.
  */
 export interface D_3D218202D529576E2F823 {
+  /**
+   * Non-empty path through the hierarchy (e.g., `["Credit", "US", "IG"]`).
+   */
+  path: string[];
+  /**
+   * Optional tag filter applied to nodes in the subtree; an empty filter
+   * canonicalizes to `None`.
+   */
+  tag_filter?: D_50465A01513B845F41C6 | null;
+}
+/**
+ * Hierarchy target to resolve to surfaces.
+ */
+export interface D_3D218202D529576E2F824 {
   /**
    * Non-empty path through the hierarchy (e.g., `["Credit", "US", "IG"]`).
    */

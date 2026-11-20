@@ -93,7 +93,7 @@ impl MetricCalculator for OasCalculator {
         let (lower_spread, intensity_floor) = match &hazard {
             Some(curve) => {
                 let min_hazard = curve
-                    .knot_points()
+                    .iter_knots()
                     .map(|(_, lambda)| lambda)
                     .fold(f64::INFINITY, f64::min);
                 ((-min_hazard).max(-0.10), Some(0.0))

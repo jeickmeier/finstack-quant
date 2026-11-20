@@ -91,7 +91,7 @@ for start, end in zip(history_dates[:-1], history_dates[1:], strict=True):
     brinson_periods.append(json.loads(bf.to_json()))
     p_snap, b_snap = [], []
     for iid in ids:
-        risk = price_instrument(json.dumps(instruments('base')[iid]), start_market, start, metrics=['ytm','duration_mod','z_spread'])
+        risk = price_instrument(json.dumps(instruments('base')[iid]), start_market, start, metrics=['ytm','duration_mod','z_spread','spread_duration'])
         curve_id = 'USD-OIS' if iid=='USD-CORP' else 'EUR-OIS'
         tenor = 5.0
         z0 = -math.log(start_market.get_discount(curve_id).df(tenor))/tenor
@@ -100,7 +100,7 @@ for start, end in zip(history_dates[:-1], history_dates[1:], strict=True):
         spread = risk.get_metric('z_spread')
         snap = {'sector':iid,'weight':weights[iid], 'total_return':returns_by_id[iid],
                 'yield_annual':risk.get_metric('ytm'), 'modified_duration':risk.get_metric('duration_mod'),
-                'spread_duration':risk.get_metric('duration_mod'), 'spread':spread,
+                'spread_duration':risk.get_metric('spread_duration'), 'spread':spread,
                 'delta_treasury_yield':z1-z0, 'delta_spread':0.0}
         p_snap.append(snap)
         b_snap.append(dict(snap, weight=0.5))

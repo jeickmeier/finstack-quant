@@ -101,8 +101,8 @@ function simmSensitivities() {
 
 function frtbSensitivities() {
   const sens = new margin.FrtbSensitivities('USD');
-  sens.addGirrDelta('USD', '5Y', 100_000);
-  sens.addGirrDelta('EUR', '10Y', -40_000);
+  sens.addGirrDelta('USD', 'USD-OIS', '5Y', 100_000);
+  sens.addGirrDelta('EUR', 'EUR-ESTR', '10Y', -40_000);
   sens.addGirrInflationDelta('USD', 5_000);
   sens.addGirrXccyBasisDelta('EUR', 2_000);
   sens.addGirrVega('USD', '1Y', '5Y', 3_000);
@@ -358,7 +358,12 @@ test('margin metric constructors and methods match Python', () => {
 
   const fundingCost = margin.marginFundingCost(10_000_000, 0.05, 0.03, 'USD');
   close(fundingCost, metrics.funding_cost.wire, 'funding_cost');
-  close(margin.marginFundingCostSpread(fundingCost), metrics.funding_cost.spread, 'spread');
+  close(
+    margin.marginFundingCostSpreadRate(fundingCost),
+    metrics.funding_cost.spread,
+    'spread rate'
+  );
+  close(margin.marginFundingCostSpreadBp(fundingCost), 200, 'spread basis points');
   close(
     margin.marginFundingCostCostForPeriod(fundingCost, 0.25),
     metrics.funding_cost.cost_for_period,
@@ -378,19 +383,9 @@ test('FundingConfig, profile and decay twins match Python', () => {
     'benefit'
   );
   close(
-    margin.fundingConfigEffectiveMarginSpreadBp(xva.funding.wire),
-    xva.funding.effective_margin_spread_bp,
-    'margin spread'
-  );
-  close(
     margin.fundingConfigEffectiveBenefitBp(xva.funding.symmetric_wire),
     xva.funding.symmetric_benefit_bp,
     'symmetric benefit'
-  );
-  close(
-    margin.fundingConfigEffectiveMarginSpreadBp(xva.funding.symmetric_wire),
-    xva.funding.symmetric_margin_spread_bp,
-    'symmetric margin spread'
   );
   throwsKind(() => margin.fundingConfigEffectiveBenefitBp({ funding_spread_bp: -1 }), 'validation');
 
@@ -417,21 +412,48 @@ test('FundingConfig, profile and decay twins match Python', () => {
   throwsKind(() => margin.imDecayProfileLinearToMaturity(0), 'validation', /maturity_years/);
   throwsKind(() => margin.imDecayProfileFactor('exponential', 1.0), 'validation');
 
-  assert.equal(margin.imProfileValidate({ times: [1, 2], im_values: [10, 5] }), undefined);
+  const im = {
+    as_of: '2025-01-01',
+    currency: 'USD',
+    basis: {
+      kind: 'external',
+      source_id: 'supplied-im',
+      netting_set: {
+        kind: 'bilateral',
+        counterparty_id: 'bank',
+        csa_id: 'agreement',
+      },
+    },
+    dates: ['2025-01-01', '2026-01-01'],
+    im_values: [10, 5],
+  };
+  assert.equal(margin.imProfileValidate(im), undefined);
   throwsKind(
-    () => margin.imProfileValidate({ times: [2, 1], im_values: [10, 5] }),
+    () => margin.imProfileValidate({ ...im, dates: ['2025-01-01', '2025-01-01'] }),
     'validation',
-    /strictly increasing/
+    /strictly increase/
   );
-  assert.equal(
-    margin.exposureProfileValidate({ times: [1, 2], mtm_values: [0, 0], epe: [0, 0], ene: [0, 0] }),
-    undefined
-  );
+  const exposure = {
+    as_of: '2025-01-01',
+    currency: 'USD',
+    basis: { kind: 'external', source_id: 'parity-test', policy_id: 'unsecured' },
+    dates: ['2025-01-01', '2026-01-01'],
+    times: [0, 1],
+    mtm_values: [0, 0],
+    epe: [0, 0],
+    ene: [0, 0],
+    diagnostics: { market_roll_failures: 0, valuation_failures: 0, total_time_points: 2 },
+  };
+  assert.equal(margin.exposureProfileValidate(exposure), undefined);
   throwsKind(
-    () =>
-      margin.exposureProfileValidate({ times: [1, 2], mtm_values: [0], epe: [0, 0], ene: [0, 0] }),
+    () => margin.exposureProfileValidate({ ...exposure, mtm_values: [0] }),
     'validation',
     /vector lengths must be equal/
+  );
+  throwsKind(
+    () => margin.exposureProfileValidate({ ...exposure, times: [0.5, 1] }),
+    'validation',
+    /explicit time-zero/
   );
 });
 
@@ -488,25 +510,29 @@ test('SimmSensitivities and SimmCalculator match Python', () => {
 test('imProfileFromSimm and computeMva match Python', () => {
   const sens = simmSensitivities();
   const calculator = new margin.SimmCalculator();
-  const profile = margin.imProfileFromSimm(
-    calculator,
-    sens,
-    'USD',
-    margin.imDecayProfileLinearToMaturity(5.0),
-    [1.0, 2.0, 4.0]
-  );
+  const projection = {
+    as_of: '2025-01-01',
+    currency: 'USD',
+    scope_source: 'shared-parity-risk',
+    netting_set: { kind: 'bilateral', counterparty_id: 'bank', csa_id: 'agreement' },
+    dates: ['2025-01-01', '2026-01-01', '2027-01-01', '2028-12-31'],
+    decay: margin.imDecayProfileLinearToMaturity(5.0),
+  };
+  const profile = margin.imProfileFromSimm(calculator, sens, projection);
   close(profile, golden.mva.profile, 'profile');
 
   const discount = core.DiscountCurve.flat('USD-OIS', '2025-01-01', 0.03, 'act_365f');
   const hazard = core.HazardCurve.flat('BANK', '2025-01-01', 0.02, 0.4, 'act_365f');
-  const spreads = [
-    [0.0, 50.0],
-    [5.0, 80.0],
-  ];
-  close(
-    margin.computeMva(profile, spreads, discount),
-    golden.mva.without_survival,
-    'without_survival'
+  const spreads = {
+    kind: 'dated',
+    knots: [
+      ['2025-01-01', 50],
+      ['2030-01-01', 80],
+    ],
+  };
+  assert.throws(
+    () => margin.computeMva(profile, spreads, discount),
+    /Choose a hazard curve or null/
   );
   close(
     margin.computeMva(profile, spreads, discount, null),
@@ -519,7 +545,11 @@ test('imProfileFromSimm and computeMva match Python', () => {
     'with_survival'
   );
   throwsKind(
-    () => margin.imProfileFromSimm(calculator, sens, 'USD', 'constant', [2.0, 1.0]),
+    () =>
+      margin.imProfileFromSimm(calculator, sens, {
+        ...projection,
+        dates: [...projection.dates].reverse(),
+      }),
     'validation'
   );
 });
@@ -709,7 +739,7 @@ test('SA-CCR configuration twins, SaCcrEngine and saccrEad match Python', () => 
     expected.engine_alpha
   );
   close(
-    wire(new margin.SaCcrEngine(1.5).calculateEad(unmargined, JSON.stringify(trades))),
+    wire(new margin.SaCcrEngine(1.5).calculateEad(JSON.stringify(trades), unmargined)),
     expected.engine_ead,
     'engine_ead'
   );
@@ -726,8 +756,8 @@ test('addRraoPosition requires the exotic flag', () => {
 test('GIRR requires explicit risk currency and DRC delegates complete Rust validation', () => {
   const sens = new margin.FrtbSensitivities('USD');
   assert.throws(() => sens.addGirrDelta('5Y', 100));
-  sens.addGirrDelta('EUR', '5Y', 100);
-  assert.deepEqual(JSON.parse(sens.toJson()).girr_delta, [['EUR', '5Y', 100]]);
+  sens.addGirrDelta('EUR', 'EUR-ESTR', '5Y', 100);
+  assert.deepEqual(JSON.parse(sens.toJson()).girr_delta, [['EUR', 'EUR-ESTR', '5Y', 100]]);
   const position = {
     issuer: 'ACME',
     jtd_amount: 1_000_000,
@@ -769,4 +799,49 @@ test('instrument roundtrip preserves the CSA-owned no-IM election', () => {
       /unknown field/
     );
   }
+});
+
+test('standalone SIMM nets opposing contractual sensitivities before calculating IM', () => {
+  const asOf = '2023-12-20';
+  const snapshot = new core.MarketContext();
+  snapshot.insert(core.DiscountCurve.flat('USD-OIS', asOf, 0.04, 'act_365f'));
+  snapshot.insert(core.ForwardCurve.flat('USD-SOFR-3M', asOf, 0.045, 'act_360'));
+  const payer = JSON.parse(valuations.instruments.InterestRateSwap.example().toJson());
+  const receiver = structuredClone(payer);
+  receiver.instrument.spec.id = 'RECEIVER';
+  receiver.instrument.spec.side = 'receive';
+  const single = valuations.calculateSimm([payer], snapshot, asOf);
+  const net = valuations.calculateSimm([payer, receiver], snapshot, asOf);
+  assert.ok(Number(single.amount.amount) > 0);
+  assert.ok(Number(net.amount.amount) < 1e-5);
+  assert.throws(() => valuations.calculateSimm([], snapshot, asOf), /empty/);
+  assert.throws(() => valuations.calculateSimm([payer], snapshot, asOf, null, 0), /MPOR/);
+});
+
+test('typed margin authoring validates agreement terms and the default-risk position', () => {
+  const usd = new core.Currency('USD');
+  const base = margin.csaSpecUsdRegulatory();
+  const withThreshold = margin
+    .csaSpecToBuilder(base)
+    .vmThreshold(new core.Money(250_000, usd), new core.Money(50_000, usd))
+    .imParams(null)
+    .build();
+  assert.equal(Number(base.vm_params.threshold.amount), 0);
+  assert.equal(Number(withThreshold.vm_params.threshold.amount), 250_000);
+  assert.equal(Number(withThreshold.vm_params.mta.amount), 50_000);
+  assert.equal(withThreshold.im_params, undefined);
+  assert.throws(() => margin.csaSpecBuilder('EXPLICIT', 'USD', 'USD-OIS').build(), /calendar_id/);
+
+  const position = margin.drcPosition({
+    issuer: 'ACME',
+    jtd_amount: 1_000_000,
+    rating_bucket: 3,
+    sector: 'corporate',
+    seniority: 'senior_unsecured',
+    maturity_years: 2,
+  });
+  const sens = new margin.FrtbSensitivities('USD');
+  sens.addDrcPosition(position);
+  assert.ok(margin.frtbSbaCharge(sens).drc > 0);
+  assert.throws(() => margin.drcPosition({ ...position, maturity_years: -1 }), /maturity/);
 });

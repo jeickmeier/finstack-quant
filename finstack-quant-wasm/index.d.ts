@@ -215,6 +215,25 @@ declare module './pkg/finstack_quant_wasm.js' {
      */
     insertCreditIndex(id: string, data: CreditIndexData): this;
     /**
+     * Store a continuous dividend yield as an annualized decimal market scalar.
+     *
+     * @param id - Identifier configured on the instrument's dividend-yield input.
+     * @param yieldRate - Finite annualized continuous decimal rate (0.02 is 2%).
+     * @throws Error with kind `validation` if the yield is not finite.
+     * @returns The same MarketContext with the input stored, for chaining in the public facade.
+     */
+    insertDividendYield(id: string, yieldRate: number): this;
+    /**
+     * Store historical observations under a contractual fixing identifier.
+     *
+     * @param indexId - Trimmed contractual index name without the FIXING prefix.
+     * @param series - Dated observations. Rate fixings are decimal rates. A copy
+     *   is stored under the derived key, replacing any existing series there.
+     * @throws Error with kind `validation` for an empty, untrimmed, or prefixed index name.
+     * @returns The same MarketContext with the input stored, for chaining in the public facade.
+     */
+    insertFixing(indexId: string, series: ScalarTimeSeries): this;
+    /**
      * Attach the FX matrix used for currency conversion (Rust `MarketContext::insert_fx_mut`).
      *
      * # Arguments
@@ -1138,6 +1157,15 @@ export interface CoreNamespace {
    */
   readonly applyLowerTriangular: typeof wasm.applyLowerTriangular;
   /**
+   * Apply a shared lower-triangular factor to each row of independent observations.
+   * @param l - Row-major square factor containing n × n numbers; the upper triangle is ignored.
+   * @param n - Number of variables per observation row and dimension of the factor.
+   * @param z - Row-major observations containing n finite inputs per row in factor order.
+   * @returns Row-major Float64Array with the same shape and row order as the input observations.
+   * @throws If inputs have invalid types, incompatible dimensions, non-finite data or overflow.
+   */
+  readonly applyLowerTriangularMany: typeof wasm.applyLowerTriangularMany;
+  /**
    * Cholesky decomposition for a flat row-major matrix.
    *
    * Accepts a `Float64Array`/`number[]` containing `n * n` row-major entries
@@ -1389,6 +1417,23 @@ export interface CoreNamespace {
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) when `q` is outside `[0, 1]` or any value is non-finite; `FinstackError` (kind `computation`) on underflow.
    */
   readonly quantile: typeof wasm.quantile;
+  /**
+   * Compute the signed mean of the worst fractional tail of a sample.
+   * @param data - Nonempty finite observations in any order, such as signed simple returns.
+   * @param confidence - Probability strictly between zero and one. The lower tail has mass `1 - confidence`.
+   * @returns Signed lower-tail mean in the observations' units.
+   * @throws `TypeError` for a mistyped argument or `FinstackError` for invalid confidence, empty or nonfinite data, or an unrepresentable result.
+   */
+  readonly expectedShortfall: typeof wasm.expectedShortfall;
+  /**
+   * Fit a full-rank linear regression over a rectangular predictor panel.
+   * @param x - Finite observations in rows and one predictor feature per column.
+   * @param y - Finite response with one value per observation.
+   * @param addIntercept - Include a constant term by default. False fits through the origin and uses uncentered R².
+   * @returns Fitted slopes, optional intercept, residuals and fit diagnostics.
+   * @throws TypeError for incompatible host types, or FinstackError for mismatched dimensions, non-finite or rank-deficient inputs, zero response variation or unrepresentable results.
+   */
+  readonly ols: typeof wasm.ols;
   /**
    * Annualized realized variance of a close price series (Rust
    * `stats::realized_variance`): the mean of squared log returns times the
@@ -2355,6 +2400,41 @@ export interface CalibrationNamespace {
    */
   readonly calibrationEnvelopeContentHash: typeof wasm.calibrationEnvelopeContentHash;
   /**
+   * Build a calibration envelope from ordered steps with inline observations.
+   * @param id - Nonempty plan identifier.
+   * @param steps - Ordered step and quote-input pairs. An empty quote list can reference a previously defined quote set.
+   * @param settings - Optional solver and validation configuration overrides.
+   * @param priorMarket - Optional previously calibrated objects used as dependencies.
+   * @returns Canonical calibration envelope ready for validation or execution.
+   * @throws `TypeError` for a mistyped argument or `FinstackError` for invalid settings, malformed data, blank or duplicate identifiers, or duplicate quote-set definitions.
+   */
+  readonly calibrationEnvelopeFromSteps: typeof wasm.calibrationEnvelopeFromSteps;
+  /**
+   * Derive an envelope with one more step at the end of the execution order.
+   * @param envelope - Envelope whose existing steps and settings are retained.
+   * @param entry - Step and inline quotes. An empty list can reference an existing quote set.
+   * @returns Independent calibration envelope with the appended step.
+   * @throws `TypeError` for malformed argument shapes and `FinstackError` for invalid or duplicate identifiers or a redefined quote set.
+   */
+  readonly calibrationEnvelopeWithStep: typeof wasm.calibrationEnvelopeWithStep;
+  /**
+   * Derive an envelope without one quote or any references to it.
+   * @param envelope - Calibration envelope containing the quoted observation.
+   * @param quoteId - Exact stable ID of the quote.
+   * @returns Independent envelope with matching references removed.
+   * @throws `TypeError` for malformed arguments or `FinstackError` for an unknown or non-quote ID.
+   */
+  readonly calibrationEnvelopeWithoutQuote: typeof wasm.calibrationEnvelopeWithoutQuote;
+  /**
+   * Apply a signed rate or spread shock to a derived calibration envelope.
+   * @param envelope - Calibration envelope with the original market inputs.
+   * @param quoteSet - Exact quote-set name or null to select every quote once.
+   * @param bp - Finite signed basis points. One basis point adds 0.0001 to decimal rates, lowers rate-futures prices by 0.01, or adds one to spreads quoted in basis points.
+   * @returns Independent envelope with the selected quotes shifted.
+   * @throws `TypeError` for malformed arguments or `FinstackError` for nonfinite shocks, unknown sets or references, or quotes without a rate or spread bump basis.
+   */
+  readonly calibrationEnvelopeBumpQuotesBp: typeof wasm.calibrationEnvelopeBumpQuotesBp;
+  /**
    * Canonical content hash of a calibration result envelope.
    *
    * Free-function twin of Python `CalibrationResultEnvelope.content_hash` (Rust
@@ -2666,6 +2746,15 @@ export interface CalibrationNamespace {
    * JavaScript value.
    */
   readonly rateBoundsEmergingMarkets: typeof wasm.rateBoundsEmergingMarkets;
+  /**
+   * Build a calibration step from a native kind-tagged parameter object.
+   * @param id - Stable step ID used in reports and as the default quote-set name.
+   * @param params - Canonical kind-tagged curve, model or surface parameters, with explicit output identifiers.
+   * @param quoteSet - The parent plan's named quote set. Defaults to the step ID.
+   * @returns One calibration step ready for plan authoring.
+   * @throws `TypeError` for invalid host shapes or `FinstackError` for missing fields, invalid parameters, or blank identifiers.
+   */
+  readonly calibrationStep: typeof wasm.calibrationStep;
   /**
    * Build a discount-curve bootstrap step.
    *
@@ -5305,12 +5394,12 @@ export interface ModelsFactorRiskNamespace {
    * decomposer — populated only by credit-aware position decomposers).
    *
    * `measure` is the risk measure in its canonical serde form, the same shape
-   * as the `riskMeasureJson` input: `"variance"` or `"volatility"`, or an
+   * as the `riskMeasure` input: `"variance"` or `"volatility"`, or an
    * object carrying `confidence` for `var` / `expected_shortfall`. The Python
    * `RiskDecomposition.measure` getter returns the same value.
-   * @param sensitivitiesJson - Canonical factor-sensitivity JSON with required `base_currency`, ordered `position_ids`/`factor_ids`, and nested `data[position][factor]` rows; `JSON.stringify` the result of `computeFactorSensitivities`. Python `SensitivityMatrix.to_json()` uses the same contract. Unknown fields, inconsistent dimensions, and non-finite entries are rejected.
-   * @param covarianceJson - Factor covariance-matrix JSON aligned with the supplied sensitivities.
-   * @param riskMeasureJson - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
+   * @param sensitivities - Structured sensitivity matrix as returned by `computeFactorSensitivities`, or its JSON text. Rows follow position order and columns follow factor order.
+   * @param covariance - Factor covariance matrix or its JSON text. Factor identifiers and their order must match sensitivities.
+   * @param riskMeasure - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
    *
    * # Errors
    *
@@ -5323,6 +5412,20 @@ export interface ModelsFactorRiskNamespace {
    * @returns Returns a structured `RiskDecomposition` object.
    */
   readonly decomposeFactors: typeof wasm.decomposeFactors;
+  /**
+   * Create a parametric expected shortfall measure for signed factor P&L.
+   * @param confidence - One-sided loss confidence strictly between 0.5 and 1.
+   * @returns The tagged RiskMeasure literal with its validated confidence.
+   * @throws TypeError for mistyped input and FinstackError for invalid confidence.
+   */
+  readonly riskMeasureExpectedShortfall: typeof wasm.riskMeasureExpectedShortfall;
+  /**
+   * Create a parametric value at risk measure for signed factor P&L.
+   * @param confidence - One-sided loss confidence strictly between 0.5 and 1.
+   * @returns The tagged RiskMeasure literal with its validated confidence.
+   * @throws TypeError for mistyped input and FinstackError for invalid confidence.
+   */
+  readonly riskMeasureVar: typeof wasm.riskMeasureVar;
   /**
    * Default utilization threshold of `evaluateRiskBudget`. Twin of the Rust and
    * Python constant `DEFAULT_UTILIZATION_THRESHOLD`.
@@ -5745,15 +5848,13 @@ export interface ModelsLiquidityNamespace {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const params = { r: 0.05, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, sigma_v: 0.3, rho: -0.7 };
- * const est = models.monteCarlo.priceHeston(100, 100, 1.0, params, true, {
+ * const contract = models.optionContractParams({ spot: 100, strike: 100, rate: 0.05, dividend_yield: 0, time_to_expiry: 1, option_type: "call" });
+ * const heston = models.hestonParams({ v0: 0.04, kappa: 2, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 });
+ * const estimate = models.monteCarlo.priceHeston(contract, heston, {
  *   num_paths: 5000,
  *   seed: 42,
  * });
- * console.log(est.mean.amount, est.mean.currency);
- * // Path count and seed default to the Rust registry values.
- * const byDefault = models.monteCarlo.priceHeston(100, 100, 1.0, params, false);
- * console.log(byDefault.num_paths); // 100000
+ * console.log(estimate.mean.amount, estimate.mean.currency);
  * ```
  */
 export interface ModelsMonteCarloNamespace {
@@ -5761,42 +5862,19 @@ export interface ModelsMonteCarloNamespace {
   readonly PathDependentPricer: typeof wasm.PathDependentPricer;
   readonly LsmcPricer: typeof wasm.LsmcPricer;
   /**
-   * Price a European option under Heston stochastic volatility by Monte Carlo.
-   *
-   * Twin of the Rust `price_heston` and the Fourier `models.hestonPrice`: same
-   * market and model inputs, with Monte Carlo settings in place of the Fourier
-   * settings. Paths use the Andersen (2008) QE discretization.
-   *
-   * # Errors
-   *
-   * Throws a `validation` error if `params` does not match
-   * `HestonPricingParams` (non-finite `r`/`q`, non-positive or non-finite
-   * `kappa`, `theta`, `sigma_v` or `v0`, `rho` outside `[-1, 1]`) or
-   * `settings` does not match `HestonMcSettings` (unknown currency, a
-   * fractional or out-of-range count), if the embedded defaults cannot be
-   * loaded, the expiry, step count, path count or computed discount factor
-   * fails validation, a simulated discounted payoff is non-finite, or the
-   * result cannot be serialized.
-   * @returns The Rust `MoneyEstimate` serde object: `mean` and `ci_95` as
-   * `{amount, currency}` money, plus `stderr`, `num_paths`,
-   * `num_simulated_paths` and the optional statistics (`null` when not captured).
-   * @param spot - Current spot price or exchange rate in the same units as the strike.
-   * @param strike - Option strike price in the same price units as the underlying.
-   * @param expiry - Time to option expiry in years on the model's annual time basis.
-   * @param params - `HestonPricingParams` object or JSON text, every key required: `r` (continuously compounded risk-free rate, decimal), `q` (continuous dividend yield, decimal), `v0` (initial instantaneous variance), `kappa` (variance mean-reversion speed per year), `theta` (long-run variance), `sigma_v` (annualized volatility of variance) and `rho` (asset/variance shock correlation in `[-1, 1]`).
-   * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @param settings - Optional `HestonMcSettings` object or JSON text; every key may be omitted and an omitted key uses the Rust registry European-pricer default: `num_paths` (independent path estimators in `[2, 10000000]`, each antithetic pair counts once; default 100 000), `seed` (Philox root seed, number or BigInt), `num_steps` (positive time steps per path) and `currency` (ISO-4217 code stamped on the estimate).
-   *
+   * Price a European Heston option by quadratic-exponential Monte Carlo.
+   * @param contract - Spot and strike in quote currency, positive expiry in years, annual continuous rates, and call or put payoff.
+   * @param heston - Checked opening variance, mean reversion, long-run variance, vol-of-vol and spot/variance correlation.
+   * @param settings - Optional independent path estimator count, Philox seed, uniform step count, and ISO currency. Omitted values use the registry defaults.
+   * @returns Discounted price, standard error, confidence interval, and path counts as MoneyEstimate.
+   * @throws TypeError for non-JSON inputs and FinstackError for invalid dynamics, settings, or simulated discounted payoffs.
    * @example
    * ```typescript
    * import init, { models } from "finstack-quant-wasm";
    * await init();
-   * const estimate = models.monteCarlo.priceHeston(
-   *   100, 100, 1.0,
-   *   { r: 0.03, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, sigma_v: 0.3, rho: -0.7 },
-   *   true,
-   *   { num_paths: 2000, seed: 42, num_steps: 16 },
-   * );
+   * const contract = models.optionContractParams({ spot: 100, strike: 100, rate: 0.03, dividend_yield: 0, time_to_expiry: 1, option_type: "call" });
+   * const model = models.hestonParams({ v0: 0.04, kappa: 2, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 });
+   * const estimate = models.monteCarlo.priceHeston(contract, model, { num_paths: 2000, seed: 42 });
    * console.log(estimate.mean.amount, estimate.stderr);
    * ```
    */
@@ -5821,7 +5899,7 @@ export interface ModelsMonteCarloNamespace {
    * validates every field. For rough Bergomi, `xi.values` contains annual variance
    * rates (0.04 for 20% volatility). Cheyette `sigma_base.amplitudes` contains
    * ordered `[time, rate_volatility]` pairs (0.005 for a 50 basis point amplitude).
-   * @param spec - `PathSimulationSpec` object or JSON: `process` (tagged by `type`, with annualized decimal rates and volatilities), optional `scheme` (`"default"` uses the process's canonical scheme), `initial_state` in the process's state layout, `time_grid` in years, `num_paths` in [1, 100000], `seed`, optional `antithetic` (default `false`), and optional `fbm`, the fractional-noise generator of the `rough_bergomi` and `cheyette_rough` processes (`{ type: "volterra" }` when omitted).
+   * @param spec - `PathSimulationSpec` object or JSON: `process` (tagged by `type`, with annualized decimal rates and volatilities), optional `scheme` (`"default"` uses the process's canonical scheme), `initial_state` in the process's state layout (Heston and rough Heston take `[spot]`, using `v0` for variance), `time_grid` in years, `num_paths` in [1, 100000], `seed`, optional `antithetic` (default `false`), and optional `fbm`, the fractional-noise generator of the `rough_bergomi` and `cheyette_rough` processes (`{ type: "volterra" }` when omitted).
    * @returns The `PathSummary` object: `num_paths`, `num_simulated_paths`, `dim`, `times`, `factor_names`, and `values` in row-major `[path][time][factor]` order, so factor `f` on path `p` at `times[s]` is `values[(p * times.length + s) * dim + f]`.
    *
    * @example
@@ -6510,8 +6588,8 @@ export interface ModelsVolatilityNamespace {
   readonly sviDurrlemanG: typeof wasm.sviDurrlemanG;
   /**
    * Butterfly-arbitrage check on a strike by expiry volatility grid.
-   * @param strikes - Strictly increasing strike grid shared by every row.
    * @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+   * @param strikes - Strictly increasing strike grid shared by every row.
    * @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
    * @param forwardPrices - One forward price to broadcast, or one per expiry.
    * @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
@@ -6525,8 +6603,8 @@ export interface ModelsVolatilityNamespace {
   readonly checkButterflyGrid: typeof wasm.checkButterflyGrid;
   /**
    * Calendar-spread arbitrage check on a strike by expiry volatility grid.
-   * @param strikes - Strictly increasing strike grid shared by every row.
    * @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+   * @param strikes - Strictly increasing strike grid shared by every row.
    * @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
    * @param forwardPrices - One forward price to broadcast, or one per expiry.
    * @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
@@ -6540,8 +6618,8 @@ export interface ModelsVolatilityNamespace {
   readonly checkCalendarSpreadGrid: typeof wasm.checkCalendarSpreadGrid;
   /**
    * Local-volatility density check (Dupire denominator positivity) on a volatility grid.
-   * @param strikes - Strictly increasing strike grid shared by every row.
    * @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+   * @param strikes - Strictly increasing strike grid shared by every row.
    * @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
    * @param forwardPrices - One forward price per expiry.
    * @returns The `ArbitrageViolation` objects found (empty when the grid is clean).
@@ -6569,8 +6647,8 @@ export interface ModelsVolatilityNamespace {
   readonly checkSurface: typeof wasm.checkSurface;
   /**
    * Run every static-arbitrage check on a strike by expiry volatility grid.
-   * @param strikes - Strictly increasing strike grid shared by every row.
    * @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+   * @param strikes - Strictly increasing strike grid shared by every row.
    * @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
    * @param forwardPrices - One forward price to broadcast, or one per expiry.
    * @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
@@ -6668,7 +6746,7 @@ export interface ModelsVolatilityNamespace {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * console.log(models.bsPrice(100, 100, 0.03, 0, 0.2, 1, true));
+ * console.log(models.bsPrice({ spot: 100, strike: 100, rate: 0.03, dividend_yield: 0, volatility: 0.2, time_to_expiry: 1, option_type: 'call' }));
  * ```
  */
 export interface ModelsNamespace {
@@ -6719,43 +6797,73 @@ export interface ModelsNamespace {
    */
   readonly optionCalculation: typeof wasm.optionCalculation;
   /**
-   * Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.
-   *
-   * Black-Scholes (1973): see docs/REFERENCES.md#black-scholes-1973.
-   * Merton (1973): see docs/REFERENCES.md#merton-1973.
-   * Garman-Kohlhagen (1983): see docs/REFERENCES.md#garman-kohlhagen-1983.
-   *
-   * @param spot - Spot price of the underlying.
-   * @param strike - Strike of the option.
-   * @param rate - Risk-free rate, **decimal** continuously compounded
-   * (e.g. `0.05` for 5%).
-   * @param divYield - Continuous dividend yield (or foreign rate for FX),
-   * **decimal** continuously compounded.
-   * @param vol - Annualized volatility, **decimal**
-   * (e.g. `0.20` for 20%).
-   * @param expiry - Time to expiry in **years**.
-   * @param isCall - `true` for a call, `false` for a put.
-   * @returns Per-unit option price.
-   *
+   * Per-unit Black-Scholes or Garman-Kohlhagen price of a European option.
+   * @param market - Canonical option inputs as an object or JSON text. Spot and strike share units; rate and dividend yield are continuously compounded decimal rates (foreign rate for FX); volatility is annualized decimal; time to expiry is in years; option type is call or put.
+   * @returns Price per unit. At zero expiry this is the intrinsic value; at zero volatility it is the discounted deterministic payoff.
+   * @throws `TypeError` if the market input is mistyped, or `FinstackError` when the contract is malformed, inputs fail validation or the discounted legs or price are non-finite.
    * @example
-   * ```javascript
+   * ```typescript
    * import init, { models } from "finstack-quant-wasm";
    * await init();
-   * const price = models.bsPrice(
-   *   100,    // spot
-   *   100,    // strike (ATM)
-   *   0.05,   // rate = 5%
-   *   0.0,    // divYield = 0
-   *   0.20,   // vol = 20%
-   *   1.0,    // expiry = 1 year
-   *   true,   // call
-   * );
-   * // price ≈ 10.45
+   * const price = models.bsPrice({
+   *   spot: 100, strike: 100, rate: 0.05, dividend_yield: 0,
+   *   volatility: 0.2, time_to_expiry: 1, option_type: "call",
+   * });
    * ```
-   *
-   * @throws If spot or strike is non-positive, volatility or expiry is negative, any numerical input is non-finite, or discounted legs or price overflow.
    */
   readonly bsPrice: typeof wasm.bsPrice;
+  /**
+   * Price BSM options at paired spot and strike coordinates.
+   * @param market - Reference BSM market fields in the same units as bsPrice.
+   * @param spots - Positive spot quotes. Scalar and singleton inputs broadcast. Omit to use market.spot.
+   * @param strikes - Positive strikes in spot quote units. Omit to use market.strike.
+   * @returns Float64Array of prices in quote units and input order.
+   * @throws TypeError for invalid input types or FinstackError for invalid or incompatible axes.
+   */
+  readonly bsPriceMany: typeof wasm.bsPriceMany;
+  /**
+   * Validate an option's market inputs and return the canonical object.
+   * @param market - Positive spot and strike in matching units; continuous annual decimal rate and carry; nonnegative annualized decimal volatility and expiry in years; and call or put payoff direction.
+   * @returns Validated option market object. Individual pricers may require strictly positive volatility or expiry.
+   * @throws `TypeError` if market has the wrong host type, or `FinstackError` for invalid or non-finite parameters.
+   */
+  readonly optionMarketParams: typeof wasm.optionMarketParams;
+  /**
+   * Validate model-independent option inputs.
+   * @param contract - Positive matching spot and strike, finite annual continuous decimal discount and carry rates, nonnegative expiry in years and payoff direction.
+   * @returns Validated model-independent contract.
+   * @throws FinstackError if its shape or values fail validation.
+   */
+  readonly optionContractParams: typeof wasm.optionContractParams;
+  /**
+   * Construct checked Heston stochastic variance dynamics.
+   * @param heston - Positive opening variance v0, mean-reversion speed kappa per year, positive long-run variance theta, positive annualized vol_of_vol, and spot/variance correlation rho in (-1, 1).
+   * @returns Canonical validated variance parameters usable by Heston pricing.
+   * @throws TypeError for a non-JSON host argument and FinstackError for invalid dynamics.
+   */
+  readonly hestonParams: typeof wasm.hestonParams;
+  /**
+   * Check the inclusive Feller condition for canonical Heston dynamics.
+   * @param heston - Validated variance dynamics or the corresponding JSON document.
+   * @returns Whether twice kappa times theta is at least vol-of-vol squared.
+   * @throws TypeError for a non-JSON host argument and FinstackError for invalid dynamics.
+   */
+  readonly hestonParamsSatisfiesFeller: typeof wasm.hestonParamsSatisfiesFeller;
+  /**
+   * Read the model-independent portion of constant-volatility option inputs.
+   * @param market - Spot, strike, continuous decimal rate and carry, annualized decimal volatility, expiry in years and direction.
+   * @returns The same contract inputs without its volatility assumption.
+   * @throws FinstackError when the inputs cannot be read as an option market.
+   */
+  readonly optionMarketParamsContract: typeof wasm.optionMarketParamsContract;
+  /**
+   * Combine a model-independent contract with annualized constant volatility.
+   * @param contract - Positive matching spot and strike, continuous decimal carrying rates, expiry in years and payoff direction.
+   * @param volatility - Nonnegative finite annualized volatility as a decimal.
+   * @returns Validated option inputs for a constant-volatility model.
+   * @throws FinstackError when the contract or volatility fail validation.
+   */
+  readonly optionContractParamsWithVolatility: typeof wasm.optionContractParamsWithVolatility;
   /**
    * Vanilla option payoff at expiry: `max(±(spot - strike), 0)`.
    *
@@ -6804,6 +6912,16 @@ export interface ModelsNamespace {
    * ```
    */
   readonly bsGreeks: typeof wasm.bsGreeks;
+  /**
+   * Evaluate BSM Greeks for paired spot and strike coordinates.
+   * @param market - Reference BSM market fields in the same units as bsGreeks.
+   * @param spots - Positive spot quotes. Scalar and singleton inputs broadcast. Omit to use market.spot.
+   * @param strikes - Positive strikes in spot quote units. Omit to use market.strike.
+   * @param thetaDaysPerYear - Positive divisor for annual theta. Omitted uses 365 calendar days.
+   * @returns One fixed-shape BsGreeks row per pair, in input order.
+   * @throws TypeError for invalid input types or FinstackError for invalid or incompatible axes.
+   */
+  readonly bsGreeksMany: typeof wasm.bsGreeksMany;
   /**
    * Whether a set of Black-Scholes Greeks is internally consistent: gamma and
    * vega non-negative and every value finite.
@@ -7049,110 +7167,61 @@ export interface ModelsNamespace {
    */
   readonly quantoOptionPrice: typeof wasm.quantoOptionPrice;
   /**
-   * Closed-form (Fourier) Heston price of a European option.
-   *
-   * Heston (1993): see docs/REFERENCES.md#heston-1993.
-   * Albrecher et al. (2007): see docs/REFERENCES.md#albrecher-2007-little-heston-trap.
-   * @param spot - Current spot price in the same units as the strike.
-   * @param strike - Option strike price.
-   * @param expiry - Time to expiry in years; a non-positive value returns intrinsic.
-   * @param params - `HestonPricingParams` object or JSON text, every key required: `r` (continuously compounded risk-free rate, decimal), `q` (continuous dividend yield or foreign rate, decimal), `v0` (initial instantaneous variance, not volatility), `kappa` (variance mean-reversion speed per year), `theta` (long-run variance), `sigma_v` (volatility of variance) and `rho` (spot/variance correlation in `[-1, 1]`).
-   * @param isCall - Whether to value a call (`true`, default) or put (`false`).
-   *
-   * # Errors
-   *
-   * Throws a JavaScript exception if `params` does not match
-   * `HestonPricingParams` or a parameter is non-finite or outside its domain,
-   * or the Fourier integration fails to produce a finite price.
-   * @returns Present-value per-unit option price.
-   *
+   * Price a European option by Heston Fourier inversion.
+   * @param contract - Positive spot and strike in quote units, finite annual continuous rates, nonnegative expiry in years, and call or put payoff. A zero expiry returns intrinsic value.
+   * @param heston - Checked opening variance, mean reversion, long-run variance, vol-of-vol and spot/variance correlation.
+   * @param settings - Optional integration settings with positive upper frequency u_max, positive panel count panels and Gauss–Legendre order gl_order in {2, 4, 8, 16}. Omission selects a grid using maturity and variance.
+   * @returns Present value per unit of the underlying in its quote currency.
+   * @throws TypeError for non-JSON inputs and FinstackError for invalid parameters or unresolved integration.
    * @example
-   * ```javascript
-   * const price = models.hestonPrice(100, 100, 1.0, {
-   *   r: 0.03, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, sigma_v: 0.3, rho: -0.7,
-   * });
-   * // price ≈ 9.24
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const contract = models.optionContractParams({ spot: 100, strike: 100, rate: 0.03, dividend_yield: 0, time_to_expiry: 1, option_type: "call" });
+   * const heston = models.hestonParams({ v0: 0.04, kappa: 2, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 });
+   * console.log(models.hestonPrice(contract, heston));
    * ```
    */
   readonly hestonPrice: typeof wasm.hestonPrice;
   /**
-   * Price a European option under the Black-Scholes model using the COS method.
-   *
-   * Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
-   * Black-Scholes (1973): see docs/REFERENCES.md#black-scholes-1973.
-   * @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield, decimal), `time_to_expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
-   * @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%; must be positive.
-   *
-   * # Errors
-   *
-   * Throws a `validation` error if `market` does not match `CosMarketParams`,
-   * spot, strike, expiry, or volatility is not finite and positive, rates/carry
-   * are non-finite, `n_terms` is outside `1..=65536` or `vol` is not positive,
-   * and a `computation` error if the model produces a degenerate or invalid COS
-   * truncation range, a non-finite characteristic-function value or forward
-   * moment, or a non-finite option price.
-   * @returns Discounted European option price in the same units as `spot`.
-   *
+   * Price a European option under a constant annualized lognormal volatility.
+   * @param market - Spot, strike, annual continuous decimal discount and carry rates, positive expiry in years, payoff direction and positive decimal annual volatility.
+   * @param nTerms - Expansion terms from 1 to 65,536. Omit for 128 terms.
+   * @returns Discounted option price per underlying unit.
+   * @throws FinstackError for invalid input, invalid term count, degenerate cumulants or an unrepresentable price.
    * @example
-   * ```javascript
-   * const call = models.bsCosPrice(
-   *   {
-   *     spot: 100,
-   *     strike: 100,
-   *     rate: 0.05,
-   *     dividend_yield: 0.0,
-   *     time_to_expiry: 1.0,
-   *     option_type: "call",
-   *   },
-   *   0.2,
-   * );
-   * // call ≈ 10.45, the Black-Scholes price
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const price = models.bsCosPrice({
+   *   spot: 100, strike: 100, rate: 0.05, dividend_yield: 0,
+   *   time_to_expiry: 1, option_type: "call", volatility: 0.2,
+   * });
+   * console.log(price); // about 10.45
    * ```
    */
   readonly bsCosPrice: typeof wasm.bsCosPrice;
   /**
-   * Price a European option under the Variance Gamma model using the COS method.
-   *
-   * Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
-   * Madan-Carr-Chang (1998): see docs/REFERENCES.md#madan-carr-chang-1998.
-   * @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield, decimal), `time_to_expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
-   * @param sigma - Positive finite volatility of the subordinated Brownian motion, as a decimal.
-   * @param theta - Finite annual log-return drift of the subordinated Brownian motion; its sign controls skew.
-   * @param nu - Positive finite variance rate of the Gamma time change, in years; larger values increase tail thickness.
-   *
-   * # Errors
-   *
-   * Throws a `validation` error if `market` does not match `CosMarketParams`,
-   * spot, strike, expiry, sigma, or nu is not finite and positive,
-   * rates/carry/theta are non-finite, the VG martingale condition fails or
-   * `n_terms` is outside `1..=65536`, and a `computation` error if the model
-   * produces a degenerate or invalid COS truncation range, a non-finite
-   * characteristic-function value or forward moment, or a non-finite option
-   * price.
-   * @returns Discounted European option price in the same units as `spot`.
+   * Price a European option under the Variance Gamma process.
+   * @param contract - Spot and strike in matching units, positive expiry in years, continuous annual discount and carry rates in decimals, and call or put direction.
+   * @param sigma - Positive annual volatility of the subordinated Brownian motion as a decimal.
+   * @param theta - Annual drift of the subordinated Brownian motion with finite forward moment.
+   * @param nu - Positive variance rate of the Gamma subordinator.
+   * @param nTerms - Expansion terms from 1 to 65,536. Omit for 128 terms.
+   * @returns Discounted option price per underlying unit.
+   * @throws FinstackError for invalid input, a missing forward moment, invalid term count, degenerate cumulants or unrepresentable price.
    */
   readonly vgCosPrice: typeof wasm.vgCosPrice;
   /**
-   * Price a European option under Merton (1976) jump-diffusion using the COS method.
-   *
-   * Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
-   * Merton jump-diffusion (1976): see docs/REFERENCES.md#merton-1976-jump.
-   * @param market - `CosMarketParams` object or JSON text: `spot` and `strike` in the same price units, `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield, decimal), `time_to_expiry` (years), `option_type` (`"call"` or `"put"`) and optional `n_terms` (COS expansion terms in `1..=65536`; omitted or `null` uses the pricer default, 128).
-   * @param sigma - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
-   * @param muJump - Mean log jump size in the Merton jump-diffusion model.
-   * @param sigmaJump - Standard deviation of log jump sizes in the Merton jump-diffusion model.
-   * @param lambda - Annual jump-arrival intensity in the Merton jump-diffusion model.
-   *
-   * # Errors
-   *
-   * Throws a `validation` error if `market` does not match `CosMarketParams`,
-   * spot, strike, or expiry is not finite and positive, rates/carry or
-   * log-jump mean are non-finite, volatility/intensity is negative or
-   * non-finite, the jump compensator overflows or `n_terms` is outside
-   * `1..=65536`, and a `computation` error if the model produces a degenerate
-   * or invalid COS truncation range, a non-finite characteristic-function
-   * value or forward moment, or a non-finite option price.
-   * @returns Discounted European option price in the same units as `spot`.
+   * Price a European option under Merton lognormal jump diffusion.
+   * @param contract - Spot and strike in matching units, positive expiry in years, continuous annual discount and carry rates in decimals, and call or put direction.
+   * @param sigma - Finite nonnegative annualized diffusion volatility as a decimal.
+   * @param muJump - Mean log jump size with finite risk-neutral compensator.
+   * @param sigmaJump - Finite nonnegative standard deviation of log jump size.
+   * @param lambda - Finite nonnegative expected jump count per year.
+   * @param nTerms - Expansion terms from 1 to 65,536. Omit for 128 terms.
+   * @returns Discounted option price per underlying unit.
+   * @throws FinstackError for invalid input, a missing forward moment, invalid term count, degenerate cumulants or unrepresentable price.
    */
   readonly mertonJumpCosPrice: typeof wasm.mertonJumpCosPrice;
 }
@@ -7218,17 +7287,54 @@ export interface MarginSchemaNamespace {
  */
 export interface MarginNamespace {
   /**
+   * Construct a checked non-securitisation Default Risk Charge position.
+   * @param position - Native issuer, signed JTD basis, residual maturity, rating, sector, seniority and optional signed P&L adjustment.
+   * @returns Independent validated position in the reporting currency designated by the caller.
+   * @throws FinstackError for missing, unknown or invalid position fields.
+   */
+  readonly drcPosition: typeof wasm.drcPosition;
+  /**
+   * Set ISDA SIMM on a copy of the bilateral agreement.
+   * @param csa - Authored CSA; collateral, variation margin and timing terms are preserved.
+   * @returns OTC margin specification with the selected methodology if IM is elected.
+   * @throws FinstackError if the CSA document cannot be decoded.
+   */
+  readonly otcMarginSpecBilateralSimm: typeof wasm.otcMarginSpecBilateralSimm;
+  /**
+   * Set schedule-based initial margin on a copy of the bilateral agreement.
+   * @param csa - Authored CSA; collateral, variation margin and timing terms are preserved.
+   * @returns OTC margin specification with the selected methodology if IM is elected.
+   * @throws FinstackError if the CSA document cannot be decoded.
+   */
+  readonly otcMarginSpecBilateralSchedule: typeof wasm.otcMarginSpecBilateralSchedule;
+  /**
+   * Construct margin terms from the embedded cleared-derivative defaults.
+   * @param ccp - Identified clearinghouse, such as LCH.
+   * @param currency - ISO-4217 settlement and collateral currency.
+   * @returns Native cleared OTC margin specification.
+   * @throws FinstackError if the currency or native margin registry is invalid.
+   */
+  readonly otcMarginSpecCleared: typeof wasm.otcMarginSpecCleared;
+  /**
+   * Add an explicit credit classification to an independent OTC margin specification.
+   * @param spec - Native OTC terms holding clearing and CSA settings.
+   * @param classification - Qualifying sector or non-qualifying class on the selected risk basis.
+   * @returns Native margin specification with that classification.
+   * @throws FinstackError if either native document cannot be decoded.
+   */
+  readonly otcMarginSpecWithSimmCreditClassification: typeof wasm.otcMarginSpecWithSimmCreditClassification;
+  /**
    * Compute bilateral XVA: CVA, DVA, FVA, MVA, and the all-in adjustment.
    *
    * All legs are weighted by joint (first-to-default) survival. MVA is computed
-   * only when `fundingJson` carries an `im_profile`; that posted IM also reduces
-   * ENE for bilateral DVA.
+   * only when `fundingJson` carries an `im_profile`. Bilateral DVA uses the
+   * supplied ENE measured under the elected collateral and close-out terms.
    *
    * The returned object reports the required all-in amount as
    * `total_xva = CVA - DVA + FVA + MVA`. Optional funding legs are absent from
    * the payload when they were not computed.
    *
-   * @param exposureProfileJson - Strict `ExposureProfile` JSON with `times`,
+   * @param exposureProfile - Strict `ExposureProfile` JSON with `times`,
    * `mtm_values`, `epe`, and `ene` arrays of equal length and an optional
    * `diagnostics` object (`market_roll_failures`, `valuation_failures`,
    * `total_time_points`); unknown fields are rejected.
@@ -7259,7 +7365,13 @@ export interface MarginNamespace {
    * });
    * const hz = core.HazardCurve.flat("CPTY", "2025-01-01", 0.02, 0.4, "act_365f");
    * const result = margin.computeBilateralXva(
-   *   JSON.stringify({ times: [1, 2], mtm_values: [1e6, 1e6], epe: [1e6, 1e6], ene: [0, 0] }),
+   *   {
+   *     as_of: "2025-01-01", currency: "USD",
+   *     basis: { kind: "external", source_id: "complete-grid", policy_id: "unsecured" },
+   *     dates: ["2025-01-01", "2026-01-01", "2027-01-01"], times: [0, 1, 2],
+   *     mtm_values: [1e6, 1e6, 1e6], epe: [1e6, 1e6, 1e6], ene: [0, 0, 0],
+   *     diagnostics: { market_roll_failures: 0, valuation_failures: 0, total_time_points: 3 },
+   *   },
    *   hz, hz, df, 0.4, 0.4,
    *   JSON.stringify({ funding_spread_bp: 50.0 }),
    * );
@@ -7273,7 +7385,13 @@ export interface MarginNamespace {
    * const df = core.DiscountCurve.flat("USD-OIS", "2025-01-01", 0.03, "act_365f");
    * const hz = core.HazardCurve.flat("CPTY", "2025-01-01", 0.02, 0.4, "act_365f");
    * const result = margin.computeBilateralXva(
-   *   JSON.stringify({ times: [1, 2], mtm_values: [1e6, 1e6], epe: [1e6, 1e6], ene: [0, 0] }),
+   *   {
+   *     as_of: "2025-01-01", currency: "USD",
+   *     basis: { kind: "external", source_id: "complete-grid", policy_id: "unsecured" },
+   *     dates: ["2025-01-01", "2026-01-01", "2027-01-01"], times: [0, 1, 2],
+   *     mtm_values: [1e6, 1e6, 1e6], epe: [1e6, 1e6, 1e6], ene: [0, 0, 0],
+   *     diagnostics: { market_roll_failures: 0, valuation_failures: 0, total_time_points: 3 },
+   *   },
    *   hz, hz, df, 0.4, 0.4,
    *   JSON.stringify({ funding_spread_bp: 50.0 }),
    * );
@@ -7304,18 +7422,15 @@ export interface MarginNamespace {
    */
   readonly constants: typeof wasm.marginConstants;
   /**
-   * Margin valuation adjustment over an expected-IM profile.
-   *
-   * `MVA = sum_i s(t_i) * IM(t_i) * DF(t_i) * S(t_i) * dt_i` on the profile
-   * grid with a `t = 0` bucket edge; IM is flat before the first grid point.
-   * @param imProfile - `ImProfile` (object or JSON) of expected IM, for example from `imProfileFromSimm`.
-   * @param fundingSpreadCurve - Array of `[timeYears, spreadBp]` pairs, linearly interpolated with flat extrapolation; one pair is a flat spread.
-   * @param discountCurve - Risk-free discount curve handle.
-   * @param survivalCurve - The bank's own hazard curve handle; omitted treats survival as 1 for all times.
-   * @returns The `MvaResult` (`mva`, `average_im`, `im_profile`) as a plain object.
-   * @throws Error - Throws if the profile or spread curve is malformed or invalid, or a curve evaluation is non-finite.
+   * Integrate dated posted-margin funding costs through the horizon.
+   * @param imProfile - Complete dated expected posted margin.
+   * @param fundingSpread - Flat or dated basis-point spread covering the IM horizon.
+   * @param discountCurve - Risk-free curve normalized at the valuation cut.
+   * @param ownSurvival - Own hazard curve, or null to omit survival weighting.
+   * @returns The MVA cost, average IM and complete contribution intervals.
+   * @throws Error if profile, funding spread, the chosen survival or a curve sample is invalid.
    */
-  readonly computeMva: (imProfile: ImProfile | string, fundingSpreadCurve: readonly (readonly [number, number])[] | string, discountCurve: DiscountCurve, survivalCurve?: HazardCurve | null) => MvaResult;
+  readonly computeMva: (imProfile: ImProfile | string, fundingSpread: generated.margin.MarginFundingSpread | string, discountCurve: DiscountCurve, ownSurvival: HazardCurve | null) => MvaResult;
   /**
    * Cleared status through a named central counterparty.
    * @param ccp - CCP identifier, for example `"LCH"`, `"CME"`, `"ICE"` or `"JSCC"`.
@@ -7358,6 +7473,23 @@ export interface MarginNamespace {
    * registry cannot be loaded.
    */
   readonly collateralAssetClassStandardHaircut: typeof wasm.collateralAssetClassStandardHaircut;
+  readonly CsaSpecBuilder: typeof wasm.CsaSpecBuilder;
+  /**
+   * Start authoring an agreement with an explicit currency and market reference.
+   * @param id - Stable agreement identifier for trade and collateral account joins.
+   * @param baseCurrency - ISO currency for transfers, thresholds and collateral amounts.
+   * @param collateralCurveId - Exact curve identifier used to discount collateral cash.
+   * @returns Builder requiring the agreement's terms, timing and calendar.
+   * @throws FinstackError for an unknown currency or incompatible input type.
+   */
+  readonly csaSpecBuilder: typeof wasm.csaSpecBuilder;
+  /**
+   * Copy a complete CSA value into an independent builder.
+   * @param value - The CSA terms to edit.
+   * @returns Builder carrying the original CSA's agreement terms.
+   * @throws FinstackError when the provided value has invalid contract fields.
+   */
+  readonly csaSpecToBuilder: typeof wasm.csaSpecToBuilder;
   /**
    * Apply a CSA's initial margin terms to one gross IM figure.
    *
@@ -7595,7 +7727,7 @@ export interface MarginNamespace {
   readonly excessCollateralHasShortfall: typeof wasm.excessCollateralHasShortfall;
   /**
    * Validate an exposure profile: equal-length arrays on a strictly increasing time grid.
-   * @param exposureProfile - `ExposureProfile` (object or JSON) with `times`, `mtm_values`, `epe`, `ene` and optional `diagnostics`.
+   * @param exposureProfile - `ExposureProfile` (object or JSON) with valuation cut, reporting currency, dated grid, signed marks, EPE and ENE, and completeness diagnostics.
    *
    * # Errors
    *
@@ -7629,19 +7761,6 @@ export interface MarginNamespace {
    * Throws if `funding` is malformed, has unknown fields, or fails validation.
    */
   readonly fundingConfigEffectiveBenefitBp: typeof wasm.fundingConfigEffectiveBenefitBp;
-  /**
-   * Funding spread applied to posted initial margin (the MVA spread).
-   *
-   * The configured `margin_funding_spread_bp`, or the funding spread when no
-   * separate margin spread is set.
-   * @param funding - `FundingConfig` (object or JSON).
-   * @returns The margin funding spread in basis points.
-   *
-   * # Errors
-   *
-   * Throws if `funding` is malformed, has unknown fields, or fails validation.
-   */
-  readonly fundingConfigEffectiveMarginSpreadBp: typeof wasm.fundingConfigEffectiveMarginSpreadBp;
   /**
    * Haircut01: PV change for a one basis point increase in the haircut.
    * @param collateralValue - Collateral market value, in major units of `currency`.
@@ -7707,30 +7826,21 @@ export interface MarginNamespace {
    */
   readonly imMethodologyFromStr: typeof wasm.imMethodologyFromStr;
   /**
-   * Expected initial-margin profile from today's SIMM margin and a decay profile.
-   *
-   * `IM(t) = SIMM(sensitivities) * decay.factor(t)` on `time_grid`.
-   * @param calculator - SIMM calculator handle.
-   * @param sensitivities - SIMM sensitivities handle.
-   * @param currency - ISO-4217 currency the IM is reported in.
-   * @param decay - `ImDecayProfile` (object or JSON) shaping IM over time.
-   * @param timeGrid - Strictly increasing positive times in years.
-   * @returns The `ImProfile` (`times`, `im_values`) as a plain object.
-   *
-   * # Errors
-   *
-   * Throws for an unknown currency, an invalid decay profile or time grid, or
-   * sensitivities the SIMM calculator rejects.
+   * Project the opening historical SIMM value over a dated runoff schedule.
+   * @param calculator - Elected SIMM parameter version and MPOR.
+   * @param sensitivities - Signed risk of the admitted netting set.
+   * @param spec - Dated legal scope, risk snapshot, currency and elected runoff.
+   * @returns Complete expected IM at each date, including the opening SIMM.
+   * @throws Error if the scope, date grid, decay or sensitivities fail validation.
    */
   readonly imProfileFromSimm: typeof wasm.imProfileFromSimm;
   /**
    * Validate an expected initial-margin profile.
-   * @param imProfile - `ImProfile` (object or JSON) with `times` (years) and `im_values`.
+   * @param imProfile - `ImProfile` (object or JSON) with currency, scope, valuation date, calendar observations and expected IM.
    *
    * # Errors
    *
-   * Throws if the profile is malformed, empty, has mismatched lengths, a
-   * non-positive or non-increasing time, or a negative or non-finite IM value.
+   * Throws for incomplete scope, unanchored or unordered dates and non-finite or negative amounts.
    */
   readonly imProfileValidate: typeof wasm.imProfileValidate;
   /**
@@ -7799,13 +7909,23 @@ export interface MarginNamespace {
   /**
    * Funding spread: funding rate minus collateral rate.
    * @param fundingCost - `MarginFundingCost` (object or JSON).
+   * @returns The spread in annualized basis points.
+   *
+   * # Errors
+   *
+   * Throws if `funding_cost` is malformed.
+   */
+  readonly marginFundingCostSpreadBp: typeof wasm.marginFundingCostSpreadBp;
+  /**
+   * Funding spread: funding rate minus collateral rate.
+   * @param fundingCost - `MarginFundingCost` (object or JSON).
    * @returns The spread as an annualized decimal.
    *
    * # Errors
    *
    * Throws if `funding_cost` is malformed.
    */
-  readonly marginFundingCostSpread: typeof wasm.marginFundingCostSpread;
+  readonly marginFundingCostSpreadRate: typeof wasm.marginFundingCostSpreadRate;
   /**
    * Parse a margin call frequency from its lower-case wire label.
    * @param s - One of `"daily"`, `"weekly"`, `"monthly"`, `"on_demand"`.
@@ -8259,22 +8379,6 @@ export interface ValuationsInstrumentsNamespace {
   readonly RevolvingCredit: typeof wasm.RevolvingCredit;
   readonly AssetBackedFacility: typeof wasm.AssetBackedFacility;
   /**
-   * Construct a canonical bond instrument envelope from a cashflow schedule.
-   * @param instrumentId - Stable instrument identifier used for pricing and metric keys.
-   * @param scheduleJson - Canonical cashflow-schedule JSON used to construct the fixed-income instrument.
-   * @param quoteCompounding - Compounding of the bond's z-spread quotes, in `Compounding` wire form (`"continuous"`, `"simple"` or `{ periodic: n }`); required, never derived from the schedule's coupon frequency.
-   * @param discountCurveId - Market-context discount-curve identifier for the instrument currency.
-   * @param quotedCleanPricePct - Optional observed clean bond price in percent of par (99.5 = 99.5%), stored as `instrument_pricing_overrides.market_quotes.quoted_clean_price_pct`.
-   *
-   * # Errors
-   *
-   * Throws a JavaScript exception if `scheduleJson` is malformed or violates
-   * cash-flow invariants, bond construction fails, or the canonical bond
-   * envelope cannot be serialized.
-   * @returns Canonical bond instrument envelope JSON.
-   */
-  readonly bondFromCashflowsJson: typeof wasm.bondFromCashflowsJson;
-  /**
    * Validate a canonical v1 instrument envelope after optional metric-pricing
    * overrides are merged by the canonical pricing path.
    *
@@ -8338,6 +8442,9 @@ export interface ValuationsInstrumentsNamespace {
    * (`{}` preserves them), supplied `bump_config` fields merge into the stored
    * object, and an explicit `null` clears a nullable field to its Rust fallback.
    * Omitted keeps the envelope configuration.
+   * `instrument_pricing_overrides` - a patch for instrument-owned market quotes
+   * and model parameters. Omitted fields keep their stored values, and an
+   * explicit `null` clears a nullable parameter for this pricing request.
    * `market_history` - a `MarketHistory` object (base date, window and daily
    * risk-factor shifts) required by historical risk metrics such as `"hvar"` and
    * `"expected_shortfall"`. Omitted prices without history.
@@ -8386,6 +8493,9 @@ export interface ValuationsInstrumentsNamespace {
    * (`{}` preserves them), supplied `bump_config` fields merge into the stored
    * object, and an explicit `null` clears a nullable field to its Rust fallback.
    * Omitted keeps the envelope configuration.
+   * `instrument_pricing_overrides` - a patch for instrument-owned market quotes
+   * and model parameters. Omitted fields keep their stored values, and an
+   * explicit `null` clears a nullable parameter for this pricing request.
    * `market_history` - a `MarketHistory` object (base date, window and daily
    * risk-factor shifts) required by historical risk metrics such as `"hvar"` and
    * `"expected_shortfall"`. Omitted prices without history.
@@ -8802,6 +8912,75 @@ export interface ValuationsInstrumentsNamespace {
    * @returns Typed `TrancheMetrics` object (PV, clean/dirty price, accrued, WAL, yield, z-spread, CS01, effective duration and convexity, requested registry metrics).
    */
   readonly trancheMetrics: typeof wasm.trancheMetrics;
+  readonly Deposit: typeof wasm.Deposit;
+  readonly DepositBuilder: typeof wasm.DepositBuilder;
+  readonly BondFuture: typeof wasm.BondFuture;
+  readonly InterestRateFutureOption: typeof wasm.InterestRateFutureOption;
+  readonly InterestRateFutureOptionBuilder: typeof wasm.InterestRateFutureOptionBuilder;
+  readonly EquityFutureOption: typeof wasm.EquityFutureOption;
+  readonly EquityFutureOptionBuilder: typeof wasm.EquityFutureOptionBuilder;
+  readonly FxFutureOption: typeof wasm.FxFutureOption;
+  readonly FxFutureOptionBuilder: typeof wasm.FxFutureOptionBuilder;
+  readonly VolatilityIndexFutureOption: typeof wasm.VolatilityIndexFutureOption;
+  readonly VolatilityIndexFutureOptionBuilder: typeof wasm.VolatilityIndexFutureOptionBuilder;
+  readonly BondFutureBuilder: typeof wasm.BondFutureBuilder;
+  readonly InterestRateFuture: typeof wasm.InterestRateFuture;
+  readonly InterestRateFutureBuilder: typeof wasm.InterestRateFutureBuilder;
+  readonly EquityFuture: typeof wasm.EquityFuture;
+  readonly EquityFutureBuilder: typeof wasm.EquityFutureBuilder;
+  readonly FxFuture: typeof wasm.FxFuture;
+  readonly FxFutureBuilder: typeof wasm.FxFutureBuilder;
+  readonly VolatilityIndexFuture: typeof wasm.VolatilityIndexFuture;
+  readonly VolatilityIndexFutureBuilder: typeof wasm.VolatilityIndexFutureBuilder;
+  readonly InflationLinkedBond: typeof wasm.InflationLinkedBond;
+  readonly InflationLinkedBondBuilder: typeof wasm.InflationLinkedBondBuilder;
+  /**
+   * Validate the native contract terms for an option on a future.
+   * @param terms - Contract and market marks in the stated price units, with exercise and settlement conventions.
+   * @returns Validated independent copy of the supplied terms.
+   * @throws `TypeError` if the input shape is invalid or `FinstackError` for invalid contract terms.
+   */
+  readonly futureOptionTerms: typeof wasm.futureOptionTerms;
+  /**
+   * Construct the native example of an option on a future.
+   * @returns Validated terms with explicit exercise, settlement, and premium conventions.
+   * @throws `FinstackError` if the native sample terms cannot be built.
+   */
+  readonly futureOptionTermsExample: typeof wasm.futureOptionTermsExample;
+  /**
+   * Validate listed position and lifecycle terms and emit their standard wire form.
+   * @param terms - Listed terms with quantity in contracts, multiplier in settlement currency per point, and marks in contract price points.
+   * @returns Validated independent position and settlement terms.
+   * @throws `TypeError` for malformed terms or `FinstackError` for invalid quantities, dates, marks or delivery terms.
+   */
+  readonly listedFutureTerms: typeof wasm.listedFutureTerms;
+  /**
+   * Set the number of exchange contracts in a derived position.
+   * @param terms - Source listed position and lifecycle terms.
+   * @param contracts - Positive finite number of contracts. Fractional values are permitted.
+   * @returns Independent listed terms with the new contract count.
+   * @throws `TypeError` for mistyped input or `FinstackError` for invalid terms or quantities.
+   */
+  readonly listedFutureTermsWithContracts: typeof wasm.listedFutureTermsWithContracts;
+  /**
+   * Derive listed-future terms with a new pair of exchange marks.
+   * @param terms - Source listed position and lifecycle terms.
+   * @param quotedPrice - Live mark in contract price points, or null to clear it.
+   * @param settlementPrice - Official final settlement mark, or null to clear it.
+   * @returns Independent terms with both marks replaced.
+   * @throws `TypeError` for an invalid input shape or `FinstackError` for invalid terms or nonfinite marks.
+   */
+  readonly listedFutureTermsWithMarks: typeof wasm.listedFutureTermsWithMarks;
+  /**
+   * Derive listed-future terms with a different final settlement policy.
+   * @param terms - Source listed position and lifecycle terms.
+   * @param settlement - Cash settlement or physical delivery of a specified asset and quantity per contract.
+   * @returns Independent terms with the replacement settlement policy.
+   * @throws `TypeError` for an invalid input shape or `FinstackError` for invalid terms or physical delivery details.
+   */
+  readonly listedFutureTermsWithSettlement: typeof wasm.listedFutureTermsWithSettlement;
+  readonly ForwardRateAgreement: typeof wasm.ForwardRateAgreement;
+  readonly ForwardRateAgreementBuilder: typeof wasm.ForwardRateAgreementBuilder;
   readonly InterestRateSwap: typeof wasm.InterestRateSwap;
   readonly Swaption: typeof wasm.Swaption;
   readonly CapFloor: typeof wasm.CapFloor;
@@ -8810,8 +8989,97 @@ export interface ValuationsInstrumentsNamespace {
   readonly CdsTranche: typeof wasm.CdsTranche;
   readonly CdsOption: typeof wasm.CdsOption;
   readonly ConvertibleBond: typeof wasm.ConvertibleBond;
+  readonly Equity: typeof wasm.Equity;
+  readonly EquityBuilder: typeof wasm.EquityBuilder;
   readonly EquityOption: typeof wasm.EquityOption;
+  readonly Autocallable: typeof wasm.Autocallable;
+  readonly AutocallableBuilder: typeof wasm.AutocallableBuilder;
+  readonly CliquetOption: typeof wasm.CliquetOption;
+  readonly CliquetOptionBuilder: typeof wasm.CliquetOptionBuilder;
+  readonly PrivateMarketsFund: typeof wasm.PrivateMarketsFund;
+  readonly PrivateMarketsFundBuilder: typeof wasm.PrivateMarketsFundBuilder;
+  readonly AsianOption: typeof wasm.AsianOption;
+  readonly AsianOptionBuilder: typeof wasm.AsianOptionBuilder;
+  readonly BarrierOption: typeof wasm.BarrierOption;
+  readonly BarrierOptionBuilder: typeof wasm.BarrierOptionBuilder;
+  readonly LookbackOption: typeof wasm.LookbackOption;
+  readonly LookbackOptionBuilder: typeof wasm.LookbackOptionBuilder;
+  readonly RangeAccrual: typeof wasm.RangeAccrual;
+  readonly RangeAccrualBuilder: typeof wasm.RangeAccrualBuilder;
+  readonly Tarn: typeof wasm.Tarn;
+  readonly TarnBuilder: typeof wasm.TarnBuilder;
+  readonly Snowball: typeof wasm.Snowball;
+  readonly SnowballBuilder: typeof wasm.SnowballBuilder;
+  readonly CallableRangeAccrual: typeof wasm.CallableRangeAccrual;
+  readonly CallableRangeAccrualBuilder: typeof wasm.CallableRangeAccrualBuilder;
+  readonly AgencyTba: typeof wasm.AgencyTba;
+  readonly AgencyTbaBuilder: typeof wasm.AgencyTbaBuilder;
+  readonly AgencyMbsPassthrough: typeof wasm.AgencyMbsPassthrough;
+  readonly AgencyMbsPassthroughBuilder: typeof wasm.AgencyMbsPassthroughBuilder;
+  readonly DollarRoll: typeof wasm.DollarRoll;
+  readonly DollarRollBuilder: typeof wasm.DollarRollBuilder;
+  readonly AgencyCmo: typeof wasm.AgencyCmo;
+  readonly AgencyCmoBuilder: typeof wasm.AgencyCmoBuilder;
+  readonly Basket: typeof wasm.Basket;
+  readonly BasketBuilder: typeof wasm.BasketBuilder;
+  readonly RealEstateAsset: typeof wasm.RealEstateAsset;
+  readonly RealEstateAssetBuilder: typeof wasm.RealEstateAssetBuilder;
+  readonly LeveredRealEstateEquity: typeof wasm.LeveredRealEstateEquity;
+  readonly LeveredRealEstateEquityBuilder: typeof wasm.LeveredRealEstateEquityBuilder;
+  readonly BasisSwap: typeof wasm.BasisSwap;
+  readonly BasisSwapBuilder: typeof wasm.BasisSwapBuilder;
+  readonly XccySwap: typeof wasm.XccySwap;
+  readonly XccySwapBuilder: typeof wasm.XccySwapBuilder;
+  readonly CmsSwap: typeof wasm.CmsSwap;
+  readonly CmsSwapBuilder: typeof wasm.CmsSwapBuilder;
+  readonly CmsOption: typeof wasm.CmsOption;
+  readonly CmsOptionBuilder: typeof wasm.CmsOptionBuilder;
+  readonly CmsSpreadOption: typeof wasm.CmsSpreadOption;
+  readonly CmsSpreadOptionBuilder: typeof wasm.CmsSpreadOptionBuilder;
+  readonly InflationSwap: typeof wasm.InflationSwap;
+  readonly InflationSwapBuilder: typeof wasm.InflationSwapBuilder;
+  readonly YoYInflationSwap: typeof wasm.YoYInflationSwap;
+  readonly YoYInflationSwapBuilder: typeof wasm.YoYInflationSwapBuilder;
+  readonly InflationCapFloor: typeof wasm.InflationCapFloor;
+  readonly InflationCapFloorBuilder: typeof wasm.InflationCapFloorBuilder;
+  readonly BermudanSwaption: typeof wasm.BermudanSwaption;
+  readonly BermudanSwaptionBuilder: typeof wasm.BermudanSwaptionBuilder;
+  readonly CommodityFutureOption: typeof wasm.CommodityFutureOption;
+  readonly CommodityFutureOptionBuilder: typeof wasm.CommodityFutureOptionBuilder;
+  readonly FxSpotBuilder: typeof wasm.FxSpotBuilder;
+  readonly CommodityForward: typeof wasm.CommodityForward;
+  readonly CommodityForwardBuilder: typeof wasm.CommodityForwardBuilder;
+  readonly CommodityFuture: typeof wasm.CommodityFuture;
+  readonly CommodityFutureBuilder: typeof wasm.CommodityFutureBuilder;
+  readonly CommodityAsianOption: typeof wasm.CommodityAsianOption;
+  readonly CommodityAsianOptionBuilder: typeof wasm.CommodityAsianOptionBuilder;
+  readonly CommoditySpotOption: typeof wasm.CommoditySpotOption;
+  readonly CommoditySpotOptionBuilder: typeof wasm.CommoditySpotOptionBuilder;
+  readonly CommoditySpreadOption: typeof wasm.CommoditySpreadOption;
+  readonly CommoditySpreadOptionBuilder: typeof wasm.CommoditySpreadOptionBuilder;
+  readonly CommoditySwap: typeof wasm.CommoditySwap;
+  readonly CommoditySwapBuilder: typeof wasm.CommoditySwapBuilder;
+  readonly CommoditySwaption: typeof wasm.CommoditySwaption;
+  readonly CommoditySwaptionBuilder: typeof wasm.CommoditySwaptionBuilder;
+  readonly FxVarianceSwapBuilder: typeof wasm.FxVarianceSwapBuilder;
+  readonly VarianceSwap: typeof wasm.VarianceSwap;
+  readonly VarianceSwapBuilder: typeof wasm.VarianceSwapBuilder;
+  readonly EquityTotalReturnSwap: typeof wasm.EquityTotalReturnSwap;
+  readonly EquityTotalReturnSwapBuilder: typeof wasm.EquityTotalReturnSwapBuilder;
+  readonly EquityTotalReturnFuture: typeof wasm.EquityTotalReturnFuture;
+  readonly EquityTotalReturnFutureBuilder: typeof wasm.EquityTotalReturnFutureBuilder;
+  readonly FiIndexTotalReturnSwap: typeof wasm.FiIndexTotalReturnSwap;
+  readonly FiIndexTotalReturnSwapBuilder: typeof wasm.FiIndexTotalReturnSwapBuilder;
+  readonly Repo: typeof wasm.Repo;
+  readonly RepoBuilder: typeof wasm.RepoBuilder;
+  readonly FxSwapBuilder: typeof wasm.FxSwapBuilder;
+  readonly NdfBuilder: typeof wasm.NdfBuilder;
+  readonly QuantoOptionBuilder: typeof wasm.QuantoOptionBuilder;
+  readonly FxDigitalOptionBuilder: typeof wasm.FxDigitalOptionBuilder;
+  readonly FxTouchOptionBuilder: typeof wasm.FxTouchOptionBuilder;
+  readonly FxBarrierOptionBuilder: typeof wasm.FxBarrierOptionBuilder;
   readonly StructuredCredit: typeof wasm.StructuredCredit;
+  readonly StructuredCreditTranche: typeof wasm.StructuredCreditTranche;
   readonly FxSpot: typeof wasm.FxSpot;
   readonly FxForward: typeof wasm.FxForward;
   readonly FxSwap: typeof wasm.FxSwap;
@@ -8979,6 +9247,24 @@ export interface ValuationsInstrumentsNamespace {
    * @throws Error - Throws with kind `validation` if `report` does not match the `PoolReport` schema.
    */
   readonly poolReportTable: typeof wasm.poolReportTable;
+  /**
+   * Measure carry and signed basis-point breakeven across the supplied horizons.
+   * @param bond - Typed bond whose native terms and price settings govern every row.
+   * @param market - Market context supplying the required prices, curves and risk inputs.
+   * @param asOf - ISO valuation date from which calendar horizons are measured.
+   * @param horizons - Nonempty list of positive calendar tenors in the desired row order, such as ["1M", "1Y"].
+   * @param config - Yield or spread target and solve mode. Iterative OAS is unsupported.
+   * @returns Ordered rows with native currency amounts and signed breakeven shifts in basis points.
+   * @throws TypeError for invalid input types or FinstackError for missing pricing or risk inputs, invalid horizons, or unsupported targets or modes.
+   */
+  readonly bondBreakevenLadder: typeof wasm.bondBreakevenLadder;
+  /**
+   * Export a breakeven ladder to ordered columns.
+   * @param ladder - Native ladder returned by bondBreakevenLadder.
+   * @returns Horizon, carry, signed sensitivity, signed basis-point breakeven and currency columns.
+   * @throws FinstackError for invalid ladder data.
+   */
+  readonly bondBreakevenLadderTable: typeof wasm.bondBreakevenLadderTable;
   /**
    * Yield and I-spread to every call, put and maturity exit of a bond at one market price, with the worst marked (mirrors Rust `bond_workout_ladder`).
    *
@@ -9349,6 +9635,18 @@ export interface ValuationsNamespace {
   readonly instruments: ValuationsInstrumentsNamespace;
   readonly market: ValuationsMarketNamespace;
   readonly schema: ValuationsSchemaNamespace;
+  /**
+   * Calculate model SIMM for a single selected set of trades.
+   * @param instruments - Canonical instrument envelopes from one netting set. Each trades at its own contractual amount and direction.
+   * @param market - MarketContext supplying the trades' SIMM risk factors.
+   * @param asOf - ISO-8601 valuation date used for sensitivities and the result.
+   * @param version - Embedded SIMM label, omitted for the registered default.
+   * @param mporDays - Positive margin period of risk in business days, omitted for the version's default.
+   * @param currency - USD calculation currency, omitted for USD. Sensitivities must already be USD.
+   * @returns Initial margin in USD, with breakdown, methodology, valuation date and approximation flag.
+   * @throws TypeError for a mistyped input, or FinstackError for an invalid instrument, empty set, unsupported currency, invalid version or margin period, missing market data or failed repricing.
+   */
+  readonly calculateSimm: typeof wasm.calculateSimm;
   /**
    * Validate and serialize a `ValuationResult` object or JSON text to canonical JSON.
    *
@@ -10088,6 +10386,38 @@ export interface StatementsNamespace {
    */
   readonly capitalStructureCashflowsGetMoney: typeof wasm.capitalStructureCashflowsGetMoney;
   /**
+   * Resume work on a model with an independent builder.
+   * @param model - Model whose periods, nodes, and settings seed the builder.
+   * @returns Builder holding the existing specification.
+   * @throws `FinstackError` when the model cannot seed a builder.
+   */
+  readonly financialModelSpecToBuilder: typeof wasm.financialModelSpecToBuilder;
+  /**
+   * Insert or replace one literal metadata value on a model copy.
+   * @param model - Source model whose nodes and settings are preserved.
+   * @param key - Exact metadata key.
+   * @param value - JSON-compatible value. Strings are stored verbatim.
+   * @returns Independent model with changed metadata.
+   * @throws `TypeError` for invalid inputs or `FinstackError` for invalid model or metadata values.
+   */
+  readonly financialModelSpecWithMeta: typeof wasm.financialModelSpecWithMeta;
+  /**
+   * Copy a model with updated monetary-unit metadata.
+   * @param model - Source model. Existing node currencies are retained.
+   * @param currency - ISO currency recorded on the model.
+   * @returns Independent model with the new currency metadata.
+   * @throws `TypeError` for malformed inputs or `FinstackError` for invalid model or currency.
+   */
+  readonly financialModelSpecWithCurrency: typeof wasm.financialModelSpecWithCurrency;
+  /**
+   * Copy a model with a different capital-structure reporting currency.
+   * @param model - Source model with a capital structure.
+   * @param currency - ISO currency for capital-structure reports.
+   * @returns Independent specification with the updated reporting currency.
+   * @throws `TypeError` for malformed inputs or `FinstackError` for invalid models, currencies, or a missing capital structure.
+   */
+  readonly financialModelSpecWithReportingCurrency: typeof wasm.financialModelSpecWithReportingCurrency;
+  /**
    * Copy of a normalization configuration with one more adjustment.
    *
    * Free-function twin of Python `NormalizationConfig.add_adjustment` (Rust
@@ -10200,7 +10530,7 @@ export interface StatementsNamespace {
  * import init, { statements_analytics } from "finstack-quant-wasm";
  * await init();
  * console.log(
- *   statements_analytics.wacc({ equity_weight: 0.6, cost_of_equity: 0.1, debt_weight: 0.4, cost_of_debt: 0.05, tax_rate: 0.25 })
+ *   statements_analytics.wacc({ equity_weight: '0.6', cost_of_equity: 0.1, debt_weight: '0.4', cost_of_debt: 0.05, tax_rate: 0.25 })
  * );
  * ```
  */
@@ -10377,9 +10707,18 @@ export interface StatementsAnalyticsNamespace {
    */
   readonly dcfSensitivity: typeof wasm.dcfSensitivity;
   /**
+   * Reconstruct a dated leveraged acquisition and calculate qualified exit returns.
+   * @param model - Identified statement model containing admitted actuals and projected exit observations.
+   * @param request - Closing uses, cash sources, exit assumptions and elected check suite.
+   * @param market - Market data for any instruments linked to statement observations.
+   * @returns Reconciled sources and uses, signed exit bridge and any supportable sponsor returns.
+   * @throws If dates, dates of observation, monetary inputs, source data or required checks are invalid.
+   */
+  readonly evaluateDatedLbo: typeof wasm.evaluateDatedLbo;
+  /**
    * Evaluate a leveraged-buyout transaction against a statement model.
    *
-   * Entry enterprise value is priced at the model's first period, the sponsor
+   * Entry enterprise value is priced at the explicitly selected entry period, the sponsor
    * equity check is solved as the sources-and-uses residual, and exit proceeds
    * are the exit enterprise value less the modelled net debt at the exit
    * period. When the config carries `check_mappings`, the Rust LBO check suite
@@ -10396,45 +10735,38 @@ export interface StatementsAnalyticsNamespace {
    * check-suite failures, or failure to serialize the result to JavaScript.
    * The result is a structured JavaScript object.
    * @param modelJson - Financial-model specification JSON.
-   * @param configJson - Rust `LboConfig` JSON: `entry_multiple` (8.5 = 8.5x), `entry_metric_node`, `transaction_fees` (model currency), `sources` (`[{"name", "amount"}]` funded at close, model currency), `exit_multiple`, `exit_metric_node`, `exit_net_debt_node`, `exit_period` (e.g. "2029"), and optional `check_mappings` (`{"three_statement", "credit"}`). Every field except `check_mappings` is required.
+   * @param configJson - Rust `LboConfig` JSON: `entry_multiple` (8.5 = 8.5x), `entry_metric_node`, `entry_period` (existing period used to read entry earnings), `transaction_fees` (model currency), `sources` (`[{"name", "amount"}]` funded at close, model currency), `exit_multiple`, `exit_metric_node`, `exit_net_debt_node`, `exit_period` (e.g. "2029"), and optional `check_mappings` (`{"three_statement", "credit"}`). Every field except `check_mappings` is required.
    * @returns Leveraged-buyout evaluation result against the statement model.
    */
   readonly evaluateLbo: typeof wasm.evaluateLbo;
   /**
-   * Weighted-average cost of capital (WACC).
+   * Compute weighted-average cost of capital (WACC) using exact capital weights.
    *
-   * `WACC = w_E * r_E + w_D * r_D * (1 - T)`.
-   *
-   * # Errors
-   *
-   * Rejects malformed inputs, any non-finite value, negative capital weights,
-   * weights that do not sum to one within tolerance, or a `tax_rate` outside
-   * `[0, 1]`.
-   * @param inputs - `WaccInputs` object or JSON text: `equity_weight` and `debt_weight` (decimal fractions of total capital summing to 1.0), `cost_of_equity` and pre-tax `cost_of_debt` (decimals, `0.06` = 6%) and `tax_rate` (decimal in [0, 1]).
-   * @returns The blended discount rate as a decimal fraction.
+   * The costs of equity and debt are annual effective rates above -100%. The
+   * debt cost is multiplied by `1 - tax_rate` before weighting.
+   * @param inputs - Capital weights as exact decimal strings summing to one, annual effective equity and pre-tax debt costs as decimal numbers, and a marginal tax rate in [0, 1].
+   * @returns The finite blended annual effective rate as a decimal.
+   * @throws TypeError if the object contains a non-JSON value. FinstackError for malformed structured inputs, inexact capital allocation, invalid effective rates or tax domain, or unrepresentable output.
    */
   readonly wacc: typeof wasm.wacc;
   /**
-   * Find the driver value that makes a target node reach a target value.
-   *
-   * Twin of Python `goal_seek` (Rust `goal_seek`). Returns the serde form of
-   * the Rust `GoalSeekResult`: `solved_value`, the solve diagnostics
-   * (`residual` and `tolerance` in the target node's units, `evaluations`,
-   * `converged`) and `model`, the input model with the solved driver written in
-   * when `update_model` is `true` and `null` otherwise. The input model is never
-   * modified; pass `model` straight back as the `modelJson` of another call.
-   *
-   * # Errors
-   *
-   * Rejects a malformed `modelJson` or `spec` (a missing or unknown key
-   * included), invalid target or driver period identifiers, missing target or
-   * driver nodes or periods, non-finite or unordered bounds, model-evaluation or
-   * solver-convergence failures, or failure to serialize the result.
-   * @param modelJson - Financial-model specification (object or JSON).
-   * @param spec - Rust `GoalSeekSpec` (object or JSON); an unknown key is rejected: `target_node` (node driven toward the target), `target_period` (period label of the target, e.g. `"2025Q4"`), `target_value` (finite target in the target node's units), `driver_node` (node the solve adjusts), `driver_period` (period label of the driver), `update_model` (whether the result carries the model with the solved driver applied) and the optional `bounds` (`[lower, upper]` search bracket in the driver node's units; omitted searches outward from the driver's current value). Every key except `bounds` is required.
-   * @returns Solved driver value and the updated model (or `null`).
+   * Find and verify a target at a fixed publication cutoff and market pricing date.
+   * @param model - Original statement model with the elected editable forecast assumption.
+   * @param spec - Explicit driver and target periods, typed amount, tolerances and search policy.
+   * @param market - Held market data for linked financing. Omit for an empty market.
+   * @returns Typed solved driver and target amounts, absolute tolerance, verified run
+   *   evidence, and a verified model copy when requested.
+   * @throws If the selected observations, units, dates or root search are inadmissible,
+   *   or if the verified objective misses the elected target tolerance.
    */
   readonly goalSeek: typeof wasm.goalSeek;
+  /**
+   * Validate the elected dates, target units and bounded root-search controls.
+   * @param spec - Complete goal-seek assumptions, including the driver, target and both absolute tolerances.
+   * @returns The canonical request with the dates and numerical search controls checked.
+   * @throws Validation error if the request fields or bounds are invalid.
+   */
+  readonly goalSeekSpec: typeof wasm.goalSeekSpec;
   /**
    * Explain a formula for a specific node and period (JSON in, structured
    * object out).
@@ -10508,6 +10840,33 @@ export interface StatementsAnalyticsNamespace {
    */
   readonly creditAssessmentReportText: typeof wasm.creditAssessmentReportText;
   /**
+   * Measure qualified same-currency credit ratios for one borrowing in a dated statement run.
+   * @param results - Statement run and capital cash flows with verified observation metadata.
+   * @param spec - Explicit borrowing, expected run identity, currency, periods and selected credit measures.
+   * @returns Dated measurements with numerator and denominator or explicit availability, and coverage by measure.
+   * @throws If source provenance, dates, borrowing scope, monetary units or requested measures are invalid.
+   */
+  readonly evaluateCreditContext: typeof wasm.evaluateCreditContext;
+  /**
+   * Calculate the elected credit score from admitted annual monetary statement observations.
+   * @param results - Evaluated statements and reporting periods.
+   * @param period - Exact full-year period label with matched stocks and flows.
+   * @param mapping - Monetary node IDs required by the selected statistical model.
+   * @param model - Scoring model, including dated market equity where required.
+   * @returns Canonical score, classification zone and model-implied PD when present.
+   * @throws If observations, units, dates, model inputs or resulting ratios are inadmissible.
+   */
+  readonly scoreStatement: typeof wasm.scoreStatement;
+  /**
+   * Calculate one credit score for each explicitly elected annual reporting period.
+   * @param results - Evaluated statements and their authoritative period plan.
+   * @param rows - Distinct full-year labels and the selected score model for each.
+   * @param mapping - Names of monetary statement inputs shared by the requested periods.
+   * @returns Canonical score results in request order.
+   * @throws If any selected year repeats or lacks an admissible scoring observation.
+   */
+  readonly scoreStatementSeries: typeof wasm.scoreStatementSeries;
+  /**
    * Compute a structured credit assessment (leverage, coverage, FCF).
    *
    * Returns a structured JavaScript object whose `series` covers every period
@@ -10565,6 +10924,29 @@ export interface StatementsAnalyticsNamespace {
    */
   readonly capitalStructureSummaryTable: typeof wasm.capitalStructureSummaryTable;
   /**
+   * Assess the selected statement covenant tests on qualified reporting dates.
+   *
+   * @param engine - Covenant engine holding effective terms, windows and waivers.
+   * @param model - Statement model with source and publication dates.
+   * @param results - Statement evaluation from the supplied model and selected publication cutoff.
+   * @param spec - Exact covenant and period IDs, scope, cutoff and metric bindings.
+   * @returns Qualified assess results with run provenance and per-period coverage.
+   * @throws If inputs are malformed, provenance differs, or dates, scopes or bindings are invalid.
+   */
+  readonly assessStatementCovenants: typeof wasm.assessStatementCovenants;
+  /**
+   * Forecast the selected statement covenant tests on qualified reporting dates.
+   *
+   * @param engine - Covenant engine holding effective terms, windows and waivers.
+   * @param model - Statement model with source and publication dates.
+   * @param results - Statement evaluation from the supplied model and selected publication cutoff.
+   * @param spec - Exact covenant and period IDs, scope, cutoff and metric bindings.
+   * @param config - Forecast policy with an explicit reference date, scope and any requested volatility.
+   * @returns Qualified forecast results with run provenance and per-period coverage.
+   * @throws If inputs are malformed, provenance differs, or dates, scopes or bindings are invalid.
+   */
+  readonly forecastStatementCovenants: typeof wasm.forecastStatementCovenants;
+  /**
    * Evaluate covenant compliance at the end of every statement result period.
    *
    * Each period of `results.periods` is tested on its last calendar day with
@@ -10578,6 +10960,7 @@ export interface StatementsAnalyticsNamespace {
    *
    * @param results - Evaluated `StatementResult` (object or JSON). Node ids are the covenant metric ids (`metric_id`, or each covenant type's conventional name); ratios in turns (`3.5` means 3.5x), amounts in the model currency.
    * @param covenants - `CovenantEngine` handle whose specifications, windows, waivers and threshold schedules are evaluated.
+   * @param nodeMapping - Optional exact metric-ID to statement-node aliases. Unlisted metrics use their own identifiers.
    * @returns `DatedCovenantReports` rows (`{ as_of, reports }`), one per result period in timeline order, with the reports of the covenants applicable on that date keyed by covenant instance key in engine order. (Python returns the same reports as a long DataFrame.)
    * @throws If `results` is malformed, the engine is invalid or a metric an applicable covenant reads is non-finite (kind `validation`), or such a metric has no value in the period (kind `not_found`).
    */
@@ -10599,6 +10982,7 @@ export interface StatementsAnalyticsNamespace {
    * @param results - Evaluated `StatementResult` (object or JSON) holding every metric the active numeric covenants read on each test date (ratios in turns).
    * @param covenants - `CovenantEngine` handle whose effective specifications are forecast.
    * @param config - Optional `CovenantForecastConfig` object or JSON text (JSON text keeps a uint64 `random_seed` exact); omitted means deterministic maintenance-scope forecasting.
+   * @param nodeMapping - Optional exact metric-ID to statement-node aliases. Unlisted metrics use their own identifiers.
    * @returns `FutureBreach` wire objects sorted by breach date, then covenant id.
    * @throws If `results` or `config` is malformed, the engine or configuration is invalid or a metric an active covenant reads is non-finite (kind `validation`), or such a metric has no value in a period (kind `not_found`).
    */
@@ -10833,6 +11217,23 @@ export interface StatementsAnalyticsNamespace {
    */
   readonly classifyStage: typeof wasm.classifyStage;
   /**
+   * Weight named credit-impaired recoveries on one dated carrying basis.
+   * @param exposure - Common sourced carrying exposure, report date and original EIR convention.
+   * @param scenarios - Unique named recovery scenarios with exact decimal string weights, summing to one.
+   * @returns Dated same-currency allowance and every credit-impaired scenario outcome. The total is absent when any positive-weight recovery is unavailable.
+   * @throws If the scenario IDs, weights or evidence are invalid, or if the monetary calculations overflow.
+   */
+  readonly computeImpairedEclWeighted: typeof wasm.computeImpairedEclWeighted;
+  /**
+   * Measure Stage 3 allowance from an approved dated recovery.
+   *
+   * @param exposure - Sourced carrying amount, reporting date, annual effective original interest rate and recovery day count.
+   * @param recovery - Approved expected recovery cash and receipt date in the exposure currency.
+   * @returns Dated recovery evidence, present value, signed shortfall and nonnegative allowance.
+   * @throws If amounts, source, date, rate, day count or currency are invalid.
+   */
+  readonly computeImpairedEcl: typeof wasm.computeImpairedEcl;
+  /**
    * Expected credit loss of one exposure under a single cumulative-PD schedule.
    *
    * Twin of Python and Rust `compute_ecl` (one scenario of weight `1.0`). The
@@ -10841,9 +11242,8 @@ export interface StatementsAnalyticsNamespace {
    * `classifyStage` first and pass its `stage`.
    * @param exposure - `Exposure` supplying EAD, undrawn amount and CCF, LGD, EIR, remaining maturity and any EAD schedule (object or JSON).
    * @param pdSchedule - Cumulative PD knots as `[timeYears, cumulativePd]` pairs, ascending in time and non-decreasing in PD (decimals).
-   * @param stage - `"stage1"` (12-month horizon), `"stage2"` (lifetime) or `"stage3"` (credit-impaired).
+   * @param stage - `"stage1"` (12-month horizon), `"stage2"` (lifetime).
    * @param bucketWidthYears - Integration bucket width in years (`0.25` = quarterly); omitted uses the Rust policy default.
-   * @param stage3TimeToRecoveryYears - Stage 3 discounting horizon to expected recovery in years; omitted uses the Rust policy default.
    * @returns `WeightedEclResult`: the ECL in the exposure's currency units, the stage and the per-scenario bucket audit trail.
    *
    * # Errors
@@ -10854,98 +11254,60 @@ export interface StatementsAnalyticsNamespace {
    */
   readonly computeEcl: typeof wasm.computeEcl;
   /**
-   * Probability-weighted expected credit loss across macro scenarios.
-   *
-   * Twin of Python and Rust `compute_ecl_weighted`. Classify with
-   * `classifyStage` first and pass its `stage`.
-   * @param exposure - `Exposure` supplying EAD, undrawn amount and CCF, LGD, EIR, remaining maturity and any EAD schedule (object or JSON).
-   * @param scenarios - `[weight, schedule]` pairs whose weights sum to `1.0`; each schedule holds `[timeYears, cumulativePd]` knots ascending in time and non-decreasing in PD.
-   * @param stage - `"stage1"` (12-month horizon), `"stage2"` (lifetime) or `"stage3"` (credit-impaired).
-   * @param bucketWidthYears - Integration bucket width in years (`0.25` = quarterly); omitted uses the Rust policy default.
-   * @param stage3TimeToRecoveryYears - Stage 3 discounting horizon to expected recovery in years; omitted uses the Rust policy default.
-   * @returns `WeightedEclResult`: the probability-weighted ECL in the exposure's currency units and one `scenario_breakdown` entry per scenario.
-   *
-   * # Errors
-   *
-   * Throws with kind `validation` if an input is malformed, `scenarios` is
-   * empty, the weights do not sum to `1.0`, `stage` is not a stage name, a
-   * schedule violates the cumulative-PD invariants, or the exposure fails
-   * validation.
+   * Measure ECL under named, jointly weighted macroeconomic scenarios.
+   * @param exposure - Credit exposure whose allowance will be calculated.
+   * @param scenarios - Unique scenario identifiers, exact decimal weights summing to one,
+   *   optional cumulative-PD schedules anchored at (0,0), and optional LGD fractions.
+   * @param stage - Already resolved IFRS 9 impairment stage.
+   * @param bucketWidthYears - Integration width in years, defaulting to the Rust policy.
+   * @returns Scenario evidence and total allowance. The total is null if required evidence is unavailable.
+   * @throws Validation error for invalid exposure, stage, scenario weights, or supplied PD or LGD data.
    */
   readonly computeEclWeighted: typeof wasm.computeEclWeighted;
   /**
-   * Add a vintage (cohort) buildup: each period's new volume decays along a curve.
-   *
-   * Twin of Python `add_vintage_buildup` (Rust `add_vintage_buildup`). Adds
-   * the node `name`, the sum over lags of `newVolume[t - lag] * decayCurve[lag]`.
-   * @param model - `FinancialModelSpec` to extend (object or JSON).
+   * Add a vintage buildup to an active builder.
+   * @param builder - ModelBuilder receiving the generated cohort total.
    * @param name - Identifier of the outstanding-balance node to create.
-   * @param newVolumeNode - Existing node holding each period's new volume.
-   * @param decayCurve - Fraction of a cohort still outstanding `lag` periods after origination, as decimals starting at lag 0 (e.g. `[1.0, 0.8, 0.5]`).
-   * Existing generated node identifiers are replaced.
-   * @returns The extended `FinancialModelSpec` plain object.
-   *
-   * # Errors
-   *
-   * Throws with kind `validation` if the model is malformed, a node identifier
-   * is invalid, or the generated formula does not compile.
+   * @param newVolumeNode - Identifier of the node holding each period's new volume.
+   * @param decayCurve - Finite retention multipliers by elapsed model period, starting at inception.
+   * @throws TypeError for malformed arguments or FinstackError for a consumed builder or invalid coefficient.
    */
   readonly addVintageBuildup: typeof wasm.addVintageBuildup;
   /**
-   * Add a roll-forward (corkscrew) structure with a zero opening balance.
-   *
-   * Twin of Python `add_roll_forward` (Rust `add_roll_forward`). Adds
-   * `<name>_beg` and `<name>_end`, where
-   * `end = beg + sum(increases) - sum(decreases)` and each period's opening
-   * balance is the prior period's close.
-   * @param model - `FinancialModelSpec` to extend (object or JSON).
-   * @param name - Prefix of the generated `<name>_beg` and `<name>_end` nodes.
-   * @param increases - Existing nodes added to the balance each period.
-   * @param decreases - Existing nodes subtracted from the balance each period.
-   * Existing generated node identifiers are replaced.
-   * @returns The extended `FinancialModelSpec` plain object.
-   *
-   * # Errors
-   *
-   * Throws with kind `validation` if the model is malformed, a node identifier
-   * is invalid, or a generated formula does not compile.
+   * Add a roll-forward with a zero opening balance.
+   * @param builder - Active ModelBuilder receiving the beginning and ending balance nodes.
+   * @param name - Prefix for the generated balance node identifiers.
+   * @param increases - Identifiers of flows added to the balance each period.
+   * @param decreases - Identifiers of flows deducted from the balance each period.
+   * @throws If a parameter has the wrong type or the builder has been consumed.
+   * Generated node identifiers, formulas and references are validated by build.
    */
   readonly addRollForward: typeof wasm.addRollForward;
   /**
-   * Add a roll-forward (corkscrew) structure with an explicit opening balance.
-   *
-   * Twin of Python `add_roll_forward_with_opening` (Rust
-   * `add_roll_forward_with_opening`).
-   * @param model - `FinancialModelSpec` to extend (object or JSON).
-   * @param name - Prefix of the generated `<name>_beg` and `<name>_end` nodes.
-   * @param increases - Existing nodes added to the balance each period.
-   * @param decreases - Existing nodes subtracted from the balance each period.
-   * @param opening - Opening balance of the first period, in the balance's own units.
-   * Existing generated node identifiers are replaced.
-   * @returns The extended `FinancialModelSpec` plain object.
-   *
-   * # Errors
-   *
-   * Throws with kind `validation` if the model is malformed, a node identifier
-   * is invalid, or a generated formula does not compile.
+   * Add a roll-forward with an explicit opening balance.
+   * @param builder - Active ModelBuilder receiving the beginning and ending balance nodes.
+   * @param name - Prefix for the generated balance node identifiers.
+   * @param increases - Identifiers of flows added to the balance each period.
+   * @param decreases - Identifiers of flows deducted from the balance each period.
+   * @param opening - First-period beginning balance in the flows' own units.
+   * @throws If a parameter has the wrong type or the builder has been consumed.
+   * Generated node identifiers, formulas and references are validated by build.
    */
   readonly addRollForwardWithOpening: typeof wasm.addRollForwardWithOpening;
   /**
    * Add a net-operating-income buildup: total revenue, total expenses and NOI.
    *
    * Twin of Python `add_noi_buildup` (Rust `add_noi_buildup`).
-   * @param model - `FinancialModelSpec` to extend (object or JSON).
+   * @param builder - Active ModelBuilder receiving the generated nodes.
    * @param totalRevenueNode - Identifier of the total-revenue node to create.
    * @param revenueNodes - Existing revenue line nodes summed into the total.
    * @param totalExpensesNode - Identifier of the total-expenses node to create.
    * @param expenseNodes - Existing operating-expense line nodes summed into the total.
    * @param noiNode - Identifier of the NOI node to create (`total revenue - total expenses`).
-   * Existing generated node identifiers are replaced.
-   * @returns The extended `FinancialModelSpec` plain object.
    *
    * # Errors
    *
-   * Throws with kind `validation` if the model is malformed, a node list is
+   * Throws with kind `validation` if the builder has been consumed, a node list is
    * empty, a node identifier is invalid, or a generated formula
    * does not compile.
    */
@@ -10954,16 +11316,14 @@ export interface StatementsAnalyticsNamespace {
    * Add a net-cash-flow buildup: NOI less capital expenditure.
    *
    * Twin of Python `add_ncf_buildup` (Rust `add_ncf_buildup`).
-   * @param model - `FinancialModelSpec` to extend (object or JSON).
+   * @param builder - Active ModelBuilder receiving the generated nodes.
    * @param noiNode - Existing NOI node.
    * @param capexNodes - Existing capital-expenditure nodes subtracted from NOI; an empty list makes NCF equal NOI.
    * @param ncfNode - Identifier of the NCF node to create.
-   * Existing generated node identifiers are replaced.
-   * @returns The extended `FinancialModelSpec` plain object.
    *
    * # Errors
    *
-   * Throws with kind `validation` if the model is malformed, a node identifier
+   * Throws with kind `validation` if the builder has been consumed, a node identifier
    * is invalid, or the generated formula does not compile.
    */
   readonly addNcfBuildup: typeof wasm.addNcfBuildup;
@@ -10971,11 +11331,9 @@ export interface StatementsAnalyticsNamespace {
    * Add a lease-by-lease rent roll: gross rent, free rent, vacancy and effective rent.
    *
    * Twin of Python `add_rent_roll` (Rust `add_rent_roll`).
-   * @param model - `FinancialModelSpec` to extend (object or JSON).
+   * @param builder - Active ModelBuilder receiving the generated nodes.
    * @param leases - Array of `LeaseSpec` objects, at least one (array or JSON).
    * @param nodes - Optional `RentRollOutputNodes` naming the generated total nodes; omitted uses the Rust default names (object or JSON).
-   * Existing generated node identifiers are replaced.
-   * @returns The extended `FinancialModelSpec` plain object.
    *
    * # Errors
    *
@@ -10989,15 +11347,13 @@ export interface StatementsAnalyticsNamespace {
    *
    * Twin of Python `add_property_operating_statement` (Rust
    * `add_property_operating_statement`).
-   * @param model - `FinancialModelSpec` to extend (object or JSON).
+   * @param builder - Active ModelBuilder receiving the generated nodes.
    * @param leases - Array of `LeaseSpec` objects, at least one (array or JSON).
    * @param otherIncomeNodes - Existing other-income nodes added to effective rent; omitted means none.
    * @param opexNodes - Existing operating-expense nodes; omitted means none.
    * @param capexNodes - Existing capital-expenditure nodes; omitted means none.
    * @param managementFee - Optional `ManagementFeeSpec` (`rate` as a decimal of its `base`); omitted adds no fee (object or JSON).
    * @param nodes - Optional `PropertyTemplateNodes` naming the generated nodes; omitted uses the Rust default names (object or JSON).
-   * Existing generated node identifiers are replaced.
-   * @returns The extended `FinancialModelSpec` plain object.
    *
    * # Errors
    *
@@ -11036,6 +11392,75 @@ export interface StatementsAnalyticsNamespace {
    */
   readonly validateRenewalSpecJson: typeof wasm.validateRenewalSpecJson;
   /**
+   * Decode and validate a set of standalone DCF assumptions.
+   * @param inputs - Named cashflow, terminal specification and WACC as an annual decimal rate.
+   * @returns Validated assumptions in the canonical wire shape, with Rust defaults.
+   * @throws If a field is malformed, the WACC is outside the supported range, or the cashflow node is empty.
+   */
+  readonly dcfInputs: typeof wasm.dcfInputs;
+  /**
+   * Resolve optional DCF controls to their canonical settings.
+   * @param options - DCF options object with optional bridge, timing and discount terms.
+   * @returns Canonical DCF options with all Rust defaults applied.
+   * @throws If any field is malformed or unknown.
+   */
+  readonly dcfOptions: typeof wasm.dcfOptions;
+  /**
+   * Validate a rectangular grid's ordered axes.
+   * @param axes - Lists of unique, nonempty finite WACC rates and growth rates or exit multiples.
+   * @returns Grid axes in their original ordering.
+   * @throws If either axis is empty, repeats a level, or contains a non-finite level.
+   */
+  readonly dcfSensitivityGridSpec: typeof wasm.dcfSensitivityGridSpec;
+  /**
+   * Reprice independent low and high WACC and terminal shocks from an admitted statement run.
+   * @param model - Unchanged model identified by the admitted statement result.
+   * @param results - Statements at the requested valuation and information dates.
+   * @param request - Baseline corporate DCF valuation assumptions.
+   * @param shocks - Positive independent decimal shock distances in the elected parameter dimensions.
+   * @returns Baseline enterprise value and signed deltas or unavailability for each requested endpoint.
+   * @throws If the inputs or baseline are invalid, the shock dimensions disagree, or an admissible endpoint fails to price.
+   */
+  readonly dcfSensitivityOnResults: typeof wasm.dcfSensitivityOnResults;
+  /**
+   * Reprice a rectangular grid of DCF assumptions on the same statement run.
+   * @param model - Unchanged source statement model identified in the results.
+   * @param results - Statement result at the requested cutoff and valuation date.
+   * @param request - Corporate DCF inputs at the baseline WACC and terminal assumption.
+   * @param axes - WACC decimal rates in row order and terminal rates or multiples in column order.
+   * @returns Rectangular grid with same-currency values and reasons for unavailable endpoints.
+   * @throws If the baseline or axes are invalid or pricing an admissible cell fails.
+   */
+  readonly dcfSensitivityGrid: typeof wasm.dcfSensitivityGrid;
+  /**
+   * Value a company's named forecast cashflows on an explicit observation cutoff.
+   * @param model - Identified model with publication dates and a reporting currency.
+   * @param request - Statement valuation date and closed observation cutoff, WACC, authored terminal horizon and basis.
+   * @param market - Optional market state for statements with linked capital-structure instruments.
+   * @returns Enterprise and common-equity values with the exact period and terminal timing.
+   * @throws If required statement evidence is missing, the currency is inconsistent, or the DCF assumptions cannot be valued.
+   */
+  readonly evaluateCorporateDcf: typeof wasm.evaluateCorporateDcf;
+  /**
+   * Value a company using an already evaluated statement snapshot.
+   * @param model - Unchanged model that produced the supplied results.
+   * @param results - Verified statement result on the requested publication cutoff and effective valuation date.
+   * @param request - Identified DCF assumptions, currency, date and terminal basis.
+   * @returns Enterprise and common-equity values from the reused statement run.
+   * @throws If the run identity or valuation cut differs from the request, or the DCF assumptions fail validation.
+   */
+  readonly evaluateDcfFromResults: typeof wasm.evaluateDcfFromResults;
+  /**
+   * Reprice retained, coherent statement forecast paths as one valuation distribution.
+   * @param model - Original statement model supplying the model identity and reporting calendar.
+   * @param results - Verified baseline observations and opening balances on the matching information cutoff.
+   * @param paths - Complete Monte Carlo results retaining the selected monetary forecast samples and path identities.
+   * @param request - Common WACC, dated cash-flow terms and terminal assumptions.
+   * @returns Same-currency values per path and R-7 sample quantiles at the elected probabilities.
+   * @throws If verified provenance differs, the retained paths are incomplete, or a sampled path cannot price.
+   */
+  readonly evaluateDcfMonteCarlo: typeof wasm.evaluateDcfMonteCarlo;
+  /**
    * Value a company with a discounted cash flow of its unlevered free cash flow.
    *
    * Twin of Python `evaluate_dcf` (Rust `evaluate_dcf`). The model
@@ -11065,7 +11490,7 @@ export interface StatementsAnalyticsNamespace {
    * @param model - `FinancialModelSpec` (object or JSON); its metadata must carry a `currency` when a DCF is requested.
    * @param options - Optional Rust `CorporateAnalysisOptions`; every field is optional: `wacc` (decimal; enables the DCF and requires `terminal_value`), `terminal_value`, `net_debt_override` (model currency), `cfads_node`, `interest_coverage_node` (default `"ebitda"`), `check_suite` (`CheckSuiteSpec`; DCF and capital-structure analyses need one including the `non_finite` check), `as_of` (ISO date) and `ltv_value_node`. Unknown keys are rejected (object or JSON).
    * @param market - Optional `MarketContext` state for statement evaluation and instrument pricing; requires `options.as_of` (object or JSON).
-   * @returns `CorporateAnalysis`: the `statement` result, the `equity` valuation (or `null`), per-instrument `credit` metrics and `ev_suppressed_non_positive`.
+   * @returns `CorporateAnalysis`: the `statement` result, the `equity` valuation (or `null`), and per-instrument `credit` metrics.
    *
    * # Errors
    *
@@ -11332,7 +11757,101 @@ export interface PortfolioSchemaNamespace {
 export interface PortfolioNamespace {
   readonly InstrumentArtifactCache: typeof wasm.InstrumentArtifactCache;
   readonly Portfolio: typeof wasm.Portfolio;
+  readonly Position: typeof wasm.Position;
   readonly FactorModel: typeof wasm.FactorModel;
+  /**
+   * Reprice ordinary FRTB GIRR yield delta at every exact regulated yield vertex.
+   * @param portfolio - Trading-book positions and their reporting currency, priced on the portfolio's as-of date.
+   * @param market - Common market and held currency observations with executed rate quote calibrations.
+   * @param pricing - Common pricing and rounding configuration for the center and all reprices.
+   * @param targets - Exact quote identifiers and executed pillars for each tenored curve. Every dependent curve must cover the complete ten-vertex grid.
+   * @returns Position reprice evidence, source fingerprints and the ordinary FRTB GIRR aggregation inputs.
+   * @throws FinstackError if bindings, curves, pricing or FX inputs are missing, unsupported or inconsistent.
+   * @throws TypeError if `targets` does not match the schema.
+   *
+   * @example
+   * ```typescript
+   * import init, { core, portfolio } from "finstack-quant-wasm";
+   * await init();
+   * const book = portfolio.Portfolio.builder("book", "USD", "2025-01-01").build();
+   * const market = new core.MarketContext();
+   * const config = new core.FinstackConfig();
+   * const result = portfolio.girrQuoteDelta(book, market, config, []);
+   * console.log(result.as_of, result.quote_risk.length);
+   * config.free();
+   * market.free();
+   * book.free();
+   * ```
+   */
+  readonly girrQuoteDelta: typeof wasm.girrQuoteDelta;
+  /**
+   * Derive ordinary non-securitisation CSR deltas from exact single-name CDS quote reprices.
+   * @param portfolio - Trading book with signed quantities, valuation date and reporting currency.
+   * @param market - Held market with original issuer spread risk recipes and reporting FX.
+   * @param pricing - Common pricing and conversion settings for held and shocked marks.
+   * @param sources - Dated issuer classification and all five exact quote coordinates for each live issuer CDS curve.
+   * @returns Source fingerprints, signed position changes per basis point, and CSR deltas scaled to a percentage point.
+   * @throws TypeError if sources contain a non-JSON value. FinstackError for unsupported exposures, invalid mappings, missing inputs or failed replay and pricing.
+   * @example
+   * ```typescript
+   * import init, { core, portfolio } from "finstack-quant-wasm";
+   * await init();
+   * const book = portfolio.Portfolio.builder("credit", "USD", "2025-01-02").build();
+   * const market = new core.MarketContext();
+   * const pricing = new core.FinstackConfig();
+   * console.log(portfolio.csrQuoteDelta(book, market, pricing, []).quote_risk.length);
+   * pricing.free();
+   * market.free();
+   * book.free();
+   * ```
+   */
+  readonly csrQuoteDelta: typeof wasm.csrQuoteDelta;
+  /**
+   * Simulate complete dated exposure at one instrument's contractual size.
+   * @param instrument - Validated instrument envelope, as a typed object or canonical JSON.
+   * @param currency - ISO 4217 reporting currency for marks and exposures.
+   * @param market - Immutable opening market with its required pricing and factor observations.
+   * @param pricing - Valuation and FX conversion settings shared across the paths.
+   * @param spec - Dated factor simulation with the instrument ID as the single scoped position.
+   * @returns Complete dated exposure moments with the selected basis and diagnostics.
+   * @throws TypeError for mistyped host values, or FinstackError for invalid scope, missing market data or failed repricing.
+   */
+  readonly instrumentExposureProfile: typeof wasm.instrumentExposureProfile;
+  /**
+   * Reprice an admitted netting set on complete dated market paths.
+   * @param portfolio - One legally nettable book and its signed positions and reporting currency.
+   * @param market - Immutable opening market with all required prices, curves, fixings and FX.
+   * @param pricing - Shared valuation and FX conversion settings.
+   * @param spec - Dated path simulation, exact risk-factor bindings and netting scope.
+   * @returns Calendar observations, expected exposures, basis and completeness evidence.
+   * @throws FinstackError for an invalid path grid, ambiguous netting or risk source, missing market data or failed repricing.
+   */
+  readonly portfolioExposureProfile: typeof wasm.portfolioExposureProfile;
+  /**
+   * Map a trading book onto the admitted ordinary GIRR and single-name CDS CSR grids.
+   * @param portfolio - Trading book dates, unsigned and signed position amounts, and reporting currency.
+   * @param market - Held pricing, FX and executed quote calibration evidence.
+   * @param pricing - Shared pricing configuration for each valuation on the grids.
+   * @param config - Exact rate quote and single-name credit spread mappings.
+   * @returns Ordinary GIRR and single-name CDS CSR inputs, repricing evidence and positions outside these grids.
+   * @throws FinstackError when required finance inputs, calibration evidence or repricing fail on admitted positions.
+   * @example
+   * ```typescript
+   * import init, { core, portfolio } from "finstack-quant-wasm";
+   * await init();
+   * const book = portfolio.Portfolio.builder("trading-book", "USD", "2025-01-02").build();
+   * const market = new core.MarketContext();
+   * const pricing = new core.FinstackConfig();
+   * const result = portfolio.portfolioFrtbSensitivities(book, market, pricing, {
+   *   girr_targets: [], csr_sources: [],
+   * });
+   * console.log(result.positions_mapped);
+   * pricing.free();
+   * market.free();
+   * book.free();
+   * ```
+   */
+  readonly portfolioFrtbSensitivities: typeof wasm.portfolioFrtbSensitivities;
   /**
    * Calculate portfolio margin requirements by netting set (Rust
    * `margin::portfolio_margin`).
@@ -11392,11 +11911,11 @@ export interface PortfolioNamespace {
    *
    * Accepts a JSON array of `SectorPeriod` objects and returns a structured
    * `BrinsonPeriodResult` object.
-   * @param sectorsJson - Sector-classification JSON.
+   * @param sectors - Sector-classification JSON.
    *
    * # Errors
    *
-   * Throws a JavaScript exception if `sectorsJson` is malformed, contains no
+   * Throws a JavaScript exception if `sectors` is malformed, contains no
    * sectors or a non-finite weight or return, portfolio or benchmark weights do
    * not sum to one, or the result cannot be converted to a JavaScript value.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
@@ -11410,11 +11929,11 @@ export interface PortfolioNamespace {
    * returns a structured `CarinoLinkedAttribution` object whose linked effects
    * reconstruct the geometrically compounded active return. To link raw sector
    * inputs, attribute each period with `brinsonFachler` first.
-   * @param periodsJson - Chronological JSON array of `BrinsonPeriodResult` objects with identical sector ordering in every period.
+   * @param periods - Chronological JSON array of `BrinsonPeriodResult` objects with identical sector ordering in every period.
    *
    * # Errors
    *
-   * Throws a JavaScript exception if `periodsJson` is malformed, the sequence is
+   * Throws a JavaScript exception if `periods` is malformed, the sequence is
    * empty or changes sector ordering, or a period return is non-finite or at
    * most `-1`.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
@@ -11443,99 +11962,60 @@ export interface PortfolioNamespace {
    */
   readonly brinsonLinked: typeof wasm.brinsonLinked;
   /**
-   * Compute a single-period Campisi fixed-income attribution from JSON.
+   * Attribute dated fixed-income returns to allocation, coupon carry, Treasury,
+   * settlement Z-spread and residual.
    *
-   * Decomposes both sides into carry / treasury / spread / selection and
-   * splits the active return into allocation plus four active component
-   * effects (Campisi 2000). Returns a structured `FiAttributionResult` object
-   * to chain into `campisiCarinoLink` or
-   * `fiAttributionResultReconciliationCheck`.
-   *
-   * Every snapshot must use the quote-reproducing `z_spread` basis:
-   * `spread_duration` is the canonical Z-spread duration, and `spread` plus
-   * `delta_spread` are the matching Z-spread level and move. OAS, G-spread, or
-   * discount-margin values are incompatible. The direct JSON shape contains
-   * numeric values but no metric IDs, so this binding cannot detect mislabeled
-   * spread provenance.
-   *
-   * Throws when JSON is malformed or canonical Rust validation rejects empty
-   * sides, non-finite values, invalid weights or period length, or a sector
-   * present on either side has `|net sector weight| <= 1e-6 * gross absolute
-   * sector weight`. Spread-basis provenance cannot be validated from numeric
-   * JSON alone.
-   * @param portfolioJson - Canonical JSON array of `FiPositionSnapshot` objects describing the portfolio side on the quote-reproducing Z-spread basis; weights must sum to 1.
-   * @param benchmarkJson - Canonical JSON array of `FiPositionSnapshot` objects describing the benchmark side on the quote-reproducing Z-spread basis; weights must sum to 1.
-   * @param configJson - Canonical JSON `FiAttributionConfig`; `period_years` is its only field, is required (no default), and unknown keys are rejected.
-   *
-   * # Errors
-   *
-   * Throws a JavaScript exception if any JSON input is malformed; either side is
-   * empty; a value is non-finite; weights do not sum to one; `periodYears` is not
-   * finite and positive; a sector has a zero or near-zero net weight relative to
-   * gross weight; or the result cannot be converted to a JavaScript value.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+   * @param portfolio - Position snapshots with exact signed opening weights and realized returns on the declared basis.
+   * @param benchmark - Benchmark snapshots on the same valuation, return, FX and fee basis.
+   * @param config - Reporting currency, positive calendar window, conventions and ordered sector axis.
+   * @returns Active return contributions and observed side returns as decimals. An absent side has a null sector return.
+   * @throws FinstackError if the inputs fail validation, exact weights do not sum to one or an output is not representable.
+   * @example
+   * ```typescript
+   * import init, { portfolio } from "finstack-quant-wasm";
+   * await init();
+   * const snapshot = {
+   *   id: "BOND", sector: "Credit", weight: "1", total_return: 0.02,
+   *   opening_market_value: { amount: "80", currency: "USD" },
+   *   annual_coupon: { amount: "5", currency: "USD" },
+   *   treasury: null, spread: null,
+   * } as const;
+   * const report = portfolio.campisiAttribution([snapshot], [snapshot], {
+   *   start: "2025-01-01", end: "2025-03-15", currency: "USD",
+   *   basis: { portfolio_series_id: "portfolio", benchmark_series_id: "benchmark", return_policy: "reinvested", valuation: "dirty", fx: "native", fees: "net" },
+   *   sectors: ["Credit"],
+   * });
+   * console.log(report.active_return); // 0
+   * ```
    */
   readonly campisiAttribution: typeof wasm.campisiAttribution;
   /**
-   * Carino-link already-computed single-period Campisi results.
-   *
-   * Binds Rust `campisi_carino_link`. Attribute each period with
-   * `campisiAttribution` first; each period carries its own already-applied
-   * `period_years`, so periods of *different* lengths (e.g. act/365 calendar
-   * months) link correctly. Returns a structured `FiCarinoLinkedResult` object.
-   *
-   * Throws if no periods are supplied, sector ordering differs, a consumed
-   * top-level return/effect, per-sector linked effect, or sector `total_active`
-   * is non-finite, `active_return` disagrees with the portfolio-minus-benchmark
-   * return, a sector `total_active` disagrees with its five effects, sector
-   * effects do not reconcile to their declared top-level totals, the five
-   * totals do not reconcile to `active_return` within the overflow-safe
-   * scaled-L1 tolerance, a reconciliation residual is non-finite, or a return
-   * is outside the Carino domain.
-   * @param periodsJson - Canonical JSON array of `FiAttributionResult` objects in chronological order, as returned by `campisiAttribution`.
-   *
-   * # Errors
-   *
-   * Throws a JavaScript exception if `periodsJson` is malformed, the sequence is
-   * empty or changes sector ordering, a consumed value or reconciliation is
-   * non-finite or inconsistent, a return is at most `-1`, or the linked result
-   * cannot be converted to a JavaScript value.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+   * Link contiguous checked Campisi periods with Carino smoothing.
+   * @param periods - Verified period results in chronological order on one series, currency, reporting basis and sector taxonomy.
+   * @returns Linked decimal effects and the independently compounded active return, with source periods retained.
+   * @throws FinstackError if the source observations do not reproduce the period, dates are not contiguous, growth is nonpositive, or a required result is unrepresentable.
    */
   readonly campisiCarinoLink: typeof wasm.campisiCarinoLink;
   /**
-   * Reconcile the five Campisi effect totals against the active return.
-   *
-   * Binds the Rust method `FiAttributionResult::reconciliation_check` (Python
-   * `FiAttributionResult.reconciliation_check`); WASM results are plain
-   * objects, so the method is a free function taking the object. The
-   * decomposition reconciles by construction (selection is the residual), so
-   * this is a floating-point sanity gate rather than a model check. Returns a
-   * structured `ReconciliationReport` object with `total_residual`,
-   * `is_reconciled` and `tolerance`.
-   * @param result - `FiAttributionResult` object or JSON as returned by `campisiAttribution`; unknown fields are rejected.
-   * @param tolerance - Absolute reconciliation tolerance in return units; `1e-10` suits return-space values.
-   *
-   * # Errors
-   *
-   * Throws a JavaScript exception if `result` is malformed or does not match
-   * `FiAttributionResult`, or if the reconciliation report cannot be converted to
-   * a JavaScript value.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+   * Compare displayed Campisi effects against the source-verified active return.
+   * @param result - Canonical Campisi result, including the dated position observations needed for native replay.
+   * @param tolerance - Finite nonnegative absolute tolerance in decimal return units.
+   * @returns The numerical residual, requested tolerance and pass indicator.
+   * @throws FinstackError if the result disagrees with its source, the tolerance is invalid or serialization fails.
    */
   readonly fiAttributionResultReconciliationCheck: typeof wasm.fiAttributionResultReconciliationCheck;
   /**
    * Build a duration-cell base-return table from a reference universe.
    *
    * Binds Rust `cell_returns_from_reference` (Dynkin, Hyman & Vankudre 1998,
-   * Appendix B): buckets `referenceJson` into fixed-width duration cells and
+   * Appendix B): buckets `reference` into fixed-width duration cells and
    * averages each cell's member total returns, interpolating interior gaps
    * and flat-extrapolating leading/trailing gaps. Returns a structured
    * `DurationCellTable` object; `JSON.stringify` it to chain into
    * `excessReturns`.
-   * @param referenceJson - Canonical JSON array of `ReferenceReturn` objects (`duration`, `total_return`, both decimals with duration in years); must be non-empty.
+   * @param reference - Canonical JSON array of `ReferenceReturn` objects (`duration`, `total_return`, both decimals with duration in years); must be non-empty.
    * @param baseLabel - Label identifying the resulting curve (e.g. `"UST"`), carried through to the output's `base_label` for policy visibility.
-   * @param configJson - Canonical JSON `CellConfig`; `width` is its only field (cell width in years, finite and positive) and is required, with no default.
+   * @param config - Canonical JSON `CellConfig`; `width` is its only field (cell width in years, finite and positive) and is required, with no default.
    *
    * # Errors
    *
@@ -11561,11 +12041,11 @@ export interface PortfolioNamespace {
    * @param horizonYears - Length of the holding period, in years; must be finite and positive.
    * @param maxDuration - Upper bound of the duration grid, in years; must be finite and strictly greater than `horizonYears`.
    * @param baseLabel - Label identifying the base curve (e.g. `"UST"`, `"USD-SOFR"`), stamped into the result purely for policy visibility.
-   * @param configJson - Canonical JSON `CellConfig`; `width` is its only field and is required, with no default.
+   * @param config - Canonical JSON `CellConfig`; `width` is its only field and is required, with no default.
    *
    * # Errors
    *
-   * Throws a JavaScript exception if `configJson` is malformed; the width,
+   * Throws a JavaScript exception if `config` is malformed; the width,
    * horizon, or maximum duration is invalid; a cell matures within the holding
    * period; the grid is too large or has duplicate labels; a required discount
    * factor is not finite and positive; or the result cannot be converted to a
@@ -11578,13 +12058,13 @@ export interface PortfolioNamespace {
    *
    * Binds Rust `excess_returns` (Dynkin, Hyman & Vankudre 1998, Appendix B):
    * each position's `duration` is matched to its duration cell in
-   * `tableJson` and the position's excess return is `total_return -
+   * `table` and the position's excess return is `total_return -
    * cell.base_return`, the credit-specific component of performance isolated
    * from the general level/shape move of the base curve. Returns a structured
    * `ExcessReturnResult` object with per-position and portfolio-level totals.
    *
-   * @param positionsJson - Canonical JSON array of `ExcessReturnPosition` objects (`id`, `weight`, `duration`, `total_return`); weights must sum to 1.
-   * @param tableJson - Canonical JSON `DurationCellTable`; `JSON.stringify` the structured table returned by `cellReturnsFromReference` or `cellReturnsFromCurves`.
+   * @param positions - Canonical JSON array of `ExcessReturnPosition` objects (`id`, `weight`, `duration`, `total_return`); weights must sum to 1.
+   * @param table - Canonical JSON `DurationCellTable`; `JSON.stringify` the structured table returned by `cellReturnsFromReference` or `cellReturnsFromCurves`.
    *
    * # Errors
    *
@@ -11608,8 +12088,8 @@ export interface PortfolioNamespace {
    * among accepted inputs, the reconciliation residual grows the closer any
    * bucket's net weight sits to the near-zero-net-weight rejection boundary
    * (see the Rust module docs for measured magnitudes).
-   * @param portfolioJson - Canonical JSON array of `GridPosition` objects (`cell`, `sector`, `weight`, `total_return`) for the portfolio side; weights must sum to 1.
-   * @param benchmarkJson - Canonical JSON array of `GridPosition` objects for the benchmark side; same weight-sum requirement.
+   * @param portfolio - Canonical JSON array of `GridPosition` objects (`cell`, `sector`, `weight`, `total_return`) for the portfolio side; weights must sum to 1.
+   * @param benchmark - Canonical JSON array of `GridPosition` objects for the benchmark side; same weight-sum requirement.
    *
    * # Errors
    *
@@ -11630,11 +12110,11 @@ export interface PortfolioNamespace {
    * return. Only the three top-level effects are linked; per-cell /
    * per-(cell, sector) multi-period linking is out of scope. Returns a structured
    * `GridCarinoLinkedResult` object.
-   * @param periodsJson - Canonical JSON array of `GridAttributionResult` objects, in chronological order; `JSON.stringify` the structured results returned by `gridAttribution`.
+   * @param periods - Canonical JSON array of `GridAttributionResult` objects, in chronological order; `JSON.stringify` the structured results returned by `gridAttribution`.
    *
    * # Errors
    *
-   * Throws a JavaScript exception if `periodsJson` is malformed, the sequence is
+   * Throws a JavaScript exception if `periods` is malformed, the sequence is
    * empty, a consumed value is non-finite or inconsistent, a return is at most
    * `-1`, or the linked result cannot be converted to a JavaScript value.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
@@ -11649,12 +12129,12 @@ export interface PortfolioNamespace {
    * caller-supplied benchmark factor-return vector. Returns a structured
    * `FactorBrinsonResult` object with `allocation`, `selection`, and their
    * per-factor / per-asset breakdowns.
-   * @param inputJson - Canonical JSON `FactorBrinsonInput` with `asset_ids`, `asset_returns`, `exposures` (row-major n_assets x n_factors), `factor_names`, `portfolio_weights` and `benchmark_weights`; each weight vector must sum to 1.
+   * @param input - Canonical JSON `FactorBrinsonInput` with `asset_ids`, `asset_returns`, `exposures` (row-major n_assets x n_factors), `factor_names`, `portfolio_weights` and `benchmark_weights`; each weight vector must sum to 1.
    * @param factorReturns - Caller-supplied benchmark factor returns `f_b` as a `number[]` or `Float64Array`, length `input.factor_names`; the `Float64Array` returned by `analytics.constrainedLeastSquares` can be passed directly.
    *
    * # Errors
    *
-   * Throws a JavaScript exception if `inputJson` is malformed; the asset or
+   * Throws a JavaScript exception if `input` is malformed; the asset or
    * factor sets are empty; dimensions disagree; a value is non-finite; either
    * weight vector does not sum to one; benchmark factor completeness is outside
    * tolerance; or the result cannot be converted to a JavaScript value.
@@ -11675,12 +12155,12 @@ export interface PortfolioNamespace {
   readonly twrrModifiedDietz: typeof wasm.twrrModifiedDietz;
   /**
    * Geometrically link TWRR sub-period returns from returns JSON.
-   * @param returnsJson - Numeric return-series JSON.
+   * @param returns - Numeric return-series JSON.
    * @param horizonYears - Full elapsed horizon in 365-day calendar years; must be finite (`NaN` or `Infinity` throws). Below one year, including zero and negative values, the linked return is not annualised (`annualised` mirrors `cumulative` and `is_annualised` is false).
    *
    * # Errors
    *
-   * Throws a JavaScript exception if `returnsJson` is malformed, `horizonYears`
+   * Throws a JavaScript exception if `returns` is malformed, `horizonYears`
    * is `NaN` or infinite, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded
    * growth factor), or the linked result cannot be converted to a JavaScript
    * value.
@@ -11843,6 +12323,7 @@ export interface PortfolioNamespace {
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
    * @param scenarioJson - Scenario specification JSON.
    * @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data.
+   * @param options - Optional portfolio valuation options as an object or JSON. Omit for strict risk with standard metrics.
    *
    * Each position's `valuation_result` matches what `priceInstrument` returns:
    * the 64-bit Monte Carlo `seed` is a `BigInt` and path counts are plain
@@ -11860,6 +12341,16 @@ export interface PortfolioNamespace {
    * @returns Revalued result object and scenario application report.
    */
   readonly applyScenarioAndRevalue: typeof wasm.applyScenarioAndRevalue;
+  /**
+   * Attribute scenario P&L with the original contracts repriced before contract changes.
+   * @param portfolio - Opening holdings, quantities and valuation date.
+   * @param scenario - Ordered shocks, including any market, clock or instrument changes.
+   * @param market - Opening market snapshot used for base valuation and the shock.
+   * @param method - Optional native factor attribution method. The default is parallel.
+   * @returns Stressed revaluation, market attribution, contract increment, and marked and economic total P&L.
+   * @throws `TypeError` for invalid host shapes or `FinstackError` if scenario execution, pricing or reconciliation fails.
+   */
+  readonly attributeScenarioPnl: typeof wasm.attributeScenarioPnl;
   /**
    * Compute the profit and loss attributable to a scenario for an already-built
    * `Portfolio` handle.
@@ -11925,7 +12416,7 @@ export interface PortfolioNamespace {
    * replay configuration. Returns a structured `ReplayResult` object.
    * @param portfolio - Built `Portfolio` handle (from `Portfolio.fromSpec` or `Portfolio.builder`) to revalue at every snapshot.
    * @param snapshotsJson - Market-snapshot JSON array.
-   * @param configJson - `ReplayConfig` JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected.
+   * @param configJson - ReplayConfig object or canonical JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected.
    *
    * Each position's `valuation_result` matches what `priceInstrument` returns:
    * the 64-bit Monte Carlo `seed` is a `BigInt` and path counts are plain
@@ -12502,19 +12993,10 @@ export interface ScenariosNamespace {
    */
   readonly composeScenarios: typeof wasm.composeScenarios;
   /**
-   * Validate a scenario specification JSON without executing it.
-   *
-   * Returns `undefined` when the spec is valid, throws on error. This mirrors
-   * the Python `validate_scenario_spec` API, which returns `None` — an invalid
-   * spec raises rather than returning a falsy value, so
-   * `if (validateScenarioSpec(s))` is not a validity check.
-   *
-   * # Errors
-   *
-   * Rejects malformed or schema-incompatible `json_str`, a blank scenario ID,
-   * multiple time-roll operations, invalid operation identifiers or numeric
-   * fields, or variant-specific operation violations.
-   * @param jsonStr - Scenario specification JSON string to deserialize and validate.
+   * Check scenario structure and return diagnostics without applying market effects.
+   * @param scenario - Bare typed scenario object or JSON text in the canonical ScenarioSpec shape.
+   * @returns Structural errors, advisory diagnostics, instrument requirements and operation count.
+   * @throws FinstackWasmError if the input cannot be decoded into the canonical shape or the report cannot be serialized.
    */
   readonly validateScenarioSpec: typeof wasm.validateScenarioSpec;
   /**
@@ -12676,9 +13158,9 @@ export interface ScenariosNamespace {
   readonly computeHorizonReturn: typeof wasm.computeHorizonReturn;
   /**
    * Expand a parallel shift into one operation per curve identifier.
-   * @param curveKind - Canonical discount, forward, par_cds, inflation or commodity family label.
+   * @param curveKind - Canonical discount, forward, par_cds or inflation family label.
    * @param curveIds - Ordered array of curve identifiers; empty input returns an empty array.
-   * @param bp - Additive basis points; percent of forward for commodity curves.
+   * @param bp - Additive rate basis points.
    * @param discountCurveId - Optional ParCDS discount curve copied onto every operation.
    * @returns An array of operations preserving identifier order.
    *

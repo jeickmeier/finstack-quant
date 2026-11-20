@@ -74,19 +74,30 @@ The first block constructs one complete, aligned panel, computes historical VaR/
 
 {/* notebook-block notebook="03_analytics/risk_and_factor_analytics.ipynb" cell="aligned-risk-panel" role="build" */}
 ```python exec id=aligned-risk-panel role=build
+from datetime import date
+
 import math
 import numpy as np
 from _shared.analyst_history import risk_panel
 from finstack_quant.analytics import Performance
 from finstack_quant.core.dates import FiscalConfig
 panel = risk_panel()
-performance = Performance.from_returns(panel[["portfolio", "benchmark"]], frequency="daily", benchmark_ticker="benchmark")
+assert panel.index.is_unique and not panel.isna().any().any()
+performance = Performance.from_returns(panel[["portfolio", "benchmark"]], frequency="daily", benchmark_ticker="benchmark", initial_date=date(2023, 2, 7))
 confidence = 0.95
-measures = {"historical_var":float(performance.value_at_risk(confidence).iloc[0]), "normal_var":float(performance.parametric_var(confidence).iloc[0]), "cornish_fisher_var":float(performance.cornish_fisher_var(confidence).iloc[0]), "historical_es":float(performance.expected_shortfall(confidence).iloc[0])}
-factors = panel[["market", "rates", "credit"]].to_numpy().T.tolist()
-fit = performance.multi_factor_greeks(0, factors)
+measures = {"historical_var":float(performance.value_at_risk(confidence).iloc[0]), "normal_var":float(performance.parametric_var(confidence).iloc[0]), "historical_es":float(performance.expected_shortfall(confidence).iloc[0])}
+from finstack_quant.analytics import AnalyticsError
+try:
+    measures["cornish_fisher_var"] = float(performance.cornish_fisher_var(confidence).iloc[0])
+except AnalyticsError as error:
+    print("Cornish–Fisher estimate rejected:", error)
+assert all(math.isfinite(value) for value in measures.values())
+assert abs(measures["historical_es"]) >= abs(measures["historical_var"])
+factors = panel[["market", "rates", "credit"]]
+fit = performance.multi_factor_greeks(0, factors, risk_free_rate=0.0)
 design = np.column_stack([np.ones(len(panel)), panel[["market", "rates", "credit"]]])
 ols = np.linalg.lstsq(design, panel["portfolio"].to_numpy(), rcond=None)[0]
+assert np.allclose(fit.betas, ols[1:], atol=1e-10), "Dimensionless OLS loadings, independent NumPy reference"
 print("Daily return-risk measures:",measures)
 print("Factor loadings [market,rates,credit]:",fit.betas,"R-squared:",fit.r_squared)
 print("Incorrect 95% one-day VaR times sqrt(10) (not 99%):",measures["normal_var"]*math.sqrt(10))
@@ -136,17 +147,22 @@ The controlled skewed sample applies a quadratic transformation to normal draws.
 
 {/* notebook-block notebook="03_analytics/risk_and_factor_analytics.ipynb" cell="skewed-return-risk" role="build" */}
 ```python exec id=skewed-return-risk role=build
+from datetime import date
+
 import pandas as pd
 
 rng = np.random.default_rng(73)
 normal_draws = rng.normal(0, 0.01, 504)
 skewed_returns = normal_draws - 0.002 * ((normal_draws/0.01)**2 - 1)
-skewed_performance = Performance.from_returns(pd.DataFrame({"skewed":skewed_returns},index=panel.index),frequency="daily")
+skewed_performance = Performance.from_returns(pd.DataFrame({"skewed":skewed_returns},index=panel.index),frequency="daily", initial_date=date(2023, 2, 7))
 skewed_measures = {
     "historical":float(skewed_performance.value_at_risk(0.95).iloc[0]),
     "Gaussian":float(skewed_performance.parametric_var(0.95).iloc[0]),
-    "Cornish-Fisher":float(skewed_performance.cornish_fisher_var(0.95).iloc[0]),
 }
+try:
+    skewed_measures["Cornish-Fisher"] = float(skewed_performance.cornish_fisher_var(0.95).iloc[0])
+except AnalyticsError as error:
+    print("Cornish–Fisher estimate rejected:", error)
 print("Controlled skewed daily returns:",skewed_measures)
 print("A correction changes the model; closeness to one empirical quantile is not a guarantee out of sample.")
 ```
@@ -158,11 +174,13 @@ Now give each of two positions a 10% loss in four of one hundred equiprobable st
 
 {/* notebook-block notebook="03_analytics/risk_and_factor_analytics.ipynb" cell="var-nonsubadditivity" role="build" */}
 ```python exec id=var-nonsubadditivity role=build
+from datetime import date
+
 # One hundred equally likely dollar-loss states; four A defaults and four different B defaults.
 loss_a = np.zeros(100); loss_a[:4] = 0.1
 loss_b = np.zeros(100); loss_b[4:8] = 0.1
 state_returns = pd.DataFrame({"A":-loss_a,"B":-loss_b,"AplusB":-(loss_a+loss_b)},index=pd.bdate_range("2025-01-01",periods=100))
-discrete = Performance.from_returns(state_returns,frequency="daily")
+discrete = Performance.from_returns(state_returns,frequency="daily", initial_date=date(2024, 12, 31))
 var_values = discrete.value_at_risk(0.95)
 # Exact 95% ES averages exactly five worst equiprobable states, including partial threshold mass if needed.
 exact_es_a = np.sort(loss_a)[-5:].mean()
@@ -170,8 +188,8 @@ exact_es_b = np.sort(loss_b)[-5:].mean()
 exact_es_sum = np.sort(loss_a+loss_b)[-5:].mean()
 print("Loss-positive VaR:",(-var_values).to_dict())
 print("Exact tail-mass ES:",{"A":exact_es_a,"B":exact_es_b,"AplusB":exact_es_sum})
-print("API closed-threshold tail averages:",(-discrete.expected_shortfall(0.95)).to_dict())
-print("Ties change the included probability mass. The API estimate is not the exact-mass ES used in the coherence theorem.")
+print("API exact fractional empirical ES:",(-discrete.expected_shortfall(0.95)).to_dict())
+print("The API integrates exactly the requested empirical tail mass, including fractional observations; tied thresholds do not add extra mass.")
 ```
 {/* /notebook-block */}
 
@@ -192,9 +210,6 @@ from datetime import date as dt_date
 from pathlib import Path
 
 import numpy as np
-
-import sys
-sys.path.insert(0, "..")
 
 from _shared.instrument_fixtures import fixed_bond
 from finstack_quant.attribution import attribute_pnl_envelope
@@ -230,7 +245,9 @@ AS_OF = "2024-03-31"
 _schedule = (
     Schedule.builder(dt_date(2022, 3, 31), dt_date.fromisoformat(AS_OF))
     .frequency("1M")
-    .end_of_month(True)
+    .stub_rule("none")
+    .grid("end_of_month")
+    .unadjusted()
     .build()
 )
 dates = [d.isoformat() for d in _schedule.dates][-N_MONTHS:]

@@ -1,0 +1,4033 @@
+{
+  "$defs": {
+    "ApplicationReport": {
+      "additionalProperties": false,
+      "description": "Report describing what happened during [`super::ScenarioEngine::apply`].\n\n# Examples\n```rust\nuse finstack_quant_scenarios::ApplicationReport;\n\nlet report = ApplicationReport {\n    operations_applied: 3,\n    user_operations: 1,\n    expanded_operations: 3,\n    changes: Default::default(),\n    applied_shocks: vec![],\n    warnings: vec![],\n    meta: None,\n    time_roll: None,\n};\n\nassert_eq!(report.operations_applied, 3);\nassert_eq!(report.user_operations, 1);\nassert_eq!(report.expanded_operations, 3);\n```",
+      "properties": {
+        "applied_shocks": {
+          "description": "Size of every market and instrument shock applied, in application\norder: one entry per accepted effect, so the entries reconcile with\n[`changes`](Self::changes) (every market target named there appears\nhere at least once, and the instrument indices here union to\n`changes.changed_instrument_indices`).\n\nStatement-forecast operations, rate bindings and the time roll are not\nlisted. Empty when the scenario applied no market or instrument shock,\nand on reports deserialized from JSON written before this field\nexisted.",
+          "items": {
+            "$ref": "#/$defs/AppliedShock"
+          },
+          "type": "array"
+        },
+        "changes": {
+          "$ref": "#/$defs/ScenarioChangeManifest",
+          "description": "Authoritative metadata describing the state changed by applied effects."
+        },
+        "expanded_operations": {
+          "description": "Number of direct (non-hierarchy) operations produced after hierarchy\nexpansion and resolution-mode deduplication. No-match expansion and\ndeduplication can make this smaller than `user_operations`. Because\n`operations_applied` counts effects rather than operations, the two\ncounters are not directly comparable.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "meta": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResultsMeta"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Audit stamp describing the numeric mode, rounding context, and FX\npolicy under which the scenario was applied."
+        },
+        "operations_applied": {
+          "description": "Number of effects successfully applied to the execution context.\n\nOne user-level operation can produce zero, one, or many effects after\nhierarchy expansion and target resolution. This low-level effect count\nis therefore not an operation-coverage ratio; inspect `changes` and\n`warnings` to determine which targets changed or were skipped.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "time_roll": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RollForwardReport"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Roll-forward report from the Phase 0 `TimeRollForward` operation,\nwhen the scenario contained one. Carries the per-instrument carry\ndecomposition and the new valuation date; instruments whose valuation\nfailed during the roll are also surfaced as\n[`Warning::TimeRollInstrumentFailed`] entries in `warnings`."
+        },
+        "user_operations": {
+          "description": "Number of user-provided `OperationSpec` entries in the scenario\n(before hierarchy expansion and deduplication).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "warnings": {
+          "description": "Structured warnings generated during application (non-fatal).",
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "operations_applied",
+        "user_operations",
+        "expanded_operations",
+        "changes",
+        "warnings"
+      ],
+      "type": "object"
+    },
+    "AppliedShock": {
+      "additionalProperties": false,
+      "description": "One shock the engine applied, in application order.\n\n[`ScenarioChangeManifest`] says *which* targets changed (deduplicated, for\ncache invalidation); this says *by how much*. A target shocked by several\neffects has one entry per effect.",
+      "properties": {
+        "applies_to": {
+          "$ref": "#/$defs/AppliedShockTarget",
+          "description": "Market target or instruments the shock was applied to."
+        },
+        "level_change": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LevelChange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Stored level before and after the shock.\n\nPresent only for scalar price targets\n([`ScenarioMarketTarget::EquityPrice`]), where both levels are read\nfrom the market context around the mutation. Absent for FX, curves,\nsurfaces and instruments."
+        },
+        "shock": {
+          "$ref": "#/$defs/ShockMagnitude",
+          "description": "Size, unit and shape of the shock."
+        }
+      },
+      "required": [
+        "applies_to",
+        "shock"
+      ],
+      "type": "object"
+    },
+    "AppliedShockTarget": {
+      "description": "What one applied shock was applied to.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A resolved market-data target; the same value the shock contributed to\n[`ScenarioChangeManifest::market_targets`].",
+          "properties": {
+            "scope": {
+              "const": "market",
+              "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/ScenarioMarketTarget",
+              "description": "Concrete market-data target that was shocked."
+            }
+          },
+          "required": [
+            "scope",
+            "target"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Instruments of the supplied inventory mutated in place.",
+          "properties": {
+            "indices": {
+              "description": "Zero-based inventory indices of the instruments the shock changed,\nascending.",
+              "items": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "scope": {
+              "const": "instruments",
+              "type": "string"
+            }
+          },
+          "required": [
+            "scope",
+            "indices"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "AttributionFactor": {
+      "description": "Factor types for P&L attribution.\n\nGroups `MarketContext` inputs by their economic role:\n- **RatesCurves**: discount_curves + forward_curves\n- **CreditCurves**: hazard_curves\n- **InflationCurves**: inflation_curves + published inflation_indices\n- **Correlations**: base_correlation_curves\n- **Fx**: FxMatrix\n- **Volatility**: surfaces and declared scalar volatility quotes\n- **MarketScalars**: other prices, non-fixing series and dividends",
+      "oneOf": [
+        {
+          "const": "carry",
+          "description": "Time decay and accruals (Theta).",
+          "type": "string"
+        },
+        {
+          "const": "rates_curves",
+          "description": "Interest rate curves (discount & forward).",
+          "type": "string"
+        },
+        {
+          "const": "credit_curves",
+          "description": "Credit hazard curves (spread risk).",
+          "type": "string"
+        },
+        {
+          "const": "inflation_curves",
+          "description": "Inflation curves and published CPI index changes.",
+          "type": "string"
+        },
+        {
+          "const": "correlations",
+          "description": "Base correlation curves (structured credit).",
+          "type": "string"
+        },
+        {
+          "const": "fx",
+          "description": "FX rate changes.",
+          "type": "string"
+        },
+        {
+          "const": "volatility",
+          "description": "Implied volatility changes.",
+          "type": "string"
+        },
+        {
+          "const": "market_scalars",
+          "description": "Market scalars (dividends and equity/commodity prices).",
+          "type": "string"
+        },
+        {
+          "const": "model_parameters",
+          "description": "Model-specific parameters (prepayment, default, recovery, conversion).",
+          "type": "string"
+        }
+      ]
+    },
+    "AttributionMeta": {
+      "description": "Attribution metadata.\n\nRecords methodology, dates, repricing count, and residual statistics.",
+      "properties": {
+        "execution_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExecutionPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Execution policy the attribution ran under (workspace\npolicy-visibility invariant: results stamp the parallel flag).\n`None` for methods without a policy knob (metrics-based)."
+        },
+        "fx_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FxPolicyMeta"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "FX policy metadata (if FX conversions were applied)."
+        },
+        "instrument_id": {
+          "description": "Instrument identifier.",
+          "type": "string"
+        },
+        "method": {
+          "$ref": "#/$defs/AttributionMethod",
+          "description": "Attribution method used."
+        },
+        "notes": {
+          "description": "Diagnostic notes and warnings.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "num_repricings": {
+          "description": "Number of top-level valuation calls, including attempted carry-helper\nmetric, flat-yield and funding valuations. Internal risk-metric bump\nvaluations are not counted separately.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "residual_pct": {
+          "description": "Residual as percentage of total P&L.",
+          "format": "double",
+          "type": "number"
+        },
+        "rounding": {
+          "$ref": "#/$defs/RoundingContext",
+          "description": "Rounding context used for calculations."
+        },
+        "t0": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Start date (T₀)."
+        },
+        "t1": {
+          "$ref": "#/$defs/DateWire",
+          "description": "End date (T₁)."
+        },
+        "tolerance_abs": {
+          "description": "Absolute tolerance for residual validation.",
+          "format": "double",
+          "type": "number"
+        },
+        "tolerance_pct": {
+          "description": "Percentage tolerance for residual validation.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "method",
+        "t0",
+        "t1",
+        "instrument_id",
+        "num_repricings",
+        "tolerance_abs",
+        "tolerance_pct",
+        "residual_pct",
+        "rounding",
+        "notes"
+      ],
+      "type": "object"
+    },
+    "AttributionMethod": {
+      "description": "Attribution methodology for decomposing P&L.\n\nFour methodologies are supported:\n- **Parallel**: Independent factor isolation (may not sum due to cross-effects)\n- **Waterfall**: Sequential application (guarantees sum = total, order matters)\n- **MetricsBased**: Linear approximation using existing metrics (fast but approximate)\n- **Taylor**: Sensitivity-based Taylor expansion (first/second order via bump-and-reprice)",
+      "oneOf": [
+        {
+          "const": "parallel",
+          "description": "Independent factor isolation (may not sum due to cross-effects).\n\nEach factor is isolated independently by restoring T₀ values for that\nfactor while keeping T₁ values for all others. Residual captures\ncross-effects and non-linearities.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Sequential waterfall attribution (guarantees sum = total, order matters).\n\nFactors are applied one-by-one in the specified order. Each factor's\nP&L is computed with all previous factors at T₁ and remaining at T₀.\nResidual is minimal by construction.",
+          "properties": {
+            "waterfall": {
+              "items": {
+                "$ref": "#/$defs/AttributionFactor"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "waterfall"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "metrics_based",
+          "description": "Use existing metrics (Theta, DV01, CS01) for approximation.\n\nLinear approximation using pre-computed sensitivities. Fast but less\naccurate for large market moves due to convexity effects.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Sensitivity-based Taylor expansion (first/second order).\n\nComputes sensitivities at T₀ via bump-and-reprice, then multiplies by\nobserved market moves to decompose P&L. Optionally includes second-order\ngamma/convexity terms.",
+          "properties": {
+            "taylor": {
+              "$ref": "#/$defs/TaylorAttributionConfig"
+            }
+          },
+          "required": [
+            "taylor"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "CarryDetail": {
+      "description": "Detailed carry decomposition.\n\nWhen available, breaks carry into sub-components:\n- **coupon_income**: Net cashflows (coupons, interest) received during the period\n- **pull_to_par**: PV convergence toward par (time effect at flat yield)\n- **roll_down**: Curve shape benefit from aging along a sloped curve\n- **funding_cost**: Cost of financing the position\n\nCarry and endpoint P&L are both gross of financing:\n`coupon_income + pull_to_par + roll_down = total`. Funding remains a\nseparately identified overlay; net financed carry is `total - funding_cost`.\nMetrics-based attribution adds FundingCost back to the net CarryTotal metric.\n\nIn metrics-based attribution, these fields are populated from pre-computed\ncarry decomposition metrics when available. In repricing-based attribution\nmethods, pull-to-par uses a flat curve that inverts the instrument's YTM\ncompounding convention, and `funding_cost` is isolated when a funding/repo\ncurve is configured and present on the carry market.\n\n`coupon_income` and `roll_down` are typed as [`SourceLine`] so that\ncallers with a `CreditFactorModel` may further split them into rates and\ncredit components.\n\n# Reference\n\nBloomberg PORT decomposes carry into Carry (coupon/funding), Curve Roll-Down,\nand Shift as distinct P&L components. `docs/REFERENCES.md#campisi-2000`",
+      "properties": {
+        "coupon_income": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceLine"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Coupon/interest income received during the period (with optional\nrates / credit split)."
+        },
+        "funding_cost": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cost of financing the position. Pure rates, never split."
+        },
+        "pull_to_par": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "PV convergence toward par (time effect at flat yield).\n\nThe wire field is a single unsplit `Money` (v1 schema). When a\n`CreditFactorModel` drives the carry split, its rates / credit shares\n(same `s / (r + s)` ratio as `coupon_income`) enter\n[`CreditCarryDecomposition::rates_carry_total`] and\n[`CreditCarryDecomposition::credit_carry_total`], so those two totals\npartition [`CarryDetail::total`] exactly."
+        },
+        "roll_down": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceLine"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Curve shape benefit from aging along a sloped curve, with optional\nrates / credit split.\n\nThis field includes slide/rolldown effects separate from pure pull-to-par.\nOn repricing paths where the full split is unavailable, the price-carry\nresidual is folded here so the partition invariant always holds."
+        },
+        "total": {
+          "$ref": "#/$defs/Money",
+          "description": "Gross carry P&L. Equals `CarryTotal + FundingCost` on the metrics-based\npath, or the repricing-based time drift plus coupons paid on the\nreprice paths. The populated sub-lines always partition this total."
+        }
+      },
+      "required": [
+        "total"
+      ],
+      "type": "object"
+    },
+    "CorrelationsAttribution": {
+      "description": "Detailed attribution for base correlation curves.\n\nUsed for structured credit products (CDO tranches, synthetic credit).",
+      "properties": {
+        "by_curve": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "description": "P&L by correlation curve ID.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "by_curve"
+      ],
+      "type": "object"
+    },
+    "CreditCarryByLevel": {
+      "description": "Per-factor breakdown of credit carry.",
+      "properties": {
+        "adder_by_issuer": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "description": "Optional per-issuer adder breakdown (gated by\n`CreditFactorDetailOptions.include_per_issuer_adder`).",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "adder_total": {
+          "$ref": "#/$defs/Money",
+          "description": "Sum of issuer-specific adder carry contributions."
+        },
+        "generic": {
+          "$ref": "#/$defs/Money",
+          "description": "Generic (PC) factor contribution to credit carry."
+        },
+        "levels": {
+          "description": "One entry per hierarchy level, in spec order.",
+          "items": {
+            "$ref": "#/$defs/LevelCarry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "generic",
+        "levels",
+        "adder_total"
+      ],
+      "type": "object"
+    },
+    "CreditCarryDecomposition": {
+      "description": "Factor-cut decomposition of carry under a calibrated `CreditFactorModel`.\nPopulated only when an `AttributionSpec.credit_factor_model` was supplied.\nPurely additive — does not modify any existing field.\n\n# Reconciliation invariants (§7.4, all at 1e-8 absolute tolerance)\n\nWith `w = s / (r + s)` the credit share used for the coupon split\n(see `compute_carry_credit_split_and_decomposition`):\n\n- `rates_carry_total + credit_carry_total ≡ carry_detail.total` — the two\n  legs partition the full carry, **including `pull_to_par`**, which is\n  split on the same `w` (its wire field stays a single unsplit `Money`)\n- `credit_carry_total ≡ Σ_lines SourceLine.credit_part + w × pull_to_par`\n  (lines = coupon + roll)\n- `credit_carry_total ≡ generic + Σ_levels(level.total) + adder_total`\n- `rates_carry_total ≡ Σ_lines SourceLine.rates_part\n  + (1 − w) × pull_to_par`\n- `funding_cost` is a separate financing overlay outside both gross totals.\n\n# Attribution method coverage\n\nAll four methods populate `carry_detail`: Parallel, Waterfall and Taylor\nvia `apply_total_return_carry` (theta + period economic cash, with financing\nidentified separately when configured), MetricsBased from the carry\ndecomposition metrics. `credit_carry_decomposition` is therefore emitted\non any path whose `carry_detail.coupon_income` is populated when a\n`CreditFactorModel` is supplied — the decomposition logic is\nmethod-agnostic.",
+      "properties": {
+        "credit_by_level": {
+          "$ref": "#/$defs/CreditCarryByLevel",
+          "description": "Per-factor breakdown of `credit_carry_total`."
+        },
+        "credit_carry_total": {
+          "$ref": "#/$defs/Money",
+          "description": "Sum of credit components across split source lines."
+        },
+        "model_id": {
+          "description": "Deterministic traceability id of the model used (matches\n`CreditFactorAttribution.model_id`).",
+          "type": "string"
+        },
+        "rates_carry_total": {
+          "$ref": "#/$defs/Money",
+          "description": "Sum of rates components across split source lines, minus funding cost."
+        }
+      },
+      "required": [
+        "model_id",
+        "rates_carry_total",
+        "credit_carry_total",
+        "credit_by_level"
+      ],
+      "type": "object"
+    },
+    "CreditCurvesAttribution": {
+      "description": "Detailed attribution for credit hazard curves.\n\nProvides per-curve and per-tenor breakdown for credit spread risk.",
+      "properties": {
+        "by_curve": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "description": "P&L by curve ID.",
+          "type": "object"
+        },
+        "by_tenor": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "default": {},
+          "description": "P&L by (curve_id, tenor), serialized with `\"{curve_id}|{tenor}\"` keys.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "by_curve"
+      ],
+      "type": "object"
+    },
+    "CreditFactorAttribution": {
+      "description": "Hierarchy-level decomposition of credit P&L, opt-in via\n`AttributionSpec.credit_factor_model`.\n\nThe reconciliation invariant\n\n```text\ngeneric_pnl + Σ_levels(level.total) + adder_pnl_total + curve_shape_pnl ≡ credit_curves_pnl\n```\n\nholds at absolute tolerance `1e-8` for both metrics-based and Taylor methods.\n`curve_shape_pnl` is the non-parallel hazard-curve residual;\nfor a purely parallel credit move it is zero and the invariant reduces to\nthe historical `generic + Σ levels + adder` form.\n\n**Single-instrument scope**: when produced via the valuations-layer\nper-instrument attribution wire (`metrics_based`, `taylor`), each call\nprocesses a single instrument. Therefore `LevelPnl.by_bucket` will contain\nat most one entry per call (the issuer's bucket at that level).\nPortfolio-level multi-bucket aggregation is provided at the portfolio layer.",
+      "properties": {
+        "adder_magnitude": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Diagnostic: absolute magnitude of the per-issuer adder step P&L\n(`|adder_pnl_total|`). Surfaced so downstream consumers can detect\nwhen the adder is absorbing significant non-parallel curve moves.\nA `tracing::warn!` is also emitted by the cascade builder when the\nadder magnitude exceeds `credit_cascade::ADDER_MAGNITUDE_WARN_RATIO`\nof total credit P&L."
+        },
+        "adder_pnl_by_issuer": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "description": "Optional per-issuer adder breakdown (gated by\n`CreditFactorDetailOptions.include_per_issuer_adder`, default off).",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "adder_pnl_total": {
+          "$ref": "#/$defs/Money",
+          "description": "Total adder P&L: `Σ_i CS01_i × Δadder_i` (canonical signed CS01).\nThis is the **parallel** issuer-idiosyncratic move only; non-parallel\ncurve-shape risk is reported separately in [`Self::curve_shape_pnl`].\n\n**Degenerate (no factor observations) semantics**: when the market\ncarries no scalar series for any credit factor, nothing about the\nissuer's spread move is identifiably systematic, so the entire\nparallel ΔS is routed here (generic and level components are zero)."
+        },
+        "curve_shape_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "P&L attributed to the **non-parallel** part of the hazard-curve move\n(steepening / twist / term-structure roll) — the curve-shape residual.\n\nOn the linear (MetricsBased / Taylor) wire the parallel steps are\nsingle-CS01 × Δbp products, so this closing residual also absorbs\n**spread convexity** of large parallel moves — read it as\n\"non-parallel + higher-order\", not pure curve shape, on that path.\nThe reprice-based parallel/waterfall cascades distribute convexity\ninto the steps via cumulative bumps.\n\nThe reconciliation invariant is:\n`generic + Σ levels + adder + curve_shape ≡ credit_curves_pnl`."
+        },
+        "generic_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "P&L attributed to the generic (PC) credit factor:\n`Σ_i CS01_i × β_i^PC × ΔF_PC` (canonical signed CS01 = ∂PV/∂s,\nnegative for long credit — no extra negation)."
+        },
+        "levels": {
+          "description": "One entry per [`finstack_quant_factor::credit::hierarchy::HierarchyDimension`]\nin the spec order recorded by the model's hierarchy.",
+          "items": {
+            "$ref": "#/$defs/LevelPnl"
+          },
+          "type": "array"
+        },
+        "model_id": {
+          "description": "Deterministic traceability ID for the calibrated model. Format:\n`format!(\"{}/{:016x}\", model.as_of, fnv1a64(serde_json::to_string(model)))`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model_id",
+        "generic_pnl",
+        "levels",
+        "adder_pnl_total",
+        "curve_shape_pnl"
+      ],
+      "type": "object"
+    },
+    "CrossFactorDetail": {
+      "description": "Detailed attribution for cross-factor interaction terms.",
+      "properties": {
+        "by_pair": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "default": {},
+          "description": "P&L by human-readable factor-pair label.",
+          "type": "object"
+        },
+        "total": {
+          "$ref": "#/$defs/Money",
+          "description": "Total cross-factor P&L across all populated pairs."
+        }
+      },
+      "required": [
+        "total"
+      ],
+      "type": "object"
+    },
+    "Currency": {
+      "description": "ISO 4217 currency enumeration",
+      "oneOf": [
+        {
+          "const": "AED",
+          "description": "UAE Dirham (784)",
+          "type": "string"
+        },
+        {
+          "const": "AFN",
+          "description": "Afghani (971)",
+          "type": "string"
+        },
+        {
+          "const": "ALL",
+          "description": "Lek (8)",
+          "type": "string"
+        },
+        {
+          "const": "AMD",
+          "description": "Armenian Dram (51)",
+          "type": "string"
+        },
+        {
+          "const": "ANG",
+          "description": "Netherlands Antillean Guilder (532)",
+          "type": "string"
+        },
+        {
+          "const": "AOA",
+          "description": "Kwanza (973)",
+          "type": "string"
+        },
+        {
+          "const": "ARS",
+          "description": "Argentine Peso (32)",
+          "type": "string"
+        },
+        {
+          "const": "AUD",
+          "description": "Australian Dollar (36)",
+          "type": "string"
+        },
+        {
+          "const": "AWG",
+          "description": "Aruban Florin (533)",
+          "type": "string"
+        },
+        {
+          "const": "AZN",
+          "description": "Azerbaijan Manat (944)",
+          "type": "string"
+        },
+        {
+          "const": "BAM",
+          "description": "Convertible Mark (977)",
+          "type": "string"
+        },
+        {
+          "const": "BBD",
+          "description": "Barbados Dollar (52)",
+          "type": "string"
+        },
+        {
+          "const": "BDT",
+          "description": "Taka (50)",
+          "type": "string"
+        },
+        {
+          "const": "BGN",
+          "description": "Bulgarian Lev (975)",
+          "type": "string"
+        },
+        {
+          "const": "BHD",
+          "description": "Bahraini Dinar (48)",
+          "type": "string"
+        },
+        {
+          "const": "BIF",
+          "description": "Burundi Franc (108)",
+          "type": "string"
+        },
+        {
+          "const": "BMD",
+          "description": "Bermudian Dollar (60)",
+          "type": "string"
+        },
+        {
+          "const": "BND",
+          "description": "Brunei Dollar (96)",
+          "type": "string"
+        },
+        {
+          "const": "BOB",
+          "description": "Boliviano (68)",
+          "type": "string"
+        },
+        {
+          "const": "BRL",
+          "description": "Brazilian Real (986)",
+          "type": "string"
+        },
+        {
+          "const": "BSD",
+          "description": "Bahamian Dollar (44)",
+          "type": "string"
+        },
+        {
+          "const": "BTN",
+          "description": "Ngultrum (64)",
+          "type": "string"
+        },
+        {
+          "const": "BWP",
+          "description": "Pula (72)",
+          "type": "string"
+        },
+        {
+          "const": "BYN",
+          "description": "Belarusian Ruble (933)",
+          "type": "string"
+        },
+        {
+          "const": "BZD",
+          "description": "Belize Dollar (84)",
+          "type": "string"
+        },
+        {
+          "const": "CAD",
+          "description": "Canadian Dollar (124)",
+          "type": "string"
+        },
+        {
+          "const": "CDF",
+          "description": "Congolese Franc (976)",
+          "type": "string"
+        },
+        {
+          "const": "CHF",
+          "description": "Swiss Franc (756)",
+          "type": "string"
+        },
+        {
+          "const": "CLF",
+          "description": "Unidad de Fomento (990)",
+          "type": "string"
+        },
+        {
+          "const": "CLP",
+          "description": "Chilean Peso (152)",
+          "type": "string"
+        },
+        {
+          "const": "CNY",
+          "description": "Yuan Renminbi (156)",
+          "type": "string"
+        },
+        {
+          "const": "COP",
+          "description": "Colombian Peso (170)",
+          "type": "string"
+        },
+        {
+          "const": "CRC",
+          "description": "Costa Rican Colon (188)",
+          "type": "string"
+        },
+        {
+          "const": "CUC",
+          "description": "Peso Convertible (931)",
+          "type": "string"
+        },
+        {
+          "const": "CUP",
+          "description": "Cuban Peso (192)",
+          "type": "string"
+        },
+        {
+          "const": "CVE",
+          "description": "Cabo Verde Escudo (132)",
+          "type": "string"
+        },
+        {
+          "const": "CZK",
+          "description": "Czech Koruna (203)",
+          "type": "string"
+        },
+        {
+          "const": "DJF",
+          "description": "Djibouti Franc (262)",
+          "type": "string"
+        },
+        {
+          "const": "DKK",
+          "description": "Danish Krone (208)",
+          "type": "string"
+        },
+        {
+          "const": "DOP",
+          "description": "Dominican Peso (214)",
+          "type": "string"
+        },
+        {
+          "const": "DZD",
+          "description": "Algerian Dinar (12)",
+          "type": "string"
+        },
+        {
+          "const": "EGP",
+          "description": "Egyptian Pound (818)",
+          "type": "string"
+        },
+        {
+          "const": "ERN",
+          "description": "Nakfa (232)",
+          "type": "string"
+        },
+        {
+          "const": "ETB",
+          "description": "Ethiopian Birr (230)",
+          "type": "string"
+        },
+        {
+          "const": "EUR",
+          "description": "Euro (978)",
+          "type": "string"
+        },
+        {
+          "const": "FJD",
+          "description": "Fiji Dollar (242)",
+          "type": "string"
+        },
+        {
+          "const": "FKP",
+          "description": "Falkland Islands Pound (238)",
+          "type": "string"
+        },
+        {
+          "const": "GBP",
+          "description": "Pound Sterling (826)",
+          "type": "string"
+        },
+        {
+          "const": "GEL",
+          "description": "Lari (981)",
+          "type": "string"
+        },
+        {
+          "const": "GHS",
+          "description": "Ghana Cedi (936)",
+          "type": "string"
+        },
+        {
+          "const": "GIP",
+          "description": "Gibraltar Pound (292)",
+          "type": "string"
+        },
+        {
+          "const": "GMD",
+          "description": "Dalasi (270)",
+          "type": "string"
+        },
+        {
+          "const": "GNF",
+          "description": "Guinean Franc (324)",
+          "type": "string"
+        },
+        {
+          "const": "GTQ",
+          "description": "Quetzal (320)",
+          "type": "string"
+        },
+        {
+          "const": "GYD",
+          "description": "Guyana Dollar (328)",
+          "type": "string"
+        },
+        {
+          "const": "HKD",
+          "description": "Hong Kong Dollar (344)",
+          "type": "string"
+        },
+        {
+          "const": "HNL",
+          "description": "Lempira (340)",
+          "type": "string"
+        },
+        {
+          "const": "HRK",
+          "description": "Kuna (191)",
+          "type": "string"
+        },
+        {
+          "const": "HTG",
+          "description": "Gourde (332)",
+          "type": "string"
+        },
+        {
+          "const": "HUF",
+          "description": "Forint (348)",
+          "type": "string"
+        },
+        {
+          "const": "IDR",
+          "description": "Rupiah (360)",
+          "type": "string"
+        },
+        {
+          "const": "ILS",
+          "description": "New Israeli Sheqel (376)",
+          "type": "string"
+        },
+        {
+          "const": "INR",
+          "description": "Indian Rupee (356)",
+          "type": "string"
+        },
+        {
+          "const": "IQD",
+          "description": "Iraqi Dinar (368)",
+          "type": "string"
+        },
+        {
+          "const": "IRR",
+          "description": "Iranian Rial (364)",
+          "type": "string"
+        },
+        {
+          "const": "ISK",
+          "description": "Iceland Krona (352)",
+          "type": "string"
+        },
+        {
+          "const": "JMD",
+          "description": "Jamaican Dollar (388)",
+          "type": "string"
+        },
+        {
+          "const": "JOD",
+          "description": "Jordanian Dinar (400)",
+          "type": "string"
+        },
+        {
+          "const": "JPY",
+          "description": "Yen (392)",
+          "type": "string"
+        },
+        {
+          "const": "KES",
+          "description": "Kenyan Shilling (404)",
+          "type": "string"
+        },
+        {
+          "const": "KGS",
+          "description": "Som (417)",
+          "type": "string"
+        },
+        {
+          "const": "KHR",
+          "description": "Riel (116)",
+          "type": "string"
+        },
+        {
+          "const": "KMF",
+          "description": "Comorian Franc (174)",
+          "type": "string"
+        },
+        {
+          "const": "KPW",
+          "description": "North Korean Won (408)",
+          "type": "string"
+        },
+        {
+          "const": "KRW",
+          "description": "Won (410)",
+          "type": "string"
+        },
+        {
+          "const": "KWD",
+          "description": "Kuwaiti Dinar (414)",
+          "type": "string"
+        },
+        {
+          "const": "KYD",
+          "description": "Cayman Islands Dollar (136)",
+          "type": "string"
+        },
+        {
+          "const": "KZT",
+          "description": "Tenge (398)",
+          "type": "string"
+        },
+        {
+          "const": "LAK",
+          "description": "Lao Kip (418)",
+          "type": "string"
+        },
+        {
+          "const": "LBP",
+          "description": "Lebanese Pound (422)",
+          "type": "string"
+        },
+        {
+          "const": "LKR",
+          "description": "Sri Lanka Rupee (144)",
+          "type": "string"
+        },
+        {
+          "const": "LRD",
+          "description": "Liberian Dollar (430)",
+          "type": "string"
+        },
+        {
+          "const": "LSL",
+          "description": "Loti (426)",
+          "type": "string"
+        },
+        {
+          "const": "LYD",
+          "description": "Libyan Dinar (434)",
+          "type": "string"
+        },
+        {
+          "const": "MAD",
+          "description": "Moroccan Dirham (504)",
+          "type": "string"
+        },
+        {
+          "const": "MDL",
+          "description": "Moldovan Leu (498)",
+          "type": "string"
+        },
+        {
+          "const": "MGA",
+          "description": "Malagasy Ariary (969)",
+          "type": "string"
+        },
+        {
+          "const": "MKD",
+          "description": "Denar (807)",
+          "type": "string"
+        },
+        {
+          "const": "MMK",
+          "description": "Kyat (104)",
+          "type": "string"
+        },
+        {
+          "const": "MNT",
+          "description": "Tugrik (496)",
+          "type": "string"
+        },
+        {
+          "const": "MOP",
+          "description": "Pataca (446)",
+          "type": "string"
+        },
+        {
+          "const": "MRU",
+          "description": "Ouguiya (929)",
+          "type": "string"
+        },
+        {
+          "const": "MUR",
+          "description": "Mauritius Rupee (480)",
+          "type": "string"
+        },
+        {
+          "const": "MVR",
+          "description": "Rufiyaa (462)",
+          "type": "string"
+        },
+        {
+          "const": "MWK",
+          "description": "Malawi Kwacha (454)",
+          "type": "string"
+        },
+        {
+          "const": "MXN",
+          "description": "Mexican Peso (484)",
+          "type": "string"
+        },
+        {
+          "const": "MYR",
+          "description": "Malaysian Ringgit (458)",
+          "type": "string"
+        },
+        {
+          "const": "MZN",
+          "description": "Mozambique Metical (943)",
+          "type": "string"
+        },
+        {
+          "const": "NAD",
+          "description": "Namibia Dollar (516)",
+          "type": "string"
+        },
+        {
+          "const": "NGN",
+          "description": "Naira (566)",
+          "type": "string"
+        },
+        {
+          "const": "NIO",
+          "description": "Cordoba Oro (558)",
+          "type": "string"
+        },
+        {
+          "const": "NOK",
+          "description": "Norwegian Krone (578)",
+          "type": "string"
+        },
+        {
+          "const": "NPR",
+          "description": "Nepalese Rupee (524)",
+          "type": "string"
+        },
+        {
+          "const": "NZD",
+          "description": "New Zealand Dollar (554)",
+          "type": "string"
+        },
+        {
+          "const": "OMR",
+          "description": "Rial Omani (512)",
+          "type": "string"
+        },
+        {
+          "const": "PAB",
+          "description": "Balboa (590)",
+          "type": "string"
+        },
+        {
+          "const": "PEN",
+          "description": "Sol (604)",
+          "type": "string"
+        },
+        {
+          "const": "PGK",
+          "description": "Kina (598)",
+          "type": "string"
+        },
+        {
+          "const": "PHP",
+          "description": "Philippine Peso (608)",
+          "type": "string"
+        },
+        {
+          "const": "PKR",
+          "description": "Pakistan Rupee (586)",
+          "type": "string"
+        },
+        {
+          "const": "PLN",
+          "description": "Zloty (985)",
+          "type": "string"
+        },
+        {
+          "const": "PYG",
+          "description": "Guarani (600)",
+          "type": "string"
+        },
+        {
+          "const": "QAR",
+          "description": "Qatari Rial (634)",
+          "type": "string"
+        },
+        {
+          "const": "RON",
+          "description": "Romanian Leu (946)",
+          "type": "string"
+        },
+        {
+          "const": "RSD",
+          "description": "Serbian Dinar (941)",
+          "type": "string"
+        },
+        {
+          "const": "RUB",
+          "description": "Russian Ruble (643)",
+          "type": "string"
+        },
+        {
+          "const": "RWF",
+          "description": "Rwanda Franc (646)",
+          "type": "string"
+        },
+        {
+          "const": "SAR",
+          "description": "Saudi Riyal (682)",
+          "type": "string"
+        },
+        {
+          "const": "SBD",
+          "description": "Solomon Islands Dollar (90)",
+          "type": "string"
+        },
+        {
+          "const": "SCR",
+          "description": "Seychelles Rupee (690)",
+          "type": "string"
+        },
+        {
+          "const": "SDG",
+          "description": "Sudanese Pound (938)",
+          "type": "string"
+        },
+        {
+          "const": "SEK",
+          "description": "Swedish Krona (752)",
+          "type": "string"
+        },
+        {
+          "const": "SGD",
+          "description": "Singapore Dollar (702)",
+          "type": "string"
+        },
+        {
+          "const": "SHP",
+          "description": "Saint Helena Pound (654)",
+          "type": "string"
+        },
+        {
+          "const": "SLE",
+          "description": "Leone (925)",
+          "type": "string"
+        },
+        {
+          "const": "SLL",
+          "description": "Leone (694)",
+          "type": "string"
+        },
+        {
+          "const": "SOS",
+          "description": "Somali Shilling (706)",
+          "type": "string"
+        },
+        {
+          "const": "SRD",
+          "description": "Surinam Dollar (968)",
+          "type": "string"
+        },
+        {
+          "const": "SSP",
+          "description": "South Sudanese Pound (728)",
+          "type": "string"
+        },
+        {
+          "const": "STN",
+          "description": "Dobra (930)",
+          "type": "string"
+        },
+        {
+          "const": "SYP",
+          "description": "Syrian Pound (760)",
+          "type": "string"
+        },
+        {
+          "const": "SZL",
+          "description": "Lilangeni (748)",
+          "type": "string"
+        },
+        {
+          "const": "THB",
+          "description": "Baht (764)",
+          "type": "string"
+        },
+        {
+          "const": "TJS",
+          "description": "Somoni (972)",
+          "type": "string"
+        },
+        {
+          "const": "TMT",
+          "description": "Turkmenistan New Manat (934)",
+          "type": "string"
+        },
+        {
+          "const": "TND",
+          "description": "Tunisian Dinar (788)",
+          "type": "string"
+        },
+        {
+          "const": "TOP",
+          "description": "Pa'anga (776)",
+          "type": "string"
+        },
+        {
+          "const": "TRY",
+          "description": "Turkish Lira (949)",
+          "type": "string"
+        },
+        {
+          "const": "TTD",
+          "description": "Trinidad and Tobago Dollar (780)",
+          "type": "string"
+        },
+        {
+          "const": "TWD",
+          "description": "New Taiwan Dollar (901)",
+          "type": "string"
+        },
+        {
+          "const": "TZS",
+          "description": "Tanzanian Shilling (834)",
+          "type": "string"
+        },
+        {
+          "const": "UAH",
+          "description": "Hryvnia (980)",
+          "type": "string"
+        },
+        {
+          "const": "UGX",
+          "description": "Uganda Shilling (800)",
+          "type": "string"
+        },
+        {
+          "const": "USD",
+          "description": "US Dollar (840)",
+          "type": "string"
+        },
+        {
+          "const": "UYU",
+          "description": "Peso Uruguayo (858)",
+          "type": "string"
+        },
+        {
+          "const": "UZS",
+          "description": "Uzbekistan Sum (860)",
+          "type": "string"
+        },
+        {
+          "const": "VED",
+          "description": "Bolívar Soberano (926)",
+          "type": "string"
+        },
+        {
+          "const": "VES",
+          "description": "Bolívar Soberano (928)",
+          "type": "string"
+        },
+        {
+          "const": "VND",
+          "description": "Dong (704)",
+          "type": "string"
+        },
+        {
+          "const": "VUV",
+          "description": "Vatu (548)",
+          "type": "string"
+        },
+        {
+          "const": "WST",
+          "description": "Tala (882)",
+          "type": "string"
+        },
+        {
+          "const": "XAF",
+          "description": "CFA Franc BEAC (950)",
+          "type": "string"
+        },
+        {
+          "const": "XCD",
+          "description": "East Caribbean Dollar (951)",
+          "type": "string"
+        },
+        {
+          "const": "XCG",
+          "description": "Caribbean Guilder (532)",
+          "type": "string"
+        },
+        {
+          "const": "XOF",
+          "description": "CFA Franc BCEAO (952)",
+          "type": "string"
+        },
+        {
+          "const": "XPF",
+          "description": "CFP Franc (953)",
+          "type": "string"
+        },
+        {
+          "const": "YER",
+          "description": "Yemeni Rial (886)",
+          "type": "string"
+        },
+        {
+          "const": "ZAR",
+          "description": "Rand (710)",
+          "type": "string"
+        },
+        {
+          "const": "ZMW",
+          "description": "Zambian Kwacha (967)",
+          "type": "string"
+        },
+        {
+          "const": "ZWG",
+          "description": "Zimbabwe Gold (924)",
+          "type": "string"
+        },
+        {
+          "const": "ZWL",
+          "description": "Zimbabwe Dollar (932)",
+          "type": "string"
+        }
+      ]
+    },
+    "CurveKind": {
+      "description": "Identifies which family of curve an operation targets.\n\nThese variants map to the market data collections exposed by\n`finstack_quant_core::market_data::context::MarketContext`.\nThey also determine which quoting and interpolation conventions apply when\ndownstream helpers extract rates or apply node shocks.\n\n# Examples\n```rust\nuse finstack_quant_scenarios::CurveKind;\n\nlet kind = CurveKind::Discount;\nassert_eq!(format!(\"{:?}\", kind), \"Discount\");\n```",
+      "oneOf": [
+        {
+          "const": "discount",
+          "description": "Discount factor curve.",
+          "type": "string"
+        },
+        {
+          "const": "forward",
+          "description": "Forward rate curve.",
+          "type": "string"
+        },
+        {
+          "const": "par_cds",
+          "description": "Credit Par CDS curve (bumping spreads)",
+          "type": "string"
+        },
+        {
+          "const": "inflation",
+          "description": "Inflation index curve.",
+          "type": "string"
+        },
+        {
+          "const": "commodity",
+          "description": "Commodity forward [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve).\n\nPrice shocks use [`OperationSpec::CommodityCurveParallelPct`] or\n[`OperationSpec::CommodityCurveNodePct`].",
+          "type": "string"
+        }
+      ]
+    },
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "DecimalWire": {
+      "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
+      "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+      "type": "string"
+    },
+    "ExecutionPolicy": {
+      "description": "Controls where attribution repricing work spends parallelism.\n\n`Serial` is the default: typical standalone factor sets are small enough\nthat inner Rayon costs more than it saves. `Parallel` opts into Rayon for\nindependent factor repricings when the caller is not already parallelizing\nan outer portfolio or batch loop.",
+      "oneOf": [
+        {
+          "const": "parallel",
+          "description": "Use Rayon for independent attribution repricings.",
+          "type": "string"
+        },
+        {
+          "const": "serial",
+          "description": "Run independent attribution repricings sequentially.",
+          "type": "string"
+        }
+      ]
+    },
+    "FxAttribution": {
+      "description": "Detailed attribution for FX rate changes.\n\nProvides per-currency-pair breakdown.",
+      "properties": {
+        "by_pair": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "default": {},
+          "description": "P&L by (from_currency, to_currency) pair, serialized with\n`\"{FROM}/{TO}\"` keys (e.g. `\"EUR/USD\"`).",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "FxConversionPolicy": {
+      "description": "Provider-selection purpose of a point-date FX query (record\nCORE-CONVENTIONS-013 #1/#2).\n\nThe policy tells a provider which source purpose the rate serves; it does\nnot calculate dates or choose spot versus forward. There is no default:\nevery query names its policy. Period averages are not point queries; an\nowner that needs one computes the oriented aggregate itself.",
+      "oneOf": [
+        {
+          "const": "cashflow_date",
+          "description": "The rate applicable on a cashflow's own date.",
+          "type": "string"
+        },
+        {
+          "const": "period_end",
+          "description": "The rate applicable on a reporting period's closing date.",
+          "type": "string"
+        }
+      ]
+    },
+    "FxPolicyMeta": {
+      "additionalProperties": false,
+      "description": "Metadata describing the policy applied by the provider.\n\nAttach [`FxPolicyMeta`] to valuation results so auditors can understand how\nFX conversions were sourced.",
+      "properties": {
+        "notes": {
+          "description": "Free-form provenance or audit notes supplied by the provider.",
+          "type": "string"
+        },
+        "strategy": {
+          "$ref": "#/$defs/FxConversionPolicy",
+          "description": "Strategy the provider actually applied or was instructed to apply."
+        },
+        "target_currency": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Currency"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional target currency stamped onto the resulting valuation."
+        }
+      },
+      "required": [
+        "strategy",
+        "notes"
+      ],
+      "type": "object"
+    },
+    "Id": {
+      "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
+      "type": "string"
+    },
+    "InflationCurvesAttribution": {
+      "description": "Detailed attribution for inflation curves.\n\nProvides per-curve breakdown with optional tenor detail for\nterm-structured inflation curves.",
+      "properties": {
+        "by_curve": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "description": "P&L by curve ID.",
+          "type": "object"
+        },
+        "by_tenor": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "default": null,
+          "description": "P&L by (curve_id, tenor) for term-structured inflation curves,\nserialized with `\"{curve_id}|{tenor}\"` keys.",
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "by_curve"
+      ],
+      "type": "object"
+    },
+    "InstrumentType": {
+      "description": "Strongly-typed instrument classification for pricer dispatch.\n\nEach variant represents a distinct instrument type with its own pricing\nlogic and risk characteristics. Used by the pricing registry to route\ninstruments to appropriate pricer implementations.",
+      "oneOf": [
+        {
+          "const": "bond",
+          "description": "Fixed or floating-rate bond (plain vanilla, callable, amortizing).",
+          "type": "string"
+        },
+        {
+          "const": "credit_default_swap",
+          "description": "Credit Default Swap (single-name credit protection).",
+          "type": "string"
+        },
+        {
+          "const": "cds_index",
+          "description": "CDS Index (portfolio credit protection, e.g., CDX, iTraxx).",
+          "type": "string"
+        },
+        {
+          "const": "cds_tranche",
+          "description": "CDS Tranche (mezzanine credit exposure via synthetic CDO).",
+          "type": "string"
+        },
+        {
+          "const": "cds_option",
+          "description": "Option on Credit Default Swap.",
+          "type": "string"
+        },
+        {
+          "const": "interest_rate_swap",
+          "description": "Interest Rate Swap (fixed-for-floating exchange).",
+          "type": "string"
+        },
+        {
+          "const": "cap_floor",
+          "description": "Interest rate cap or floor (portfolio of caplets/floorlets).",
+          "type": "string"
+        },
+        {
+          "const": "swaption",
+          "description": "Option on interest rate swap (European exercise).",
+          "type": "string"
+        },
+        {
+          "const": "bermudan_swaption",
+          "description": "Bermudan swaption (multiple exercise dates).",
+          "type": "string"
+        },
+        {
+          "const": "basis_swap",
+          "description": "Basis swap (floating-for-floating with spread).",
+          "type": "string"
+        },
+        {
+          "const": "basket",
+          "description": "Multi-asset basket (worst-of, best-of, or weighted).",
+          "type": "string"
+        },
+        {
+          "const": "convertible_bond",
+          "description": "Convertible bond (bond with embedded equity option).",
+          "type": "string"
+        },
+        {
+          "const": "deposit",
+          "description": "Money market deposit (single-period).",
+          "type": "string"
+        },
+        {
+          "const": "equity_option",
+          "description": "Vanilla equity option (call or put on single stock or index).",
+          "type": "string"
+        },
+        {
+          "const": "fx_option",
+          "description": "FX option (Garman-Kohlhagen model).",
+          "type": "string"
+        },
+        {
+          "const": "fx_spot",
+          "description": "FX spot position (currency pair).",
+          "type": "string"
+        },
+        {
+          "const": "fx_swap",
+          "description": "FX forward or FX swap.",
+          "type": "string"
+        },
+        {
+          "const": "xccy_swap",
+          "description": "Cross-currency swap (multi-currency floating legs).",
+          "type": "string"
+        },
+        {
+          "const": "inflation_linked_bond",
+          "description": "Inflation-linked bond (TIPS, index-linked gilts).",
+          "type": "string"
+        },
+        {
+          "const": "inflation_swap",
+          "description": "Zero-coupon inflation swap.",
+          "type": "string"
+        },
+        {
+          "const": "yoy_inflation_swap",
+          "description": "Year-on-year inflation swap.",
+          "type": "string"
+        },
+        {
+          "const": "inflation_cap_floor",
+          "description": "Inflation cap/floor (YoY inflation options).",
+          "type": "string"
+        },
+        {
+          "const": "interest_rate_future",
+          "description": "Interest rate futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "variance_swap",
+          "description": "Variance swap (volatility exposure).",
+          "type": "string"
+        },
+        {
+          "const": "fx_variance_swap",
+          "description": "FX variance swap (volatility exposure on FX).",
+          "type": "string"
+        },
+        {
+          "const": "equity",
+          "description": "Equity spot position (shares in single stock or fund).",
+          "type": "string"
+        },
+        {
+          "const": "repo",
+          "description": "Repurchase agreement (repo or reverse repo).",
+          "type": "string"
+        },
+        {
+          "const": "forward_rate_agreement",
+          "description": "Forward Rate Agreement (forward-starting interest rate contract).",
+          "type": "string"
+        },
+        {
+          "const": "structured_credit",
+          "description": "Structured credit (ABS, RMBS, CMBS, CLO with tranches and waterfall).",
+          "type": "string"
+        },
+        {
+          "const": "private_markets_fund",
+          "description": "Private markets fund (PE/credit fund with waterfall).",
+          "type": "string"
+        },
+        {
+          "const": "revolving_credit",
+          "description": "Revolving credit facility with drawdown/repayment.",
+          "type": "string"
+        },
+        {
+          "const": "asian_option",
+          "description": "Asian option (payoff based on average price).",
+          "type": "string"
+        },
+        {
+          "const": "barrier_option",
+          "description": "Barrier option (knock-in or knock-out on barrier cross).",
+          "type": "string"
+        },
+        {
+          "const": "lookback_option",
+          "description": "Lookback option (payoff based on path extremum).",
+          "type": "string"
+        },
+        {
+          "const": "quanto_option",
+          "description": "Quanto option (cross-currency option with quanto adjustment).",
+          "type": "string"
+        },
+        {
+          "const": "autocallable",
+          "description": "Autocallable structured note (early redemption feature).",
+          "type": "string"
+        },
+        {
+          "const": "cms_option",
+          "description": "CMS option (constant maturity swap option).",
+          "type": "string"
+        },
+        {
+          "const": "cms_swap",
+          "description": "CMS swap (constant maturity swap).",
+          "type": "string"
+        },
+        {
+          "const": "cliquet_option",
+          "description": "Cliquet option (ratchet option with periodic resets).",
+          "type": "string"
+        },
+        {
+          "const": "range_accrual",
+          "description": "Range accrual note (coupon accrues when rate in range).",
+          "type": "string"
+        },
+        {
+          "const": "fx_barrier_option",
+          "description": "FX barrier option (FX option with knock-in/out barrier).",
+          "type": "string"
+        },
+        {
+          "const": "term_loan",
+          "description": "Term loan (optionally Delayed Draw Term Loan)",
+          "type": "string"
+        },
+        {
+          "const": "discounted_cash_flow",
+          "description": "Discounted Cash Flow (corporate valuation)",
+          "type": "string"
+        },
+        {
+          "const": "real_estate_asset",
+          "description": "Real estate asset valuation (DCF or direct cap).",
+          "type": "string"
+        },
+        {
+          "const": "levered_real_estate_equity",
+          "description": "Levered real estate equity (asset minus financing).",
+          "type": "string"
+        },
+        {
+          "const": "trs_equity",
+          "description": "Equity Total Return Swap.",
+          "type": "string"
+        },
+        {
+          "const": "trs_fixed_income_index",
+          "description": "Fixed Income Index Total Return Swap.",
+          "type": "string"
+        },
+        {
+          "const": "bond_future",
+          "description": "Bond future (futures on a deliverable bond basket with CTD mechanics).",
+          "type": "string"
+        },
+        {
+          "const": "commodity_forward",
+          "description": "Commodity forward or futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "commodity_swap",
+          "description": "Commodity swap (fixed-for-floating commodity price exchange).",
+          "type": "string"
+        },
+        {
+          "const": "commodity_spot_option",
+          "description": "Commodity option (option on commodity forward or spot).",
+          "type": "string"
+        },
+        {
+          "const": "commodity_asian_option",
+          "description": "Commodity Asian option (option on arithmetic/geometric average of commodity prices).",
+          "type": "string"
+        },
+        {
+          "const": "commodity_swaption",
+          "description": "Commodity swaption (option on a fixed-for-floating commodity swap).",
+          "type": "string"
+        },
+        {
+          "const": "commodity_spread_option",
+          "description": "Commodity spread option (option on the spread between two commodities).",
+          "type": "string"
+        },
+        {
+          "const": "volatility_index_future",
+          "description": "Volatility index future (VIX, VXN, VSTOXX).",
+          "type": "string"
+        },
+        {
+          "const": "fx_forward",
+          "description": "FX forward (outright forward, single exchange at maturity).",
+          "type": "string"
+        },
+        {
+          "const": "ndf",
+          "description": "Non-deliverable forward (NDF) for restricted currencies.",
+          "type": "string"
+        },
+        {
+          "const": "agency_mbs_passthrough",
+          "description": "Agency MBS passthrough (FNMA, FHLMC, GNMA pools).",
+          "type": "string"
+        },
+        {
+          "const": "agency_tba",
+          "description": "Agency TBA (To-Be-Announced) forward.",
+          "type": "string"
+        },
+        {
+          "const": "dollar_roll",
+          "description": "Dollar roll (TBA financing trade).",
+          "type": "string"
+        },
+        {
+          "const": "agency_cmo",
+          "description": "Agency CMO (Collateralized Mortgage Obligation).",
+          "type": "string"
+        },
+        {
+          "const": "fx_digital_option",
+          "description": "FX digital (binary) option (cash-or-nothing / asset-or-nothing).",
+          "type": "string"
+        },
+        {
+          "const": "fx_touch_option",
+          "description": "FX touch option (one-touch / no-touch American binary).",
+          "type": "string"
+        },
+        {
+          "const": "tarn",
+          "description": "Target Redemption Note (path-dependent coupon with knockout).",
+          "type": "string"
+        },
+        {
+          "const": "cms_spread_option",
+          "description": "CMS Spread Option (option on spread between two CMS rates).",
+          "type": "string"
+        },
+        {
+          "const": "callable_range_accrual",
+          "description": "Callable Range Accrual (range accrual with Bermudan call).",
+          "type": "string"
+        },
+        {
+          "const": "snowball",
+          "description": "Snowball / Inverse Floater structured note.",
+          "type": "string"
+        },
+        {
+          "const": "composite",
+          "description": "Generic resolved basket of signed underlying instrument quantities.",
+          "type": "string"
+        },
+        {
+          "const": "commodity_future",
+          "description": "Linear listed future on a single or average observed price.",
+          "type": "string"
+        },
+        {
+          "const": "fx_future",
+          "description": "Exchange-listed future on a deliverable currency pair.",
+          "type": "string"
+        },
+        {
+          "const": "equity_future",
+          "description": "Exchange-listed equity or equity-index future, including fixed-currency quantos.",
+          "type": "string"
+        },
+        {
+          "const": "equity_total_return_future",
+          "description": "Listed equity total-return future quoted as an annualized financing spread.",
+          "type": "string"
+        },
+        {
+          "const": "interest_rate_future_option",
+          "description": "Listed or bilateral option on an interest-rate futures price.",
+          "type": "string"
+        },
+        {
+          "const": "equity_future_option",
+          "description": "Exchange-listed option on an equity or equity-index futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "fx_future_option",
+          "description": "Exchange-listed option on an FX futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "commodity_future_option",
+          "description": "Exchange-listed option on a commodity futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "volatility_index_future_option",
+          "description": "Exchange-listed option on a volatility-index futures contract.",
+          "type": "string"
+        },
+        {
+          "const": "asset_backed_facility",
+          "description": "Asset-backed facility (warehouse line against a collateral pool).",
+          "type": "string"
+        },
+        {
+          "const": "structured_credit_tranche",
+          "description": "Single note owned by a structured-credit waterfall.",
+          "type": "string"
+        }
+      ]
+    },
+    "LevelCarry": {
+      "description": "Carry contribution from a single hierarchy level.",
+      "properties": {
+        "by_bucket": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "description": "Optional per-bucket breakdown keyed by dotted bucket path.",
+          "type": "object"
+        },
+        "level_name": {
+          "description": "Human-readable level name (e.g. `\"rating\"`, `\"region\"`).",
+          "type": "string"
+        },
+        "total": {
+          "$ref": "#/$defs/Money",
+          "description": "Aggregate carry for this level across all buckets."
+        }
+      },
+      "required": [
+        "level_name",
+        "total"
+      ],
+      "type": "object"
+    },
+    "LevelChange": {
+      "additionalProperties": false,
+      "description": "Level of a scalar market value immediately before and after a shock.",
+      "properties": {
+        "after": {
+          "description": "Stored level after the shock, in the same units.",
+          "format": "double",
+          "type": "number"
+        },
+        "before": {
+          "description": "Stored level before the shock, in the scalar's own units (the amount\nfor a monetary price).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "before",
+        "after"
+      ],
+      "type": "object"
+    },
+    "LevelPnl": {
+      "description": "P&L contribution from a single hierarchy level.",
+      "properties": {
+        "by_bucket": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "description": "Optional per-bucket breakdown keyed by dotted bucket path\n(e.g. `\"IG.EU.FIN\"`). Empty when\n`CreditFactorDetailOptions.include_per_bucket_breakdown == false`.",
+          "type": "object"
+        },
+        "level_name": {
+          "description": "Human-readable level name (e.g. `\"rating\"`, `\"region\"`, `\"sector\"`,\nor a custom dimension key).",
+          "type": "string"
+        },
+        "total": {
+          "$ref": "#/$defs/Money",
+          "description": "Aggregate P&L for this level across all buckets."
+        }
+      },
+      "required": [
+        "level_name",
+        "total"
+      ],
+      "type": "object"
+    },
+    "MetricId": {
+      "description": "Strongly-typed metric identifier.\n\nProvides compile-time validation, autocomplete support, and safe refactoring\nwhen metric names change. Covers bond, IRS, deposit, and risk metrics.\n\nSee unit tests and `examples/` for usage.",
+      "type": "string"
+    },
+    "ModelParamsAttribution": {
+      "description": "Detailed attribution for model-specific parameters.\n\nExtensible structure for instrument-specific model parameters\n(prepayment speeds, default rates, recovery rates, etc.).",
+      "properties": {
+        "conversion_ratio": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Conversion ratio changes (for convertible bonds)."
+        },
+        "default_rate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default rate changes (for structured credit)."
+        },
+        "other": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "default": {},
+          "description": "Other model-specific parameters.",
+          "type": "object"
+        },
+        "prepayment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Prepayment speed changes (for MBS/ABS)."
+        },
+        "recovery_rate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Recovery rate changes (for credit instruments)."
+        }
+      },
+      "type": "object"
+    },
+    "Money": {
+      "additionalProperties": false,
+      "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
+      "properties": {
+        "amount": {
+          "$ref": "#/$defs/DecimalWire",
+          "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not."
+        },
+        "currency": {
+          "$ref": "#/$defs/Currency",
+          "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion."
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "type": "object"
+    },
+    "MoveUnit": {
+      "description": "Unit of a [`SensitivityStep`] market move; the sensitivity is a currency\namount per one such unit.",
+      "oneOf": [
+        {
+          "const": "basis_point",
+          "description": "One basis point (0.01%) of rate, spread or yield.",
+          "type": "string"
+        },
+        {
+          "const": "vol_point",
+          "description": "One volatility point (0.01 of absolute implied volatility).",
+          "type": "string"
+        },
+        {
+          "const": "percent",
+          "description": "One percent relative change of the quoted level (1.0 = 1%).",
+          "type": "string"
+        },
+        {
+          "const": "price_unit",
+          "description": "One unit of the quoted price or level (absolute change).",
+          "type": "string"
+        }
+      ]
+    },
+    "PnlAttribution": {
+      "description": "Complete P&L attribution result for a single instrument.\n\nDecomposes total P&L into constituent factors with optional detailed\nbreakdowns by curve, tenor, FX pair, etc.\n\n# Examples\n\n```no_run\nuse finstack_quant_attribution::{\n    attribute_pnl, AttributionMethod, AttributionRequest, ExecutionPolicy,\n};\nuse finstack_quant_valuations::instruments::Instrument;\nuse finstack_quant_valuations::instruments::rates::deposit::Deposit;\nuse finstack_quant_core::config::FinstackConfig;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::market_data::context::MarketContext;\nuse finstack_quant_core::money::Money;\nuse std::sync::Arc;\nuse time::macros::date;\n\n# fn main() -> Result<(), Box<dyn std::error::Error>> {\nlet as_of_t0 = date!(2025-01-15);\nlet as_of_t1 = date!(2025-01-16);\nlet market_t0 = MarketContext::new();\nlet market_t1 = MarketContext::new();\nlet config = FinstackConfig::default();\n\nlet instrument = Arc::new(\n    Deposit::builder()\n        .id(\"DEP-1D\".into())\n        .notional(Money::from((1_000_000_i64, Currency::USD)))\n        .start_date(as_of_t0)\n        .maturity(as_of_t1)\n        .day_count(finstack_quant_core::dates::DayCount::Act360)\n        .discount_curve_id(\"USD-OIS\".into())\n        .build()\n        .expect(\"deposit builder should succeed\"),\n) as Arc<dyn Instrument>;\n\nlet request = AttributionRequest {\n    execution_policy: ExecutionPolicy::Parallel,\n    ..AttributionRequest::new(\n        &instrument,\n        &market_t0,\n        &market_t1,\n        as_of_t0,\n        as_of_t1,\n        &config,\n    )\n};\nlet attribution = attribute_pnl(&AttributionMethod::Parallel, &request)?;\n\nprintln!(\"Total P&L: {}\", attribution.total_pnl);\nprintln!(\"Carry: {} ({:.1}%)\",\n    attribution.carry,\n    attribution.carry.amount() / attribution.total_pnl.amount() * 100.0\n);\n# Ok(())\n# }\n```",
+      "properties": {
+        "carry": {
+          "$ref": "#/$defs/Money",
+          "description": "Carry P&L (theta + accruals)."
+        },
+        "carry_detail": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CarryDetail"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Detailed carry decomposition (theta + roll-down)."
+        },
+        "correlations_detail": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CorrelationsAttribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Detailed correlations attribution (by curve)."
+        },
+        "correlations_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Base correlation curves P&L."
+        },
+        "credit_carry_decomposition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CreditCarryDecomposition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional credit-factor-hierarchy decomposition of carry.\n\nPopulated only when an `AttributionSpec.credit_factor_model` was\nsupplied."
+        },
+        "credit_curves_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Credit hazard curves P&L."
+        },
+        "credit_detail": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CreditCurvesAttribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Detailed credit curves attribution (by curve and tenor)."
+        },
+        "credit_factor_detail": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CreditFactorAttribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional credit-factor-hierarchy decomposition of `credit_curves_pnl`.\n\nPopulated only when an `AttributionSpec.credit_factor_model` was supplied\nto the attribution call. When present, this is purely additive detail —\n`credit_curves_pnl` itself is unchanged."
+        },
+        "cross_factor_detail": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CrossFactorDetail"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Detailed cross-factor attribution (by factor-pair label)."
+        },
+        "cross_factor_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Cross-factor interaction P&L (rates×credit, spot×vol, FX×rates, etc.).\n\nStored as the **additive contribution to the attributed sum**: for the\nparallel method this is the negated mixed second difference\n`V(a@T₀) + V(b@T₀) − V(all-T₁) − V(ab@T₀)` summed over factor pairs,\nso that extracting cross terms drives the residual toward zero; for\nthe metrics-based method it is the Taylor cross-gamma term, which is\nadditive by construction. A positive value means factor co-movement\nadded P&L beyond the sum of the isolated factor effects."
+        },
+        "fx_detail": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FxAttribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Detailed FX attribution (by currency pair)."
+        },
+        "fx_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "FX rate changes P&L — the **pricing-impact** component of FX moves on\ncross-currency instruments (the FX matrix feeding into the instrument's\nown pricer). For pure single-currency instruments this is zero."
+        },
+        "fx_translation_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "FX translation P&L — the **reporting-currency** component of FX moves.\n\nPopulated only when the attribution call passed an explicit\n`target_currency` that differs from the instrument's native pricing currency\n(`val_t1.currency()`). In that case the native-currency P&L is\ntranslated into `target_currency` using `market_t0`'s FX at T₀ and\n`market_t1`'s FX at T₁; the difference between those two translated\ntotals lands here.\n\nFor attribution calls that report in native currency (the default —\n`target_currency = None`), this is always zero in the `total_pnl` currency.\n\nThe field is always constructed in the same currency as `total_pnl`."
+        },
+        "inflation_curves_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Inflation curves P&L."
+        },
+        "inflation_detail": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InflationCurvesAttribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Detailed inflation curves attribution (by curve, optional tenor)."
+        },
+        "mark_to_market_pnl": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pure mark-to-market change: `val_t1 − val_t0` with **no** intra-period\ncashflow adjustment.\n\nSeparates the raw user-input price change from\nthe total-return view stamped on `total_pnl`. When the attribution path\nadded period economic cash to `total_pnl` (the standard total-return convention\nin parallel / waterfall / taylor attribution), this field still reports\nthe raw `val_t1 − val_t0` so a downstream consumer that computed their\nown total from the underlying valuations can reconcile cleanly.\n\nAttribution paths that cannot provide the raw mark-to-market change use\n`None`."
+        },
+        "market_scalars_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Market scalars P&L."
+        },
+        "meta": {
+          "$ref": "#/$defs/AttributionMeta",
+          "description": "Attribution metadata."
+        },
+        "model_params_detail": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelParamsAttribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Detailed model parameters attribution."
+        },
+        "model_params_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Model parameters P&L."
+        },
+        "pv_t0": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Present value at T₀ on the T₀ market: the opening endpoint of the\nattribution, in the `total_pnl` currency.\n\n`mark_to_market_pnl == pv_t1 − pv_t0`, and `total_pnl` adds the period\ncash receipts the method documents. After a target-currency\ntranslation this is the opening value converted at T₀ FX.\n\nAbsent when the result was not produced from two endpoint valuations in\nthe `total_pnl` currency: a bare [`Self::new`] result, a payload\nwritten before this field existed, or an opening value quoted in a\ndifferent currency from the closing value."
+        },
+        "pv_t1": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Present value at T₁ on the T₁ market: the closing endpoint of the\nattribution, in the `total_pnl` currency.\n\nAfter a target-currency translation this is the closing value\nconverted at T₁ FX. Absent under the same conditions as\n[`Self::pv_t0`]."
+        },
+        "rates_curves_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Interest rate curves P&L."
+        },
+        "rates_detail": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RatesCurvesAttribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Detailed rates curves attribution (by curve and tenor)."
+        },
+        "residual": {
+          "$ref": "#/$defs/Money",
+          "description": "Residual P&L (total - sum of attributed factors)."
+        },
+        "result_invalid": {
+          "description": "True if residual computation encountered non-finite (NaN/Inf) inputs,\nor if any factor P&L value is non-finite. When `true`, `residual` and\n`meta.residual_pct` are not meaningful and downstream callers should\ntreat the attribution as invalid.",
+          "type": "boolean"
+        },
+        "scalars_detail": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScalarsAttribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Detailed market scalars attribution."
+        },
+        "sensitivity_steps": {
+          "description": "The working behind each factor of a sensitivity-based attribution, in\nthe order computed: sensitivity, observed market move, first-order\nP&L and second-order P&L (or the repriced value for factors isolated\nby a reprice).\n\nPopulated by the Taylor and metrics-based methods. Each factor bucket\nequals the sum of `explained_pnl + gamma_pnl` over its rows, with two\nmetrics-based exceptions that have no rows: `carry` is read directly\nfrom the T₀ carry metrics (see `carry_detail`), and `cross_factor_pnl`\nis itemized by pair in `cross_factor_detail`. Empty for\nthe parallel and waterfall methods, for a composite aggregate, and for\npayloads written before this field existed.",
+          "items": {
+            "$ref": "#/$defs/SensitivityStep"
+          },
+          "type": "array"
+        },
+        "total_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Total P&L *as reported by this attribution*.\n\nIn the standard total-return convention (the default carry path uses\nthe internal total-return carry helper), this is\n`(val_t1 − val_t0) + economic_cash_between(T0, T1)`. Cashflows received\nduring the period are added back so that\n`total_pnl == carry + factor_sum + residual` holds: the `carry` field\nincludes income and principal receipts, and reconciliation against the user's\nobserved val_t1 − val_t0 must subtract the economic cash out of\n`total_pnl` to recover the pure mark-to-market move.\n\n**For a raw mark-to-market view that excludes intra-period cashflows,\nread [`Self::mark_to_market_pnl`].** That field, when present, is the\nuntouched `val_t1 − val_t0` and never absorbs cash receipts."
+        },
+        "vol_detail": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VolAttribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Detailed volatility attribution (by surface)."
+        },
+        "vol_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Implied volatility changes P&L."
+        },
+        "waterfall_steps": {
+          "description": "Ordered repricing steps of a waterfall attribution: the running\npresent value before and after each factor, in the order applied.\n\nThe step P&Ls chain from [`Self::pv_t0`] to the fully rolled value and\nsum to `mark_to_market_pnl − residual`. After a target-currency\ntranslation every step value is converted at T₁ FX, so the first\n`pv_before` equals `pv_t0 + fx_translation_pnl`.\n\nEmpty for every other method, for a composite aggregate, and for\npayloads written before this field existed.",
+          "items": {
+            "$ref": "#/$defs/WaterfallStep"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "total_pnl",
+        "carry",
+        "rates_curves_pnl",
+        "credit_curves_pnl",
+        "inflation_curves_pnl",
+        "correlations_pnl",
+        "fx_pnl",
+        "fx_translation_pnl",
+        "vol_pnl",
+        "cross_factor_pnl",
+        "model_params_pnl",
+        "market_scalars_pnl",
+        "residual",
+        "meta",
+        "result_invalid"
+      ],
+      "type": "object"
+    },
+    "PortfolioAttribution": {
+      "additionalProperties": false,
+      "description": "Portfolio-level P&L attribution result.\n\nAggregates P&L attribution across all positions with currency conversion\nto portfolio base currency.\n\n# FX Translation Effects\n\nFor positions denominated in currencies other than the portfolio's base currency,\nthe attribution includes FX translation effects. The `total_pnl` field represents\nthe **all-in P&L** including both:\n\n1. **Instrument-level P&L** converted to base currency at T₁ FX rates\n2. **FX translation P&L** from the revaluation of opening principal\n\nThe decomposition is:\n\n```text\ntotal_pnl = sum(factor_pnl_at_T1_FX) + fx_translation_pnl + residual\n```\n\nWhere each factor bucket (carry, rates, credit, vol, etc.) is converted to\nbase currency using the T₁ FX rate. This means the implicit FX translation\nof the P&L *flow* (i.e., `PnL_native × (FX_T1 - FX_T0)`) is absorbed into\neach factor bucket rather than isolated in `fx_translation_pnl`.\n\n`fx_translation_pnl` captures **only** the revaluation of the opening\nprincipal:\n\n```text\nfx_translation_pnl = Val_T0_native × (FX_T1 - FX_T0)\n```\n\nThis convention is consistent with systems that convert factor P&L at\nclosing rates and report principal revaluation separately.\n\n# Note on by_position Attribution\n\nThe `by_position` map contains instrument-currency attribution before FX\ntranslation effects are applied. To reconcile with `total_pnl`, apply the\nFX rates and add the principal revaluation effect.\n\n# Conventions\n\nThe portfolio-level aggregates are reported in portfolio base currency,\nwhile `by_position` remains in each instrument's native currency so callers\ncan inspect raw instrument attribution before FX translation.",
+      "properties": {
+        "by_position": {
+          "additionalProperties": {
+            "$ref": "#/$defs/PnlAttribution"
+          },
+          "description": "Attribution by position in instrument-native currency.\n\nNote: These values are in each instrument's native currency and do not\ninclude FX translation effects. Use the portfolio-level aggregates for\nbase-currency totals.",
+          "type": "object"
+        },
+        "carry": {
+          "$ref": "#/$defs/Money",
+          "description": "Carry P&L (theta + accruals) in base currency."
+        },
+        "correlations_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Base correlation curves P&L in base currency."
+        },
+        "credit_curves_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Credit hazard curves P&L in base currency."
+        },
+        "cross_factor_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Cross-factor interaction P&L in base currency.\n\nAggregated from each position's native-currency `cross_factor_pnl`\nafter conversion to portfolio base currency."
+        },
+        "fx_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "FX rate changes P&L in base currency.\n\nThis captures FX exposure within instruments (e.g., cross-currency swaps),\nnot the translation effect from converting instrument P&L to base currency."
+        },
+        "fx_translation_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "FX translation P&L from revaluing opening principal to base currency.\n\nFor cross-currency positions, this captures the effect of FX rate changes\non the T₀ position value:\n\n```text\nfx_translation_pnl = Val_T0_native × (FX_T1 - FX_T0)\n```\n\nNote: The implicit FX translation of each factor's P&L flow\n(converting native-currency factor P&L at T₁ FX rather than T₀ FX) is\nabsorbed into the respective factor buckets (carry, rates, etc.) and is\n**not** included here.\n\nThis is separate from `fx_pnl` which captures FX exposure within instruments."
+        },
+        "inflation_curves_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Inflation curves P&L in base currency."
+        },
+        "market_scalars_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Market scalars P&L in base currency."
+        },
+        "model_params_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Model parameters P&L in base currency."
+        },
+        "rates_curves_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Interest rate curves P&L in base currency."
+        },
+        "residual": {
+          "$ref": "#/$defs/Money",
+          "description": "Residual P&L (unexplained) in base currency."
+        },
+        "result_invalid": {
+          "description": "True if any constituent position's attribution was flagged invalid\n(for example, a non-finite factor sensitivity — see\n[`PnlAttribution::result_invalid`]). When `true`, the portfolio\naggregates and [`PortfolioAttribution::reconciliation_check`] are not\ntrustworthy and must not be relied on for reporting.",
+          "type": "boolean"
+        },
+        "total_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Total portfolio P&L in base currency.\n\nThis is the **all-in P&L** that includes:\n- All factor attributions converted to base currency at T₁ rates\n- FX translation effects from opening principal revaluation\n\nNote: This differs from a simple sum of factor attributions because\ncross-currency positions include FX translation P&L on the principal."
+        },
+        "vol_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "Implied volatility changes P&L in base currency."
+        }
+      },
+      "required": [
+        "total_pnl",
+        "carry",
+        "rates_curves_pnl",
+        "credit_curves_pnl",
+        "inflation_curves_pnl",
+        "correlations_pnl",
+        "fx_pnl",
+        "fx_translation_pnl",
+        "cross_factor_pnl",
+        "vol_pnl",
+        "model_params_pnl",
+        "market_scalars_pnl",
+        "residual",
+        "by_position",
+        "result_invalid"
+      ],
+      "type": "object"
+    },
+    "PortfolioValuation": {
+      "description": "Complete portfolio valuation results.\n\nProvides per-position valuations, totals by entity, and the grand total.",
+      "properties": {
+        "as_of": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Valuation date carried through from the portfolio."
+        },
+        "by_entity": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "description": "Aggregated values by entity",
+          "type": "object"
+        },
+        "degraded_positions": {
+          "description": "Positions whose valuation fell back to PV-only because requested risk\nmetrics could not be computed.",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "type": "array"
+        },
+        "fx_collapse_policy": {
+          "$ref": "#/$defs/FxConversionPolicy",
+          "description": "FX policy applied when collapsing position values to the base currency.\n\nBase-currency rollups use an explicit spot-equivalent conversion at\n[`as_of`](Self::as_of) through the market FX matrix; this records the\napplied [`FxConversionPolicy`] so the result envelope satisfies the\npolicy-visibility invariant (the FX strategy is stamped, not implied)."
+        },
+        "position_values": {
+          "additionalProperties": {
+            "$ref": "#/$defs/PositionValue"
+          },
+          "description": "Values for each position",
+          "type": "object"
+        },
+        "total_base_currency": {
+          "$ref": "#/$defs/Money",
+          "description": "Total portfolio value in base currency"
+        }
+      },
+      "required": [
+        "as_of",
+        "position_values",
+        "total_base_currency",
+        "by_entity",
+        "fx_collapse_policy"
+      ],
+      "type": "object"
+    },
+    "PositionValue": {
+      "description": "Result of valuing a single position.\n\nHolds both native-currency and base-currency valuations along with\nthe underlying [`ValuationResult`].",
+      "properties": {
+        "entity_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Entity that owns this position"
+        },
+        "fx_rate": {
+          "description": "Spot FX rate applied to collapse [`value_native`](Self::value_native)\ninto [`value_base`](Self::value_base): units of the portfolio base\ncurrency per one unit of the native currency, observed at the\nvaluation date, so `value_native × fx_rate = value_base` (up to the\nbase currency's `Money` rounding).\n\nAbsent when the native currency is the base currency (no FX lookup is\nmade).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fx_triangulated": {
+          "description": "Whether [`fx_rate`](Self::fx_rate) was built by triangulating through\nthe FX matrix's pivot currency (`true`) or read from a direct or\ninverse quote (`false`).\n\nAbsent exactly when `fx_rate` is absent.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "inapplicable_metrics": {
+          "description": "Metrics on the portfolio menu that this position's instrument type has\nno calculator for, and which were therefore never requested of it.\n\nA portfolio metric list is a menu offered to a heterogeneous book (see\n[`RequestedMetrics`]), so this records the per-position narrowing that\nmakes such a list usable. It is not a failure report: unlike\n[`PortfolioValuation::degraded_positions`] and\n[`PortfolioMetrics::skipped_metrics`](crate::metrics::PortfolioMetrics::skipped_metrics),\nnothing here could have been computed and was not. An entry means the\nmodel gives this instrument type no such exposure, so the position\ncontributes nothing to that metric's portfolio total by construction.\n\nListed in menu order. Empty for a position that supports the whole menu.",
+          "items": {
+            "$ref": "#/$defs/MetricId"
+          },
+          "type": "array"
+        },
+        "metric_scale": {
+          "description": "Linear scaling factor to apply to summable risk measures.\n\nThis mirrors the economic position size and sign used for PV scaling,\nbut is kept separate so non-summable metrics such as YTM remain\nunscaled at the position drill-down level.",
+          "format": "double",
+          "type": "number"
+        },
+        "position_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Position identifier"
+        },
+        "risk_error": {
+          "description": "Original metrics failure message when the valuation fell back to PV-only.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "risk_metrics_complete": {
+          "description": "Whether every risk metric requested *of this position* was computed\nsuccessfully.\n\nThe requested set is the portfolio metric menu narrowed to what this\nposition's instrument type supports, so structural narrowing does not\nclear this flag; the narrowed-away entries are listed on\n[`inapplicable_metrics`](Self::inapplicable_metrics). `false` means a\nsupported metric failed to compute and the position fell back to\nPV-only.",
+          "type": "boolean"
+        },
+        "valuation_result": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Full valuation result with metrics (including computed risk measures)."
+        },
+        "value_base": {
+          "$ref": "#/$defs/Money",
+          "description": "Value converted to portfolio base currency"
+        },
+        "value_native": {
+          "$ref": "#/$defs/Money",
+          "description": "Value in the instrument's native currency"
+        }
+      },
+      "required": [
+        "position_id",
+        "entity_id",
+        "value_native",
+        "value_base",
+        "metric_scale",
+        "risk_metrics_complete"
+      ],
+      "type": "object"
+    },
+    "PositiveF64Wire": {
+      "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
+      "exclusiveMinimum": 0.0,
+      "format": "double",
+      "type": "number"
+    },
+    "RatesCurvesAttribution": {
+      "description": "Detailed attribution for interest rate curves.\n\nProvides aggregate and per-curve/per-tenor breakdown for discount\nand forward curves.",
+      "properties": {
+        "by_curve": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "description": "P&L by curve ID.",
+          "type": "object"
+        },
+        "by_tenor": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "default": {},
+          "description": "P&L by (curve_id, tenor), serialized with `\"{curve_id}|{tenor}\"` keys.",
+          "type": "object"
+        },
+        "discount_total": {
+          "$ref": "#/$defs/Money",
+          "description": "Total discount curves P&L."
+        },
+        "forward_total": {
+          "$ref": "#/$defs/Money",
+          "description": "Total forward curves P&L."
+        }
+      },
+      "required": [
+        "by_curve",
+        "discount_total",
+        "forward_total"
+      ],
+      "type": "object"
+    },
+    "ResultsMeta": {
+      "description": "Metadata bundle that accompanies valuation outputs.\n\nThe metadata is intentionally small so it can be attached to reports and\ndownstream data stores for reproducibility and audit trails.\n\n# Examples\n```rust\nuse finstack_quant_core::config::{results_meta, FinstackConfig, NUMERIC_MODE_F64};\n\nlet meta = results_meta(&FinstackConfig::default());\nassert_eq!(meta.numeric_mode, NUMERIC_MODE_F64);\nassert!(meta.timestamp.is_none()); // deterministic by default\n```",
+      "properties": {
+        "fx_policy_applied": {
+          "default": null,
+          "description": "Optional FX policy applied by the computing layer (human-readable key).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "numeric_mode": {
+          "description": "Numeric engine mode used to produce the results.\n\nAlways [`NUMERIC_MODE_F64`] today; a plain string so result\nenvelopes stay wire-compatible across host languages.",
+          "type": "string"
+        },
+        "parallel": {
+          "description": "Whether the producing computation ran in parallel.\n\nSerial results omit the field entirely so existing payloads and golden\nfiles stay byte-identical.",
+          "type": "boolean"
+        },
+        "rounding": {
+          "$ref": "#/$defs/RoundingContext",
+          "description": "Rounding context snapshot applied to IO boundaries."
+        },
+        "timestamp": {
+          "description": "Timestamp when result was computed (ISO 8601 format).\nUseful for audit trails and reproducibility.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "description": "Finstack Quant library version used to produce the result.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "numeric_mode",
+        "rounding"
+      ],
+      "type": "object"
+    },
+    "RollForwardReport": {
+      "description": "Report from time roll-forward operation.\n\n# Examples\n```rust\nuse finstack_quant_scenarios::RollForwardReport;\nuse indexmap::IndexMap;\nuse time::macros::date;\n\nlet report = RollForwardReport {\n    old_date: date!(2025 - 01 - 01),\n    new_date: date!(2025 - 02 - 01),\n    days: 31,\n    instrument_carry: vec![],\n    total_carry: IndexMap::new(),\n    failed_instruments: vec![],\n};\nassert_eq!(report.days, 31);\n```",
+      "properties": {
+        "days": {
+          "description": "Calendar days between `old_date` and `new_date`.\n\nAlways a calendar-day span, including under\n[`TimeRollMode::BusinessDays`](crate::spec::TimeRollMode::BusinessDays):\nthe target date is business-day adjusted, but the span back to\n`old_date` is still calendar days. Downstream ACT/365F annualization\ndepends on this.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "failed_instruments": {
+          "description": "Instruments whose carry calculation failed but did not abort the roll.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "instrument_carry": {
+          "description": "Per-instrument carry accrual (if instruments provided), grouped by currency.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": {
+                  "$ref": "#/$defs/Money"
+                },
+                "type": "object"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "new_date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "New as-of date after roll."
+        },
+        "old_date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Original as-of date."
+        },
+        "total_carry": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "description": "Total P&L from carry, grouped by currency.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "old_date",
+        "new_date",
+        "days",
+        "instrument_carry",
+        "total_carry",
+        "failed_instruments"
+      ],
+      "type": "object"
+    },
+    "RoundingContext": {
+      "description": "Snapshot of active rounding settings used for result stamping.\n\nInstances are produced from a [`FinstackConfig`] via `RoundingContext::from` and persisted\nalongside valuation results.",
+      "properties": {
+        "ingest_scale_by_currency": {
+          "additionalProperties": {
+            "maximum": 28,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": "Validated ingest scale snapshot by currency code, with values in `0..=28`.",
+          "type": "object"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoundingMode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Explicitly selected rounding mode; absent when none was selected."
+        },
+        "output_scale_by_currency": {
+          "additionalProperties": {
+            "maximum": 28,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": "Validated output scale snapshot by currency code, with values in `0..=28`.",
+          "type": "object"
+        },
+        "tolerances": {
+          "$ref": "#/$defs/ToleranceConfig",
+          "default": {
+            "generic_epsilon": 1e-10
+          },
+          "description": "Tolerance settings snapshot for floating-point comparisons."
+        },
+        "version": {
+          "description": "Schema version for forward compatibility.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ingest_scale_by_currency",
+        "output_scale_by_currency",
+        "version"
+      ],
+      "type": "object"
+    },
+    "RoundingMode": {
+      "description": "Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).\n\nThere is no default mode: every financial rounding names one explicitly.\n\n# Examples\n```rust\nuse finstack_quant_core::config::{FinstackConfig, RoundingMode};\n\nlet mut cfg = FinstackConfig::default();\nassert_eq!(cfg.rounding.mode, None);\ncfg.rounding.mode = Some(RoundingMode::TowardZero);\nassert_eq!(cfg.rounding.mode, Some(RoundingMode::TowardZero));\n```",
+      "oneOf": [
+        {
+          "const": "bankers",
+          "description": "Nearest; an exact midpoint goes to the even coefficient.",
+          "type": "string"
+        },
+        {
+          "const": "midpoint_away_from_zero",
+          "description": "Nearest; an exact midpoint increases absolute magnitude. Other\nfractions round to nearest (`1.1` -> `1`), not away from zero.",
+          "type": "string"
+        },
+        {
+          "const": "toward_zero",
+          "description": "Round toward zero (truncate).",
+          "type": "string"
+        },
+        {
+          "const": "floor",
+          "description": "Round toward negative infinity.",
+          "type": "string"
+        },
+        {
+          "const": "ceil",
+          "description": "Round toward positive infinity.",
+          "type": "string"
+        }
+      ]
+    },
+    "ScalarsAttribution": {
+      "description": "Detailed attribution for market scalars.\n\nIncludes dividends, equity/commodity prices, inflation indices, etc.",
+      "properties": {
+        "commodity_prices": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "default": {},
+          "description": "Commodity price changes.",
+          "type": "object"
+        },
+        "dividends": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "default": {},
+          "description": "Dividend changes by equity ID.",
+          "type": "object"
+        },
+        "equity_prices": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "default": {},
+          "description": "Equity price changes.",
+          "type": "object"
+        },
+        "inflation": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "default": {},
+          "description": "Inflation index changes.",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "ScenarioChangeManifest": {
+      "additionalProperties": false,
+      "description": "Authoritative change manifest produced while applying a scenario.\n\nReaders use the manifest to invalidate only the market factors and\ninstruments that actually changed, while `all_dirty` provides a\nconservative escape hatch for changes that cannot be represented precisely.",
+      "properties": {
+        "all_dirty": {
+          "description": "Whether callers must conservatively treat every dependency as dirty.\n\nThis is set for effective time rolls because date-sensitive values can\nchange even when no explicit market or instrument target was mutated.",
+          "type": "boolean"
+        },
+        "as_of_changed": {
+          "description": "Whether the execution context's effective valuation date changed.",
+          "type": "boolean"
+        },
+        "changed_instrument_indices": {
+          "description": "Zero-based indices of portfolio instruments mutated in place.",
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "market_targets": {
+          "description": "Concrete market-data targets changed by applied effects.",
+          "items": {
+            "$ref": "#/$defs/ScenarioMarketTarget"
+          },
+          "type": "array"
+        },
+        "portfolio_shape_changed": {
+          "description": "Whether instruments were inserted, removed, or reordered.\n\nScenario operations do not change portfolio shape, so this stays `false`.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "market_targets",
+        "changed_instrument_indices",
+        "as_of_changed",
+        "portfolio_shape_changed",
+        "all_dirty"
+      ],
+      "type": "object"
+    },
+    "ScenarioMarketTarget": {
+      "description": "A concrete market-data target changed while applying a scenario.\n\nTargets are recorded from hierarchy-expanded operations together with the\neffects that were actually accepted by the engine. Consequently, every\nidentifier is a resolved market identifier rather than an unresolved\nhierarchy path or a best-effort reconstruction of the original spec.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A discount, forward, credit, inflation, or commodity curve.",
+          "properties": {
+            "curve_id": {
+              "$ref": "#/$defs/Id",
+              "description": "Concrete identifier changed in that collection."
+            },
+            "curve_kind": {
+              "$ref": "#/$defs/CurveKind",
+              "description": "Curve family used to select the market-data collection."
+            },
+            "kind": {
+              "const": "curve",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "curve_kind",
+            "curve_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A volatility-index curve.",
+          "properties": {
+            "curve_id": {
+              "$ref": "#/$defs/Id",
+              "description": "Concrete volatility-index curve identifier."
+            },
+            "kind": {
+              "const": "volatility_index",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "curve_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A base-correlation surface.",
+          "properties": {
+            "kind": {
+              "const": "base_correlation",
+              "type": "string"
+            },
+            "surface_id": {
+              "$ref": "#/$defs/Id",
+              "description": "Concrete base-correlation surface identifier."
+            }
+          },
+          "required": [
+            "kind",
+            "surface_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A volatility surface.",
+          "properties": {
+            "kind": {
+              "const": "vol_surface",
+              "type": "string"
+            },
+            "vol_surface_id": {
+              "$ref": "#/$defs/Id",
+              "description": "Concrete volatility-surface identifier."
+            }
+          },
+          "required": [
+            "kind",
+            "vol_surface_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An equity or other scalar price entry.",
+          "properties": {
+            "kind": {
+              "const": "equity_price",
+              "type": "string"
+            },
+            "spot_id": {
+              "$ref": "#/$defs/Id",
+              "description": "Concrete `MarketContext::get_price` scalar identifier."
+            }
+          },
+          "required": [
+            "kind",
+            "spot_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A directed FX pair.",
+          "properties": {
+            "base": {
+              "$ref": "#/$defs/Currency",
+              "description": "Base currency strengthened or weakened by the operation."
+            },
+            "kind": {
+              "const": "fx",
+              "type": "string"
+            },
+            "quote": {
+              "$ref": "#/$defs/Currency",
+              "description": "Quote currency used for the shocked rate."
+            }
+          },
+          "required": [
+            "kind",
+            "base",
+            "quote"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ScenarioPnl": {
+      "description": "Scenario-attributable profit and loss, in the portfolio base currency.\n\nProduced by [`scenario_pnl`] as the difference between the stressed and the\nunstressed [`PortfolioValuation`](crate::valuation::PortfolioValuation).\nEvery amount is a [`Money`] in the portfolio's base currency — the\ncomputation never leaves `Money`, so the Decimal rounding contract of\n[`crate::valuation::value_portfolio`] carries through to the P&L unchanged.\n\n# Reconciliation\n\n`by_position` sums to `total` in the base currency: both sides are derived\nfrom the same per-position `value_base` amounts, so a desk-style\n\"does the drill-down foot to the headline\" check passes.\n\n# Ordering\n\n`by_position` is deterministically ordered: positions present in the\nstressed valuation come first, in stressed-valuation order, followed by any\nposition that only exists in the base valuation, in base-valuation order.",
+      "properties": {
+        "by_position": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "description": "Per-position scenario P&L in the portfolio base currency.",
+          "type": "object"
+        },
+        "total": {
+          "$ref": "#/$defs/Money",
+          "description": "Total scenario P&L in the portfolio base currency\n(`stressed.total_base_currency - base.total_base_currency`)."
+        }
+      },
+      "required": [
+        "total",
+        "by_position"
+      ],
+      "type": "object"
+    },
+    "ScenarioRevalueView": {
+      "description": "Scenario-and-revalue view returned by binding surfaces.\n\nThis pre-1.0 API intentionally has no alias under its former\npersistence-implying name:\n\n```compile_fail\nuse finstack_quant_portfolio::scenarios::ScenarioRevalueEnvelope;\n```",
+      "properties": {
+        "report": {
+          "$ref": "#/$defs/ApplicationReport",
+          "description": "Scenario application report."
+        },
+        "valuation": {
+          "$ref": "#/$defs/PortfolioValuation",
+          "description": "Stressed portfolio valuation."
+        }
+      },
+      "required": [
+        "valuation",
+        "report"
+      ],
+      "type": "object"
+    },
+    "SensitivityBucket": {
+      "description": "One tenor bucket of a key-rate [`SensitivityStep`].\n\nThe bucket's first-order P&L is `sensitivity × market_move`; the bucket\nproducts of one step sum to that step's `explained_pnl`.",
+      "properties": {
+        "market_move": {
+          "description": "Observed T₀ → T₁ market move at this tenor, in the step's `move_unit`.",
+          "format": "double",
+          "type": "number"
+        },
+        "sensitivity": {
+          "$ref": "#/$defs/Money",
+          "description": "Bucket sensitivity: currency amount per one unit of the step's\n`move_unit` (per basis point for key-rate DV01 / CS01)."
+        },
+        "tenor_years": {
+          "description": "Bucket tenor in years from the T₀ curve base date.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "tenor_years",
+        "sensitivity",
+        "market_move"
+      ],
+      "type": "object"
+    },
+    "SensitivityStep": {
+      "description": "The working behind one factor of a sensitivity-based (Taylor or\nmetrics-based) attribution.\n\nRows are stored on [`crate::PnlAttribution::sensitivity_steps`] in the\norder the method computed them. A row's contribution to its factor bucket\nis `explained_pnl + gamma_pnl`. Exactly one of four shapes applies:\n\n- **Scalar** (`sensitivity` and `market_move` present, `buckets` empty):\n  `explained_pnl = sensitivity × market_move`.\n- **Key-rate** (`buckets` non-empty): `explained_pnl = Σ bucket\n  sensitivity × bucket market_move`.\n- **Second-order only** (`market_move` present, no `sensitivity`, no\n  `buckets`): `explained_pnl` is zero and `gamma_pnl` is the second-order\n  term the metrics-based method computed from the T₀ convexity / gamma\n  metric of the supplied valuation and this `market_move`.\n- **Repriced** (`repriced_pv` present): the factor was isolated by a full\n  reprice instead of a sensitivity. For the Taylor `Theta` row\n  `repriced_pv` is the value at the T₁ date on the T₀ market and\n  `explained_pnl = (repriced_pv − pv_t0) + period cash receipts`. For every\n  other repriced row `repriced_pv` is the T₁ value with that factor\n  restored to its T₀ state and `explained_pnl = pv_t1 − repriced_pv`.\n\nWhen a sensitivity or move is not finite the working is omitted (the row\nkeeps only `factor`, `explained_pnl` and `gamma_pnl`), a note records it\nand the attribution is flagged invalid.\n\nAfter a target-currency translation every amount on a row is converted at\nT₁ FX, so these identities still hold with one substitution: in the\n`Theta` identity `pv_t0 + fx_translation_pnl` stands in for `pv_t0`\n(which is converted at T₀ FX).\n\n# Factor labels\n\n| Method | Labels | Bucket |\n|---|---|---|\n| Taylor | `Rates:{curve}`, `Forward:{curve}` | `rates_curves_pnl` |\n| Taylor | `Credit:{curve}` | `credit_curves_pnl` |\n| Taylor | `Vol:{surface}`, `Vol:scalars` | `vol_pnl` |\n| Taylor | `Fx`, `Inflation`, `Correlations`, `MarketScalars`, `ModelParameters` | the bucket of the same name |\n| Taylor | `Theta` | `carry` |\n| Metrics-based | `Rates:{curve}`, `Rates`, `RatesConvexity` | `rates_curves_pnl` |\n| Metrics-based | `Credit:{curve}`, `Credit`, `CreditGamma` | `credit_curves_pnl` |\n| Metrics-based | `Vol`, `Volga` | `vol_pnl` |\n| Metrics-based | `Fx` | `fx_pnl` |\n| Metrics-based | `Spot`, `SpotGamma` | `market_scalars_pnl` |\n| Metrics-based | `Inflation`, `InflationConvexity` | `inflation_curves_pnl` |\n| Metrics-based | `ModelParameters` | `model_params_pnl` |\n\nA label without a curve id (`Rates`, `Credit`) is the aggregate fallback:\none parallel sensitivity times the average move across the instrument's\ncurves.",
+      "properties": {
+        "buckets": {
+          "description": "Per-tenor sensitivities and moves for key-rate factors; empty\notherwise.",
+          "items": {
+            "$ref": "#/$defs/SensitivityBucket"
+          },
+          "type": "array"
+        },
+        "explained_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "First-order (or fully repriced) P&L of this factor, in the attribution\ncurrency."
+        },
+        "factor": {
+          "description": "Factor label, including its market-data id where one applies\n(`\"Rates:USD-OIS\"`, `\"Credit:ACME-HZD\"`, `\"Vol:SPX\"`, `\"Fx\"`,\n`\"Theta\"`).",
+          "type": "string"
+        },
+        "gamma_pnl": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Second-order (gamma / convexity / volga) P&L of this factor, in the\nattribution currency. Absent when no second-order term was computed."
+        },
+        "market_move": {
+          "description": "Observed T₀ → T₁ market move in `move_unit`. For a second-order-only\nrow this is the (averaged) move the convexity term was applied to.\nAbsent for key-rate and repriced rows.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "move_unit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MoveUnit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Unit of `market_move` and of the sensitivity denominator: basis points\nfor rates, credit and inflation rows, volatility points\nfor volatility rows, percent for the metrics-based `Fx` row and price\nunits for `Spot` rows. Absent for repriced rows."
+        },
+        "repriced_pv": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Repriced present value used to isolate this factor, in the attribution\ncurrency. Absent for sensitivity rows."
+        },
+        "sensitivity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Scalar sensitivity: currency amount per one `move_unit`. Absent for\nkey-rate and repriced rows."
+        }
+      },
+      "required": [
+        "factor",
+        "explained_pnl"
+      ],
+      "type": "object"
+    },
+    "ShockMagnitude": {
+      "description": "Size and shape of one applied shock.\n\nSizes are the shock as requested on the (hierarchy-expanded) operation, in\nthat operation's own quote space, with the resolved location where the\nengine produced one. Delivery adjustments that change how the request\nreaches the market object — interpolation splits across neighbouring\nknots, solve-to-par recalibration, first-order hazard shifts, clamping —\nare reported in [`ApplicationReport::warnings`], not here.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "One size applied to the whole target: a parallel curve or surface\nshift, or the shock to a scalar price, an FX rate or a set of\ninstruments.",
+          "properties": {
+            "kind": {
+              "const": "uniform",
+              "type": "string"
+            },
+            "unit": {
+              "$ref": "#/$defs/ShockUnit",
+              "description": "Unit of `value`."
+            },
+            "value": {
+              "description": "Shock size in `unit`.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "value",
+            "unit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Triangular key-rate bump centred on one curve knot, emitted once per\nresolved knot of a discount or inflation curve node shock.",
+          "properties": {
+            "kind": {
+              "const": "key_rate",
+              "type": "string"
+            },
+            "time_years": {
+              "description": "Knot time the bump is centred on, in years on the curve's own time\naxis.",
+              "format": "double",
+              "type": "number"
+            },
+            "unit": {
+              "$ref": "#/$defs/ShockUnit",
+              "description": "Unit of `value`."
+            },
+            "value": {
+              "description": "Bump size delivered at that knot, in `unit`. For an off-knot tenor\nmatched by interpolation this is the knot's calibrated share of\nthe requested shock.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "time_years",
+            "value",
+            "unit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Node shocks delivered by rebuilding the curve in one step (forward,\npar-CDS, commodity and volatility-index node shocks). Lists the nodes\nas requested; the rebuilt curve is not echoed.",
+          "properties": {
+            "kind": {
+              "const": "nodes",
+              "type": "string"
+            },
+            "nodes": {
+              "description": "Requested `(tenor, size)` nodes in operation order.",
+              "items": {
+                "$ref": "#/$defs/ShockNode"
+              },
+              "type": "array"
+            },
+            "unit": {
+              "$ref": "#/$defs/ShockUnit",
+              "description": "Unit of every node `value`."
+            }
+          },
+          "required": [
+            "kind",
+            "nodes",
+            "unit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Volatility-surface bucket shock.",
+          "properties": {
+            "expiries_years": {
+              "description": "Surface grid expiries the shock was restricted to, in years, after\nsnapping the requested tenors to the grid. Absent when every\nexpiry is shocked.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "kind": {
+              "const": "vol_bucket",
+              "type": "string"
+            },
+            "strikes": {
+              "description": "Strikes the shock was restricted to. Absent when every strike is\nshocked.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "unit": {
+              "$ref": "#/$defs/ShockUnit",
+              "description": "Unit of `value`."
+            },
+            "value": {
+              "description": "Shock size in `unit`.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "value",
+            "unit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Base-correlation shock restricted to detachment points.",
+          "properties": {
+            "detachments_bp": {
+              "description": "Detachment points the shock was restricted to, in basis points\n(`300` = 3%), as supplied on the operation.",
+              "items": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "const": "detachment_bucket",
+              "type": "string"
+            },
+            "unit": {
+              "$ref": "#/$defs/ShockUnit",
+              "description": "Unit of `value`."
+            },
+            "value": {
+              "description": "Shock size in `unit`.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "detachments_bp",
+            "value",
+            "unit"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ShockNode": {
+      "additionalProperties": false,
+      "description": "One requested curve-node shock, as written on the operation.",
+      "properties": {
+        "tenor": {
+          "description": "Tenor label of the node as supplied on the operation (for example `\"5Y\"`).",
+          "type": "string"
+        },
+        "value": {
+          "description": "Shock size requested at that tenor, in the enclosing\n[`ShockMagnitude::Nodes`] unit.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "tenor",
+        "value"
+      ],
+      "type": "object"
+    },
+    "ShockUnit": {
+      "description": "Unit in which an applied shock's size is expressed.",
+      "oneOf": [
+        {
+          "const": "bp",
+          "description": "Additive basis points of a rate or spread (`1.0` = 0.0001 in decimal\nrate space).",
+          "type": "string"
+        },
+        {
+          "const": "percent",
+          "description": "Relative change in percent of the current level (`5.0` = +5%).",
+          "type": "string"
+        },
+        {
+          "const": "absolute",
+          "description": "Additive change in the target's own quote units: volatility-index\npoints for a volatility-index curve, decimal correlation for base\ncorrelation and structured-credit correlations (`0.02` = +0.02).",
+          "type": "string"
+        }
+      ]
+    },
+    "SourceLine": {
+      "additionalProperties": false,
+      "description": "One source-line of carry, optionally split into rates / credit components.\n\nUsed for `CarryDetail.coupon_income` and `CarryDetail.roll_down`. When no\n`CreditFactorModel` is supplied to attribution, `rates_part` and\n`credit_part` are both `None` and `total` carries the canonical scalar\nvalue. When a model is supplied, the two parts sum to `total` at\n1e-8 absolute tolerance.",
+      "properties": {
+        "credit_part": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Credit-only contribution (populated only when a credit factor model\ndrove the split)."
+        },
+        "rates_part": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rates-only contribution (populated only when a credit factor model\ndrove the split)."
+        },
+        "total": {
+          "$ref": "#/$defs/Money",
+          "description": "Total signed amount for this line (always populated)."
+        }
+      },
+      "required": [
+        "total"
+      ],
+      "type": "object"
+    },
+    "TaylorAttributionConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for Taylor-based P&L attribution.",
+      "properties": {
+        "credit_spread_bump_bp": {
+          "default": 1.0,
+          "description": "Credit spread bump size for CS01 computation (basis points).",
+          "format": "double",
+          "type": "number"
+        },
+        "include_gamma": {
+          "default": false,
+          "description": "Include second-order (gamma/convexity) terms.",
+          "type": "boolean"
+        },
+        "rate_bump_bp": {
+          "default": 1.0,
+          "description": "Rate bump size for DV01 computation (basis points).",
+          "format": "double",
+          "type": "number"
+        },
+        "vol_bump": {
+          "default": 0.01,
+          "description": "Vol bump size for vega computation (absolute vol points, e.g. 0.01 = 1%).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "ToleranceConfig": {
+      "additionalProperties": false,
+      "description": "Numerical tolerance configuration for floating-point comparisons.\n\nProvides the configurable epsilon for generic floating-point zero-checks.\nThe default is chosen to balance numerical stability with practical\nprecision requirements.\n\n# Examples\n```rust\nuse finstack_quant_core::config::ToleranceConfig;\n\nlet mut tol = ToleranceConfig::default();\nassert_eq!(tol.generic_epsilon, 1e-10);\n\n// Customize for stricter comparisons\ntol.generic_epsilon = 1e-12;\n```",
+      "properties": {
+        "generic_epsilon": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "default": 1e-10,
+          "description": "Epsilon for generic floating-point comparisons (default: 1e-10).\n\nUsed for general numerical comparisons where higher tolerance is acceptable."
+        }
+      },
+      "type": "object"
+    },
+    "VolAttribution": {
+      "description": "Detailed attribution for implied volatility changes.\n\nProvides per-surface breakdown.",
+      "properties": {
+        "by_surface": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "description": "P&L by volatility surface ID.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "by_surface"
+      ],
+      "type": "object"
+    },
+    "Warning": {
+      "description": "A single warning emitted by an adapter, the engine, or a downstream helper.\n\nNew variants will be added over time; pattern matches on `Warning` should\nalways include a wildcard arm.",
+      "oneOf": [
+        {
+          "description": "A discount curve was resolved heuristically (currency-prefix or single-\ncurve fallback) instead of via an explicit `discount_curve_id`.",
+          "properties": {
+            "chosen_discount": {
+              "description": "The discount curve selected by the heuristic.",
+              "type": "string"
+            },
+            "for_curve": {
+              "description": "Curve identifier the heuristic was applied to.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "discount_curve_heuristic",
+              "type": "string"
+            },
+            "reason": {
+              "description": "Reason text describing the heuristic path.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "for_curve",
+            "chosen_discount",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Equity identifier was missing from the market context; no bump applied.",
+          "properties": {
+            "id": {
+              "description": "Equity price identifier.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "equity_not_found",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Rate binding produced no statement update because the target node has\nno explicit forecast values.",
+          "properties": {
+            "curve_id": {
+              "description": "Curve identifier from which the rate would have been extracted.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "rate_binding_no_forecast_values",
+              "type": "string"
+            },
+            "node_id": {
+              "description": "Statement node identifier.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "node_id",
+            "curve_id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Rate binding evaluation failed.",
+          "properties": {
+            "curve_id": {
+              "description": "Curve identifier.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "rate_binding_failed",
+              "type": "string"
+            },
+            "node_id": {
+              "description": "Statement node identifier.",
+              "type": "string"
+            },
+            "reason": {
+              "description": "Underlying error message.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "node_id",
+            "curve_id",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Statement node had no forecast values to modify.",
+          "properties": {
+            "kind": {
+              "const": "statement_node_no_values",
+              "type": "string"
+            },
+            "node_id": {
+              "description": "Statement node identifier.",
+              "type": "string"
+            },
+            "op": {
+              "description": "Operation that was attempted (e.g. `\"forecast_percent\"`).",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "node_id",
+            "op"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Statement operation failed.",
+          "properties": {
+            "kind": {
+              "const": "statement_op_failed",
+              "type": "string"
+            },
+            "node_id": {
+              "description": "Statement node identifier.",
+              "type": "string"
+            },
+            "op": {
+              "description": "Operation name.",
+              "type": "string"
+            },
+            "reason": {
+              "description": "Underlying error message.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "node_id",
+            "op",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Model evaluator emitted a warning during re-evaluation.",
+          "properties": {
+            "detail": {
+              "description": "Free-text detail from the evaluator (already includes context).",
+              "type": "string"
+            },
+            "kind": {
+              "const": "model_evaluation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "detail"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Model re-evaluation failed.",
+          "properties": {
+            "kind": {
+              "const": "model_reevaluation_failed",
+              "type": "string"
+            },
+            "reason": {
+              "description": "Underlying error message.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "FX shock left a non-pivot direct quote inconsistent with the pivot-\ntriangulated cross.",
+          "properties": {
+            "detail": {
+              "description": "Free-text detail naming the inconsistent pair and computed values.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "fx_triangulation_inconsistent",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "detail"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Instrument shock fell back to attribute metadata because no pricing\noverride was exposed by the instrument's pricer.",
+          "properties": {
+            "inst_type": {
+              "$ref": "#/$defs/InstrumentType",
+              "description": "Canonical instrument type that could not apply the shock directly."
+            },
+            "kind": {
+              "const": "instrument_shock_fallback",
+              "type": "string"
+            },
+            "label": {
+              "description": "Instrument label (id / name / unidentified).",
+              "type": "string"
+            },
+            "shock_kind": {
+              "description": "Whether the shock is a price (`\"price\"`) or spread (`\"spread\"`).",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "shock_kind",
+            "inst_type",
+            "label"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Instrument shock found no instruments matching the filter.",
+          "properties": {
+            "filter_desc": {
+              "description": "Free-text description of the filter (e.g. `IndexMap` debug form).",
+              "type": "string"
+            },
+            "kind": {
+              "const": "instrument_shock_no_match",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "filter_desc"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Correlation shock found no `StructuredCredit` instruments with a\ncorrelation structure.",
+          "properties": {
+            "kind": {
+              "const": "correlation_shock_no_match",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Correlation bump clamped one or more correlation parameters.",
+          "properties": {
+            "detail": {
+              "description": "Detail string describing what was clamped.",
+              "type": "string"
+            },
+            "instrument_id": {
+              "description": "Instrument identifier.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "correlation_clamped",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "instrument_id",
+            "detail"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A shock targeting a curve node by tenor had to extrapolate beyond the\ncurve's pillar range.",
+          "properties": {
+            "curve_id": {
+              "description": "Curve identifier.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Free-text describing the tenor and the gap.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "tenor_extrapolated",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "curve_id",
+            "detail"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An interpolated node bump split its shock across two pillars of a\npar-CDS curve that is rebuilt by solve-to-par recalibration. On that\npath the 1/Σw² delivery correction is only first-order — the weighted\ntargets are snapped to the nearest calibration quotes before\nre-solving, so the realized shock at the requested tenor may differ\nfrom the requested size. Direct-shift curves (discount, inflation,\nforward, commodity) calibrate onto the native interpolant and do not\nemit this warning. Use `TenorMatchMode::Exact` at pillar tenors for\npillar-accurate par-CDS bucket risk.",
+          "properties": {
+            "curve_id": {
+              "description": "Curve identifier.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Free-text describing the tenor and adjacent pillars.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "interpolated_node_bump_first_order",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "curve_id",
+            "detail"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Vol-surface bucket shock selected zero grid points (no-op).",
+          "properties": {
+            "kind": {
+              "const": "vol_surface_bucket_empty_selection",
+              "type": "string"
+            },
+            "vol_surface_id": {
+              "description": "Volatility-surface identifier.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "vol_surface_id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An instrument's valuation failed while computing carry during a\n`TimeRollForward` operation. The instrument is excluded from the\nroll-forward carry aggregation but the roll itself proceeds.",
+          "properties": {
+            "instrument_id": {
+              "description": "Instrument identifier.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "time_roll_instrument_failed",
+              "type": "string"
+            },
+            "reason": {
+              "description": "Underlying valuation error message.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "instrument_id",
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "WaterfallStep": {
+      "description": "One sequential repricing step of a waterfall attribution.\n\nRows are stored on [`crate::PnlAttribution::waterfall_steps`] in the order\nthe waterfall applied them, so the present values chain:\n`steps[0].pv_before` is the opening value, each `pv_after` is the next\nrow's `pv_before`, and the last `pv_after` is the value with every listed\nfactor moved to T₁.\n\n`step_pnl == pv_after − pv_before` for every row. The factor bucket on\n[`crate::PnlAttribution`] equals `step_pnl`, except\n[`AttributionFactor::Carry`]: the `carry` bucket is the carry row's\n`step_pnl` plus the period cash receipts (`total_pnl −\nmark_to_market_pnl`).\n\nA factor the instrument does not use is not repriced and appears with\n`pv_after == pv_before`. When a credit-factor model replaces the single\ncredit step with a hierarchy cascade, the cascade is one\n[`AttributionFactor::CreditCurves`] row spanning all of its sub-steps; the\nper-level amounts are in `credit_factor_detail`.",
+      "properties": {
+        "factor": {
+          "$ref": "#/$defs/AttributionFactor",
+          "description": "Factor moved from its T₀ state to its T₁ state in this step."
+        },
+        "pv_after": {
+          "$ref": "#/$defs/Money",
+          "description": "Running present value after this step, in the attribution currency."
+        },
+        "pv_before": {
+          "$ref": "#/$defs/Money",
+          "description": "Running present value before this step, in the attribution currency."
+        },
+        "step_index": {
+          "description": "Zero-based position of this step in the applied factor order.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "step_pnl": {
+          "$ref": "#/$defs/Money",
+          "description": "P&L of this step, `pv_after − pv_before`, in the attribution currency."
+        }
+      },
+      "required": [
+        "step_index",
+        "factor",
+        "pv_before",
+        "pv_after",
+        "step_pnl"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_attribution_view.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Ordered portfolio scenario attribution and stressed revaluation.",
+  "examples": [
+    {
+      "contract_pnl": {
+        "by_position": {},
+        "total": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      },
+      "mark_pnl": {
+        "by_position": {},
+        "total": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      },
+      "market_attribution": {
+        "by_position": {},
+        "carry": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "correlations_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "credit_curves_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "cross_factor_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "fx_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "fx_translation_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "inflation_curves_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "market_scalars_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "model_params_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "rates_curves_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "residual": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "result_invalid": false,
+        "total_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "vol_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      },
+      "revaluation": {
+        "report": {
+          "changes": {
+            "all_dirty": false,
+            "as_of_changed": false,
+            "changed_instrument_indices": [],
+            "market_targets": [],
+            "portfolio_shape_changed": false
+          },
+          "expanded_operations": 0,
+          "meta": {
+            "fx_policy_applied": null,
+            "numeric_mode": "f64",
+            "rounding": {
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "version": "0.11.0"
+          },
+          "operations_applied": 0,
+          "user_operations": 0,
+          "warnings": []
+        },
+        "valuation": {
+          "as_of": "2025-01-02",
+          "by_entity": {},
+          "fx_collapse_policy": "cashflow_date",
+          "position_values": {},
+          "total_base_currency": {
+            "amount": "0",
+            "currency": "USD"
+          }
+        }
+      },
+      "total_pnl": {
+        "amount": "0",
+        "currency": "USD"
+      }
+    }
+  ],
+  "properties": {
+    "contract_pnl": {
+      "$ref": "#/$defs/ScenarioPnl",
+      "description": "Incremental mark from changes to the positions or contracts, measured on the stressed market."
+    },
+    "mark_pnl": {
+      "$ref": "#/$defs/ScenarioPnl",
+      "description": "Change in marked PV from opening to the fully stressed portfolio."
+    },
+    "market_attribution": {
+      "$ref": "#/$defs/PortfolioAttribution",
+      "description": "Factor attribution of the original contracts on the stressed market and date."
+    },
+    "revaluation": {
+      "$ref": "#/$defs/ScenarioRevalueView",
+      "description": "Stressed portfolio valuation and complete scenario application report."
+    },
+    "total_pnl": {
+      "$ref": "#/$defs/Money",
+      "description": "Economic attribution including the selected market method's carry and the contract change."
+    }
+  },
+  "required": [
+    "revaluation",
+    "market_attribution",
+    "contract_pnl",
+    "mark_pnl",
+    "total_pnl"
+  ],
+  "title": "ScenarioAttributionView",
+  "type": "object"
+}

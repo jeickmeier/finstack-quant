@@ -22,6 +22,8 @@ True
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import datetime
 from typing import Any
 
@@ -35,12 +37,15 @@ from finstack_quant.valuations import instruments as instruments
 from finstack_quant.valuations import market as market
 from finstack_quant.valuations import schema as schema
 
+from finstack_quant.valuations._margin import calculate_simm as calculate_simm
+
 __all__ = [
     "composite",
     "instruments",
     "market",
     "schema",
     "ValuationResult",
+    "calculate_simm",
 ]
 
 class ValuationResult:
@@ -553,6 +558,36 @@ class ValuationResult:
         ------
         ValueError
             If the result cannot be serialized into a pandas object.
+        """
+        ...
+
+    @staticmethod
+    def concat(results: Sequence[ValuationResult]) -> pd.DataFrame:
+        """Collect one wide row per result in input order.
+
+        Parameters
+        ----------
+        results : Sequence[ValuationResult]
+            Ordered typed result objects. Each row contains the valuation date, PV, currency and its computed measures. Metric columns appear in order of first occurrence; missing measures are null.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Wide frame in the to_dataframe column order. An empty sequence
+            returns a zero-row frame with the standard identity columns.
+
+        Raises
+        ------
+        TypeError
+            If the input is not a sequence of typed results.
+        ValueError
+            If a result cannot be projected as a wide row.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations import ValuationResult
+        >>> ValuationResult.concat([]).empty
+        True
         """
         ...
 

@@ -240,14 +240,16 @@ class TestModelBuilderCapitalStructure:
         model = b.build()
         assert '"TL-A"' in model.to_json()
 
-    def test_reporting_currency_and_fx_policy(self, usd: Currency) -> None:
+    def test_reporting_currency_and_fx_policy(self) -> None:
         b = statements.ModelBuilder("deal")
-        b.reporting_currency(usd)
+        assert b.currency("EUR") is b
+        b.reporting_currency("USD")
         b.fx_policy("period_end")
         b.periods("2025Q1..Q1", None)
         b.value("x", [("2025Q1", 1.0)])
         b.add_debt("T", _debt_envelope_json("T"))
         js = b.build().to_json()
+        assert json.loads(js)["meta"]["currency"] == "EUR"
         assert '"reporting_currency":"USD"' in js
         assert '"fx_policy":"period_end"' in js
 
@@ -335,7 +337,7 @@ class TestModelBuilderForecasts:
         b.value("cogs", [("2025Q1", 40.0)])
         b.compute("bonus", "revenue * 0.01")
         b.where_clause("bonus", "revenue > 50")
-        b.with_meta("source", '{"system":"unit-test"}')
+        b.with_meta("source", {"system": "unit-test"})
         b.add_metric_from_registry("fin.gross_profit", statements.Registry.with_builtins())
         model = b.build()
         assert model.has_node("fin.gross_profit")

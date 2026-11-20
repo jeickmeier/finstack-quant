@@ -454,8 +454,8 @@ fn require_zero_shock_identity(
     expected: &HazardCurve,
     replayed: &HazardCurve,
 ) -> finstack_quant_core::Result<()> {
-    let expected_knots: Vec<_> = expected.knot_points().collect();
-    let replayed_knots: Vec<_> = replayed.knot_points().collect();
+    let expected_knots: Vec<_> = expected.iter_knots().collect();
+    let replayed_knots: Vec<_> = replayed.iter_knots().collect();
     let same_knots = expected_knots.len() == replayed_knots.len()
         && expected_knots.iter().zip(&replayed_knots).all(
             |((expected_t, expected_h), (replayed_t, replayed_h))| {
@@ -836,7 +836,7 @@ pub(crate) fn replay_hazard_at_horizon(
     let rebuilt = context.get_hazard(params.curve_id.as_str())?;
     // Requoting must retain the conditional survival economics, including the
     // intervals between pillars. Reject any material projection drift.
-    let times: Vec<f64> = rolled.knot_points().map(|(t, _)| t).collect();
+    let times: Vec<f64> = rolled.knots().to_vec();
     for t in times
         .iter()
         .copied()
@@ -1092,8 +1092,8 @@ mod tests {
                 assert_eq!(rebuilt.recovery_rate().to_bits(), recovery.to_bits());
                 assert_eq!(host.recovery_rate().to_bits(), recovery.to_bits());
                 assert_eq!(
-                    rebuilt.knot_points().collect::<Vec<_>>(),
-                    host.knot_points().collect::<Vec<_>>()
+                    rebuilt.iter_knots().collect::<Vec<_>>(),
+                    host.iter_knots().collect::<Vec<_>>()
                 );
                 let recipe = rebuilt.hazard_calibration().expect("rebuilt recipe");
                 assert_eq!(
@@ -1407,8 +1407,8 @@ mod tests {
         );
         assert_eq!(cache.sources.len(), 1);
         assert_ne!(
-            base.knot_points().collect::<Vec<_>>(),
-            shocked.knot_points().collect::<Vec<_>>()
+            base.iter_knots().collect::<Vec<_>>(),
+            shocked.iter_knots().collect::<Vec<_>>()
         );
         let wrong_identity = HazardParRecalibration {
             identity_context: Some(&changed),

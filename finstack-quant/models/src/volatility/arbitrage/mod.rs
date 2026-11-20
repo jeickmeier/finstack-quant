@@ -288,8 +288,8 @@ fn surface_from_rows(
 ///
 /// # Arguments
 ///
-/// * `strikes` - Strictly ordered strike grid shared by every volatility row.
 /// * `expiries` - Strictly ordered expiry times in years, one per row in `vols`.
+/// * `strikes` - Strictly ordered strike grid shared by every volatility row.
 /// * `vols` - Implied-volatility rows aligned with `expiries` and `strikes`.
 /// * `forward_prices` - One forward price to broadcast or one price per expiry.
 /// * `tolerance` - Non-negative numerical tolerance in total-variance units
@@ -299,8 +299,8 @@ fn surface_from_rows(
 /// Returns an error if the grid or forward vector is invalid, any forward is
 /// non-finite or non-positive, or tolerance is non-finite or negative.
 pub fn check_butterfly_grid(
-    strikes: &[f64],
     expiries: &[f64],
+    strikes: &[f64],
     vols: &[Vec<f64>],
     forward_prices: Vec<f64>,
     tolerance: f64,
@@ -319,8 +319,8 @@ pub fn check_butterfly_grid(
 ///
 /// # Arguments
 ///
-/// * `strikes` - Strictly ordered strike grid shared by every volatility row.
 /// * `expiries` - Strictly ordered expiry times in years, one per row in `vols`.
+/// * `strikes` - Strictly ordered strike grid shared by every volatility row.
 /// * `vols` - Implied-volatility rows aligned with `expiries` and `strikes`.
 /// * `forward_prices` - One forward price to broadcast or one price per expiry.
 /// * `tolerance` - Non-negative numerical tolerance in total-variance units
@@ -330,8 +330,8 @@ pub fn check_butterfly_grid(
 /// Returns an error if the grid or forward vector is invalid, any forward is
 /// non-finite or non-positive, or tolerance is non-finite or negative.
 pub fn check_calendar_spread_grid(
-    strikes: &[f64],
     expiries: &[f64],
+    strikes: &[f64],
     vols: &[Vec<f64>],
     forward_prices: Vec<f64>,
     tolerance: f64,
@@ -353,8 +353,8 @@ pub fn check_calendar_spread_grid(
 ///
 /// # Arguments
 ///
-/// * `strikes` - Strictly ordered strike grid shared by every volatility row.
 /// * `expiries` - Strictly ordered expiry times in years, one per row in `vols`.
+/// * `strikes` - Strictly ordered strike grid shared by every volatility row.
 /// * `vols` - Implied-volatility rows aligned with `expiries` and `strikes`.
 /// * `forward_prices` - One finite positive forward price for every expiry, in the same
 ///   order as `expiries`.
@@ -363,8 +363,8 @@ pub fn check_calendar_spread_grid(
 /// Returns an error if the volatility grid is invalid or the forward vector
 /// length does not match the expiry count, or any forward is non-finite or non-positive.
 pub fn check_local_vol_density_grid(
-    strikes: &[f64],
     expiries: &[f64],
+    strikes: &[f64],
     vols: &[Vec<f64>],
     forward_prices: Vec<f64>,
 ) -> finstack_quant_core::Result<Vec<ArbitrageViolation>> {
@@ -391,8 +391,8 @@ pub fn check_local_vol_density_grid(
 ///
 /// # Arguments
 ///
-/// * `strikes` - Strictly ordered strike grid shared by every volatility row.
 /// * `expiries` - Strictly ordered expiry times in years, one per row in `vols`.
+/// * `strikes` - Strictly ordered strike grid shared by every volatility row.
 /// * `vols` - Implied-volatility rows aligned with `expiries` and `strikes`.
 /// * `forward_prices` - One-value broadcast or one forward price per expiry.
 /// * `tolerance` - Non-negative numerical tolerance in total-variance units
@@ -402,8 +402,8 @@ pub fn check_local_vol_density_grid(
 /// Returns an error if the grid or forward vector is invalid, any forward is
 /// non-finite or non-positive, or tolerance is non-finite or negative.
 pub fn check_surface_grid(
-    strikes: &[f64],
     expiries: &[f64],
+    strikes: &[f64],
     vols: &[Vec<f64>],
     forward_prices: Vec<f64>,
     tolerance: f64,
@@ -519,8 +519,8 @@ mod tests {
         ];
 
         let report = check_surface_grid(
-            &strikes,
             &expiries,
+            &strikes,
             &vols,
             vec![100.0, 101.0, 102.0, 103.0],
             1e-6,
@@ -562,7 +562,7 @@ mod tests {
         ];
 
         let report =
-            check_surface_grid(&strikes, &expiries, &vols, vec![100.0, 101.0, 102.0], 1e-10)
+            check_surface_grid(&expiries, &strikes, &vols, vec![100.0, 101.0, 102.0], 1e-10)
                 .expect("grid arbitrage check");
 
         let local_vol_count = report

@@ -60,15 +60,18 @@ ContractLimitExceededError = _portfolio.ContractLimitExceededError
 
 Portfolio = _portfolio.Portfolio
 PortfolioBuilder = _portfolio.PortfolioBuilder
+Position = _portfolio.Position
 PositionValue = _portfolio.PositionValue
 ReconciliationReport = _portfolio.ReconciliationReport
 InstrumentArtifactCache = _portfolio.InstrumentArtifactCache
 MaterializationReport = _portfolio.MaterializationReport
 PortfolioValuation = _portfolio.PortfolioValuation
+ScenarioAttributionView = _portfolio.ScenarioAttributionView
 ScenarioPnl = _portfolio.ScenarioPnl
 ScenarioPnlBatchItem = _portfolio.ScenarioPnlBatchItem
 PortfolioResult = _portfolio.PortfolioResult
 PortfolioMetrics = _portfolio.PortfolioMetrics
+PortfolioCashflowPositionSummary = _portfolio.PortfolioCashflowPositionSummary
 PortfolioCashflows = _portfolio.PortfolioCashflows
 PortfolioAttribution = _portfolio.PortfolioAttribution
 
@@ -79,19 +82,31 @@ DurationCellTable = _portfolio.DurationCellTable
 ExcessReturnResult = _portfolio.ExcessReturnResult
 FactorBrinsonResult = _portfolio.FactorBrinsonResult
 FiAttributionResult = _portfolio.FiAttributionResult
+FiAttributionConfig = _portfolio.FiAttributionConfig
+FiPositionSnapshot = _portfolio.FiPositionSnapshot
+FiQuote = _portfolio.FiQuote
+FiQuoteLeg = _portfolio.FiQuoteLeg
+FiReportingBasis = _portfolio.FiReportingBasis
 FiCarinoLinkedResult = _portfolio.FiCarinoLinkedResult
 GridAttributionResult = _portfolio.GridAttributionResult
 GridCarinoLinkedResult = _portfolio.GridCarinoLinkedResult
 LinkedReturn = _portfolio.LinkedReturn
+ReplayConfig = _portfolio.ReplayConfig
 ReplayResult = _portfolio.ReplayResult
+ReplayStep = _portfolio.ReplayStep
+ReplaySummary = _portfolio.ReplaySummary
 WeightAllocationResult = _portfolio.WeightAllocationResult
+StrategyAllocationInput = _portfolio.StrategyAllocationInput
+WeightAllocationSpec = _portfolio.WeightAllocationSpec
 
 parse_portfolio_spec_json = _portfolio.parse_portfolio_spec_json
 aggregate_metrics = _portfolio.aggregate_metrics
 value_portfolio = _portfolio.value_portfolio
 aggregate_full_cashflows = _portfolio.aggregate_full_cashflows
 net_in_currency_by_date = _portfolio.net_in_currency_by_date
+ScenarioRevalueView = _portfolio.ScenarioRevalueView
 apply_scenario_and_revalue = _portfolio.apply_scenario_and_revalue
+attribute_scenario_pnl = _portfolio.attribute_scenario_pnl
 scenario_pnl = _portfolio.scenario_pnl
 scenario_pnl_batch = _portfolio.scenario_pnl_batch
 attribute_portfolio_pnl = _portfolio.attribute_portfolio_pnl
@@ -152,6 +167,20 @@ PortfolioOptimizationResult = _portfolio.PortfolioOptimizationResult
 CandidatePosition = _portfolio.CandidatePosition
 TradeUniverse = _portfolio.TradeUniverse
 NettingSetMargin = _portfolio.NettingSetMargin
+CsrQuoteClassification = _portfolio.CsrQuoteClassification
+CsrQuoteSource = _portfolio.CsrQuoteSource
+PortfolioFrtbConfig = _portfolio.PortfolioFrtbConfig
+PortfolioFrtbSensitivitiesResult = _portfolio.PortfolioFrtbSensitivitiesResult
+portfolio_frtb_sensitivities = _portfolio.portfolio_frtb_sensitivities
+ExposureCashVm = _portfolio.ExposureCashVm
+ExposureSimulationConfig = _portfolio.ExposureSimulationConfig
+instrument_exposure_profile = _portfolio.instrument_exposure_profile
+portfolio_exposure_profile = _portfolio.portfolio_exposure_profile
+CsrQuoteDelta = _portfolio.CsrQuoteDelta
+csr_quote_delta = _portfolio.csr_quote_delta
+GirrQuoteDelta = _portfolio.GirrQuoteDelta
+GirrQuoteTarget = _portfolio.GirrQuoteTarget
+girr_quote_delta = _portfolio.girr_quote_delta
 PortfolioMarginResult = _portfolio.PortfolioMarginResult
 portfolio_margin = _portfolio.portfolio_margin
 schema = _portfolio.schema
@@ -164,15 +193,27 @@ __all__ = [
     "ContractLimitExceededError",
     "ContractValidationError",
     "CreditVolReport",
+    "CsrQuoteClassification",
+    "CsrQuoteDelta",
+    "CsrQuoteSource",
     "DurationCellTable",
     "ExcessReturnResult",
+    "ExposureCashVm",
+    "ExposureSimulationConfig",
     "FactorAssignmentReport",
     "FactorBrinsonResult",
     "FactorContributionDelta",
     "FactorModel",
     "FactorPnlProfile",
+    "FiAttributionConfig",
     "FiAttributionResult",
     "FiCarinoLinkedResult",
+    "FiPositionSnapshot",
+    "FiQuote",
+    "FiQuoteLeg",
+    "FiReportingBasis",
+    "GirrQuoteDelta",
+    "GirrQuoteTarget",
     "GridAttributionResult",
     "GridCarinoLinkedResult",
     "Inequality",
@@ -191,8 +232,11 @@ __all__ = [
     "Portfolio",
     "PortfolioAttribution",
     "PortfolioBuilder",
+    "PortfolioCashflowPositionSummary",
     "PortfolioCashflows",
     "PortfolioError",
+    "PortfolioFrtbConfig",
+    "PortfolioFrtbSensitivitiesResult",
     "PortfolioMarginResult",
     "PortfolioMetrics",
     "PortfolioOptimizationResult",
@@ -200,15 +244,22 @@ __all__ = [
     "PortfolioPrimitiveExposureReport",
     "PortfolioResult",
     "PortfolioValuation",
+    "Position",
     "PositionAssignment",
     "PositionFilter",
     "PositionValue",
     "PositionVolContribution",
     "ReconciliationReport",
+    "ReplayConfig",
     "ReplayResult",
+    "ReplayStep",
+    "ReplaySummary",
+    "ScenarioAttributionView",
     "ScenarioPnl",
     "ScenarioPnlBatchItem",
+    "ScenarioRevalueView",
     "SensitivityMatrix",
+    "StrategyAllocationInput",
     "StressPnl",
     "StressResult",
     "TradeDirection",
@@ -218,6 +269,7 @@ __all__ = [
     "UnmatchedEntry",
     "UnsupportedContractVersionError",
     "WeightAllocationResult",
+    "WeightAllocationSpec",
     "WeightingScheme",
     "WhatIfResult",
     "aggregate_full_cashflows",
@@ -225,6 +277,7 @@ __all__ = [
     "allocate_weights",
     "apply_scenario_and_revalue",
     "attribute_portfolio_pnl",
+    "attribute_scenario_pnl",
     "brinson_fachler",
     "brinson_linked",
     "build_credit_vol_report",
@@ -235,14 +288,19 @@ __all__ = [
     "cell_returns_from_reference",
     "compute_factor_sensitivities",
     "compute_pnl_profiles",
+    "csr_quote_delta",
     "excess_returns",
     "factor_brinson_attribution",
+    "girr_quote_delta",
     "grid_attribution",
     "grid_carino_link",
+    "instrument_exposure_profile",
     "mwr_xirr",
     "net_in_currency_by_date",
     "optimize_portfolio",
     "parse_portfolio_spec_json",
+    "portfolio_exposure_profile",
+    "portfolio_frtb_sensitivities",
     "portfolio_margin",
     "primitive_exposures",
     "rebalance_from_spec",

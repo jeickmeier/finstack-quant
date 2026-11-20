@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corporate_analysis.schema.json",
-      "bytes": 37340,
+      "bytes": 36595,
       "kind": "output",
       "path": "schemas/statements_analytics/1/corporate_analysis.schema.json",
       "summary": "Unified analysis result combining statement, equity, and credit perspectives.",
@@ -83,12 +83,21 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corporate_analysis_options.schema.json",
-      "bytes": 55628,
+      "bytes": 55756,
       "kind": "input",
       "path": "schemas/statements_analytics/1/corporate_analysis_options.schema.json",
       "summary": "Optional DCF, coverage, check-suite, valuation-date and LTV settings of the corporate analysis pipeline.",
       "title": "CorporateAnalysisOptions",
       "type_name": "CorporateAnalysisOptions"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corporate_dcf_request.schema.json",
+      "bytes": 39159,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/corporate_dcf_request.schema.json",
+      "summary": "Named cash-flow and terminal assumptions on an explicit statement valuation cut.",
+      "title": "CorporateDcfRequest",
+      "type_name": "CorporateDcfRequest"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/coverage_floor_check.schema.json",
@@ -109,8 +118,62 @@
       "type_name": "CreditAssessment"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/credit_context_report.schema.json",
+      "bytes": 33352,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/credit_context_report.schema.json",
+      "summary": "Borrower credit observations and available minima on selected periods.",
+      "title": "CreditContextReport",
+      "type_name": "CreditContextReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/credit_context_spec.schema.json",
+      "bytes": 26304,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/credit_context_spec.schema.json",
+      "summary": "Explicit same-run borrowing, ratio selections and reference valuations.",
+      "title": "CreditContextSpec",
+      "type_name": "CreditContextSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/credit_scoring_model.schema.json",
+      "bytes": 23796,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/credit_scoring_model.schema.json",
+      "summary": "Elected statistical credit model and any matching market-equity observation.",
+      "title": "CreditScoringModel",
+      "type_name": "CreditScoringModel"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dated_lbo_request.schema.json",
+      "bytes": 58904,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/dated_lbo_request.schema.json",
+      "summary": "Acquisition and exit dates, recognized funding and projected exit assumptions.",
+      "title": "DatedLboRequest",
+      "type_name": "DatedLboRequest"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dated_lbo_result.schema.json",
+      "bytes": 45900,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/dated_lbo_result.schema.json",
+      "summary": "Reconciled sources and uses and qualified sponsor returns.",
+      "title": "DatedLboResult",
+      "type_name": "DatedLboResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_distribution_result.schema.json",
+      "bytes": 28469,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/dcf_distribution_result.schema.json",
+      "summary": "Coherent repriced Monte Carlo enterprise and equity values by path and quantile.",
+      "title": "DcfDistributionResult",
+      "type_name": "DcfDistributionResult"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_inputs.schema.json",
-      "bytes": 4243,
+      "bytes": 4381,
       "kind": "input",
       "path": "schemas/statements_analytics/1/dcf_inputs.schema.json",
       "summary": "Headline DCF assumptions: decimal WACC, terminal value, unlevered free cash flow node and optional net-debt override.",
@@ -127,6 +190,33 @@
       "type_name": "DcfOptions"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_projection.schema.json",
+      "bytes": 23934,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/dcf_projection.schema.json",
+      "summary": "Authored terminal horizon, cash-flow basis and optional forward remainder.",
+      "title": "DcfProjection",
+      "type_name": "DcfProjection"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_grid_result.schema.json",
+      "bytes": 25093,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/dcf_sensitivity_grid_result.schema.json",
+      "summary": "Rectangular enterprise-value results and unavailable endpoints.",
+      "title": "DcfSensitivityGridResult",
+      "type_name": "DcfSensitivityGridResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_grid_spec.schema.json",
+      "bytes": 838,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/dcf_sensitivity_grid_spec.schema.json",
+      "summary": "Ordered WACC and terminal parameter axes.",
+      "title": "DcfSensitivityGridSpec",
+      "type_name": "DcfSensitivityGridSpec"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
       "bytes": 24148,
       "kind": "output",
@@ -134,6 +224,24 @@
       "summary": "Enterprise-value tornado for the headline DCF assumptions.",
       "title": "DcfSensitivityResult",
       "type_name": "DcfSensitivityResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_shocks.schema.json",
+      "bytes": 4645,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/dcf_sensitivity_shocks.schema.json",
+      "summary": "Independent WACC and terminal value assumption shocks.",
+      "title": "DcfSensitivityShocks",
+      "type_name": "DcfSensitivityShocks"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_shock_report.schema.json",
+      "bytes": 24862,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/dcf_shock_report.schema.json",
+      "summary": "Ranked DCF sensitivity pairs preserving unavailable endpoints.",
+      "title": "DcfShockReport",
+      "type_name": "DcfShockReport"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dependency_tree.schema.json",
@@ -164,12 +272,30 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_config.schema.json",
-      "bytes": 13156,
+      "bytes": 12705,
       "kind": "input",
       "path": "schemas/statements_analytics/1/ecl_config.schema.json",
       "summary": "Configuration for ECL calculation.",
       "title": "EclConfig",
       "type_name": "EclConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_scenario.schema.json",
+      "bytes": 2023,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/ecl_scenario.schema.json",
+      "summary": "Named cumulative-PD and LGD assumptions with an exact scenario probability.",
+      "title": "EclScenario",
+      "type_name": "EclScenario"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_scenario_outcome.schema.json",
+      "bytes": 14130,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/ecl_scenario_outcome.schema.json",
+      "summary": "A scenario weight and its measured or unavailable allowance.",
+      "title": "EclScenarioOutcome",
+      "type_name": "EclScenarioOutcome"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/effective_tax_rate_check.schema.json",
@@ -218,7 +344,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/goal_seek_result.schema.json",
-      "bytes": 2424,
+      "bytes": 28751,
       "kind": "output",
       "path": "schemas/statements_analytics/1/goal_seek_result.schema.json",
       "summary": "Outcome of a `goal_seek` solve.",
@@ -227,7 +353,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/goal_seek_spec.schema.json",
-      "bytes": 2180,
+      "bytes": 27274,
       "kind": "input",
       "path": "schemas/statements_analytics/1/goal_seek_spec.schema.json",
       "summary": "Target node, period and value, driver node and period, model write-back flag and optional bracket of a `goal_seek` solve.",
@@ -244,6 +370,33 @@
       "type_name": "GrowthRateConsistency"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/impaired_ecl_result.schema.json",
+      "bytes": 41563,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/impaired_ecl_result.schema.json",
+      "summary": "Signed recovery shortfall and nonnegative credit-impaired allowance.",
+      "title": "ImpairedEclResult",
+      "type_name": "ImpairedEclResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/impaired_ecl_scenario.schema.json",
+      "bytes": 23126,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/impaired_ecl_scenario.schema.json",
+      "summary": "Exact scenario probability and its scoped dated expected recovery.",
+      "title": "ImpairedEclScenario",
+      "type_name": "ImpairedEclScenario"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/impaired_exposure.schema.json",
+      "bytes": 39173,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/impaired_exposure.schema.json",
+      "summary": "Sourced carrying exposure, qualified report date, original effective rate and clock.",
+      "title": "ImpairedExposure",
+      "type_name": "ImpairedExposure"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/interest_expense_reconciliation.schema.json",
       "bytes": 2939,
       "kind": "component",
@@ -254,7 +407,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json",
-      "bytes": 42410,
+      "bytes": 42596,
       "kind": "input",
       "path": "schemas/statements_analytics/1/lbo_config.schema.json",
       "summary": "Transaction assumptions for an LBO evaluation.",
@@ -262,8 +415,53 @@
       "type_name": "LboConfig"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_debt_funding.schema.json",
+      "bytes": 22166,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/lbo_debt_funding.schema.json",
+      "summary": "Actual closing proceeds and contractual opening face.",
+      "title": "LboDebtFunding",
+      "type_name": "LboDebtFunding"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_earnings.schema.json",
+      "bytes": 2185,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/lbo_earnings.schema.json",
+      "summary": "Matched earnings basis and purchase or exit multiple.",
+      "title": "LboEarnings",
+      "type_name": "LboEarnings"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_exit_bridge.schema.json",
+      "bytes": 22925,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/lbo_exit_bridge.schema.json",
+      "summary": "Signed exit equity and available sized and funded returns.",
+      "title": "LboExitBridge",
+      "type_name": "LboExitBridge"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_funding.schema.json",
+      "bytes": 25278,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/lbo_funding.schema.json",
+      "summary": "Dated closing cash sources and uses.",
+      "title": "LboFunding",
+      "type_name": "LboFunding"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_funding_result.schema.json",
+      "bytes": 22864,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/lbo_funding_result.schema.json",
+      "summary": "Reconciled funding gap and identified debt proportions.",
+      "title": "LboFundingResult",
+      "type_name": "LboFundingResult"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
-      "bytes": 39062,
+      "bytes": 39075,
       "kind": "output",
       "path": "schemas/statements_analytics/1/lbo_result.schema.json",
       "summary": "Outputs of an LBO evaluation.",
@@ -350,6 +548,15 @@
       "summary": "Rating-keyed map of cumulative PD curves.",
       "title": "RatingPdMap",
       "type_name": "RatingPdMap"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/recovery_evidence.schema.json",
+      "bytes": 22302,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/recovery_evidence.schema.json",
+      "summary": "Sourced expected recovery and dated receipt.",
+      "title": "RecoveryEvidence",
+      "type_name": "RecoveryEvidence"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/regression_result.schema.json",
@@ -460,6 +667,60 @@
       "type_name": "StageResult"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/statement_covenant_assessment.schema.json",
+      "bytes": 62628,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/statement_covenant_assessment.schema.json",
+      "summary": "Effective covenant terms and available evidence by dated period.",
+      "title": "StatementCovenantAssessment",
+      "type_name": "StatementCovenantAssessment"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/statement_covenant_forecast.schema.json",
+      "bytes": 65175,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/statement_covenant_forecast.schema.json",
+      "summary": "Qualified forecast, breach evidence and per-period coverage.",
+      "title": "StatementCovenantForecast",
+      "type_name": "StatementCovenantForecast"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/statement_covenant_spec.schema.json",
+      "bytes": 23350,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/statement_covenant_spec.schema.json",
+      "summary": "Named covenants, result periods, publication cutoff and units.",
+      "title": "StatementCovenantSpec",
+      "type_name": "StatementCovenantSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/statement_scoring_mapping.schema.json",
+      "bytes": 1966,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/statement_scoring_mapping.schema.json",
+      "summary": "Annual monetary statement sources for a canonical credit score.",
+      "title": "StatementScoringMapping",
+      "type_name": "StatementScoringMapping"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/statement_valuation_cut.schema.json",
+      "bytes": 20627,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/statement_valuation_cut.schema.json",
+      "summary": "Effective valuation and information dates and a reporting currency.",
+      "title": "StatementValuationCut",
+      "type_name": "StatementValuationCut"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/terminal_fcff_basis.schema.json",
+      "bytes": 22482,
+      "kind": "component",
+      "path": "schemas/statements_analytics/1/terminal_fcff_basis.schema.json",
+      "summary": "Explicit annual cash flow or the complete additive trailing forecast.",
+      "title": "TerminalFcffBasis",
+      "type_name": "TerminalFcffBasis"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/trend_check.schema.json",
       "bytes": 3578,
       "kind": "component",
@@ -479,7 +740,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/wacc_inputs.schema.json",
-      "bytes": 1505,
+      "bytes": 2039,
       "kind": "input",
       "path": "schemas/statements_analytics/1/wacc_inputs.schema.json",
       "summary": "Capital-structure inputs of a weighted-average cost of capital calculation.",
@@ -488,12 +749,21 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/weighted_ecl_result.schema.json",
-      "bytes": 12356,
+      "bytes": 15665,
       "kind": "output",
       "path": "schemas/statements_analytics/1/weighted_ecl_result.schema.json",
       "summary": "Probability-weighted ECL across macro scenarios with the per-scenario audit trail.",
       "title": "WeightedEclResult",
       "type_name": "WeightedEclResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/weighted_impaired_ecl_result.schema.json",
+      "bytes": 44763,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/weighted_impaired_ecl_result.schema.json",
+      "summary": "Weighted impairment and dated recovery scenario contributions.",
+      "title": "WeightedImpairedEclResult",
+      "type_name": "WeightedImpairedEclResult"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/working_capital_consistency.schema.json",

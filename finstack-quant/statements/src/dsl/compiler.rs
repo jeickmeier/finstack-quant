@@ -57,6 +57,15 @@ fn lower(ast: &StmtExpr) -> Result<Expr> {
         )),
         StmtExpr::BinOp { op, left, right } => Ok(Expr::bin_op(*op, lower(left)?, lower(right)?)),
         StmtExpr::UnaryOp { op, operand } => Ok(Expr::unary_op(*op, lower(operand)?)),
+        StmtExpr::AsMoney { value, currency } => Ok(Expr::bin_op(
+            BinOp::Mul,
+            lower(value)?,
+            Expr {
+                node: finstack_quant_core::expr::ExprNode::MoneyLiteral(
+                    finstack_quant_core::money::Money::from((1_i64, *currency)),
+                ),
+            },
+        )),
         StmtExpr::Call { func, args } => {
             let signature = FunctionSignature::lookup(func).ok_or_else(|| {
                 crate::error::Error::eval(format!("Function '{func}' is not supported"))
@@ -190,8 +199,8 @@ pub(crate) fn check_capital_references(
             }
         }
         StmtExpr::Literal(_) | StmtExpr::NodeRef(_) => Ok(()),
-        StmtExpr::UnaryOp { operand, .. } => {
-            check_capital_references(operand, context, has_capital_structure)
+        StmtExpr::AsMoney { value, .. } | StmtExpr::UnaryOp { operand: value, .. } => {
+            check_capital_references(value, context, has_capital_structure)
         }
         StmtExpr::BinOp { left, right, .. } => {
             check_capital_references(left, context, has_capital_structure)?;
@@ -247,6 +256,13 @@ impl UnitContext<'_> {
                 let right = self.infer(right)?;
                 self.bin_op(*op, left, right)
             }
+            StmtExpr::AsMoney { value, currency } => match self.infer(value)? {
+                Dimension::Scalar => Ok(Dimension::Monetary(*currency)),
+                Dimension::Unknown if self.provisional => Ok(Dimension::Monetary(*currency)),
+                _ => Err(crate::error::Error::build(
+                    "as_money requires a unitless scalar expression",
+                )),
+            },
             StmtExpr::Call { func, args } => self.call(func, args),
             StmtExpr::IfThenElse {
                 condition,

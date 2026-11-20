@@ -14,9 +14,7 @@ use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_m
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::fractional::HurstExponent;
 use finstack_quant_core::math::time_grid::TimeGrid;
-use finstack_quant_models::closed_form::{
-    HestonPricingParams, bs_price, heston_call_price_fourier,
-};
+use finstack_quant_models::closed_form::{bs_price, heston_call_price_fourier};
 use finstack_quant_models::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
 use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
 use finstack_quant_models::monte_carlo::discretization::rough_heston::RoughHestonHybrid;
@@ -36,6 +34,7 @@ use finstack_quant_models::monte_carlo::pricer::path_dependent::{
 };
 use finstack_quant_models::monte_carlo::process::gbm::{GbmParams, GbmProcess};
 use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
+use finstack_quant_models::monte_carlo::process::heston::HestonProcessParams;
 use finstack_quant_models::monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
 use finstack_quant_models::monte_carlo::process::rough_heston::{
     RoughHestonParams, RoughHestonProcess,
@@ -90,8 +89,16 @@ fn bench_european_pricer(c: &mut Criterion) {
         let checked = price();
         check_estimate(&checked, n, n);
         check_repeat(&checked, &price());
-        let reference = bs_price(100.0, 100.0, 0.05, 0.02, 0.20, 1.0, OptionType::Call)
-            .expect("valid Black-Scholes reference");
+        let reference = bs_price(&finstack_quant_models::types::OptionMarketParams {
+            spot: 100.0,
+            strike: 100.0,
+            rate: 0.05,
+            dividend_yield: 0.02,
+            volatility: 0.20,
+            time_to_expiry: 1.0,
+            option_type: OptionType::Call,
+        })
+        .expect("valid Black-Scholes reference");
         check_against_reference(&checked, reference, 1e-8);
         b.iter(price);
     });
@@ -178,7 +185,7 @@ fn bench_heston_qe_pricer(c: &mut Criterion) {
     group.throughput(Throughput::Elements(num_paths as u64));
     group.bench_with_input(BenchmarkId::new("paths", num_paths), &num_paths, |b, &n| {
         let params =
-            HestonPricingParams::new(0.03, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid Heston");
+            HestonProcessParams::new(0.03, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid Heston");
         let process = HestonProcess::new(params);
         let disc = QeHeston::new();
         let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
@@ -201,8 +208,22 @@ fn bench_heston_qe_pricer(c: &mut Criterion) {
         let checked = price();
         check_estimate(&checked, n, n);
         check_repeat(&checked, &price());
-        let reference = heston_call_price_fourier(100.0, 100.0, 1.0, &params, None)
-            .expect("converged Heston Fourier reference");
+        let reference = {
+            let dynamics = &params;
+            heston_call_price_fourier(
+                &finstack_quant_models::types::OptionContractParams {
+                    spot: 100.0,
+                    strike: 100.0,
+                    rate: dynamics.r,
+                    dividend_yield: dynamics.q,
+                    time_to_expiry: 1.0,
+                    option_type: finstack_quant_models::types::OptionType::Call,
+                },
+                &dynamics.model,
+                None,
+            )
+        }
+        .expect("converged Heston Fourier reference");
         // This is a 252-step QE smoke check, not a replacement for existing
         // finer-step martingale, convergence and Fourier accuracy tests.
         check_against_reference(&checked, reference, 0.05);
@@ -228,7 +249,7 @@ fn bench_rough_heston_step(c: &mut Criterion) {
                     v0: 0.04,
                     kappa: 2.0,
                     theta: 0.04,
-                    sigma_v: 0.3,
+                    vol_of_vol: 0.3,
                     rho: -0.7,
                 },
             });

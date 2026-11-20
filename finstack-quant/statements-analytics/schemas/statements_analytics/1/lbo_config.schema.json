@@ -1383,13 +1383,17 @@
       "description": "Optional mappings enabling the [`lbo_model_checks`] suite."
     },
     "entry_metric_node": {
-      "description": "Node id supplying the entry valuation metric (typically `\"ebitda\"`),\nread at the model's first period.",
+      "description": "Node id supplying the entry valuation metric (typically `\"ebitda\"`),\nread at the explicitly selected entry period.",
       "type": "string"
     },
     "entry_multiple": {
       "description": "Entry valuation multiple applied to `entry_metric_node`, e.g. `8.5`\nfor 8.5x EBITDA.",
       "format": "double",
       "type": "number"
+    },
+    "entry_period": {
+      "$ref": "#/$defs/PeriodId",
+      "description": "Explicit statement observation period used to size the acquisition."
     },
     "exit_metric_node": {
       "description": "Node id supplying the exit valuation metric, read at `exit_period`.",
@@ -1424,6 +1428,7 @@
   "required": [
     "entry_multiple",
     "entry_metric_node",
+    "entry_period",
     "transaction_fees",
     "sources",
     "exit_multiple",

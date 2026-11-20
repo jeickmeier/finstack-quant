@@ -299,7 +299,7 @@ pub(crate) fn measure_hazard_intensity_shift_bp(
     market_t1: &MarketContext,
 ) -> Result<f64> {
     let h0 = market_t0.get_hazard(curve_id)?;
-    let times: Vec<f64> = h0.knot_points().map(|(t, _)| t).collect();
+    let times: Vec<f64> = h0.knots().to_vec();
     let diff = measure_hazard_intensity_diff(
         &HazardDiffQuery::new(curve_id, &times, HazardDiffScale::IntensityBp),
         market_t0,

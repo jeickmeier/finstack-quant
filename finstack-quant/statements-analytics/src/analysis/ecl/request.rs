@@ -1,10 +1,9 @@
 //! Canonical request surfaces for simplified ECL staging and calculation.
 
-use finstack_quant_core::{Error, Result};
+use finstack_quant_core::{Error, Result, wire::DecimalWire};
+use serde::{Deserialize, Serialize};
 
-use super::engine::{
-    EclConfigBuilder, MacroScenario, WeightedEclResult, compute_ecl_weighted_from_curves,
-};
+use super::engine::{EclConfigBuilder, MacroScenario, WeightedEclResult, measure_weighted};
 use super::staging::{StageResult, StagingConfig, classify_stage_with_pds};
 use super::types::{Exposure, PdTermStructure, RawPdCurve, Stage};
 
@@ -59,18 +58,37 @@ pub fn classify_stage(
     classify_stage_with_pds(exposure, config, || Ok(Some((origination_pd, current_pd))))
 }
 
+/// Exact scenario weight, cumulative marginal evidence and scenario-specific LGD.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct EclScenario {
+    /// Nonempty scenario identifier, distinct within one scenario set.
+    pub id: String,
+    /// Exact decimal probability in [0, 1]; the admitted set sums to one.
+    pub weight: DecimalWire,
+    /// Ordered year and cumulative PD observations from valuation.
+    /// Omit when the scenario evidence is missing. An explicitly present
+    /// schedule must cover the measurement horizon.
+    pub pd_schedule: Option<Vec<(f64, f64)>>,
+    /// Elected nonnegative loss fraction in [0, 1] for this scenario.
+    pub lgd_override: Option<f64>,
+}
+
 /// Compute probability-weighted ECL for an exposure from cumulative-PD schedules.
 ///
 /// This is the canonical measurement entry point for hosts that hold one
 /// cumulative-PD schedule per macro scenario. The rating-keyed term-structure
 /// path with a full [`super::engine::EclConfig`] is
-/// [`compute_ecl_weighted_from_curves`].
+/// [`super::engine::compute_ecl_weighted_from_curves`].
 ///
 /// The exposure's own `ead`, `undrawn`, `ccf`, `lgd`, `eir`,
 /// `remaining_maturity_years` and `ead_schedule` drive the calculation, so the
 /// priced exposure at default is `ead + undrawn * ccf` exactly as in the full
-/// engine. Schedules are anchored at `(0, 0)` when that knot is absent and
-/// omitted policy values fall back to the canonical IFRS 9 defaults.
+/// engine. Positive scenarios carry their own PD schedules and LGD
+/// elections. An absent positive schedule leaves the aggregate unavailable
+/// while retaining priced entries. Zero-probability cases are identified
+/// without requesting their PD curves.
 ///
 /// # Arguments
 ///
@@ -78,13 +96,12 @@ pub fn classify_stage(
 ///   `undrawn * ccf`), LGD, EIR, remaining maturity and any EAD schedule.
 /// * `stage` - Assigned IFRS 9 stage selecting the 12-month, lifetime or
 ///   credit-impaired horizon.
-/// * `scenarios` - Probability-weighted `(weight, schedule)` pairs whose
-///   weights sum to `1.0`; each schedule holds `(time_years, cumulative_pd)`
-///   knots ascending in time and non-decreasing in PD.
+/// * `scenarios` - Uniquely named scenario evidence with exact decimal
+///   weights summing to one. Positive schedules use strictly ordered
+///   `(time_years, cumulative_pd)` knots starting at (0, 0) and cover the
+///   applicable horizon. LGD is an optional scenario loss fraction in [0, 1].
 /// * `bucket_width_years` - Integration bucket width in years (`0.25` =
 ///   quarterly); `None` uses the canonical policy default.
-/// * `stage3_time_to_recovery_years` - Stage 3 discounting horizon to expected
-///   recovery in years; `None` uses the canonical policy default.
 ///
 /// # Returns
 ///
@@ -98,9 +115,8 @@ pub fn classify_stage(
 pub fn compute_ecl_weighted(
     exposure: &Exposure,
     stage: Stage,
-    scenarios: &[(f64, Vec<(f64, f64)>)],
+    scenarios: &[EclScenario],
     bucket_width_years: Option<f64>,
-    stage3_time_to_recovery_years: Option<f64>,
 ) -> Result<WeightedEclResult> {
     if scenarios.is_empty() {
         return Err(Error::Validation(
@@ -110,19 +126,16 @@ pub fn compute_ecl_weighted(
 
     let macro_scenarios = scenarios
         .iter()
-        .enumerate()
-        .map(|(index, (weight, _))| MacroScenario {
-            id: format!("scenario_{index}"),
-            weight: *weight,
-            lgd_override: None,
+        .map(|scenario| MacroScenario {
+            id: scenario.id.clone(),
+            weight: scenario.weight,
+            lgd_override: scenario.lgd_override,
         })
         .collect::<Vec<_>>();
+    super::engine::validate_scenario_weights(&macro_scenarios)?;
     let mut config = EclConfigBuilder::new();
     if let Some(years) = bucket_width_years {
         config = config.bucket_width(years);
-    }
-    if let Some(years) = stage3_time_to_recovery_years {
-        config = config.stage3_time_to_recovery(years);
     }
     let config = config.build()?;
 
@@ -130,19 +143,54 @@ pub fn compute_ecl_weighted(
     priced.current_rating = Some(SCENARIO_RATING.to_string());
     priced.origination_rating = Some(SCENARIO_RATING.to_string());
 
+    let required_horizon = match stage {
+        Stage::Stage1 => exposure.remaining_maturity_years.min(1.0),
+        Stage::Stage2 => exposure.remaining_maturity_years,
+        Stage::Stage3 => return Err(Error::Validation(
+            "Stage 3 requires dated carrying and recovery evidence through compute_impaired_ecl"
+                .into(),
+        )),
+    };
     let curves = scenarios
         .iter()
-        .map(|(_, schedule)| {
-            RawPdCurve::new(SCENARIO_RATING, RawPdCurve::anchor_knots(schedule.clone()))
+        .map(|scenario| {
+            if scenario.weight.0.is_zero() {
+                return Ok(None);
+            }
+            let Some(schedule) = &scenario.pd_schedule else {
+                return Ok(None);
+            };
+            if schedule.first() != Some(&(0.0, 0.0)) {
+                return Err(Error::Validation(format!(
+                    "Scenario '{}' PD schedule must start at (0, 0)",
+                    scenario.id
+                )));
+            }
+            let curve = RawPdCurve::new(SCENARIO_RATING, schedule.clone())?;
+            if !curve
+                .knots
+                .last()
+                .is_some_and(|(years, _)| *years >= required_horizon)
+            {
+                return Err(Error::Validation(format!(
+                    "Scenario '{}' PD schedule must cover {required_horizon} years",
+                    scenario.id
+                )));
+            }
+            Ok(Some(curve))
         })
         .collect::<Result<Vec<_>>>()?;
-    let pd_sources = macro_scenarios
+    let sources = macro_scenarios
         .iter()
-        .zip(curves.iter())
-        .map(|(scenario, curve)| (scenario, curve as &dyn PdTermStructure))
+        .zip(&curves)
+        .map(|(scenario, curve)| {
+            (
+                scenario,
+                curve.as_ref().map(|curve| curve as &dyn PdTermStructure),
+            )
+        })
         .collect::<Vec<_>>();
-
-    compute_ecl_weighted_from_curves(&priced, stage, &pd_sources, &config)
+    measure_weighted(&priced, stage, &sources, &config)
 }
 
 /// Compute ECL for an exposure from a single cumulative-PD schedule.
@@ -160,8 +208,6 @@ pub fn compute_ecl_weighted(
 ///   non-decreasing in PD; a `(0, 0)` knot is inserted when absent.
 /// * `bucket_width_years` - Integration bucket width in years (`0.25` =
 ///   quarterly); `None` uses the canonical policy default.
-/// * `stage3_time_to_recovery_years` - Stage 3 discounting horizon to expected
-///   recovery in years; `None` uses the canonical policy default.
 ///
 /// # Returns
 ///
@@ -176,14 +222,17 @@ pub fn compute_ecl(
     stage: Stage,
     pd_schedule: Vec<(f64, f64)>,
     bucket_width_years: Option<f64>,
-    stage3_time_to_recovery_years: Option<f64>,
 ) -> Result<WeightedEclResult> {
     compute_ecl_weighted(
         exposure,
         stage,
-        &[(1.0, pd_schedule)],
+        &[EclScenario {
+            id: "base".to_owned(),
+            weight: DecimalWire(rust_decimal::Decimal::ONE),
+            pd_schedule: Some(RawPdCurve::anchor_knots(pd_schedule)),
+            lgd_override: None,
+        }],
         bucket_width_years,
-        stage3_time_to_recovery_years,
     )
 }
 
@@ -192,6 +241,68 @@ mod tests {
     use super::super::types::QualitativeFlags;
     use super::*;
     use crate::analysis::StagingTrigger;
+
+    #[test]
+    fn exact_named_ecl_scenarios_preserve_joint_loss_and_missing_evidence() {
+        let exposure = Exposure {
+            id: "secured".into(),
+            segments: vec![],
+            ead: 100.0,
+            eir: 0.0,
+            remaining_maturity_years: 2.0,
+            lgd: 0.35,
+            days_past_due: 0,
+            current_rating: None,
+            origination_rating: None,
+            qualitative_flags: QualitativeFlags::default(),
+            consecutive_performing_periods: 0,
+            previous_stage: None,
+            ead_schedule: None,
+            undrawn: 0.0,
+            ccf: 0.0,
+        };
+        let mut scenarios = [
+            EclScenario {
+                id: "base".into(),
+                weight: DecimalWire("0.75".parse().unwrap()),
+                pd_schedule: Some(vec![(0.0, 0.0), (2.0, 0.04)]),
+                lgd_override: Some(0.25),
+            },
+            EclScenario {
+                id: "downturn".into(),
+                weight: DecimalWire("0.25".parse().unwrap()),
+                pd_schedule: Some(vec![(0.0, 0.0), (2.0, 0.16)]),
+                lgd_override: Some(0.75),
+            },
+            EclScenario {
+                id: "excluded".into(),
+                weight: DecimalWire(rust_decimal::Decimal::ZERO),
+                pd_schedule: Some(vec![(0.0, f64::NAN)]),
+                lgd_override: None,
+            },
+        ];
+        let complete = compute_ecl_weighted(&exposure, Stage::Stage2, &scenarios, None).unwrap();
+        assert!((complete.ecl.unwrap() - 3.75).abs() < 1.0e-12);
+        assert!(matches!(
+            complete.scenario_breakdown[2].measurement,
+            super::super::engine::EclScenarioMeasurement::ZeroWeight
+        ));
+
+        scenarios[1].pd_schedule = None;
+        let partial = compute_ecl_weighted(&exposure, Stage::Stage2, &scenarios, None).unwrap();
+        assert_eq!(partial.ecl, None);
+        assert!(matches!(
+            partial.scenario_breakdown[0].measurement,
+            super::super::engine::EclScenarioMeasurement::Measured { .. }
+        ));
+        assert!(matches!(
+            partial.scenario_breakdown[1].measurement,
+            super::super::engine::EclScenarioMeasurement::Unavailable { .. }
+        ));
+
+        scenarios[1].weight = DecimalWire("0.2500000000000000000000000001".parse().unwrap());
+        assert!(compute_ecl_weighted(&exposure, Stage::Stage2, &scenarios, None).is_err());
+    }
 
     #[test]
     fn classify_stage_reaches_qualitative_and_rating_triggers() {
@@ -262,22 +373,30 @@ mod tests {
             undrawn: 0.0,
             ccf: 0.75,
         };
-        let scenarios = vec![(1.0, vec![(1.0, 0.1), (2.0, 0.2)])];
-        let drawn_only =
-            compute_ecl_weighted(&base, Stage::Stage2, &scenarios, None, None).unwrap();
+        let scenarios = [EclScenario {
+            id: "only".into(),
+            weight: DecimalWire(rust_decimal::Decimal::ONE),
+            pd_schedule: Some(vec![(0.0, 0.0), (1.0, 0.1), (2.0, 0.2)]),
+            lgd_override: None,
+        }];
+        let drawn_only = compute_ecl_weighted(&base, Stage::Stage2, &scenarios, None).unwrap();
 
         let revolver = Exposure {
             undrawn: 100.0,
             ccf: 0.5,
             ..base
         };
-        let priced =
-            compute_ecl_weighted(&revolver, Stage::Stage2, &scenarios, None, None).unwrap();
-        assert!((priced.ecl - 1.5 * drawn_only.ecl).abs() < 1e-9);
+        let priced = compute_ecl_weighted(&revolver, Stage::Stage2, &scenarios, None).unwrap();
+        assert!((priced.ecl.unwrap() - 1.5 * drawn_only.ecl.unwrap()).abs() < 1e-9);
         assert_eq!(priced.scenario_breakdown.len(), 1);
 
-        let single =
-            compute_ecl(&revolver, Stage::Stage2, scenarios[0].1.clone(), None, None).unwrap();
+        let single = compute_ecl(
+            &revolver,
+            Stage::Stage2,
+            scenarios[0].pd_schedule.clone().unwrap(),
+            None,
+        )
+        .unwrap();
         assert_eq!(single.ecl, priced.ecl);
         assert_eq!(single.scenario_breakdown.len(), 1);
     }

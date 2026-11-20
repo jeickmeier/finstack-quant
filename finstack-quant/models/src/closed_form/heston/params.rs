@@ -1,5 +1,3 @@
-use crate::volatility::heston::HestonParams;
-
 /// Relative price tolerance for residual integration mass and no-arbitrage bounds.
 pub(super) const HESTON_TAIL_DIAGNOSTIC_THRESHOLD: f64 = 1e-9;
 
@@ -8,113 +6,12 @@ pub(super) const HESTON_MAX_NODES: usize = 1_048_576;
 /// Target characteristic-function magnitude used to initialize the integration limit.
 pub(super) const HESTON_TAIL_LOG_TARGET: f64 = 27.631_021_115_928_547;
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(try_from = "RawHestonPricingParams")]
-/// Market inputs for closed-form Heston pricing.
-///
-/// The stochastic parameters are stored once in the canonical models-layer
-/// [`HestonParams`]; this wrapper adds only the continuous carry rates required
-/// by risk-neutral pricing.
-///
-/// # References
-///
-/// - Heston, S. L. (1993). "A Closed-Form Solution for Options with Stochastic Volatility
-///   with Applications to Bond and Currency Options." *Review of Financial Studies*, 6(2), 327-343. `docs/REFERENCES.md#heston-1993`
-pub struct HestonPricingParams {
-    /// Continuously compounded risk-free rate as an annual decimal.
-    pub r: f64,
-    /// Continuously compounded dividend or foreign yield as an annual decimal.
-    pub q: f64,
-    /// Canonical Heston stochastic parameters.
-    #[serde(flatten)]
-    pub model: HestonParams,
-}
-
-/// Raw deserialization state of [`HestonPricingParams`].
-///
-/// Mirrors the serialized (flat) field layout exactly; conversion runs
-/// [`HestonPricingParams::new`] validation. Flat rather than a flattened
-/// [`HestonParams`] because serde's `flatten` ignores unknown fields.
-#[derive(Debug, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-struct RawHestonPricingParams {
-    /// Continuously compounded risk-free rate as an annual decimal.
-    r: f64,
-    /// Continuously compounded dividend or foreign yield as an annual decimal.
-    q: f64,
-    /// Initial variance.
-    v0: f64,
-    /// Mean reversion speed.
-    kappa: f64,
-    /// Long-run variance.
-    theta: f64,
-    /// Vol-of-vol.
-    sigma_v: f64,
-    /// Spot-variance correlation.
-    rho: f64,
-}
-
-impl TryFrom<RawHestonPricingParams> for HestonPricingParams {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(raw: RawHestonPricingParams) -> finstack_quant_core::Result<Self> {
-        Self::new(
-            raw.r,
-            raw.q,
-            raw.kappa,
-            raw.theta,
-            raw.sigma_v,
-            raw.rho,
-            raw.v0,
-        )
-    }
-}
-
-impl HestonPricingParams {
-    /// Create new Heston model parameters
-    ///
-    /// # Arguments
-    ///
-    /// * `r` - Continuously compounded risk-free rate in decimal annual units
-    /// * `q` - Continuous dividend yield in decimal annual units
-    /// * `kappa` - Mean-reversion speed of the stochastic volatility or short-rate factor
-    /// * `theta` - Long-run mean level of the mean-reverting stochastic factor
-    /// * `sigma_v` - Volatility-of-variance parameter for the Heston-style variance process
-    /// * `rho` - Instantaneous correlation between Brownian drivers, in `(-1, 1)`
-    /// * `v0` - Initial variance level for the stochastic volatility process at time zero
-    pub fn new(
-        r: f64,
-        q: f64,
-        kappa: f64,
-        theta: f64,
-        sigma_v: f64,
-        rho: f64,
-        v0: f64,
-    ) -> finstack_quant_core::Result<Self> {
-        if !r.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Heston parameter r (risk-free rate) must be finite, got {r}"
-            )));
-        }
-        if !q.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Heston parameter q (dividend yield) must be finite, got {q}"
-            )));
-        }
-        Ok(Self {
-            r,
-            q,
-            model: HestonParams::new(v0, kappa, theta, sigma_v, rho)?,
-        })
-    }
-}
-
 /// Configuration for Heston Fourier integration.
 ///
 /// Provides tuning knobs for the numerical integration.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct HestonFourierSettings {
     /// Upper limit for Fourier integral (default: 100)
     pub u_max: f64,

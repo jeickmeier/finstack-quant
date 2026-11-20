@@ -109,7 +109,9 @@ crate::bindings::macros::wire_methods!(
 );
 
 impl PyPortfolioAttribution {
-    fn from_inner(inner: finstack_quant_portfolio::attribution::PortfolioAttribution) -> Self {
+    pub(super) fn from_inner(
+        inner: finstack_quant_portfolio::attribution::PortfolioAttribution,
+    ) -> Self {
         Self { inner }
     }
 }

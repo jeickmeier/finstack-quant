@@ -5,29 +5,35 @@ import json
 import pytest
 
 from finstack_quant.statements import ModelBuilder
-from finstack_quant.statements_analytics import goal_seek, run_checks
+from finstack_quant.statements_analytics import GoalSeekSpec, goal_seek, run_checks
 
 
 def test_goal_seek_rejects_unattainable_target_without_mutation() -> None:
-    b = ModelBuilder("discontinuous")
+    b = ModelBuilder("discontinuous").source_snapshot("discontinuous-test-forecast")
     b.periods("2025Q1..Q1", None)
     b.value("driver", [("2025Q1", 1.0)])
     b.compute("target", "if(driver < 0, 0, 1)")
     model = b.build()
     before = model.to_json()
-    for bounds in [None, (-1.0, 1.0)]:
+    for search in [
+        {"kind": "bracket", "lower": -1.0, "upper": 1.0},
+        {"kind": "bounded", "lower": -2.0, "upper": 2.0, "start": 1.0, "initial_half_width": 0.25, "max_expansions": 8},
+    ]:
         with pytest.raises(ValueError, match="residual"):
             goal_seek(
                 model,
-                {
-                    "target_node": "target",
-                    "target_period": "2025Q1",
-                    "target_value": 0.5,
-                    "driver_node": "driver",
-                    "driver_period": "2025Q1",
-                    "update_model": True,
-                    "bounds": bounds,
-                },
+                GoalSeekSpec(
+                    target={"node": "target", "period": "2025Q1"},
+                    target_value=0.5,
+                    target_tolerance=1e-7,
+                    driver={"node": "driver", "period": "2025Q1"},
+                    driver_tolerance=1e-10,
+                    max_iterations=100,
+                    search=search,
+                    as_of="2024-12-31",
+                    observed_through="2024-12-31",
+                    update_model=True,
+                ),
             )
         assert model.to_json() == before
 

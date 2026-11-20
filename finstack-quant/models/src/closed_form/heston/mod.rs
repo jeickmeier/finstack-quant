@@ -24,7 +24,7 @@
 //! |-----------|-----------|-------|
 //! | Rates (r, q) | Continuously compounded | Decimal (0.05 = 5%) |
 //! | Variance (v0, theta) | Annualized variance | Decimal (0.04 = 20% vol) |
-//! | Vol-of-vol (sigma_v) | Annualized | Decimal |
+//! | Vol-of-vol (vol_of_vol) | Annualized | Decimal |
 //! | Time (T) | ACT/365-style | Years |
 //! | Prices | Per unit of underlying | Currency units |
 //!
@@ -41,7 +41,7 @@ mod strip_pricer;
 #[cfg(test)]
 pub(crate) use fourier_prices::heston_put_price_fourier;
 pub use fourier_prices::{heston_call_price_fourier, heston_price};
-pub use params::{HestonFourierSettings, HestonPricingParams};
+pub use params::HestonFourierSettings;
 pub(crate) use strip_pricer::HestonStripPricer;
 
 #[cfg(test)]

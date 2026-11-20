@@ -33,7 +33,7 @@ use super::problem2d::PdeProblem2D;
 /// # Fields
 ///
 /// All parameters follow the conventions in
-/// [`crate::closed_form::HestonPricingParams`].
+/// [`crate::monte_carlo::process::heston::HestonProcessParams`].
 pub struct HestonPde {
     /// Risk-free interest rate (continuous, decimal).
     pub r: f64,
@@ -44,7 +44,7 @@ pub struct HestonPde {
     /// Long-run variance level (θ).
     pub theta_v: f64,
     /// Volatility of variance (σ_v).
-    pub sigma_v: f64,
+    pub vol_of_vol: f64,
     /// Correlation between spot and variance (-1 < ρ < 1).
     pub rho: f64,
     /// Strike price.
@@ -61,12 +61,12 @@ impl PdeProblem2D for HestonPde {
 
     fn diffusion_yy(&self, _x: f64, y: f64, _t: f64) -> f64 {
         // 0.5 * σ_v² * v
-        0.5 * self.sigma_v * self.sigma_v * y.max(0.0)
+        0.5 * self.vol_of_vol * self.vol_of_vol * y.max(0.0)
     }
 
     fn mixed_diffusion(&self, _x: f64, y: f64, _t: f64) -> f64 {
         // ρ * σ_v * v
-        self.rho * self.sigma_v * y.max(0.0)
+        self.rho * self.vol_of_vol * y.max(0.0)
     }
 
     fn convection_x(&self, _x: f64, y: f64, _t: f64) -> f64 {
@@ -130,15 +130,30 @@ mod tests {
         q: f64,
         kappa: f64,
         theta: f64,
-        sigma_v: f64,
+        vol_of_vol: f64,
         rho: f64,
         v0: f64,
     ) -> f64 {
-        use crate::closed_form::{HestonPricingParams, heston_call_price_fourier};
-        let params = HestonPricingParams::new(r, q, kappa, theta, sigma_v, rho, v0)
+        use crate::closed_form::heston_call_price_fourier;
+        use crate::monte_carlo::process::heston::HestonProcessParams;
+        let params = HestonProcessParams::new(r, q, kappa, theta, vol_of_vol, rho, v0)
             .expect("valid heston params");
-        heston_call_price_fourier(spot, strike, maturity, &params, None)
-            .expect("Heston Fourier call price")
+        {
+            let dynamics = &params;
+            heston_call_price_fourier(
+                &crate::types::OptionContractParams {
+                    spot,
+                    strike,
+                    rate: dynamics.r,
+                    dividend_yield: dynamics.q,
+                    time_to_expiry: maturity,
+                    option_type: crate::types::OptionType::Call,
+                },
+                &dynamics.model,
+                None,
+            )
+        }
+        .expect("Heston Fourier call price")
     }
 
     #[test]
@@ -151,12 +166,12 @@ mod tests {
         let q = 0.02;
         let kappa = 2.0;
         let theta_v = 0.04; // 20% vol long-run
-        let sigma_v = 0.3;
+        let vol_of_vol = 0.3;
         let rho = -0.7;
         let v0 = 0.04;
 
         let exact = heston_call_reference(
-            spot, strike, maturity, r, q, kappa, theta_v, sigma_v, rho, v0,
+            spot, strike, maturity, r, q, kappa, theta_v, vol_of_vol, rho, v0,
         );
 
         let pde = HestonPde {
@@ -164,7 +179,7 @@ mod tests {
             q,
             kappa,
             theta_v,
-            sigma_v,
+            vol_of_vol,
             rho,
             strike,
             is_call: true,
@@ -213,7 +228,7 @@ mod tests {
         let q = 0.02;
         let kappa = 2.0;
         let theta_v = 0.04;
-        let sigma_v = 0.3;
+        let vol_of_vol = 0.3;
         let rho = -0.7;
         let v0 = 0.04;
 
@@ -224,7 +239,7 @@ mod tests {
 
         for strike in [100.0, 120.0] {
             let exact = heston_call_reference(
-                spot, strike, maturity, r, q, kappa, theta_v, sigma_v, rho, v0,
+                spot, strike, maturity, r, q, kappa, theta_v, vol_of_vol, rho, v0,
             );
 
             let pde = HestonPde {
@@ -232,7 +247,7 @@ mod tests {
                 q,
                 kappa,
                 theta_v,
-                sigma_v,
+                vol_of_vol,
                 rho,
                 strike,
                 is_call: true,
@@ -275,12 +290,12 @@ mod tests {
         let q = 0.02;
         let kappa = 10.0;
         let theta_v = 0.04;
-        let sigma_v = 0.3;
+        let vol_of_vol = 0.3;
         let rho = -0.7;
         let v0 = 0.04;
 
         let exact = heston_call_reference(
-            spot, strike, maturity, r, q, kappa, theta_v, sigma_v, rho, v0,
+            spot, strike, maturity, r, q, kappa, theta_v, vol_of_vol, rho, v0,
         );
 
         let pde = HestonPde {
@@ -288,7 +303,7 @@ mod tests {
             q,
             kappa,
             theta_v,
-            sigma_v,
+            vol_of_vol,
             rho,
             strike,
             is_call: true,
@@ -328,7 +343,7 @@ mod tests {
             q: 0.0,
             kappa: 0.1,
             theta_v: 0.04,
-            sigma_v: 1.0,
+            vol_of_vol: 1.0,
             rho: -0.7,
             strike: 100.0,
             is_call: true,
@@ -373,7 +388,7 @@ mod tests {
         let q = 0.01;
         let kappa = 1.5;
         let theta_v = 0.04;
-        let sigma_v = 0.4;
+        let vol_of_vol = 0.4;
         let rho = -0.5;
         let v0 = 0.06;
 
@@ -391,7 +406,7 @@ mod tests {
             q,
             kappa,
             theta_v,
-            sigma_v,
+            vol_of_vol,
             rho,
             strike,
             is_call: true,
@@ -408,7 +423,7 @@ mod tests {
             q,
             kappa,
             theta_v,
-            sigma_v,
+            vol_of_vol,
             rho,
             strike,
             is_call: false,
@@ -518,12 +533,12 @@ mod tests {
         let q = 0.0;
         let kappa = 1.5;
         let theta_v = 0.04;
-        let sigma_v = 0.3;
+        let vol_of_vol = 0.3;
         let rho = -0.9; // strong negative correlation
         let v0 = 0.04;
 
         let exact = heston_call_reference(
-            spot, strike, maturity, r, q, kappa, theta_v, sigma_v, rho, v0,
+            spot, strike, maturity, r, q, kappa, theta_v, vol_of_vol, rho, v0,
         );
 
         let pde = HestonPde {
@@ -531,7 +546,7 @@ mod tests {
             q,
             kappa,
             theta_v,
-            sigma_v,
+            vol_of_vol,
             rho,
             strike,
             is_call: true,
@@ -642,7 +657,7 @@ mod tests {
     /// validated against the Heston Fourier closed form.
     ///
     /// Companion to [`heston_pde_mcs_vs_douglas_high_correlation`], which uses
-    /// rho = -0.9. The mixed-derivative term `rho * sigma_v * v` flips sign
+    /// rho = -0.9. The mixed-derivative term `rho * vol_of_vol * v` flips sign
     /// with rho, so the cross-derivative stencil contributes with the opposite
     /// sign here. Pinning MCS against the independent Fourier reference at
     /// rho = +0.9 is cheap insurance against a sign-of-rho cross-stencil bug
@@ -657,12 +672,12 @@ mod tests {
         let q = 0.0;
         let kappa = 1.5;
         let theta_v = 0.04;
-        let sigma_v = 0.3;
+        let vol_of_vol = 0.3;
         let rho = 0.9; // strong positive correlation
         let v0 = 0.04;
 
         let exact = heston_call_reference(
-            spot, strike, maturity, r, q, kappa, theta_v, sigma_v, rho, v0,
+            spot, strike, maturity, r, q, kappa, theta_v, vol_of_vol, rho, v0,
         );
 
         let pde = HestonPde {
@@ -670,7 +685,7 @@ mod tests {
             q,
             kappa,
             theta_v,
-            sigma_v,
+            vol_of_vol,
             rho,
             strike,
             is_call: true,

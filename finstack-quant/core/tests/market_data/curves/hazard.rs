@@ -43,7 +43,7 @@ fn from_survival_probs_reproduces_pillars() {
         let actual = curve.sp(t).unwrap();
         assert!((actual - sp).abs() < 1e-12, "S({t}) = {actual}");
     }
-    assert_eq!(curve.knot_points().count(), 3);
+    assert_eq!(curve.iter_knots().count(), 3);
 
     // Unsorted and increasing survival are rejected.
     assert!(
@@ -186,8 +186,8 @@ fn to_builder_preserves_metadata() {
     assert_eq!(rebuilt.recovery_rate(), curve.recovery_rate());
     assert_eq!(rebuilt.seniority(), Some(Seniority::Senior));
     assert_eq!(
-        rebuilt.knot_points().collect::<Vec<_>>(),
-        curve.knot_points().collect::<Vec<_>>()
+        rebuilt.iter_knots().collect::<Vec<_>>(),
+        curve.iter_knots().collect::<Vec<_>>()
     );
 }
 

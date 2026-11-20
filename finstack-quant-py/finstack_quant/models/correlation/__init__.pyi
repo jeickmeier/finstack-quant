@@ -968,8 +968,8 @@ class PortfolioLossResult:
 
     def tranche_loss_statistics(
         self,
-        attachment: float,
-        detachment: float,
+        attach_pct: float,
+        detach_pct: float,
         pool_notional: float,
     ) -> TrancheLossStatistics:
         """
@@ -978,19 +978,19 @@ class PortfolioLossResult:
         Each path's pool loss fraction ``L = loss / pool_notional`` maps through
         the standard tranche loss function
         ``clamp(L - attachment, 0, detachment - attachment) / (detachment - attachment)``,
-        and the resulting distribution is aggregated at this result's own
+        where the boundaries in the formula are fractions. The resulting
+        distribution is aggregated at this result's own
         :attr:`confidence`.
 
         Parameters
         ----------
-        attachment : float
-            Lower tranche boundary as a **fraction** of pool notional in
-            ``[0, 1)``; losses below this point hit more junior tranches. A
-            0-3% equity tranche uses ``0.0``.
-        detachment : float
-            Upper tranche boundary as a **fraction** of pool notional in
-            ``(0, 1]`` and strictly above ``attachment``; losses above this
-            point hit more senior tranches. A 0-3% equity tranche uses ``0.03``.
+        attach_pct : float
+            Lower tranche boundary in percentage points of pool notional.
+            Must be in ``[0, 100)``. A 0–3% equity tranche uses ``0.0``.
+        detach_pct : float
+            Upper tranche boundary in percentage points of pool notional.
+            Must exceed ``attach_pct`` and be at most 100. A 0–3% equity
+            tranche uses ``3.0``.
         pool_notional : float
             Total pool notional, finite and strictly positive, in the same
             scalar unit as the simulated losses.
@@ -1004,7 +1004,7 @@ class PortfolioLossResult:
         Raises
         ------
         ValueError
-            If a boundary lies outside ``[0, 1]``, ``attachment >= detachment``,
+            If a boundary lies outside ``[0, 100]``, ``attach_pct >= detach_pct``,
             or ``pool_notional`` is not finite and strictly positive.
         """
         ...
@@ -1151,7 +1151,7 @@ class TrancheLossStatistics:
     >>> exposures = [CreditExposure("A", 100.0, 0.05, 0.6, [0.3]), CreditExposure("B", 100.0, 0.03, 0.6, [0.3])]
     >>> config = PortfolioLossConfig(200, 42, 0.99, CopulaSpec.gaussian())
     >>> result = simulate_portfolio_loss(exposures, config)
-    >>> statistics = result.tranche_loss_statistics(0.0, 0.1, 200.0)
+    >>> statistics = result.tranche_loss_statistics(0.0, 10.0, 200.0)
     >>> (statistics.attachment, statistics.detachment, statistics.tranche_notional)
     (0.0, 0.1, 20.0)
 
@@ -1348,7 +1348,7 @@ class TrancheLossStatistics:
 
             pd.concat(
                 [
-                    result.tranche_loss_statistics(a, d, pool).to_dataframe()
+                    result.tranche_loss_statistics(100 * a, 100 * d, pool).to_dataframe()
                     for a, d in [(0.0, 0.03), (0.03, 0.07), (0.07, 1.0)]
                 ],
                 ignore_index=True,
@@ -1415,7 +1415,7 @@ class TrancheLossStatistics:
         ... )
         >>> config = PortfolioLossConfig(1000, 42, 0.99, CopulaSpec.gaussian())
         >>> result = simulate_portfolio_loss([CreditExposure("A", 1e6, 0.02, 0.6, [0.3])], config)
-        >>> stats = result.tranche_loss_statistics(0.0, 0.03, 1e6)
+        >>> stats = result.tranche_loss_statistics(0.0, 3.0, 1e6)
         >>> TrancheLossStatistics.from_json(stats.to_json()).detachment
         0.03
 

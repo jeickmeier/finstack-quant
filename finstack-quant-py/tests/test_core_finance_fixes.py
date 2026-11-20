@@ -33,6 +33,13 @@ def test_future_price_quotes_preserve_supplied_pillars(kind: str) -> None:
         with pytest.raises(ValueError, match="below minimum knot"):
             reconstructed.price(0.0)
 
+    bumped = curve.bump_parallel_pct(-2.5)
+    assert bumped.knots == curve.knots
+    assert bumped.prices == pytest.approx([78.0, 97.5])
+    assert curve.prices == [80.0, 100.0]
+    with pytest.raises(ValueError, match="finite"):
+        curve.bump_parallel_pct(math.nan)
+
 
 def test_business_day_price_curve_uses_registered_calendar() -> None:
     curve = PriceCurve({

@@ -119,6 +119,7 @@ pub(super) fn sensitivity_rows(frame: &Bound<'_, PyAny>) -> PyResult<Vec<Sensiti
                 risk_class: req_str(row, "risk_class")?,
                 bucket: opt_str(row, "bucket")?,
                 tenor: opt_str(row, "tenor")?,
+                curve_id: opt_str(row, "curve_id")?,
                 expiry_tenor: opt_str(row, "expiry_tenor")?,
                 issuer: opt_str(row, "issuer")?,
                 kind: req_str(row, "kind")?,
@@ -132,18 +133,23 @@ pub(super) fn sensitivity_rows(frame: &Bound<'_, PyAny>) -> PyResult<Vec<Sensiti
         .collect()
 }
 
-/// Convert ``list[tuple[float, float]] | pandas.Series`` into ``(x, y)`` pairs.
-///
-/// A ``Series`` contributes its index as ``x`` and its values as ``y``; any
-/// other iterable must yield two-element tuples.
-pub(super) fn pairs_from_series_or_list(obj: &Bound<'_, PyAny>) -> PyResult<Vec<(f64, f64)>> {
-    if obj.hasattr("items")? && obj.hasattr("index")? {
-        let mut out = Vec::new();
-        for item in obj.call_method0("items")?.try_iter()? {
-            let (x, y): (f64, f64) = item?.extract()?;
-            out.push((x, y));
-        }
-        return Ok(out);
+/// Read dated funding observations from explicit pairs or a pandas Series.
+pub(super) fn dated_pairs_from_series_or_list(
+    observations: &Bound<'_, PyAny>,
+) -> PyResult<Vec<(finstack_quant_core::dates::Date, f64)>> {
+    let read_pair = |item: Bound<'_, PyAny>| {
+        let (date, spread): (Bound<'_, PyAny>, f64) = item.extract()?;
+        Ok((crate::bindings::date_utils::py_to_date(&date)?, spread))
+    };
+    if observations.hasattr("items")? && observations.hasattr("index")? {
+        return observations
+            .call_method0("items")?
+            .try_iter()?
+            .map(|item| item.and_then(read_pair))
+            .collect();
     }
-    obj.extract::<Vec<(f64, f64)>>()
+    observations
+        .try_iter()?
+        .map(|item| item.and_then(read_pair))
+        .collect()
 }

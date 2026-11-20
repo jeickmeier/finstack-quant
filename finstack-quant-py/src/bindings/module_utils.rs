@@ -162,6 +162,8 @@ fn json_default<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<Bound
         };
     }
     wire_of_wrapper!(
+        crate::bindings::core::money::PyMoney,
+        crate::bindings::statements_analytics::valuation::PyStatementValuationCut,
         PyTenor,
         PyDayCount,
         PyBusinessDayConvention,

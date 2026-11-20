@@ -494,6 +494,42 @@ impl MarketContext {
         self
     }
 
+    /// Store a series of historical observations under a contractual fixing index.
+    ///
+    /// # Arguments
+    ///
+    /// * `index_id` - Trimmed contractual rate or benchmark name without the
+    ///   `FIXING:` prefix.
+    /// * `series` - Dated observations, stored under the derived
+    ///   `FIXING:{index_id}` identifier. Replaces an existing series under that key.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if the index name is empty, untrimmed, or prefixed.
+    pub fn insert_fixing(
+        &mut self,
+        index_id: &str,
+        series: ScalarTimeSeries,
+    ) -> crate::Result<&mut Self> {
+        use crate::market_data::fixings::{fixing_series_id, validate_fixing_index_id};
+        let id = fixing_series_id(validate_fixing_index_id(index_id)?);
+        Ok(self.insert_series_mut(series.with_id(id.into())))
+    }
+
+    /// Store a continuous dividend yield as a unitless market scalar.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Market identifier configured on the instrument's dividend-yield input.
+    /// * `yield_rate` - Finite annualized continuously compounded decimal yield (0.02 is 2%).
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for a non-finite yield.
+    pub fn insert_dividend_yield(&mut self, id: &str, yield_rate: f64) -> crate::Result<&mut Self> {
+        Ok(self.insert_price_mut(id, MarketScalar::unitless(yield_rate)?))
+    }
+
     /// Insert an inflation index, mutating in place.
     ///
     /// Mirrors [`Self::insert_inflation_index`] but takes `&mut self`.

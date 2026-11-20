@@ -83,9 +83,9 @@ pub(crate) mod series;
 pub mod templates;
 
 pub use engine::{
-    BoundKind, ConsequenceApplication, Covenant, CovenantBreach, CovenantConsequence,
-    CovenantEngine, CovenantScope, CovenantSpec, CovenantType, CovenantWaiver, CovenantWindow,
-    InstrumentMutator, SpringingCondition, ThresholdTest,
+    BoundKind, ConsequenceApplication, Covenant, CovenantAssessment, CovenantAssessmentState,
+    CovenantBreach, CovenantConsequence, CovenantEngine, CovenantScope, CovenantSpec, CovenantType,
+    CovenantWaiver, CovenantWindow, InstrumentMutator, SpringingCondition, ThresholdTest,
 };
 pub use forward::{
     CovenantForecast, CovenantForecastConfig, FutureBreach, ModelTimeSeries,

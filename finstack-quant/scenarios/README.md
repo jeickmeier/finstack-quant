@@ -64,16 +64,16 @@ through `ScenarioEngine::apply`.
   `ByType` variant with an explicit instrument-type list for a broad shock.
 + **Statements.** `StmtForecastPercent`, `StmtForecastAssign`, `RateBinding`.
 + **Hierarchy-targeted.** `HierarchyCurveParallelBp`,
-  `HierarchyVolSurfaceParallelPct`, `HierarchyEquityPricePct`,
+  `HierarchyCommodityCurveParallelPct`, `HierarchyVolSurfaceParallelPct`, `HierarchyEquityPricePct`,
   `HierarchyBaseCorrParallelPts`.
 + **Time.** `TimeRollForward` (period, `apply_shocks`, `roll_mode`).
 
 ## Units
 
 + `Pct` fields are percentage points: `5.0` means +5%.
-+ `Bp` fields are additive basis points: 1 bp = 1e-4, except commodity
-  `CurveParallelBp` / `CurveNodeBp` where `bp` is percent of the
-  price-curve forward (`5.0` = +5%).
++ `Bp` fields are additive rate basis points: 1 bp = 1e-4.
++ Commodity `Pct` shocks scale forward prices (`5.0` = +5%) and use
+  `CommodityCurveParallelPct` or `CommodityCurveNodePct`.
 + Vol-index `Pts` are index points (`1.0` on 18.5 → 19.5).
 + Correlation / base-corr `Pts` are decimal correlation (`0.02` = +0.02).
 + Vol-surface shocks are sticky-strike multiplicative grid moves. The
@@ -238,6 +238,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   (`exports/scenarios.js`) — `parseScenarioSpec`, `parallelBpMany`,
   `composeScenarios`, `validateScenarioSpec`, `applyScenario`,
   `computeHorizonReturn`, and the template helpers.
+  The validation functions return structural diagnostics and instrument
+  requirements. Scenario parsing and application reject invalid specs.
   Unsuffixed builders, composers, and template helpers return structured specs;
   JSON remains explicit through Python `to_json`/`from_json` or JSON-named inputs.
 

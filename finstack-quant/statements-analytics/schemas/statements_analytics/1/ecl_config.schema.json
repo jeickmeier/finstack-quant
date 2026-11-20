@@ -209,12 +209,6 @@
       "$ref": "#/$defs/LgdType",
       "description": "LGD methodology label; see [`LgdType`] for the formulas each variant\napplies and the companion field it requires."
     },
-    "stage3_time_to_recovery_years": {
-      "default": 1.0,
-      "description": "Assumed time (in years) from the reporting date to recovery\nrealisation for Stage 3 (credit-impaired) exposures. Used to\ndiscount expected recoveries `(1 - LGD) x EAD` at the EIR.\nThe allowance is current EAD less those discounted recoveries.\nDefault: 1.0 year, a common practical recovery-lag assumption.",
-      "format": "double",
-      "type": "number"
-    },
     "staging": {
       "$ref": "#/$defs/StagingConfig",
       "description": "Staging configuration for IFRS 9."

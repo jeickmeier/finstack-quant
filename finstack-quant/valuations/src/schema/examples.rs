@@ -309,6 +309,18 @@ pub(super) fn pool_stats() -> Result<Vec<Value>> {
     )?)
 }
 
+/// One reported quarterly horizon on the vanilla bond Z-spread basis.
+pub(super) fn bond_breakeven_ladder() -> Result<Vec<Value>> {
+    use crate::instruments::fixed_income::bond::pricing::quote_conversions::BondBreakevenLadder;
+    example_from_json::<BondBreakevenLadder>(json!({
+        "instrument_id": "USD-BOND",
+        "as_of": "2025-01-15",
+        "currency": "USD",
+        "config": {"target": "z_spread", "mode": "linear"},
+        "rows": [{"horizon":{"count": 3, "unit": "months"}, "carry": 10.0, "sensitivity": -2.0, "breakeven_bp": 5.0}]
+    }))
+}
+
 /// The workout ladder of the example callable bond at 108 clean on a flat curve.
 pub(super) fn bond_workout_ladder() -> Result<Vec<Value>> {
     use crate::instruments::fixed_income::bond::Bond;
@@ -605,13 +617,13 @@ pub(super) fn cds_trade_params() -> Result<Vec<Value>> {
 /// A 5Y USD SOFR + 200bp quarterly floating-rate note.
 pub(super) fn floating_bond_params() -> Result<Vec<Value>> {
     use finstack_quant_core::dates::{DayCount, Tenor};
-    use finstack_quant_core::types::{Bps, CurveId, InstrumentId};
+    use finstack_quant_core::types::{CurveId, InstrumentId};
     example(
         &crate::instruments::fixed_income::bond::FloatingBondParams {
             id: InstrumentId::new("FRN-001"),
             notional: Money::from((1_000_000_i64, Currency::USD)),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
-            spread_bp: Bps::new(200),
+            spread_bp: 200.into(),
             issue_date: date(2025, time::Month::January, 15)?,
             maturity: date(2030, time::Month::January, 15)?,
             frequency: Tenor::quarterly(),

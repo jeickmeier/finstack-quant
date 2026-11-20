@@ -3,10 +3,405 @@
 from __future__ import annotations
 
 import datetime
-from typing import Any
+from typing import Any, Literal
 import pandas as pd
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.money import Money
+from finstack_quant.portfolio._attribution import PortfolioAttribution
 from finstack_quant.portfolio._container import Portfolio
+from finstack_quant.portfolio._valuation import PortfolioValuation
+
+class ReplayConfig:
+    """Configure replay mode, per-snapshot valuation, and failure policy.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import ReplayConfig
+    >>> ReplayConfig("pv_and_pnl", on_error="best_effort").on_error
+    'best_effort'
+    """
+
+    def __init__(
+        self,
+        mode: Literal["pv_only", "pv_and_pnl", "full_attribution"],
+        *,
+        attribution_method: str = "parallel",
+        valuation_options: dict[str, Any] | str | None = None,
+        on_error: Literal["strict", "best_effort"] = "strict",
+    ) -> None:
+        """Build replay settings for one timeline.
+
+        Parameters
+        ----------
+        mode : str
+            pv_only for marks, pv_and_pnl for mark changes, or full_attribution
+            for mark changes with the configured attribution method.
+        attribution_method : str
+            Canonical attribution method label. Used in full_attribution only.
+        valuation_options : dict or str or None
+            Valuation option mapping or canonical JSON for each replay date.
+            Omit to use the standard valuation profile.
+        on_error : str
+            strict fails on a snapshot error. best_effort records skipped dates.
+
+        Raises
+        ------
+        ValueError
+            If a label is unknown or valuation options are malformed.
+        """
+        ...
+
+    @property
+    def mode(self) -> str:
+        """Requested replay calculation mode.
+
+        Returns
+        -------
+        str
+            Requested replay calculation mode.
+
+        Raises
+        ------
+        ValueError
+            If the stored field cannot be converted to its Python representation.
+        """
+        ...
+
+    @property
+    def attribution_method(self) -> str:
+        """Canonical label of the attribution method.
+
+        Returns
+        -------
+        str
+            Canonical label of the attribution method.
+
+        Raises
+        ------
+        ValueError
+            If the stored field cannot be converted to its Python representation.
+        """
+        ...
+
+    @property
+    def valuation_options(self) -> dict[str, Any]:
+        """Valuation option fields used for each snapshot.
+
+        Returns
+        -------
+        dict[str, Any]
+            Valuation option fields used for each snapshot.
+
+        Raises
+        ------
+        ValueError
+            If the stored field cannot be converted to its Python representation.
+        """
+        ...
+
+    @property
+    def on_error(self) -> str:
+        """Canonical policy for failures during replay.
+
+        Returns
+        -------
+        str
+            Canonical policy for failures during replay.
+
+        Raises
+        ------
+        ValueError
+            If the stored field cannot be converted to its Python representation.
+        """
+        ...
+
+class ReplayStep:
+    """Single dated valuation with its associated mark-to-market change.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.portfolio import Portfolio, ReplayConfig, replay_portfolio
+    >>> portfolio = Portfolio.builder("replay", "USD", "2025-01-15").build()
+    >>> run = replay_portfolio(portfolio, [("2025-01-15", MarketContext())], ReplayConfig("pv_only"))
+    >>> run.steps[0].date.isoformat()
+    '2025-01-15'
+    """
+
+    @property
+    def date(self) -> datetime.date:
+        """Replay valuation date.
+
+        Returns
+        -------
+        datetime.date
+            Replay valuation date.
+
+        Raises
+        ------
+        ValueError
+            If the recorded date is outside the Python datetime range.
+        """
+        ...
+
+    @property
+    def valuation(self) -> PortfolioValuation:
+        """Full portfolio valuation on this date.
+
+        Returns
+        -------
+        PortfolioValuation
+            Full portfolio valuation on this date.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def daily_mtm_pnl(self) -> Money | None:
+        """Change in marked value since the previous snapshot, excluding paid cashflows. None at the first snapshot or in PV-only mode.
+
+        Returns
+        -------
+        Money | None
+            Change in marked value since the previous snapshot, excluding paid cashflows. None at the first snapshot or in PV-only mode.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def cumulative_mtm_pnl(self) -> Money | None:
+        """Change in marked value since the first snapshot, excluding paid cashflows. None at the first snapshot or in PV-only mode.
+
+        Returns
+        -------
+        Money | None
+            Change in marked value since the first snapshot, excluding paid cashflows. None at the first snapshot or in PV-only mode.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def attribution(self) -> PortfolioAttribution | None:
+        """Factor attribution from the prior snapshot, available only in full-attribution mode after the first step.
+
+        Returns
+        -------
+        PortfolioAttribution | None
+            Factor attribution from the prior snapshot, available only in full-attribution mode after the first step.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+class ReplaySummary:
+    """Aggregate mark-to-market and drawdown diagnostics across the replay.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.portfolio import Portfolio, ReplayConfig, replay_portfolio
+    >>> portfolio = Portfolio.builder("replay", "USD", "2025-01-15").build()
+    >>> run = replay_portfolio(portfolio, [("2025-01-15", MarketContext())], ReplayConfig("pv_only"))
+    >>> run.summary.num_steps
+    1
+    """
+
+    @property
+    def start_date(self) -> datetime.date:
+        """First valued snapshot date.
+
+        Returns
+        -------
+        datetime.date
+            First valued snapshot date.
+
+        Raises
+        ------
+        ValueError
+            If the recorded date is outside the Python datetime range.
+        """
+        ...
+
+    @property
+    def end_date(self) -> datetime.date:
+        """Last valued snapshot date.
+
+        Returns
+        -------
+        datetime.date
+            Last valued snapshot date.
+
+        Raises
+        ------
+        ValueError
+            If the recorded date is outside the Python datetime range.
+        """
+        ...
+
+    @property
+    def num_steps(self) -> int:
+        """Number of successfully valued snapshots, including the first.
+
+        Returns
+        -------
+        int
+            Number of successfully valued snapshots, including the first.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def start_value(self) -> Money:
+        """Portfolio value at the first snapshot in the reporting currency.
+
+        Returns
+        -------
+        Money
+            Portfolio value at the first snapshot in the reporting currency.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def end_value(self) -> Money:
+        """Portfolio value at the last snapshot in the reporting currency.
+
+        Returns
+        -------
+        Money
+            Portfolio value at the last snapshot in the reporting currency.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def total_mtm_pnl(self) -> Money:
+        """End value minus start value, excluding paid cashflows, in reporting currency.
+
+        Returns
+        -------
+        Money
+            End value minus start value, excluding paid cashflows, in reporting currency.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def max_mtm_drawdown(self) -> Money:
+        """Largest marked-value decline from a prior peak measured in the reporting currency.
+
+        Returns
+        -------
+        Money
+            Largest marked-value decline from a prior peak measured in the reporting currency.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def max_mtm_drawdown_pct(self) -> float:
+        """Largest marked-value decline as a fraction of a positive peak. Zero if there was no positive peak.
+
+        Returns
+        -------
+        float
+            Largest marked-value decline as a fraction of a positive peak. Zero if there was no positive peak.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def max_mtm_drawdown_peak_date(self) -> datetime.date:
+        """Peak date for the largest currency drawdown.
+
+        Returns
+        -------
+        datetime.date
+            Peak date for the largest currency drawdown.
+
+        Raises
+        ------
+        ValueError
+            If the recorded date is outside the Python datetime range.
+        """
+        ...
+
+    @property
+    def max_mtm_drawdown_trough_date(self) -> datetime.date:
+        """Trough date for the largest currency drawdown.
+
+        Returns
+        -------
+        datetime.date
+            Trough date for the largest currency drawdown.
+
+        Raises
+        ------
+        ValueError
+            If the recorded date is outside the Python datetime range.
+        """
+        ...
+
+    @property
+    def max_mtm_drawdown_pct_peak_date(self) -> datetime.date | None:
+        """Peak date for the largest fractional drawdown, or None if no positive peak produced a decline.
+
+        Returns
+        -------
+        datetime.date | None
+            Peak date for the largest fractional drawdown, or None if no positive peak produced a decline.
+
+        Raises
+        ------
+        ValueError
+            If the recorded date is outside the Python datetime range.
+        """
+        ...
+
+    @property
+    def max_mtm_drawdown_pct_trough_date(self) -> datetime.date | None:
+        """Trough date for the largest fractional drawdown, or None if no positive peak produced a decline.
+
+        Returns
+        -------
+        datetime.date | None
+            Trough date for the largest fractional drawdown, or None if no positive peak produced a decline.
+
+        Raises
+        ------
+        ValueError
+            If the recorded date is outside the Python datetime range.
+        """
+        ...
 
 class ReplayResult:
     """
@@ -35,7 +430,7 @@ class ReplayResult:
     ...         "max_mtm_drawdown_trough_date": "2025-01-15",
     ...     },
     ... }
-    >>> ReplayResult.from_json(json.dumps(doc)).summary["num_steps"]
+    >>> ReplayResult.from_json(json.dumps(doc)).summary.num_steps
     0
     """
 
@@ -71,34 +466,32 @@ class ReplayResult:
         ...
 
     @property
-    def steps(self) -> list[dict[str, object]]:
-        """
-        Per-step output as records, full valuations included.
+    def steps(self) -> list[ReplayStep]:
+        """Valuations and optional P&L by snapshot date, in timeline order.
 
         Returns
         -------
-        list[dict[str, object]]
-            JSON-shaped view of the canonical Rust field.
+        list[ReplayStep]
+            Valuations and optional P&L by snapshot date, in timeline order.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored or derived value.
+        This accessor does not raise.
         """
         ...
 
     @property
-    def summary(self) -> dict[str, object]:
-        """
-        Aggregate statistics across the full replay.
+    def summary(self) -> ReplaySummary:
+        """Aggregate valuation and marked drawdown for the run.
 
         Returns
         -------
-        dict[str, object]
-            JSON-shaped view of the canonical Rust field.
+        ReplaySummary
+            Aggregate valuation and marked drawdown for the run.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored or derived value.
+        This accessor does not raise.
         """
         ...
 
@@ -157,7 +550,7 @@ class ReplayResult:
 def replay_portfolio(
     portfolio: Portfolio | str,
     snapshots: list[tuple[datetime.date | str, MarketContext | str]] | list[dict[str, Any]] | str,
-    config: dict[str, Any] | str,
+    config: ReplayConfig | dict[str, Any] | str,
 ) -> ReplayResult:
     """
     Replay a portfolio through dated market snapshots.
@@ -171,7 +564,7 @@ def replay_portfolio(
         (dates as ``datetime.date`` or ISO strings), JSON-shaped
         ``{"date": "YYYY-MM-DD", "market": {...}}`` dicts, or the canonical
         JSON array string.
-    config : dict | str
+    config : ReplayConfig | dict | str
         ``ReplayConfig`` as a dict or JSON string: required ``mode``
         (``"pv_only"``, ``"pv_and_pnl"`` or ``"full_attribution"``) and
         optional ``attribution_method``, ``valuation_options`` and

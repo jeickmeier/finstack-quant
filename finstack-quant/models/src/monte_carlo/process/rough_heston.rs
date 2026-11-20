@@ -117,7 +117,7 @@ struct RawRoughHestonParams {
     /// Long-run variance level (θ > 0).
     theta: f64,
     /// Volatility of variance — vol-of-vol (σᵥ > 0).
-    sigma_v: f64,
+    vol_of_vol: f64,
     /// Spot–variance correlation ρ ∈ (−1, 1).
     rho: f64,
     /// Initial variance (v₀ > 0).
@@ -134,7 +134,7 @@ impl From<RawRoughHestonParams> for RoughHestonParams {
                 v0: raw.v0,
                 kappa: raw.kappa,
                 theta: raw.theta,
-                sigma_v: raw.sigma_v,
+                vol_of_vol: raw.vol_of_vol,
                 rho: raw.rho,
             },
         }
@@ -231,7 +231,7 @@ impl StochasticProcess for RoughHestonProcess {
         // σ_S = √v · S
         out[0] = v.sqrt() * s;
         // σ_v = σᵥ √v — formal
-        out[1] = self.params.model.sigma_v * v.sqrt();
+        out[1] = self.params.model.vol_of_vol * v.sqrt();
         Ok(())
     }
 
@@ -253,7 +253,7 @@ impl ProcessMetadata for RoughHestonProcess {
         params.add_param("H", self.params.hurst.get_value());
         params.add_param("kappa", self.params.model.kappa);
         params.add_param("theta", self.params.model.theta);
-        params.add_param("sigma_v", self.params.model.sigma_v);
+        params.add_param("vol_of_vol", self.params.model.vol_of_vol);
         params.add_param("rho", self.params.model.rho);
         params.add_param("v0", self.params.model.v0);
 
@@ -283,7 +283,7 @@ mod tests {
                 v0: 0.04,
                 kappa: 2.0,
                 theta: 0.04,
-                sigma_v: 0.3,
+                vol_of_vol: 0.3,
                 rho: -0.7,
             },
         }
@@ -301,7 +301,7 @@ mod tests {
                 v0: 0.04,
                 kappa: 2.0,
                 theta: 0.04,
-                sigma_v: 0.3,
+                vol_of_vol: 0.3,
                 rho: -0.7,
             },
         };
@@ -325,7 +325,7 @@ mod tests {
                 v0: 0.04,
                 kappa: 2.0,
                 theta: 0.04,
-                sigma_v: 0.3,
+                vol_of_vol: 0.3,
                 rho: -0.7,
             },
         }
@@ -343,7 +343,7 @@ mod tests {
                 v0: 0.04,
                 kappa: 2.0,
                 theta: 0.04,
-                sigma_v: 0.3,
+                vol_of_vol: 0.3,
                 rho: -0.7,
             },
         }
@@ -361,7 +361,7 @@ mod tests {
                 v0: 0.04,
                 kappa: 0.0,
                 theta: 0.04,
-                sigma_v: 0.3,
+                vol_of_vol: 0.3,
                 rho: -0.7,
             },
         }
@@ -375,7 +375,7 @@ mod tests {
                 v0: 0.04,
                 kappa: -1.0,
                 theta: 0.04,
-                sigma_v: 0.3,
+                vol_of_vol: 0.3,
                 rho: -0.7,
             },
         }
@@ -393,7 +393,7 @@ mod tests {
                 v0: 0.04,
                 kappa: 2.0,
                 theta: 0.0,
-                sigma_v: 0.3,
+                vol_of_vol: 0.3,
                 rho: -0.7,
             },
         }
@@ -411,7 +411,7 @@ mod tests {
                 v0: 0.04,
                 kappa: 2.0,
                 theta: 0.04,
-                sigma_v: 0.0,
+                vol_of_vol: 0.0,
                 rho: -0.7,
             },
         }
@@ -429,7 +429,7 @@ mod tests {
                 v0: 0.04,
                 kappa: 2.0,
                 theta: 0.04,
-                sigma_v: 0.3,
+                vol_of_vol: 0.3,
                 rho: 1.5,
             },
         }
@@ -443,7 +443,7 @@ mod tests {
                 v0: 0.04,
                 kappa: 2.0,
                 theta: 0.04,
-                sigma_v: 0.3,
+                vol_of_vol: 0.3,
                 rho: -1.5,
             },
         }
@@ -461,7 +461,7 @@ mod tests {
                 v0: 0.0,
                 kappa: 2.0,
                 theta: 0.04,
-                sigma_v: 0.3,
+                vol_of_vol: 0.3,
                 rho: -0.7,
             },
         }
@@ -482,7 +482,7 @@ mod tests {
                         v0: 0.04,
                         kappa: 2.0,
                         theta: 0.04,
-                        sigma_v: 0.3,
+                        vol_of_vol: 0.3,
                         rho,
                     },
                 }
@@ -502,7 +502,7 @@ mod tests {
                 v0: 0.04,
                 kappa: 2.0,
                 theta: 0.04,
-                sigma_v: 0.3,
+                vol_of_vol: 0.3,
                 rho: -0.7,
             },
         });
@@ -521,7 +521,7 @@ mod tests {
                 v0: 0.04,
                 kappa: 2.0,
                 theta: 0.04,
-                sigma_v: 0.3,
+                vol_of_vol: 0.3,
                 rho: -0.7,
             },
         });
@@ -556,7 +556,7 @@ mod tests {
                 v0: 0.04,
                 kappa: 2.0,
                 theta: 0.04,
-                sigma_v: 0.3,
+                vol_of_vol: 0.3,
                 rho: -0.7,
             },
         });

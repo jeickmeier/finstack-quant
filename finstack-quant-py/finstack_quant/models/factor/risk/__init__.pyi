@@ -9,11 +9,15 @@ Examples
 
 from __future__ import annotations
 from finstack_quant.models.factor.risk._functions import (
+    RiskMeasure as RiskMeasure,
     decompose_factors as decompose_factors,
     position_component_var as position_component_var,
 )
 from finstack_quant.models.factor.risk._report import (
+    PositionRiskBudget as PositionRiskBudget,
     PositionRiskReport as PositionRiskReport,
+    PositionRiskRequest as PositionRiskRequest,
+    PositionRiskSource as PositionRiskSource,
     position_risk_report as position_risk_report,
 )
 from finstack_quant.models.factor.risk._budget import (
@@ -45,11 +49,15 @@ __all__ = [
     "PositionEsContribution",
     "PositionFactorContribution",
     "PositionResidualContribution",
+    "PositionRiskBudget",
     "PositionRiskDecomposition",
     "PositionRiskReport",
+    "PositionRiskRequest",
+    "PositionRiskSource",
     "PositionVarContribution",
     "RiskBudgetResult",
     "RiskDecomposition",
+    "RiskMeasure",
     "StressAttribution",
     "StressPositionEntry",
     "TailScenarioBreakdown",

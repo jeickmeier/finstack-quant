@@ -54,6 +54,7 @@ impl PyAccountType {
     }
 
     /// String identifier used in JSON (``"asset"``, ``"liability"``, ``"equity"``).
+    #[getter]
     fn value(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_label(self).map_err(crate::errors::core_to_py)
     }

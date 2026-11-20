@@ -3,4 +3,4 @@
 pub(crate) mod metrics;
 mod types;
 
-pub use types::EquityTotalReturnFuture;
+pub use types::{EquityTotalReturnFuture, EquityTotalReturnFutureBuilder};

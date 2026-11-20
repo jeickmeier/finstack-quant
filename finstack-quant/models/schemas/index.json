@@ -181,15 +181,6 @@
       "type_name": "CosConfig"
     },
     {
-      "$id": "https://finstack_quant.dev/schemas/models/1/cos_market_params.schema.json",
-      "bytes": 1878,
-      "kind": "input",
-      "path": "schemas/models/1/cos_market_params.schema.json",
-      "summary": "Option and market inputs of the COS Fourier pricers.",
-      "title": "CosMarketParams",
-      "type_name": "CosMarketParams"
-    },
-    {
       "$id": "https://finstack_quant.dev/schemas/models/1/credit_exposure.schema.json",
       "bytes": 1145,
       "kind": "component",
@@ -352,6 +343,15 @@
       "type_name": "GbmParams"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/models/1/heston_fourier_settings.schema.json",
+      "bytes": 882,
+      "kind": "input",
+      "path": "schemas/models/1/heston_fourier_settings.schema.json",
+      "summary": "Numerical settings for Heston Fourier integration.",
+      "title": "HestonFourierSettings",
+      "type_name": "HestonFourierSettings"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/models/1/heston_mc_settings.schema.json",
       "bytes": 20816,
       "kind": "input",
@@ -362,21 +362,12 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/heston_params.schema.json",
-      "bytes": 967,
+      "bytes": 973,
       "kind": "input",
       "path": "schemas/models/1/heston_params.schema.json",
       "summary": "Heston stochastic volatility model parameters.",
       "title": "HestonParams",
       "type_name": "HestonParams"
-    },
-    {
-      "$id": "https://finstack_quant.dev/schemas/models/1/heston_pricing_params.schema.json",
-      "bytes": 1314,
-      "kind": "input",
-      "path": "schemas/models/1/heston_pricing_params.schema.json",
-      "summary": "Market inputs for closed-form Heston pricing.",
-      "title": "HestonPricingParams",
-      "type_name": "HestonPricingParams"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/hull_white1_f_params.schema.json",
@@ -505,6 +496,15 @@
       "type_name": "LrmGreeks"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/models/1/lsmc_result.schema.json",
+      "bytes": 27264,
+      "kind": "output",
+      "path": "schemas/models/1/lsmc_result.schema.json",
+      "summary": "Least-squares Monte Carlo price estimate and fitted exercise diagnostics.",
+      "title": "LsmcResult",
+      "type_name": "LsmcResult"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/models/1/lvar_bangia_scalar.schema.json",
       "bytes": 1085,
       "kind": "component",
@@ -631,6 +631,15 @@
       "type_name": "OptionCalculationResult"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/models/1/option_contract_params.schema.json",
+      "bytes": 1737,
+      "kind": "input",
+      "path": "schemas/models/1/option_contract_params.schema.json",
+      "summary": "Spot, strike, carry, expiry and direction shared by option pricing models.",
+      "title": "OptionContractParams",
+      "type_name": "OptionContractParams"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/models/1/option_market_params.schema.json",
       "bytes": 1898,
       "kind": "input",
@@ -650,7 +659,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/path_simulation_spec.schema.json",
-      "bytes": 44319,
+      "bytes": 44439,
       "kind": "input",
       "path": "schemas/models/1/path_simulation_spec.schema.json",
       "summary": "Complete, serializable description of one path simulation.",
@@ -740,7 +749,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/process_spec.schema.json",
-      "bytes": 33622,
+      "bytes": 33692,
       "kind": "input",
       "path": "schemas/models/1/process_spec.schema.json",
       "summary": "Stochastic process to simulate, with its parameters.",
@@ -821,7 +830,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/rough_heston_fourier_params.schema.json",
-      "bytes": 1138,
+      "bytes": 1144,
       "kind": "input",
       "path": "schemas/models/1/rough_heston_fourier_params.schema.json",
       "summary": "Rough Heston model parameters for Fourier-based European option pricing.",
@@ -830,7 +839,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/rough_heston_params.schema.json",
-      "bytes": 2151,
+      "bytes": 2157,
       "kind": "input",
       "path": "schemas/models/1/rough_heston_params.schema.json",
       "summary": "Rough Heston model parameters.",

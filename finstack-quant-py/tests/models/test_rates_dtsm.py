@@ -3,6 +3,7 @@
 import datetime
 import pickle
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -97,3 +98,18 @@ def test_reextracting_factors_clears_stale_var_state() -> None:
     assert replacement.q_cov is None
     with pytest.raises(ValueError, match="fit_var"):
         replacement.forecast(1)
+
+
+def test_yield_panel_tenor_labels_and_numpy_axes() -> None:
+    yields = np.asarray([[0.021, 0.033], [0.025, 0.035], [0.023, 0.037]])
+    frame = pd.DataFrame(yields, columns=["6M", "2Y"], index=pd.to_datetime(DATES[:3]))
+    panel = YieldPanel.from_dataframe(frame)
+    assert panel.tenors == [0.5, 2.0]
+    assert panel.dates == DATES[:3]
+    copied = panel.to_numpy()
+    assert copied.dtype == np.float64
+    np.testing.assert_array_equal(copied, yields)
+    copied[0, 1] = 1.0
+    np.testing.assert_array_equal(panel.to_numpy(), yields)
+    with pytest.raises((TypeError, ValueError)):
+        YieldPanel.from_dataframe(frame.set_axis(["invalid", "2025-01-02", "2025-01-03"]))

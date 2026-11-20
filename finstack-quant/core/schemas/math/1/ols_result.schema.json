@@ -1,0 +1,70 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/math/1/ols_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Ordinary least-squares coefficients, residuals and fit diagnostics.",
+  "properties": {
+    "adj_r_squared": {
+      "description": "Coefficient of determination adjusted for residual degrees of freedom.",
+      "format": "double",
+      "type": "number"
+    },
+    "coefficients": {
+      "description": "Fitted slope per input feature, in column order.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "intercept": {
+      "description": "Fitted constant term when the regression includes one.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "n_features": {
+      "description": "Number of slope coefficients, excluding the intercept.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "n_obs": {
+      "description": "Number of observations used in the fit.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "r_squared": {
+      "description": "Coefficient of determination, centered when a constant is fitted.",
+      "format": "double",
+      "type": "number"
+    },
+    "residual_std_error": {
+      "description": "Residual standard error in response units.",
+      "format": "double",
+      "type": "number"
+    },
+    "residuals": {
+      "description": "Observed minus fitted response in input row order.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "coefficients",
+    "r_squared",
+    "adj_r_squared",
+    "residual_std_error",
+    "residuals",
+    "n_obs",
+    "n_features"
+  ],
+  "title": "OlsResult",
+  "type": "object"
+}

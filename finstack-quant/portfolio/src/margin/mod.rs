@@ -60,9 +60,31 @@
 //! ```
 
 mod aggregator;
+mod csr_quotes;
+mod exposure;
+mod frtb;
+mod girr_quotes;
 mod netting_set;
+mod regulatory_quotes;
 mod results;
 mod wire;
 
 pub use aggregator::portfolio_margin;
+pub use csr_quotes::{
+    CsrQuoteClassification, CsrQuoteDelta, CsrQuoteRisk, CsrQuoteSource, csr_quote_delta,
+};
+pub use girr_quotes::{
+    GirrQuoteDelta, GirrQuoteRisk, GirrQuoteSource, GirrQuoteTarget, girr_quote_delta,
+};
+pub use regulatory_quotes::RegulatoryQuoteReprice;
 pub use results::{NettingSetMargin, PortfolioMarginResult};
+
+pub use frtb::{
+    FrtbUnmappedPosition, OrdinaryDeltaStatus, PortfolioFrtbConfig,
+    PortfolioFrtbSensitivitiesResult, portfolio_frtb_sensitivities,
+};
+
+pub use exposure::{
+    ExposureCashVm, ExposureFactor, ExposureSimulationConfig, instrument_exposure_profile,
+    portfolio_exposure_profile,
+};

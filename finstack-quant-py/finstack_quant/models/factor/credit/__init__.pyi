@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import datetime
 from collections.abc import Mapping
+from finstack_quant.models.factor.risk import RiskMeasure
 from typing import Any
 
 import numpy as np
@@ -1107,7 +1108,7 @@ class FactorCovarianceForecast:
     def factor_model_at(
         self,
         horizon: str | VolHorizon,
-        risk_measure: str | Mapping[str, Any] | None = None,
+        risk_measure: RiskMeasure | str | Mapping[str, Any] | None = None,
     ) -> FactorModelConfig:
         """
             Return a typed portfolio-ready factor model at a horizon.

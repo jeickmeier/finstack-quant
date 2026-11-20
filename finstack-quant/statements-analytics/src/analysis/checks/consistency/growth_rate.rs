@@ -91,7 +91,7 @@ impl Check for GrowthRateConsistency {
                         period: Some(*curr_pid),
                         materiality: Some(Materiality {
                             absolute: abs_change,
-                            relative_pct: Some(growth.abs() * 100.0),
+                            relative: Some(growth.abs()),
                             reference_value: prev_val,
                             reference_label: format!("prior_{}", node.as_str()),
                         }),

@@ -15,6 +15,9 @@ from finstack_quant.models import (
 BsGreeks = _models.BsGreeks
 ForwardGreeks = _models.ForwardGreeks
 OptionCalculationResult = _models.OptionCalculationResult
+OptionMarketParams = _models.OptionMarketParams
+OptionContractParams = _models.OptionContractParams
+HestonParams = _models.HestonParams
 asian_option_price = _models.asian_option_price
 bachelier_greeks = _models.bachelier_greeks
 bachelier_price = _models.bachelier_price
@@ -28,6 +31,8 @@ bs_cos_price = _models.bs_cos_price
 bs_greeks = _models.bs_greeks
 bs_implied_vol = _models.bs_implied_vol
 bs_price = _models.bs_price
+bs_price_many = _models.bs_price_many
+bs_greeks_many = _models.bs_greeks_many
 heston_price = _models.heston_price
 lookback_option_price = _models.lookback_option_price
 merton_jump_cos_price = _models.merton_jump_cos_price
@@ -39,7 +44,10 @@ vg_cos_price = _models.vg_cos_price
 __all__: list[str] = [
     "BsGreeks",
     "ForwardGreeks",
+    "HestonParams",
     "OptionCalculationResult",
+    "OptionContractParams",
+    "OptionMarketParams",
     "asian_option_price",
     "bachelier_greeks",
     "bachelier_price",
@@ -51,8 +59,10 @@ __all__: list[str] = [
     "black_shifted_vega",
     "bs_cos_price",
     "bs_greeks",
+    "bs_greeks_many",
     "bs_implied_vol",
     "bs_price",
+    "bs_price_many",
     "correlation",
     "credit",
     "factor",

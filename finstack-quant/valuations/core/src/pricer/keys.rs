@@ -191,6 +191,8 @@ pub enum InstrumentType {
     VolatilityIndexFutureOption = 92,
     /// Asset-backed facility (warehouse line against a collateral pool).
     AssetBackedFacility = 93,
+    /// Single note owned by a structured-credit waterfall.
+    StructuredCreditTranche = 94,
 }
 
 use strum::IntoEnumIterator;
@@ -228,6 +230,7 @@ impl InstrumentType {
             InstrumentType::Repo => "repo",
             InstrumentType::Fra => "forward_rate_agreement",
             InstrumentType::StructuredCredit => "structured_credit",
+            InstrumentType::StructuredCreditTranche => "structured_credit_tranche",
             InstrumentType::PrivateMarketsFund => "private_markets_fund",
             InstrumentType::RevolvingCredit => "revolving_credit",
             InstrumentType::AssetBackedFacility => "asset_backed_facility",

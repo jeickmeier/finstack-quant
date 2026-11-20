@@ -99,6 +99,29 @@ macro_rules! instrument_pricing_methods {
         }
     };
 }
+/// Bind named option Greeks to the same scalar metric pipeline as `metric()`.
+macro_rules! instrument_greek_methods {
+    ($ty:ident, $name:literal, $module:literal, [$($metric:ident),+ $(,)?]) => {
+        #[pymethods]
+        impl $ty {
+            $(
+                #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".", stringify!($metric)))]
+                #[pyo3(signature = (market, as_of, model="default"))]
+                fn $metric(
+                    &self,
+                    py: Python<'_>,
+                    market: &Bound<'_, PyAny>,
+                    as_of: &Bound<'_, PyAny>,
+                    model: &str,
+                ) -> PyResult<f64> {
+                    self.metric(py, market, as_of, stringify!($metric), model)
+                }
+            )+
+        }
+    };
+}
+
+pub(crate) use instrument_greek_methods;
 pub(crate) use instrument_pricing_methods;
 
 /// Stamp the envelope and builder surface of a typed instrument wrapper.

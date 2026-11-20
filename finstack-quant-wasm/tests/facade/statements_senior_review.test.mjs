@@ -281,6 +281,7 @@ test('empty explicit periods preserve the model builder for retry', () => {
   try {
     builder.valueScalar('revenue', { '2025Q1': 100 });
     builder.withMeta('marker', { retained: true });
+    builder.currency('EUR');
     assert.throws(
       () => builder.periodsExplicit({ calendar: 'gregorian', periods: [] }),
       /at least one period/
@@ -290,6 +291,7 @@ test('empty explicit periods preserve the model builder for retry', () => {
     const model = builder.build();
     assert.equal(model.nodes.revenue.values['2025Q1'], 100);
     assert.deepEqual(model.meta.marker, { retained: true });
+    assert.equal(model.meta.currency, 'EUR');
   } finally {
     builder.free();
   }

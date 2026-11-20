@@ -323,7 +323,7 @@ class CovenantForecast:
         -------
         pd.DataFrame
             Columns ``test_date`` (ISO string), ``projected_value``,
-            ``threshold``, ``headroom``, ``breach_probability``,
+            ``threshold``, ``headroom``, ``headroom_raw``, ``breach_probability``,
             ``breach_probability_stderr``; ``None`` where a value is not
             meaningful.
 
@@ -410,6 +410,21 @@ class CovenantForecast:
         list[float]
             Static threshold or step-down schedule value.
         """
+
+    @property
+    def headroom_raw(self) -> list[float | None]:
+        """Get the signed cushion in the covenant metric's original units.
+
+        Returns
+        -------
+        list of float or None
+            Signed distance per test date. Inactive and indeterminate dates are None.
+
+        Notes
+        -----
+        This property does not raise.
+        """
+        ...
 
     @property
     def headroom(self) -> list[float | None]:
@@ -626,6 +641,21 @@ class FutureBreach:
         """
 
     @property
+    def headroom_raw(self) -> float | None:
+        """Get the signed cushion in the covenant metric's original units.
+
+        Returns
+        -------
+        float or None
+            Signed distance when the metric and threshold support a numerical comparison.
+
+        Notes
+        -----
+        This property does not raise.
+        """
+        ...
+
+    @property
     def headroom(self) -> float | None:
         """
         Relative headroom.
@@ -782,7 +812,7 @@ def breaches_to_dataframe(breaches: list[FutureBreach]) -> pd.DataFrame:
     -------
     pd.DataFrame
         Columns ``covenant_id``, ``covenant_description``, ``breach_date``
-        (ISO string), ``projected_value``, ``threshold``, ``headroom``,
+        (ISO string), ``projected_value``, ``threshold``, ``headroom``, ``headroom_raw``,
         ``breach_probability``; typed and empty when there are no breaches.
 
     Raises

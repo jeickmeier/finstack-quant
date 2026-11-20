@@ -374,7 +374,17 @@ test('namespace results match their published result types', () => {
   const hazard = core.HazardCurve.flat('HZ', '2025-01-01', 0.02, 0.4, 'act_365f');
   try {
     const xva = margin.computeBilateralXva(
-      JSON.stringify({ times: [1.0, 2.0], mtm_values: [1e6, 1e6], epe: [1e6, 1e6], ene: [0, 0] }),
+      {
+        as_of: '2025-01-01',
+        currency: 'USD',
+        basis: { kind: 'external', source_id: 'type-test', policy_id: 'unsecured' },
+        dates: ['2025-01-01', '2026-01-01'],
+        times: [0, 1],
+        mtm_values: [1e6, 1e6],
+        epe: [1e6, 1e6],
+        ene: [0, 0],
+        diagnostics: { market_roll_failures: 0, valuation_failures: 0, total_time_points: 2 },
+      },
       hazard,
       hazard,
       discount,
@@ -550,7 +560,7 @@ test('namespace results match their published result types', () => {
     );
   const gordon = tornado({ type: 'gordon_growth', stable_growth_rate: 0.02 });
   const exitMultiple = tornado(
-    { type: 'exit_multiple', multiple: 8.0, terminal_metric: 999.0 },
+    { type: 'exit_multiple', multiple: 8.0 },
     {
       exit_multiple_metric_node: 'ebitda',
     }

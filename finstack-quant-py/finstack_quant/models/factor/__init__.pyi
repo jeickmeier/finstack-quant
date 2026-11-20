@@ -27,6 +27,11 @@ from finstack_quant.models.factor import credit as credit
 from finstack_quant.models.factor import risk as risk
 from finstack_quant.models.factor import schema as schema
 
+from finstack_quant.models.factor._definitions import (
+    FactorDefinition as FactorDefinition,
+    MarketMapping as MarketMapping,
+)
+
 class FactorCovarianceMatrix:
     """
     Validated factor covariance matrix with deterministic row-major storage.
@@ -106,6 +111,39 @@ class FactorCovarianceMatrix:
         ------
         ValueError
             If serialization fails.
+        """
+        ...
+
+    @staticmethod
+    def from_dataframe(df: pd.DataFrame) -> FactorCovarianceMatrix:
+        """Build a covariance matrix from labeled pandas rows and columns.
+
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            Annualized covariances in the factors' native units. Rows and columns
+            must contain the same unique string identifiers in the same order.
+
+        Returns
+        -------
+        FactorCovarianceMatrix
+            Validated covariance matrix using the frame's factor order.
+
+        Raises
+        ------
+        TypeError
+            If df is not a DataFrame or an axis contains non-string labels.
+        ValueError
+            If axes differ, values cannot convert to float64, or the matrix is
+            nonfinite, asymmetric or not positive semidefinite.
+
+        Examples
+        --------
+        >>> import pandas as pd
+        >>> from finstack_quant.models.factor import FactorCovarianceMatrix
+        >>> frame = pd.DataFrame([[0.04]], index=["equity"], columns=["equity"])
+        >>> FactorCovarianceMatrix.from_dataframe(frame).variance("equity")
+        0.04
         """
         ...
 
@@ -453,6 +491,8 @@ class FactorModelConfig:
 __all__ = [
     "FactorCovarianceMatrix",
     "FactorModelConfig",
+    "FactorDefinition",
+    "MarketMapping",
     "credit",
     "risk",
     "schema",

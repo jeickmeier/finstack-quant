@@ -46,6 +46,21 @@ impl JsCovenantEngine {
         JsCovenantEngine::default()
     }
 
+    /// Build a covenant engine from a validated standard template.
+    /// @param template - Standard template and threshold terms in their contractual units.
+    /// @returns An engine containing the authored covenant specifications.
+    /// @throws Error if the template is malformed or contains an invalid threshold.
+    #[wasm_bindgen(js_name = fromTemplate)]
+    pub fn from_template(
+        #[wasm_bindgen(unchecked_param_type = "generated.covenants.CovenantTemplate | string")]
+        template: JsValue,
+    ) -> Result<JsCovenantEngine, JsValue> {
+        let template = from_js_json(&template, "template")?;
+        Ok(Self {
+            inner: CovenantEngine::from_template(&template).map_err(to_js_err)?,
+        })
+    }
+
     /// Build an engine from covenant specifications.
     ///
     /// @param specs - `CovenantSpec` wire objects, for example the result of `covLite` or `lboStandard`; they are added in order.

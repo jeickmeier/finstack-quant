@@ -1007,3 +1007,72 @@ impl JsTrancheBuilder {
         to_js_value(&self.inner.take()?.build().map_err(to_js_err)?)
     }
 }
+
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCreditTranche;
+
+instrument_class!(
+    /// A standalone note priced against its original deal waterfall.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const note = valuations.instruments.StructuredCreditTranche.example();
+    /// console.log(note.trancheId);
+    /// note.free();
+    /// ```
+    JsStructuredCreditTranche, "StructuredCreditTranche", StructuredCreditTranche
+);
+factories!(JsStructuredCreditTranche, "StructuredCreditTranche", StructuredCreditTranche, {
+    /// Construct a note from the canonical structured-credit example.
+    /// @returns Standalone note with its originating waterfall and collateral.
+    /// @throws FinstackError if the sample deal or its note is invalid.
+    example as example,
+});
+instrument_pricing!(JsStructuredCreditTranche, "StructuredCreditTranche");
+getters!(JsStructuredCreditTranche, "StructuredCreditTranche", |note| {
+    /// Read the selected note identifier within the original deal.
+    /// @returns Contract identifier stored on the deal's tranche structure.
+    tranche_id as trancheId: "string" => text(note.tranche_id()),
+    /// Registered model used by the note when no model is selected.
+    /// @returns The deterministic discounting model.
+    default_model as defaultModel: "string" => text(finstack_quant_valuations::instruments::Instrument::default_model(note)),
+    /// Read the inherited deal attributes used for scenario selection.
+    /// @returns The attribute bag of the originating deal.
+    attributes as attributes: "generated.valuations.Attributes" => json(finstack_quant_valuations::instruments::Instrument::attributes(note)),
+});
+
+#[wasm_bindgen(js_class = StructuredCreditTranche)]
+impl JsStructuredCreditTranche {
+    /// Output the bare specification of the selected note.
+    /// @returns Standalone instrument ID, selected tranche ID and complete deal specification.
+    /// @throws FinstackError if the specification cannot be serialized.
+    #[wasm_bindgen(js_name = toDict, unchecked_return_type = "generated.valuations.StructuredCreditTranche")]
+    pub fn to_dict(&self) -> Result<JsValue, JsValue> {
+        crate::utils::to_js_value(&self.inner)
+    }
+
+    /// Report the market data used by the selected note's waterfall and discounting.
+    /// @returns Active pricing curves, fixings and other market identifiers.
+    /// @throws FinstackError if the originating deal cannot resolve dependencies.
+    #[wasm_bindgen(js_name = marketDependencies, unchecked_return_type = "generated.valuations.MarketDependencies")]
+    pub fn market_dependencies(&self) -> Result<JsValue, JsValue> {
+        super::market_dependencies(&self.inner)
+    }
+
+    /// Select one existing note as a priceable instrument.
+    /// @param deal - Originating deal, with its full collateral and waterfall structure.
+    /// @param trancheId - Exact identifier of a note within the deal.
+    /// @returns A standalone note with stable deal and note identity.
+    /// @throws FinstackError if the deal or note is invalid.
+    #[wasm_bindgen(js_name = fromDeal)]
+    pub fn from_deal(
+        deal: &JsStructuredCredit,
+        #[wasm_bindgen(js_name = "trancheId", unchecked_param_type = "string")] tranche_id: JsValue,
+    ) -> Result<JsStructuredCreditTranche, JsValue> {
+        let tranche_id = crate::utils::input::js_string(&tranche_id, "trancheId")?;
+        StructuredCreditTranche::from_deal(deal.inner.clone(), &tranche_id)
+            .map(|inner| Self { inner })
+            .map_err(crate::utils::to_js_err)
+    }
+}

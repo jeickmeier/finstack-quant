@@ -1,6 +1,7 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/valuations/typed_equity.rs``."""
 
 from __future__ import annotations
+from finstack_quant.valuations.instruments._pricing import PriceExtras
 
 import datetime
 from typing import Any, Literal
@@ -127,7 +128,7 @@ class EquityOption:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        extras: dict[str, Any] | str | None = None,
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -144,7 +145,7 @@ class EquityOption:
             Model key (``"black76"`` (European) or ``"tree"``).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        extras : dict[str, Any] or str, optional
+        extras : PriceExtras or dict[str, Any] or str, optional
             The rarer pricing inputs, as a dict or JSON text in the shape of the
             Rust ``PriceExtras``; every key is optional and an unknown key raises
             ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
@@ -361,10 +362,10 @@ class EquityOption:
     ) -> EquityOption:
         """
         Build a cash-settled European call or put (mirrors Rust
-        ``EquityOption::european``). The option binds to the generic market-data
-        ids ``"USD-OIS"`` (discount), ``"EQUITY-SPOT"`` (spot), ``"EQUITY-VOL"``
-        (volatility surface) and ``"EQUITY-DIVYIELD"`` (continuous dividend
-        yield); use :meth:`EquityOption.builder` to bind other ids.
+        ``EquityOption::european``). Market data IDs use
+        ``{currency}-OIS`` for discounting, ``{ticker}-SPOT`` for spot
+        and ``{ticker}-VOL`` for volatility. Continuous dividend yield
+        defaults to zero. Use :meth:`EquityOption.builder` to bind other IDs.
 
         Parameters
         ----------
@@ -400,7 +401,7 @@ class EquityOption:
         >>> from finstack_quant.valuations.instruments import EquityOption
         >>> opt = EquityOption.european("AAPL-C-200", "AAPL", 200.0, "2025-06-20", 100.0, "USD", "call")
         >>> (opt.option_type, opt.settlement, opt.spot_id)
-        ('call', 'cash', 'EQUITY-SPOT')
+        ('call', 'cash', 'AAPL-SPOT')
         """
         ...
     def implied_vol(

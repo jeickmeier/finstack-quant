@@ -1,0 +1,142 @@
+{
+  "$defs": {
+    "DcfMultipleShocks": {
+      "description": "Explicit low and high directions for an enterprise exit multiple.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Apply positive differences measured in multiple turns.",
+          "properties": {
+            "high": {
+              "$ref": "#/$defs/DecimalWire",
+              "description": "Difference from baseline to the higher multiple in turns."
+            },
+            "kind": {
+              "const": "absolute",
+              "type": "string"
+            },
+            "low": {
+              "$ref": "#/$defs/DecimalWire",
+              "description": "Difference from baseline to the lower multiple in turns."
+            }
+          },
+          "required": [
+            "kind",
+            "low",
+            "high"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Apply positive fractions of the nonzero baseline multiple.",
+          "properties": {
+            "high": {
+              "$ref": "#/$defs/DecimalWire",
+              "description": "Proportion of baseline added to it."
+            },
+            "kind": {
+              "const": "relative",
+              "type": "string"
+            },
+            "low": {
+              "$ref": "#/$defs/DecimalWire",
+              "description": "Proportion of baseline subtracted from it."
+            }
+          },
+          "required": [
+            "kind",
+            "low",
+            "high"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "DcfRateShocks": {
+      "additionalProperties": false,
+      "description": "Decimal-rate distances in the low and high directions from an admitted rate.",
+      "properties": {
+        "high": {
+          "$ref": "#/$defs/DecimalWire",
+          "description": "Positive difference from the baseline to the requested higher rate."
+        },
+        "low": {
+          "$ref": "#/$defs/DecimalWire",
+          "description": "Positive difference from the baseline to the requested lower rate."
+        }
+      },
+      "required": [
+        "low",
+        "high"
+      ],
+      "type": "object"
+    },
+    "DcfTerminalShocks": {
+      "description": "Terminal dimension selected for fixed-statement DCF sensitivity.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Shock stable growth while holding high growth and half-life fixed.",
+          "properties": {
+            "parameter": {
+              "const": "stable_growth",
+              "type": "string"
+            },
+            "shocks": {
+              "$ref": "#/$defs/DcfRateShocks"
+            }
+          },
+          "required": [
+            "parameter",
+            "shocks"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Shock the exit multiple while holding the same enterprise metric fixed.",
+          "properties": {
+            "parameter": {
+              "const": "exit_multiple",
+              "type": "string"
+            },
+            "shocks": {
+              "$ref": "#/$defs/DcfMultipleShocks"
+            }
+          },
+          "required": [
+            "parameter",
+            "shocks"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "DecimalWire": {
+      "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
+      "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_shocks.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Independent WACC and terminal value assumption shocks.",
+  "properties": {
+    "terminal": {
+      "$ref": "#/$defs/DcfTerminalShocks",
+      "description": "Low and high terminal shocks in the compatible terminal dimension."
+    },
+    "wacc": {
+      "$ref": "#/$defs/DcfRateShocks",
+      "description": "Positive low and high WACC distances in decimal rate units."
+    }
+  },
+  "required": [
+    "wacc",
+    "terminal"
+  ],
+  "title": "DcfSensitivityShocks",
+  "type": "object"
+}

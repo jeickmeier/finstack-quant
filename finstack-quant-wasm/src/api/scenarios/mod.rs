@@ -82,24 +82,16 @@ pub fn compose_scenarios(
     crate::utils::to_js_value(&composed)
 }
 
-/// Validate a scenario specification JSON without executing it.
-///
-/// Returns `undefined` when the spec is valid, throws on error. This mirrors
-/// the Python `validate_scenario_spec` API, which returns `None` — an invalid
-/// spec raises rather than returning a falsy value, so
-/// `if (validateScenarioSpec(s))` is not a validity check.
-///
-/// # Errors
-///
-/// Rejects malformed or schema-incompatible `json_str`, a blank scenario ID,
-/// multiple time-roll operations, invalid operation identifiers or numeric
-/// fields, or variant-specific operation violations.
-/// @param jsonStr - Scenario specification JSON string to deserialize and validate.
-#[wasm_bindgen(js_name = validateScenarioSpec)]
+/// Check scenario structure and return diagnostics without applying market effects.
+/// @param scenario - Bare typed scenario object or JSON text in the canonical ScenarioSpec shape.
+/// @returns Structural errors, advisory diagnostics, instrument requirements and operation count.
+/// @throws FinstackWasmError if the input cannot be decoded into the canonical shape or the report cannot be serialized.
+#[wasm_bindgen(js_name = validateScenarioSpec, unchecked_return_type = "generated.scenarios.ScenarioValidationReport")]
 pub fn validate_scenario_spec(
-    #[wasm_bindgen(js_name = "jsonStr", unchecked_param_type = "JsonInput")] json_str: JsValue,
-) -> Result<(), JsValue> {
-    scenario_spec(&json_str, "jsonStr").map(|_| ())
+    #[wasm_bindgen(unchecked_param_type = "generated.scenarios.ScenarioSpec | JsonInput")] scenario: JsValue,
+) -> Result<JsValue, JsValue> {
+    let spec = from_js_json(&scenario, "scenario")?;
+    crate::utils::to_js_value(&finstack_quant_scenarios::validate_scenario_spec(&spec))
 }
 
 /// List all built-in template identifiers.
@@ -374,9 +366,12 @@ pub fn compute_horizon_return(
     let calendar_id = js_opt_string(calendar_id.as_ref(), "calendarId")?;
     use std::sync::Arc;
 
-    let boxed =
-        finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(instrument_json, None)
-            .map_err(to_js_err)?;
+    let boxed = finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
+        instrument_json,
+        None,
+        None,
+    )
+    .map_err(to_js_err)?;
     let instrument: Arc<dyn finstack_quant_valuations::instruments::Instrument> =
         Arc::from(boxed.into_boxed());
 

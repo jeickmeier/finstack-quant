@@ -47,8 +47,16 @@ use validity::{
 };
 
 fn call_reference() -> f64 {
-    bs_price(SPOT, STRIKE, RATE, DIV, VOL, 1.0, OptionType::Call)
-        .expect("Black-Scholes fixture reference")
+    bs_price(&finstack_quant_models::types::OptionMarketParams {
+        spot: SPOT,
+        strike: STRIKE,
+        rate: RATE,
+        dividend_yield: DIV,
+        volatility: VOL,
+        time_to_expiry: 1.0,
+        option_type: OptionType::Call,
+    })
+    .expect("Black-Scholes fixture reference")
 }
 
 fn scaling_european_paths(c: &mut Criterion) {
@@ -142,8 +150,22 @@ fn scaling_heston_paths(c: &mut Criterion) {
             };
             let first = engine.price(inputs).expect("Heston QE pricing");
             check_estimate(&first, n, n);
-            let reference = heston_call_price_fourier(SPOT, STRIKE, 1.0, process.params(), None)
-                .expect("converged Heston Fourier reference");
+            let reference = {
+                let dynamics = process.params();
+                heston_call_price_fourier(
+                    &finstack_quant_models::types::OptionContractParams {
+                        spot: SPOT,
+                        strike: STRIKE,
+                        rate: dynamics.r,
+                        dividend_yield: dynamics.q,
+                        time_to_expiry: 1.0,
+                        option_type: finstack_quant_models::types::OptionType::Call,
+                    },
+                    &dynamics.model,
+                    None,
+                )
+            }
+            .expect("converged Heston Fourier reference");
             // A 52-step QE discretization is approximate; this smoke envelope
             // retains sampling noise plus a fixed five-cent discretization allowance.
             check_against_reference(&first, reference, 0.05);
@@ -240,7 +262,7 @@ fn scaling_rough_heston_steps(c: &mut Criterion) {
                         v0: 0.04,
                         kappa: 2.0,
                         theta: 0.04,
-                        sigma_v: 0.3,
+                        vol_of_vol: 0.3,
                         rho: -0.7,
                     },
                 });
@@ -543,8 +565,16 @@ fn bench_lmm_caplet(c: &mut Criterion) {
         let reference = 1_000_000.0
             * params.accrual_factors[2]
             * discount_payment
-            * bs_price(0.035, 0.035, 0.0, 0.0, volatility, 2.0, OptionType::Call)
-                .expect("displaced-Black caplet reference");
+            * bs_price(&finstack_quant_models::types::OptionMarketParams {
+                spot: 0.035,
+                strike: 0.035,
+                rate: 0.0,
+                dividend_yield: 0.0,
+                volatility,
+                time_to_expiry: 2.0,
+                option_type: OptionType::Call,
+            })
+            .expect("displaced-Black caplet reference");
         // The nonterminal predictor/corrector discretization is approximate.
         // This smoke check is distinct from the tighter original-drift panel.
         check_against_reference(&checked, reference, 5.0);

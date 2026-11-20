@@ -1,14 +1,30 @@
 //! Regression coverage for valuation acceptance and monetary input contracts.
-use finstack_quant_core::dates::PeriodId;
+use finstack_quant_core::{dates::PeriodId, market_data::context::MarketContext};
 use finstack_quant_statements::{builder::ModelBuilder, types::AmountOrScalar};
-use finstack_quant_statements_analytics::analysis::{GoalSeekSpec, goal_seek};
+use finstack_quant_statements_analytics::analysis::{
+    GoalSeekCell, GoalSeekSearch, GoalSeekSpec, goal_seek,
+};
+use time::macros::date;
 
 #[test]
 fn discontinuous_objective_is_rejected_without_mutation() {
     let q = PeriodId::quarter(2025, 1).unwrap();
-    for bounds in [None, Some((-1., 1.))] {
+    for search in [
+        GoalSeekSearch::Bracket {
+            lower: -1.0,
+            upper: 1.0,
+        },
+        GoalSeekSearch::Bounded {
+            lower: -2.0,
+            upper: 2.0,
+            start: 1.0,
+            initial_half_width: 0.25,
+            max_expansions: 8,
+        },
+    ] {
         let model = {
             let mut model_builder = ModelBuilder::new("discontinuous");
+            model_builder.source_snapshot("goal-seek-fixture");
             model_builder.periods("2025Q1..Q1", None).unwrap();
             model_builder.value("driver", &[(q, AmountOrScalar::scalar(1.))]);
             model_builder
@@ -20,14 +36,24 @@ fn discontinuous_objective_is_rejected_without_mutation() {
         let error = goal_seek(
             &model,
             &GoalSeekSpec {
-                target_node: "target".to_string(),
-                target_period: q,
-                target_value: 0.5,
-                driver_node: "driver".to_string(),
-                driver_period: q,
+                target: GoalSeekCell {
+                    node: "target".into(),
+                    period: q,
+                },
+                target_value: AmountOrScalar::Scalar(0.5),
+                target_tolerance: AmountOrScalar::Scalar(1e-7),
+                driver: GoalSeekCell {
+                    node: "driver".into(),
+                    period: q,
+                },
+                driver_tolerance: 1e-10,
+                max_iterations: 100,
+                search,
+                as_of: date!(2024 - 12 - 31),
+                observed_through: date!(2024 - 12 - 31),
                 update_model: true,
-                bounds,
             },
+            &MarketContext::new(),
         )
         .expect_err("no attainable target");
         assert!(error.to_string().contains("residual"), "{error}");
@@ -46,6 +72,7 @@ fn credit_reports_and_checks_reject_mixed_currency_ratios() {
     let period = PeriodId::annual(2025).expect("valid annual period");
     let model = {
         let mut model_builder = ModelBuilder::new("mixed credit units");
+        model_builder.source_snapshot("goal-seek-fixture");
         model_builder.periods("2025..2025", None).unwrap();
         model_builder.value(
             "total_debt",
@@ -100,6 +127,7 @@ fn credit_checks_reject_overflowing_ratios() {
     let period = PeriodId::annual(2025).expect("valid annual period");
     let model = {
         let mut model_builder = ModelBuilder::new("overflowing credit ratio");
+        model_builder.source_snapshot("goal-seek-fixture");
         model_builder.periods("2025..2025", None).unwrap();
         model_builder.value("large", &[(period, AmountOrScalar::scalar(100.0))]);
         model_builder.value("small", &[(period, AmountOrScalar::scalar(1e-320))]);
@@ -137,6 +165,7 @@ fn credit_reports_reject_contradictory_numeric_and_monetary_values() {
     let period = PeriodId::annual(2025).expect("valid annual period");
     let model = {
         let mut model_builder = ModelBuilder::new("contradictory monetary projection");
+        model_builder.source_snapshot("goal-seek-fixture");
         model_builder.periods("2025..2025", None).unwrap();
         model_builder.value_money(
             "total_debt",
@@ -186,6 +215,7 @@ fn working_capital_rejects_currency_change_without_metadata() {
     let second = PeriodId::quarter(2025, 2).unwrap();
     let model = {
         let mut model_builder = ModelBuilder::new("changed working capital currency");
+        model_builder.source_snapshot("goal-seek-fixture");
         model_builder.periods("2025Q1..Q2", None).unwrap();
         model_builder.value_money(
             "wc",
@@ -242,6 +272,7 @@ fn growth_terminal_flow_rejects_missing_calendar_quarters() {
         .collect();
     let mut model = {
         let mut model_builder = ModelBuilder::new("sparse terminal year");
+        model_builder.source_snapshot("goal-seek-fixture");
         model_builder.periods("2025Q1..2026Q4", None).unwrap();
         model_builder.value_money("ufcf", &values);
         model_builder.with_meta("currency", serde_json::json!("USD"));
@@ -264,7 +295,11 @@ fn growth_terminal_flow_rejects_missing_calendar_quarters() {
     )
     .unwrap();
     assert_eq!(
-        valid.dcf_instrument.unwrap().terminal_flow_override,
+        valid
+            .dcf_instrument
+            .unwrap()
+            .normalized_annual_fcff
+            .map(|flow| flow.amount()),
         Some(100.0)
     );
     let missing_period = PeriodId::quarter(2026, 1).unwrap();
@@ -316,6 +351,7 @@ fn growth_terminal_flow_rejects_partial_week_at_calendar_year_boundary() {
         .collect();
     let model = {
         let mut model_builder = ModelBuilder::new("unaligned weekly terminal year");
+        model_builder.source_snapshot("goal-seek-fixture");
         model_builder.periods("2025W01..W52", None).unwrap();
         model_builder.value_money("ufcf", &values);
         model_builder.with_meta("currency", serde_json::json!("USD"));
@@ -364,6 +400,7 @@ fn growth_terminal_flow_uses_complete_year_across_half_year_periods() {
     let forecast = PeriodId::half(2025, 1).expect("valid half-year period");
     let model = {
         let mut model_builder = ModelBuilder::new("complete year across half-years");
+        model_builder.source_snapshot("goal-seek-fixture");
         model_builder
             .periods("2024H2..2025H1", Some("2024H2"))
             .unwrap();
@@ -393,7 +430,10 @@ fn growth_terminal_flow_uses_complete_year_across_half_year_periods() {
     )
     .unwrap();
     let dcf = result.dcf_instrument.unwrap();
-    assert_eq!(dcf.terminal_flow_override, Some(200.0));
+    assert_eq!(
+        dcf.normalized_annual_fcff.map(|flow| flow.amount()),
+        Some(200.0)
+    );
     let terminal_value = dcf.calculate_terminal_value().unwrap();
     assert!((terminal_value - 200.0 * 1.02 / (0.10 - 0.02)).abs() < 1e-10);
 }

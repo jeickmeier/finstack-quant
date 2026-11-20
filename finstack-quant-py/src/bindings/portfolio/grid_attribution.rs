@@ -232,11 +232,11 @@ impl PyGridCarinoLinkedResult {
 ///
 /// Parameters
 /// ----------
-/// portfolio_json : str | dict | list | pandas.DataFrame
+/// portfolio : str | dict | list | pandas.DataFrame
 ///     JSON array of ``GridPosition`` objects (``cell``, ``sector``,
 ///     ``weight``, ``total_return``) for the portfolio side; weights must
 ///     sum to ``1.0`` within ``1e-6``.
-/// benchmark_json : str | dict | list | pandas.DataFrame
+/// benchmark : str | dict | list | pandas.DataFrame
 ///     JSON array of ``GridPosition`` objects for the benchmark side; same
 ///     weight-sum requirement.
 ///
@@ -278,23 +278,21 @@ impl PyGridCarinoLinkedResult {
 /// >>> result.total_selection
 /// 0.01
 #[pyfunction]
-#[pyo3(text_signature = "(portfolio_json, benchmark_json)")]
+#[pyo3(text_signature = "(portfolio, benchmark)")]
 fn grid_attribution(
     py: Python<'_>,
-    portfolio_json: &Bound<'_, PyAny>,
-    benchmark_json: &Bound<'_, PyAny>,
+    portfolio: &Bound<'_, PyAny>,
+    benchmark: &Bound<'_, PyAny>,
 ) -> PyResult<PyGridAttributionResult> {
-    let portfolio_json =
-        crate::bindings::extract::extract_records_json(py, portfolio_json, "portfolio")?;
-    let benchmark_json =
-        crate::bindings::extract::extract_records_json(py, benchmark_json, "benchmark")?;
+    let portfolio = crate::bindings::extract::extract_records_json(py, portfolio, "portfolio")?;
+    let benchmark = crate::bindings::extract::extract_records_json(py, benchmark, "benchmark")?;
     Ok(PyGridAttributionResult {
         inner: py.detach(move || {
             let portfolio: Vec<finstack_quant_portfolio::grid_attribution::GridPosition> =
-                serde_json::from_str(&portfolio_json)
+                serde_json::from_str(&portfolio)
                     .map_err(|err| serde_json_to_py(err, "invalid grid portfolio JSON"))?;
             let benchmark: Vec<finstack_quant_portfolio::grid_attribution::GridPosition> =
-                serde_json::from_str(&benchmark_json)
+                serde_json::from_str(&benchmark)
                     .map_err(|err| serde_json_to_py(err, "invalid grid benchmark JSON"))?;
             finstack_quant_portfolio::grid_attribution::grid_attribution(&portfolio, &benchmark)
                 .map_err(portfolio_to_py)
@@ -313,7 +311,7 @@ fn grid_attribution(
 ///
 /// Parameters
 /// ----------
-/// periods_json : str | dict | list | pandas.DataFrame
+/// periods : str | dict | list | pandas.DataFrame
 ///     JSON array of ``GridAttributionResult`` objects, in chronological
 ///     order, each the wire output of :meth:`to_json` (or
 ///     ``GridAttributionResult.to_json()``).
@@ -327,7 +325,7 @@ fn grid_attribution(
 /// Raises
 /// ------
 /// PortfolioError
-///     If ``periods_json`` is empty; any consumed return or top-level effect
+///     If ``periods`` is empty; any consumed return or top-level effect
 ///     is non-finite; ``active_return`` disagrees with the portfolio-minus-
 ///     benchmark return; the three effect totals do not reconcile to
 ///     ``active_return`` within an overflow-safe scaled-L1 tolerance; a
@@ -335,7 +333,7 @@ fn grid_attribution(
 ///     per-period or compounded return is at or below -100% (outside the
 ///     Carino domain).
 /// ValueError
-///     If ``periods_json`` is malformed or does not match the
+///     If ``periods`` is malformed or does not match the
 ///     ``GridAttributionResult`` schema.
 ///
 /// Sources
@@ -354,16 +352,16 @@ fn grid_attribution(
 /// >>> round(result.linked_selection, 4)
 /// 0.0203
 #[pyfunction]
-#[pyo3(text_signature = "(periods_json)")]
+#[pyo3(text_signature = "(periods)")]
 fn grid_carino_link(
     py: Python<'_>,
-    periods_json: &Bound<'_, PyAny>,
+    periods: &Bound<'_, PyAny>,
 ) -> PyResult<PyGridCarinoLinkedResult> {
-    let periods_json = crate::bindings::extract::extract_records_json(py, periods_json, "periods")?;
+    let periods = crate::bindings::extract::extract_records_json(py, periods, "periods")?;
     Ok(PyGridCarinoLinkedResult {
         inner: py.detach(move || {
             let periods: Vec<finstack_quant_portfolio::grid_attribution::GridAttributionResult> =
-                serde_json::from_str(&periods_json)
+                serde_json::from_str(&periods)
                     .map_err(|err| serde_json_to_py(err, "invalid grid periods JSON"))?;
             finstack_quant_portfolio::grid_attribution::grid_carino_link(&periods)
                 .map_err(portfolio_to_py)

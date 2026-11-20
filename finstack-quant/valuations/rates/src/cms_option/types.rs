@@ -116,6 +116,33 @@ pub struct CmsOption {
 }
 
 impl CmsOption {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> CmsOptionBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .strike(self.strike)
+            .cms_tenor(self.cms_tenor)
+            .fixing_dates(self.fixing_dates.clone())
+            .payment_dates(self.payment_dates.clone())
+            .accrual_fractions(self.accrual_fractions.clone())
+            .option_type(self.option_type)
+            .notional(self.notional)
+            .day_count(self.day_count)
+            .index_id_opt(self.index_id.clone())
+            .cms_fixing_index_id_opt(self.cms_fixing_index_id.clone())
+            .swap_fixed_frequency_opt(self.swap_fixed_frequency)
+            .swap_float_frequency_opt(self.swap_float_frequency)
+            .swap_fixed_day_count_opt(self.swap_fixed_day_count)
+            .swap_float_day_count_opt(self.swap_float_day_count)
+            .discount_curve_id(self.discount_curve_id.clone())
+            .forward_curve_id(self.forward_curve_id.clone())
+            .vol_surface_id(self.vol_surface_id.clone())
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Reference swap observed by this instrument's CMS fixings.
     pub fn reference_swap(&self) -> CmsReferenceSwap<'_> {
         CmsReferenceSwap {

@@ -9,6 +9,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyList;
 
 pub(crate) mod credit;
+pub(crate) mod definitions;
 pub(crate) mod risk;
 mod schema;
 
@@ -62,11 +63,15 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "PositionEsContribution",
             "PositionFactorContribution",
             "PositionResidualContribution",
+            "PositionRiskBudget",
             "PositionRiskDecomposition",
             "PositionRiskReport",
+            "PositionRiskRequest",
+            "PositionRiskSource",
             "PositionVarContribution",
             "RiskBudgetResult",
             "RiskDecomposition",
+            "RiskMeasure",
             "StressAttribution",
             "StressPositionEntry",
             "TailScenarioBreakdown",
@@ -91,12 +96,16 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     // they live on `finstack_quant.models.factor`, not under `credit`.
     m.add_class::<credit::PyFactorCovarianceMatrix>()?;
     m.add_class::<credit::PyFactorModelConfig>()?;
+    m.add_class::<definitions::PyFactorDefinition>()?;
+    m.add_class::<definitions::PyMarketMapping>()?;
 
     let all = PyList::new(
         py,
         [
             "FactorCovarianceMatrix",
             "FactorModelConfig",
+            "FactorDefinition",
+            "MarketMapping",
             "credit",
             "risk",
             "schema",

@@ -12,9 +12,10 @@ mod operation_spec;
 mod schema;
 pub(crate) mod spec;
 
+use crate::bindings::pydoc::pydoc;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
-use spec::{PyScenarioSpec, PyTemplateMetadata};
+use spec::{PyScenarioSpec, PyScenarioValidationReport, PyTemplateMetadata};
 
 use crate::errors::scenarios_to_py;
 
@@ -27,11 +28,11 @@ fn builtin_registry() -> PyResult<&'static finstack_quant_scenarios::TemplateReg
 /// Parameters
 /// ----------
 /// curve_kind : CurveKind | str
-///     Canonical curve family: discount, forward, par_cds, inflation or commodity.
+///     Canonical curve family: discount, forward, par_cds or inflation.
 /// curve_ids : list[str]
 ///     Curve identifiers in execution order; empty input produces an empty list.
 /// bp : float
-///     Additive basis points, or percent of forward for commodity curves.
+///     Additive rate basis points.
 /// discount_curve_id : str | None, default None
 ///     Optional discount curve for ParCDS quote replay, copied onto each operation.
 ///
@@ -67,6 +68,7 @@ fn parallel_bp_many(
         bp,
         discount_curve_id.map(Into::into),
     )
+    .map_err(scenarios_to_py)?
     .into_iter()
     .map(operation_spec::PyOperationSpec::from_inner)
     .collect())
@@ -117,34 +119,23 @@ fn compose_scenarios(specs: Vec<PyScenarioSpec>) -> PyResult<PyScenarioSpec> {
     Ok(PyScenarioSpec::from_inner(composed))
 }
 
-/// Validate a scenario specification without applying it.
-///
-/// Parameters
-/// ----------
-/// scenario : ScenarioSpec | str
-///     Typed scenario or JSON-serialized ``ScenarioSpec``.
-///
-/// Returns
-/// -------
-/// None
-///     Returns nothing on success. An invalid spec raises instead, so
-///     ``if validate_scenario_spec(s):`` is not a validity check — call it
-///     bare and catch ``ValueError``.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the JSON is malformed or the spec fails validation. The message is
-///     the same one ``ScenarioSpec.validate()`` raises.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.scenarios import ScenarioSpec, validate_scenario_spec
-/// >>> validate_scenario_spec(ScenarioSpec("ok", []).to_json()) is None
-/// True
+#[doc = pydoc!("finstack_quant.scenarios", "validate_scenario_spec")]
 #[pyfunction]
-fn validate_scenario_spec(py: Python<'_>, scenario: &Bound<'_, PyAny>) -> PyResult<()> {
-    crate::bindings::extract::extract_scenario_spec(py, scenario).map(|_| ())
+fn validate_scenario_spec(scenario: &Bound<'_, PyAny>) -> PyResult<PyScenarioValidationReport> {
+    use finstack_quant_scenarios::validate_scenario_spec;
+    if let Ok(typed) = scenario.extract::<PyRef<'_, PyScenarioSpec>>() {
+        return Ok(PyScenarioValidationReport::from_inner(
+            validate_scenario_spec(&typed.inner),
+        ));
+    }
+
+    let json: String = scenario.extract()?;
+    let spec = serde_json::from_str(&json).map_err(|error| {
+        crate::errors::serde_json_to_py(error, "Failed to parse ScenarioSpec JSON")
+    })?;
+    Ok(PyScenarioValidationReport::from_inner(
+        validate_scenario_spec(&spec),
+    ))
 }
 
 /// List the identifiers of every built-in scenario template.
@@ -288,6 +279,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
 
     m.add_class::<PyScenarioSpec>()?;
+    m.add_class::<PyScenarioValidationReport>()?;
     m.add_class::<PyTemplateMetadata>()?;
     m.add_function(wrap_pyfunction!(compose_scenarios, &m)?)?;
     m.add_function(wrap_pyfunction!(parallel_bp_many, &m)?)?;
@@ -315,6 +307,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "OperationSpec",
             "RateBindingSpec",
             "ScenarioSpec",
+            "ScenarioValidationReport",
             "TemplateMetadata",
             "TenorMatchMode",
             "TimeRollMode",

@@ -49,4 +49,4 @@
 pub(crate) mod metrics;
 mod types;
 
-pub use types::Equity;
+pub use types::{Equity, EquityBuilder};

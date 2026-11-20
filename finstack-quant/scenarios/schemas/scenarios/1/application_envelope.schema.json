@@ -9614,7 +9614,7 @@
         },
         {
           "const": "commodity",
-          "description": "Commodity forward [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve).\n\n`bp` on parallel/node ops is percent of the price-curve forward\n(`5.0` = +5%), not a rate basis-point shock. Looking up a\n[`DiscountCurve`](finstack_quant_core::market_data::term_structures::DiscountCurve)\nunder this id is an error.",
+          "description": "Commodity forward [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve).\n\nPrice shocks use [`OperationSpec::CommodityCurveParallelPct`] or\n[`OperationSpec::CommodityCurveNodePct`].",
           "type": "string"
         }
       ]
@@ -10363,7 +10363,7 @@
     },
     "DiscountedCashFlow": {
       "additionalProperties": false,
-      "description": "Discounted Cash Flow instrument for corporate valuation.\n\nDCF values a company by discounting projected free cash flows and terminal value.\nThe equity value is calculated as: Enterprise Value - Net Debt (or structured bridge).\n\n# Equity Bridge\n\n[`equity_bridge`](Self::equity_bridge) is the single EV-to-equity channel; a\nflat net-debt deduction sets only its `total_debt` and `cash`.\n\n# Mid-Year Convention\n\nWhen [`mid_year_convention`](Self::mid_year_convention) is `true`, cash flows are\ndiscounted at `t` minus half the average flow spacing instead of `t` years,\nreflecting the assumption that cash flows arrive mid-period (standard IB/PE\npractice). For annual grids this is the classic `(t - 0.5)`; for sub-annual\ngrids the shift is half a period. `ExitMultiple` terminal values always\ndiscount at the full horizon (a point-in-time sale price).\n\n# Valuation Discounts\n\nPrivate company valuations can apply DLOM, DLOC, and other discounts via\n[`valuation_discounts`](Self::valuation_discounts). These discounts apply\nafter the EV-to-equity bridge, so the reported enterprise value remains a\npre-discount enterprise value and does not equal discounted equity value\nplus net debt.",
+      "description": "Discounted Cash Flow instrument for corporate valuation.\n\nDCF values a company by discounting projected free cash flows and terminal value.\nThe equity value is calculated as: Enterprise Value - Net Debt (or structured bridge).\n\n# Equity Bridge\n\n[`equity_bridge`](Self::equity_bridge) is the single EV-to-equity channel; a\nflat net-debt deduction sets only its `total_debt` and `cash`.\n\n# Discounting dates\nForecast receipts use their authored dates or exact period midpoints.\nTerminal value uses its own date on the same ACT/365.25 clock.\n\n# Valuation Discounts\n\nPrivate company valuations can apply DLOM, DLOC, and other discounts via\n[`valuation_discounts`](Self::valuation_discounts). These discounts apply\nafter the EV-to-equity bridge, so the reported enterprise value remains a\npre-discount enterprise value and does not equal discounted equity value\nplus net debt.",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -10394,13 +10394,16 @@
                 "$ref": "#/$defs/DateWire"
               },
               {
-                "format": "double",
-                "type": "number"
+                "$ref": "#/$defs/Money"
               }
             ],
             "type": "array"
           },
           "type": "array"
+        },
+        "forecast_timing": {
+          "$ref": "#/$defs/ForecastTiming",
+          "description": "Authored receipt or actual midpoint timing for the explicit projection."
         },
         "id": {
           "$ref": "#/$defs/Id",
@@ -10414,10 +10417,16 @@
           "$ref": "#/$defs/MetricPricingOverrides",
           "description": "Metric-time pricing configuration."
         },
-        "mid_year_convention": {
-          "default": false,
-          "description": "Mid-year discounting convention (default: `false` = end-of-period).\n\nWhen `true`, each flow is discounted at `t` minus half the average\nflow spacing instead of `t` (the classic `t - 0.5` for annual\ngrids; half a period for sub-annual grids), reflecting the\nassumption that cash flows arrive mid-period. This is the standard\nconvention in IB/PE practice (Koller et al.). Exit-multiple\nterminal values are not shifted (point-in-time sale at the horizon).",
-          "type": "boolean"
+        "normalized_annual_fcff": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Normalized signed annual FCFF at the terminal date, in instrument currency.\nRequired for Gordon and H-model, and absent for exit-multiple valuation."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -10431,13 +10440,9 @@
             "null"
           ]
         },
-        "terminal_flow_override": {
-          "description": "Annualized terminal flow used by growth-perpetuity terminal values.\n\nGordon Growth and H-Model capitalize an *annual* flow with annual\nWACC and growth rates. When the explicit `flows` grid is sub-annual\n(e.g. quarterly), the last flow is a period flow, not an annual one;\nset this to the trailing-twelve-month aggregate of the final\nexplicit year so the terminal value is computed on a consistent\nannual basis (Koller et al., Damodaran). When `None`, the last\nexplicit flow is used directly (correct for annual grids).\n\nIgnored by `ExitMultiple` terminal values.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+        "terminal_date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Terminal horizon on or after the final forecast end, independently discounted."
         },
         "terminal_value": {
           "$ref": "#/$defs/TerminalValueSpec",
@@ -10471,6 +10476,8 @@
         "wacc",
         "terminal_value",
         "valuation_date",
+        "forecast_timing",
+        "terminal_date",
         "equity_bridge",
         "attributes"
       ],
@@ -11799,6 +11806,19 @@
         },
         {
           "additionalProperties": false,
+          "description": "Exact money literal for typed statement expressions.",
+          "properties": {
+            "money_literal": {
+              "$ref": "#/$defs/Money"
+            }
+          },
+          "required": [
+            "money_literal"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "Call a registered function with positional arguments.",
           "properties": {
             "call": {
@@ -12736,6 +12756,47 @@
         "reset_frequency"
       ],
       "type": "object"
+    },
+    "ForecastTiming": {
+      "description": "Timing election for the dates of the explicit FCFF projection.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Discount every cash flow on its individually authored receipt date.",
+          "properties": {
+            "kind": {
+              "const": "dated_receipts",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Discount each signed FCFF observation on the exact elapsed midpoint\nof its authored period on ACT/365.25.",
+          "properties": {
+            "kind": {
+              "const": "midpoints",
+              "type": "string"
+            },
+            "period_starts": {
+              "description": "Actual start date for each forecast period, aligned to its authored\nflow end date. A forward stub begins on the valuation date.",
+              "items": {
+                "$ref": "#/$defs/DateWire"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "period_starts"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "ForwardRateAgreement": {
       "additionalProperties": false,
@@ -16745,6 +16806,24 @@
         },
         {
           "additionalProperties": false,
+          "description": "Canonical `structured_credit_tranche` instrument payload.",
+          "properties": {
+            "spec": {
+              "$ref": "#/$defs/StructuredCreditTranche"
+            },
+            "type": {
+              "const": "structured_credit_tranche",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "spec"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "Canonical `asset_backed_facility` instrument payload.",
           "properties": {
             "spec": {
@@ -17210,6 +17289,11 @@
         {
           "const": "asset_backed_facility",
           "description": "Asset-backed facility (warehouse line against a collateral pool).",
+          "type": "string"
+        },
+        {
+          "const": "structured_credit_tranche",
+          "description": "Single note owned by a structured-credit waterfall.",
           "type": "string"
         }
       ]
@@ -25800,6 +25884,27 @@
       ],
       "type": "object"
     },
+    "StructuredCreditTranche": {
+      "additionalProperties": false,
+      "description": "An independently held note priced through its originating deal's waterfall.",
+      "properties": {
+        "deal": {
+          "$ref": "#/$defs/StructuredCredit"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "tranche_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "deal",
+        "tranche_id"
+      ],
+      "type": "object"
+    },
     "StubKind": {
       "description": "Stub period handling when start/end dates don't align with payment frequency.\n\nControls how schedules are generated when the start and end dates don't\ndivide evenly by the payment frequency, resulting in an irregular period\n(stub) at the beginning or end of the schedule.\n\n# Variants\n\n- **`None`**: No stub allowed (default). Generates regular periods from\n  start to end and returns an error\n  ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide\n  evenly by the frequency. Use a stub variant for misaligned schedules.\n\n[`InputError::NonIntegerScheduleTenor`]: crate::InputError::NonIntegerScheduleTenor\n- **`ShortFront`**: Short stub period at the start. Schedule is built\n  backward from the end date, creating a short first period.\n- **`ShortBack`**: Short stub period at the end. Schedule is built forward\n  from the start date, creating a short final period.\n- **`LongFront`**: Long stub period at the start. Combines the first two\n  periods into a single longer period.\n- **`LongBack`**: Long stub period at the end. Combines the last two periods\n  into a single longer period.\n\n# Financial Context\n\nStub conventions are important for:\n- Interest accrual calculations (short/long first coupons)\n- Cash flow present value computations\n- Matching market conventions for specific instruments\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{GridMode, Schedule, StubKind, Tenor};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::January, 10)?;\nlet end = Date::from_calendar_date(2025, Month::December, 15)?;\n\n// Short stub at front\nlet sched = Schedule::builder(start, end)?\n    .frequency(Tenor::quarterly())\n    .stub_rule(StubKind::ShortFront)\n    .grid(GridMode::Natural)\n    .unadjusted()\n    .build()?;\n# Ok::<(), Box<dyn std::error::Error>>(())\n```\n\n# See Also\n\n- [`ScheduleBuilder::stub_rule`] to configure stub behavior",
       "oneOf": [
@@ -26417,9 +26522,12 @@
               "type": "number"
             },
             "terminal_metric": {
-              "description": "Terminal metric value (e.g., EBITDA)",
+              "description": "Terminal metric in major currency units (for example, EBITDA).\nRequired for standalone pricing. A statement DCF can resolve it from a metric node.",
               "format": "double",
-              "type": "number"
+              "type": [
+                "number",
+                "null"
+              ]
             },
             "type": {
               "const": "exit_multiple",
@@ -26428,7 +26536,6 @@
           },
           "required": [
             "type",
-            "terminal_metric",
             "multiple"
           ],
           "type": "object"
@@ -27394,29 +27501,6 @@
           "type": "object"
         },
         {
-          "description": "A commodity price-curve shock was outside the typical percent-of-forward\nstress range (approximately `[-80, +200]` percent).",
-          "properties": {
-            "curve_id": {
-              "description": "Curve identifier.",
-              "type": "string"
-            },
-            "detail": {
-              "description": "Detail describing whether the trigger was a parallel or node shock\nand which knot(s) were extreme.",
-              "type": "string"
-            },
-            "kind": {
-              "const": "commodity_shock_outside_range",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "curve_id",
-            "detail"
-          ],
-          "type": "object"
-        },
-        {
           "description": "Equity identifier was missing from the market context; no bump applied.",
           "properties": {
             "id": {
@@ -27719,29 +27803,6 @@
           "type": "object"
         },
         {
-          "description": "Vol-surface arbitrage warning detected post-shock.",
-          "properties": {
-            "detail": {
-              "description": "Free-text from `ArbitrageViolation` Display.",
-              "type": "string"
-            },
-            "kind": {
-              "const": "vol_surface_arbitrage",
-              "type": "string"
-            },
-            "vol_surface_id": {
-              "description": "Volatility-surface identifier.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "vol_surface_id",
-            "detail"
-          ],
-          "type": "object"
-        },
-        {
           "description": "Vol-surface bucket shock selected zero grid points (no-op).",
           "properties": {
             "kind": {
@@ -27756,35 +27817,6 @@
           "required": [
             "kind",
             "vol_surface_id"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "Vol-surface negative bucket shock that may produce non-positive vols.",
-          "properties": {
-            "bucket": {
-              "description": "Whether this was a parallel (`false`) or bucket (`true`) shock.",
-              "type": "boolean"
-            },
-            "kind": {
-              "const": "vol_surface_large_negative_shock",
-              "type": "string"
-            },
-            "pct": {
-              "description": "Percent shock value.",
-              "format": "double",
-              "type": "number"
-            },
-            "vol_surface_id": {
-              "description": "Volatility-surface identifier.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "vol_surface_id",
-            "pct",
-            "bucket"
           ],
           "type": "object"
         },

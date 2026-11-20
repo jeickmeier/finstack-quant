@@ -43,7 +43,7 @@
 //! };
 //!
 //! let config = EclConfigBuilder::new().bucket_width(0.25).build()?;
-//! let scenario = MacroScenario { id: "base".into(), weight: 1.0, lgd_override: None };
+//! let scenario = MacroScenario { id: "base".into(), weight: finstack_quant_core::wire::DecimalWire("1.0".parse()?), lgd_override: None };
 //! let origination_pd = RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 0.02), (5.0, 0.10)])?;
 //! let staging = classify_stage_from_curves(&exposure, &pd_curve, &origination_pd, 0.0, &config.staging)?;
 //! let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> = vec![(&scenario, &pd_curve)];
@@ -77,10 +77,18 @@ pub use types::{
 pub use staging::{StageResult, StagingConfig, StagingTrigger, classify_stage_from_curves};
 
 pub use engine::{
-    EclBucket, EclConfig, EclConfigBuilder, EclResult, LgdType, MacroScenario, WeightedEclResult,
-    compute_ecl_from_curve, compute_ecl_weighted_from_curves,
+    EclBucket, EclConfig, EclConfigBuilder, EclResult, EclScenarioMeasurement, EclScenarioOutcome,
+    LgdType, MacroScenario, WeightedEclResult, compute_ecl_from_curve,
+    compute_ecl_weighted_from_curves,
 };
 
-pub use request::{classify_stage, compute_ecl, compute_ecl_weighted};
+pub use request::{EclScenario, classify_stage, compute_ecl, compute_ecl_weighted};
 
 pub use cecl::{CeclConfig, CeclEngine, CeclMethodology, CeclResult, ReversionMethod};
+
+mod recovery;
+pub use recovery::{
+    ImpairedEclMeasurement, ImpairedEclOutcome, ImpairedEclResult, ImpairedEclScenario,
+    ImpairedExposure, RecoveryEvidence, WeightedImpairedEclResult, compute_impaired_ecl,
+    compute_impaired_ecl_weighted,
+};

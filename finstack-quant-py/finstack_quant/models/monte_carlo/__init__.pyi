@@ -18,6 +18,8 @@ True
 from __future__ import annotations
 from finstack_quant.models.monte_carlo._results import (
     Estimate as Estimate,
+    ExerciseBoundaryPoint as ExerciseBoundaryPoint,
+    LsmcResult as LsmcResult,
     LrmGreeks as LrmGreeks,
     MoneyEstimate as MoneyEstimate,
     PathSummary as PathSummary,
@@ -40,8 +42,10 @@ from finstack_quant.models.monte_carlo._greeks import (
 __all__ = [
     "Estimate",
     "EuropeanPricer",
+    "ExerciseBoundaryPoint",
     "LrmGreeks",
     "LsmcPricer",
+    "LsmcResult",
     "MoneyEstimate",
     "PathDependentPricer",
     "PathSummary",

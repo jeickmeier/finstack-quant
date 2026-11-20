@@ -577,6 +577,33 @@ class TestMultiFactor:
         assert len(result.betas) == 2
         assert 0.0 <= result.r_squared <= 1.0
 
+    def test_multi_factor_dataframe_matches_active_ticker_dates(self) -> None:
+        panel_dates = _daily_dates(8)
+        prices = pd.DataFrame(
+            {
+                "ACME": [math.nan, 100.0, 102.0, 101.0, 105.0, 107.0, 106.0, math.nan],
+                "BENCH": [100.0 + i for i in range(8)],
+            },
+            index=panel_dates,
+        )
+        perf_prices = Performance(prices, benchmark_ticker="BENCH", frequency="daily")
+        dates = perf_prices.get_active_dates_for_ticker("ACME")
+        assert dates == panel_dates[2:7]
+        factor = [0.001 * (i % 5) for i in range(len(dates))]
+        frame = pd.DataFrame({"factor": [*factor, "outside active sample"]}, index=[*dates, panel_dates[1]]).iloc[::-1]
+        expected = perf_prices.multi_factor_greeks("ACME", [factor], 0.0)
+        fit = perf_prices.multi_factor_greeks("ACME", frame, 0.0)
+        assert fit.betas == pytest.approx(expected.betas)
+        assert fit.alpha == pytest.approx(expected.alpha)
+        with pytest.raises(KeyError, match=str(dates[0])):
+            perf_prices.multi_factor_greeks("ACME", frame.drop(dates[0]), 0.0)
+        duplicate = pd.concat([frame, frame.iloc[[0]]])
+        with pytest.raises(ValueError, match="duplicate factor date"):
+            perf_prices.multi_factor_greeks("ACME", duplicate, 0.0)
+        frame.loc[dates[0], "factor"] = float("inf")
+        with pytest.raises(ValueError, match="aligned factor return must be finite"):
+            perf_prices.multi_factor_greeks("ACME", frame, 0.0)
+
     def test_multi_factor_rejects_non_finite_inputs(self, perf_prices: Performance) -> None:
         n = len(perf_prices.get_dates())
         bad = [float("nan")] + [0.001] * (n - 1)

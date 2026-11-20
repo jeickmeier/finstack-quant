@@ -127,6 +127,8 @@ chain(wasm.MarketContext, [
   'insertFx',
   'insertCreditIndex',
   'insertSeries',
+  'insertFixing',
+  'insertDividendYield',
   'insertInflationIndex',
 ]);
 chain(wasm.ScheduleBuilder, [
@@ -227,6 +229,7 @@ export const core = {
   FxPairConvention: wasm.FxPairConvention,
   invertFxRate: wasm.invertFxRate,
   applyLowerTriangular: wasm.applyLowerTriangular,
+  applyLowerTriangularMany: wasm.applyLowerTriangularMany,
   choleskyDecomposition: wasm.choleskyDecomposition,
   choleskySolve: wasm.choleskySolve,
   symmetricEigen: wasm.symmetricEigen,
@@ -244,6 +247,8 @@ export const core = {
   correlation: wasm.correlation,
   covariance: wasm.covariance,
   quantile: wasm.quantile,
+  expectedShortfall: wasm.expectedShortfall,
+  ols: wasm.ols,
   realizedVariance: wasm.realizedVariance,
   realizedVarianceOhlc: wasm.realizedVarianceOhlc,
   normCdf: wasm.normCdf,

@@ -187,9 +187,7 @@ pub use forward::{
     ForwardGreeks, bachelier_greeks, bachelier_price, black_shifted_price, black_shifted_vega,
     black76_greeks, black76_price,
 };
-pub use heston::{
-    HestonFourierSettings, HestonPricingParams, heston_call_price_fourier, heston_price,
-};
+pub use heston::{HestonFourierSettings, heston_call_price_fourier, heston_price};
 #[cfg(test)]
 pub(crate) use heston::{heston_call_prices_fourier, heston_put_price_fourier};
 pub use implied_vol::{black76_implied_vol, bs_implied_vol};
@@ -199,6 +197,7 @@ pub use lookback::{
 };
 pub use quanto::quanto_price;
 pub use vanilla::{
-    BsGreeks, DEFAULT_THETA_DAYS_PER_YEAR, ONE_PERCENT, bs_greeks, bs_greeks_unchecked, bs_price,
-    bs_price_unchecked, checked_closed_form_value, vanilla_expiry_payoff,
+    BsGreeks, DEFAULT_THETA_DAYS_PER_YEAR, ONE_PERCENT, bs_greeks, bs_greeks_many,
+    bs_greeks_unchecked, bs_price, bs_price_many, bs_price_unchecked, checked_closed_form_value,
+    vanilla_expiry_payoff,
 };

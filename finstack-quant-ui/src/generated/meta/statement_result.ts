@@ -240,6 +240,11 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ForecastStream"
   },
   {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/market_content_hash",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/market_content_hash",
+    "description": "Canonical snapshot hash of the market held for an explicitly priced run.\nAbsent if the supplied provider cannot furnish a coherent capture."
+  },
+  {
     "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/model_content_hash",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/model_content_hash",
     "description": "Canonical content hash of the evaluated model\n([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash))."
@@ -259,7 +264,7 @@ export default [
   {
     "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/run_id",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/run_id",
-    "description": "Identity of this evaluation run: the canonical content hash of the\nfields above. Two runs of the same model content, snapshot, cutoff\nand valuation date share it."
+    "description": "Identity of this evaluation run: the canonical content hash of the\nfields above, including the market snapshot identity when it was supplied."
   },
   {
     "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/source_snapshot",
@@ -346,13 +351,13 @@ export default [
   {
     "path": "#/$defs/d_288b30976e4551573cdd/properties/reference_value",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Materiality/properties/reference_value",
-    "description": "The reference (denominator) value used when computing `relative_pct`.",
+    "description": "The reference (denominator) value used when computing `relative`.",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_288b30976e4551573cdd/properties/relative_pct",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Materiality/properties/relative_pct",
-    "description": "Discrepancy as a percentage of the reference value; `None` when the\npercentage is undefined (a zero reference) or does not apply.",
+    "path": "#/$defs/d_288b30976e4551573cdd/properties/relative",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Materiality/properties/relative",
+    "description": "Discrepancy as a decimal fraction of the reference value (0.025 is 2.5%);\n`None` when the fraction is undefined (a zero reference) or does not apply.",
     "format": "double"
   },
   {

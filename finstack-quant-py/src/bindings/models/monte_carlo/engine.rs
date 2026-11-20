@@ -2,9 +2,9 @@
 
 use super::results::{PyMoneyEstimate, PyPathSummary};
 use crate::bindings::core::currency::extract_currency;
-use crate::bindings::module_utils::{opt_spec_from_py, py_to_json_value, spec_from_py};
+use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
 use crate::bindings::pydoc::pydoc;
-use crate::errors::{core_to_py, serde_json_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::simulate::PathSimulationSpec;
 use pyo3::prelude::*;
@@ -13,10 +13,8 @@ use pyo3::prelude::*;
 #[pyfunction]
 #[pyo3(text_signature = "(spec)")]
 fn simulate_paths(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyPathSummary> {
-    let value = py_to_json_value(py, spec, "PathSimulationSpec")?;
+    let spec: PathSimulationSpec = spec_from_py(py, spec, "PathSimulationSpec")?;
     py.detach(move || {
-        let spec: PathSimulationSpec = serde_json::from_value(value)
-            .map_err(|e| serde_json_to_py(e, "invalid PathSimulationSpec"))?;
         finstack_quant_models::monte_carlo::simulate::simulate_paths(&spec).map_err(core_to_py)
     })
     .map(PyPathSummary::from_inner)
@@ -42,35 +40,22 @@ pub(super) fn extract_optional_currency(
 
 #[doc = pydoc!("finstack_quant.models.monte_carlo._engine", "price_heston")]
 #[pyfunction]
-#[pyo3(signature = (spot, strike, expiry, params, is_call, settings=None))]
+#[pyo3(signature = (contract, heston, settings=None))]
 fn price_heston(
     py: Python<'_>,
-    spot: f64,
-    strike: f64,
-    expiry: f64,
-    params: &Bound<'_, PyAny>,
-    is_call: bool,
+    contract: &Bound<'_, PyAny>,
+    heston: &Bound<'_, PyAny>,
     settings: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyMoneyEstimate> {
-    use finstack_quant_models::closed_form::HestonPricingParams;
+    use crate::bindings::models::closed_form::{heston_params, option_contract};
     use finstack_quant_models::monte_carlo::pricer::heston as canonical;
-    use finstack_quant_models::types::OptionType;
 
-    let params: HestonPricingParams = spec_from_py(py, params, "HestonPricingParams")?;
-    let settings: canonical::HestonMcSettings =
-        opt_spec_from_py(py, settings, "HestonMcSettings")?.unwrap_or_default();
-    py.detach(|| {
-        canonical::price_heston(
-            spot,
-            strike,
-            expiry,
-            &params,
-            OptionType::from(is_call),
-            &settings,
-        )
-    })
-    .map(PyMoneyEstimate::from_inner)
-    .map_err(core_to_py)
+    let contract = option_contract(contract)?;
+    let heston = heston_params(heston)?;
+    let settings = opt_spec_from_py(py, settings, "HestonMcSettings")?;
+    py.detach(|| canonical::price_heston(&contract, &heston, settings))
+        .map(PyMoneyEstimate::from_inner)
+        .map_err(core_to_py)
 }
 
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {

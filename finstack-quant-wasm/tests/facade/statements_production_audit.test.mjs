@@ -122,6 +122,8 @@ test('retained earnings accepts the elected inflow-positive dividend convention'
 
 test('goal seek rejects a discontinuity that brackets the target without reaching it', () => {
   const m = model({ '2025Q1': 1, '2025Q2': 1, '2025Q3': 1, '2025Q4': 1 });
+  m.source_snapshot = 'discontinuity-forecast';
+  m.periods.periods[0].is_actual = false;
   m.nodes.target = {
     node_id: 'target',
     node_type: 'calculated',
@@ -130,13 +132,16 @@ test('goal seek rejects a discontinuity that brackets the target without reachin
   assert.throws(
     () =>
       statements_analytics.goalSeek(JSON.stringify(m), {
-        target_node: 'target',
-        target_period: '2025Q4',
+        target: { node: 'target', period: '2025Q4' },
         target_value: 0.5,
-        driver_node: 'revenue',
-        driver_period: '2025Q4',
+        target_tolerance: 1e-9,
+        driver: { node: 'revenue', period: '2025Q4' },
+        driver_tolerance: 1e-10,
+        max_iterations: 100,
+        as_of: '2024-12-31',
+        observed_through: '2024-12-31',
         update_model: true,
-        bounds: [-1, 1],
+        search: { kind: 'bracket', lower: -1, upper: 1 },
       }),
     /residual|target.*tolerance/i
   );

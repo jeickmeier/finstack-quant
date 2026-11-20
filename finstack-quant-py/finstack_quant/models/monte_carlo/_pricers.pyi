@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 from typing import Any
-from finstack_quant.models.monte_carlo._results import LrmGreeks, MoneyEstimate
+from finstack_quant.models._closed_form import OptionMarketParams
+from finstack_quant.models.monte_carlo._results import LrmGreeks, LsmcResult, MoneyEstimate
 
 class EuropeanPricer:
     """
@@ -117,7 +118,7 @@ class EuropeanPricer:
 
     def price_gbm(
         self,
-        market: dict[str, Any] | str,
+        market: OptionMarketParams | dict[str, Any] | str,
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
@@ -259,7 +260,7 @@ class PathDependentPricer:
 
     def price_asian(
         self,
-        market: dict[str, Any] | str,
+        market: OptionMarketParams | dict[str, Any] | str,
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
@@ -334,7 +335,7 @@ class PathDependentPricer:
 
     def price_with_lrm_greeks(
         self,
-        market: dict[str, Any] | str,
+        market: OptionMarketParams | dict[str, Any] | str,
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> LrmGreeks:
@@ -521,7 +522,7 @@ class LsmcPricer:
     ...     "volatility": 0.3,
     ...     "time_to_expiry": 1.0,
     ...     "option_type": "put",
-    ... }).num_paths
+    ... }).estimate.num_paths
     300
     """
 
@@ -678,18 +679,18 @@ class LsmcPricer:
 
     def price_american(
         self,
-        market: dict[str, Any] | str,
+        market: OptionMarketParams | dict[str, Any] | str,
         currency: str | None = None,
         num_steps: int | None = None,
         basis: str | None = None,
         basis_degree: int | None = None,
-    ) -> MoneyEstimate:
+    ) -> LsmcResult:
         """
         Price a Bermudan option via LSMC on the grid ``1..=num_steps``.
 
         Immediate exercise at valuation floors the reported price at
-        ``max(strike - spot, 0)``. If that floor binds, stderr and the 95%
-        CI collapse to the intrinsic value.
+        contractual intrinsic value. If that floor binds, sampling errors
+        still describe the path estimate and the interval includes the reported price.
 
         Parameters
         ----------
@@ -716,8 +717,8 @@ class LsmcPricer:
 
         Returns
         -------
-        MoneyEstimate
-            LSMC price with stderr and confidence bands.
+        LsmcResult
+            Fitted-policy price and training exercise diagnostics.
 
         Examples
         --------
@@ -730,7 +731,7 @@ class LsmcPricer:
         ...     "volatility": 0.25,
         ...     "time_to_expiry": 1.0,
         ...     "option_type": "put",
-        ... }).num_paths
+        ... }).estimate.num_paths
         200
 
         Raises
@@ -751,13 +752,13 @@ class LsmcPricer:
 
     def price_american_unbiased(
         self,
-        market: dict[str, Any] | str,
+        market: OptionMarketParams | dict[str, Any] | str,
         pricing_seed: int,
         currency: str | None = None,
         num_steps: int | None = None,
         basis: str | None = None,
         basis_degree: int | None = None,
-    ) -> MoneyEstimate:
+    ) -> LsmcResult:
         """
         Two-pass unbiased American option price.
 
@@ -794,8 +795,8 @@ class LsmcPricer:
 
         Returns
         -------
-        MoneyEstimate
-            Out-of-sample price with stderr and confidence bands.
+        LsmcResult
+            Out-of-sample price and diagnostics from the frozen training policy.
 
         Raises
         ------

@@ -119,7 +119,11 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughHestonM
         let to_pricing_error =
             |e| finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone());
         let model = finstack_quant_models::volatility::heston::HestonParams::new(
-            s.v0, s.kappa, s.theta, s.sigma_v, s.rho,
+            s.v0,
+            s.kappa,
+            s.theta,
+            s.vol_of_vol,
+            s.rho,
         )
         .map_err(to_pricing_error)?;
         let params = finstack_quant_models::monte_carlo::process::rough_heston::RoughHestonParams {

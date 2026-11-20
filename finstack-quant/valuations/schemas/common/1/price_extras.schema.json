@@ -287,6 +287,17 @@
       "description": "When `true`, attaches a step trace to the result as `explanation`.\nDefaults to `false` (no trace).",
       "type": "boolean"
     },
+    "instrument_pricing_overrides": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Call-time JSON object patch for instrument-owned market quotes and model\ncontrols. Only supplied fields replace stored values. Setting a nullable\nleaf to null clears it, while omitted leaves keep their original values."
+    },
     "market_history": {
       "anyOf": [
         {
@@ -307,7 +318,7 @@
           "type": "null"
         }
       ],
-      "description": "JSON object patch merged into `instrument.spec.metric_pricing_overrides`\nbefore validation, in the shape of [`MetricPricingOverrides`]. Only the\nkeys present replace stored controls (an explicit `null` clears an\noptional control) and `bump_config` keys merge into the stored bump\nconfiguration. The field holds the raw patch rather than the typed\nstruct because key presence decides what is replaced. `None` keeps\nthe instrument's stored overrides."
+      "description": "JSON object patch merged into the instrument’s stored metric controls\nbefore validation, in the shape of [`MetricPricingOverrides`]. Only the\nkeys present replace stored controls (an explicit `null` clears an\noptional control) and `bump_config` keys merge into the stored bump\nconfiguration. The field holds the raw patch rather than the typed\nstruct because key presence decides what is replaced. `None` keeps\nthe instrument's stored overrides."
     }
   },
   "title": "PriceExtras",

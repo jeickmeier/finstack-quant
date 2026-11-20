@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import datetime
 from typing import Any
 import pandas as pd
@@ -1021,6 +1023,36 @@ class PnlAttribution:
         Notes
         -----
         This method does not raise; it returns the stored or derived value.
+        """
+        ...
+
+    @staticmethod
+    def compare(attributions: Sequence[PnlAttribution]) -> pd.DataFrame:
+        """Collect one wide row per result in input order.
+
+        Parameters
+        ----------
+        attributions : Sequence[PnlAttribution]
+            Ordered typed result objects. Each row carries its own reporting currency, method, dates and factor contributions. Every row must pass the same currency validation as to_dataframe.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Wide frame in the to_dataframe column order. An empty sequence
+            returns a zero-row frame with the standard identity columns.
+
+        Raises
+        ------
+        TypeError
+            If the input is not a sequence of typed results.
+        ValueError
+            If a result cannot be projected as a wide row.
+
+        Examples
+        --------
+        >>> from finstack_quant.attribution import PnlAttribution
+        >>> PnlAttribution.compare([]).empty
+        True
         """
         ...
 

@@ -83,6 +83,20 @@ pub(crate) mod risk;
 pub(crate) mod scenario;
 pub(crate) mod summary;
 
+pub(crate) fn metric_deal(
+    context: &finstack_quant_valuations_core::metrics::MetricContext,
+) -> finstack_quant_core::Result<&crate::structured_credit::StructuredCredit> {
+    use crate::structured_credit::StructuredCreditTranche;
+    if let Some(note) = context
+        .instrument
+        .as_any()
+        .downcast_ref::<StructuredCreditTranche>()
+    {
+        return Ok(note.deal());
+    }
+    context.instrument_as()
+}
+
 /// Reprice a (bumped) deal on the scope of the metric context: the named
 /// tranche when the context carries one tranche's cashflows (set by
 /// [`tranche_metrics`]'s registry pass), else the whole deal
@@ -128,9 +142,17 @@ pub(crate) fn register_structured_credit_metrics(
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
     use finstack_quant_valuations_core::pricer::InstrumentType;
 
+    register_scope_metrics(registry, InstrumentType::StructuredCredit)?;
+    register_scope_metrics(registry, InstrumentType::StructuredCreditTranche)
+}
+
+fn register_scope_metrics(
+    registry: &mut finstack_quant_valuations_core::metrics::MetricRegistry,
+    instrument: finstack_quant_valuations_core::pricer::InstrumentType,
+) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
     finstack_quant_valuations_core::register_metrics! {
         registry: registry,
-        instrument: InstrumentType::StructuredCredit,
+        instrument: instrument,
         metrics: [
             // Standard cashflow-based metrics
             (Accrued, pricing::AccruedCalculator),

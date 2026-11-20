@@ -354,9 +354,62 @@ pub(crate) fn metric_pricing_overrides_from_py(
     spec_from_py(py, obj, "metric_pricing_overrides")
 }
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "PriceExtras")]
+#[pyclass(
+    name = "PriceExtras",
+    module = "finstack_quant.valuations.instruments",
+    frozen,
+    skip_from_py_object
+)]
+struct PyPriceExtras {
+    inner: PriceExtras,
+}
+
+#[pymethods]
+impl PyPriceExtras {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "PriceExtras.__init__")]
+    #[new]
+    #[pyo3(signature = (*, metric_pricing_overrides=None, instrument_pricing_overrides=None, market_history=None, explain=false))]
+    fn new(
+        py: Python<'_>,
+        metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
+        instrument_pricing_overrides: Option<&Bound<'_, PyDict>>,
+        market_history: Option<&PyMarketHistory>,
+        explain: bool,
+    ) -> PyResult<Self> {
+        let metric_pricing_overrides = metric_pricing_overrides
+            .map(|value| {
+                py_to_serde::<serde_json::Map<String, serde_json::Value>>(
+                    py,
+                    value,
+                    "metric_pricing_overrides",
+                )
+            })
+            .transpose()?
+            .map(serde_json::Value::Object);
+        let instrument_pricing_overrides = instrument_pricing_overrides
+            .map(|value| py_to_serde(py, value.as_any(), "instrument_pricing_overrides"))
+            .transpose()?;
+        Ok(Self {
+            inner: PriceExtras {
+                metric_pricing_overrides,
+                instrument_pricing_overrides,
+                market_history: market_history.map(|history| history.inner.clone()),
+                explain,
+            },
+        })
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "PriceExtras.explain")]
+    #[getter]
+    fn explain(&self) -> bool {
+        self.inner.explain
+    }
+}
+
 /// Read the optional ``extras`` argument of the pricing entry points.
 ///
-/// Accepts ``None`` (no extras), a dict or JSON text in the shape of the Rust
+/// Accepts ``None`` (no extras), a typed ``PriceExtras``, a dict or JSON text in the shape of the Rust
 /// `PriceExtras`; typed ``MetricPricingOverrides`` / ``MarketHistory``
 /// wrappers inside a dict serialize through the shared ``json.dumps`` hook.
 ///
@@ -369,6 +422,11 @@ pub(crate) fn price_extras_from_py(
     py: Python<'_>,
     extras: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PriceExtras> {
+    if let Some(value) = extras
+        && let Ok(typed) = value.cast::<PyPriceExtras>()
+    {
+        return Ok(typed.borrow().inner.clone());
+    }
     Ok(opt_spec_from_py(py, extras, "PriceExtras")?.unwrap_or_default())
 }
 
@@ -389,7 +447,12 @@ fn price_instrument(
     let overrides = extras.metric_pricing_overrides_json();
     let instrument = extract_instrument(instrument)?;
     let prepared = py
-        .detach(move || instrument.into_parsed(overrides.as_deref()))
+        .detach(|| {
+            instrument.into_parsed(
+                overrides.as_deref(),
+                extras.instrument_pricing_overrides.as_ref(),
+            )
+        })
         .map_err(core_to_py)?;
     price_prepared(py, prepared, market, as_of, model, metrics, extras)
 }
@@ -557,7 +620,7 @@ fn instrument_cashflows(
     // Parse the instrument before the market so instrument errors surface first.
     let instrument = extract_instrument(instrument)?;
     let instrument = py
-        .detach(move || instrument.into_parsed(None))
+        .detach(move || instrument.into_parsed(None, None))
         .map_err(core_to_py)?;
     let market = extract_market(py, market)?;
     let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
@@ -730,6 +793,7 @@ crate::bindings::macros::py_getters!(PyInstrumentCashflowEnvelope |s| {
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyMetricPricingOverrides>()?;
     m.add_class::<PyMarketHistory>()?;
+    m.add_class::<PyPriceExtras>()?;
     m.add_class::<PyInstrumentCashflowEnvelope>()?;
     m.add_function(pyo3::wrap_pyfunction!(instrument_cashflows, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(price_instrument, m)?)?;
@@ -759,6 +823,7 @@ pub(crate) const EXPORTS: &[&str] = &[
     "InstrumentCashflowEnvelope",
     "MarketHistory",
     "MetricPricingOverrides",
+    "PriceExtras",
     "instrument_cashflows",
     "list_models",
     "list_models_grouped",
@@ -804,10 +869,11 @@ pub(crate) fn price_typed(
     extras: PriceExtras,
 ) -> PyResult<PyValuationResult> {
     let overrides = extras.metric_pricing_overrides_json();
-    let instrument = py.detach(move || {
+    let instrument = py.detach(|| {
         finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
             instrument,
             overrides.as_deref(),
+            extras.instrument_pricing_overrides.as_ref(),
         )
         .map_err(core_to_py)
     })?;
@@ -871,8 +937,9 @@ pub(crate) fn metric_typed(
     let model = model.to_owned();
     let metric_id = metric_id.to_owned();
     py.detach(move || {
-        let instrument =
-            finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(instrument, None)?;
+        let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
+            instrument, None, None,
+        )?;
         finstack_quant_valuations::pricer::metric_value(
             &instrument,
             &market,
@@ -911,7 +978,7 @@ pub(crate) fn typed_option_greeks<'py>(
     let pairs = py
         .detach(move || {
             let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
-                instrument, None,
+                instrument, None, None,
             )?;
             finstack_quant_valuations::pricer::present_standard_option_greeks(
                 &instrument,

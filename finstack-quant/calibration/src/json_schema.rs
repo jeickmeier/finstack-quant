@@ -1,6 +1,6 @@
 //! Checked-in JSON schemas owned by the calibration crate.
 
-use crate::api::schema::{CalibrationEnvelope, CalibrationResultEnvelope};
+use crate::api::schema::{CalibrationEnvelope, CalibrationResultEnvelope, StepWithQuotes};
 use crate::api::validate::CalibrationValidationReport;
 use crate::quotes::MarketQuote;
 use finstack_quant_core::schema::{SchemaArtifact, SchemaKind, example, example_from_json};
@@ -173,6 +173,16 @@ pub fn artifacts() -> &'static [SchemaArtifact] {
 
 fn build_artifacts() -> Vec<SchemaArtifact> {
     vec![
+        finstack_quant_core::schema_artifact!(
+            StepWithQuotes,
+            "calibration",
+            "step_with_quotes",
+            Component,
+            "One typed calibration step with inline observations.",
+            title = "Step With Quotes"
+        )
+        .with_packager(finstack_quant_valuations_core::schema::package_valuations_schema)
+        .with_kind(SchemaKind::Input),
         finstack_quant_core::schema_artifact!(
     CalibrationEnvelope,
     "calibration",

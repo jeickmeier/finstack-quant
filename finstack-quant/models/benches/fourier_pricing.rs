@@ -18,10 +18,11 @@
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_models::closed_form::{
-    HestonFourierSettings, HestonPricingParams, bs_price, heston_call_price_fourier,
+    HestonFourierSettings, bs_price, heston_call_price_fourier,
 };
 use finstack_quant_models::fourier::characteristic_function::BlackScholesCf;
 use finstack_quant_models::fourier::cos::{CosConfig, CosPricer};
+use finstack_quant_models::monte_carlo::process::heston::HestonProcessParams;
 use finstack_quant_models::types::OptionType;
 use std::hint::black_box;
 
@@ -62,7 +63,7 @@ fn validate_heston_convergence(
     strikes: &[f64],
     prices: &[f64],
     time: f64,
-    params: &HestonPricingParams,
+    params: &HestonProcessParams,
 ) {
     // This is a grid-convergence control using the canonical CF and checked
     // adaptive driver, not an independent Heston implementation. Three
@@ -73,8 +74,22 @@ fn validate_heston_convergence(
     landmarks.dedup();
     for index in landmarks {
         let strike = strikes[index];
-        let reference = heston_call_price_fourier(spot, strike, time, params, Some(&settings))
-            .expect("converged Heston landmark reference");
+        let reference = {
+            let dynamics = params;
+            heston_call_price_fourier(
+                &finstack_quant_models::types::OptionContractParams {
+                    spot,
+                    strike,
+                    rate: dynamics.r,
+                    dividend_yield: dynamics.q,
+                    time_to_expiry: time,
+                    option_type: finstack_quant_models::types::OptionType::Call,
+                },
+                &dynamics.model,
+                Some(&settings),
+            )
+        }
+        .expect("converged Heston landmark reference");
         assert!(reference.is_finite(), "non-finite Heston reference");
         // Both drivers require 1e-9 discounted-spot agreement between grids;
         // leave one order of magnitude for their different starting grids.
@@ -88,27 +103,63 @@ fn validate_heston_convergence(
 
 /// Check a resolved-grid reference and the independent Black-Scholes limit.
 fn validate_heston_controls() {
-    let params = HestonPricingParams::new(0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04)
+    let params = HestonProcessParams::new(0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04)
         .expect("valid Heston short-expiry control parameters");
     // The reference in models/src/closed_form/heston/tests.rs comes from a
     // 20,000-frequency, 320,000-node integration, independent of default grids.
-    let short_expiry = heston_call_price_fourier(100.0, 100.0, 0.001, &params, None)
-        .expect("converged Heston short-expiry control");
+    let short_expiry = {
+        let dynamics = &params;
+        heston_call_price_fourier(
+            &finstack_quant_models::types::OptionContractParams {
+                spot: 100.0,
+                strike: 100.0,
+                rate: dynamics.r,
+                dividend_yield: dynamics.q,
+                time_to_expiry: 0.001,
+                option_type: finstack_quant_models::types::OptionType::Call,
+            },
+            &dynamics.model,
+            None,
+        )
+    }
+    .expect("converged Heston short-expiry control");
     assert!(
         short_expiry.is_finite() && (short_expiry - 0.254_803_543_342).abs() < 1e-9,
         "Heston short-expiry reference disagreement: {short_expiry}"
     );
 
-    let params = HestonPricingParams::new(0.03, 0.01, 1.5, 0.04, 1e-10, -0.6, 0.04)
+    let params = HestonProcessParams::new(0.03, 0.01, 1.5, 0.04, 1e-10, -0.6, 0.04)
         .expect("valid near-deterministic Heston control parameters");
-    let heston = heston_call_price_fourier(100.0, 100.0, 1.0, &params, None)
-        .expect("converged near-deterministic Heston control");
-    let reference = bs_price(100.0, 100.0, 0.03, 0.01, 0.2, 1.0, OptionType::Call)
-        .expect("valid Black-Scholes limit control");
-    // This is an independent closed-form control, with the O(sigma_v)
+    let heston = {
+        let dynamics = &params;
+        heston_call_price_fourier(
+            &finstack_quant_models::types::OptionContractParams {
+                spot: 100.0,
+                strike: 100.0,
+                rate: dynamics.r,
+                dividend_yield: dynamics.q,
+                time_to_expiry: 1.0,
+                option_type: finstack_quant_models::types::OptionType::Call,
+            },
+            &dynamics.model,
+            None,
+        )
+    }
+    .expect("converged near-deterministic Heston control");
+    let reference = bs_price(&finstack_quant_models::types::OptionMarketParams {
+        spot: 100.0,
+        strike: 100.0,
+        rate: 0.03,
+        dividend_yield: 0.01,
+        volatility: 0.2,
+        time_to_expiry: 1.0,
+        option_type: OptionType::Call,
+    })
+    .expect("valid Black-Scholes limit control");
+    // This is an independent closed-form control, with the O(vol_of_vol)
     // correction bound used by the model's deterministic-limit regression.
     assert!(
-        heston.is_finite() && (heston - reference).abs() < 20.0 * params.model.sigma_v + 1e-9,
+        heston.is_finite() && (heston - reference).abs() < 20.0 * params.model.vol_of_vol + 1e-9,
         "Heston deterministic-limit disagreement: {heston} vs {reference}"
     );
 }
@@ -129,8 +180,16 @@ fn bench_cos_strip(c: &mut Criterion) {
                 .expect("valid COS preflight prices");
             validate_call_prices(spot, &strikes, &prices, r, q, t);
             for (&strike, &price) in strikes.iter().zip(&prices) {
-                let reference = bs_price(spot, strike, r, q, sigma, t, OptionType::Call)
-                    .expect("valid Black-Scholes reference");
+                let reference = bs_price(&finstack_quant_models::types::OptionMarketParams {
+                    spot,
+                    strike,
+                    rate: r,
+                    dividend_yield: q,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    option_type: OptionType::Call,
+                })
+                .expect("valid Black-Scholes reference");
                 assert!(
                     reference.is_finite() && (price - reference).abs() < 1e-6,
                     "COS disagrees with Black-Scholes at K={strike}: {price} vs {reference}"
@@ -157,7 +216,7 @@ fn bench_heston_fourier_scalar_batch(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, &n| {
             let spot = 100.0;
             let time = 1.0_f64;
-            let params = HestonPricingParams::new(0.03, 0.01, 1.5, 0.04, 0.3, -0.6, 0.04)
+            let params = HestonProcessParams::new(0.03, 0.01, 1.5, 0.04, 0.3, -0.6, 0.04)
                 .expect("valid benchmark Heston parameters");
             let strikes = if n == 1 {
                 vec![spot]
@@ -167,8 +226,22 @@ fn bench_heston_fourier_scalar_batch(c: &mut Criterion) {
             let prices: Vec<f64> = strikes
                 .iter()
                 .map(|&strike| {
-                    heston_call_price_fourier(spot, strike, time, &params, None)
-                        .expect("valid Heston preflight price")
+                    {
+                        let dynamics = &params;
+                        heston_call_price_fourier(
+                            &finstack_quant_models::types::OptionContractParams {
+                                spot,
+                                strike,
+                                rate: dynamics.r,
+                                dividend_yield: dynamics.q,
+                                time_to_expiry: time,
+                                option_type: finstack_quant_models::types::OptionType::Call,
+                            },
+                            &dynamics.model,
+                            None,
+                        )
+                    }
+                    .expect("valid Heston preflight price")
                 })
                 .collect();
             validate_call_prices(spot, &strikes, &prices, params.r, params.q, time);
@@ -179,17 +252,44 @@ fn bench_heston_fourier_scalar_batch(c: &mut Criterion) {
                 let strike = strikes[0];
                 b.iter(|| {
                     black_box(
-                        heston_call_price_fourier(spot, black_box(strike), time, &params, None)
-                            .expect("Heston Fourier call price"),
+                        {
+                            let dynamics = &params;
+                            heston_call_price_fourier(
+                                &finstack_quant_models::types::OptionContractParams {
+                                    spot,
+                                    strike: black_box(strike),
+                                    rate: dynamics.r,
+                                    dividend_yield: dynamics.q,
+                                    time_to_expiry: time,
+                                    option_type: finstack_quant_models::types::OptionType::Call,
+                                },
+                                &dynamics.model,
+                                None,
+                            )
+                        }
+                        .expect("Heston Fourier call price"),
                     )
                 });
             } else {
                 b.iter(|| {
                     let mut acc = 0.0_f64;
                     for &k in &strikes {
-                        let price =
-                            heston_call_price_fourier(spot, black_box(k), time, &params, None)
-                                .expect("Heston Fourier call price");
+                        let price = {
+                            let dynamics = &params;
+                            heston_call_price_fourier(
+                                &finstack_quant_models::types::OptionContractParams {
+                                    spot,
+                                    strike: black_box(k),
+                                    rate: dynamics.r,
+                                    dividend_yield: dynamics.q,
+                                    time_to_expiry: time,
+                                    option_type: finstack_quant_models::types::OptionType::Call,
+                                },
+                                &dynamics.model,
+                                None,
+                            )
+                        }
+                        .expect("Heston Fourier call price");
                         acc += black_box(price);
                     }
                     black_box(acc)

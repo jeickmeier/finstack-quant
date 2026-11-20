@@ -1107,8 +1107,8 @@
         "description": "Change wacc from 0.1 to 0.11; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "76708462.6603578", "currency": "USD" },
-        "edited": { "amount": "66398388.4064043", "currency": "USD" }
+        "baseline": { "amount": "73616855.72387479", "currency": "USD" },
+        "edited": { "amount": "63515866.83549547", "currency": "USD" }
       }
     },
     {
@@ -2174,6 +2174,52 @@
         },
         "edited": {
           "amount": "110456685.27631544825225171865",
+          "currency": "USD"
+        }
+      }
+    },
+    {
+      "type": "structured_credit_tranche",
+      "instrumentSource": {
+        "path": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit_tranche.json",
+        "pointer": []
+      },
+      "instrumentPatches": [],
+      "marketSource": {
+        "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
+        "pointer": []
+      },
+      "marketPatches": [],
+      "request": {
+        "asOf": "2023-12-28",
+        "model": "discounting",
+        "metrics": [],
+        "metricPricingOverrides": null,
+        "marketHistory": null
+      },
+      "edit": {
+        "path": [
+          "instrument",
+          "spec",
+          "deal",
+          "tranches",
+          "tranches",
+          0,
+          "coupon",
+          "fixed",
+          "rate"
+        ],
+        "from": 0.06,
+        "to": 0.065,
+        "description": "Change the selected note coupon from 6% to 6.5% while preserving the full waterfall."
+      },
+      "reference": {
+        "baseline": {
+          "amount": "108904991.249921081747",
+          "currency": "USD"
+        },
+        "edited": {
+          "amount": "110456685.276315443647",
           "currency": "USD"
         }
       }

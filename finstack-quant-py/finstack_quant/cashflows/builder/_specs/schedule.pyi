@@ -104,7 +104,7 @@ class ScheduleParams:
             Holiday calendar id (``"weekends_only"`` for weekend-only
             rolling).
         business_day_convention : BusinessDayConvention | str
-            Payment-date rolling convention (default ``"modified_following"``).
+            Payment-date rolling convention applied using the selected holiday calendar.
         stub : StubKind | str
             Stub rule (default ``"short_front"``); IMM honours it. For a plain ACT/ACT ICMA grid, short-front
             and long-front anchor regular periods on maturity; other rules

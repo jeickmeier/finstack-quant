@@ -14,7 +14,7 @@ api:
 - finstack_quant.core.currency.Currency
 - finstack_quant.core.market_data.DiscountCurve
 - finstack_quant.core.market_data.FxMatrix
-- finstack_quant.core.market_data.fx_pair_convention
+- finstack_quant.core.market_data.FxPairConvention
 - finstack_quant.core.market_data.invert_fx_rate
 - finstack_quant.core.money.Money
 - finstack_quant.core.types.Bps
@@ -89,7 +89,7 @@ from decimal import Decimal
 from finstack_quant.core.money import Money
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.config import FinstackConfig, RoundingMode
-from finstack_quant.core.market_data import FxMatrix, fx_pair_convention, invert_fx_rate
+from finstack_quant.core.market_data import FxMatrix, FxPairConvention, invert_fx_rate
 from finstack_quant.valuations.instruments import price_instrument
 from _shared.analyst_book import book_spec, build_book, build_market, instruments
 AS_OF = date(2025, 1, 15)
@@ -101,15 +101,20 @@ try:
 except ValueError as error:
     mixed_currency_error = str(error)
 print('Mixed-currency addition rejected:', mixed_currency_error)
-fx = FxMatrix()
+# Crosses route through an explicit USD pivot (no implicit hub).
+fx = FxMatrix('USD')
 fx.set_quotes([(Currency('EUR'), Currency('USD'), 1.08)])
 fx.set_quotes([(Currency('USD'), Currency('JPY'), 150.0)])
-cross = fx.rate('EUR', 'JPY', AS_OF)
+cross = fx.rate('EUR', 'JPY', AS_OF, "cashflow_date")
+# Quote metadata keeps the order you state; the pip size is explicit, not inferred.
+eur_jpy_quote = FxPairConvention('EUR', 'JPY', 0.01)
 config = FinstackConfig(rounding_mode=RoundingMode.BANKERS)
 market = build_market('foundations')
 bond = json.dumps(instruments('foundations')['USD-CORP'])
 first = price_instrument(bond, market, AS_OF)
 second = price_instrument(bond, market, AS_OF)
+# No financial rounding mode is selected unless configured, so the stamp omits it;
+# an explicit FinstackConfig records the chosen mode.
 foundation_spec = book_spec('foundations')
 holdings = []
 for position in foundation_spec['positions']:
@@ -160,13 +165,14 @@ The intermediate USD units cancel. The reciprocal is EUR per JPY, so multiplying
 ```python exec id=exercise-fx-triangulation role=exercise
 from datetime import date
 from finstack_quant.core.currency import Currency
-from finstack_quant.core.market_data import FxMatrix, fx_pair_convention, invert_fx_rate
+from finstack_quant.core.market_data import FxMatrix, FxPairConvention, invert_fx_rate
 AS_OF = date(2025, 1, 15)
-crosses=FxMatrix()
+crosses=FxMatrix('USD')  # explicit USD pivot for the EUR/JPY cross
 crosses.set_quotes([(Currency('EUR'),Currency('USD'),1.08)])
 crosses.set_quotes([(Currency('USD'),Currency('JPY'),150.0)])
-eur_jpy=crosses.rate('EUR','JPY',AS_OF).rate
-print({'JPY_per_EUR':eur_jpy,'JPY_pip':fx_pair_convention('EUR','JPY').pip_size,'EUR_per_JPY':invert_fx_rate(eur_jpy)})
+eur_jpy=crosses.rate('EUR','JPY',AS_OF,'cashflow_date').rate
+eur_jpy_quote=FxPairConvention('EUR','JPY',0.01)  # explicit pip size for this ordered pair
+print({'JPY_per_EUR':eur_jpy,'JPY_pip':eur_jpy_quote.pip_size,'EUR_per_JPY':invert_fx_rate(eur_jpy)})
 ```
 {/* /notebook-block */}
 
@@ -212,8 +218,8 @@ gbp=copy.deepcopy(next(p for p in extended['positions'] if p['position_id']=='EU
 gbp.update(position_id='GBP-CASH',instrument_id='GBP-CASH')
 gbp['instrument_spec']['spec'].update(id='GBP-CASH',notional={'amount':'100000','currency':'GBP'},discount_curve_id='GBP-OIS')
 extended['positions'].append(gbp)
-gbp_market=build_market('foundations').insert(DiscountCurve.flat('GBP-OIS',AS_OF,0.04))
-quotes=FxMatrix();quotes.set_quotes([(Currency('EUR'),Currency('USD'),1.08)]);quotes.set_quotes([(Currency('GBP'),Currency('USD'),1.25)])
+gbp_market=build_market('foundations').insert(DiscountCurve.flat('GBP-OIS',AS_OF,0.04,'act_365f'))
+quotes=FxMatrix(None);quotes.set_quotes([(Currency('EUR'),Currency('USD'),1.08)]);quotes.set_quotes([(Currency('GBP'),Currency('USD'),1.25)])
 gbp_market.insert_fx(quotes)
 valuation=value_portfolio(Portfolio.from_spec(json.dumps(extended)),gbp_market,metrics=[])
 wire=json.loads(valuation.to_json());holding=wire['position_values']['GBP-CASH']

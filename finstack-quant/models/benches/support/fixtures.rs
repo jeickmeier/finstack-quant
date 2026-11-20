@@ -57,7 +57,7 @@ pub fn gbm() -> GbmProcess {
 }
 
 pub fn heston() -> HestonProcess {
-    finstack_quant_models::closed_form::HestonPricingParams::new(
+    finstack_quant_models::monte_carlo::process::heston::HestonProcessParams::new(
         0.03, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04,
     )
     .map(HestonProcess::new)

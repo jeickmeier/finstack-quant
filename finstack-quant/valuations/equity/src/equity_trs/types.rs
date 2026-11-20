@@ -189,6 +189,27 @@ pub struct EquityTotalReturnSwap {
 finstack_quant_valuations_core::validate_on_deserialize!(EquityTotalReturnSwap);
 
 impl EquityTotalReturnSwap {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> EquityTotalReturnSwapBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .notional(self.notional)
+            .underlying(self.underlying.clone())
+            .financing_leg(self.financing_leg.clone())
+            .schedule(self.schedule.clone())
+            .side(self.side)
+            .initial_level_opt(self.initial_level)
+            .past_fixings(self.past_fixings.clone())
+            .margin_spec_opt(self.margin_spec.clone())
+            .dividend_tax_rate(self.dividend_tax_rate)
+            .dividend_settlement(self.dividend_settlement)
+            .discrete_dividends(self.discrete_dividends.clone())
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Create a canonical example equity TRS for testing and documentation.
     ///
     /// Returns a 1-year SPX total return swap with quarterly resets.

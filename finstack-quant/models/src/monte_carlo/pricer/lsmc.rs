@@ -53,6 +53,7 @@ use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::{Discretization, RandomStream};
 use crate::types::{OptionMarketParams, OptionType};
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::{Error, Result};
@@ -116,6 +117,91 @@ pub struct ExercisePolicy {
     /// Number of simulation steps in the training run; the pricing run must
     /// agree.
     pub num_steps: usize,
+}
+
+/// Continuation-regression diagnostics for one interior exercise date.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ExerciseBoundaryPoint {
+    /// Index on the uniform simulation grid, excluding inception and expiry.
+    pub step: usize,
+    /// Years from simulation inception.
+    pub time: f64,
+    /// Strike-adjacent exercise boundary within the observed in-the-money spots.
+    /// Absent if a crossing cannot be established or the fit was skipped.
+    pub critical_spot: Option<f64>,
+    /// Number of training paths in the money before this regression.
+    pub itm_paths: usize,
+    /// Number of those paths selected for immediate exercise at this step by
+    /// the backward regression, before any decision at an earlier step.
+    pub exercised_paths: usize,
+    /// Fitted weights in basis order, empty when the regression was skipped.
+    pub continuation_coeffs: Vec<f64>,
+}
+
+/// Option price estimate and interior exercise-boundary diagnostics.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct LsmcResult {
+    /// Price in the specified currency, with sampling error and confidence interval.
+    pub estimate: MoneyEstimate,
+    /// Diagnostics from the training paths, ordered by ascending step.
+    pub exercise_boundary: Vec<ExerciseBoundaryPoint>,
+}
+
+struct TrainingResult {
+    values: Vec<f64>,
+    policy: ExercisePolicy,
+    exercise_boundary: Vec<ExerciseBoundaryPoint>,
+}
+
+fn critical_spot<B: BasisFunctions + ?Sized>(
+    spots: &mut [f64],
+    exercise: &AmericanExercise,
+    basis: &B,
+    coefficients: &[f64],
+    basis_vals: &mut [f64],
+) -> Option<f64> {
+    spots.sort_unstable_by(f64::total_cmp);
+    let mut gap = |spot| {
+        basis.evaluate(spot, basis_vals);
+        let continuation: f64 = coefficients
+            .iter()
+            .zip(basis_vals.iter())
+            .map(|(a, b)| a * b)
+            .sum();
+        exercise.exercise_value(spot) - continuation
+    };
+    // The in-the-money region is one-sided. Traverse from the strike so
+    // the first bracket is the strike-adjacent one even with multiple roots.
+    let ordered = (0..spots.len()).map(|i| match exercise.option_type {
+        OptionType::Call => spots[i],
+        OptionType::Put => spots[spots.len() - 1 - i],
+    });
+    let mut previous: Option<(f64, f64)> = None;
+    for spot in ordered {
+        let value = gap(spot);
+        if !value.is_finite() {
+            previous = None;
+            continue;
+        }
+        if value == 0.0 {
+            return Some(spot);
+        }
+        if let Some((prior_spot, prior_value)) = previous
+            && value.is_sign_positive() != prior_value.is_sign_positive()
+        {
+            let tolerance = (exercise.strike * 1e-10).max(f64::EPSILON);
+            return BrentSolver::new(tolerance, 100)
+                .ok()?
+                .solve_in_bracket(|x| Ok(gap(x)), prior_spot, spot)
+                .ok();
+        }
+        previous = Some((spot, value));
+    }
+    None
 }
 
 /// Simulation and exercise inputs of one GBM LSMC run.
@@ -578,7 +664,7 @@ impl LsmcPricer {
         currency: Option<Currency>,
         basis: Option<&str>,
         basis_degree: Option<usize>,
-    ) -> Result<MoneyEstimate> {
+    ) -> Result<LsmcResult> {
         let &OptionMarketParams {
             option_type,
             spot,
@@ -605,7 +691,7 @@ impl LsmcPricer {
             basis: &basis,
             discount_rate: rate,
         };
-        pricer.price(&inputs, currency)
+        pricer.price_internal(&inputs, currency, true)
     }
 
     /// Two-pass unbiased American option price under GBM.
@@ -638,7 +724,7 @@ impl LsmcPricer {
         basis: Option<&str>,
         basis_degree: Option<usize>,
         pricing_seed: u64,
-    ) -> Result<MoneyEstimate> {
+    ) -> Result<LsmcResult> {
         let &OptionMarketParams {
             option_type,
             spot,
@@ -665,7 +751,7 @@ impl LsmcPricer {
             basis: &basis,
             discount_rate: rate,
         };
-        pricer.price_unbiased(&inputs, currency, pricing_seed)
+        pricer.price_unbiased_internal(&inputs, currency, pricing_seed, true)
     }
 
     /// Resolve one pricing call's overrides against the construction-time
@@ -806,14 +892,25 @@ impl LsmcEngine {
     where
         B: BasisFunctions + ?Sized,
     {
+        Ok(self.price_internal(inputs, currency, false)?.estimate)
+    }
+
+    fn price_internal<B>(
+        &self,
+        inputs: &LsmcInputs<'_, B>,
+        currency: Currency,
+        diagnostics: bool,
+    ) -> Result<LsmcResult>
+    where
+        B: BasisFunctions + ?Sized,
+    {
         let &LsmcInputs {
             process,
             initial_spot,
             time_to_maturity,
             num_steps,
             exercise,
-            basis,
-            discount_rate,
+            ..
         } = inputs;
         let paths = self.generate_paths_with_seed(
             process,
@@ -823,21 +920,22 @@ impl LsmcEngine {
             self.config.seed,
         )?;
 
-        let (values, _) = self.train_exercise_policy(
-            &paths,
-            exercise,
-            basis,
-            discount_rate,
-            time_to_maturity,
-            num_steps,
-        )?;
+        let TrainingResult {
+            values,
+            exercise_boundary,
+            ..
+        } = self.train_exercise_policy(&paths, inputs, diagnostics)?;
 
         let intrinsic_floor = self
             .config
             .exercise_dates
             .contains(&0)
             .then(|| exercise.exercise_value(initial_spot));
-        self.summarize_present_values(&values, intrinsic_floor, currency)
+        let estimate = self.summarize_present_values(&values, intrinsic_floor, currency)?;
+        Ok(LsmcResult {
+            estimate,
+            exercise_boundary,
+        })
     }
 
     /// Generate Monte Carlo paths with an explicit seed override.
@@ -953,14 +1051,24 @@ impl LsmcEngine {
     where
         B: BasisFunctions + ?Sized,
     {
+        let (policy, _) = self.fit_exercise_policy_internal(inputs, false)?;
+        Ok(policy)
+    }
+
+    fn fit_exercise_policy_internal<B>(
+        &self,
+        inputs: &LsmcInputs<'_, B>,
+        diagnostics: bool,
+    ) -> Result<(ExercisePolicy, Vec<ExerciseBoundaryPoint>)>
+    where
+        B: BasisFunctions + ?Sized,
+    {
         let &LsmcInputs {
             process,
             initial_spot,
             time_to_maturity,
             num_steps,
-            exercise,
-            basis,
-            discount_rate,
+            ..
         } = inputs;
         let paths = self.generate_paths_with_seed(
             process,
@@ -969,15 +1077,12 @@ impl LsmcEngine {
             num_steps,
             self.config.seed,
         )?;
-        let (_, policy) = self.train_exercise_policy(
-            &paths,
-            exercise,
-            basis,
-            discount_rate,
-            time_to_maturity,
-            num_steps,
-        )?;
-        Ok(policy)
+        let TrainingResult {
+            policy,
+            exercise_boundary,
+            ..
+        } = self.train_exercise_policy(&paths, inputs, diagnostics)?;
+        Ok((policy, exercise_boundary))
     }
 
     /// Two-pass step 2: price using a frozen [`ExercisePolicy`] on independent paths.
@@ -1099,6 +1204,21 @@ impl LsmcEngine {
     where
         B: BasisFunctions + ?Sized,
     {
+        Ok(self
+            .price_unbiased_internal(inputs, currency, pricing_seed, false)?
+            .estimate)
+    }
+
+    fn price_unbiased_internal<B>(
+        &self,
+        inputs: &LsmcInputs<'_, B>,
+        currency: Currency,
+        pricing_seed: u64,
+        diagnostics: bool,
+    ) -> Result<LsmcResult>
+    where
+        B: BasisFunctions + ?Sized,
+    {
         if pricing_seed == self.config.seed {
             return Err(finstack_quant_core::Error::Validation(
                 "price_unbiased requires pricing_seed != configured training seed; \
@@ -1107,9 +1227,12 @@ impl LsmcEngine {
             ));
         }
 
-        let policy = self.fit_exercise_policy(inputs)?;
-
-        self.price_with_policy(inputs, &policy, currency, pricing_seed)
+        let (policy, exercise_boundary) = self.fit_exercise_policy_internal(inputs, diagnostics)?;
+        let estimate = self.price_with_policy(inputs, &policy, currency, pricing_seed)?;
+        Ok(LsmcResult {
+            estimate,
+            exercise_boundary,
+        })
     }
 
     /// Fit continuation coefficients and retain the training-path values.
@@ -1122,15 +1245,20 @@ impl LsmcEngine {
     fn train_exercise_policy<B>(
         &self,
         paths: &PathMatrix,
-        exercise: &AmericanExercise,
-        basis: &B,
-        discount_rate: f64,
-        time_to_maturity: f64,
-        num_steps: usize,
-    ) -> Result<(Vec<f64>, ExercisePolicy)>
+        inputs: &LsmcInputs<'_, B>,
+        diagnostics: bool,
+    ) -> Result<TrainingResult>
     where
         B: BasisFunctions + ?Sized,
     {
+        let &LsmcInputs {
+            exercise,
+            basis,
+            discount_rate,
+            time_to_maturity,
+            num_steps,
+            ..
+        } = inputs;
         if !discount_rate.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "LSMC discount_rate must be finite, got {discount_rate}"
@@ -1166,6 +1294,7 @@ impl LsmcEngine {
         let mut regression_indices: Vec<usize> = Vec::with_capacity(num_paths / 2);
         let mut basis_vals = vec![0.0; basis.num_basis()];
         let mut coefficients_by_date: Vec<(usize, Vec<f64>)> = Vec::new();
+        let mut exercise_boundary = Vec::new();
 
         for &exercise_step in &sorted_exercise_dates {
             if exercise_step == 0 || exercise_step >= num_steps {
@@ -1196,11 +1325,22 @@ impl LsmcEngine {
                     itm_paths = regression_x.len(),
                     "LSMC fit_exercise_policy: insufficient ITM paths, skipping date"
                 );
+                if diagnostics {
+                    exercise_boundary.push(ExerciseBoundaryPoint {
+                        step: exercise_step,
+                        time: t,
+                        itm_paths: regression_x.len(),
+                        exercised_paths: 0,
+                        critical_spot: None,
+                        continuation_coeffs: Vec::new(),
+                    });
+                }
                 continue;
             }
             match regression_coefficients_with_basis(&regression_x, &regression_y, basis) {
                 Ok(coeffs) => {
                     // Subsequent earlier-date regressions must see the updated Y.
+                    let mut exercised_paths = 0;
                     for &i in &regression_indices {
                         let spot = paths.row(i)[exercise_step];
                         basis.evaluate(spot, &mut basis_vals);
@@ -1212,7 +1352,24 @@ impl LsmcEngine {
                         if immediate > continuation {
                             cashflows[i] = immediate;
                             exercise_times[i] = t;
+                            exercised_paths += 1;
                         }
+                    }
+                    if diagnostics {
+                        exercise_boundary.push(ExerciseBoundaryPoint {
+                            step: exercise_step,
+                            time: t,
+                            itm_paths: regression_x.len(),
+                            exercised_paths,
+                            critical_spot: critical_spot(
+                                &mut regression_x,
+                                exercise,
+                                basis,
+                                &coeffs,
+                                &mut basis_vals,
+                            ),
+                            continuation_coeffs: coeffs.clone(),
+                        });
                     }
                     coefficients_by_date.push((exercise_step, coeffs));
                 }
@@ -1226,6 +1383,7 @@ impl LsmcEngine {
         }
 
         coefficients_by_date.sort_by_key(|(step, _)| *step);
+        exercise_boundary.reverse();
 
         let present_values: Vec<f64> = cashflows
             .iter()
@@ -1241,15 +1399,16 @@ impl LsmcEngine {
                 .get_mean()?
                 .is_some_and(|mean| exercise.exercise_value(paths.row(0)[0]) >= mean);
 
-        Ok((
-            present_values,
-            ExercisePolicy {
+        Ok(TrainingResult {
+            values: present_values,
+            policy: ExercisePolicy {
                 exercise_at_start,
                 coefficients_by_date,
                 num_basis: basis.num_basis(),
                 num_steps,
             },
-        ))
+            exercise_boundary,
+        })
     }
 
     /// Apply a frozen exercise policy forward in time on independent paths.
@@ -1617,9 +1776,30 @@ mod tests {
         let basis = PolynomialBasis::new(2).expect("valid regression basis");
         let paths = PathMatrix::from_rows(&[vec![100.0, 110.0, 130.0]]);
 
-        let (present_values, _) = pricer
-            .train_exercise_policy(&paths, &exercise, &basis, 0.05, 1.0, 2)
+        let process = GbmProcess::new(
+            crate::monte_carlo::process::gbm::GbmParams::new(0.05, 0.0, 0.2).unwrap(),
+        );
+        let inputs = LsmcInputs {
+            process: &process,
+            initial_spot: 100.0,
+            time_to_maturity: 1.0,
+            num_steps: 2,
+            exercise: &exercise,
+            basis: &basis,
+            discount_rate: 0.05,
+        };
+        let TrainingResult {
+            values: present_values,
+            exercise_boundary,
+            ..
+        } = pricer
+            .train_exercise_policy(&paths, &inputs, true)
             .expect("backward induction should succeed");
+        assert_eq!(exercise_boundary.len(), 1);
+        assert_eq!(exercise_boundary[0].itm_paths, 1);
+        assert_eq!(exercise_boundary[0].exercised_paths, 0);
+        assert!(exercise_boundary[0].critical_spot.is_none());
+        assert!(exercise_boundary[0].continuation_coeffs.is_empty());
 
         let expected = 30.0 * (-0.05_f64).exp();
         assert!((present_values[0] - expected).abs() < 1e-12);
@@ -1718,12 +1898,23 @@ mod tests {
         let zero_continuation = PathMatrix::from_rows(&vec![vec![90.0, 100.0]; 2]);
         let high_continuation = PathMatrix::from_rows(&vec![vec![90.0, 50.0]; 2]);
 
+        let process = GbmProcess::new(GbmParams::new(0.0, 0.0, 0.2).unwrap());
+        let inputs = LsmcInputs {
+            process: &process,
+            initial_spot: 90.0,
+            time_to_maturity: 1.0,
+            num_steps: 1,
+            exercise: &exercise,
+            basis: &basis,
+            discount_rate: 0.0,
+        };
+
         for (training, pricing, exercise_at_start, expected) in [
             (&zero_continuation, &high_continuation, true, 10.0),
             (&high_continuation, &zero_continuation, false, 0.0),
         ] {
-            let (_, policy) = pricer
-                .train_exercise_policy(training, &exercise, &basis, 0.0, 1.0, 1)
+            let TrainingResult { policy, .. } = pricer
+                .train_exercise_policy(training, &inputs, false)
                 .unwrap();
             assert_eq!(policy.exercise_at_start, exercise_at_start);
             let values = pricer.apply_policy_to_paths(
@@ -1796,8 +1987,23 @@ mod tests {
         let basis = PolynomialBasis::new(1).expect("valid regression basis");
         let paths = PathMatrix::from_rows(&vec![vec![100.0, 100.0 + 1.0e-8, 100.0]; 16]);
 
-        let (present_values, _) = pricer
-            .train_exercise_policy(&paths, &exercise, &basis, 0.0, 1.0, 2)
+        let process = GbmProcess::new(
+            crate::monte_carlo::process::gbm::GbmParams::new(0.0, 0.0, 0.2).unwrap(),
+        );
+        let inputs = LsmcInputs {
+            process: &process,
+            initial_spot: 100.0,
+            time_to_maturity: 1.0,
+            num_steps: 2,
+            exercise: &exercise,
+            basis: &basis,
+            discount_rate: 0.0,
+        };
+        let TrainingResult {
+            values: present_values,
+            ..
+        } = pricer
+            .train_exercise_policy(&paths, &inputs, false)
             .expect("backward induction should succeed");
 
         for value in present_values {
@@ -1837,6 +2043,14 @@ mod tests {
                 Some(3),
             )
             .expect("American put pricing should succeed");
+        assert_eq!(estimate.exercise_boundary.len(), 7);
+        assert!(
+            estimate
+                .exercise_boundary
+                .iter()
+                .all(|p| p.itm_paths >= p.exercised_paths)
+        );
+        let estimate = estimate.estimate;
         assert!(estimate.mean.amount() > 0.0);
     }
 
@@ -1868,7 +2082,8 @@ mod tests {
                 Some("laguerre"),
                 Some(3),
             )
-            .expect("deep ITM put should price");
+            .expect("deep ITM put should price")
+            .estimate;
         let intrinsic = 50.0;
         assert!(
             estimate.mean.amount() + 1e-12 >= intrinsic,
@@ -1905,7 +2120,8 @@ mod tests {
                 Some("laguerre"),
                 Some(3),
             )
-            .expect("deep ITM short-horizon put should price");
+            .expect("deep ITM short-horizon put should price")
+            .estimate;
         let intrinsic = 50.0;
         assert_eq!(
             estimate.mean.amount(),
@@ -1939,15 +2155,15 @@ mod tests {
         let div_yield = 0.0;
         let vol = 0.2;
         let expiry = 1.0;
-        let european = crate::closed_form::bs_price(
+        let european = crate::closed_form::bs_price(&crate::types::OptionMarketParams {
             spot,
             strike,
             rate,
-            div_yield,
-            vol,
-            expiry,
-            crate::types::OptionType::Put,
-        )
+            dividend_yield: div_yield,
+            volatility: vol,
+            time_to_expiry: expiry,
+            option_type: crate::types::OptionType::Put,
+        })
         .expect("valid Black-Scholes inputs");
         let pricer = LsmcPricer::new(
             Some(8_000),
@@ -1975,7 +2191,8 @@ mod tests {
                 Some("laguerre"),
                 Some(3),
             )
-            .expect("ATM American put should price");
+            .expect("ATM American put should price")
+            .estimate;
         let price = estimate.mean.amount();
         let tol = (4.0 * estimate.stderr).max(0.05);
         assert!(
@@ -1993,15 +2210,15 @@ mod tests {
         let div_yield = 0.0;
         let vol = 0.2;
         let expiry = 1.0;
-        let european = crate::closed_form::bs_price(
+        let european = crate::closed_form::bs_price(&crate::types::OptionMarketParams {
             spot,
             strike,
             rate,
-            div_yield,
-            vol,
-            expiry,
-            crate::types::OptionType::Call,
-        )
+            dividend_yield: div_yield,
+            volatility: vol,
+            time_to_expiry: expiry,
+            option_type: crate::types::OptionType::Call,
+        })
         .expect("valid Black-Scholes inputs");
         let pricer = LsmcPricer::new(
             Some(8_000),
@@ -2029,7 +2246,8 @@ mod tests {
                 Some("laguerre"),
                 Some(3),
             )
-            .expect("ATM American call should price");
+            .expect("ATM American call should price")
+            .estimate;
         let price = estimate.mean.amount();
         let tol = (4.0 * estimate.stderr).max(0.15);
         assert!(
@@ -2127,7 +2345,7 @@ mod tests {
             ),
         ];
         for (estimate, (price, stderr)) in estimates.into_iter().zip(expected) {
-            let estimate = estimate.expect("price");
+            let estimate = estimate.expect("price").estimate;
             assert!(
                 (estimate.mean.amount() - price).abs() <= 1e-12,
                 "American price {} vs {price}",

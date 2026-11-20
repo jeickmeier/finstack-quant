@@ -6,6 +6,7 @@ use finstack_quant_valuations_core::instruments::FutureOptionTerms;
 finstack_quant_valuations_core::define_future_option! {
     /// Exchange-listed option on an arbitrary FX futures contract.
     pub struct FxFutureOption;
+    builder: FxFutureOptionBuilder,
     instrument_type: finstack_quant_valuations_core::pricer::InstrumentType::FxFutureOption,
     family: crate::FX,
     register_metrics: register_fx_future_option_metrics,

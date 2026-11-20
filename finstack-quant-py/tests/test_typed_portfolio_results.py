@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
+from finstack_quant.core.money import Money
 import finstack_quant.portfolio as pf
 
 AS_OF = "2025-01-15"
@@ -43,23 +44,20 @@ def _brinson_sectors() -> str:
     ])
 
 
-def _campisi_snapshot(sector: str, weight: float, r: float) -> dict[str, Any]:
-    return {
-        "sector": sector,
-        "weight": weight,
-        "total_return": r,
-        "yield_annual": 0.05,
-        "modified_duration": 5.0,
-        "spread_duration": 4.0,
-        "spread": 0.01,
-        "delta_treasury_yield": 0.001,
-        "delta_spread": -0.0005,
-    }
-
-
-_CAMPISI_PORTFOLIO = json.dumps([_campisi_snapshot("CORP", 0.5, 0.02), _campisi_snapshot("GOVT", 0.5, 0.01)])
-_CAMPISI_BENCHMARK = json.dumps([_campisi_snapshot("CORP", 0.4, 0.015), _campisi_snapshot("GOVT", 0.6, 0.012)])
-_CAMPISI_CONFIG = json.dumps({"period_years": 0.25})
+def _campisi_period(start: str = "2025-01-01", end: str = "2025-03-15") -> pf.FiAttributionResult:
+    basis = pf.FiReportingBasis("portfolio", "benchmark", "reinvested", "dirty settlement", "native USD", "net of fees")
+    config = pf.FiAttributionConfig(start, end, "USD", basis, ["CORP", "GOVT"])
+    mark = Money(80, "USD")
+    coupon = Money(5, "USD")
+    portfolio = [
+        pf.FiPositionSnapshot("P-CORP", "CORP", "0.5", 0.02, mark, coupon),
+        pf.FiPositionSnapshot("P-GOVT", "GOVT", "0.5", 0.01, mark, coupon),
+    ]
+    benchmark = [
+        pf.FiPositionSnapshot("B-CORP", "CORP", "0.4", 0.015, mark, coupon),
+        pf.FiPositionSnapshot("B-GOVT", "GOVT", "0.6", 0.012, mark, coupon),
+    ]
+    return pf.campisi_attribution(portfolio, benchmark, config)
 
 
 def _reference_table_json() -> str:
@@ -233,7 +231,7 @@ def test_carino_link_returns_typed_result() -> None:
 
 
 def test_campisi_attribution_returns_typed_result() -> None:
-    result = pf.campisi_attribution(_CAMPISI_PORTFOLIO, _CAMPISI_BENCHMARK, _CAMPISI_CONFIG)
+    result = _campisi_period()
     expected = json.loads(result.to_json())
 
     _assert_contract(result, pf.FiAttributionResult)
@@ -246,18 +244,20 @@ def test_campisi_attribution_returns_typed_result() -> None:
         "benchmark_weight",
         "portfolio_return",
         "benchmark_return",
+        "benchmark_comparator",
         "allocation",
         "active_carry",
         "active_treasury",
         "active_spread",
-        "selection",
+        "residual",
         "total_active",
     ]
 
 
 def test_campisi_carino_link_returns_typed_result() -> None:
-    period = pf.campisi_attribution(_CAMPISI_PORTFOLIO, _CAMPISI_BENCHMARK, _CAMPISI_CONFIG).to_json()
-    periods = json.dumps([json.loads(period), json.loads(period)])
+    first = _campisi_period().to_json()
+    second = _campisi_period("2025-03-15", "2025-05-15").to_json()
+    periods = [pf.FiAttributionResult.from_json(first), pf.FiAttributionResult.from_json(second)]
     result = pf.campisi_carino_link(periods)
     expected = json.loads(result.to_json())
 
@@ -270,22 +270,23 @@ def test_campisi_carino_link_returns_typed_result() -> None:
         "active_carry",
         "active_treasury",
         "active_spread",
-        "selection",
+        "residual",
         "total_active",
     ]
 
 
 def test_campisi_carino_link_accepts_typed_results() -> None:
-    period = pf.campisi_attribution(_CAMPISI_PORTFOLIO, _CAMPISI_BENCHMARK, _CAMPISI_CONFIG)
-    result = pf.campisi_carino_link([period, period])
+    period = _campisi_period()
+    later = _campisi_period("2025-03-15", "2025-05-15")
+    result = pf.campisi_carino_link([period, later])
     expected = json.loads(result.to_json())
 
     _assert_contract(result, pf.FiCarinoLinkedResult)
-    assert result.linked_selection == pytest.approx(expected["linked_selection"])
+    assert result.linked_residual == pytest.approx(expected["linked_residual"])
 
 
 def test_fi_attribution_reconciliation_check_returns_typed_report() -> None:
-    period = pf.campisi_attribution(_CAMPISI_PORTFOLIO, _CAMPISI_BENCHMARK, _CAMPISI_CONFIG)
+    period = _campisi_period()
     report = pf.FiAttributionResult.from_json(period.to_json()).reconciliation_check(1e-10)
     expected = json.loads(report.to_json())
 
@@ -463,8 +464,13 @@ def test_replay_portfolio_returns_typed_result() -> None:
     expected = json.loads(result.to_json())
 
     _assert_contract(result, pf.ReplayResult)
-    assert result.summary["num_steps"] == expected["summary"]["num_steps"] == 2
+    assert result.summary.num_steps == expected["summary"]["num_steps"] == 2
     assert len(result.steps) == 2
+    assert isinstance(result.summary, pf.ReplaySummary)
+    assert isinstance(result.steps[0], pf.ReplayStep)
+    assert result.steps[0].date == date(2025, 1, 15)
+    assert result.steps[0].valuation.total_base_currency == result.summary.start_value
+    assert result.steps[0].daily_mtm_pnl is None
     assert _frame_columns(result) == ["date", "value", "daily_mtm_pnl", "cumulative_mtm_pnl"]
 
 
@@ -477,7 +483,7 @@ def test_replay_portfolio_typed_snapshot_tuples_match_the_json_wire() -> None:
         {"date": "2025-01-16", "market": json.loads(m1.to_json())},
     ]
 
-    typed = pf.replay_portfolio(portfolio, [(date(2025, 1, 15), m0), ("2025-01-16", m1)], config)
+    typed = pf.replay_portfolio(portfolio, [(date(2025, 1, 15), m0), ("2025-01-16", m1)], pf.ReplayConfig("pv_only"))
     from_dicts = pf.replay_portfolio(portfolio, wire, config)
     from_json = pf.replay_portfolio(portfolio, json.dumps(wire), config)
 

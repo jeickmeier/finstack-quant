@@ -86,11 +86,11 @@ const PATH_SPECS = {
       q: 0.01,
       kappa: 2.0,
       theta: 0.05,
-      sigma_v: 0.3,
+      vol_of_vol: 0.3,
       rho: -0.7,
       v0: 0.03,
     },
-    initial_state: [100.0, 0.03],
+    initial_state: [100.0],
     antithetic: true,
     ...PATH_GRID,
   },
@@ -143,6 +143,20 @@ const PATH_SPECS = {
     ...PATH_GRID,
   },
 };
+test('Heston paths derive opening variance from the variance dynamics', () => {
+  const spec = PATH_SPECS.heston;
+  const opening = [spec.initial_state[0], spec.process.v0];
+  assert.deepEqual(monteCarlo.simulatePaths(spec).values.slice(0, 2), opening);
+  assert.throws(
+    () => monteCarlo.simulatePaths({ ...spec, initial_state: opening }),
+    /one initial_state value/
+  );
+  const { vol_of_vol, ...rest } = spec.process;
+  assert.throws(() =>
+    monteCarlo.simulatePaths({ ...spec, process: { ...rest, sigma_v: vol_of_vol } })
+  );
+});
+
 const GBM = [100.0, 100.0, 0.05, 0.0, 0.2, 1.0];
 /** `GBM` as the `OptionMarketParams` object of the closed-form and Monte Carlo pricers. */
 const gbmMarket = (optionType) => {
@@ -741,11 +755,18 @@ const CASES = {
   },
   'monte_carlo.lsmc': () => {
     const lsmc = new monteCarlo.LsmcPricer(2000, 42, false, 20);
+    const diagnostics = lsmc.priceAmericanUnbiased(gbmMarket('put'), 99).exercise_boundary;
+    assert.ok(diagnostics.length > 0);
+    assert.ok(diagnostics.every((point) => point.exercised_paths <= point.itm_paths));
+    assert.deepEqual(
+      lsmc.priceAmericanUnbiased(gbmMarket('put'), 100).exercise_boundary,
+      diagnostics
+    );
     return [
-      money(lsmc.priceAmerican(gbmMarket('put'))),
-      money(lsmc.priceAmerican(gbmMarket('call'), undefined, 10, 'polynomial', 2)),
-      money(lsmc.priceAmericanUnbiased(gbmMarket('put'), 99)),
-      money(lsmc.priceAmericanUnbiased(gbmMarket('call'), 99)),
+      money(lsmc.priceAmerican(gbmMarket('put')).estimate),
+      money(lsmc.priceAmerican(gbmMarket('call'), undefined, 10, 'polynomial', 2).estimate),
+      money(lsmc.priceAmericanUnbiased(gbmMarket('put'), 99).estimate),
+      money(lsmc.priceAmericanUnbiased(gbmMarket('call'), 99).estimate),
       lsmc.basis,
       lsmc.basisDegree,
     ];
@@ -855,10 +876,10 @@ const CASES = {
     volatility.sviImpliedVol(SVI, 0.1, 1.0),
   ],
   'volatility.arbitrage': () => [
-    volatility.checkSurfaceGrid(STRIKES, EXPIRIES, VOLS, [100.0, 100.0]),
-    volatility.checkButterflyGrid(STRIKES, EXPIRIES, VOLS, [100.0, 100.0]).length,
-    volatility.checkCalendarSpreadGrid(STRIKES, EXPIRIES, VOLS, [100.0, 100.0]).length,
-    volatility.checkLocalVolDensityGrid(STRIKES, EXPIRIES, VOLS, [100.0, 100.0]).length,
+    volatility.checkSurfaceGrid(EXPIRIES, STRIKES, VOLS, [100.0, 100.0]),
+    volatility.checkButterflyGrid(EXPIRIES, STRIKES, VOLS, [100.0, 100.0]).length,
+    volatility.checkCalendarSpreadGrid(EXPIRIES, STRIKES, VOLS, [100.0, 100.0]).length,
+    volatility.checkLocalVolDensityGrid(EXPIRIES, STRIKES, VOLS, [100.0, 100.0]).length,
   ],
   'volatility.cube_slices': () => {
     const strikes = [0.02, 0.03, 0.04];
@@ -1010,21 +1031,27 @@ const CASES = {
     ),
   ],
   'fourier.heston': () => [
-    models.hestonPrice(100.0, 100.0, 1.0, {
-      r: 0.05,
-      q: 0.0,
-      v0: 0.04,
-      kappa: 2.0,
-      theta: 0.04,
-      sigma_v: 0.3,
-      rho: -0.7,
-    }),
     models.hestonPrice(
-      100.0,
-      110.0,
-      1.0,
-      { r: 0.05, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, sigma_v: 0.3, rho: -0.7 },
-      false
+      {
+        spot: 100.0,
+        strike: 100.0,
+        rate: 0.05,
+        dividend_yield: 0.0,
+        time_to_expiry: 1.0,
+        option_type: 'call',
+      },
+      { v0: 0.04, kappa: 2.0, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 }
+    ),
+    models.hestonPrice(
+      {
+        spot: 100.0,
+        strike: 110.0,
+        rate: 0.05,
+        dividend_yield: 0.0,
+        time_to_expiry: 1.0,
+        option_type: 'put',
+      },
+      { v0: 0.04, kappa: 2.0, theta: 0.04, vol_of_vol: 0.3, rho: -0.7 }
     ),
   ],
   'fourier.cos': () => [
@@ -1049,11 +1076,11 @@ const CASES = {
         dividend_yield: 0.0,
         time_to_expiry: 1.0,
         option_type: 'put',
-        n_terms: 512,
       },
       0.2,
       -0.14,
-      0.2
+      0.2,
+      512
     ),
     models.mertonJumpCosPrice(
       {
@@ -1077,12 +1104,12 @@ const CASES = {
         dividend_yield: 0.0,
         time_to_expiry: 1.0,
         option_type: 'put',
-        n_terms: 512,
       },
       0.2,
       -0.1,
       0.15,
-      0.5
+      0.5,
+      512
     ),
   ],
   'volatility.convert_atm': () => [
@@ -1138,3 +1165,36 @@ for (const [name, compute] of Object.entries(CASES)) {
     assertClose(plain(compute()), GOLDEN[name], name);
   });
 }
+
+test('option market construction shares the validated greeks inputs', () => {
+  const wire = {
+    spot: 101.0,
+    strike: 94.0,
+    rate: 0.037,
+    dividend_yield: 0.011,
+    volatility: 0.24,
+    time_to_expiry: 0.65,
+    option_type: 'put',
+  };
+  const market = models.optionMarketParams(wire);
+  assert.deepEqual(market, wire);
+  assert.deepEqual(models.bsGreeks(market), models.bsGreeks(wire));
+  const zeroVol = models.optionMarketParams({ ...wire, volatility: 0.0 });
+  assert.throws(() => models.bsGreeks(zeroVol), /positive vol/);
+  assert.throws(() => models.optionMarketParams({ ...wire, volatility: Number.NaN }), /volatility/);
+});
+
+test('option contract inputs are shared by closed-form and COS pricing', () => {
+  const contract = models.optionContractParams({
+    spot: 100,
+    strike: 85,
+    rate: 0.05,
+    dividend_yield: 0.02,
+    time_to_expiry: 1,
+    option_type: 'call',
+  });
+  const market = models.optionContractParamsWithVolatility(contract, 0.2);
+  assert.deepEqual(models.optionMarketParamsContract(market), contract);
+  assert.ok(Math.abs(models.bsCosPrice(market, 256) - models.bsPrice(market)) < 1e-8);
+  assert.throws(() => models.optionContractParams({ ...contract, strike: 0 }), /strike/);
+});

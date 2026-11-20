@@ -58,8 +58,8 @@ it(
     expect(json(sensitivities)).toEqual(report.sensitivities);
     const decomposition = unwrap(
       await proxy().decomposeFactors({
-        sensitivitiesJson: JSON.stringify(sensitivities),
-        covarianceJson: request.covarianceJson,
+        sensitivities,
+        covariance: request.covariance,
       }),
     );
     expect(json(decomposition)).toEqual(report.decomposition);
@@ -75,12 +75,12 @@ it("keeps the host-parity probe: one factor carries all the variance", () => {
   expect(report.decomposition.factor_contributions[0]!.relative_risk).toBe(1);
 });
 it("passes the risk measure through and keeps its returned sign", async () => {
-  const sensitivitiesJson = JSON.stringify(report.sensitivities);
+  const sensitivities = report.sensitivities;
   const tail = unwrap(
     await proxy().decomposeFactors({
-      sensitivitiesJson,
-      covarianceJson: request.covarianceJson,
-      riskMeasureJson: JSON.stringify({ var: { confidence: 0.99 } }),
+      sensitivities,
+      covariance: request.covariance,
+      riskMeasure: { var: { confidence: 0.99 } },
     }),
   );
   expect(tail.measure).toEqual({ var: { confidence: 0.99 } });
@@ -95,12 +95,12 @@ it("returns Rust's rejection of unknown fields and misaligned factors", async ()
   expect(unknown.ok).toBe(false);
   if (!unknown.ok) expect(unknown.error.kind).toBe("validation");
   const misaligned = await proxy().decomposeFactors({
-    sensitivitiesJson: JSON.stringify(report.sensitivities),
-    covarianceJson: JSON.stringify({
+    sensitivities: report.sensitivities,
+    covariance: {
       factor_ids: ["other"],
       n: 1,
       data: [0.0001],
-    }),
+    },
   });
   expect(misaligned.ok).toBe(false);
 });

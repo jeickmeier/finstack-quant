@@ -199,6 +199,21 @@ class CovenantReport:
         ...
 
     @property
+    def headroom_raw(self) -> float | None:
+        """Get the signed cushion in the covenant metric's original units.
+
+        Returns
+        -------
+        float or None
+            Signed distance when the metric and threshold support a numerical comparison.
+
+        Notes
+        -----
+        This property does not raise.
+        """
+        ...
+
+    @property
     def headroom(self) -> float | None:
         """
         Cushion relative to the threshold.
@@ -240,7 +255,7 @@ class CovenantReport:
         Export the report as a single-row pandas DataFrame.
 
         Columns: ``covenant_type``, ``covenant_id``, ``passed``,
-        ``actual_value``, ``threshold``, ``headroom``, ``details``.
+        ``actual_value``, ``threshold``, ``headroom``, ``headroom_raw``, ``details``.
 
         Returns
         -------

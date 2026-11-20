@@ -413,13 +413,13 @@ class CarinoLinkedAttribution:
         """
         ...
 
-def brinson_fachler(sectors_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> BrinsonPeriodResult:
+def brinson_fachler(sectors: str | dict[str, Any] | list[Any] | pd.DataFrame) -> BrinsonPeriodResult:
     """
     Compute single-period Brinson-Fachler attribution from sector JSON.
 
     Parameters
     ----------
-    sectors_json : str | dict | list | pandas.DataFrame
+    sectors : str | dict | list | pandas.DataFrame
         JSON array of ``SectorPeriod`` objects with ``sector``,
         ``portfolio_weight``, ``benchmark_weight``, ``portfolio_return``, and
         ``benchmark_return`` fields. Returns are simple decimal returns for the
@@ -437,7 +437,7 @@ def brinson_fachler(sectors_json: str | dict[str, Any] | list[Any] | pd.DataFram
     PortfolioError
         If sector weights do not sum to one or returns are invalid.
     ValueError
-        If ``sectors_json`` is malformed.
+        If ``sectors`` is malformed.
 
     Sources
     -------
@@ -461,7 +461,7 @@ def brinson_fachler(sectors_json: str | dict[str, Any] | list[Any] | pd.DataFram
     """
     ...
 
-def carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> CarinoLinkedAttribution:
+def carino_link(periods: str | dict[str, Any] | list[Any] | pd.DataFrame) -> CarinoLinkedAttribution:
     """
     Carino-link already-computed single-period Brinson-Fachler results.
 
@@ -472,7 +472,7 @@ def carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -
 
     Parameters
     ----------
-    periods_json : str | dict | list | pandas.DataFrame
+    periods : str | dict | list | pandas.DataFrame
         Chronological list of typed ``BrinsonPeriodResult`` objects (as
         returned by :func:`brinson_fachler`) or their JSON form (for example
         ``json.loads(brinson_fachler(...).to_json())`` per period) with identical
@@ -490,7 +490,7 @@ def carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -
         If the sequence is empty or changes sector ordering, or a period
         return is non-finite or at most ``-1``.
     ValueError
-        If ``periods_json`` is malformed.
+        If ``periods`` is malformed.
 
     Sources
     -------

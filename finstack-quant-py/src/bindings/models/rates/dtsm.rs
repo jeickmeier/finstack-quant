@@ -15,11 +15,13 @@ use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{dates_to_datetime_index, dict_to_dataframe};
 use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, value_error};
+use finstack_quant_core::dates::Tenor;
 use finstack_quant_core::math::linalg::rows_of;
 use finstack_quant_models::rates::dtsm::{
     self, DieboldLi, FactorTimeSeries, YieldForecast, YieldPanel, YieldPca, YieldPcaView,
 };
 use nalgebra::DVector;
+use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2, ndarray::Array2};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule, PyType};
 
@@ -101,28 +103,39 @@ impl PyYieldPanel {
         }
         let columns: Vec<Bound<'_, PyAny>> =
             df.getattr("columns")?.call_method0("tolist")?.extract()?;
+        let float = py.import("builtins")?.getattr("float")?;
         let tenors = columns
             .iter()
             .map(|label| {
-                py.import("builtins")?
-                    .getattr("float")?
-                    .call1((label,))?
-                    .extract::<f64>()
-                    .map_err(|_| {
-                        value_error(format!(
-                            "YieldPanel.from_dataframe: column label {label} is not a numeric tenor in years"
-                        ))
-                    })
+                if let Ok(value) = float.call1((label,)) {
+                    return value.extract::<f64>();
+                }
+                let label = label.extract::<&str>().map_err(|_| {
+                    value_error(format!(
+                        "YieldPanel.from_dataframe: invalid tenor column {label}"
+                    ))
+                })?;
+                Tenor::parse(label)
+                    .map(|tenor| tenor.to_years_approx())
+                    .map_err(core_to_py)
             })
             .collect::<PyResult<Vec<f64>>>()?;
-        let index_values = df.getattr("index")?.call_method0("tolist")?;
-        let dates = extract_dates(Some(&index_values)).unwrap_or_default();
+        let index = df.getattr("index")?;
+        let dates = if index.is_instance(&py.import("pandas")?.getattr("RangeIndex")?)? {
+            None
+        } else {
+            extract_dates(Some(&index.call_method0("tolist")?))?
+        };
         let kwargs = PyDict::new(py);
         kwargs.set_item("dtype", "float64")?;
-        let yields: Vec<Vec<f64>> = df
-            .call_method("to_numpy", (), Some(&kwargs))?
-            .call_method0("tolist")?
-            .extract()?;
+        let array = df.call_method("to_numpy", (), Some(&kwargs))?;
+        let numeric = array.extract::<PyReadonlyArray2<'_, f64>>()?;
+        let yields = numeric
+            .as_array()
+            .rows()
+            .into_iter()
+            .map(|row| row.iter().copied().collect::<Vec<f64>>())
+            .collect();
         YieldPanel::from_rows(tenors, yields, dates)
             .map(Self::from_inner)
             .map_err(core_to_py)
@@ -161,6 +174,12 @@ impl PyYieldPanel {
     #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.yield_changes")]
     fn yield_changes(&self) -> Vec<Vec<f64>> {
         rows_of(&self.inner.yield_changes())
+    }
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.to_numpy")]
+    fn to_numpy<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f64>> {
+        let yields = &self.inner.yields;
+        Array2::from_shape_fn(yields.shape(), |index| yields[index]).into_pyarray(py)
     }
 
     #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.to_dataframe")]

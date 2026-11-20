@@ -1,0 +1,78 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/statement_scoring_mapping.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Annual monetary statement sources for a canonical credit score.",
+  "properties": {
+    "book_equity": {
+      "description": "Closing book equity for the book-value Altman models.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "current_assets": {
+      "description": "Closing current assets for Zmijewski.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "current_liabilities": {
+      "description": "Closing current liabilities for Zmijewski.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ebit": {
+      "description": "Full-year EBIT used by the Altman models.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "net_income": {
+      "description": "Full-year net income for Zmijewski.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "retained_earnings": {
+      "description": "Closing retained earnings used by the Altman models.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sales": {
+      "description": "Full-year sales used by the manufacturing Altman models.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "total_assets": {
+      "description": "Closing total assets, a positive same-currency monetary observation.",
+      "type": "string"
+    },
+    "total_liabilities": {
+      "description": "Closing total liabilities in statement currency.",
+      "type": "string"
+    },
+    "working_capital": {
+      "description": "Closing net working capital used by the Altman models.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "total_assets",
+    "total_liabilities"
+  ],
+  "title": "StatementScoringMapping",
+  "type": "object"
+}

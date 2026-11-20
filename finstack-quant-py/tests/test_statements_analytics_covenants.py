@@ -59,7 +59,7 @@ def test_window_keeps_early_non_finite_leverage_out_of_the_evaluation() -> None:
     assert results.get("leverage", "2024Q3") is None
     assert results.get_cell("leverage", "2024Q3")["status"] == "unavailable"
 
-    frame = evaluate_covenants(results, _engine("2024-10-01"))
+    frame = evaluate_covenants(_engine("2024-10-01"), results)
 
     assert frame["as_of"].unique().tolist() == ["2024-03-31", "2024-06-30", "2024-09-30", "2024-12-31"]
     leverage = frame[frame["covenant"] == "max_debt_to_ebitda"]
@@ -71,16 +71,16 @@ def test_window_keeps_early_non_finite_leverage_out_of_the_evaluation() -> None:
 def test_json_inputs_and_engine_series_agree() -> None:
     results = _results()
     engine = _engine("2024-10-01")
-    from_json = evaluate_covenants(results.to_json(), engine)
-    assert from_json.equals(evaluate_covenants(results, engine))
+    from_json = evaluate_covenants(engine, results.to_json())
+    assert from_json.equals(evaluate_covenants(engine, results))
 
 
 def test_required_non_finite_metric_raises_value_error() -> None:
     results = _results()
     with pytest.raises(ValueError, match="leverage"):
-        evaluate_covenants(results, _engine("2024-07-01"))
+        evaluate_covenants(_engine("2024-07-01"), results)
     with pytest.raises(ValueError, match="leverage"):
-        forecast_breaches(results, _engine("2024-07-01"))
+        forecast_breaches(_engine("2024-07-01"), results)
 
 
 def test_missing_required_metric_raises_key_error() -> None:
@@ -89,15 +89,30 @@ def test_missing_required_metric_raises_key_error() -> None:
         json.dumps({"specs": [_spec({"min_dscr": {"threshold": 1.2}}, "min_dscr", "dscr")]})
     )
     with pytest.raises(KeyError, match="dscr"):
-        evaluate_covenants(results, engine)
+        evaluate_covenants(engine, results)
     with pytest.raises(KeyError, match="dscr"):
-        forecast_breaches(results, engine)
+        forecast_breaches(engine, results)
 
 
 def test_forecast_breaches_reads_the_same_periods() -> None:
     results = _results()
-    breaches = forecast_breaches(results, _engine("2024-10-01"))
+    breaches = forecast_breaches(_engine("2024-10-01"), results)
     assert [(b.covenant_id, b.breach_date.isoformat(), b.breach_probability) for b in breaches] == [
         ("min_interest_coverage", "2024-12-31", 1.0)
     ]
-    assert breaches == forecast_breaches(results, _engine("2024-10-01"), CovenantForecastConfig())
+    assert breaches == forecast_breaches(_engine("2024-10-01"), results, CovenantForecastConfig())
+
+
+def test_aliases_apply_to_assessment_and_forecast() -> None:
+    results = _results()
+    engine = _engine("2024-07-01")
+    aliases = {"leverage": "interest_coverage"}
+    frame = evaluate_covenants(engine, results, aliases)
+    leverage = frame[frame["covenant"] == "max_debt_to_ebitda"]
+    assert leverage[["actual_value", "headroom_raw"]].values.tolist() == [[5.0, -1.5], [2.5, 1.0]]
+
+    breaches = forecast_breaches(engine, results, node_mapping=aliases)
+    assert [(b.covenant_id, b.headroom_raw) for b in breaches] == [
+        ("max_debt_to_ebitda", -1.5),
+        ("min_interest_coverage", -0.5),
+    ]

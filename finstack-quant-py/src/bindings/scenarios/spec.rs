@@ -2,6 +2,7 @@
 
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::extract::parse_label;
+use crate::bindings::pydoc::pydoc;
 use crate::errors::{display_to_py, scenarios_to_py};
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
@@ -40,6 +41,8 @@ use super::operation_spec::PyOperationSpec;
 /// 'rates_up'
 /// >>> spec == ScenarioSpec.from_json(spec.to_json())
 /// True
+/// >>> (spec + ScenarioSpec("rates_next", [operation])).id
+/// 'rates_up+rates_next'
 #[pyclass(
     name = "ScenarioSpec",
     module = "finstack_quant.scenarios",
@@ -92,6 +95,15 @@ impl PyScenarioSpec {
         };
         inner.validate().map_err(scenarios_to_py)?;
         Ok(Self { inner })
+    }
+
+    fn __add__(&self, other: PyRef<Self>) -> PyResult<Self> {
+        finstack_quant_scenarios::ScenarioSpec::compose(vec![
+            self.inner.clone(),
+            other.inner.clone(),
+        ])
+        .map(Self::from_inner)
+        .map_err(scenarios_to_py)
     }
 
     /// Deserialize and validate canonical scenario JSON.
@@ -317,5 +329,60 @@ impl PyTemplateMetadata {
             "TemplateMetadata(id={:?}, name={:?})",
             self.inner.id, self.inner.name
         )
+    }
+}
+
+#[doc = pydoc!("finstack_quant.scenarios._spec", "ScenarioValidationReport")]
+#[pyclass(
+    name = "ScenarioValidationReport",
+    module = "finstack_quant.scenarios",
+    frozen
+)]
+pub(crate) struct PyScenarioValidationReport {
+    inner: finstack_quant_scenarios::ScenarioValidationReport,
+}
+
+impl PyScenarioValidationReport {
+    pub(super) fn from_inner(inner: finstack_quant_scenarios::ScenarioValidationReport) -> Self {
+        Self { inner }
+    }
+}
+
+#[pymethods]
+impl PyScenarioValidationReport {
+    #[doc = pydoc!("finstack_quant.scenarios._spec", "ScenarioValidationReport.valid")]
+    #[getter]
+    fn valid(&self) -> bool {
+        self.inner.valid
+    }
+
+    #[doc = pydoc!("finstack_quant.scenarios._spec", "ScenarioValidationReport.errors")]
+    #[getter]
+    fn errors(&self) -> Vec<String> {
+        self.inner.errors.clone()
+    }
+
+    #[doc = pydoc!("finstack_quant.scenarios._spec", "ScenarioValidationReport.warnings")]
+    #[getter]
+    fn warnings(&self) -> Vec<String> {
+        self.inner.warnings.clone()
+    }
+
+    #[doc = pydoc!("finstack_quant.scenarios._spec", "ScenarioValidationReport.requires_instruments")]
+    #[getter]
+    fn requires_instruments(&self) -> bool {
+        self.inner.requires_instruments
+    }
+
+    #[doc = pydoc!("finstack_quant.scenarios._spec", "ScenarioValidationReport.mutates_instruments")]
+    #[getter]
+    fn mutates_instruments(&self) -> bool {
+        self.inner.mutates_instruments
+    }
+
+    #[doc = pydoc!("finstack_quant.scenarios._spec", "ScenarioValidationReport.operation_count")]
+    #[getter]
+    fn operation_count(&self) -> usize {
+        self.inner.operation_count
     }
 }

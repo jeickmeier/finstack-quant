@@ -4,7 +4,7 @@
 
 use finstack_quant_wasm::api::{
     cashflows,
-    valuations::pricing::{bond_from_cashflows_json, price_instrument},
+    valuations::{pricing::price_instrument, typed::fixed_income::JsBond},
 };
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
@@ -247,13 +247,16 @@ fn cashflows_json_bridge_builds_accrues_and_prices_custom_bond() {
     assert_eq!(flows.len(), schedule["flows"].as_array().unwrap().len());
     assert!(accrued_interest(&schedule_json, "2025-02-28", None).unwrap() > 0.0);
 
-    let instrument_json = bond_from_cashflows_json(
+    let instrument_json = JsBond::from_cashflows(
         JsValue::from("CUSTOM-CF"),
-        JsValue::from(&schedule_json),
+        &cashflows::schedule::JsCashFlowSchedule::from_json(JsValue::from(&schedule_json))
+            .expect("typed schedule"),
         JsValue::from("{\"periodic\":4}"),
         JsValue::from("USD-OIS"),
         Some(JsValue::from(99.0)),
     )
+    .expect("typed bond")
+    .to_json()
     .expect("bond JSON");
     // `priceInstrument` hands back a structured JS object; stringify to decode
     // it (a `Map` would collapse to `{}` and fail the assertion below).
@@ -421,13 +424,16 @@ fn cashflows_json_bridge_accepts_config_and_missing_quoted_clean_price_pct() {
 
     assert!(accrued_interest(&schedule_json, "2025-02-28", Some(&config_json)).unwrap() > 0.0);
 
-    let instrument_json = bond_from_cashflows_json(
+    let instrument_json = JsBond::from_cashflows(
         JsValue::from("CUSTOM-CF-NO-QUOTE"),
-        JsValue::from(&schedule_json),
+        &cashflows::schedule::JsCashFlowSchedule::from_json(JsValue::from(&schedule_json))
+            .expect("typed schedule"),
         JsValue::from("{\"periodic\":1}"),
         JsValue::from("USD-OIS"),
         None,
     )
+    .expect("typed bond")
+    .to_json()
     .expect("bond JSON");
     let instrument: serde_json::Value = serde_json::from_str(&instrument_json).unwrap();
     assert_eq!(instrument["instrument"]["spec"]["id"], "CUSTOM-CF-NO-QUOTE");

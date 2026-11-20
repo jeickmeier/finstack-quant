@@ -793,14 +793,14 @@ test('volatility helpers take a VolSurface in its canonical wire form', () => {
   // An omitted tolerance is the Rust DEFAULT_ARBITRAGE_TOLERANCE (1e-10), the
   // same default as every Rust arbitrage check.
   assert.deepEqual(
-    volatility.checkSurfaceGrid(strikes, [0.5, 1], vols, [100, 100]),
-    volatility.checkSurfaceGrid(strikes, [0.5, 1], vols, [100, 100], 1e-10)
+    volatility.checkSurfaceGrid([0.5, 1], strikes, vols, [100, 100]),
+    volatility.checkSurfaceGrid([0.5, 1], strikes, vols, [100, 100], 1e-10)
   );
   assert.throws(
-    () => volatility.checkButterflyGrid(strikes, [0.5, 1], vols, [100, 100], -1),
+    () => volatility.checkButterflyGrid([0.5, 1], strikes, vols, [100, 100], -1),
     kind('validation')
   );
-  assert.throws(() => volatility.checkSurfaceGrid(strikes, [0.5], vols, [100]), kind('validation'));
+  assert.throws(() => volatility.checkSurfaceGrid([0.5], strikes, vols, [100]), kind('validation'));
   assert.throws(
     () => volatility.sviTotalVariance({ a: 0.04, b: -1, rho: 0, m: 0, sigma: 0.2 }, 0),
     kind('validation')
@@ -1000,4 +1000,27 @@ test('credit registry methods require exact IDs and an explicit recovery calibra
     () => credit.RatingFactorTable.fromRegistryId('moodys_idealized_default_rates_2024_09'),
     kind('not_found')
   );
+});
+
+test('BS batch pricing aligns spot and strike coordinates and broadcasts a scalar', () => {
+  const market = {
+    spot: 100,
+    strike: 90,
+    rate: 0.025,
+    volatility: 0.21,
+    time_to_expiry: 1.3,
+    dividend_yield: 0.015,
+    option_type: 'put',
+  };
+  const spots = new Float64Array([71, 118, 135]);
+  const strikes = [80, 98, 121];
+  assert.deepEqual(
+    Array.from(models.bsPriceMany(market, spots, strikes)),
+    strikes.map((strike, i) => models.bsPrice({ ...market, spot: spots[i], strike }))
+  );
+  assert.deepEqual(
+    models.bsGreeksMany(market, spots, 115, 360),
+    Array.from(spots, (spot) => models.bsGreeks({ ...market, spot, strike: 115 }, 360))
+  );
+  assert.throws(() => models.bsPriceMany(market, spots, strikes.slice(0, 2)), /equal lengths/);
 });

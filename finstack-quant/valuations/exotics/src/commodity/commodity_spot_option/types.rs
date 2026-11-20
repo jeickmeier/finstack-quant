@@ -223,6 +223,32 @@ pub struct CommoditySpotOption {
 }
 
 impl CommoditySpotOption {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> CommoditySpotOptionBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .underlying(self.underlying.clone())
+            .strike(self.strike)
+            .option_type(self.option_type)
+            .exercise_style(self.exercise_style)
+            .exercise_dates_opt(self.exercise_dates.clone())
+            .expiry(self.expiry)
+            .quantity(self.quantity)
+            .multiplier(self.multiplier)
+            .settlement(self.settlement)
+            .exercise_opt(self.exercise)
+            .forward_curve_id(self.forward_curve_id.clone())
+            .discount_curve_id(self.discount_curve_id.clone())
+            .vol_surface_id(self.vol_surface_id.clone())
+            .spot_id_opt(self.spot_id.clone())
+            .quoted_forward_opt(self.quoted_forward)
+            .day_count(self.day_count)
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Validate the static economic inputs shared by builders and JSON loads.
     pub fn validate(&self) -> Result<()> {
         self.underlying.validate("CommoditySpotOption")?;

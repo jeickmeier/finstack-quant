@@ -305,8 +305,8 @@ it("routes scenario sets, rollups and data-gap checks to WASM", async () => {
   expect(scenarios).toEqual(
     native.evaluateScenarioSet(canonical, scenarioSetJson),
   );
-  expect(scenarios.downside.cells.revenue["2025Q4"].value).not.toEqual(
-    scenarios.base.cells.revenue["2025Q4"].value,
+  expect(scenarios.downside.cells.revenue["2025Q3"].value).not.toEqual(
+    scenarios.base.cells.revenue["2025Q3"].value,
   );
   const asOf = "2025-07-01";
   expect(

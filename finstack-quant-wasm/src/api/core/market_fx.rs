@@ -310,6 +310,21 @@ impl JsFxMatrix {
         })
     }
 
+    /// Create an empty FX matrix for direct and reciprocal quotes.
+    ///
+    /// @returns A matrix with no cross-routing pivot and no supplied quotes.
+    /// @example
+    /// ```ts
+    /// const matrix = core.FxMatrix.direct();
+    /// matrix.setQuotes([["EUR", "USD", 1.1]]);
+    /// ```
+    #[wasm_bindgen(js_name = direct)]
+    pub fn direct() -> JsFxMatrix {
+        Self {
+            inner: Arc::new(RustFxMatrix::direct()),
+        }
+    }
+
     /// Set several pair-global quotes atomically (Rust `FxMatrix::set_quotes`).
     ///
     /// # Arguments

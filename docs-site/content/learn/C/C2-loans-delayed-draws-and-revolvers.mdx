@@ -134,7 +134,7 @@ validate_instrument_json(json.dumps(loan))
 loan_quote=deepcopy(loan)
 loan_quote["instrument"]["spec"]["instrument_pricing_overrides"]={"market_quotes":{"quoted_clean_price_pct":98.5,"implied_volatility":.01}}
 loan_measures=price_instrument(json.dumps(loan_quote),credit_market,AS_OF,
-    metrics=["ytc","ytw","all_in_rate","discount_margin","oid_eir_amortization"])
+    metrics=["ytc","ytw","all_in_rate","discount_margin","oid_eir_rate"])
 print(pd.Series({k:loan_measures.metrics[k] for k in ["ytc","ytw","all_in_rate","discount_margin","oid_eir_rate"]}))
 ```
 {/* /notebook-block */}
@@ -186,7 +186,7 @@ d.update({"id":"C2-DDTL","upfront_fee":None,"amortization":"none","ddtl":{
         {"date":"2025-07-15","amount":{"amount":"600000","currency":"USD"}}],
     "commitment_steps":[],"usage_fee_bp":"25","commitment_fee_bp":"50",
     "fee_base":"undrawn","oid_policy":{"withheld_bp":"200"}}})
-ddtl_value=price_instrument(json.dumps(ddtl),credit_market,AS_OF,metrics=["all_in_rate","oid_eir_amortization"])
+ddtl_value=price_instrument(json.dumps(ddtl),credit_market,AS_OF,metrics=["all_in_rate","oid_eir_rate"])
 no_commitment_fee=deepcopy(ddtl);no_commitment_fee["instrument"]["spec"]["ddtl"]["commitment_fee_bp"]="0"
 free_value=price_instrument(json.dumps(no_commitment_fee),credit_market,AS_OF).value.amount
 print({"DDTL_net_pv_usd":ddtl_value.value.amount,"commitment_fee_pv_usd":ddtl_value.value.amount-free_value,

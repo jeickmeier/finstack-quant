@@ -18,6 +18,7 @@ from finstack_quant.core.money import Money
 from finstack_quant.statements_analytics import (
     AccountType,
     CorkscrewAccount,
+    GoalSeekSpec,
     ScorecardConfig,
     add_roll_forward_with_opening,
     evaluate_dcf,
@@ -28,7 +29,7 @@ from finstack_quant.statements_analytics import (
 
 
 def _model_json() -> str:
-    b = statements.ModelBuilder("test_model")
+    b = statements.ModelBuilder("test_model").source_snapshot("goal-seek-test-forecast")
     b.periods("2024Q1..Q2", None)
     b.value("revenue", [("2024Q1", 100_000.0), ("2024Q2", 110_000.0)])
     b.value("cogs", [("2024Q1", 40_000.0), ("2024Q2", 44_000.0)])
@@ -40,14 +41,18 @@ class TestGoalSeek:
     def test_update_model_false_returns_none(self) -> None:
         outcome = goal_seek(
             _model_json(),
-            {
-                "target_node": "gross_profit",
-                "target_period": "2024Q1",
-                "target_value": 70_000.0,
-                "driver_node": "revenue",
-                "driver_period": "2024Q1",
-                "update_model": False,
-            },
+            GoalSeekSpec(
+                target={"node": "gross_profit", "period": "2024Q1"},
+                target_value=70_000.0,
+                target_tolerance=1e-7,
+                driver={"node": "revenue", "period": "2024Q1"},
+                driver_tolerance=1e-10,
+                max_iterations=100,
+                search={"kind": "bracket", "lower": 0.0, "upper": 200_000.0},
+                as_of="2023-12-31",
+                observed_through="2023-12-31",
+                update_model=False,
+            ),
         )
         assert outcome.solved_value > 100_000.0
         assert outcome.model is None
@@ -55,14 +60,18 @@ class TestGoalSeek:
     def test_update_model_true_returns_model(self) -> None:
         outcome = goal_seek(
             _model_json(),
-            {
-                "target_node": "gross_profit",
-                "target_period": "2024Q1",
-                "target_value": 70_000.0,
-                "driver_node": "revenue",
-                "driver_period": "2024Q1",
-                "update_model": True,
-            },
+            GoalSeekSpec(
+                target={"node": "gross_profit", "period": "2024Q1"},
+                target_value=70_000.0,
+                target_tolerance=1e-7,
+                driver={"node": "revenue", "period": "2024Q1"},
+                driver_tolerance=1e-10,
+                max_iterations=100,
+                search={"kind": "bracket", "lower": 0.0, "upper": 200_000.0},
+                as_of="2023-12-31",
+                observed_through="2023-12-31",
+                update_model=True,
+            ),
         )
         assert outcome.solved_value > 100_000.0
         assert isinstance(outcome.model, statements.FinancialModelSpec)
@@ -126,9 +135,8 @@ class TestRunChecks:
 
 
 class TestCorporateAnalysis:
-    def test_suppressed_enterprise_value_status_is_top_level(self) -> None:
+    def test_corporate_analysis_without_dcf_returns_statement_result(self) -> None:
         result = run_corporate_analysis(_model_json())
-        assert result.ev_suppressed_non_positive is False
         assert isinstance(result.statement, statements.StatementResult)
         assert result.equity is None
         assert isinstance(result.credit, dict)
@@ -142,7 +150,7 @@ class TestEvaluateDcf:
             "ufcf",
             [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))],
         )
-        b.with_meta("currency", '"USD"')
+        b.with_meta("currency", "USD")
         terminal = {"type": "gordon_growth", "stable_growth_rate": 0.02}
         with pytest.raises(ValueError, match="as_of"):
             evaluate_dcf(
@@ -191,12 +199,14 @@ class TestRollForward:
         b = statements.ModelBuilder("rf")
         b.periods("2024Q1..Q2", None)
         b.value("adds", [("2024Q1", 10.0), ("2024Q2", 10.0)])
-        model_json = b.build().to_json()
-        model = add_roll_forward_with_opening(model_json, "bal", ["adds"], [], 100.0)
+        add_roll_forward_with_opening(b, "bal", ["adds"], [], 100.0)
+        b.compute("twice_balance", "2 * bal_end")
+        model = b.build()
         assert isinstance(model, statements.FinancialModelSpec)
         result = statements.Evaluator().evaluate(model)
         assert result.get("bal_end", "2024Q1") == pytest.approx(110.0)
         assert result.get("bal_end", "2024Q2") == pytest.approx(120.0)
+        assert result.get("twice_balance", "2024Q2") == pytest.approx(240.0)
 
 
 class TestStatementResultTypedAccessors:

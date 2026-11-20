@@ -19,4 +19,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
-pub use types::{EquityTotalReturnSwap, TrsDividendSettlement};
+pub use types::{EquityTotalReturnSwap, EquityTotalReturnSwapBuilder, TrsDividendSettlement};

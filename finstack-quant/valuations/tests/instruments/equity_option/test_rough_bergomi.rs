@@ -111,13 +111,15 @@ fn rbergomi_small_eta_converges_to_black_scholes() {
     // accrual is 366/365 years. Use the same maturity for the BS reference.
     let t = 366.0 / 365.0;
     let bs_price = finstack_quant_models::closed_form::bs_price(
-        spot,
-        strike,
-        0.0,
-        0.0,
-        vol,
-        t,
-        finstack_quant_models::types::OptionType::Call,
+        &finstack_quant_models::types::OptionMarketParams {
+            spot,
+            strike,
+            rate: 0.0,
+            dividend_yield: 0.0,
+            volatility: vol,
+            time_to_expiry: t,
+            option_type: finstack_quant_models::types::OptionType::Call,
+        },
     )
     .expect("valid Black-Scholes inputs")
         * 100.0; // contract size 100
@@ -151,13 +153,15 @@ fn rbergomi_nonzero_rate_price_is_discounted() {
     // Act365F over a leap year ⇒ t = 366/365.
     let t = 366.0 / 365.0;
     let bs_price = finstack_quant_models::closed_form::bs_price(
-        spot,
-        strike,
-        rate,
-        0.0,
-        vol,
-        t,
-        finstack_quant_models::types::OptionType::Call,
+        &finstack_quant_models::types::OptionMarketParams {
+            spot,
+            strike,
+            rate,
+            dividend_yield: 0.0,
+            volatility: vol,
+            time_to_expiry: t,
+            option_type: finstack_quant_models::types::OptionType::Call,
+        },
     )
     .expect("valid Black-Scholes inputs")
         * 100.0; // contract size 100

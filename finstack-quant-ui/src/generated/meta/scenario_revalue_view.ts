@@ -603,6 +603,12 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_276e49563c6406102455/properties/headroom_raw",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/CovenantReport/properties/headroom_raw",
+    "description": "Signed cushion in the covenant metric's own units when numerically meaningful.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_276e49563c6406102455/properties/meta",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/CovenantReport/properties/meta",
     "default": {
@@ -682,7 +688,7 @@ export default [
     "path": "#/$defs/d_329d437a8212bdfb6be2/oneOf/4",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/CurveKind/oneOf/4",
     "const": "commodity",
-    "description": "Commodity forward [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve).\n\n`bp` on parallel/node ops is percent of the price-curve forward\n(`5.0` = +5%), not a rate basis-point shock. Looking up a\n[`DiscountCurve`](finstack_quant_core::market_data::term_structures::DiscountCurve)\nunder this id is an error."
+    "description": "Commodity forward [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve).\n\nPrice shocks use [`OperationSpec::CommodityCurveParallelPct`] or\n[`OperationSpec::CommodityCurveNodePct`]."
   },
   {
     "path": "#/$defs/d_344a092481142c1669cc",
@@ -3172,6 +3178,12 @@ export default [
     "description": "Asset-backed facility (warehouse line against a collateral pool)."
   },
   {
+    "path": "#/$defs/d_afddc625e94070f6fe94/oneOf/78",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/InstrumentType/oneOf/78",
+    "const": "structured_credit_tranche",
+    "description": "Single note owned by a structured-credit waterfall."
+  },
+  {
     "path": "#/$defs/d_afddc625e94070f6fe94/oneOf/8",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/InstrumentType/oneOf/8",
     "const": "bermudan_swaption",
@@ -3253,99 +3265,87 @@ export default [
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/1",
-    "description": "A commodity price-curve shock was outside the typical percent-of-forward\nstress range (approximately `[-80, +200]` percent)."
+    "description": "Equity identifier was missing from the market context; no bump applied."
   },
   {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/1/properties/curve_id",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/1/properties/curve_id",
-    "description": "Curve identifier."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/1/properties/detail",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/1/properties/detail",
-    "description": "Detail describing whether the trigger was a parallel or node shock\nand which knot(s) were extreme."
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/1/properties/id",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/1/properties/id",
+    "description": "Equity price identifier."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/1/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/1/properties/kind",
-    "const": "commodity_shock_outside_range"
+    "const": "equity_not_found"
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/10",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/10",
-    "description": "Instrument shock fell back to attribute metadata because no pricing\noverride was exposed by the instrument's pricer."
+    "description": "Instrument shock found no instruments matching the filter."
   },
   {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/10/properties/inst_type",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/10/properties/inst_type",
-    "description": "Canonical instrument type that could not apply the shock directly.",
-    "ref": "#/$defs/InstrumentType",
-    "resolvedRef": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/InstrumentType"
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/10/properties/filter_desc",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/10/properties/filter_desc",
+    "description": "Free-text description of the filter (e.g. `IndexMap` debug form)."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/10/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/10/properties/kind",
-    "const": "instrument_shock_fallback"
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/10/properties/label",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/10/properties/label",
-    "description": "Instrument label (id / name / unidentified)."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/10/properties/shock_kind",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/10/properties/shock_kind",
-    "description": "Whether the shock is a price (`\"price\"`) or spread (`\"spread\"`)."
+    "const": "instrument_shock_no_match"
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/11",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/11",
-    "description": "Instrument shock found no instruments matching the filter."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/11/properties/filter_desc",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/11/properties/filter_desc",
-    "description": "Free-text description of the filter (e.g. `IndexMap` debug form)."
+    "description": "Correlation shock found no `StructuredCredit` instruments with a\ncorrelation structure."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/11/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/11/properties/kind",
-    "const": "instrument_shock_no_match"
+    "const": "correlation_shock_no_match"
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/12",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/12",
-    "description": "Correlation shock found no `StructuredCredit` instruments with a\ncorrelation structure."
+    "description": "Correlation bump clamped one or more correlation parameters."
+  },
+  {
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/12/properties/detail",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/12/properties/detail",
+    "description": "Detail string describing what was clamped."
+  },
+  {
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/12/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/12/properties/instrument_id",
+    "description": "Instrument identifier."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/12/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/12/properties/kind",
-    "const": "correlation_shock_no_match"
+    "const": "correlation_clamped"
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/13",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/13",
-    "description": "Correlation bump clamped one or more correlation parameters."
+    "description": "A shock targeting a curve node by tenor had to extrapolate beyond the\ncurve's pillar range."
+  },
+  {
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/13/properties/curve_id",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/13/properties/curve_id",
+    "description": "Curve identifier."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/13/properties/detail",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/13/properties/detail",
-    "description": "Detail string describing what was clamped."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/13/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/13/properties/instrument_id",
-    "description": "Instrument identifier."
+    "description": "Free-text describing the tenor and the gap."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/13/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/13/properties/kind",
-    "const": "correlation_clamped"
+    "const": "tenor_extrapolated"
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/14",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/14",
-    "description": "A shock targeting a curve node by tenor had to extrapolate beyond the\ncurve's pillar range."
+    "description": "An interpolated node bump split its shock across two pillars of a\npar-CDS curve that is rebuilt by solve-to-par recalibration. On that\npath the 1/Σw² delivery correction is only first-order — the weighted\ntargets are snapped to the nearest calibration quotes before\nre-solving, so the realized shock at the requested tenor may differ\nfrom the requested size. Direct-shift curves (discount, inflation,\nforward, commodity) calibrate onto the native interpolant and do not\nemit this warning. Use `TenorMatchMode::Exact` at pillar tenors for\npillar-accurate par-CDS bucket risk."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/14/properties/curve_id",
@@ -3355,143 +3355,82 @@ export default [
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/14/properties/detail",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/14/properties/detail",
-    "description": "Free-text describing the tenor and the gap."
+    "description": "Free-text describing the tenor and adjacent pillars."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/14/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/14/properties/kind",
-    "const": "tenor_extrapolated"
+    "const": "interpolated_node_bump_first_order"
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/15",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/15",
-    "description": "An interpolated node bump split its shock across two pillars of a\npar-CDS curve that is rebuilt by solve-to-par recalibration. On that\npath the 1/Σw² delivery correction is only first-order — the weighted\ntargets are snapped to the nearest calibration quotes before\nre-solving, so the realized shock at the requested tenor may differ\nfrom the requested size. Direct-shift curves (discount, inflation,\nforward, commodity) calibrate onto the native interpolant and do not\nemit this warning. Use `TenorMatchMode::Exact` at pillar tenors for\npillar-accurate par-CDS bucket risk."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/15/properties/curve_id",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/15/properties/curve_id",
-    "description": "Curve identifier."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/15/properties/detail",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/15/properties/detail",
-    "description": "Free-text describing the tenor and adjacent pillars."
+    "description": "Vol-surface bucket shock selected zero grid points (no-op)."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/15/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/15/properties/kind",
-    "const": "interpolated_node_bump_first_order"
+    "const": "vol_surface_bucket_empty_selection"
+  },
+  {
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/15/properties/vol_surface_id",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/15/properties/vol_surface_id",
+    "description": "Volatility-surface identifier."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/16",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/16",
-    "description": "Vol-surface arbitrage warning detected post-shock."
+    "description": "An instrument's valuation failed while computing carry during a\n`TimeRollForward` operation. The instrument is excluded from the\nroll-forward carry aggregation but the roll itself proceeds."
   },
   {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/16/properties/detail",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/16/properties/detail",
-    "description": "Free-text from `ArbitrageViolation` Display."
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/16/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/16/properties/instrument_id",
+    "description": "Instrument identifier."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/16/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/16/properties/kind",
-    "const": "vol_surface_arbitrage"
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/16/properties/vol_surface_id",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/16/properties/vol_surface_id",
-    "description": "Volatility-surface identifier."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/17",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/17",
-    "description": "Vol-surface bucket shock selected zero grid points (no-op)."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/17/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/17/properties/kind",
-    "const": "vol_surface_bucket_empty_selection"
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/17/properties/vol_surface_id",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/17/properties/vol_surface_id",
-    "description": "Volatility-surface identifier."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/18",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/18",
-    "description": "Vol-surface negative bucket shock that may produce non-positive vols."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/18/properties/bucket",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/18/properties/bucket",
-    "description": "Whether this was a parallel (`false`) or bucket (`true`) shock."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/18/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/18/properties/kind",
-    "const": "vol_surface_large_negative_shock"
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/18/properties/pct",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/18/properties/pct",
-    "description": "Percent shock value.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/18/properties/vol_surface_id",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/18/properties/vol_surface_id",
-    "description": "Volatility-surface identifier."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/19",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/19",
-    "description": "An instrument's valuation failed while computing carry during a\n`TimeRollForward` operation. The instrument is excluded from the\nroll-forward carry aggregation but the roll itself proceeds."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/19/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/19/properties/instrument_id",
-    "description": "Instrument identifier."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/19/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/19/properties/kind",
     "const": "time_roll_instrument_failed"
   },
   {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/19/properties/reason",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/19/properties/reason",
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/16/properties/reason",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/16/properties/reason",
     "description": "Underlying valuation error message."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/2",
-    "description": "Equity identifier was missing from the market context; no bump applied."
+    "description": "Rate binding produced no statement update because the target node has\nno explicit forecast values."
   },
   {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/2/properties/id",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/2/properties/id",
-    "description": "Equity price identifier."
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/2/properties/curve_id",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/2/properties/curve_id",
+    "description": "Curve identifier from which the rate would have been extracted."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/2/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/2/properties/kind",
-    "const": "equity_not_found"
+    "const": "rate_binding_no_forecast_values"
+  },
+  {
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/2/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/2/properties/node_id",
+    "description": "Statement node identifier."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/3",
-    "description": "Rate binding produced no statement update because the target node has\nno explicit forecast values."
+    "description": "Rate binding evaluation failed."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/3/properties/curve_id",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/3/properties/curve_id",
-    "description": "Curve identifier from which the rate would have been extracted."
+    "description": "Curve identifier."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/3/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/3/properties/kind",
-    "const": "rate_binding_no_forecast_values"
+    "const": "rate_binding_failed"
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/3/properties/node_id",
@@ -3499,19 +3438,19 @@ export default [
     "description": "Statement node identifier."
   },
   {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/4",
-    "description": "Rate binding evaluation failed."
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/3/properties/reason",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/3/properties/reason",
+    "description": "Underlying error message."
   },
   {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/4/properties/curve_id",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/4/properties/curve_id",
-    "description": "Curve identifier."
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/4",
+    "description": "Statement node had no forecast values to modify."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/4/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/4/properties/kind",
-    "const": "rate_binding_failed"
+    "const": "statement_node_no_values"
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/4/properties/node_id",
@@ -3519,19 +3458,19 @@ export default [
     "description": "Statement node identifier."
   },
   {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/4/properties/reason",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/4/properties/reason",
-    "description": "Underlying error message."
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/4/properties/op",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/4/properties/op",
+    "description": "Operation that was attempted (e.g. `\"forecast_percent\"`)."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/5",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/5",
-    "description": "Statement node had no forecast values to modify."
+    "description": "Statement operation failed."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/5/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/5/properties/kind",
-    "const": "statement_node_no_values"
+    "const": "statement_op_failed"
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/5/properties/node_id",
@@ -3541,77 +3480,84 @@ export default [
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/5/properties/op",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/5/properties/op",
-    "description": "Operation that was attempted (e.g. `\"forecast_percent\"`)."
+    "description": "Operation name."
+  },
+  {
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/5/properties/reason",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/5/properties/reason",
+    "description": "Underlying error message."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/6",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/6",
-    "description": "Statement operation failed."
+    "description": "Model evaluator emitted a warning during re-evaluation."
+  },
+  {
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/6/properties/detail",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/6/properties/detail",
+    "description": "Free-text detail from the evaluator (already includes context)."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/6/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/6/properties/kind",
-    "const": "statement_op_failed"
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/6/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/6/properties/node_id",
-    "description": "Statement node identifier."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/6/properties/op",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/6/properties/op",
-    "description": "Operation name."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/6/properties/reason",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/6/properties/reason",
-    "description": "Underlying error message."
+    "const": "model_evaluation"
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/7",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/7",
-    "description": "Model evaluator emitted a warning during re-evaluation."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/7/properties/detail",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/7/properties/detail",
-    "description": "Free-text detail from the evaluator (already includes context)."
+    "description": "Model re-evaluation failed."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/7/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/7/properties/kind",
-    "const": "model_evaluation"
+    "const": "model_reevaluation_failed"
+  },
+  {
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/7/properties/reason",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/7/properties/reason",
+    "description": "Underlying error message."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/8",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/8",
-    "description": "Model re-evaluation failed."
+    "description": "FX shock left a non-pivot direct quote inconsistent with the pivot-\ntriangulated cross."
+  },
+  {
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/8/properties/detail",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/8/properties/detail",
+    "description": "Free-text detail naming the inconsistent pair and computed values."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/8/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/8/properties/kind",
-    "const": "model_reevaluation_failed"
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/8/properties/reason",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/8/properties/reason",
-    "description": "Underlying error message."
+    "const": "fx_triangulation_inconsistent"
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/9",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/9",
-    "description": "FX shock left a non-pivot direct quote inconsistent with the pivot-\ntriangulated cross."
+    "description": "Instrument shock fell back to attribute metadata because no pricing\noverride was exposed by the instrument's pricer."
   },
   {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/9/properties/detail",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/9/properties/detail",
-    "description": "Free-text detail naming the inconsistent pair and computed values."
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/9/properties/inst_type",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/9/properties/inst_type",
+    "description": "Canonical instrument type that could not apply the shock directly.",
+    "ref": "#/$defs/InstrumentType",
+    "resolvedRef": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/InstrumentType"
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/9/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/9/properties/kind",
-    "const": "fx_triangulation_inconsistent"
+    "const": "instrument_shock_fallback"
+  },
+  {
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/9/properties/label",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/9/properties/label",
+    "description": "Instrument label (id / name / unidentified)."
+  },
+  {
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/9/properties/shock_kind",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/9/properties/shock_kind",
+    "description": "Whether the shock is a price (`\"price\"`) or spread (`\"spread\"`)."
   },
   {
     "path": "#/$defs/d_b613c7ee220c23ada4e9",

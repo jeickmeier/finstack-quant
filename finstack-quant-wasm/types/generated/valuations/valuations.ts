@@ -2350,6 +2350,10 @@ export type InstrumentJson =
       type: "structured_credit";
     }
   | {
+      spec: StructuredCreditTranche;
+      type: "structured_credit_tranche";
+    }
+  | {
       spec: AssetBackedFacility;
       type: "asset_backed_facility";
     }
@@ -3068,6 +3072,21 @@ export type RealEstatePropertyType =
  */
 export type RealEstateValuationMethod = "dcf" | "direct_cap";
 /**
+ * Timing election for the dates of the explicit FCFF projection.
+ */
+export type ForecastTiming =
+  | {
+      kind: "dated_receipts";
+    }
+  | {
+      kind: "midpoints";
+      /**
+       * Actual start date for each forecast period, aligned to its authored
+       * flow end date. A forward stub begins on the valuation date.
+       */
+      period_starts: DateWire[];
+    };
+/**
  * Terminal value calculation method for DCF.
  */
 export type TerminalValueSpec =
@@ -3086,9 +3105,10 @@ export type TerminalValueSpec =
        */
       multiple: number;
       /**
-       * Terminal metric value (e.g., EBITDA)
+       * Terminal metric in major currency units (for example, EBITDA).
+       * Required for standalone pricing. A statement DCF can resolve it from a metric node.
        */
-      terminal_metric: number;
+      terminal_metric?: number | null;
       type: "exit_multiple";
       [k: string]: unknown;
     }
@@ -3644,6 +3664,9 @@ export type ExprNode =
       literal: number;
     }
   | {
+      money_literal: Money;
+    }
+  | {
       /**
        * @minItems 2
        * @maxItems 2
@@ -4124,7 +4147,8 @@ export type InstrumentType =
   | "fx_future_option"
   | "commodity_future_option"
   | "volatility_index_future_option"
-  | "asset_backed_facility";
+  | "asset_backed_facility"
+  | "structured_credit_tranche";
 /**
  * Rule for deriving an interest-rate future's reference period from its expiry.
  */
@@ -16195,14 +16219,9 @@ export interface RealEstateAsset {
  * [`equity_bridge`](Self::equity_bridge) is the single EV-to-equity channel; a
  * flat net-debt deduction sets only its `total_debt` and `cash`.
  *
- * # Mid-Year Convention
- *
- * When [`mid_year_convention`](Self::mid_year_convention) is `true`, cash flows are
- * discounted at `t` minus half the average flow spacing instead of `t` years,
- * reflecting the assumption that cash flows arrive mid-period (standard IB/PE
- * practice). For annual grids this is the classic `(t - 0.5)`; for sub-annual
- * grids the shift is half a period. `ExitMultiple` terminal values always
- * discount at the full horizon (a point-in-time sale price).
+ * # Discounting dates
+ * Forecast receipts use their authored dates or exact period midpoints.
+ * Terminal value uses its own date on the same ACT/365.25 clock.
  *
  * # Valuation Discounts
  *
@@ -16234,7 +16253,11 @@ export interface DiscountedCashFlow {
   /**
    * Explicit period free cash flows (date, amount pairs).
    */
-  flows: [DateWire, number][];
+  flows: [DateWire, Money][];
+  /**
+   * Authored receipt or actual midpoint timing for the explicit projection.
+   */
+  forecast_timing: ForecastTiming;
   /**
    * Unique identifier for the DCF.
    */
@@ -16248,16 +16271,10 @@ export interface DiscountedCashFlow {
    */
   metric_pricing_overrides?: MetricPricingOverrides;
   /**
-   * Mid-year discounting convention (default: `false` = end-of-period).
-   *
-   * When `true`, each flow is discounted at `t` minus half the average
-   * flow spacing instead of `t` (the classic `t - 0.5` for annual
-   * grids; half a period for sub-annual grids), reflecting the
-   * assumption that cash flows arrive mid-period. This is the standard
-   * convention in IB/PE practice (Koller et al.). Exit-multiple
-   * terminal values are not shifted (point-in-time sale at the horizon).
+   * Normalized signed annual FCFF at the terminal date, in instrument currency.
+   * Required for Gordon and H-model, and absent for exit-multiple valuation.
    */
-  mid_year_convention?: boolean;
+  normalized_annual_fcff?: Money | null;
   /**
    * Scenario-only pricing adjustments.
    */
@@ -16267,19 +16284,9 @@ export interface DiscountedCashFlow {
    */
   shares_outstanding?: number | null;
   /**
-   * Annualized terminal flow used by growth-perpetuity terminal values.
-   *
-   * Gordon Growth and H-Model capitalize an *annual* flow with annual
-   * WACC and growth rates. When the explicit `flows` grid is sub-annual
-   * (e.g. quarterly), the last flow is a period flow, not an annual one;
-   * set this to the trailing-twelve-month aggregate of the final
-   * explicit year so the terminal value is computed on a consistent
-   * annual basis (Koller et al., Damodaran). When `None`, the last
-   * explicit flow is used directly (correct for annual grids).
-   *
-   * Ignored by `ExitMultiple` terminal values.
+   * Terminal horizon on or after the final forecast end, independently discounted.
    */
-  terminal_flow_override?: number | null;
+  terminal_date: DateWire;
   /**
    * Terminal value specification.
    */
@@ -17621,6 +17628,14 @@ export interface TargetOcSpec {
   fraction_of_current: number;
 }
 /**
+ * An independently held note priced through its originating deal's waterfall.
+ */
+export interface StructuredCreditTranche {
+  deal: StructuredCredit;
+  id: Id;
+  tranche_id: string;
+}
+/**
  * Levered real estate equity = unlevered asset + financing.
  *
  * Value convention:
@@ -17859,6 +17874,52 @@ export interface BermudanSwaptionParams {
    * Swaption volatility cube.
    */
   vol_surface_id: Id;
+}
+/**
+ * Carry, sensitivity, and signed breakeven across the requested bond horizons.
+ */
+export interface BondBreakevenLadder {
+  /**
+   * Valuation date anchoring the horizons.
+   */
+  as_of: DateWire;
+  /**
+   * Target and solve mode used for each row.
+   */
+  config: BreakevenConfig;
+  /**
+   * Native currency of carry and sensitivity.
+   */
+  currency: Currency;
+  /**
+   * Identifier of the priced bond.
+   */
+  instrument_id: string;
+  /**
+   * Rows in the requested horizon order.
+   */
+  rows: BondBreakevenRow[];
+}
+/**
+ * One carry horizon with its sensitivity and solved signed shift.
+ */
+export interface BondBreakevenRow {
+  /**
+   * Signed basis points of movement that offset carry under the selected calculation.
+   */
+  breakeven_bp: number;
+  /**
+   * Net carry and roll-down in the bond currency over the allowed horizon.
+   */
+  carry: number;
+  /**
+   * Requested calendar tenor measured from the valuation date.
+   */
+  horizon: Tenor;
+  /**
+   * Signed starting-date price change per basis point of the selected risk factor.
+   */
+  sensitivity: number;
 }
 /**
  * Every price, yield and spread quote of a bond, solved from any one of them.
@@ -18733,6 +18794,10 @@ export interface CovenantReport {
    * Cushion relative to threshold (positive => passing buffer)
    */
   headroom?: number | null;
+  /**
+   * Signed cushion in the covenant metric's own units when numerically meaningful.
+   */
+  headroom_raw?: number | null;
   /**
    * Audit stamp: numeric mode, rounding context, and FX policy in force.
    */
@@ -20613,9 +20678,9 @@ export interface FloatingBondParams {
    */
   quote_compounding: Compounding;
   /**
-   * Spread over the index in integer basis points (200 = 2%).
+   * Exact spread over the index in basis points (200 = 2%).
    */
-  spread_bp: number;
+  spread_bp: DecimalWire;
 }
 /**
  * Trade-date, tenor and spot-roll inputs of an FX forward built from its trade date.
@@ -21461,13 +21526,19 @@ export interface PriceExtras {
    */
   explain?: boolean;
   /**
+   * Call-time JSON object patch for instrument-owned market quotes and model
+   * controls. Only supplied fields replace stored values. Setting a nullable
+   * leaf to null clears it, while omitted leaves keep their original values.
+   */
+  instrument_pricing_overrides?: InstrumentPricingOverrides | null;
+  /**
    * Historical market scenarios for the historical risk metrics (`hvar`,
    * `expected_shortfall`). `None` prices without history; requesting
    * those metrics then fails.
    */
   market_history?: MarketHistory | null;
   /**
-   * JSON object patch merged into `instrument.spec.metric_pricing_overrides`
+   * JSON object patch merged into the instrument’s stored metric controls
    * before validation, in the shape of [`MetricPricingOverrides`]. Only the
    * keys present replace stored controls (an explicit `null` clears an
    * optional control) and `bump_config` keys merge into the stored bump

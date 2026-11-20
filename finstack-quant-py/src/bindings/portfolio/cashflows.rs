@@ -20,6 +20,49 @@ use pyo3::types::PyDict;
 use pyo3::types::PyModule;
 use std::collections::HashMap;
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._cashflows", "PortfolioCashflowPositionSummary")]
+#[pyclass(
+    name = "PortfolioCashflowPositionSummary",
+    module = "finstack_quant.portfolio",
+    frozen
+)]
+pub(crate) struct PyPortfolioCashflowPositionSummary {
+    inner: finstack_quant_portfolio::cashflows::PortfolioCashflowPositionSummary,
+}
+
+#[pymethods]
+impl PyPortfolioCashflowPositionSummary {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._cashflows", "PortfolioCashflowPositionSummary.position_id")]
+    #[getter]
+    fn position_id(&self) -> &str {
+        self.inner.position_id.as_str()
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._cashflows", "PortfolioCashflowPositionSummary.instrument_id")]
+    #[getter]
+    fn instrument_id(&self) -> &str {
+        &self.inner.instrument_id
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._cashflows", "PortfolioCashflowPositionSummary.instrument_type")]
+    #[getter]
+    fn instrument_type(&self) -> &str {
+        self.inner.instrument_type.as_str()
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._cashflows", "PortfolioCashflowPositionSummary.representation")]
+    #[getter]
+    fn representation(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_label(&self.inner.representation).map_err(core_to_py)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._cashflows", "PortfolioCashflowPositionSummary.event_count")]
+    #[getter]
+    fn event_count(&self) -> usize {
+        self.inner.event_count
+    }
+}
+
 /// Classified portfolio cashflow ladder.
 ///
 /// Holds the flat position-scaled ``events`` (sorted by payment date), the
@@ -128,6 +171,22 @@ impl PyPortfolioCashflows {
     #[getter]
     fn by_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.by_date)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._cashflows", "PortfolioCashflows.position_summaries")]
+    #[getter]
+    fn position_summaries<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let summaries = PyDict::new(py);
+        for (id, item) in &self.inner.position_summaries {
+            let summary = Py::new(
+                py,
+                PyPortfolioCashflowPositionSummary {
+                    inner: item.clone(),
+                },
+            )?;
+            summaries.set_item(id.as_str(), summary)?;
+        }
+        Ok(summaries)
     }
 
     /// Extraction issues as a list of JSON-shaped dicts (``position_id``,
@@ -516,6 +575,7 @@ fn net_in_currency_by_date(
 /// Register the cashflows bindings on the portfolio submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyPortfolioCashflows>()?;
+    m.add_class::<PyPortfolioCashflowPositionSummary>()?;
     m.add_function(pyo3::wrap_pyfunction!(aggregate_full_cashflows, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(net_in_currency_by_date, m)?)?;
     Ok(())

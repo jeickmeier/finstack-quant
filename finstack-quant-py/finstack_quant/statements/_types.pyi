@@ -8,6 +8,8 @@ from typing import Any, Literal
 import pandas as pd
 
 from finstack_quant.core.money import Money
+from finstack_quant.core.currency import Currency
+from finstack_quant.statements._builder import ModelBuilder
 
 class ForecastMethod:
     """
@@ -1125,6 +1127,80 @@ class FinancialModelSpec:
     'demo'
 
     """
+
+    def to_builder(self) -> ModelBuilder:
+        """Resume work on an independent builder with the model's existing inputs.
+
+        Returns
+        -------
+        ModelBuilder
+            Editor holding the current timeline, nodes, settings and capital structure.
+
+        Raises
+        ------
+        ValueError
+            If this model cannot seed a builder.
+        """
+        ...
+    def with_meta(self, key: str, value: object) -> FinancialModelSpec:
+        """Insert or replace one literal metadata value on a model copy.
+
+        Parameters
+        ----------
+        key : str
+            Exact metadata key.
+        value : object
+            JSON-compatible value. A string is stored as a string, even if it looks like JSON.
+
+        Returns
+        -------
+        FinancialModelSpec
+            Independent model carrying the changed metadata.
+
+        Raises
+        ------
+        ValueError
+            If the value is not representable as finite JSON data.
+        """
+        ...
+    def with_currency(self, currency: Currency | str) -> FinancialModelSpec:
+        """Set the monetary unit metadata on a model copy.
+
+        Parameters
+        ----------
+        currency : Currency or str
+            ISO currency recorded for the model. Existing amounts keep their currencies.
+
+        Returns
+        -------
+        FinancialModelSpec
+            Independent model with the updated currency metadata.
+
+        Raises
+        ------
+        ValueError
+            If the currency code is invalid.
+        """
+        ...
+    def with_reporting_currency(self, currency: Currency | str) -> FinancialModelSpec:
+        """Set the capital-structure reporting currency on a model copy.
+
+        Parameters
+        ----------
+        currency : Currency or str
+            ISO reporting currency of the existing capital structure.
+
+        Returns
+        -------
+        FinancialModelSpec
+            Independent model with the updated capital-structure reporting policy.
+
+        Raises
+        ------
+        ValueError
+            If the currency code is invalid or the model has no capital structure.
+        """
+        ...
 
     @staticmethod
     def from_json(json: str) -> FinancialModelSpec:

@@ -291,6 +291,7 @@ fn primary_inner(input: &str) -> IResult<&str, StmtExpr> {
         multispace0,
         alt((
             if_then_else,
+            as_money_expression,
             function_call,
             literal,
             identifier,
@@ -319,6 +320,28 @@ fn if_then_else(input: &str) -> IResult<&str, StmtExpr> {
     Ok((
         input,
         StmtExpr::if_then_else(condition, then_expr, else_expr),
+    ))
+}
+
+// Explicit denomination uses a currency token rather than a node dependency.
+fn as_money_expression(input: &str) -> IResult<&str, StmtExpr> {
+    let (input, _) = tag("as_money").parse(input)?;
+    let (input, _) = multispace0.parse(input)?;
+    let (input, _) = char('(').parse(input)?;
+    let (input, value) = expression(input)?;
+    let (input, _) = delimited(multispace0, char(','), multispace0).parse(input)?;
+    let (input, currency) = nom::combinator::map_res(identifier_string, |code: String| {
+        code.parse::<finstack_quant_core::currency::Currency>()
+    })
+    .parse(input)?;
+    let (input, _) = multispace0.parse(input)?;
+    let (input, _) = char(')').parse(input)?;
+    Ok((
+        input,
+        StmtExpr::AsMoney {
+            value: Box::new(value),
+            currency,
+        },
     ))
 }
 

@@ -2063,6 +2063,54 @@
         "structured_credit_stochastic"
       ]
     },
+    "structured_credit_tranche": {
+      "metrics": [
+        "abs_ce_level",
+        "abs_charge_off",
+        "abs_delinquency",
+        "abs_excess_spread",
+        "abs_payment_rate",
+        "accrued",
+        "breakeven",
+        "bucketed_cs01",
+        "bucketed_dv01",
+        "carry_total",
+        "cdr",
+        "clean_price",
+        "clo_warf",
+        "clo_was",
+        "cmbs_dscr",
+        "convexity",
+        "coupon_income",
+        "cpr",
+        "cs01",
+        "default01",
+        "dirty_price",
+        "duration_mac",
+        "duration_mod",
+        "dv01",
+        "expected_shortfall",
+        "funding_cost",
+        "hvar",
+        "prepayment01",
+        "pull_to_par",
+        "recovery01",
+        "roll_down",
+        "severity01",
+        "spread_duration",
+        "theta",
+        "theta_carry",
+        "theta_period_days",
+        "theta_roll_down",
+        "wal",
+        "wam",
+        "ytm",
+        "z_spread"
+      ],
+      "models": [
+        "discounting"
+      ]
+    },
     "swaption": {
       "metrics": [
         "breakeven",

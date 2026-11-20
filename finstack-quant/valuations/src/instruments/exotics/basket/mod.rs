@@ -50,5 +50,6 @@ pub(crate) mod types;
 
 // Builder is generated via derive on `Basket`.
 pub use types::{
-    Basket, BasketAssetType, BasketConstituent, BasketPricingConfig, ConstituentReference,
+    Basket, BasketAssetType, BasketBuilder, BasketConstituent, BasketPricingConfig,
+    ConstituentReference,
 };

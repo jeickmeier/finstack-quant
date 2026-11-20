@@ -9,7 +9,17 @@ await facade.default({
 
 test('checked Black-Scholes rejects invalid spot inputs', () => {
   for (const spot of [NaN, Infinity, -100, 0]) {
-    assert.throws(() => facade.models.bsPrice(spot, 100, 0.05, 0, 0.2, 1, true));
+    assert.throws(() =>
+      facade.models.bsPrice({
+        spot,
+        strike: 100,
+        rate: 0.05,
+        dividend_yield: 0,
+        volatility: 0.2,
+        time_to_expiry: 1,
+        option_type: 'call',
+      })
+    );
   }
 });
 
@@ -23,9 +33,9 @@ test('COS rejects an empty expansion', () => {
         dividend_yield: 0,
         time_to_expiry: 1,
         option_type: 'call',
-        n_terms: 0,
+        volatility: 0.2,
       },
-      0.2
+      0
     )
   );
 });
@@ -35,32 +45,28 @@ test('COS reports invalid market inputs as exceptions without a panic', () => {
     for (const isCall of [true, false]) {
       assert.throws(
         () =>
-          facade.models.bsCosPrice(
-            {
-              spot: invalid,
-              strike: 100,
-              rate: 0.05,
-              dividend_yield: 0,
-              time_to_expiry: 1,
-              option_type: isCall ? 'call' : 'put',
-            },
-            0.2
-          ),
+          facade.models.bsCosPrice({
+            spot: invalid,
+            strike: 100,
+            rate: 0.05,
+            dividend_yield: 0,
+            time_to_expiry: 1,
+            option_type: isCall ? 'call' : 'put',
+            volatility: 0.2,
+          }),
         /spot/
       );
       assert.throws(
         () =>
-          facade.models.bsCosPrice(
-            {
-              spot: 100,
-              strike: invalid,
-              rate: 0.05,
-              dividend_yield: 0,
-              time_to_expiry: 1,
-              option_type: isCall ? 'call' : 'put',
-            },
-            0.2
-          ),
+          facade.models.bsCosPrice({
+            spot: 100,
+            strike: invalid,
+            rate: 0.05,
+            dividend_yield: 0,
+            time_to_expiry: 1,
+            option_type: isCall ? 'call' : 'put',
+            volatility: 0.2,
+          }),
         /strike/
       );
     }
@@ -149,11 +155,11 @@ test('seasoned lookbacks match independent continuous-maximum payoff values', ()
 test('tranche ES preserves empirical tail probability under replication', () => {
   const { PortfolioLossResult } = facade.models.correlation;
   const losses = [0, 0, 10, 20];
-  const result = PortfolioLossResult.fromLosses(losses, 0.75).trancheLossStatistics(0, 1, 100);
+  const result = PortfolioLossResult.fromLosses(losses, 0.75).trancheLossStatistics(0, 100, 100);
   const repeated = PortfolioLossResult.fromLosses(
     Array(10).fill(losses).flat(),
     0.75
-  ).trancheLossStatistics(0, 1, 100);
+  ).trancheLossStatistics(0, 100, 100);
   assert.ok(Math.abs(result.expected_shortfall_amount - 20) < 1e-12);
   assert.ok(
     Math.abs(result.expected_shortfall_amount - repeated.expected_shortfall_amount) < 1e-12
@@ -173,7 +179,7 @@ test('PortfolioLossResult mirrors the Rust handle and validates its JSON', () =>
   assert.equal(result.confidence, 0.75);
   assert.ok(Math.abs(result.expectedShortfall - 9) < 1e-12);
 
-  const tranche = result.trancheLossStatistics(0.02, 0.06, 100);
+  const tranche = result.trancheLossStatistics(2.0, 6.0, 100);
   assert.deepEqual(Object.keys(tranche).sort(), [
     'attachment',
     'detachment',

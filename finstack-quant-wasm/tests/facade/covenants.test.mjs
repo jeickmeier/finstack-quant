@@ -61,6 +61,8 @@ test('covenants facade generates and evaluates template specs', () => {
   assert.equal(typeof reports, 'object');
   const report = reports.max_debt_ebitda;
   assert.equal(report.passed, true);
+  assert.equal(report.headroom_raw, 1);
+  assert.equal(report.headroom, 0.2);
   assert.equal(typeof report.covenant_type, 'string');
   assert.equal(typeof report.actual_value, 'number');
   assert.equal(typeof report.threshold, 'number');
@@ -104,6 +106,7 @@ test('net cash requires a positive earnings denominator across the JSON bridge',
     const report = reports[spec.covenant.label];
     assert.equal(report.passed, ebitda > 0);
     assert.equal(report.headroom != null, ebitda > 0);
+    assert.equal(report.headroom_raw != null, ebitda > 0);
   }
   assert.throws(() =>
     covenants.evaluateEngine(engine, JSON.stringify({ net_debt_to_ebitda: -1 }), '2026-03-31')
@@ -160,4 +163,13 @@ test('JSON metric-map errors come from the Rust parser (same text as Python)', (
       (error) => error.kind === 'validation' && error.message.startsWith(message)
     );
   }
+});
+
+test('covenant engine accepts a typed standard template', () => {
+  const engine = covenants.CovenantEngine.fromTemplate({
+    kind: 'cov_lite',
+    max_leverage: 7,
+    max_senior_leverage: 4.5,
+  });
+  assert.ok(engine instanceof covenants.CovenantEngine);
 });

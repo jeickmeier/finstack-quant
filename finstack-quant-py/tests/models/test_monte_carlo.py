@@ -190,11 +190,11 @@ def test_path_summary_round_trips_through_json_and_pickle() -> None:
                 "q": 0.01,
                 "kappa": 2.0,
                 "theta": 0.05,
-                "sigma_v": 0.3,
+                "vol_of_vol": 0.3,
                 "rho": -0.7,
                 "v0": 0.03,
             },
-            [100.0, 0.03],
+            [100.0],
             ["spot", "variance"],
         ),
         (
@@ -242,7 +242,12 @@ def test_simulate_paths_reaches_non_gbm_processes(
     assert summary.factor_names == factor_names
     assert summary.dim == dim
     assert len(summary.values) == 3 * 5 * dim
-    assert summary.values[:dim] == initial_state
+    if process["type"] == "heston":
+        assert summary.values[:dim] == [*initial_state, process["v0"]]
+        with pytest.raises(ValueError, match="one initial_state value"):
+            simulate_paths({**_GBM_SPEC, "process": process, "initial_state": [*initial_state, process["v0"]]})
+    else:
+        assert summary.values[:dim] == initial_state
     assert all(math.isfinite(value) for value in summary.values)
 
 
@@ -280,7 +285,7 @@ def test_simulate_paths_scheme_changes_the_paths_but_not_the_seeded_draws() -> N
             {**_GBM_SPEC, "process": {"type": "cir", "kappa": 0.5, "theta": 0.04, "sigma": 0.1}, "scheme": "milstein"},
             "scheme 'milstein' is not available for process 'cir'",
         ),
-        ("not json", "invalid PathSimulationSpec"),
+        ("{bad", "invalid PathSimulationSpec JSON"),
         (42, "invalid PathSimulationSpec"),
     ],
 )

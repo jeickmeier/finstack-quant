@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 from typing import Any
 
 import pytest
 
+from finstack_quant.portfolio import ScenarioPnlBatchItem
 from finstack_quant.reporting import scenario_tearsheet
 from finstack_quant.reporting.document import TearSheet
 
@@ -148,3 +150,30 @@ def test_scenario_tearsheet_renders_typed_rust_results() -> None:
 def test_scenario_tearsheet_rejects_unsupported_tornado_input(tornado: Any) -> None:
     with pytest.raises((TypeError, ValueError)):
         scenario_tearsheet(tornado=tornado, sections=["tornado"])
+
+
+def test_scenario_comparison_uses_native_batch_labels_and_totals() -> None:
+    item = ScenarioPnlBatchItem.from_json(
+        json.dumps({
+            "scenario_id": "rates-up",
+            "pnl": {"total": {"amount": "125", "currency": "USD"}, "by_position": {}},
+            "report": {
+                "operations_applied": 0,
+                "user_operations": 0,
+                "expanded_operations": 0,
+                "changes": {
+                    "market_targets": [],
+                    "changed_instrument_indices": [],
+                    "as_of_changed": False,
+                    "portfolio_shape_changed": False,
+                    "all_dirty": False,
+                },
+                "warnings": [],
+            },
+        })
+    )
+    batch = scenario_tearsheet(scenarios=[item], sections=["scenarios"]).to_html()
+    assert batch == scenario_tearsheet(scenarios={"rates-up": item.pnl}, sections=["scenarios"]).to_html()
+    assert batch == scenario_tearsheet(scenarios={"rates-up": 125.0}, sections=["scenarios"]).to_html()
+    with pytest.raises(TypeError, match="labeled scenario batch items"):
+        scenario_tearsheet(scenarios=[item.pnl], sections=["scenarios"])

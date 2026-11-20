@@ -6,7 +6,20 @@ credit, Monte Carlo, and rates APIs are grouped under the matching submodules.
 Examples
 --------
 >>> from finstack_quant.models import bs_price
->>> round(bs_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True), 4)
+>>> round(
+...     bs_price(
+...         dict(
+...             spot=100.0,
+...             strike=100.0,
+...             rate=0.05,
+...             dividend_yield=0.0,
+...             volatility=0.2,
+...             time_to_expiry=1.0,
+...             option_type="call",
+...         )
+...     ),
+...     4,
+... )
 10.4506
 """
 
@@ -21,6 +34,9 @@ from finstack_quant.models._closed_form import (
     BsGreeks as BsGreeks,
     ForwardGreeks as ForwardGreeks,
     OptionCalculationResult as OptionCalculationResult,
+    OptionContractParams as OptionContractParams,
+    HestonParams as HestonParams,
+    OptionMarketParams as OptionMarketParams,
     asian_option_price as asian_option_price,
     bachelier_greeks as bachelier_greeks,
     bachelier_price as bachelier_price,
@@ -33,6 +49,8 @@ from finstack_quant.models._closed_form import (
     bs_greeks as bs_greeks,
     bs_implied_vol as bs_implied_vol,
     bs_price as bs_price,
+    bs_price_many as bs_price_many,
+    bs_greeks_many as bs_greeks_many,
     heston_price as heston_price,
     lookback_option_price as lookback_option_price,
     option_calculation as option_calculation,
@@ -49,6 +67,9 @@ __all__ = [
     "BsGreeks",
     "ForwardGreeks",
     "OptionCalculationResult",
+    "OptionContractParams",
+    "HestonParams",
+    "OptionMarketParams",
     "asian_option_price",
     "bachelier_greeks",
     "bachelier_price",
@@ -62,6 +83,8 @@ __all__ = [
     "bs_greeks",
     "bs_implied_vol",
     "bs_price",
+    "bs_price_many",
+    "bs_greeks_many",
     "correlation",
     "credit",
     "factor",

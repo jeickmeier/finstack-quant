@@ -18,6 +18,7 @@ from finstack_quant.calibration import (
     PriceDatum,
     RateQuote,
     SolverConfig,
+    StepWithQuotes,
     ValidationConfig,
     VolQuote,
     XccyQuote,
@@ -435,3 +436,62 @@ def test_calibration_params_objects_take_python_dates() -> None:
     assert as_date.to_json() == as_text.to_json()
     with pytest.raises(ValueError, match="invalid discount step"):
         CalibrationStep.discount("D", {"currency": "USD", "base_date": datetime.datetime(2026, 5, 8, 12)})
+
+
+def test_inline_calibration_inputs_match_explicit_envelope() -> None:
+    step = CalibrationStep.discount("USD-OIS", {"currency": "USD", "base_date": "2026-09-30"})
+    quote = RateQuote.deposit("USD-DEP-3M", "USD-SOFR-OIS", "3M", 0.04)
+    explicit = CalibrationEnvelope(
+        CalibrationPlan([step], id="inline", quote_sets={"USD-OIS": [quote.id]}),
+        market_data=[quote],
+    )
+    authored = CalibrationEnvelope.from_steps("inline", [StepWithQuotes(step, [quote])])
+    assert authored.content_hash() == explicit.content_hash()
+    assert calibrate(authored).success
+
+
+def test_inline_calibration_preserves_quote_set_reuse_and_rejects_duplicate_inputs() -> None:
+    params = {"currency": "USD", "base_date": "2026-09-30"}
+    first = CalibrationStep.discount("USD-OIS", params, quote_set="deposits")
+    next_step = CalibrationStep.discount("USD-OIS-2", params, quote_set="deposits")
+    quote = RateQuote.deposit("USD-DEP-3M", "USD-SOFR-OIS", "3M", 0.04)
+    envelope = CalibrationEnvelope.from_steps("reuse", [StepWithQuotes(first, [quote]), StepWithQuotes(next_step, [])])
+    assert envelope.plan.quote_sets == {"deposits": ["USD-DEP-3M"]}
+    assert len(envelope.market_data) == 1
+    original = CalibrationEnvelope.from_steps("reuse", [StepWithQuotes(first, [quote])])
+    assert original.with_step(StepWithQuotes(next_step, [])).content_hash() == envelope.content_hash()
+    with pytest.raises(ValueError, match="Duplicate definition of calibration quote set"):
+        original.with_step(StepWithQuotes(next_step, [quote]))
+    assert len(original.plan.steps) == 1
+    bumped = envelope.bump_quotes_bp(2.5, quote_set="deposits")
+    shifted = RateQuote.deposit("USD-DEP-3M", "USD-SOFR-OIS", "3M", 0.04025)
+    expected = CalibrationEnvelope.from_steps(
+        "reuse", [StepWithQuotes(first, [shifted]), StepWithQuotes(next_step, [])]
+    )
+    assert bumped.content_hash() == expected.content_hash()
+    assert original.with_step(StepWithQuotes(next_step, [])).content_hash() == envelope.content_hash()
+    removed = envelope.without_quote(quote.id)
+    assert removed.plan.quote_sets == {"deposits": []}
+    assert not removed.market_data
+    with pytest.raises(ValueError, match="bump must be finite"):
+        envelope.bump_quotes_bp(float("nan"))
+
+    with pytest.raises(ValueError, match="duplicate calibration market input"):
+        CalibrationEnvelope.from_steps("duplicate", [StepWithQuotes(first, [quote, quote])])
+
+
+def test_native_step_parameters_use_distinct_output_and_quote_ids() -> None:
+    from finstack_quant.calibration import DiscountCurveParams
+
+    fields = DiscountCurveParams(curve_id="USD-OIS", currency="USD", base_date="2026-05-08")
+    step = CalibrationStep("discount-front", fields, "on-the-run")
+    wire = json.loads(step.to_json())
+    assert wire["kind"] == "discount"
+    assert wire["curve_id"] == "USD-OIS"
+    assert wire["id"] == "discount-front"
+    assert wire["quote_set"] == "on-the-run"
+    assert fields.to_dict()["interpolation"] == "log_linear"
+    with pytest.raises(ValueError, match="nonempty"):
+        CalibrationStep("discount-front", fields, "")
+    with pytest.raises(TypeError, match="native calibration step"):
+        CalibrationStep("discount-front", fields.to_dict())

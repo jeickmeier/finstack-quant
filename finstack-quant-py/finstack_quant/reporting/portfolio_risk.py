@@ -111,7 +111,6 @@ def _section_budget(budget: dict[str, Any] | None) -> Section | None:
 def portfolio_risk_tearsheet(
     decomposition: Any,
     *,
-    es: Any = None,
     budget: Any = None,
     title: str | None = None,
     subtitle: str | None = None,
@@ -125,11 +124,8 @@ def portfolio_risk_tearsheet(
     ----------
     decomposition : PositionRiskDecomposition | dict | str
         A ``position_risk_report(...).decomposition`` result (typed, dict or
-        JSON); its ``var_contributions`` feed the VaR-contributions section.
-    es : dict | str, optional
-        A ``PositionRiskDecomposition`` (typed, dict or JSON) whose
-        ``es_contributions`` feed the ES-contributions section; usually the
-        same object as ``decomposition``.
+        JSON); its ``var_contributions`` and ``es_contributions`` feed the
+        VaR and ES sections.
     budget : dict | str, optional
         An ``evaluate_risk_budget`` result; enables the risk-budget section.
     title : str, optional
@@ -164,13 +160,12 @@ def portfolio_risk_tearsheet(
     wanted = _resolve_sections(sections, ALL_SECTIONS)
 
     decomp = json_or_dict(decomposition, noun="decomposition")
-    es_d = json_or_dict(es, noun="es") if es is not None else None
     budget_d = json_or_dict(budget, noun="budget") if budget is not None else None
 
     secs: list[Section] = []
     if "contributions" in wanted and (s := _section_contributions(decomp, theme)) is not None:
         secs.append(s)
-    if "es" in wanted and (s := _section_es(es_d)) is not None:
+    if "es" in wanted and (s := _section_es(decomp)) is not None:
         secs.append(s)
     if "budget" in wanted and (s := _section_budget(budget_d)) is not None:
         secs.append(s)

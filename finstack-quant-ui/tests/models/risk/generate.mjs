@@ -65,7 +65,7 @@ const reports = Object.fromEntries(
 );
 // The worker's PortfolioApi.computeFactorSensitivities (over the cached
 // Portfolio and MarketContext handles) and ModelsApi.decomposeFactors of the
-// returned matrix's JSON, as the useFactorRisk chain calls them, over the raw
+// returned matrix, as the useFactorRisk chain calls them, over the raw
 // package (portfolio and models.factor.risk re-export these unchanged).
 function factorRisk(request) {
   const book = native.Portfolio.fromSpec(request.specJson);
@@ -81,9 +81,9 @@ function factorRisk(request) {
     return {
       sensitivities,
       decomposition: native.decomposeFactors(
-        JSON.stringify(sensitivities),
-        request.covarianceJson,
-        optional(request.riskMeasureJson),
+        sensitivities,
+        request.covariance,
+        optional(request.riskMeasure),
       ),
     };
   } finally {
@@ -102,7 +102,7 @@ const factorRequest = {
   marketJson: JSON.stringify(inputs.market_t0),
   factorsJson: JSON.stringify(inputs.factor_model_config.factors),
   asOf: inputs.as_of_t0,
-  covarianceJson: JSON.stringify(inputs.factor_model_config.covariance),
+  covariance: inputs.factor_model_config.covariance,
 };
 reports.factor = { request: factorRequest, report: factorRisk(factorRequest) };
 assertFinite(reports, "risk");

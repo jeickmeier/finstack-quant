@@ -32,11 +32,13 @@ const EXPORTED_KEYS = [
   'InstrumentArtifactCache',
   'Portfolio',
   'PortfolioBuilder',
+  'Position',
   'aggregateFullCashflows',
   'aggregateMetrics',
   'allocateWeights',
   'applyScenarioAndRevalue',
   'attributePortfolioPnl',
+  'attributeScenarioPnl',
   'brinsonFachler',
   'brinsonLinked',
   'buildCreditVolReport',
@@ -50,11 +52,14 @@ const EXPORTED_KEYS = [
   'computePnlProfiles',
   'constraintExposureLimit',
   'constraintExposureMinimum',
+  'csrQuoteDelta',
   'excessReturns',
   'factorBrinsonAttribution',
   'fiAttributionResultReconciliationCheck',
+  'girrQuoteDelta',
   'gridAttribution',
   'gridCarinoLink',
+  'instrumentExposureProfile',
   'mwrXirr',
   'netInCurrencyByDate',
   'optimizePortfolio',
@@ -62,6 +67,8 @@ const EXPORTED_KEYS = [
   'portfolioAttributionExplainText',
   'portfolioAttributionPctOfTotalByBucket',
   'portfolioAttributionReconciliationCheck',
+  'portfolioExposureProfile',
+  'portfolioFrtbSensitivities',
   'portfolioMargin',
   'portfolioMetricsGetMetric',
   'portfolioMetricsGetPositionMetrics',
@@ -149,11 +156,20 @@ test('models.factor.risk.decomposeFactors consumes the canonical Python monetary
     const measured = models.factor.risk.decomposeFactors(
       JSON.stringify(sensitivities),
       covariance,
-      JSON.stringify(measure)
+      measure
     );
     assert.deepEqual(measured.measure, measure);
     assert.ok(Number.isFinite(measured.total_risk));
   }
+});
+
+test('tail risk factories validate confidence before decomposition', () => {
+  const risk = models.factor.risk;
+  const es = risk.riskMeasureExpectedShortfall(0.975);
+  assert.deepEqual(es, { expected_shortfall: { confidence: 0.975 } });
+  assert.deepEqual(risk.riskMeasureVar(0.99), { var: { confidence: 0.99 } });
+  assert.throws(() => risk.riskMeasureVar(1.0), /confidence/);
+  assert.deepEqual(risk.decomposeFactors(SENSITIVITY_WIRE, SENSITIVITY_COVARIANCE, es).measure, es);
 });
 
 test('models.factor.risk.decomposeFactors rejects malformed matrices and missing reporting currency', () => {
@@ -199,27 +215,43 @@ test('analytics.constrainedLeastSquares keeps its declared arity', () => {
   assert.equal(analytics.constrainedLeastSquares.length, 4);
 });
 
-const campisiSnapshot = (sector, weight, totalReturn, yieldAnnual, modifiedDuration) => ({
+const campisiSnapshot = (id, sector, weight, totalReturn, coupon, duration = 5) => ({
+  id,
   sector,
   weight,
   total_return: totalReturn,
-  yield_annual: yieldAnnual,
-  modified_duration: modifiedDuration,
-  spread_duration: 0.0,
-  spread: 0.0,
-  delta_treasury_yield: -0.001,
-  delta_spread: 0.0,
+  opening_market_value: { amount: '80', currency: 'USD' },
+  annual_coupon: { amount: coupon, currency: 'USD' },
+  treasury: {
+    sensitivity_basis: 'UST 5Y settlement yield',
+    duration,
+    opening: { basis: 'UST 5Y settlement yield', rate: 0.03 },
+    closing: { basis: 'UST 5Y settlement yield', rate: 0.031 },
+  },
+  spread: null,
 });
-
-const CAMPISI_PORTFOLIO = JSON.stringify([
-  campisiSnapshot('GOVT', 0.6, 0.016, 0.04, 5.0),
-  campisiSnapshot('CORP', 0.4, 0.012, 0.06, 4.0),
-]);
-const CAMPISI_BENCHMARK = JSON.stringify([
-  campisiSnapshot('GOVT', 0.5, 0.015, 0.04, 5.5),
-  campisiSnapshot('CORP', 0.5, 0.011, 0.055, 4.5),
-]);
-const campisiConfig = (periodYears) => JSON.stringify({ period_years: periodYears });
+const CAMPISI_PORTFOLIO = [
+  campisiSnapshot('P-GOVT', 'GOVT', '0.6', 0.016, '4'),
+  campisiSnapshot('P-CORP', 'CORP', '0.4', 0.012, '6', 4),
+];
+const CAMPISI_BENCHMARK = [
+  campisiSnapshot('B-GOVT', 'GOVT', '0.5', 0.015, '4'),
+  campisiSnapshot('B-CORP', 'CORP', '0.5', 0.011, '5.5', 4.5),
+];
+const campisiConfig = (start = '2025-01-01', end = '2025-03-15', sectors = ['GOVT', 'CORP']) => ({
+  start,
+  end,
+  sectors,
+  currency: 'USD',
+  basis: {
+    portfolio_series_id: 'portfolio',
+    benchmark_series_id: 'benchmark',
+    return_policy: 'reinvested',
+    valuation: 'dirty-settlement',
+    fx: 'native USD',
+    fees: 'net',
+  },
+});
 
 const brinsonPeriod = (wpA, wbA, rpA, rbA, rpB, rbB) => [
   {
@@ -279,57 +311,54 @@ test('portfolio.brinsonLinked links raw sector periods to the compounded active 
   assert.throws(() => portfolio.brinsonLinked(7), TypeError);
 });
 
-test('portfolio.campisiAttribution reconciles the five effects to active return', () => {
+test('portfolio.campisiAttribution reconciles the five checked effects', () => {
   const result = assertStructured(
-    portfolio.campisiAttribution(CAMPISI_PORTFOLIO, CAMPISI_BENCHMARK, campisiConfig(0.25)),
+    portfolio.campisiAttribution(CAMPISI_PORTFOLIO, CAMPISI_BENCHMARK, campisiConfig()),
     'campisiAttribution result'
   );
-  // Direct property read: an ES Map would give undefined here.
-  assert.equal(typeof result.active_return, 'number');
+  assert.ok(Math.abs(result.portfolio_components.carry - 0.012) < 1e-12);
+  assert.ok(Math.abs(result.portfolio_components.treasury + 0.0046) < 1e-12);
+  assert.ok(Math.abs(result.active_return - 0.0014) < 1e-12);
   const reconstructed =
     result.total_allocation +
     result.total_active_carry +
     result.total_active_treasury +
     result.total_active_spread +
-    result.total_selection;
+    result.total_residual;
   assert.ok(Math.abs(reconstructed - result.active_return) < 1e-12);
-  assert.equal('spread_mode' in result, false);
+  assert.deepEqual(result.source.config.sectors, ['GOVT', 'CORP']);
 });
 
-test('portfolio.campisiAttribution fails closed on unknown and missing config fields', () => {
-  // `period_years` is the config's only field and has no default: omitting it
-  // must be rejected, not guessed.
+test('portfolio.campisiAttribution rejects legacy inputs and inexact net weights', () => {
+  assert.throws(() => portfolio.campisiAttribution(CAMPISI_PORTFOLIO, CAMPISI_BENCHMARK, {}));
   assert.throws(() =>
-    portfolio.campisiAttribution(CAMPISI_PORTFOLIO, CAMPISI_BENCHMARK, JSON.stringify({}))
+    portfolio.campisiAttribution(CAMPISI_PORTFOLIO, CAMPISI_BENCHMARK, {
+      ...campisiConfig(),
+      period_years: 0.25,
+    })
   );
-  // The retired `spread_mode` key is now an unknown field. A stale caller must
-  // be told, not silently served a result computed without it.
-  assert.throws(() =>
-    portfolio.campisiAttribution(
-      CAMPISI_PORTFOLIO,
-      CAMPISI_BENCHMARK,
-      JSON.stringify({ period_years: 0.25, spread_mode: 'dts' })
-    )
+  const short = structuredClone(CAMPISI_PORTFOLIO);
+  short[0].weight = '0.599999999999999999999';
+  assert.throws(
+    () => portfolio.campisiAttribution(short, CAMPISI_BENCHMARK, campisiConfig()),
+    /weights must sum to one/
   );
 });
 
-test('portfolio.campisiCarinoLink links precomputed periods of unequal length', () => {
-  // 31/365 and 28/365 — an act/365 monthly pair the snapshot-based entry
-  // point cannot express, because it applies one shared period_years.
+test('portfolio.campisiCarinoLink links exact periods of unequal length', () => {
   const jan = portfolio.campisiAttribution(
     CAMPISI_PORTFOLIO,
     CAMPISI_BENCHMARK,
-    campisiConfig(31 / 365)
+    campisiConfig('2025-01-01', '2025-02-01')
   );
   const feb = portfolio.campisiAttribution(
     CAMPISI_PORTFOLIO,
     CAMPISI_BENCHMARK,
-    campisiConfig(28 / 365)
+    campisiConfig('2025-02-01', '2025-03-01')
   );
   assert.notEqual(jan.total_active_carry, feb.total_active_carry);
-
   const linked = assertStructured(
-    portfolio.campisiCarinoLink(JSON.stringify([jan, feb])),
+    portfolio.campisiCarinoLink([jan, feb]),
     'campisiCarinoLink result'
   );
   const geometric = linked.portfolio_return_compounded - linked.benchmark_return_compounded;
@@ -338,156 +367,63 @@ test('portfolio.campisiCarinoLink links precomputed periods of unequal length', 
     linked.linked_active_carry +
     linked.linked_active_treasury +
     linked.linked_active_spread +
-    linked.linked_selection;
+    linked.linked_residual;
   assert.ok(Math.abs(reconstructed - geometric) < 1e-10);
   assert.equal(linked.periods.length, 2);
+  assert.throws(() => portfolio.campisiCarinoLink([jan, jan]), /contiguous/);
+  assert.throws(() => portfolio.campisiCarinoLink([feb, jan]), /contiguous/);
+  assert.throws(() => portfolio.campisiCarinoLink([CAMPISI_PORTFOLIO]));
 });
 
-test('portfolio.campisiCarinoLink rejects inconsistent result contracts', () => {
+test('portfolio.campisiCarinoLink rejects a tampered result independently of tolerance', () => {
   const result = portfolio.campisiAttribution(
     CAMPISI_PORTFOLIO,
     CAMPISI_BENCHMARK,
-    campisiConfig(0.25)
+    campisiConfig()
   );
-
   const badActive = { ...result, active_return: result.active_return + 0.001 };
-  assert.throws(() => portfolio.campisiCarinoLink(JSON.stringify([badActive])), /active_return/);
-
   const badSector = structuredClone(result);
-  badSector.sectors[0].selection += 0.001;
+  badSector.sectors[0].residual += 0.001;
   badSector.sectors[0].total_active += 0.001;
-  assert.throws(() => portfolio.campisiCarinoLink(JSON.stringify([badSector])), /total_selection/);
-
-  const badSectorTotal = structuredClone(result);
-  badSectorTotal.sectors[0].total_active += 0.001;
-  assert.throws(
-    () => portfolio.campisiCarinoLink(JSON.stringify([badSectorTotal])),
-    /total_active/
-  );
-});
-
-test('portfolio.campisiCarinoLink accepts huge finite cancelling effects', () => {
-  const period = portfolio.campisiAttribution(
-    CAMPISI_PORTFOLIO,
-    CAMPISI_BENCHMARK,
-    campisiConfig(0.25)
-  );
-  period.portfolio_return = 0.01;
-  period.benchmark_return = 0.01;
-  period.active_return = 0;
-  for (const name of [
-    'total_allocation',
-    'total_active_carry',
-    'total_active_treasury',
-    'total_active_spread',
-    'total_selection',
-  ]) {
-    period[name] = 0;
+  for (const value of [badActive, badSector]) {
+    assert.throws(() => portfolio.campisiCarinoLink([value]), /source observations/);
+    assert.throws(
+      () => portfolio.fiAttributionResultReconciliationCheck(value, 1),
+      /source observations/
+    );
   }
-  for (const sector of period.sectors) {
-    for (const name of [
-      'allocation',
-      'active_carry',
-      'active_treasury',
-      'active_spread',
-      'selection',
-      'total_active',
-    ]) {
-      sector[name] = 0;
-    }
-  }
-  period.total_allocation = 1e308;
-  period.total_active_carry = -1e308;
-  period.sectors[0].allocation = 1e308;
-  period.sectors[0].active_carry = -1e308;
-
-  const linked = portfolio.campisiCarinoLink(JSON.stringify([period]));
-  assert.equal(linked.linked_allocation, 1e308);
-  assert.equal(linked.linked_active_carry, -1e308);
 });
 
-test('portfolio.campisiCarinoLink links per-period campisiAttribution results', () => {
-  const result = portfolio.campisiAttribution(
-    CAMPISI_PORTFOLIO,
-    CAMPISI_BENCHMARK,
-    campisiConfig(0.25)
-  );
-  const linked = assertStructured(
-    portfolio.campisiCarinoLink([result, result]),
-    'campisiCarinoLink result'
-  );
-  const geometric = linked.portfolio_return_compounded - linked.benchmark_return_compounded;
-  const reconstructed =
-    linked.linked_allocation +
-    linked.linked_active_carry +
-    linked.linked_active_treasury +
-    linked.linked_active_spread +
-    linked.linked_selection;
-  assert.ok(Math.abs(reconstructed - geometric) < 1e-10);
-
-  // Raw snapshot periods are not `FiAttributionResult`s.
-  const period = {
-    portfolio: JSON.parse(CAMPISI_PORTFOLIO),
-    benchmark: JSON.parse(CAMPISI_BENCHMARK),
-  };
-  assert.throws(() => portfolio.campisiCarinoLink(JSON.stringify([period])));
-});
-
-test('portfolio.campisiAttribution fails closed on a zero-net-weight sector', () => {
-  // A long/short pair (or a CDS hedge against a cash bond) inside one bucket
-  // nets to exactly zero weight. Its real contribution stays in the side
-  // return while every per-sector effect would be forced to zero, so the
-  // decomposition must be rejected with the offending sector named.
-  const core = campisiSnapshot('CORE', 1.0, 0.015, 0.048, 5.0);
-  const cleanBenchmark = JSON.stringify([campisiSnapshot('CORE', 1.0, 0.014, 0.044, 5.5)]);
-
-  const hedgedPortfolio = JSON.stringify([
-    core,
-    campisiSnapshot('HEDGE', 0.5, 0.04, 0.06, 3.0),
-    campisiSnapshot('HEDGE', -0.5, 0.01, 0.02, 1.0),
-  ]);
+test('portfolio.campisiAttribution distinguishes zero net weight from an absent side', () => {
+  const core = campisiSnapshot('CORE', 'CORE', '1', 0.015, '4.8');
+  const hedge = [
+    campisiSnapshot('LONG', 'HEDGE', '0.5', 0.04, '6'),
+    campisiSnapshot('SHORT', 'HEDGE', '-0.5', 0.01, '2'),
+  ];
+  const config = campisiConfig('2025-01-01', '2025-03-15', ['HEDGE', 'CORE']);
   assert.throws(
-    () => portfolio.campisiAttribution(hedgedPortfolio, cleanBenchmark, campisiConfig(0.25)),
-    (error) => /HEDGE/.test(String(error)) && /Portfolio/.test(String(error))
+    () => portfolio.campisiAttribution([core, ...hedge], [core], config),
+    /HEDGE.*exactly zero/
   );
-
-  const hedgedBenchmark = JSON.stringify([
-    campisiSnapshot('CORE', 1.0, 0.014, 0.044, 5.5),
-    campisiSnapshot('HEDGE', 0.4, 0.03, 0.055, 4.0),
-    campisiSnapshot('HEDGE', -0.4, 0.005, 0.015, 1.0),
-  ]);
-  assert.throws(
-    () =>
-      portfolio.campisiAttribution(JSON.stringify([core]), hedgedBenchmark, campisiConfig(0.25)),
-    (error) => /HEDGE/.test(String(error)) && /Benchmark/.test(String(error))
-  );
-
-  // A sector genuinely absent from one side is the legitimate zero-weight
-  // case and must keep working.
-  const oneSided = JSON.stringify([
-    campisiSnapshot('CORE', 0.8, 0.015, 0.048, 5.0),
-    campisiSnapshot('EXTRA', 0.2, 0.021, 0.07, 3.0),
-  ]);
-  const result = portfolio.campisiAttribution(oneSided, cleanBenchmark, campisiConfig(0.25));
+  const oneSided = [
+    { ...core, weight: '0.8' },
+    campisiSnapshot('EXTRA', 'HEDGE', '0.2', 0.021, '7'),
+  ];
+  const result = portfolio.campisiAttribution(oneSided, [core], config);
   assert.deepEqual(
     result.sectors.map((s) => s.sector),
-    ['CORE', 'EXTRA']
+    ['HEDGE', 'CORE']
   );
-  assert.equal(result.sectors[1].benchmark_weight, 0.0);
-  const reconstructed =
-    result.total_allocation +
-    result.total_active_carry +
-    result.total_active_treasury +
-    result.total_active_spread +
-    result.total_selection;
-  assert.ok(Math.abs(reconstructed - result.active_return) < 1e-12);
+  assert.equal(result.sectors[0].benchmark_weight, 0);
+  assert.equal(result.sectors[0].benchmark_return, null);
+  assert.equal(result.sectors[0].benchmark_comparator, 0.015);
 });
 
-test('portfolio.fiAttributionResultReconciliationCheck reports the residual and fails closed', () => {
+test('portfolio.fiAttributionResultReconciliationCheck validates its diagnostic tolerance', () => {
   const result = portfolio.campisiAttribution(
     CAMPISI_PORTFOLIO,
     CAMPISI_BENCHMARK,
-    campisiConfig(0.25)
+    campisiConfig()
   );
   const report = assertStructured(
     portfolio.fiAttributionResultReconciliationCheck(result, 1e-10),
@@ -495,23 +431,12 @@ test('portfolio.fiAttributionResultReconciliationCheck reports the residual and 
   );
   assert.equal(report.is_reconciled, true);
   assert.equal(report.tolerance, 1e-10);
-  assert.ok(Math.abs(report.total_residual) <= 1e-10);
-
-  // The tolerance argument is load-bearing, not decorative: a result whose
-  // active_return has been tampered with breaks the identity at 1e-10 and
-  // passes only under an absurdly loose tolerance.
-  const tampered = JSON.stringify({ ...result, active_return: result.active_return + 0.01 });
-  assert.equal(
-    portfolio.fiAttributionResultReconciliationCheck(tampered, 1e-10).is_reconciled,
-    false
-  );
-  assert.equal(portfolio.fiAttributionResultReconciliationCheck(tampered, 1.0).is_reconciled, true);
-
-  // `FiAttributionResult` denies unknown fields, so a stale key fails closed
-  // instead of being silently dropped into a report that still "reconciles".
-  const withBogus = JSON.stringify({ ...result, bogus_field: 1.0 });
-  assert.throws(() => portfolio.fiAttributionResultReconciliationCheck(withBogus, 1e-10));
-  assert.throws(() => portfolio.campisiCarinoLink(`[${withBogus}]`));
+  for (const tolerance of [-1, NaN, Infinity]) {
+    assert.throws(() => portfolio.fiAttributionResultReconciliationCheck(result, tolerance));
+  }
+  const unknown = { ...result, bogus_field: 1 };
+  assert.throws(() => portfolio.fiAttributionResultReconciliationCheck(unknown, 1e-10));
+  assert.throws(() => portfolio.campisiCarinoLink([unknown]));
 });
 
 // Credit excess returns, hierarchical grid attribution, and factor-Brinson
@@ -1290,7 +1215,7 @@ test('models.factor.risk.decomposeFactors reads the canonical wire and returns t
     const decomposition = models.factor.risk.decomposeFactors(
       SENSITIVITY_WIRE,
       SENSITIVITY_COVARIANCE,
-      JSON.stringify(measure)
+      measure
     );
     assert.deepEqual(decomposition.measure, expected);
   }
@@ -1303,7 +1228,7 @@ test('models.factor.risk.decomposeFactors reads the canonical wire and returns t
   );
   assert.throws(
     () => models.factor.risk.decomposeFactors(SENSITIVITY_WIRE, SENSITIVITY_COVARIANCE, 'nope'),
-    (error) => error.kind === 'validation' && /riskMeasureJson/.test(error.message)
+    (error) => error.kind === 'validation' && /riskMeasure: unknown variant/.test(error.message)
   );
 });
 
@@ -1384,5 +1309,393 @@ test('portfolio.portfolioMargin returns a plain PortfolioMarginResult', () => {
   } finally {
     market.free();
     book.free();
+  }
+});
+
+test('typed positions round-trip and append to a copied portfolio', () => {
+  const deposit = facade.valuations.instruments.Deposit.example();
+  const position = new portfolio.Position('DEP-LOT', deposit.toJson(), -2, null, {
+    notional: 'USD',
+  });
+  const loaded = portfolio.Position.fromJson(position.toJson());
+  const empty = portfolio.Portfolio.builder('book', 'USD', '2025-01-01')
+    .tag('desk', 'rates')
+    .build();
+  const built = empty.withPosition(loaded);
+  assert.deepEqual(empty.positions, []);
+  const [holding] = built.positions;
+  assert.equal(holding.positionId, 'DEP-LOT');
+  assert.equal(holding.quantity, -2);
+  assert.deepEqual(holding.unit, { notional: 'USD' });
+  assert.throws(() => built.withPosition(loaded), /Duplicate position ID/i);
+  const extra = new portfolio.Position('DEP-LOT-2', deposit.toJson(), 1, null, 'units');
+  const expanded = built.toBuilder().addPosition(extra).build();
+  assert.deepEqual(expanded.positionIds, ['DEP-LOT', 'DEP-LOT-2']);
+  for (const handle of [expanded, extra, holding, built, empty, loaded, position, deposit])
+    handle.free();
+});
+
+test('typed inflation-linked bond edits preserve decimal coupons and the source', () => {
+  const Type = facade.valuations.instruments.InflationLinkedBond;
+  const source = Type.example();
+  const coupon = '0.025000000000000000000000001';
+  const edited = source.toBuilder().id('TIPS-EDITED').realCoupon(coupon).lag('90D').build();
+  const restored = Type.fromJson(edited.toJson());
+  try {
+    assert.equal(restored.id, 'TIPS-EDITED');
+    assert.equal(restored.realCoupon, coupon);
+    assert.equal(restored.lag, '90D');
+    assert.equal(source.lag, '3M');
+    assert.equal(restored.toJson(), edited.toJson());
+  } finally {
+    source.free();
+    edited.free();
+    restored.free();
+  }
+});
+
+test('typed bond futures distinguish live and final settlement marks', () => {
+  const instruments = facade.valuations.instruments;
+  const initial = instruments.BondFuture.example();
+  const terms = instruments.listedFutureTermsWithMarks(
+    instruments.listedFutureTermsWithContracts(initial.terms, 2),
+    112.75,
+    112.5
+  );
+  const edited = initial.toBuilder().terms(terms).build();
+  const market = new core.MarketContext();
+  try {
+    assert.equal(Number(edited.price(market.toJson(), '2025-09-01').value.amount), 1000);
+    assert.equal(Number(edited.price(market.toJson(), '2025-09-23').value.amount), 500);
+    assert.equal(initial.terms.contracts, 10);
+    assert.equal(edited.terms.contracts, 2);
+  } finally {
+    market.free();
+    edited.free();
+    initial.free();
+  }
+});
+
+test('typed listed option terms preserve contract economics and validate strike inputs', () => {
+  const instruments = facade.valuations.instruments;
+  const terms = instruments.futureOptionTermsExample();
+  assert.deepEqual(instruments.futureOptionTerms(terms), terms);
+  assert.throws(() => instruments.futureOptionTerms({ ...terms, strike: -1.0 }), /strike/);
+  const initial = instruments.EquityFutureOption.example();
+  const edited = initial.toBuilder().id('EQUITY-OPTION-REPRICE').terms(terms).build();
+  try {
+    assert.notEqual(initial.id, edited.id);
+    assert.deepEqual(edited.terms, terms);
+  } finally {
+    edited.free();
+    initial.free();
+  }
+});
+
+test('ordinary GIRR uses exact tenors and preserves the signed quote change under WASM', () => {
+  const date = '2025-01-02';
+  const id = 'GBP-SONIA';
+  const vertices = ['0.25Y', '0.5Y', '1Y', '2Y', '3Y', '5Y', '10Y', '15Y', '20Y', '30Y'];
+  const quotes = vertices.map((vertex, index) => ({
+    kind: 'rate_quote',
+    type: 'deposit',
+    id: vertex,
+    index: 'GBP-SONIA-OIS',
+    pillar: {
+      tenor: {
+        count: index < 2 ? 3 * (index + 1) : Number.parseInt(vertex, 10),
+        unit: index < 2 ? 'months' : 'years',
+      },
+    },
+    rate: 0.057,
+  }));
+  const calibration = facade.calibration.calibrate({
+    schema: 'finstack_quant.calibration/1',
+    plan: {
+      id: 'gbp',
+      quote_sets: { gbp: vertices },
+      steps: [
+        {
+          id,
+          quote_set: 'gbp',
+          kind: 'discount',
+          curve_id: id,
+          currency: 'GBP',
+          base_date: date,
+          method: 'bootstrap',
+          interpolation: 'log_linear',
+          extrapolation: 'extend',
+          conventions: { curve_day_count: 'act_365f' },
+        },
+      ],
+      settings: {},
+    },
+    market_data: quotes,
+  });
+  const market = core.MarketContext.fromJson(calibration.result.final_market);
+  const curve = market.getDiscount(id);
+  const currency = new core.Currency('GBP');
+  const principal = new core.Money(100_000, currency);
+  const bond = facade.valuations.instruments.Bond.zeroCoupon(
+    'ZC',
+    principal,
+    date,
+    '2026-01-02',
+    { periodic: 1 },
+    id
+  );
+  const position = new portfolio.Position('SHORT', bond.toJson(), -2);
+  const builder = portfolio.Portfolio.builder('book', 'GBP', date);
+  const book = builder.addPosition(position).build();
+  const pricing = new core.FinstackConfig();
+
+  try {
+    const targets = curve.rateCalibration.execution.bindings.map(({ quote_id, pillar_date }) => ({
+      risk_currency: 'GBP',
+      risk_curve_id: id,
+      vertex: quote_id,
+      source: { kind: 'discount', curve_id: id },
+      quote: { quote_id, pillar_date },
+    }));
+    const result = portfolio.girrQuoteDelta(book, market, pricing, targets);
+    const year = result.quote_risk.find((row) => row.target.vertex === '1Y');
+    const expected = -200_000 * (1 / 1.0571 - 1 / 1.057);
+    assert.equal(result.as_of, date);
+    assert.equal(result.quote_risk.length, vertices.length);
+    assert.equal(year.positions[0].position_scale, -2);
+    assert.ok(Math.abs(year.positions[0].pnl_base_per_pp - 100 * expected) < 2);
+    const risk = facade.margin.FrtbSensitivities.fromJson(result.sensitivities);
+    try {
+      assert.ok(facade.margin.frtbSbaCharge(risk).total > 0);
+    } finally {
+      risk.free();
+    }
+    assert.throws(
+      () => portfolio.girrQuoteDelta(book, market, pricing, targets.slice(1)),
+      /Missing GIRR delta vertex/
+    );
+  } finally {
+    for (const handle of [pricing, book, position, bond, principal, currency, curve, market])
+      handle.free();
+  }
+});
+
+test('ordinary CSR uses the executed CDS quote and signed book position', () => {
+  const asOf = '2024-03-20';
+  const discountId = 'USD-OIS';
+  const creditId = 'CORP-HAZARD';
+  const vertices = ['0.5Y', '1Y', '3Y', '5Y', '10Y'];
+  const rateTenors = {
+    '0.25Y': [3, 'months'],
+    '0.5Y': [6, 'months'],
+    '1Y': [1, 'years'],
+    '2Y': [2, 'years'],
+    '3Y': [3, 'years'],
+    '5Y': [5, 'years'],
+    '10Y': [10, 'years'],
+    '15Y': [15, 'years'],
+    '20Y': [20, 'years'],
+    '30Y': [30, 'years'],
+  };
+  const rateQuotes = Object.entries(rateTenors).map(([vertex, [count, unit]]) => ({
+    kind: 'rate_quote',
+    type: 'deposit',
+    id: `usd-${vertex}`,
+    index: 'USD-SOFR-OIS',
+    pillar: { tenor: { count, unit } },
+    rate: 0.04,
+  }));
+
+  const fit = (bump5y) => {
+    const quotes = vertices.map((vertex, index) => ({
+      kind: 'cds_quote',
+      type: 'cds_par_spread',
+      id: vertex,
+      entity: 'CORP',
+      convention: { currency: 'USD', doc_clause: 'isda_na' },
+      pillar: {
+        tenor: {
+          count: index === 0 ? 6 : Number.parseInt(vertex, 10),
+          unit: index === 0 ? 'months' : 'years',
+        },
+      },
+      spread_bp: [80, 85, 95, 105 + bump5y, 115][index],
+      recovery_rate: 0.4,
+    }));
+    const calibration = facade.calibration.calibrate({
+      schema: 'finstack_quant.calibration/1',
+      plan: {
+        id: 'usd-credit',
+        quote_sets: { rates: rateQuotes.map(({ id }) => id), credit: vertices },
+        steps: [
+          {
+            id: discountId,
+            quote_set: 'rates',
+            kind: 'discount',
+            curve_id: discountId,
+            currency: 'USD',
+            base_date: asOf,
+            method: 'bootstrap',
+            interpolation: 'log_linear',
+            extrapolation: 'extend',
+            conventions: { curve_day_count: 'act_365f' },
+          },
+          {
+            id: creditId,
+            quote_set: 'credit',
+            kind: 'hazard',
+            curve_id: creditId,
+            currency: 'USD',
+            base_date: asOf,
+            discount_curve_id: discountId,
+            entity: 'CORP',
+            seniority: 'senior',
+            recovery_rate: 0.4,
+            notional: 1,
+            method: 'bootstrap',
+          },
+        ],
+        settings: {},
+      },
+      market_data: [...rateQuotes, ...quotes],
+    });
+    return core.MarketContext.fromJson(calibration.result.final_market);
+  };
+  const market = fit(0);
+  const shocked = fit(1);
+  const curve = market.getHazard(creditId);
+  const cds = facade.valuations.instruments.CreditDefaultSwap.example();
+  const position = new portfolio.Position('short-cds', cds.toJson(), -2);
+  const book = portfolio.Portfolio.builder('credit-book', 'USD', asOf)
+    .addPosition(position)
+    .build();
+  const pricing = new core.FinstackConfig();
+  try {
+    const source = {
+      curve_id: creditId,
+      classification: {
+        issuer: 'CORP',
+        currency: 'USD',
+        seniority: 'senior',
+        bucket: 5,
+        source_id: 'issuer-review',
+        as_of: asOf,
+      },
+      vertices: Object.fromEntries(
+        curve.hazardCalibration.spread_risk_inputs.map(({ quote, pillar_date }) => [
+          quote.id,
+          { quote_id: quote.id, pillar_date },
+        ])
+      ),
+    };
+    const result = portfolio.csrQuoteDelta(book, market, pricing, [source]);
+    assert.deepEqual(
+      result.quote_risk.map(({ vertex }) => vertex),
+      vertices
+    );
+    const row = result.quote_risk[3].positions[0];
+    assert.equal(row.position_scale, -2);
+    const expected =
+      -2 *
+      (Number(cds.price(shocked.toJson(), asOf).value.amount) -
+        Number(cds.price(market.toJson(), asOf).value.amount));
+    assert.ok(Math.abs(expected) > 1);
+    assert.ok(Math.abs(row.pnl_base_per_pp - 100 * expected) < 2);
+    const rateCurve = market.getDiscount(discountId);
+    const girrTargets = rateCurve.rateCalibration.execution.bindings.map(
+      ({ quote_id, pillar_date }) => ({
+        risk_currency: 'USD',
+        risk_curve_id: discountId,
+        vertex: quote_id.slice('usd-'.length),
+        source: { kind: 'discount', curve_id: discountId },
+        quote: { quote_id, pillar_date },
+      })
+    );
+    rateCurve.free();
+    const combined = portfolio.portfolioFrtbSensitivities(book, market, pricing, {
+      girr_targets: girrTargets,
+      csr_sources: [source],
+    });
+    assert.equal(combined.positions_mapped, 1);
+    assert.deepEqual(combined.positions_unmapped, []);
+    assert.equal(combined.girr.quote_risk.length, 10);
+    assert.deepEqual(combined.csr.quote_risk, result.quote_risk);
+    assert.throws(
+      () =>
+        portfolio.portfolioFrtbSensitivities(book, market, pricing, {
+          girr_targets: [],
+          csr_sources: [source],
+        }),
+      /Missing GIRR delta source/
+    );
+    [source.vertices['3Y'], source.vertices['5Y']] = [source.vertices['5Y'], source.vertices['3Y']];
+    assert.throws(
+      () => portfolio.csrQuoteDelta(book, market, pricing, [source]),
+      /exact 3Y issuer vertex/
+    );
+  } finally {
+    for (const handle of [pricing, book, position, cds, curve, shocked, market]) handle.free();
+  }
+});
+
+test('dated exposure reprices the signed book and a standalone equity on the same paths', () => {
+  const instrument = facade.valuations.instruments.Equity.example();
+  const market = new core.MarketContext();
+  market.insertPrice('AAPL-SPOT', 100, 'USD');
+  const asOf = '2025-01-02';
+  const dates = [asOf, '2025-02-01', '2025-04-02'];
+  const times = [0, 30 / 365, 90 / 365];
+  const position = new portfolio.Position('short', instrument.toJson(), -2);
+  const book = portfolio.Portfolio.builder('short-equity', 'USD', asOf)
+    .addPosition(position)
+    .build();
+  const pricing = new core.FinstackConfig();
+  const base = {
+    netting_set: { kind: 'bilateral', counterparty_id: 'example-bank', csa_id: 'example-csa' },
+    netting_source_id: 'admitted-teaching-trades',
+    dates,
+    factors: [{ kind: 'equity', state: 0, price_id: 'AAPL-SPOT' }],
+    simulation: {
+      process: { type: 'gbm', r: 0.04, q: 0, sigma: 0 },
+      initial_state: [100],
+      time_grid: { type: 'times', times },
+      num_paths: 4,
+      antithetic: true,
+      seed: 2025,
+    },
+  };
+  try {
+    const before = market.toJson();
+    const short = portfolio.portfolioExposureProfile(book, market, pricing, {
+      ...base,
+      position_ids: ['short'],
+    });
+    assert.equal(short.basis.path_count, 8);
+    assert.deepEqual(short.dates, dates);
+    assert.deepEqual(short.epe, [0, 0, 0]);
+    assert.equal(short.mtm_values[0], -20_000);
+    const standalone = portfolio.instrumentExposureProfile(
+      instrument.toJson(),
+      'USD',
+      market,
+      pricing,
+      {
+        ...base,
+        position_ids: ['EQUITY-AAPL'],
+      }
+    );
+    assert.ok(Math.abs(standalone.epe[2] - 10_000 * Math.exp(0.04 * times[2])) < 1e-8);
+    assert.ok(Math.abs(short.ene[2] - 2 * standalone.epe[2]) < 1e-8);
+    assert.equal(market.toJson(), before);
+    assert.throws(
+      () =>
+        portfolio.portfolioExposureProfile(book, market, pricing, {
+          ...base,
+          position_ids: ['missing'],
+        }),
+      /exact position IDs/
+    );
+  } finally {
+    for (const handle of [pricing, book, position, market, instrument]) handle.free();
   }
 });

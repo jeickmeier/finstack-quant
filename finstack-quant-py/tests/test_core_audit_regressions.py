@@ -7,7 +7,46 @@ import math
 import pytest
 
 from finstack_quant.core.dates import Schedule
-from finstack_quant.core.market_data import DiscountCurve, HazardCurve, InflationCurve, MarketContext, PriceCurve
+from finstack_quant.core.market_data import (
+    DiscountCurve,
+    HazardCurve,
+    InflationCurve,
+    MarketContext,
+    PriceCurve,
+    ScalarTimeSeries,
+)
+from finstack_quant.core.money import Money
+
+
+def test_schedule_notebook_preview_limits_the_displayed_periods() -> None:
+    schedule = (
+        Schedule
+        .builder("2025-01-01", "2027-01-01")
+        .frequency("1M")
+        .stub_rule("none")
+        .grid("natural")
+        .unadjusted()
+        .build()
+    )
+    assert len(schedule.to_dataframe()) == 24
+    html = schedule._repr_html_()
+    assert html is not None
+    assert html.count("<tr>") == 12
+    assert "period_end" in html
+
+
+def test_fixing_and_yield_inserts_use_canonical_keys_and_copies() -> None:
+    series = ScalarTimeSeries("observation", [("2025-01-01", 0.035)], "step", "error")
+    market = MarketContext().insert_fixing("USD-SOFR", series)
+    copy = market.copy()
+    copy.insert_dividend_yield("SPX-DIV", 0.016)
+    copy.insert_price("SPX", Money(100, "USD"))
+    assert series.id == "observation"
+    assert market.get_series("FIXING:USD-SOFR").id == "FIXING:USD-SOFR"
+    assert market.prices() == {}
+    assert copy.prices() == {"SPX-DIV": 0.016, "SPX": Money(100, "USD")}
+    with pytest.raises(ValueError, match="must not already carry"):
+        copy.insert_fixing("FIXING:USD-SOFR", series)
 
 
 def cpi_curve() -> InflationCurve:

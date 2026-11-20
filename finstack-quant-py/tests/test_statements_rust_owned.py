@@ -27,6 +27,7 @@ from finstack_quant.statements_analytics import (
     DependencyTree,
     ForecastMetrics,
     GoalSeekResult,
+    GoalSeekSpec,
     LboCheckMappings,
     ThreeStatementMapping,
     backtest_forecast,
@@ -60,6 +61,7 @@ def quarter(q: int, year: int = 2025) -> dict[str, object]:
 def goal_seek_model() -> str:
     return json.dumps({
         "id": "goal-seek",
+        "source_snapshot": "goal-seek-test-forecast",
         "schema_version": 1,
         "periods": {"calendar": "gregorian", "periods": [quarter(1)]},
         "nodes": {
@@ -94,6 +96,7 @@ def lbo_model() -> str:
 LBO_CONFIG = {
     "entry_multiple": 8.0,
     "entry_metric_node": "ebitda",
+    "entry_period": "2025Q1",
     "transaction_fees": 0.0,
     "sources": [{"name": "debt", "amount": 500.0}],
     "exit_multiple": 9.0,
@@ -137,64 +140,78 @@ EXIT_MULTIPLE = {"type": "exit_multiple", "terminal_metric": 999.0, "multiple": 
 def test_goal_seek_returns_the_rust_result_with_one_update_model_owner() -> None:
     updated = goal_seek(
         goal_seek_model(),
-        {
-            "target_node": "profit",
-            "target_period": "2025Q1",
-            "target_value": 60.0,
-            "driver_node": "revenue",
-            "driver_period": "2025Q1",
-            "update_model": True,
-        },
+        GoalSeekSpec(
+            target={"node": "profit", "period": "2025Q1"},
+            target_value=60.0,
+            target_tolerance=1e-7,
+            driver={"node": "revenue", "period": "2025Q1"},
+            driver_tolerance=1e-10,
+            max_iterations=100,
+            search={"kind": "bracket", "lower": 0.0, "upper": 200_000.0},
+            as_of="2024-12-31",
+            observed_through="2024-12-31",
+            update_model=True,
+        ),
     )
     assert updated.solved_value == pytest.approx(120.0)
     assert updated.model is not None
     wire = json.loads(updated.to_json())
-    assert sorted(wire) == ["converged", "evaluations", "model", "residual", "solved_value", "tolerance"]
+    assert wire["achieved_value"] == pytest.approx(wire["target_value"])
+    assert wire["solved_run"]["run_id"] != wire["original_run"]["run_id"]
     # Solve diagnostics: the residual of the reported driver, its tolerance and the evaluation count.
-    assert updated.converged is True
-    assert updated.tolerance == pytest.approx(1e-9 * 60.0)
-    assert abs(updated.residual) <= updated.tolerance
+    assert updated.target_tolerance == pytest.approx(1e-7)
+    assert abs(updated.residual) <= updated.target_tolerance
     assert updated.evaluations >= 3
     solved = Evaluator().evaluate(updated.model)
     assert solved.get("profit", "2025Q1") - 60.0 == pytest.approx(updated.residual, abs=1e-12)
     restored = GoalSeekResult.from_json(updated.to_json())
-    assert (restored.residual, restored.evaluations, restored.converged) == (
+    assert (restored.residual, restored.evaluations, restored.achieved_value) == (
         updated.residual,
         updated.evaluations,
-        True,
+        updated.achieved_value,
     )
-    # JSON written before the diagnostics existed still loads, flagged by evaluations == 0.
-    legacy = GoalSeekResult.from_json('{"solved_value": 2.5, "model": null}')
-    assert (legacy.evaluations, legacy.converged) == (0, False)
     assert wire["model"]["nodes"]["revenue"]["values"]["2025Q1"] == pytest.approx(120.0)
     assert GoalSeekResult.from_json(updated.to_json()).solved_value == pytest.approx(120.0)
     assert pickle.loads(pickle.dumps(updated)).solved_value == pytest.approx(120.0)  # noqa: S301 - trusted in-process round trip
 
     bare = goal_seek(
         goal_seek_model(),
-        {
-            "target_node": "profit",
-            "target_period": "2025Q1",
-            "target_value": 60.0,
-            "driver_node": "revenue",
-            "driver_period": "2025Q1",
-            "update_model": False,
-            "bounds": (1.0, 200.0),
-        },
+        GoalSeekSpec(
+            target={"node": "profit", "period": "2025Q1"},
+            target_value=60.0,
+            target_tolerance=1e-7,
+            driver={"node": "revenue", "period": "2025Q1"},
+            driver_tolerance=1e-10,
+            max_iterations=100,
+            search={"kind": "bracket", "lower": 1.0, "upper": 200.0},
+            as_of="2024-12-31",
+            observed_through="2024-12-31",
+            update_model=False,
+        ),
     )
     assert bare.model is None
     assert json.loads(bare.to_json())["model"] is None
+    assert GoalSeekResult.from_json(bare.to_json()).model is None
+
+    wire["model"]["periods"]["periods"] = []
+    with pytest.raises(ValueError, match="at least one period"):
+        GoalSeekResult.from_json(json.dumps(wire))
+
     # update_model has no binding-invented default: the Rust GoalSeekSpec requires it.
     with pytest.raises(ValueError, match="update_model"):
         goal_seek(
             goal_seek_model(),
-            {
-                "target_node": "profit",
-                "target_period": "2025Q1",
-                "target_value": 60.0,
-                "driver_node": "revenue",
-                "driver_period": "2025Q1",
-            },
+            GoalSeekSpec(
+                target={"node": "profit", "period": "2025Q1"},
+                target_value=60.0,
+                target_tolerance=1e-7,
+                driver={"node": "revenue", "period": "2025Q1"},
+                driver_tolerance=1e-10,
+                max_iterations=100,
+                search={"kind": "bracket", "lower": 0.0, "upper": 200_000.0},
+                as_of="2024-12-31",
+                observed_through="2024-12-31",
+            ),
         )
 
 

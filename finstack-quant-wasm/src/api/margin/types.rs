@@ -221,6 +221,172 @@ pub fn csa_spec_eur_regulatory() -> Result<JsValue, JsValue> {
     to_js_value(&fm::types::CsaSpec::eur_regulatory().map_err(to_js_err)?)
 }
 
+/// Builder for explicit variation-margin, collateral eligibility and settlement terms.
+///
+/// @example
+/// ```typescript
+/// import { margin } from "finstack-quant-wasm";
+/// const original = margin.csaSpecUsdRegulatory();
+/// const agreement = margin.csaSpecToBuilder(original).calendarId("usny").build();
+/// console.log(agreement.base_currency);
+/// ```
+#[wasm_bindgen(js_name = CsaSpecBuilder)]
+pub struct JsCsaSpecBuilder {
+    inner: fm::types::CsaSpecBuilder,
+}
+
+/// Start authoring an agreement with an explicit currency and market reference.
+/// @param id - Stable agreement identifier for trade and collateral account joins.
+/// @param baseCurrency - ISO currency for transfers, thresholds and collateral amounts.
+/// @param collateralCurveId - Exact curve identifier used to discount collateral cash.
+/// @returns Builder requiring the agreement's terms, timing and calendar.
+/// @throws FinstackError for an unknown currency or incompatible input type.
+#[wasm_bindgen(js_name = csaSpecBuilder)]
+pub fn csa_spec_builder(
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(js_name = "baseCurrency", unchecked_param_type = "string")]
+    base_currency: JsValue,
+    #[wasm_bindgen(js_name = "collateralCurveId", unchecked_param_type = "string")]
+    collateral_curve_id: JsValue,
+) -> Result<JsCsaSpecBuilder, JsValue> {
+    Ok(JsCsaSpecBuilder {
+        inner: fm::types::CsaSpec::builder(
+            js_string(&id, "id")?,
+            js_currency(&base_currency, "baseCurrency")?,
+            js_string(&collateral_curve_id, "collateralCurveId")?,
+        ),
+    })
+}
+
+/// Copy a complete CSA value into an independent builder.
+/// @param value - The CSA terms to edit.
+/// @returns Builder carrying the original CSA's agreement terms.
+/// @throws FinstackError when the provided value has invalid contract fields.
+#[wasm_bindgen(js_name = csaSpecToBuilder)]
+pub fn csa_spec_to_builder(
+    #[wasm_bindgen(unchecked_param_type = "CsaSpec")] value: JsValue,
+) -> Result<JsCsaSpecBuilder, JsValue> {
+    let spec: fm::types::CsaSpec = from_js_json(&value, "csa")?;
+    spec.validate().map_err(to_js_err)?;
+    Ok(JsCsaSpecBuilder {
+        inner: spec.to_builder(),
+    })
+}
+
+#[wasm_bindgen(js_class = CsaSpecBuilder)]
+impl JsCsaSpecBuilder {
+    /// Validate and assemble the elected terms.
+    /// @returns Plain, complete CSA agreement which can be used by margin engines.
+    /// @throws FinstackError if required terms are absent or the agreement fails validation.
+    #[wasm_bindgen(unchecked_return_type = "CsaSpec")]
+    pub fn build(self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.build().map_err(to_js_err)?)
+    }
+
+    /// Elect SIMM initial-margin terms in the agreement currency.
+    /// @returns Builder with the SIMM terms selected from the embedded registry.
+    /// @throws FinstackError if registry terms cannot be resolved.
+    #[wasm_bindgen(js_name = imSimm)]
+    pub fn im_simm(self) -> Result<JsCsaSpecBuilder, JsValue> {
+        Ok(Self {
+            inner: self.inner.im_simm().map_err(to_js_err)?,
+        })
+    }
+
+    /// Set the uncollateralized allowance and minimum variation-margin transfer.
+    /// @param threshold - Exact money in the agreement currency.
+    /// @param mta - Exact minimum transfer in the same currency.
+    /// @returns Builder with the elected terms.
+    #[wasm_bindgen(js_name = vmThreshold)]
+    pub fn vm_threshold(
+        self,
+        threshold: &crate::api::core::money::JsMoney,
+        mta: &crate::api::core::money::JsMoney,
+    ) -> JsCsaSpecBuilder {
+        Self {
+            inner: self.inner.vm_threshold(threshold.inner, mta.inner),
+        }
+    }
+
+    /// Set the agreement's calendar id.
+    /// @param value - Registered business-day calendar for the agreement.
+    /// @returns Builder carrying the supplied agreement term.
+    /// @throws FinstackError when the value does not match the required type.
+    #[wasm_bindgen(js_name = calendarId)]
+    pub fn calendar_id(
+        self,
+        #[wasm_bindgen(unchecked_param_type = "string")] value: JsValue,
+    ) -> Result<JsCsaSpecBuilder, JsValue> {
+        Ok(Self {
+            inner: self.inner.calendar_id(js_string(&value, "value")?),
+        })
+    }
+
+    /// Set the agreement's vm params.
+    /// @param value - Canonical variation-margin terms and settlement frequency.
+    /// @returns Builder carrying the supplied agreement term.
+    /// @throws FinstackError when the value does not match the required type.
+    #[wasm_bindgen(js_name = vmParams)]
+    pub fn vm_params(
+        self,
+        #[wasm_bindgen(unchecked_param_type = "generated.margin.VmParameters")] value: JsValue,
+    ) -> Result<JsCsaSpecBuilder, JsValue> {
+        Ok(Self {
+            inner: self.inner.vm_params(from_js_json(&value, "value")?),
+        })
+    }
+
+    /// Set the agreement's im params.
+    /// @param value - Initial-margin method, MPOR, minimum transfer, threshold and segregation. Pass null to clear.
+    /// @returns Builder carrying the supplied agreement term.
+    /// @throws FinstackError when the value does not match the required type.
+    #[wasm_bindgen(js_name = imParams)]
+    pub fn im_params(
+        self,
+        #[wasm_bindgen(unchecked_param_type = "generated.margin.ImParameters | null")]
+        value: JsValue,
+    ) -> Result<JsCsaSpecBuilder, JsValue> {
+        let params = if value.is_null() {
+            None
+        } else {
+            Some(from_js_json(&value, "value")?)
+        };
+        Ok(Self {
+            inner: self.inner.im_params(params),
+        })
+    }
+
+    /// Set the agreement's eligible collateral.
+    /// @param value - Contractual list of eligible instruments and valuation haircuts.
+    /// @returns Builder carrying the supplied agreement term.
+    /// @throws FinstackError when the value does not match the required type.
+    #[wasm_bindgen(js_name = eligibleCollateral)]
+    pub fn eligible_collateral(
+        self,
+        #[wasm_bindgen(unchecked_param_type = "generated.margin.EligibleCollateralSchedule")] value: JsValue,
+    ) -> Result<JsCsaSpecBuilder, JsValue> {
+        Ok(Self {
+            inner: self
+                .inner
+                .eligible_collateral(from_js_json(&value, "value")?),
+        })
+    }
+
+    /// Set the agreement's call timing.
+    /// @param value - Notification deadline, delivery grace and dispute timing.
+    /// @returns Builder carrying the supplied agreement term.
+    /// @throws FinstackError when the value does not match the required type.
+    #[wasm_bindgen(js_name = callTiming)]
+    pub fn call_timing(
+        self,
+        #[wasm_bindgen(unchecked_param_type = "generated.margin.MarginCallTiming")] value: JsValue,
+    ) -> Result<JsCsaSpecBuilder, JsValue> {
+        Ok(Self {
+            inner: self.inner.call_timing(from_js_json(&value, "value")?),
+        })
+    }
+}
+
 /// Regulatory CSA specification for any supported base currency.
 /// @param currency - ISO-4217 base currency of the agreement; every CSA amount is in it.
 /// @param id - Identifier stamped on the specification; must be non-empty (an empty or whitespace-only id is rejected).
@@ -564,4 +730,59 @@ pub fn eligible_collateral_schedule_check_concentration_limits(
 #[wasm_bindgen(js_name = marginConstants, unchecked_return_type = "MarginConstants")]
 pub fn margin_constants() -> Result<JsValue, JsValue> {
     to_js_value(&fm::constants::MarginConstants::current())
+}
+
+/// Set ISDA SIMM on a copy of the bilateral agreement.
+/// @param csa - Authored CSA; collateral, variation margin and timing terms are preserved.
+/// @returns OTC margin specification with the selected methodology if IM is elected.
+/// @throws FinstackError if the CSA document cannot be decoded.
+#[wasm_bindgen(js_name = otcMarginSpecBilateralSimm, unchecked_return_type = "generated.margin.OtcMarginSpec")]
+pub fn otc_margin_spec_bilateral_simm(
+    #[wasm_bindgen(unchecked_param_type = "generated.margin.CsaSpec")] csa: JsValue,
+) -> Result<JsValue, JsValue> {
+    let csa = from_js_json(&csa, "csa")?;
+    to_js_value(&fm::types::OtcMarginSpec::bilateral_simm(csa))
+}
+
+/// Set schedule-based initial margin on a copy of the bilateral agreement.
+/// @param csa - Authored CSA; collateral, variation margin and timing terms are preserved.
+/// @returns OTC margin specification with the selected methodology if IM is elected.
+/// @throws FinstackError if the CSA document cannot be decoded.
+#[wasm_bindgen(js_name = otcMarginSpecBilateralSchedule, unchecked_return_type = "generated.margin.OtcMarginSpec")]
+pub fn otc_margin_spec_bilateral_schedule(
+    #[wasm_bindgen(unchecked_param_type = "generated.margin.CsaSpec")] csa: JsValue,
+) -> Result<JsValue, JsValue> {
+    let csa = from_js_json(&csa, "csa")?;
+    to_js_value(&fm::types::OtcMarginSpec::bilateral_schedule(csa))
+}
+
+/// Construct margin terms from the embedded cleared-derivative defaults.
+/// @param ccp - Identified clearinghouse, such as LCH.
+/// @param currency - ISO-4217 settlement and collateral currency.
+/// @returns Native cleared OTC margin specification.
+/// @throws FinstackError if the currency or native margin registry is invalid.
+#[wasm_bindgen(js_name = otcMarginSpecCleared, unchecked_return_type = "generated.margin.OtcMarginSpec")]
+pub fn otc_margin_spec_cleared(
+    #[wasm_bindgen(unchecked_param_type = "string")] ccp: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+) -> Result<JsValue, JsValue> {
+    let ccp = js_string(&ccp, "ccp")?;
+    let currency = js_currency(&currency, "currency")?;
+    to_js_value(&fm::types::OtcMarginSpec::cleared(ccp, currency).map_err(to_js_err)?)
+}
+
+/// Add an explicit credit classification to an independent OTC margin specification.
+/// @param spec - Native OTC terms holding clearing and CSA settings.
+/// @param classification - Qualifying sector or non-qualifying class on the selected risk basis.
+/// @returns Native margin specification with that classification.
+/// @throws FinstackError if either native document cannot be decoded.
+#[wasm_bindgen(js_name = otcMarginSpecWithSimmCreditClassification, unchecked_return_type = "generated.margin.OtcMarginSpec")]
+pub fn otc_margin_spec_with_simm_credit_classification(
+    #[wasm_bindgen(unchecked_param_type = "generated.margin.OtcMarginSpec")] spec: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.margin.SimmCreditClassification")]
+    classification: JsValue,
+) -> Result<JsValue, JsValue> {
+    let spec: fm::types::OtcMarginSpec = from_js_json(&spec, "spec")?;
+    let classification = from_js_json(&classification, "classification")?;
+    to_js_value(&spec.with_simm_credit_classification(classification))
 }

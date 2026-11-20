@@ -12,12 +12,13 @@
 use finstack_quant_core::schema::SchemaArtifact;
 
 use crate::closed_form::{
-    BsGreeks, ForwardGreeks, HestonPricingParams, OptionCalculation, OptionCalculationResult,
+    BsGreeks, ForwardGreeks, HestonFourierSettings, OptionCalculation, OptionCalculationResult,
 };
+use crate::monte_carlo::pricer::lsmc::LsmcResult;
 use crate::monte_carlo::simulate::{
     FbmSpec, PathSimulationSpec, PathSummary, ProcessSpec, SchemeSpec,
 };
-use crate::types::{ExerciseStyle, OptionMarketParams, OptionType};
+use crate::types::{ExerciseStyle, OptionContractParams, OptionMarketParams, OptionType};
 use crate::{
     correlation::CreditExposure, correlation::LatentFactorSpec, correlation::PortfolioLossConfig,
     correlation::PortfolioLossResult, correlation::RecoverySpec,
@@ -40,9 +41,9 @@ use crate::{
     credit::scoring::ZmijewskiInput, fourier::characteristic_function::BlackScholesCf,
     fourier::characteristic_function::MertonJumpCf,
     fourier::characteristic_function::VarianceGammaCf, fourier::cos::CosConfig,
-    fourier::cos::CosMarketParams, liquidity::AlmgrenChrissModel, liquidity::ExecutionTrajectory,
-    liquidity::ImpactEstimate, liquidity::KyleLambdaModel, liquidity::LiquidityTier,
-    liquidity::LvarBangiaScalar, liquidity::TradeParams, monte_carlo::estimate::Estimate,
+    liquidity::AlmgrenChrissModel, liquidity::ExecutionTrajectory, liquidity::ImpactEstimate,
+    liquidity::KyleLambdaModel, liquidity::LiquidityTier, liquidity::LvarBangiaScalar,
+    liquidity::TradeParams, monte_carlo::estimate::Estimate,
     monte_carlo::greeks::gbm_european::GbmEuropeanFdSpec, monte_carlo::greeks::lrm::LrmGreeks,
     monte_carlo::payoff::asian::AveragingMethod, monte_carlo::pricer::basis::BasisKind,
     monte_carlo::pricer::heston::HestonMcSettings, monte_carlo::process::brownian::BrownianParams,
@@ -65,6 +66,13 @@ use crate::{
 
 /// The crate's complete schema registry.
 pub const ARTIFACTS: &[SchemaArtifact] = &[
+    finstack_quant_core::schema_artifact!(
+        LsmcResult,
+        "models",
+        "lsmc_result",
+        Output,
+        "Least-squares Monte Carlo price estimate and fitted exercise diagnostics."
+    ),
     finstack_quant_core::schema_artifact!(
         AlmgrenChrissModel,
         "models",
@@ -178,11 +186,11 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "COS method configuration."
     ),
     finstack_quant_core::schema_artifact!(
-        CosMarketParams,
+        OptionContractParams,
         "models",
-        "cos_market_params",
+        "option_contract_params",
         Input,
-        "Option and market inputs of the COS Fourier pricers."
+        "Spot, strike, carry, expiry and direction shared by option pricing models."
     ),
     finstack_quant_core::schema_artifact!(
         CreditExposure,
@@ -318,18 +326,18 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "Monte Carlo run settings of the Heston European pricer."
     ),
     finstack_quant_core::schema_artifact!(
+        HestonFourierSettings,
+        "models",
+        "heston_fourier_settings",
+        Input,
+        "Numerical settings for Heston Fourier integration."
+    ),
+    finstack_quant_core::schema_artifact!(
         HestonParams,
         "models",
         "heston_params",
         Input,
         "Heston stochastic volatility model parameters."
-    ),
-    finstack_quant_core::schema_artifact!(
-        HestonPricingParams,
-        "models",
-        "heston_pricing_params",
-        Input,
-        "Market inputs for closed-form Heston pricing."
     ),
     finstack_quant_core::schema_artifact!(
         HullWhite1FParams,

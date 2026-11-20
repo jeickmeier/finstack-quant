@@ -88,7 +88,7 @@ fn price_with_model(
     model: &str,
     metrics: &[&str],
 ) -> finstack_quant_core::Result<ValuationResult> {
-    let parsed = parse_boxed_instrument_from_json(instrument_json, None)
+    let parsed = parse_boxed_instrument_from_json(instrument_json, None, None)
         .expect("canonical fixture parses and validates");
     let owned: Vec<String> = metrics.iter().map(|m| (*m).to_string()).collect();
     price_instrument(
@@ -105,7 +105,7 @@ fn price_with_model(
 }
 
 fn single(instrument_json: &str, as_of: &str, metric: &str) -> finstack_quant_core::Result<f64> {
-    let parsed = parse_boxed_instrument_from_json(instrument_json, None)
+    let parsed = parse_boxed_instrument_from_json(instrument_json, None, None)
         .expect("canonical fixture parses and validates");
     metric_value(
         &parsed,

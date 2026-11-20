@@ -350,6 +350,7 @@ fn covenant_forecast_roundtrip() {
         projected_values: vec![Some(4.2), Some(4.5), Some(4.8)],
         thresholds: vec![5.0, 5.0, 5.0],
         headroom: vec![Some(0.16), Some(0.10), Some(0.04)],
+        headroom_raw: vec![Some(0.8), Some(0.5), Some(0.2)],
         breach_probability: vec![0.0, 0.0, 0.0],
         breach_probability_stderr: vec![0.0, 0.0, 0.0],
         first_breach_date: None,
@@ -371,6 +372,7 @@ fn covenant_forecast_with_breach_roundtrip() {
         projected_values: vec![Some(1.6), Some(1.3)],
         thresholds: vec![1.5, 1.5],
         headroom: vec![Some(0.067), Some(-0.133)],
+        headroom_raw: vec![Some(0.1), Some(-0.2)],
         breach_probability: vec![0.05, 0.75],
         breach_probability_stderr: vec![0.0, 0.0],
         first_breach_date: Some(date(2025, 6, 30)),
@@ -392,6 +394,7 @@ fn covenant_forecast_nullable_values_roundtrip_as_json_null() {
         projected_values: vec![None],
         thresholds: vec![4.0],
         headroom: vec![None],
+        headroom_raw: vec![None],
         breach_probability: vec![1.0],
         breach_probability_stderr: vec![0.0],
         first_breach_date: Some(date(2025, 3, 31)),
@@ -415,6 +418,7 @@ fn future_breach_roundtrip() {
         projected_value: Some(3.5),
         threshold: 3.0,
         headroom: Some(-0.167),
+        headroom_raw: Some(-0.5),
         breach_probability: 0.85,
     };
 

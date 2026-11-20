@@ -45,4 +45,4 @@ pub mod pricer;
 pub mod replication_pricer;
 pub(crate) mod types;
 
-pub use types::CmsOption;
+pub use types::{CmsOption, CmsOptionBuilder};

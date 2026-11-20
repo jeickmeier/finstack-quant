@@ -67,7 +67,21 @@ def test_european_serial_parallel_and_seed_replay_are_identical() -> None:
         for item in estimates
     ]
     assert signatures[0] == signatures[1] == signatures[2]
-    assert abs(estimates[0].mean.amount - bs_price(100, 100, 0.05, 0, 0.2, 1, True)) < 4 * estimates[0].stderr
+    assert (
+        abs(
+            estimates[0].mean.amount
+            - bs_price({
+                "spot": 100,
+                "strike": 100,
+                "rate": 0.05,
+                "dividend_yield": 0,
+                "volatility": 0.2,
+                "time_to_expiry": 1,
+                "option_type": "call",
+            })
+        )
+        < 4 * estimates[0].stderr
+    )
 
 
 def test_maturity_only_lsmc_counts_pairs_and_uses_pair_mean_standard_error() -> None:
@@ -85,17 +99,19 @@ def test_maturity_only_lsmc_counts_pairs_and_uses_pair_mean_standard_error() -> 
     ]
     results = []
     for antithetic, count, payoffs in ((True, pairs, paired_payoffs), (False, 2 * pairs, plain_payoffs)):
-        result = LsmcPricer(
-            num_paths=count, seed=seed, use_parallel=False, num_steps=1, antithetic=antithetic
-        ).price_american({
-            "spot": spot,
-            "strike": strike,
-            "rate": rate,
-            "dividend_yield": 0.0,
-            "volatility": vol,
-            "time_to_expiry": expiry,
-            "option_type": "put",
-        })
+        result = (
+            LsmcPricer(num_paths=count, seed=seed, use_parallel=False, num_steps=1, antithetic=antithetic)
+            .price_american({
+                "spot": spot,
+                "strike": strike,
+                "rate": rate,
+                "dividend_yield": 0.0,
+                "volatility": vol,
+                "time_to_expiry": expiry,
+                "option_type": "put",
+            })
+            .estimate
+        )
         assert result.num_paths == count
         assert result.num_simulated_paths == 2 * pairs
         assert result.mean.amount == pytest.approx(statistics.mean(payoffs), abs=1e-12)
@@ -171,7 +187,19 @@ def test_nested_barrier_monitoring_on_identical_paths_has_pathwise_order() -> No
         "up",
         "out",
     )
-    assert 0 < continuous < bs_price(100, 100, 0.05, 0.0, 0.2, 1.0, True)
+    assert (
+        0
+        < continuous
+        < bs_price({
+            "spot": 100,
+            "strike": 100,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "volatility": 0.2,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        })
+    )
     fine_se = monitored[-1].std(ddof=1) / math.sqrt(len(paths))
     # Continuous <= discrete is an expectation ordering; allow sampling error.
     assert monitored[-1].mean() + 4 * fine_se >= continuous
@@ -179,7 +207,6 @@ def test_nested_barrier_monitoring_on_identical_paths_has_pathwise_order() -> No
 
 def test_asian_exact_one_fixing_and_geometric_benchmark() -> None:
     """Arithmetic TW is approximate; one terminal fixing reduces exactly to BS."""
-    args = (100.0, 100.0, 0.05, 0.0, 0.2, 1.0)
     call = {
         "spot": 100.0,
         "strike": 100.0,
@@ -189,7 +216,7 @@ def test_asian_exact_one_fixing_and_geometric_benchmark() -> None:
         "time_to_expiry": 1.0,
         "option_type": "call",
     }
-    vanilla = bs_price(*args, True)
+    vanilla = bs_price(call)
     for convention in ("arithmetic", "geometric"):
         assert asian_option_price(call, 1, convention) == pytest.approx(vanilla, abs=1e-12)
     european = EuropeanPricer(4096, 17, False).price_gbm(call, num_steps=1)
@@ -224,12 +251,20 @@ def test_lsmc_holdout_seed_is_independent_and_replayable() -> None:
     pricer = LsmcPricer(2048, 17, False, 20, "polynomial", 3, True)
     with pytest.raises(ValueError, match="pricing_seed"):
         pricer.price_american_unbiased(put, pricing_seed=17)
-    first = pricer.price_american_unbiased(put, pricing_seed=1017)
-    second = pricer.price_american_unbiased(put, pricing_seed=1017)
+    result = pricer.price_american_unbiased(put, pricing_seed=1017)
+    first = result.estimate
+    second = pricer.price_american_unbiased(put, pricing_seed=1017).estimate
     assert first.mean.amount == second.mean.amount
     assert first.stderr == second.stderr
     assert first.num_paths == 2048
     assert first.num_simulated_paths == 4096
+    points = result.exercise_boundary
+    assert [point.step for point in points] == list(range(1, 20))
+    assert all(point.itm_paths >= point.exercised_paths for point in points)
+    assert all(point.critical_spot is None or 0 < point.critical_spot < put["strike"] for point in points)
+    # The independent pricing sample cannot alter the training diagnostics.
+    same_policy = pricer.price_american_unbiased(put, pricing_seed=2017).exercise_boundary
+    assert [point.critical_spot for point in same_policy] == [point.critical_spot for point in points]
     assert 0 < first.mean.amount < 100
     assert math.isfinite(first.stderr)
     assert first.stderr > 0

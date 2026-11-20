@@ -440,6 +440,16 @@ pub trait PdTermStructure: Send + Sync {
         self.cumulative_pd(rating, 0.0).is_ok()
     }
 
+    /// Return published curve knots used to split the loss integration grid.
+    ///
+    /// # Arguments
+    /// * `_rating` - Label on the declared credit scale for the reporting-date cumulative curve.
+    ///
+    /// Also returns None for continuous sources without an authored knot grid.
+    fn knots(&self, _rating: &str) -> Option<&[(f64, f64)]> {
+        None
+    }
+
     /// Marginal (forward) PD for the interval (t1, t2\], conditional on
     /// survival to t1. Default implementation derives from cumulative PD.
     ///
@@ -610,6 +620,10 @@ impl PdTermStructure for RawPdCurve {
         self.interp.interp(t)
     }
 
+    fn knots(&self, rating: &str) -> Option<&[(f64, f64)]> {
+        (rating == self.rating).then_some(&self.knots)
+    }
+
     fn contains_rating(&self, rating: &str) -> bool {
         rating == self.rating
     }
@@ -656,6 +670,10 @@ impl PdTermStructure for RatingPdMap {
             )));
         }
         curve.interp.interp(t)
+    }
+
+    fn knots(&self, rating: &str) -> Option<&[(f64, f64)]> {
+        self.curves.get(rating).map(|curve| curve.knots.as_slice())
     }
 
     fn contains_rating(&self, rating: &str) -> bool {

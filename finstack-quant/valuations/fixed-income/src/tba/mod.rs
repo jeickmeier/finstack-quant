@@ -47,4 +47,4 @@ pub(crate) mod pricer;
 mod types;
 
 pub(crate) use types::sifma_settlement;
-pub use types::{AgencyTba, TbaTerm};
+pub use types::{AgencyTba, AgencyTbaBuilder, TbaTerm};

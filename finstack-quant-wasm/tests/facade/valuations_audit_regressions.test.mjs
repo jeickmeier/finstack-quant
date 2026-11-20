@@ -8,6 +8,39 @@ await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
 });
 
+test('call-time clean price patches match typed and envelope pricing', () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL(
+        '../../../finstack-quant/valuations/tests/fixtures/production_icma.json',
+        import.meta.url
+      )
+    )
+  );
+  const bond = valuations.instruments.Bond.fromJson(fixture.instrument);
+  const wire = bond.toJson();
+  const market = JSON.stringify(fixture.market);
+  const metrics = ['clean_price', 'ytm'];
+  const extras = {
+    instrument_pricing_overrides: { market_quotes: { quoted_clean_price_pct: 98.25 } },
+  };
+  const priced = bond.price(market, '2024-05-01', 'discounting', metrics, extras);
+  const viaEnvelope = valuations.instruments.priceInstrument(
+    wire,
+    market,
+    '2024-05-01',
+    'discounting',
+    metrics,
+    JSON.stringify(extras)
+  );
+  assert.deepEqual(priced.measures, viaEnvelope.measures);
+  assert.notEqual(
+    priced.measures.clean_price,
+    bond.price(market, '2024-05-01', 'discounting', metrics).measures.clean_price
+  );
+  assert.equal(bond.toJson(), wire);
+});
+
 test('metric override patches preserve omitted fields and explicitly clear nullable fields', () => {
   const fixture = JSON.parse(
     readFileSync(

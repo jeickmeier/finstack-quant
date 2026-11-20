@@ -29,10 +29,6 @@ pub struct CorporateAnalysis {
     pub equity: Option<CorporateValuationResult>,
     /// Per-instrument coverage and leverage metrics.
     pub credit: IndexMap<String, CreditContextMetrics>,
-    /// `true` when a DCF enterprise value was computed but suppressed as the
-    /// LTV reference because it was non-positive. Credit metrics are then
-    /// computed without an enterprise-value reference.
-    pub ev_suppressed_non_positive: bool,
 }
 
 /// DCF equity valuation inputs configured on the builder.
@@ -289,17 +285,14 @@ impl CorporateAnalysisBuilder {
     ///
     /// When set, LTV is `debt_balance[t] / node[t]` for each requested
     /// period. A missing or non-positive node value omits LTV for that
-    /// period only. This overrides a scalar DCF enterprise value.
-    ///
-    /// A DCF enterprise value used without this node is broadcast as a
-    /// constant denominator (current valuation versus forward debt, not a
-    /// rolled EV path).
+    /// period only. The denominator must be the collateral valuation on
+    /// the same date and the same currency and collateral scope.
     ///
     /// # Arguments
     ///
     /// * `node` - Monetary statement node id whose per-period values are LTV
     ///   denominators, in the same currency as instrument debt balances
-    ///   (typically an enterprise-value or collateral-value series).
+    ///   (a collateral-value series on matching dates).
     ///
     /// # Returns
     ///
@@ -422,6 +415,7 @@ impl CorporateAnalysisBuilder {
                     crate::analysis::valuation::corporate::DcfEvalContext {
                         net_debt_override,
                         options: &dcf_options,
+                        projection: None,
                     },
                     self.as_of,
                 )
@@ -434,19 +428,6 @@ impl CorporateAnalysisBuilder {
             }
             None => None,
         };
-
-        let ev_raw = equity.as_ref().map(|eq| eq.enterprise_value.amount());
-        let ev_for_ltv = ev_raw.filter(|ev| *ev > 0.0);
-        // Surface (rather than silently drop) a non-positive EV: LTV-style
-        // metrics will be computed without an EV reference.
-        let ev_suppressed_non_positive = ev_raw.is_some_and(|ev| ev <= 0.0);
-        if ev_suppressed_non_positive {
-            tracing::warn!(
-                enterprise_value = ev_raw,
-                "non-positive DCF enterprise value suppressed as LTV reference; \
-                 credit metrics computed without an EV reference"
-            );
-        }
 
         let mut credit = IndexMap::new();
         if let Some(ref cs) = statement.cs_cashflows {
@@ -463,7 +444,6 @@ impl CorporateAnalysisBuilder {
                 &self.model.periods,
                 &statement,
                 self.ltv_value_node.as_deref(),
-                ev_for_ltv,
                 reporting_currency,
             )?;
             for instrument_id in cs.by_instrument.keys() {
@@ -487,7 +467,6 @@ impl CorporateAnalysisBuilder {
             statement,
             equity,
             credit,
-            ev_suppressed_non_positive,
         })
     }
 }
@@ -529,8 +508,8 @@ pub struct CorporateAnalysisOptions {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub as_of: Option<Date>,
-    /// Statement node supplying a per-period LTV denominator; `None`
-    /// broadcasts a positive DCF enterprise value instead.
+    /// Same-date monetary collateral value for each LTV observation.
+    /// Omitting the node leaves LTV unavailable.
     pub ltv_value_node: Option<String>,
 }
 
@@ -593,15 +572,12 @@ pub fn run_corporate_analysis(
 
 /// Per-period LTV denominators for [`compute_credit_context`].
 ///
-/// A statement node, when configured, supplies `value[t]` (missing or
-/// non-positive periods are omitted). Otherwise a positive scalar DCF
-/// enterprise value is broadcast to every requested period: current
-/// valuation versus forward debt, not a rolled EV path.
+/// An elected collateral node supplies each matching reporting-date value.
+/// Missing and non-positive observations leave LTV unavailable for that period.
 fn ltv_reference_path(
     periods: &[Period],
     statement: &StatementResult,
     ltv_value_node: Option<&str>,
-    ev_for_ltv: Option<f64>,
     reporting_currency: finstack_quant_core::currency::Currency,
 ) -> Result<Option<Vec<(PeriodId, f64)>>> {
     if let Some(node) = ltv_value_node {
@@ -622,7 +598,7 @@ fn ltv_reference_path(
         }
         Ok(Some(path))
     } else {
-        Ok(ev_for_ltv.map(|ev| periods.iter().map(|period| (period.id, ev)).collect()))
+        Ok(None)
     }
 }
 
@@ -727,7 +703,6 @@ mod tests {
 
         assert!(result.equity.is_none());
         assert!(result.credit.is_empty());
-        assert!(!result.ev_suppressed_non_positive);
         assert!(
             result
                 .statement
@@ -842,7 +817,6 @@ mod tests {
         let equity = result.equity.as_ref().expect("equity should be present");
         assert!(equity.equity_value.amount() > 0.0);
         assert!(equity.enterprise_value.amount() > equity.equity_value.amount());
-        assert!(!result.ev_suppressed_non_positive);
     }
 
     #[test]
@@ -908,7 +882,7 @@ mod tests {
     }
 
     #[test]
-    fn test_non_positive_enterprise_value_status_is_top_level() {
+    fn test_zero_enterprise_value_remains_in_equity_result() {
         let model = {
             let mut model_builder_1 = ModelBuilder::new("non-positive-ev");
             model_builder_1
@@ -937,7 +911,14 @@ mod tests {
             .analyze()
             .expect("analysis should succeed");
 
-        assert!(result.ev_suppressed_non_positive);
+        assert_eq!(
+            result
+                .equity
+                .expect("requested DCF")
+                .enterprise_value
+                .amount(),
+            0.0
+        );
     }
 
     #[test]
@@ -1049,56 +1030,23 @@ mod tests {
             IndexMap::from([(periods[0].id, Money::from((1_000_i64, Currency::EUR)))]),
         );
         assert!(
-            ltv_reference_path(
-                &periods,
-                &statement,
-                Some("collateral"),
-                None,
-                Currency::USD
-            )
-            .is_err()
+            ltv_reference_path(&periods, &statement, Some("collateral"), Currency::USD).is_err()
         );
         statement
             .set_series("collateral", IndexMap::from([(periods[0].id, 1_000.0)]))
             .expect("finite fixture values");
         assert!(
-            ltv_reference_path(
-                &periods,
-                &statement,
-                Some("collateral"),
-                None,
-                Currency::USD
-            )
-            .is_err()
+            ltv_reference_path(&periods, &statement, Some("collateral"), Currency::USD).is_err()
         );
     }
 
     #[test]
-    fn test_ltv_reference_path_broadcasts_scalar_ev() {
+    fn ltv_reference_requires_same_date_collateral_values() {
         let periods = sample_periods();
         let statement = StatementResult::new();
-        let path = ltv_reference_path(
-            &periods,
-            &statement,
-            None,
-            Some(10_000_000.0),
-            Currency::USD,
-        )
-        .expect("valid path")
-        .expect("broadcast path");
-        assert_eq!(
-            path,
-            vec![
-                (
-                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    10_000_000.0
-                ),
-                (
-                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                    10_000_000.0
-                ),
-            ]
-        );
+        let path = ltv_reference_path(&periods, &statement, None, Currency::USD)
+            .expect("valid unpopulated collateral path");
+        assert!(path.is_none());
     }
 
     #[test]
@@ -1134,7 +1082,6 @@ mod tests {
             &periods,
             &statement,
             Some("enterprise_value"),
-            Some(1.0),
             Currency::USD,
         )
         .expect("valid path")
@@ -1162,7 +1109,6 @@ mod tests {
             &periods,
             &statement,
             Some("enterprise_value"),
-            None,
             Currency::USD,
         )
         .expect("valid path")

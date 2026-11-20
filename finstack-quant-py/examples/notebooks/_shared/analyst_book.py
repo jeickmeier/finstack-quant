@@ -21,7 +21,6 @@ from pathlib import Path
 from typing import Any
 
 from finstack_quant.calibration import calibrate
-from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import (
     DiscountCurve,
     ForwardCurve,
@@ -209,7 +208,10 @@ def build_book(stage: str = "base") -> Portfolio:
     >>> len(build_book("foundations"))
     4
     """
-    return Portfolio.from_spec(json.dumps(book_spec(stage)))
+    builder = Portfolio.builder(f"ANALYST-{stage.upper()}", "USD", AS_OF).entity("FUND")
+    for iid, instrument in instruments(stage).items():
+        builder.position(iid, instrument, 1.0, entity_id="FUND")
+    return builder.build()
 
 
 def calibration_envelope(stage: str = "base", as_of: date = AS_OF) -> dict[str, Any]:
@@ -288,7 +290,7 @@ def build_market(stage: str = "base", as_of: date = AS_OF) -> MarketContext:
     'USD-OIS'
     """
     index = _stage_index(stage)
-    market = calibrate(json.dumps(calibration_envelope(stage, as_of))).market
+    market = calibrate(calibration_envelope(stage, as_of)).market
     market.insert(
         DiscountCurve(
             "EUR-OIS",
@@ -305,8 +307,8 @@ def build_market(stage: str = "base", as_of: date = AS_OF) -> MarketContext:
             extrapolation="extend",
         )
     )
-    fx = FxMatrix(None)
-    fx.set_quotes([(Currency("EUR"), Currency("USD"), 1.08)])
+    fx = FxMatrix.direct()
+    fx.set_quotes([("EUR", "USD", 1.08)])
     market.insert_fx(fx)
     # Overnight observations enter with the first compounding lesson, before
     # the later term-SOFR forward curve and payer swap are introduced.

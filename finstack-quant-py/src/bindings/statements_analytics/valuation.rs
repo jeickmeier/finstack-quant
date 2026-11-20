@@ -23,10 +23,15 @@ use crate::bindings::statements_analytics::checks::{
 };
 use crate::bindings::statements_analytics::typed::PyTornadoEntry;
 use crate::errors::{serde_json_to_py, statements_to_py};
+use finstack_quant_statements_analytics::analysis::DcfDistributionResult;
 use finstack_quant_statements_analytics::analysis::{
     CorporateAnalysis, CorporateAnalysisOptions, CorporateValuationResult, DEFAULT_UFCF_NODE,
     DcfInputs, DcfOptions, DcfSensitivityResult, LboCheckMappings, LboConfig, LboResult,
     WaccInputs,
+};
+use finstack_quant_statements_analytics::analysis::{
+    CorporateDcfRequest, DcfProjection, DcfSensitivityEndpoint, DcfSensitivityGridResult,
+    DcfSensitivityGridSpec, StatementValuationCut, TerminalFcffBasis,
 };
 use finstack_quant_valuations::instruments::equity::dcf_equity::{
     EquityBridge, TerminalValueSpec, ValuationDiscounts,
@@ -96,15 +101,15 @@ impl PyTerminalValueSpec {
     /// ----------
     /// multiple : float
     ///     Exit multiple in turns (``9.0`` = 9.0x).
-    /// terminal_metric : float
+    /// terminal_metric : float or None
     ///     Terminal-year metric (EBITDA, revenue, ...) in model currency.
-    ///     Required, as in the Rust wire form. Pass ``0.0`` when
+    ///     Omit when
     ///     ``DcfOptions.exit_multiple_metric_node`` supplies the metric from
-    ///     the statement model; without that node ``evaluate_dcf`` raises
+    ///     the statement model. Without that node, ``evaluate_dcf`` raises
     ///     ``ValueError`` unless the metric is positive and finite.
     #[staticmethod]
-    #[pyo3(text_signature = "(multiple, terminal_metric)")]
-    fn exit_multiple(multiple: f64, terminal_metric: f64) -> Self {
+    #[pyo3(signature = (multiple, terminal_metric=None))]
+    fn exit_multiple(multiple: f64, terminal_metric: Option<f64>) -> Self {
         Self {
             inner: TerminalValueSpec::ExitMultiple {
                 terminal_metric,
@@ -356,6 +361,456 @@ wire_methods!(
     "ValuationDiscounts"
 );
 
+#[pyclass(
+    name = "DcfInputs",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfInputs")]
+#[derive(Clone)]
+struct PyDcfInputs {
+    inner: DcfInputs,
+}
+
+#[pymethods]
+impl PyDcfInputs {
+    #[new]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfInputs.__init__")]
+    #[pyo3(signature = (*, wacc, terminal_value, ufcf_node=DEFAULT_UFCF_NODE, net_debt_override=None))]
+    fn new(
+        wacc: f64,
+        terminal_value: &PyTerminalValueSpec,
+        ufcf_node: &str,
+        net_debt_override: Option<f64>,
+    ) -> PyResult<Self> {
+        let inner = DcfInputs {
+            wacc,
+            terminal_value: terminal_value.inner.clone(),
+            ufcf_node: ufcf_node.to_owned(),
+            net_debt_override,
+        };
+        inner.validate().map_err(statements_to_py)?;
+        Ok(Self { inner })
+    }
+}
+
+#[pyclass(
+    name = "DcfOptions",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfOptions")]
+#[derive(Clone)]
+struct PyDcfOptions {
+    inner: DcfOptions,
+}
+
+#[pymethods]
+impl PyDcfOptions {
+    #[new]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfOptions.__init__")]
+    #[pyo3(
+        signature = (**fields),
+        text_signature = "(*, mid_year_convention=False, equity_bridge=None, shares_outstanding=None, valuation_discounts=None, exit_multiple_metric_node=None)"
+    )]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner = crate::bindings::module_utils::fields_from_py(py, fields, "DcfOptions")?;
+        Ok(Self { inner })
+    }
+}
+
+#[pyclass(
+    name = "StatementValuationCut",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "StatementValuationCut")]
+#[derive(Clone)]
+pub(crate) struct PyStatementValuationCut {
+    pub(crate) inner: StatementValuationCut,
+}
+
+#[pymethods]
+impl PyStatementValuationCut {
+    #[new]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "StatementValuationCut.__init__")]
+    fn new(
+        as_of: &Bound<'_, PyAny>,
+        observed_through: &Bound<'_, PyAny>,
+        currency: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        use crate::bindings::date_utils::py_to_date;
+        Ok(Self {
+            inner: StatementValuationCut {
+                as_of: py_to_date(as_of)?,
+                observed_through: py_to_date(observed_through)?,
+                currency: crate::bindings::core::currency::extract_currency(currency)?,
+            },
+        })
+    }
+}
+
+#[pyclass(
+    name = "DcfProjection",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfProjection")]
+#[derive(Clone)]
+struct PyDcfProjection {
+    inner: DcfProjection,
+}
+
+#[pymethods]
+impl PyDcfProjection {
+    #[new]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfProjection.__init__")]
+    #[pyo3(signature = (*, terminal_date, normalized_annual_fcff=None, forward_remainder_node=None, stable_growth_ceiling=None))]
+    fn new(
+        terminal_date: &Bound<'_, PyAny>,
+        normalized_annual_fcff: Option<PyRef<'_, PyTerminalFcffBasis>>,
+        forward_remainder_node: Option<String>,
+        stable_growth_ceiling: Option<f64>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: DcfProjection {
+                terminal_date: crate::bindings::date_utils::py_to_date(terminal_date)?,
+                normalized_annual_fcff: normalized_annual_fcff.map(|basis| basis.inner.clone()),
+                forward_remainder_node,
+                stable_growth_ceiling,
+            },
+        })
+    }
+}
+
+#[pyclass(
+    name = "TerminalFcffBasis",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "TerminalFcffBasis")]
+#[derive(Clone)]
+struct PyTerminalFcffBasis {
+    inner: TerminalFcffBasis,
+}
+
+#[pymethods]
+impl PyTerminalFcffBasis {
+    #[staticmethod]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "TerminalFcffBasis.authored")]
+    fn authored(amount: &PyMoney) -> Self {
+        Self {
+            inner: TerminalFcffBasis::Authored {
+                amount: amount.inner,
+            },
+        }
+    }
+
+    #[staticmethod]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "TerminalFcffBasis.trailing_additive")]
+    fn trailing_additive() -> Self {
+        Self {
+            inner: TerminalFcffBasis::TrailingAdditive,
+        }
+    }
+}
+
+#[pyclass(
+    name = "CorporateDcfRequest",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "CorporateDcfRequest")]
+#[derive(Clone)]
+struct PyCorporateDcfRequest {
+    inner: CorporateDcfRequest,
+}
+
+#[pymethods]
+impl PyCorporateDcfRequest {
+    #[new]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "CorporateDcfRequest.__init__")]
+    #[pyo3(signature = (*, cut, inputs, projection, options=None))]
+    fn new(
+        cut: &PyStatementValuationCut,
+        inputs: &PyDcfInputs,
+        projection: &PyDcfProjection,
+        options: Option<PyRef<'_, PyDcfOptions>>,
+    ) -> Self {
+        Self {
+            inner: CorporateDcfRequest {
+                cut: cut.inner.clone(),
+                inputs: inputs.inner.clone(),
+                projection: projection.inner.clone(),
+                options: options
+                    .map(|options| options.inner.clone())
+                    .unwrap_or_default(),
+            },
+        }
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "evaluate_corporate_dcf")]
+#[pyfunction]
+#[pyo3(signature = (model, request, market=None))]
+fn evaluate_corporate_dcf<'py>(
+    py: Python<'py>,
+    model: &Bound<'py, PyAny>,
+    request: &PyCorporateDcfRequest,
+    market: Option<&Bound<'py, PyAny>>,
+) -> PyResult<PyCorporateValuationResult> {
+    let model = extract_model_ref(model)?.into_owned();
+    let request = request.inner.clone();
+    let market = extract_market_opt(py, market)?;
+    let inner = py
+        .detach(move || {
+            finstack_quant_statements_analytics::analysis::evaluate_corporate_dcf(
+                &model,
+                &request,
+                market.as_ref(),
+            )
+        })
+        .map_err(statements_to_py)?;
+    Ok(PyCorporateValuationResult { inner })
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "evaluate_dcf_from_results")]
+#[pyfunction]
+fn evaluate_dcf_from_results<'py>(
+    py: Python<'py>,
+    model: &Bound<'py, PyAny>,
+    results: &Bound<'py, PyAny>,
+    request: &PyCorporateDcfRequest,
+) -> PyResult<PyCorporateValuationResult> {
+    let model = extract_model_ref(model)?.into_owned();
+    let results = crate::bindings::extract::extract_results_ref(results)?.into_owned();
+    let request = request.inner.clone();
+    let inner = py
+        .detach(move || {
+            finstack_quant_statements_analytics::analysis::evaluate_dcf_from_results(
+                &model, &results, &request,
+            )
+        })
+        .map_err(statements_to_py)?;
+    Ok(PyCorporateValuationResult { inner })
+}
+
+#[pyclass(
+    name = "DcfSensitivityGridSpec",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfSensitivityGridSpec")]
+#[derive(Clone)]
+struct PyDcfSensitivityGridSpec {
+    inner: DcfSensitivityGridSpec,
+}
+
+#[pymethods]
+impl PyDcfSensitivityGridSpec {
+    #[new]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfSensitivityGridSpec.__init__")]
+    fn new(wacc_values: Vec<f64>, terminal_values: Vec<f64>) -> PyResult<Self> {
+        let inner = DcfSensitivityGridSpec {
+            wacc_values,
+            terminal_values,
+        };
+        inner.validate().map_err(statements_to_py)?;
+        Ok(Self { inner })
+    }
+}
+
+#[pyclass(
+    name = "DcfSensitivityGridResult",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfSensitivityGridResult")]
+#[derive(Clone)]
+struct PyDcfSensitivityGridResult {
+    inner: DcfSensitivityGridResult,
+}
+
+#[pymethods]
+impl PyDcfSensitivityGridResult {
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfSensitivityGridResult.baseline_enterprise_value")]
+    fn baseline_enterprise_value(&self) -> PyMoney {
+        PyMoney::from_inner(self.inner.baseline_enterprise_value)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfSensitivityGridResult.to_dataframe")]
+    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let rows = self
+            .inner
+            .cells
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|cell| match cell {
+                        DcfSensitivityEndpoint::Priced {
+                            enterprise_value, ..
+                        } => Some(enterprise_value.amount()),
+                        DcfSensitivityEndpoint::Unavailable { .. } => None,
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("index", &self.inner.axes.wacc_values)?;
+        kwargs.set_item("columns", &self.inner.axes.terminal_values)?;
+        py.import("pandas")?
+            .getattr("DataFrame")?
+            .call((rows,), Some(&kwargs))
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "dcf_sensitivity_on_results")]
+#[pyfunction]
+fn dcf_sensitivity_on_results<'py>(
+    py: Python<'py>,
+    model: &Bound<'py, PyAny>,
+    results: &Bound<'py, PyAny>,
+    request: &PyCorporateDcfRequest,
+    shocks: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let model = extract_model_ref(model)?.into_owned();
+    let results = crate::bindings::extract::extract_results_ref(results)?.into_owned();
+    let request = request.inner.clone();
+    let shocks = crate::bindings::module_utils::spec_from_py(py, shocks, "DCF shocks")?;
+    let report = py
+        .detach(move || {
+            finstack_quant_statements_analytics::analysis::dcf_sensitivity_on_results(
+                &model, &results, &request, &shocks,
+            )
+        })
+        .map_err(statements_to_py)?;
+    crate::bindings::pandas_utils::serde_to_py(py, &report)
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "dcf_sensitivity_grid")]
+#[pyfunction]
+fn dcf_sensitivity_grid<'py>(
+    py: Python<'py>,
+    model: &Bound<'py, PyAny>,
+    results: &Bound<'py, PyAny>,
+    request: &PyCorporateDcfRequest,
+    axes: &PyDcfSensitivityGridSpec,
+) -> PyResult<PyDcfSensitivityGridResult> {
+    let model = extract_model_ref(model)?.into_owned();
+    let results = crate::bindings::extract::extract_results_ref(results)?.into_owned();
+    let request = request.inner.clone();
+    let axes = axes.inner.clone();
+    let inner = py
+        .detach(move || {
+            finstack_quant_statements_analytics::analysis::dcf_sensitivity_grid(
+                &model, &results, &request, &axes,
+            )
+        })
+        .map_err(statements_to_py)?;
+    Ok(PyDcfSensitivityGridResult { inner })
+}
+
+#[pyclass(
+    name = "DcfDistributionResult",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfDistributionResult")]
+#[derive(Clone)]
+struct PyDcfDistributionResult {
+    inner: DcfDistributionResult,
+}
+
+#[pymethods]
+impl PyDcfDistributionResult {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfDistributionResult.to_dataframe")]
+    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let rows = self
+            .inner
+            .paths
+            .iter()
+            .map(|row| {
+                serde_json::json!({
+                    "path_id": row.path_id,
+                    "enterprise_value": row.enterprise_value.amount(),
+                    "equity_value": row.equity_value.amount(),
+                    "currency": row.enterprise_value.currency().to_string(),
+                })
+            })
+            .collect::<Vec<_>>();
+        serde_rows_to_dataframe_with_schema(
+            py,
+            &rows,
+            &[
+                ("path_id", "uint32"),
+                ("enterprise_value", "float64"),
+                ("equity_value", "float64"),
+                ("currency", "str"),
+            ],
+        )
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfDistributionResult.quantiles_to_dataframe")]
+    fn quantiles_to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let rows = self
+            .inner
+            .quantiles
+            .iter()
+            .map(|row| {
+                serde_json::json!({
+                    "probability": row.probability,
+                    "enterprise_value": row.enterprise_value.amount(),
+                    "equity_value": row.equity_value.amount(),
+                    "currency": row.enterprise_value.currency().to_string(),
+                })
+            })
+            .collect::<Vec<_>>();
+        serde_rows_to_dataframe_with_schema(
+            py,
+            &rows,
+            &[
+                ("probability", "float64"),
+                ("enterprise_value", "float64"),
+                ("equity_value", "float64"),
+                ("currency", "str"),
+            ],
+        )
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "evaluate_dcf_monte_carlo")]
+#[pyfunction]
+fn evaluate_dcf_monte_carlo<'py>(
+    py: Python<'py>,
+    model: &Bound<'py, PyAny>,
+    results: &Bound<'py, PyAny>,
+    paths: &crate::bindings::statements::monte_carlo::PyMonteCarloResults,
+    request: &PyCorporateDcfRequest,
+) -> PyResult<PyDcfDistributionResult> {
+    let model = extract_model_ref(model)?.into_owned();
+    let results = crate::bindings::extract::extract_results_ref(results)?.into_owned();
+    let paths = paths.inner.clone();
+    let request = request.inner.clone();
+    let inner = py
+        .detach(move || {
+            finstack_quant_statements_analytics::analysis::evaluate_dcf_monte_carlo(
+                &model, &results, &paths, &request,
+            )
+        })
+        .map_err(statements_to_py)?;
+    Ok(PyDcfDistributionResult { inner })
+}
+
 fn extract_terminal_value(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<TerminalValueSpec> {
     if let Ok(typed) = obj.extract::<PyRef<'_, PyTerminalValueSpec>>() {
         return Ok(typed.inner.clone());
@@ -366,6 +821,11 @@ fn extract_terminal_value(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<Te
 /// Rust `DcfOptions` from its serde form (a dict or JSON string, missing
 /// fields taking their Rust defaults); `None` is `DcfOptions::default()`.
 fn extract_dcf_options(py: Python<'_>, obj: Option<&Bound<'_, PyAny>>) -> PyResult<DcfOptions> {
+    if let Some(bound) = obj
+        && let Ok(options) = bound.extract::<PyRef<'_, PyDcfOptions>>()
+    {
+        return Ok(options.inner.clone());
+    }
     obj.map(|obj| crate::bindings::module_utils::spec_from_py(py, obj, "options"))
         .transpose()
         .map(Option::unwrap_or_default)
@@ -378,7 +838,7 @@ fn extract_dcf_options(py: Python<'_>, obj: Option<&Bound<'_, PyAny>>) -> PyResu
 /// >>> from finstack_quant.statements_analytics import CorporateValuationResult
 /// >>> r = CorporateValuationResult.from_json(
 /// ...     '{"equity_value":{"amount":"90","currency":"USD"},"enterprise_value":{"amount":"100","currency":"USD"},'
-/// ...     '"net_debt":{"amount":"10","currency":"USD"},"valuation_discount":{"amount":"0","currency":"USD"},'
+/// ...     '"net_debt":{"amount":"10","currency":"USD"},"other_equity_claims":{"amount":"0","currency":"USD"},"valuation_discount":{"amount":"0","currency":"USD"},'
 /// ...     '"terminal_value_pv":{"amount":"60","currency":"USD"},'
 /// ...     '"equity_value_per_share":null,"diluted_shares":null}')
 /// >>> r.equity_value.amount
@@ -407,15 +867,21 @@ impl PyCorporateValuationResult {
         PyMoney::from_inner(self.inner.enterprise_value)
     }
 
-    /// Net debt (or effective bridge amount) subtracted from EV.
+    /// Interest-bearing debt less cash in model currency.
     #[getter]
     fn net_debt(&self) -> PyMoney {
         PyMoney::from_inner(self.inner.net_debt)
     }
 
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "CorporateValuationResult.other_equity_claims")]
+    fn other_equity_claims(&self) -> PyMoney {
+        PyMoney::from_inner(self.inner.other_equity_claims)
+    }
+
     /// Total valuation discount (DLOM, DLOC, other) deducted after the
     /// EV-to-equity bridge; zero without ``valuation_discounts``.
-    /// ``enterprise_value - net_debt - valuation_discount`` equals
+    /// ``enterprise_value - net_debt - other_equity_claims - valuation_discount`` equals
     /// ``equity_value``.
     #[getter]
     fn valuation_discount(&self) -> PyMoney {
@@ -488,7 +954,7 @@ impl PyCorporateValuationResult {
     /// Export as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``currency``, ``equity_value``, ``enterprise_value``,
-    /// ``net_debt``, ``valuation_discount``, ``terminal_value_pv`` (float
+    /// ``net_debt``, ``other_equity_claims``, ``valuation_discount``, ``terminal_value_pv`` (float
     /// amounts in ``currency``),
     /// ``equity_value_per_share``, ``diluted_shares`` (``None`` when absent),
     /// then the DCF working: ``wacc`` (decimal), ``pv_explicit``,
@@ -502,6 +968,7 @@ impl PyCorporateValuationResult {
             "equity_value": self.inner.equity_value.amount(),
             "enterprise_value": self.inner.enterprise_value.amount(),
             "net_debt": self.inner.net_debt.amount(),
+            "other_equity_claims": self.inner.other_equity_claims.amount(),
             "valuation_discount": self.inner.valuation_discount.amount(),
             "terminal_value_pv": self.inner.terminal_value_pv.amount(),
             "equity_value_per_share": self.inner.equity_value_per_share,
@@ -521,6 +988,7 @@ impl PyCorporateValuationResult {
                 "equity_value",
                 "enterprise_value",
                 "net_debt",
+                "other_equity_claims",
                 "valuation_discount",
                 "terminal_value_pv",
                 "equity_value_per_share",
@@ -749,7 +1217,7 @@ impl PyLboResult {
         PyMoney::from_inner(self.inner.entry_enterprise_value)
     }
 
-    /// Entry metric read from the model's first period.
+    /// Entry metric read from the explicitly selected entry period.
     #[getter]
     fn entry_metric(&self) -> f64 {
         self.inner.entry_metric
@@ -882,8 +1350,8 @@ impl_repr_html_via_dataframe!(PyLboResult);
 /// >>> from finstack_quant.statements_analytics import run_corporate_analysis
 /// >>> b = ModelBuilder("m"); b.periods("2024Q1..Q2", None); b.value("revenue", [("2024Q1", 1.0), ("2024Q2", 2.0)])
 /// >>> analysis = run_corporate_analysis(b.build())
-/// >>> analysis.equity is None, analysis.ev_suppressed_non_positive
-/// (True, False)
+/// >>> analysis.equity is None
+/// True
 #[pyclass(
     name = "CorporateAnalysis",
     module = "finstack_quant.statements_analytics",
@@ -913,17 +1381,23 @@ impl PyCorporateAnalysis {
             .map(|inner| PyCorporateValuationResult { inner })
     }
 
-    /// Per-instrument credit metrics as ``{instrument_id: CreditContextMetrics dict}``
-    /// (serde form, including ``dscr_incl_fees`` / ``dscr_incl_fees_min``).
     #[getter]
-    fn credit<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.credit)
-    }
-
-    /// Whether a non-positive DCF enterprise value was excluded from LTV.
-    #[getter]
-    fn ev_suppressed_non_positive(&self) -> bool {
-        self.inner.ev_suppressed_non_positive
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "CorporateAnalysis.credit")]
+    fn credit(
+        &self,
+    ) -> std::collections::HashMap<String, super::credit_context::PyCreditContextMetrics> {
+        self.inner
+            .credit
+            .iter()
+            .map(|(id, metrics)| {
+                (
+                    id.clone(),
+                    super::credit_context::PyCreditContextMetrics {
+                        inner: metrics.clone(),
+                    },
+                )
+            })
+            .collect()
     }
 
     /// Export the per-instrument credit metrics as a long pandas ``DataFrame``.
@@ -933,23 +1407,12 @@ impl PyCorporateAnalysis {
     /// ``NaN`` where a metric is not available for that period). One row per
     /// (instrument, period) present on any metric series.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        use std::collections::BTreeMap;
         let mut rows = Vec::new();
         for (instrument_id, metrics) in &self.inner.credit {
-            let mut by_period: BTreeMap<finstack_quant_core::dates::PeriodId, [Option<f64>; 4]> =
-                BTreeMap::new();
-            let series = [
-                (&metrics.dscr, 0usize),
-                (&metrics.dscr_total, 1),
-                (&metrics.dscr_incl_fees, 2),
-                (&metrics.interest_coverage, 3),
-            ];
-            for (values, slot) in series {
-                for (period, value) in values {
-                    by_period.entry(*period).or_default()[slot] = Some(*value);
+            for (period, values) in super::credit_context::observations(metrics) {
+                if values[..4].iter().all(Option::is_none) {
+                    continue;
                 }
-            }
-            for (period, values) in by_period {
                 rows.push(serde_json::json!({
                     "instrument_id": instrument_id,
                     "period": period.to_string(),
@@ -965,15 +1428,14 @@ impl PyCorporateAnalysis {
 
     fn __repr__(&self) -> String {
         format!(
-            "CorporateAnalysis(statement_nodes={}, equity={}, credit_instruments={}, ev_suppressed_non_positive={})",
+            "CorporateAnalysis(statement_nodes={}, equity={}, credit_instruments={})",
             self.inner.statement.cells.len(),
             if self.inner.equity.is_some() {
                 "CorporateValuationResult(...)"
             } else {
                 "None"
             },
-            self.inner.credit.len(),
-            crate::bindings::statements_analytics::py_bool(self.inner.ev_suppressed_non_positive)
+            self.inner.credit.len()
         )
     }
 }
@@ -992,7 +1454,10 @@ fn evaluate_dcf<'py>(
     as_of: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<PyCorporateValuationResult> {
     let model = extract_model_ref(model)?.into_owned();
-    let inputs: DcfInputs = crate::bindings::module_utils::spec_from_py(py, inputs, "DcfInputs")?;
+    let inputs = match inputs.extract::<PyRef<'_, PyDcfInputs>>() {
+        Ok(inputs) => inputs.inner.clone(),
+        Err(_) => crate::bindings::module_utils::spec_from_py(py, inputs, "DcfInputs")?,
+    };
     let options = extract_dcf_options(py, options)?;
     let market = extract_market_opt(py, market)?;
     let as_of = as_of
@@ -1115,7 +1580,7 @@ fn dcf_sensitivity<'py>(
 
 /// Evaluate a leveraged-buyout transaction against a statement model.
 ///
-/// Entry enterprise value is priced at the model's first period, the sponsor
+/// Entry enterprise value is priced at the explicitly selected entry period, the sponsor
 /// equity check is the sources-and-uses residual, and exit proceeds are the
 /// exit enterprise value less modelled net debt at ``exit_period``. IRR is out
 /// of scope: pair ``exit_equity_proceeds`` with the equity outflow at close and
@@ -1164,7 +1629,7 @@ fn dcf_sensitivity<'py>(
 /// >>> quarters = ["2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1"]
 /// >>> _ = b.value_money("ebitda", [(q, Money(v, "USD")) for q, v in zip(quarters, [100.0] * 4 + [120.0])])
 /// >>> _ = b.value_money("net_debt", [(q, Money(v, "USD")) for q, v in zip(quarters, [300.0] * 4 + [200.0])])
-/// >>> config = {"entry_multiple": 8.0, "entry_metric_node": "ebitda", "transaction_fees": 0.0,
+/// >>> config = {"entry_multiple": 8.0, "entry_metric_node": "ebitda", "entry_period": "2025Q1", "transaction_fees": 0.0,
 /// ...     "sources": [{"name": "debt", "amount": 500.0}], "exit_multiple": 9.0,
 /// ...     "exit_metric_node": "ebitda", "exit_net_debt_node": "net_debt", "exit_period": "2026Q1"}
 /// >>> round(evaluate_lbo(b.build(), config).moic, 4)
@@ -1187,27 +1652,7 @@ fn evaluate_lbo<'py>(
     Ok(PyLboResult { inner })
 }
 
-/// Capital-structure inputs of a WACC calculation, all decimals.
-///
-/// Parameters
-/// ----------
-/// equity_weight : float
-///     Equity share of total capital as a decimal fraction; non-negative.
-/// cost_of_equity : float
-///     Required return on equity in decimal form (``0.115`` = 11.5%).
-/// debt_weight : float
-///     Debt share of total capital as a decimal fraction; non-negative and
-///     summing with ``equity_weight`` to ``1.0``.
-/// cost_of_debt : float
-///     Pre-tax marginal borrowing yield in decimal form.
-/// tax_rate : float
-///     Marginal corporate tax rate as a decimal in ``[0, 1]``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.statements_analytics import WaccInputs
-/// >>> WaccInputs(equity_weight=0.6, cost_of_equity=0.10, debt_weight=0.4, cost_of_debt=0.05, tax_rate=0.25).tax_rate
-/// 0.25
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "WaccInputs")]
 #[pyclass(
     name = "WaccInputs",
     module = "finstack_quant.statements_analytics",
@@ -1222,51 +1667,62 @@ pub struct PyWaccInputs {
 
 #[pymethods]
 impl PyWaccInputs {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "WaccInputs.__init__")]
     #[new]
     #[pyo3(signature = (*, equity_weight, cost_of_equity, debt_weight, cost_of_debt, tax_rate))]
     fn new(
-        equity_weight: f64,
+        equity_weight: &Bound<'_, PyAny>,
         cost_of_equity: f64,
-        debt_weight: f64,
+        debt_weight: &Bound<'_, PyAny>,
         cost_of_debt: f64,
         tax_rate: f64,
-    ) -> Self {
-        Self {
+    ) -> PyResult<Self> {
+        Ok(Self {
             inner: WaccInputs {
-                equity_weight,
+                equity_weight: finstack_quant_core::wire::DecimalWire(
+                    crate::bindings::core::money::extract_exact_decimal(
+                        equity_weight,
+                        "equity_weight must be an exact decimal",
+                    )?,
+                ),
                 cost_of_equity,
-                debt_weight,
+                debt_weight: finstack_quant_core::wire::DecimalWire(
+                    crate::bindings::core::money::extract_exact_decimal(
+                        debt_weight,
+                        "debt_weight must be an exact decimal",
+                    )?,
+                ),
                 cost_of_debt,
                 tax_rate,
             },
-        }
+        })
     }
 
-    /// Equity share of total capital as a decimal fraction.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "WaccInputs.equity_weight")]
     #[getter]
-    fn equity_weight(&self) -> f64 {
-        self.inner.equity_weight
+    fn equity_weight<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::core::money::decimal_to_py(py, self.inner.equity_weight.0)
     }
 
-    /// Required return on equity as a decimal.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "WaccInputs.cost_of_equity")]
     #[getter]
     fn cost_of_equity(&self) -> f64 {
         self.inner.cost_of_equity
     }
 
-    /// Debt share of total capital as a decimal fraction.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "WaccInputs.debt_weight")]
     #[getter]
-    fn debt_weight(&self) -> f64 {
-        self.inner.debt_weight
+    fn debt_weight<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::core::money::decimal_to_py(py, self.inner.debt_weight.0)
     }
 
-    /// Pre-tax cost of debt as a decimal.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "WaccInputs.cost_of_debt")]
     #[getter]
     fn cost_of_debt(&self) -> f64 {
         self.inner.cost_of_debt
     }
 
-    /// Marginal corporate tax rate as a decimal.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "WaccInputs.tax_rate")]
     #[getter]
     fn tax_rate(&self) -> f64 {
         self.inner.tax_rate
@@ -1279,32 +1735,7 @@ impl PyWaccInputs {
 
 wire_methods!(PyWaccInputs, WaccInputs, "WaccInputs");
 
-/// Weighted-average cost of capital (WACC).
-///
-/// ``WACC = w_E * r_E + w_D * r_D * (1 - T)``.
-///
-/// Parameters
-/// ----------
-/// inputs : WaccInputs
-///     Capital weights, cost of equity, pre-tax cost of debt and tax rate.
-///
-/// Returns
-/// -------
-/// float
-///     Blended discount rate as a decimal fraction.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If an input is not finite, a weight is negative, the weights do not
-///     sum to ``1.0``, or the tax rate is outside ``[0, 1]``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.statements_analytics import WaccInputs, wacc
-/// >>> inputs = WaccInputs(equity_weight=0.6, cost_of_equity=0.10, debt_weight=0.4, cost_of_debt=0.05, tax_rate=0.25)
-/// >>> round(wacc(inputs), 4)
-/// 0.075
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "wacc")]
 #[pyfunction]
 #[pyo3(signature = (inputs))]
 fn wacc(inputs: PyWaccInputs) -> PyResult<f64> {
@@ -1338,6 +1769,20 @@ fn run_corporate_analysis<'py>(
 
 /// Register valuation types and functions.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyDcfDistributionResult>()?;
+    m.add_function(pyo3::wrap_pyfunction!(evaluate_dcf_monte_carlo, m)?)?;
+    m.add_class::<PyDcfInputs>()?;
+    m.add_class::<PyDcfOptions>()?;
+    m.add_class::<PyStatementValuationCut>()?;
+    m.add_class::<PyTerminalFcffBasis>()?;
+    m.add_class::<PyDcfProjection>()?;
+    m.add_class::<PyCorporateDcfRequest>()?;
+    m.add_class::<PyDcfSensitivityGridSpec>()?;
+    m.add_class::<PyDcfSensitivityGridResult>()?;
+    m.add_function(pyo3::wrap_pyfunction!(evaluate_corporate_dcf, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(evaluate_dcf_from_results, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(dcf_sensitivity_grid, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(dcf_sensitivity_on_results, m)?)?;
     m.add_class::<PyTerminalValueSpec>()?;
     m.add_class::<PyEquityBridge>()?;
     m.add_class::<PyValuationDiscounts>()?;

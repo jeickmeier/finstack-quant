@@ -159,6 +159,28 @@ pub struct CommodityAsianOption {
 }
 
 impl CommodityAsianOption {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> CommodityAsianOptionBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .underlying(self.underlying.clone())
+            .strike(self.strike)
+            .option_type(self.option_type)
+            .averaging_method(self.averaging_method)
+            .fixing_dates(self.fixing_dates.clone())
+            .past_fixings(self.past_fixings.clone())
+            .quantity(self.quantity)
+            .expiry(self.expiry)
+            .forward_curve_id(self.forward_curve_id.clone())
+            .discount_curve_id(self.discount_curve_id.clone())
+            .vol_surface_id(self.vol_surface_id.clone())
+            .day_count(self.day_count)
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     fn validate_structure(&self) -> finstack_quant_core::Result<()> {
         use finstack_quant_core::validation;
 

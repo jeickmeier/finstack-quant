@@ -3423,6 +3423,10 @@ export type InstrumentJson =
       type: "structured_credit";
     }
   | {
+      spec: StructuredCreditTranche;
+      type: "structured_credit_tranche";
+    }
+  | {
       spec: AssetBackedFacility;
       type: "asset_backed_facility";
     }
@@ -12615,6 +12619,10 @@ export type Id234 = string;
  */
 export type Date129 = string;
 /**
+ * ISO 8601 calendar date string.
+ */
+export type Date130 = string;
+/**
  * Opaque string identifier.
  */
 export type Id235 = string;
@@ -12647,7 +12655,7 @@ export type Id237 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date130 = string;
+export type Date131 = string;
 /**
  * Opaque string identifier.
  */
@@ -12659,7 +12667,7 @@ export type Id239 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date131 = string;
+export type Date132 = string;
 /**
  * Opaque string identifier.
  */
@@ -12671,11 +12679,11 @@ export type Id241 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date132 = string;
+export type Date133 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date133 = string;
+export type Date134 = string;
 /**
  * Where the template places a coverage test tier.
  *
@@ -12750,7 +12758,7 @@ export type Id242 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date134 = string;
+export type Date135 = string;
 /**
  * Opaque string identifier.
  */
@@ -12793,7 +12801,7 @@ export type LossRecognition = "at_default" | "at_liquidation";
 /**
  * ISO 8601 calendar date string.
  */
-export type Date135 = string;
+export type Date136 = string;
 /**
  * Cashflow prepayment-model specification.
  */
@@ -12841,7 +12849,7 @@ export type PrepaymentModelSpec4 =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date136 = string;
+export type Date137 = string;
 /**
  * Day-count convention.
  */
@@ -12867,7 +12875,7 @@ export type Id244 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date137 = string;
+export type Date138 = string;
 /**
  * Base currency
  */
@@ -13065,11 +13073,11 @@ export type ManagementFeeType = "senior" | "subordinated" | "incentive";
 /**
  * ISO 8601 calendar date string.
  */
-export type Date138 = string;
+export type Date139 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date139 = string;
+export type Date140 = string;
 /**
  * Target balance of the deal reserve account, re-evaluated every period.
  *
@@ -13132,7 +13140,7 @@ export type StepDownTrigger =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date140 = string;
+export type Date141 = string;
 /**
  * Currency (must match asset currency; financing PV is validated at valuation time).
  */
@@ -13341,7 +13349,7 @@ export type BusinessDayConvention22 =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date141 = string;
+export type Date142 = string;
 /**
  * Currency in which value, P&L, additive risk, and capital are reported.
  */
@@ -13587,7 +13595,7 @@ export type MetricId = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date142 = string;
+export type Date143 = string;
 /**
  * Opaque string identifier.
  */
@@ -14572,6 +14580,9 @@ export type ExprNode =
       literal: number;
     }
   | {
+      money_literal: Money6;
+    }
+  | {
       /**
        * @minItems 2
        * @maxItems 2
@@ -14671,6 +14682,24 @@ export type FloatingRateFallback =
   | "spread_only"
   | {
       fixed_rate: Decimal5;
+    };
+/**
+ * Timing election for the dates of the explicit FCFF projection.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "ForecastTiming".
+ */
+export type ForecastTiming =
+  | {
+      kind: "dated_receipts";
+    }
+  | {
+      kind: "midpoints";
+      /**
+       * Actual start date for each forecast period, aligned to its authored
+       * flow end date. A forward stub begins on the valuation date.
+       */
+      period_starts: Date[];
     };
 /**
  * Type of fund event.
@@ -15268,7 +15297,7 @@ export type RebalanceRule =
       end?: Date | null;
       frequency: Tenor29;
       kind: "calendar";
-      start: Date141;
+      start: Date142;
     };
 /**
  * Recipient of waterfall payments
@@ -15560,9 +15589,10 @@ export type TerminalValueSpec =
        */
       multiple: number;
       /**
-       * Terminal metric value (e.g., EBITDA)
+       * Terminal metric in major currency units (for example, EBITDA).
+       * Required for standalone pricing. A statement DCF can resolve it from a metric node.
        */
-      terminal_metric: number;
+      terminal_metric?: number | null;
       type: "exit_multiple";
       [k: string]: unknown;
     }
@@ -16904,6 +16934,7 @@ export interface SharedDefs {
   FloatingLegCompounding?: FloatingLegCompounding;
   FloatingRateFallback?: FloatingRateFallback;
   FloatingRateSpec?: FloatingRateSpec1;
+  ForecastTiming?: ForecastTiming;
   ForwardRateAgreement?: ForwardRateAgreement;
   Function?: Function;
   FundEvent?: FundEvent;
@@ -17067,6 +17098,7 @@ export interface SharedDefs {
   StochasticPrepaySpec?: StochasticPrepaySpec;
   StochasticUtilizationSpec?: StochasticUtilizationSpec;
   StructuredCredit?: StructuredCredit;
+  StructuredCreditTranche?: StructuredCreditTranche;
   StubKind?: StubKind;
   SwapNotional?: SwapNotional;
   SwapPriority?: SwapPriority;
@@ -51356,14 +51388,9 @@ export interface ScenarioPricingOverrides70 {
  * [`equity_bridge`](Self::equity_bridge) is the single EV-to-equity channel; a
  * flat net-debt deduction sets only its `total_debt` and `cash`.
  *
- * # Mid-Year Convention
- *
- * When [`mid_year_convention`](Self::mid_year_convention) is `true`, cash flows are
- * discounted at `t` minus half the average flow spacing instead of `t` years,
- * reflecting the assumption that cash flows arrive mid-period (standard IB/PE
- * practice). For annual grids this is the classic `(t - 0.5)`; for sub-annual
- * grids the shift is half a period. `ExitMultiple` terminal values always
- * discount at the full horizon (a point-in-time sale price).
+ * # Discounting dates
+ * Forecast receipts use their authored dates or exact period midpoints.
+ * Terminal value uses its own date on the same ACT/365.25 clock.
  *
  * # Valuation Discounts
  *
@@ -51387,40 +51414,36 @@ export interface DiscountedCashFlow {
   /**
    * Explicit period free cash flows (date, amount pairs).
    */
-  flows: [Date, number][];
+  flows: [Date, Money6][];
+  /**
+   * Authored receipt or actual midpoint timing for the explicit projection.
+   */
+  forecast_timing:
+    | {
+        kind: "dated_receipts";
+      }
+    | {
+        kind: "midpoints";
+        /**
+         * Actual start date for each forecast period, aligned to its authored
+         * flow end date. A forward stub begins on the valuation date.
+         */
+        period_starts: Date[];
+      };
   id: Id234;
   instrument_pricing_overrides?: InstrumentPricingOverrides71;
   metric_pricing_overrides?: MetricPricingOverrides71;
   /**
-   * Mid-year discounting convention (default: `false` = end-of-period).
-   *
-   * When `true`, each flow is discounted at `t` minus half the average
-   * flow spacing instead of `t` (the classic `t - 0.5` for annual
-   * grids; half a period for sub-annual grids), reflecting the
-   * assumption that cash flows arrive mid-period. This is the standard
-   * convention in IB/PE practice (Koller et al.). Exit-multiple
-   * terminal values are not shifted (point-in-time sale at the horizon).
+   * Normalized signed annual FCFF at the terminal date, in instrument currency.
+   * Required for Gordon and H-model, and absent for exit-multiple valuation.
    */
-  mid_year_convention?: boolean;
+  normalized_annual_fcff?: Money6 | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides71;
   /**
    * Basic shares outstanding for per-share value calculation.
    */
   shares_outstanding?: number | null;
-  /**
-   * Annualized terminal flow used by growth-perpetuity terminal values.
-   *
-   * Gordon Growth and H-Model capitalize an *annual* flow with annual
-   * WACC and growth rates. When the explicit `flows` grid is sub-annual
-   * (e.g. quarterly), the last flow is a period flow, not an annual one;
-   * set this to the trailing-twelve-month aggregate of the final
-   * explicit year so the terminal value is computed on a consistent
-   * annual basis (Koller et al., Damodaran). When `None`, the last
-   * explicit flow is used directly (correct for annual grids).
-   *
-   * Ignored by `ExitMultiple` terminal values.
-   */
-  terminal_flow_override?: number | null;
+  terminal_date: Date129;
   /**
    * Terminal value specification.
    */
@@ -51440,9 +51463,10 @@ export interface DiscountedCashFlow {
          */
         multiple: number;
         /**
-         * Terminal metric value (e.g., EBITDA)
+         * Terminal metric in major currency units (for example, EBITDA).
+         * Required for standalone pricing. A statement DCF can resolve it from a metric node.
          */
-        terminal_metric: number;
+        terminal_metric?: number | null;
         type: "exit_multiple";
         [k: string]: unknown;
       }
@@ -51462,7 +51486,7 @@ export interface DiscountedCashFlow {
         type: "h_model";
         [k: string]: unknown;
       };
-  valuation_date: Date129;
+  valuation_date: Date130;
   /**
    * Private company valuation discounts (DLOM, DLOC).
    */
@@ -51809,7 +51833,7 @@ export interface RangeAccrualTerms {
    */
   quanto?: QuantoSpec | null;
   spot_id: Id237;
-  start_date: Date130;
+  start_date: Date131;
   /**
    * Total number of past observations (for mid-life valuations).
    * Must be provided if `past_observations_in_range` is set.
@@ -52112,7 +52136,7 @@ export interface BondFuture {
    * @minItems 1
    */
   deliverable_basket: [DeliverableBond, ...DeliverableBond[]];
-  delivery_start: Date131;
+  delivery_start: Date132;
   discount_curve_id: Id240;
   id: Id241;
   instrument_pricing_overrides?: InstrumentPricingOverrides73;
@@ -52351,7 +52375,7 @@ export interface StructuredCredit {
    * Set to `None` to disable clean-up call (default).
    */
   cleanup_call_decimal?: number | null;
-  closing_date: Date133;
+  closing_date: Date134;
   /**
    * Optional correlation structure for stochastic modeling.
    */
@@ -52417,7 +52441,7 @@ export interface StructuredCredit {
    * to apply the deal-type calibration from `types/constants.rs`.
    */
   fees?: DealFees | null;
-  first_payment_date: Date134;
+  first_payment_date: Date135;
   frequency: Tenor27;
   /**
    * Interest rate swaps settled through the waterfall: net receipts join
@@ -52454,7 +52478,7 @@ export interface StructuredCredit {
    */
   loss_recognition?: LossRecognition | null;
   market_conditions: MarketConditions;
-  maturity: Date135;
+  maturity: Date136;
   metric_pricing_overrides?: MetricPricingOverrides74;
   pool: AssetPool2;
   prepayment_spec?: PrepaymentModelSpec4;
@@ -52590,7 +52614,7 @@ export interface CallAssumption {
    * trigger). `None` keeps the scheduled date only.
    */
   after_early_amortization_months?: number | null;
-  date: Date132;
+  date: Date133;
   /**
    * Redemption price as a percent of the notes' current balance
    * (`100.0` = par; above par the premium is paid as interest, below par
@@ -53083,7 +53107,7 @@ export interface ScenarioPricingOverrides74 {
  */
 export interface TrancheDraw {
   amount: Money85;
-  date: Date136;
+  date: Date137;
   /**
    * Id of the note drawn.
    */
@@ -53513,7 +53537,7 @@ export interface Tranche {
    */
   ic_trigger?: CoverageTrigger | null;
   id: Id244;
-  maturity: Date137;
+  maturity: Date138;
   /**
    * Whether the coupon is a non-deferrable claim the template pays from
    * principal proceeds when interest proceeds fall short (and the deal's
@@ -54958,8 +54982,8 @@ export interface WaterfallRules {
  * via the `definition` "ControlledAccumulationSpec".
  */
 export interface ControlledAccumulationSpec {
-  bullet_date: Date138;
-  start: Date139;
+  bullet_date: Date139;
+  start: Date140;
 }
 /**
  * Early-amortization specification for revolving (master-trust) deals.
@@ -55310,7 +55334,7 @@ export interface ShiftingInterestStep {
  * via the `definition` "StepDownSpec".
  */
 export interface StepDownSpec {
-  step_down_date: Date140;
+  step_down_date: Date141;
   /**
    * Performance triggers; all must pass for the step-down to take effect.
    */
@@ -55342,6 +55366,17 @@ export interface TargetOcSpec {
    * pool balance (after the period's collections).
    */
   fraction_of_current: number;
+}
+/**
+ * An independently held note priced through its originating deal's waterfall.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "StructuredCreditTranche".
+ */
+export interface StructuredCreditTranche {
+  deal: StructuredCredit;
+  id: Id9;
+  tranche_id: string;
 }
 /**
  * Levered real estate equity = unlevered asset + financing.
@@ -55693,7 +55728,7 @@ export interface CompositeSpec {
         end?: Date | null;
         frequency: Tenor29;
         kind: "calendar";
-        start: Date141;
+        start: Date142;
       };
   reporting_currency: Currency48;
   /**
@@ -56273,6 +56308,10 @@ export interface CompositeLegSpec {
         type: "structured_credit";
       }
     | {
+        spec: StructuredCreditTranche;
+        type: "structured_credit_tranche";
+      }
+    | {
         spec: AssetBackedFacility;
         type: "asset_backed_facility";
       }
@@ -56517,6 +56556,9 @@ export interface Expr {
         literal: number;
       }
     | {
+        money_literal: Money6;
+      }
+    | {
         /**
          * @minItems 2
          * @maxItems 2
@@ -56575,6 +56617,9 @@ export interface Expr1 {
       }
     | {
         literal: number;
+      }
+    | {
+        money_literal: Money6;
       }
     | {
         /**
@@ -56637,6 +56682,9 @@ export interface Expr2 {
         literal: number;
       }
     | {
+        money_literal: Money6;
+      }
+    | {
         /**
          * @minItems 2
          * @maxItems 2
@@ -56695,6 +56743,9 @@ export interface Expr3 {
       }
     | {
         literal: number;
+      }
+    | {
+        money_literal: Money6;
       }
     | {
         /**
@@ -56757,6 +56808,9 @@ export interface Expr4 {
         literal: number;
       }
     | {
+        money_literal: Money6;
+      }
+    | {
         /**
          * @minItems 2
          * @maxItems 2
@@ -56815,6 +56869,9 @@ export interface Expr5 {
       }
     | {
         literal: number;
+      }
+    | {
+        money_literal: Money6;
       }
     | {
         /**
@@ -56877,6 +56934,9 @@ export interface Expr6 {
         literal: number;
       }
     | {
+        money_literal: Money6;
+      }
+    | {
         /**
          * @minItems 2
          * @maxItems 2
@@ -56914,7 +56974,7 @@ export interface Expr6 {
  * Frozen quantities used for every valuation until explicit rebalance.
  */
 export interface CompositeState {
-  effective_date: Date142;
+  effective_date: Date143;
   /**
    * Resolved top-level quantities in specification order.
    */
@@ -57411,7 +57471,7 @@ export interface CompositeSpec1 {
         end?: Date | null;
         frequency: Tenor29;
         kind: "calendar";
-        start: Date141;
+        start: Date142;
       };
   reporting_currency: Currency48;
   /**
@@ -57494,7 +57554,7 @@ export interface CompositeSpec1 {
  * via the `definition` "CompositeState".
  */
 export interface CompositeState1 {
-  effective_date: Date142;
+  effective_date: Date143;
   /**
    * Resolved top-level quantities in specification order.
    */
@@ -58551,7 +58611,7 @@ export interface RangeAccrualTerms1 {
    */
   quanto?: QuantoSpec | null;
   spot_id: Id237;
-  start_date: Date130;
+  start_date: Date131;
   /**
    * Total number of past observations (for mid-life valuations).
    * Must be provided if `past_observations_in_range` is set.

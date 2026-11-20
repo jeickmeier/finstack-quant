@@ -14,11 +14,10 @@ use crate::bindings::pandas_utils::{
 };
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::statements::parse_period_id;
-use crate::bindings::statements::types::PyFinancialModelSpec;
 use finstack_quant_statements_analytics::templates::real_estate as rust_re;
 use pyo3::prelude::*;
 
-use super::templates_common::{extract_builder, finish_builder};
+use crate::bindings::statements::builder::PyModelBuilder;
 
 /// Rent step that resets the base rent starting at ``start`` (inclusive).
 #[pyclass(
@@ -251,6 +250,7 @@ impl PyLeaseGrowthConvention {
     }
 
     /// String identifier used in JSON (``"per_period"`` or ``"annual_escalator"``).
+    #[getter]
     fn value(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_label(self).map_err(crate::errors::core_to_py)
     }
@@ -538,6 +538,7 @@ impl PyManagementFeeBase {
     }
 
     /// String identifier used in JSON (``"egi"`` or ``"effective_rent"``).
+    #[getter]
     fn value(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_label(self).map_err(crate::errors::core_to_py)
     }
@@ -754,70 +755,66 @@ impl_repr_html_via_dataframe!(PyPropertyTemplateNodes);
 
 // add_noi_buildup
 
-/// Apply the NOI buildup template to a model spec.
+#[doc = pydoc!("finstack_quant.statements_analytics._templates_real_estate", "add_noi_buildup")]
 #[pyfunction]
 fn add_noi_buildup(
-    model: &Bound<'_, PyAny>,
+    mut builder: PyRefMut<'_, PyModelBuilder>,
     total_revenue_node: &str,
     revenue_nodes: Vec<String>,
     total_expenses_node: &str,
     expense_nodes: Vec<String>,
     noi_node: &str,
-) -> PyResult<PyFinancialModelSpec> {
+) -> PyResult<()> {
     let revenue_refs: Vec<&str> = revenue_nodes.iter().map(String::as_str).collect();
     let expense_refs: Vec<&str> = expense_nodes.iter().map(String::as_str).collect();
-    let builder = rust_re::add_noi_buildup(
-        extract_builder(model)?,
+    rust_re::add_noi_buildup(
+        builder.builder_mut()?,
         total_revenue_node,
         &revenue_refs,
         total_expenses_node,
         &expense_refs,
         noi_node,
     )
-    .map_err(crate::errors::statements_to_py)?;
-    finish_builder(builder)
+    .map_err(crate::errors::statements_to_py)
 }
 
 // add_ncf_buildup
 
-/// Apply the NCF buildup template to a model spec.
+#[doc = pydoc!("finstack_quant.statements_analytics._templates_real_estate", "add_ncf_buildup")]
 #[pyfunction]
 fn add_ncf_buildup(
-    model: &Bound<'_, PyAny>,
+    mut builder: PyRefMut<'_, PyModelBuilder>,
     noi_node: &str,
     capex_nodes: Vec<String>,
     ncf_node: &str,
-) -> PyResult<PyFinancialModelSpec> {
+) -> PyResult<()> {
     let capex_refs: Vec<&str> = capex_nodes.iter().map(String::as_str).collect();
-    let builder =
-        rust_re::add_ncf_buildup(extract_builder(model)?, noi_node, &capex_refs, ncf_node)
-            .map_err(crate::errors::statements_to_py)?;
-    finish_builder(builder)
+    rust_re::add_ncf_buildup(builder.builder_mut()?, noi_node, &capex_refs, ncf_node)
+        .map_err(crate::errors::statements_to_py)
 }
 
 // add_rent_roll
 
-/// Apply the rich rent-roll template to a model spec.
+#[doc = pydoc!("finstack_quant.statements_analytics._templates_real_estate", "add_rent_roll")]
 #[pyfunction]
-#[pyo3(signature = (model, leases, nodes=None))]
+#[pyo3(signature = (builder, leases, nodes=None))]
 fn add_rent_roll(
-    model: &Bound<'_, PyAny>,
+    mut builder: PyRefMut<'_, PyModelBuilder>,
     leases: Vec<PyLeaseSpec>,
     nodes: Option<PyRentRollOutputNodes>,
-) -> PyResult<PyFinancialModelSpec> {
+) -> PyResult<()> {
     let lease_specs: Vec<rust_re::LeaseSpec> = leases.into_iter().map(|l| l.inner).collect();
     let nodes_inner = nodes.map(|n| n.inner).unwrap_or_default();
-    let builder = rust_re::add_rent_roll(extract_builder(model)?, &lease_specs, &nodes_inner)
-        .map_err(crate::errors::statements_to_py)?;
-    finish_builder(builder)
+    rust_re::add_rent_roll(builder.builder_mut()?, &lease_specs, &nodes_inner)
+        .map_err(crate::errors::statements_to_py)
 }
 
 // add_property_operating_statement
 
-/// Apply the full property operating-statement template to a model spec.
+#[doc = pydoc!("finstack_quant.statements_analytics._templates_real_estate", "add_property_operating_statement")]
 #[pyfunction]
 #[pyo3(signature = (
-    model,
+    builder,
     leases,
     other_income_nodes,
     opex_nodes,
@@ -826,22 +823,22 @@ fn add_rent_roll(
     nodes=None,
 ))]
 fn add_property_operating_statement(
-    model: &Bound<'_, PyAny>,
+    mut builder: PyRefMut<'_, PyModelBuilder>,
     leases: Vec<PyLeaseSpec>,
     other_income_nodes: Vec<String>,
     opex_nodes: Vec<String>,
     capex_nodes: Vec<String>,
     management_fee: Option<PyManagementFeeSpec>,
     nodes: Option<PyPropertyTemplateNodes>,
-) -> PyResult<PyFinancialModelSpec> {
+) -> PyResult<()> {
     let lease_specs: Vec<rust_re::LeaseSpec> = leases.into_iter().map(|l| l.inner).collect();
     let other_refs: Vec<&str> = other_income_nodes.iter().map(String::as_str).collect();
     let opex_refs: Vec<&str> = opex_nodes.iter().map(String::as_str).collect();
     let capex_refs: Vec<&str> = capex_nodes.iter().map(String::as_str).collect();
     let nodes_inner = nodes.map(|n| n.inner).unwrap_or_default();
     let fee = management_fee.map(|f| f.inner);
-    let builder = rust_re::add_property_operating_statement(
-        extract_builder(model)?,
+    rust_re::add_property_operating_statement(
+        builder.builder_mut()?,
         &lease_specs,
         &other_refs,
         &opex_refs,
@@ -849,8 +846,7 @@ fn add_property_operating_statement(
         fee,
         &nodes_inner,
     )
-    .map_err(crate::errors::statements_to_py)?;
-    finish_builder(builder)
+    .map_err(crate::errors::statements_to_py)
 }
 
 /// Register real-estate template types and functions on the parent module.

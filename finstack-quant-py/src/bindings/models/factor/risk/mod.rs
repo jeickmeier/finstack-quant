@@ -1,7 +1,7 @@
 //! Models-owned factor risk wrappers and pure calculation entry points.
 mod budget;
 pub(crate) mod contributions;
-mod functions;
+pub(super) mod functions;
 mod report;
 mod stress;
 use budget::{
@@ -15,7 +15,10 @@ use contributions::{
 };
 use functions::{decompose_factors, position_component_var};
 use pyo3::prelude::*;
-use report::{PyPositionRiskReport, position_risk_report};
+use report::{
+    PyPositionRiskBudget, PyPositionRiskReport, PyPositionRiskRequest, PyPositionRiskSource,
+    position_risk_report,
+};
 use stress::{
     PyStressAttribution, PyStressPositionEntry, PyTailScenarioBreakdown, build_stress_attribution,
 };
@@ -24,6 +27,7 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFactorContribution>()?;
     m.add_class::<PyPositionFactorContribution>()?;
     m.add_class::<PyPositionResidualContribution>()?;
+    m.add_class::<functions::PyRiskMeasure>()?;
     m.add_class::<PyRiskDecomposition>()?;
     m.add_class::<PyPositionVarContribution>()?;
     m.add_class::<PyPositionEsContribution>()?;
@@ -33,6 +37,9 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyStressPositionEntry>()?;
     m.add_class::<PyTailScenarioBreakdown>()?;
     m.add_class::<PyStressAttribution>()?;
+    m.add_class::<PyPositionRiskBudget>()?;
+    m.add_class::<PyPositionRiskRequest>()?;
+    m.add_class::<PyPositionRiskSource>()?;
     m.add_class::<PyPositionRiskReport>()?;
     m.add(
         "DEFAULT_UTILIZATION_THRESHOLD",

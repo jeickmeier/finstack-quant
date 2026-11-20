@@ -10,7 +10,7 @@
 
 use crate::utils::input::{from_js_json, js_opt_string, js_string};
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_calibration::api::schema::CalibrationStep;
+use finstack_quant_calibration::api::schema::{CalibrationStep, StepParams};
 use serde_json::{Map, Value};
 use wasm_bindgen::prelude::*;
 
@@ -26,6 +26,25 @@ fn step(
     let step = CalibrationStep::from_wire_fields(kind, &id, quote_set.as_deref(), fields)
         .map_err(to_js_err)?;
     to_js_value(&step)
+}
+
+/// Build a calibration step from a native kind-tagged parameter object.
+/// @param id - Stable step ID used in reports and as the default quote-set name.
+/// @param params - Canonical kind-tagged curve, model or surface parameters, with explicit output identifiers.
+/// @param quoteSet - The parent plan's named quote set. Defaults to the step ID.
+/// @returns One calibration step ready for plan authoring.
+/// @throws `TypeError` for invalid host shapes or `FinstackError` for missing fields, invalid parameters, or blank identifiers.
+#[wasm_bindgen(js_name = calibrationStep, unchecked_return_type = "generated.calibration.CalibrationStep")]
+pub fn calibration_step(
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.calibration.StepParams")] params: JsValue,
+    #[wasm_bindgen(js_name = "quoteSet", unchecked_optional_param_type = "string | null")]
+    quote_set: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let id = js_string(&id, "id")?;
+    let params: StepParams = from_js_json(&params, "params")?;
+    let quote_set = js_opt_string(quote_set.as_ref(), "quoteSet")?;
+    to_js_value(&CalibrationStep::new(&id, params, quote_set.as_deref()).map_err(to_js_err)?)
 }
 
 /// Build a discount-curve bootstrap step.

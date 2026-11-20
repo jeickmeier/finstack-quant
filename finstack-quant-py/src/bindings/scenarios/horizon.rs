@@ -93,7 +93,7 @@ pub(crate) fn compute_horizon_return<'py>(
     use std::sync::Arc;
 
     let boxed = extract_instrument(instrument)?
-        .into_parsed(None)
+        .into_parsed(None, None)
         .map_err(core_to_py)?;
     let instrument: Arc<dyn finstack_quant_valuations::instruments::Instrument> =
         Arc::from(boxed.into_boxed());

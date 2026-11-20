@@ -707,16 +707,20 @@ def test_unknown_keywords_are_rejected_by_rust(build: Any) -> None:
         build()
 
 
-def test_decimal_fields_take_the_exact_wire_string_not_a_float() -> None:
+def test_decimal_fields_normalize_python_values_and_keep_exact_wire_strings() -> None:
+    leg = FixedLegSpec(
+        discount_curve_id="USD-OIS",
+        rate=0.04,
+        frequency=Tenor.semi_annual(),
+        day_count=DayCount.THIRTY_360,
+        start=START,
+        end=END,
+    )
+    fields = json.loads(leg.to_json())
+    assert fields["rate"] == "0.04"
+    fields["rate"] = 0.04
     with pytest.raises(ValueError, match="floating point"):
-        FixedLegSpec(
-            discount_curve_id="USD-OIS",
-            rate=0.04,
-            frequency=Tenor.semi_annual(),
-            day_count=DayCount.THIRTY_360,
-            start=START,
-            end=END,
-        )
+        FixedLegSpec.from_json(json.dumps(fields))
 
 
 def test_exposure_requires_both_staging_pds() -> None:

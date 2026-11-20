@@ -49,6 +49,7 @@ def test_credit_tearsheet_renders_all_sections() -> None:
     assert "Leverage &amp; Coverage" in html
     assert "Per-Instrument Coverage" in html
     assert "TLB" in html
+    assert "55.0%" in html
     assert "Covenant Compliance" in html
     assert "Max Leverage" in html
     assert "EBITDA Build" in html

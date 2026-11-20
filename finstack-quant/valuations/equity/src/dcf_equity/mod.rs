@@ -10,5 +10,6 @@ pub(crate) mod pricer;
 mod types;
 
 pub use types::{
-    DilutionSecurity, DiscountedCashFlow, EquityBridge, TerminalValueSpec, ValuationDiscounts,
+    DilutionSecurity, DiscountedCashFlow, EquityBridge, ForecastTiming, TerminalValueSpec,
+    ValuationDiscounts,
 };

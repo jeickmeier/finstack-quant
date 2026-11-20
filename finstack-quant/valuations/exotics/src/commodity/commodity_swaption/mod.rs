@@ -32,4 +32,4 @@
 pub(crate) mod metrics;
 mod types;
 
-pub use types::CommoditySwaption;
+pub use types::{CommoditySwaption, CommoditySwaptionBuilder};

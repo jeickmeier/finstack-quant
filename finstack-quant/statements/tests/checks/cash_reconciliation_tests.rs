@@ -90,7 +90,7 @@ fn every_period_reconciles_from_the_explicit_opening() {
     // Residual 10 against the opening of 70, with no floor on the reference.
     assert_eq!(materiality.absolute, 10.0);
     assert_eq!(materiality.reference_value, 70.0);
-    assert!((materiality.relative_pct.unwrap() - 100.0 / 7.0).abs() < 1e-12);
+    assert!((materiality.relative.unwrap() - 1.0 / 7.0).abs() < 1e-12);
     assert_eq!(materiality.reference_label, "opening_cash");
 }
 

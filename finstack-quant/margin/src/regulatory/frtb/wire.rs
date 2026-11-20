@@ -1,10 +1,11 @@
 //! Deterministic JSON wire representation for FRTB sensitivities.
 
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::types::CurveId;
 
 use super::types::{DrcPosition, FrtbSensitivities, RraoPosition};
 
-type CurrencyTenor = (Currency, String, f64);
+type YieldDelta = (Currency, CurveId, String, f64);
 type CurrencyValue = (Currency, f64);
 type CurrencyVega = (Currency, String, String, f64);
 type CurrencyCurvature = (Currency, f64, f64);
@@ -21,7 +22,7 @@ type CurrencyPairCurvature = (Currency, Currency, f64, f64);
 #[serde(deny_unknown_fields)]
 pub(super) struct FrtbSensitivitiesWire {
     base_currency: Currency,
-    girr_delta: Vec<CurrencyTenor>,
+    girr_delta: Vec<YieldDelta>,
     girr_inflation_delta: Vec<CurrencyValue>,
     girr_xccy_basis_delta: Vec<CurrencyValue>,
     girr_vega: Vec<CurrencyVega>,
@@ -54,9 +55,13 @@ impl From<&FrtbSensitivities> for FrtbSensitivitiesWire {
         let mut girr_delta: Vec<_> = value
             .girr_delta
             .iter()
-            .map(|((currency, tenor), amount)| (*currency, tenor.clone(), *amount))
+            .map(|((currency, curve, tenor), amount)| {
+                (*currency, curve.clone(), tenor.clone(), *amount)
+            })
             .collect();
-        girr_delta.sort_by(|left, right| left.0.cmp(&right.0).then_with(|| left.1.cmp(&right.1)));
+        girr_delta.sort_by(|left, right| {
+            (left.0, left.1.as_str(), &left.2).cmp(&(right.0, right.1.as_str(), &right.2))
+        });
 
         let mut girr_inflation_delta: Vec<_> = value
             .girr_inflation_delta
@@ -199,11 +204,19 @@ impl From<&FrtbSensitivities> for FrtbSensitivitiesWire {
     }
 }
 
-impl From<FrtbSensitivitiesWire> for FrtbSensitivities {
-    fn from(wire: FrtbSensitivitiesWire) -> Self {
+impl TryFrom<FrtbSensitivitiesWire> for FrtbSensitivities {
+    type Error = finstack_quant_core::Error;
+
+    fn try_from(wire: FrtbSensitivitiesWire) -> Result<Self, Self::Error> {
         let mut value = Self::new(wire.base_currency);
-        for (currency, tenor, amount) in wire.girr_delta {
-            value.girr_delta.insert((currency, tenor), amount);
+        for (currency, curve_id, tenor, amount) in wire.girr_delta {
+            let key = (currency, curve_id.clone(), tenor.clone());
+            if value.girr_delta.contains_key(&key) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "duplicate FRTB girr_delta sensitivity for {currency} {curve_id} {tenor}"
+                )));
+            }
+            value.add_girr_delta(currency, curve_id, &tenor, amount)?;
         }
         value.girr_inflation_delta.extend(wire.girr_inflation_delta);
         value
@@ -249,7 +262,7 @@ impl From<FrtbSensitivitiesWire> for FrtbSensitivities {
         }
         value.drc_positions = wire.drc_positions;
         value.rrao_exotic_notionals = wire.rrao_exotic_notionals;
-        value
+        Ok(value)
     }
 }
 
@@ -265,7 +278,7 @@ where
     D: serde::Deserializer<'de>,
 {
     let wire = <FrtbSensitivitiesWire as serde::Deserialize>::deserialize(deserializer)?;
-    Ok(FrtbSensitivities::from(wire))
+    FrtbSensitivities::try_from(wire).map_err(serde::de::Error::custom)
 }
 
 fn label_bucket_tenor(

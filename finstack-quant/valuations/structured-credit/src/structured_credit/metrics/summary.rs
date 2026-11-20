@@ -492,9 +492,11 @@ fn registry_metrics(
     let tranche = deal.tranches.require(tranche_id)?;
     let pv = deal.value_tranche_cashflows(&flows, market, valuation_date)?;
     let mut context = MetricContext::new(
-        std::sync::Arc::new(
-            crate::structured_credit::types::StructuredCreditTranche::new(deal.clone(), tranche_id),
-        ),
+        std::sync::Arc::new(crate::structured_credit::StructuredCreditTranche::new(
+            deal.id.clone(),
+            deal.clone(),
+            tranche_id,
+        )?),
         std::sync::Arc::new(market.clone()),
         valuation_date,
         pv,

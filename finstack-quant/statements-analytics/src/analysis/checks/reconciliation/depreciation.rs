@@ -159,7 +159,7 @@ impl Check for DepreciationReconciliation {
 
             if diff.abs() > tolerance {
                 let reference = ppe_prev.abs().max(1.0);
-                let relative = (diff / reference).abs() * 100.0;
+                let relative = (diff / reference).abs();
 
                 let mut nodes = vec![
                     self.ppe_node.clone(),
@@ -182,7 +182,7 @@ impl Check for DepreciationReconciliation {
                     period: Some(*curr_pid),
                     materiality: Some(Materiality {
                         absolute: diff.abs(),
-                        relative_pct: Some(relative),
+                        relative: Some(relative),
                         reference_value: ppe_prev,
                         reference_label: "prior_ppe".to_string(),
                     }),

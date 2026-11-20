@@ -15,6 +15,15 @@ use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_s
 use crate::errors::portfolio_to_py;
 use finstack_quant_portfolio::{margin::NettingSetMargin, margin::PortfolioMarginResult};
 
+use crate::bindings::core::config::PyFinstackConfig;
+use crate::bindings::margin::PyFrtbSensitivities;
+use crate::bindings::module_utils::{parse_currency, py_to_serde};
+use crate::bindings::pandas_utils::serde_to_py;
+use finstack_quant_portfolio::margin::{
+    CsrQuoteClassification, CsrQuoteDelta, CsrQuoteSource, GirrQuoteDelta, GirrQuoteTarget,
+    csr_quote_delta as csr_quote_delta_rs, girr_quote_delta as girr_quote_delta_rs,
+};
+
 /// Column schema for [`PyPortfolioMarginResult::to_dataframe`].
 const NETTING_SET_COLUMNS: &[ColumnSchema<'static>] = &[
     ("netting_set_id", "str"),
@@ -439,7 +448,350 @@ fn portfolio_margin(
     Ok(PyPortfolioMarginResult { inner })
 }
 
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "GirrQuoteTarget")]
+#[pyclass(
+    name = "GirrQuoteTarget",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+struct PyGirrQuoteTarget {
+    inner: GirrQuoteTarget,
+}
+
+#[pymethods]
+impl PyGirrQuoteTarget {
+    #[new]
+    #[pyo3(signature = (*, risk_currency, risk_curve_id, vertex, source, quote))]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "GirrQuoteTarget.__init__")]
+    fn new(
+        py: Python<'_>,
+        risk_currency: &str,
+        risk_curve_id: &str,
+        vertex: String,
+        source: &Bound<'_, PyAny>,
+        quote: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: GirrQuoteTarget {
+                risk_currency: parse_currency(risk_currency)?,
+                risk_curve_id: risk_curve_id.into(),
+                vertex,
+                source: py_to_serde(py, source, "GIRR quote source")?,
+                quote: py_to_serde(py, quote, "GIRR quote coordinate")?,
+            },
+        })
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "GirrQuoteTarget.to_dict")]
+    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner)
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "GirrQuoteDelta")]
+#[pyclass(
+    name = "GirrQuoteDelta",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+struct PyGirrQuoteDelta {
+    inner: GirrQuoteDelta,
+}
+
+#[pymethods]
+impl PyGirrQuoteDelta {
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "GirrQuoteDelta.as_of")]
+    fn as_of<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.as_of)
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "GirrQuoteDelta.sensitivities")]
+    fn sensitivities(&self) -> PyFrtbSensitivities {
+        PyFrtbSensitivities::from_inner(self.inner.sensitivities.clone())
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "GirrQuoteDelta.to_dict")]
+    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner)
+    }
+}
+
+#[pyfunction]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "girr_quote_delta")]
+fn girr_quote_delta(
+    py: Python<'_>,
+    portfolio: &Bound<'_, PyAny>,
+    market: &Bound<'_, PyAny>,
+    pricing: &PyFinstackConfig,
+    targets: Vec<Py<PyGirrQuoteTarget>>,
+) -> PyResult<PyGirrQuoteDelta> {
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let market = extract_market_ref(py, market)?;
+    let targets = targets
+        .into_iter()
+        .map(|target| target.borrow(py).inner.clone())
+        .collect::<Vec<_>>();
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let inner = py
+        .detach(|| girr_quote_delta_rs(portfolio_ref, market_ref, &pricing.inner, &targets))
+        .map_err(portfolio_to_py)?;
+    Ok(PyGirrQuoteDelta { inner })
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "CsrQuoteClassification")]
+#[pyclass(
+    name = "CsrQuoteClassification",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+struct PyCsrQuoteClassification {
+    inner: CsrQuoteClassification,
+}
+
+#[pymethods]
+impl PyCsrQuoteClassification {
+    #[new]
+    #[pyo3(signature = (*, issuer, currency, seniority, bucket, source_id, as_of))]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "CsrQuoteClassification.__init__")]
+    fn new(
+        issuer: String,
+        currency: &str,
+        seniority: &str,
+        bucket: u8,
+        source_id: String,
+        as_of: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: CsrQuoteClassification {
+                issuer,
+                currency: parse_currency(currency)?,
+                seniority: seniority.parse().map_err(crate::errors::core_to_py)?,
+                bucket,
+                source_id,
+                as_of: crate::bindings::date_utils::py_to_date(as_of)?,
+            },
+        })
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "CsrQuoteSource")]
+#[pyclass(
+    name = "CsrQuoteSource",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+struct PyCsrQuoteSource {
+    inner: CsrQuoteSource,
+}
+
+#[pymethods]
+impl PyCsrQuoteSource {
+    #[new]
+    #[pyo3(signature = (*, curve_id, classification, vertices))]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "CsrQuoteSource.__init__")]
+    fn new(
+        py: Python<'_>,
+        curve_id: &str,
+        classification: PyRef<'_, PyCsrQuoteClassification>,
+        vertices: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: CsrQuoteSource {
+                curve_id: curve_id.into(),
+                classification: classification.inner.clone(),
+                vertices: py_to_serde(py, vertices, "CSR quote coordinates")?,
+            },
+        })
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "CsrQuoteSource.to_dict")]
+    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner)
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "CsrQuoteDelta")]
+#[pyclass(
+    name = "CsrQuoteDelta",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+struct PyCsrQuoteDelta {
+    inner: CsrQuoteDelta,
+}
+
+#[pymethods]
+impl PyCsrQuoteDelta {
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "CsrQuoteDelta.as_of")]
+    fn as_of<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.as_of)
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "CsrQuoteDelta.sensitivities")]
+    fn sensitivities(&self) -> PyFrtbSensitivities {
+        PyFrtbSensitivities::from_inner(self.inner.sensitivities.clone())
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "CsrQuoteDelta.to_dict")]
+    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner)
+    }
+}
+
+#[pyfunction]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "csr_quote_delta")]
+fn csr_quote_delta(
+    py: Python<'_>,
+    portfolio: &Bound<'_, PyAny>,
+    market: &Bound<'_, PyAny>,
+    pricing: &PyFinstackConfig,
+    sources: Vec<Py<PyCsrQuoteSource>>,
+) -> PyResult<PyCsrQuoteDelta> {
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let market = extract_market_ref(py, market)?;
+    let sources = sources
+        .into_iter()
+        .map(|source| source.borrow(py).inner.clone())
+        .collect::<Vec<_>>();
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let inner = py
+        .detach(|| csr_quote_delta_rs(portfolio_ref, market_ref, &pricing.inner, &sources))
+        .map_err(portfolio_to_py)?;
+    Ok(PyCsrQuoteDelta { inner })
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "PortfolioFrtbConfig")]
+#[pyclass(
+    name = "PortfolioFrtbConfig",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+struct PyPortfolioFrtbConfig {
+    inner: finstack_quant_portfolio::margin::PortfolioFrtbConfig,
+}
+
+#[pymethods]
+impl PyPortfolioFrtbConfig {
+    #[new]
+    #[pyo3(signature = (*, girr_targets, csr_sources))]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "PortfolioFrtbConfig.__init__")]
+    fn new(
+        py: Python<'_>,
+        girr_targets: Vec<Py<PyGirrQuoteTarget>>,
+        csr_sources: Vec<Py<PyCsrQuoteSource>>,
+    ) -> Self {
+        Self {
+            inner: finstack_quant_portfolio::margin::PortfolioFrtbConfig {
+                girr_targets: girr_targets
+                    .iter()
+                    .map(|target| target.borrow(py).inner.clone())
+                    .collect(),
+                csr_sources: csr_sources
+                    .iter()
+                    .map(|source| source.borrow(py).inner.clone())
+                    .collect(),
+            },
+        }
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "PortfolioFrtbSensitivitiesResult")]
+#[pyclass(
+    name = "PortfolioFrtbSensitivitiesResult",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+struct PyPortfolioFrtbSensitivitiesResult {
+    inner: finstack_quant_portfolio::margin::PortfolioFrtbSensitivitiesResult,
+}
+
+#[pymethods]
+impl PyPortfolioFrtbSensitivitiesResult {
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "PortfolioFrtbSensitivitiesResult.sensitivities")]
+    fn sensitivities(&self) -> PyFrtbSensitivities {
+        PyFrtbSensitivities::from_inner(self.inner.sensitivities.clone())
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "PortfolioFrtbSensitivitiesResult.girr")]
+    fn girr(&self) -> PyGirrQuoteDelta {
+        PyGirrQuoteDelta {
+            inner: self.inner.girr.clone(),
+        }
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "PortfolioFrtbSensitivitiesResult.csr")]
+    fn csr(&self) -> PyCsrQuoteDelta {
+        PyCsrQuoteDelta {
+            inner: self.inner.csr.clone(),
+        }
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "PortfolioFrtbSensitivitiesResult.positions_mapped")]
+    fn positions_mapped(&self) -> usize {
+        self.inner.positions_mapped
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "PortfolioFrtbSensitivitiesResult.positions_unmapped")]
+    fn positions_unmapped<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.positions_unmapped)
+    }
+}
+
+#[pyfunction]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._margin", "portfolio_frtb_sensitivities")]
+fn portfolio_frtb_sensitivities(
+    py: Python<'_>,
+    portfolio: &Bound<'_, PyAny>,
+    market: &Bound<'_, PyAny>,
+    pricing: &PyFinstackConfig,
+    config: &PyPortfolioFrtbConfig,
+) -> PyResult<PyPortfolioFrtbSensitivitiesResult> {
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let market = extract_market_ref(py, market)?;
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let inner = py
+        .detach(|| {
+            finstack_quant_portfolio::margin::portfolio_frtb_sensitivities(
+                portfolio_ref,
+                market_ref,
+                &pricing.inner,
+                &config.inner,
+            )
+        })
+        .map_err(portfolio_to_py)?;
+    Ok(PyPortfolioFrtbSensitivitiesResult { inner })
+}
+
 pub(super) fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyPortfolioFrtbConfig>()?;
+    m.add_class::<PyPortfolioFrtbSensitivitiesResult>()?;
+    m.add_function(wrap_pyfunction!(portfolio_frtb_sensitivities, m)?)?;
+    m.add_class::<PyCsrQuoteClassification>()?;
+    m.add_class::<PyCsrQuoteSource>()?;
+    m.add_class::<PyCsrQuoteDelta>()?;
+    m.add_function(wrap_pyfunction!(csr_quote_delta, m)?)?;
+    m.add_class::<PyGirrQuoteTarget>()?;
+    m.add_class::<PyGirrQuoteDelta>()?;
+    m.add_function(wrap_pyfunction!(girr_quote_delta, m)?)?;
     m.add_class::<PyNettingSetMargin>()?;
     m.add_class::<PyPortfolioMarginResult>()?;
     m.add_function(wrap_pyfunction!(portfolio_margin, m)?)?;

@@ -169,6 +169,28 @@ pub struct CommoditySpreadOption {
 }
 
 impl CommoditySpreadOption {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> CommoditySpreadOptionBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .currency(self.currency)
+            .option_type(self.option_type)
+            .expiry(self.expiry)
+            .strike(self.strike)
+            .quantity(self.quantity)
+            .leg1_forward_curve_id(self.leg1_forward_curve_id.clone())
+            .leg2_forward_curve_id(self.leg2_forward_curve_id.clone())
+            .leg1_vol_surface_id(self.leg1_vol_surface_id.clone())
+            .leg2_vol_surface_id(self.leg2_vol_surface_id.clone())
+            .discount_curve_id(self.discount_curve_id.clone())
+            .correlation(self.correlation)
+            .day_count(self.day_count)
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Create a representative WTI-RBOB crack spread call option example.
     ///
     /// $5 strike, 10,000 bbl quantity, 0.85 correlation, European-style.

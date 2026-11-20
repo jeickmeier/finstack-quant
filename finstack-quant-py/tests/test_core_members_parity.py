@@ -101,7 +101,8 @@ def test_hazard_curve_json_round_trip() -> None:
         currency="USD",
     )
     assert HazardCurve.from_json(curve.to_json()).to_json() == curve.to_json()
-    assert curve.knot_points == [(1.0, 0.02), (5.0, 0.03)]
+    assert curve.knots == [1.0, 5.0]
+    assert curve.hazard_rates == [0.02, 0.03]
     assert curve.day_count == "act_365f"
     assert curve.calendar_id is None
 

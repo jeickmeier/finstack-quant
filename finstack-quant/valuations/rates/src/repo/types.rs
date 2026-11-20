@@ -165,6 +165,7 @@ impl CollateralSpec {
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
+#[builder(validate = Repo::validate)]
 pub struct Repo {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -242,6 +243,29 @@ pub struct Repo {
 }
 
 impl Repo {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> RepoBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .cash_amount(self.cash_amount)
+            .collateral(self.collateral.clone())
+            .repo_rate(self.repo_rate)
+            .start_date(self.start_date)
+            .maturity(self.maturity)
+            .haircut(self.haircut)
+            .repo_type(self.repo_type)
+            .triparty(self.triparty)
+            .day_count(self.day_count)
+            .business_day_convention(self.business_day_convention)
+            .calendar_id_opt(self.calendar_id.clone())
+            .discount_curve_id(self.discount_curve_id.clone())
+            .margin_spec_opt(self.margin_spec.clone())
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Validate structural and economic repo invariants at the canonical boundary.
     pub fn validate(&self) -> Result<()> {
         if !self.cash_amount.amount().is_finite() || self.cash_amount.amount() <= 0.0 {

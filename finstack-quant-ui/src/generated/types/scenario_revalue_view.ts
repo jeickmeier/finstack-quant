@@ -423,19 +423,6 @@ export type DB3A70F30000C75370Aed =
     }
   | {
       /**
-       * Curve identifier.
-       */
-      curve_id: string;
-      /**
-       * Detail describing whether the trigger was a parallel or node shock
-       * and which knot(s) were extreme.
-       */
-      detail: string;
-      kind: "commodity_shock_outside_range";
-      [k: string]: unknown;
-    }
-  | {
-      /**
        * Equity price identifier.
        */
       id: string;
@@ -604,7 +591,8 @@ export type DB3A70F30000C75370Aed =
         | "fx_future_option"
         | "commodity_future_option"
         | "volatility_index_future_option"
-        | "asset_backed_facility";
+        | "asset_backed_facility"
+        | "structured_credit_tranche";
       kind: "instrument_shock_fallback";
       /**
        * Instrument label (id / name / unidentified).
@@ -665,35 +653,7 @@ export type DB3A70F30000C75370Aed =
       [k: string]: unknown;
     }
   | {
-      /**
-       * Free-text from `ArbitrageViolation` Display.
-       */
-      detail: string;
-      kind: "vol_surface_arbitrage";
-      /**
-       * Volatility-surface identifier.
-       */
-      vol_surface_id: string;
-      [k: string]: unknown;
-    }
-  | {
       kind: "vol_surface_bucket_empty_selection";
-      /**
-       * Volatility-surface identifier.
-       */
-      vol_surface_id: string;
-      [k: string]: unknown;
-    }
-  | {
-      /**
-       * Whether this was a parallel (`false`) or bucket (`true`) shock.
-       */
-      bucket: boolean;
-      kind: "vol_surface_large_negative_shock";
-      /**
-       * Percent shock value.
-       */
-      pct: number;
       /**
        * Volatility-surface identifier.
        */
@@ -2813,6 +2773,10 @@ export interface D_276E49563C6406102455 {
    * Cushion relative to threshold (positive => passing buffer)
    */
   headroom?: number | null;
+  /**
+   * Signed cushion in the covenant metric's own units when numerically meaningful.
+   */
+  headroom_raw?: number | null;
   meta?: DBbbaabd9311C14F65E9B;
   /**
    * Whether the covenant passed

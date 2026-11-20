@@ -23,7 +23,7 @@ the Heston parameter validator. From core it uses `math::special_functions`
 Bachelier pricing formulas are owned directly by this module.
 
 It reads no market data, no curves, and no `MarketContext`: apart from the
-payoff/barrier enums and the `BarrierParams`/`HestonPricingParams` grouping structs,
+payoff/barrier enums and `BarrierParams` and the shared option contract types,
 every argument is a flat `f64`.
 
 Consumed by `valuations::instruments` — `equity/equity_option`,
@@ -229,9 +229,9 @@ P_j = 0.5 + (1/π) ∫₀^∞ Re[e^(-iφ·ln K) · ψ_j(φ) / (iφ)] dφ
 
 | Item | Notes |
 |------|-------|
-| `heston_call_price_fourier` | `(spot, strike, time, &HestonPricingParams, Option<&HestonFourierSettings>) -> f64` |
+| `heston_call_price_fourier` | `(&OptionContractParams, &HestonParams, Option<&HestonFourierSettings>) -> Result<f64>` |
 | `heston_put_price_fourier` | same, via put-call parity |
-| `HestonPricingParams` | `r` and `q` plus canonical `volatility::heston::HestonParams` — `new()` validates and returns `Result` |
+| `HestonParams` | Canonical variance dynamics with checked construction |
 | `HestonFourierSettings` | `u_max`, `panels`, `gl_order`; `new()` / `validate()` |
 
 The "Little Heston Trap" algebra (Albrecher et al. 2007) lives once in
@@ -249,7 +249,7 @@ beyond. `gl_order` must be one of `{2, 4, 8, 16}`; anything else fails
 validation because there is no node/weight table for it and the strip pricer
 would silently degrade to the slower per-strike path.
 
-`sigma_v < 1e-10` falls back to Black-Scholes evaluated at the *deterministic
+`vol_of_vol < 1e-10` falls back to Black-Scholes evaluated at the *deterministic
 average variance* `v̄(T)`, not at `v0`. A Feller violation (`2κθ ≤ σ_v²`) logs a
 warning but is informational only: the Fourier pricer never simulates the
 variance path.
@@ -333,14 +333,17 @@ use finstack_quant_models::types::{OptionMarketParams, OptionType};
 use finstack_quant_models::closed_form::{
     barrier::{barrier_price, BarrierParams},
     bs_greeks, bs_price,
-    heston::{heston_call_price_fourier, HestonPricingParams},
+    heston_call_price_fourier,
     implied_vol::bs_implied_vol,
 };
 
 let (spot, strike, r, q, vol, t) = (100.0, 100.0, 0.05, 0.02, 0.20, 1.0);
 
 // Vanilla price and Greeks on a 365-day theta basis.
-let price = bs_price(spot, strike, r, q, vol, t, OptionType::Call);
+let price = bs_price(&finstack_quant_models::types::OptionMarketParams {
+    spot, strike, rate: r, dividend_yield: q, volatility: vol,
+    time_to_expiry: t, option_type: OptionType::Call,
+})?;
 let market = OptionMarketParams {
     spot,
     strike,
@@ -363,8 +366,8 @@ let ko = barrier_price(&params, BarrierType::DownAndOut, OptionType::Call);
 assert!(ko < price);
 
 // Heston with adaptive quadrature settings.
-let params = HestonPricingParams::new(r, q, 2.0, 0.04, 0.3, -0.7, 0.04)?;
-let heston = heston_call_price_fourier(spot, strike, t, &params, None)?;
+let model = finstack_quant_models::volatility::heston::HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.7)?;
+let heston = heston_call_price_fourier(&market.contract(), &model, None)?;
 assert!(heston > 0.0 && heston < spot);
 # Ok::<(), finstack_quant_core::Error>(())
 ```
@@ -380,7 +383,7 @@ Both hosts (Python `finstack_quant.models`, WASM `models` namespace) bind
 `heston_price` under the same names (camelCase in WASM). A function whose
 Rust signature takes `&OptionMarketParams` takes its serde form as one
 `market` dict / object (`option_type` `"call"` or `"put"`), `heston_price`
-takes `HestonPricingParams` as `params`, and the other bindings convert
+takes `OptionContractParams` and `HestonParams`, and the other bindings convert
 `is_call` to `OptionType`; each makes one call. The Asian `_times` variants are
 Rust-only.
 

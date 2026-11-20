@@ -13,6 +13,7 @@ use wasm_bindgen::prelude::*;
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
 /// @param scenarioJson - Scenario specification JSON.
 /// @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data.
+/// @param options - Optional portfolio valuation options as an object or JSON. Omit for strict risk with standard metrics.
 ///
 /// Each position's `valuation_result` matches what `priceInstrument` returns:
 /// the 64-bit Monte Carlo `seed` is a `BigInt` and path counts are plain
@@ -34,20 +35,73 @@ pub fn apply_scenario_and_revalue(
     #[wasm_bindgen(js_name = "scenarioJson", unchecked_param_type = "JsonInput")]
     scenario_json: JsValue,
     market: &JsMarketContext,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "generated.portfolio.PortfolioValuationOptions | JsonInput"
+    )]
+    options: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
     let scenario =
         finstack_quant_scenarios::ScenarioSpec::from_json(scenario_json).map_err(to_js_err)?;
+    let options = options
+        .as_ref()
+        .filter(|value| !value.is_null())
+        .map(|value| {
+            crate::utils::input::from_js_json::<
+                finstack_quant_portfolio::valuation::PortfolioValuationOptions,
+            >(value, "options")
+        })
+        .transpose()?;
     let config = finstack_quant_core::config::FinstackConfig::default();
     let out = finstack_quant_portfolio::scenarios::apply_scenario_and_revalue(
         &portfolio.inner,
         &scenario,
         market.inner(),
         &config,
+        options.as_ref(),
     )
     .map_err(to_js_err)?;
     to_js_value_with_bigints(&out)
 }
+/// Attribute scenario P&L with the original contracts repriced before contract changes.
+/// @param portfolio - Opening holdings, quantities and valuation date.
+/// @param scenario - Ordered shocks, including any market, clock or instrument changes.
+/// @param market - Opening market snapshot used for base valuation and the shock.
+/// @param method - Optional native factor attribution method. The default is parallel.
+/// @returns Stressed revaluation, market attribution, contract increment, and marked and economic total P&L.
+/// @throws `TypeError` for invalid host shapes or `FinstackError` if scenario execution, pricing or reconciliation fails.
+#[wasm_bindgen(js_name = attributeScenarioPnl, unchecked_return_type = "ScenarioAttributionView")]
+pub fn attribute_scenario_pnl(
+    portfolio: &JsPortfolio,
+    #[wasm_bindgen(unchecked_param_type = "generated.scenarios.ScenarioSpec | string")]
+    scenario: JsValue,
+    market: &JsMarketContext,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "generated.attribution.AttributionMethod | null"
+    )]
+    method: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let scenario =
+        finstack_quant_scenarios::ScenarioSpec::from_json(&json_text(&scenario, "scenario")?)
+            .map_err(to_js_err)?;
+    let method = method
+        .as_ref()
+        .filter(|value| !value.is_null())
+        .map(|value| crate::utils::wire::js_wire(value, "method"))
+        .transpose()?
+        .unwrap_or_default();
+    let config = finstack_quant_core::config::FinstackConfig::default();
+    let result = finstack_quant_portfolio::scenarios::attribute_scenario_pnl(
+        &portfolio.inner,
+        &scenario,
+        market.inner(),
+        &config,
+        &method,
+    )
+    .map_err(to_js_err)?;
+    to_js_value_with_bigints(&result)
+}
+
 /// Compute the profit and loss attributable to a scenario for an already-built
 /// `Portfolio` handle.
 ///

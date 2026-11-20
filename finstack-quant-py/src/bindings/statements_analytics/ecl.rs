@@ -39,7 +39,7 @@ const BUCKET_COLUMNS: [ColumnSchema<'static>; 7] = [
 /// Column schema for `WeightedEclResult.to_dataframe`.
 const WEIGHTED_BUCKET_COLUMNS: [ColumnSchema<'static>; 9] = [
     ("scenario", "str"),
-    ("weight", "float64"),
+    ("weight", "str"),
     ("t_start", "float64"),
     ("t_end", "float64"),
     ("marginal_pd", "float64"),
@@ -984,6 +984,119 @@ impl PyEclResult {
 wire_methods!(PyEclResult, rust_ecl::EclResult, "EclResult");
 impl_repr_html_via_dataframe!(PyEclResult);
 
+#[pyclass(
+    name = "EclScenario",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "EclScenario")]
+#[derive(Clone)]
+struct PyEclScenario {
+    inner: rust_ecl::EclScenario,
+}
+
+#[pymethods]
+impl PyEclScenario {
+    #[new]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "EclScenario.__init__")]
+    #[pyo3(signature = (*, id, weight, pd_schedule=None, lgd_override=None))]
+    fn new(
+        id: String,
+        weight: &Bound<'_, PyAny>,
+        pd_schedule: Option<Vec<(f64, f64)>>,
+        lgd_override: Option<f64>,
+    ) -> PyResult<Self> {
+        let weight = crate::bindings::core::money::extract_exact_decimal(
+            weight,
+            "weight must be a decimal probability",
+        )?;
+        Ok(Self {
+            inner: rust_ecl::EclScenario {
+                id,
+                weight: finstack_quant_core::wire::DecimalWire(weight),
+                pd_schedule,
+                lgd_override,
+            },
+        })
+    }
+}
+
+#[pyclass(
+    name = "EclScenarioOutcome",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "EclScenarioOutcome")]
+#[derive(Clone)]
+struct PyEclScenarioOutcome {
+    inner: rust_ecl::EclScenarioOutcome,
+}
+
+#[pymethods]
+impl PyEclScenarioOutcome {
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "EclScenarioOutcome.id")]
+    fn id(&self) -> &str {
+        &self.inner.id
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "EclScenarioOutcome.weight")]
+    fn weight<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::core::money::decimal_to_py(py, self.inner.weight.0)
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "EclScenarioOutcome.lgd_override")]
+    fn lgd_override(&self) -> Option<f64> {
+        self.inner.lgd_override
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "EclScenarioOutcome.status")]
+    fn status(&self) -> &str {
+        match &self.inner.measurement {
+            rust_ecl::EclScenarioMeasurement::Measured { .. } => "measured",
+            rust_ecl::EclScenarioMeasurement::Unavailable { .. } => "unavailable",
+            rust_ecl::EclScenarioMeasurement::ZeroWeight => "zero_weight",
+        }
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "EclScenarioOutcome.result")]
+    fn result(&self) -> Option<PyEclResult> {
+        match &self.inner.measurement {
+            rust_ecl::EclScenarioMeasurement::Measured { result, .. } => Some(PyEclResult {
+                inner: result.as_ref().clone(),
+            }),
+            _ => None,
+        }
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "EclScenarioOutcome.weighted_allowance")]
+    fn weighted_allowance(&self) -> Option<f64> {
+        match &self.inner.measurement {
+            rust_ecl::EclScenarioMeasurement::Measured {
+                weighted_allowance, ..
+            } => Some(*weighted_allowance),
+            rust_ecl::EclScenarioMeasurement::ZeroWeight => Some(0.0),
+            rust_ecl::EclScenarioMeasurement::Unavailable { .. } => None,
+        }
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "EclScenarioOutcome.reason")]
+    fn reason(&self) -> Option<&str> {
+        match &self.inner.measurement {
+            rust_ecl::EclScenarioMeasurement::Unavailable { reason } => Some(reason),
+            _ => None,
+        }
+    }
+}
+
 /// Probability-weighted ECL across macro scenarios with the per-scenario
 /// audit trail.
 ///
@@ -1028,27 +1141,20 @@ impl PyWeightedEclResult {
         PyStage::from_rust(self.inner.stage)
     }
 
-    /// Probability-weighted ECL in the exposure's base currency.
+    /// Probability-weighted ECL in exposure currency, or None when evidence is incomplete.
     #[getter]
-    fn ecl(&self) -> f64 {
+    fn ecl(&self) -> Option<f64> {
         self.inner.ecl
     }
 
-    /// Per-scenario ``(scenario_id, weight, EclResult)`` triples.
+    /// Named scenarios, exact weights, and allowance availability in request order.
     #[getter]
-    fn scenario_breakdown(&self) -> Vec<(String, f64, PyEclResult)> {
+    fn scenario_breakdown(&self) -> Vec<PyEclScenarioOutcome> {
         self.inner
             .scenario_breakdown
             .iter()
-            .map(|(id, weight, result)| {
-                (
-                    id.clone(),
-                    *weight,
-                    PyEclResult {
-                        inner: result.clone(),
-                    },
-                )
-            })
+            .cloned()
+            .map(|inner| PyEclScenarioOutcome { inner })
             .collect()
     }
 
@@ -1060,7 +1166,7 @@ impl PyWeightedEclResult {
 
     /// Export the scenario x bucket audit trail as a pandas ``DataFrame``.
     ///
-    /// Columns: ``scenario`` (scenario id), ``weight`` (decimal probability),
+    /// Columns: ``scenario`` (scenario id), ``weight`` (exact decimal probability text),
     /// ``t_start``, ``t_end`` (years), ``marginal_pd``, ``lgd`` (decimals),
     /// ``ead``, ``ecl`` (base currency, unweighted per scenario),
     /// ``discount_factor``. One row per (scenario, bucket).
@@ -1069,11 +1175,17 @@ impl PyWeightedEclResult {
             .inner
             .scenario_breakdown
             .iter()
-            .flat_map(|(id, weight, result)| {
+            .filter_map(|scenario| match &scenario.measurement {
+                rust_ecl::EclScenarioMeasurement::Measured { result, .. } => {
+                    Some((scenario, result))
+                }
+                _ => None,
+            })
+            .flat_map(|(scenario, result)| {
                 result.buckets.iter().map(move |bucket| {
                     serde_json::json!({
-                        "scenario": id,
-                        "weight": weight,
+                        "scenario": scenario.id,
+                        "weight": scenario.weight,
                         "t_start": bucket.t_start,
                         "t_end": bucket.t_end,
                         "marginal_pd": bucket.marginal_pd,
@@ -1090,7 +1202,7 @@ impl PyWeightedEclResult {
 
     fn __repr__(&self) -> String {
         format!(
-            "WeightedEclResult(exposure_id='{}', stage=Stage.{:?}, ecl={}, scenarios={})",
+            "WeightedEclResult(exposure_id='{}', stage=Stage.{:?}, ecl={:?}, scenarios={})",
             self.inner.exposure_id,
             self.inner.stage,
             self.inner.ecl,
@@ -1187,15 +1299,11 @@ fn classify_stage(
 ///     in time and non-decreasing in PD. A ``(0.0, 0.0)`` knot is inserted
 ///     when absent.
 /// stage : Stage | str
-///     Measurement stage (``Stage`` or serde name ``"stage1"``/``"stage2"``/
-///     ``"stage3"``). Required: classify first with ``classify_stage`` under
-///     the desk's ``StagingConfig`` and pass ``result.stage``.
+///     Measurement stage (``Stage`` or serde name ``"stage1"`` or ``"stage2"``). Required: classify first with ``classify_stage`` under
+///     the desk's ``StagingConfig`` and pass ``result.stage``. For Stage 3 use ``compute_impaired_ecl``.
 /// bucket_width_years : float | None
 ///     Finite integration width of at least 0.0001 years (``0.25`` = quarterly); ``None`` uses
 ///     the canonical policy default.
-/// stage3_time_to_recovery_years : float | None
-///     Stage 3 discounting horizon to expected recovery, in years; ``None``
-///     uses the canonical policy default.
 ///
 /// Returns
 /// -------
@@ -1224,103 +1332,246 @@ fn classify_stage(
 /// >>> compute_ecl(exp, [(1.0, 0.02), (3.0, 0.06)], stage="stage1").ecl > 0
 /// True
 #[pyfunction]
-#[pyo3(signature = (exposure, pd_schedule, stage, bucket_width_years=None, stage3_time_to_recovery_years=None))]
+#[pyo3(signature = (exposure, pd_schedule, stage, bucket_width_years=None))]
 fn compute_ecl(
     py: Python<'_>,
     exposure: &PyExposure,
     pd_schedule: Vec<(f64, f64)>,
     stage: &Bound<'_, PyAny>,
     bucket_width_years: Option<f64>,
-    stage3_time_to_recovery_years: Option<f64>,
 ) -> PyResult<PyWeightedEclResult> {
     let stage = extract_stage(stage)?;
     let exposure = exposure.inner.clone();
     let inner = py
+        .detach(move || rust_ecl::compute_ecl(&exposure, stage, pd_schedule, bucket_width_years))
+        .map_err(core_to_py)?;
+    Ok(PyWeightedEclResult { inner })
+}
+
+#[pyclass(
+    name = "ImpairedExposure",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "ImpairedExposure")]
+#[derive(Clone)]
+struct PyImpairedExposure {
+    inner: rust_ecl::ImpairedExposure,
+}
+
+#[pymethods]
+impl PyImpairedExposure {
+    #[new]
+    #[pyo3(signature = (**fields), text_signature = "(*, exposure_id, carrying_amount_source, carrying_amount, reporting_date, effective_interest_rate, recovery_day_count)")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "ImpairedExposure.__init__")]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
+        Ok(Self {
+            inner: crate::bindings::module_utils::fields_from_py(py, fields, "ImpairedExposure")?,
+        })
+    }
+}
+
+#[pyclass(
+    name = "RecoveryEvidence",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "RecoveryEvidence")]
+#[derive(Clone)]
+struct PyRecoveryEvidence {
+    inner: rust_ecl::RecoveryEvidence,
+}
+
+#[pymethods]
+impl PyRecoveryEvidence {
+    #[new]
+    #[pyo3(signature = (**fields), text_signature = "(*, source_id, amount, date)")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "RecoveryEvidence.__init__")]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
+        Ok(Self {
+            inner: crate::bindings::module_utils::fields_from_py(py, fields, "RecoveryEvidence")?,
+        })
+    }
+}
+
+#[pyclass(
+    name = "ImpairedEclResult",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "ImpairedEclResult")]
+#[derive(Clone)]
+struct PyImpairedEclResult {
+    inner: rust_ecl::ImpairedEclResult,
+}
+
+#[pymethods]
+impl PyImpairedEclResult {
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "ImpairedEclResult.present_value_recovery")]
+    fn present_value_recovery(&self) -> crate::bindings::core::money::PyMoney {
+        crate::bindings::core::money::PyMoney::from_inner(self.inner.present_value_recovery)
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "ImpairedEclResult.signed_shortfall")]
+    fn signed_shortfall(&self) -> crate::bindings::core::money::PyMoney {
+        crate::bindings::core::money::PyMoney::from_inner(self.inner.signed_shortfall)
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "ImpairedEclResult.allowance")]
+    fn allowance(&self) -> crate::bindings::core::money::PyMoney {
+        crate::bindings::core::money::PyMoney::from_inner(self.inner.allowance)
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "ImpairedEclResult.time_to_recovery_years")]
+    fn time_to_recovery_years(&self) -> f64 {
+        self.inner.time_to_recovery_years
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "ImpairedEclResult.discount_factor")]
+    fn discount_factor(&self) -> f64 {
+        self.inner.discount_factor
+    }
+}
+
+crate::bindings::macros::wire_methods!(
+    PyImpairedEclResult,
+    rust_ecl::ImpairedEclResult,
+    "ImpairedEclResult",
+    module = "finstack_quant.statements_analytics._ecl"
+);
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "compute_impaired_ecl")]
+#[pyfunction]
+fn compute_impaired_ecl(
+    exposure: &PyImpairedExposure,
+    recovery: &PyRecoveryEvidence,
+) -> PyResult<PyImpairedEclResult> {
+    rust_ecl::compute_impaired_ecl(&exposure.inner, &recovery.inner)
+        .map(|inner| PyImpairedEclResult { inner })
+        .map_err(core_to_py)
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "compute_ecl_weighted")]
+#[pyfunction]
+#[pyo3(signature = (exposure, scenarios, stage, bucket_width_years=None))]
+fn compute_ecl_weighted(
+    py: Python<'_>,
+    exposure: &PyExposure,
+    scenarios: Vec<PyEclScenario>,
+    stage: &Bound<'_, PyAny>,
+    bucket_width_years: Option<f64>,
+) -> PyResult<PyWeightedEclResult> {
+    let stage = extract_stage(stage)?;
+    let exposure = exposure.inner.clone();
+    let scenarios = scenarios
+        .into_iter()
+        .map(|scenario| scenario.inner)
+        .collect::<Vec<_>>();
+    let inner = py
         .detach(move || {
-            rust_ecl::compute_ecl(
-                &exposure,
-                stage,
-                pd_schedule,
-                bucket_width_years,
-                stage3_time_to_recovery_years,
-            )
+            rust_ecl::compute_ecl_weighted(&exposure, stage, &scenarios, bucket_width_years)
         })
         .map_err(core_to_py)?;
     Ok(PyWeightedEclResult { inner })
 }
 
-/// Compute probability-weighted ECL across macro scenarios.
-///
-/// Parameters
-/// ----------
-/// exposure : Exposure
-///     The credit exposure to measure (EAD is ``ead + undrawn * ccf``).
-/// scenarios : list[tuple[float, list[tuple[float, float]]]]
-///     ``(weight, pd_schedule)`` pairs; weights must sum to ``1.0`` and each
-///     schedule follows the ``compute_ecl`` conventions.
-/// stage : Stage | str
-///     Measurement stage (required); classify first with ``classify_stage``
-///     under the desk's ``StagingConfig`` and pass ``result.stage``.
-/// bucket_width_years : float | None
-///     Finite integration width of at least 0.0001 years; ``None`` uses the canonical default.
-/// stage3_time_to_recovery_years : float | None
-///     Stage 3 discounting horizon in years; ``None`` uses the canonical default.
-///
-/// Returns
-/// -------
-/// WeightedEclResult
-///     Probability-weighted ``ecl`` with one ``scenario_breakdown`` entry per
-///     scenario.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``scenarios`` is empty, weights do not sum to ``1.0``, ``stage`` is
-///     unknown, a schedule is invalid, or an exposure input is out of range.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.statements_analytics import Exposure, compute_ecl_weighted
-/// >>> exp = Exposure(
-/// ...     id="loan",
-/// ...     ead=1_000_000.0,
-/// ...     lgd=0.45,
-/// ...     eir=0.06,
-/// ...     remaining_maturity_years=1.0,
-/// ...     current_pd=0.02,
-/// ...     origination_pd=0.015,
-/// ... )
-/// >>> scenarios = [(0.7, [(1.0, 0.02)]), (0.3, [(1.0, 0.05)])]
-/// >>> len(compute_ecl_weighted(exp, scenarios, stage="stage1").scenario_breakdown)
-/// 2
-#[pyfunction]
-#[pyo3(signature = (exposure, scenarios, stage, bucket_width_years=None, stage3_time_to_recovery_years=None))]
-fn compute_ecl_weighted(
-    py: Python<'_>,
-    exposure: &PyExposure,
-    scenarios: Vec<(f64, Vec<(f64, f64)>)>,
-    stage: &Bound<'_, PyAny>,
-    bucket_width_years: Option<f64>,
-    stage3_time_to_recovery_years: Option<f64>,
-) -> PyResult<PyWeightedEclResult> {
-    let stage = extract_stage(stage)?;
-    let exposure = exposure.inner.clone();
-    let inner = py
-        .detach(move || {
-            rust_ecl::compute_ecl_weighted(
-                &exposure,
-                stage,
-                &scenarios,
-                bucket_width_years,
-                stage3_time_to_recovery_years,
-            )
+#[pyclass(
+    name = "ImpairedEclScenario",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "ImpairedEclScenario")]
+#[derive(Clone)]
+struct PyImpairedEclScenario {
+    inner: rust_ecl::ImpairedEclScenario,
+}
+
+#[pymethods]
+impl PyImpairedEclScenario {
+    #[new]
+    #[pyo3(signature = (*, id, weight, recovery=None))]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "ImpairedEclScenario.__init__")]
+    fn new(
+        id: String,
+        weight: &Bound<'_, PyAny>,
+        recovery: Option<&PyRecoveryEvidence>,
+    ) -> PyResult<Self> {
+        let weight = crate::bindings::core::money::extract_exact_decimal(
+            weight,
+            "weight must be a decimal probability",
+        )?;
+        Ok(Self {
+            inner: rust_ecl::ImpairedEclScenario {
+                id,
+                weight: finstack_quant_core::wire::DecimalWire(weight),
+                recovery: recovery.map(|source| source.inner.clone()),
+            },
         })
-        .map_err(core_to_py)?;
-    Ok(PyWeightedEclResult { inner })
+    }
+}
+
+#[pyclass(
+    name = "WeightedImpairedEclResult",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "WeightedImpairedEclResult")]
+#[derive(Clone)]
+struct PyWeightedImpairedEclResult {
+    inner: rust_ecl::WeightedImpairedEclResult,
+}
+
+#[pymethods]
+impl PyWeightedImpairedEclResult {
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "WeightedImpairedEclResult.allowance")]
+    fn allowance(&self) -> Option<crate::bindings::core::money::PyMoney> {
+        self.inner
+            .allowance
+            .map(crate::bindings::core::money::PyMoney::from_inner)
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "WeightedImpairedEclResult.outcomes")]
+    fn outcomes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.outcomes)
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._ecl", "compute_impaired_ecl_weighted")]
+#[pyfunction]
+fn compute_impaired_ecl_weighted(
+    exposure: &PyImpairedExposure,
+    scenarios: Vec<PyImpairedEclScenario>,
+) -> PyResult<PyWeightedImpairedEclResult> {
+    let scenarios = scenarios
+        .into_iter()
+        .map(|scenario| scenario.inner)
+        .collect::<Vec<_>>();
+    rust_ecl::compute_impaired_ecl_weighted(&exposure.inner, &scenarios)
+        .map(|inner| PyWeightedImpairedEclResult { inner })
+        .map_err(core_to_py)
 }
 
 /// Register ECL types and functions on the `statements_analytics` submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyImpairedEclScenario>()?;
+    m.add_class::<PyWeightedImpairedEclResult>()?;
+    m.add_function(wrap_pyfunction!(compute_impaired_ecl_weighted, m)?)?;
+    m.add_class::<PyImpairedExposure>()?;
+    m.add_class::<PyRecoveryEvidence>()?;
+    m.add_class::<PyImpairedEclResult>()?;
+    m.add_function(wrap_pyfunction!(compute_impaired_ecl, m)?)?;
     m.add_class::<PyStage>()?;
     m.add_class::<PyQualitativeFlags>()?;
     m.add_class::<PyStagingConfig>()?;
@@ -1328,6 +1579,8 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyExposure>()?;
     m.add_class::<PyEclBucket>()?;
     m.add_class::<PyEclResult>()?;
+    m.add_class::<PyEclScenario>()?;
+    m.add_class::<PyEclScenarioOutcome>()?;
     m.add_class::<PyWeightedEclResult>()?;
     m.add_function(pyo3::wrap_pyfunction!(classify_stage, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(compute_ecl, m)?)?;

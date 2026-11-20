@@ -38,6 +38,7 @@
 
 use crate::math::interp::exact_f64_eq;
 
+use super::common::factor::dated_points_to_knots;
 use super::common::{CurveCalendar, signed_curve_year_fraction, validate_curve_clock};
 use crate::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
@@ -187,6 +188,24 @@ impl TryFrom<RawPriceCurve> for PriceCurve {
 }
 
 impl PriceCurve {
+    /// Return a copy of the curve with a uniform relative shift to its levels.
+    ///
+    /// # Arguments
+    /// * `pct` - Signed percentage change applied to every knot. A value of
+    ///   `2.5` increases each level by 2.5 percent.
+    ///
+    /// # Errors
+    /// Returns a validation error if the bump is not finite, exceeds the
+    /// representable levels, or would reverse a volatility-index curve.
+    pub fn bump_parallel_pct(&self, pct: f64) -> crate::Result<Self> {
+        self.apply_bump(BumpSpec {
+            mode: BumpMode::Multiplicative,
+            units: BumpUnits::Percent,
+            value: pct,
+            bump_type: BumpType::Parallel,
+        })
+    }
+
     /// Start building a price curve for the given `id`.
     ///
     /// # Arguments
@@ -204,6 +223,50 @@ impl PriceCurve {
             style: None,
             extrapolation: None,
         }
+    }
+
+    /// Construct a price curve from dated forward prices or index levels.
+    ///
+    /// # Arguments
+    /// * `id` - Market identifier of the price or volatility-index curve.
+    /// * `base_date` - Date at the origin of the curve's time axis.
+    /// * `points` - Dated pillars ordered by increasing curve time, beginning
+    ///   on or after the base date. Levels are in the curve's native quote unit.
+    /// * `kind` - Price allows signed levels under compatible interpolation;
+    ///   volatility index requires nonnegative levels.
+    /// * `day_count` - Explicit source clock. It must be usable without a holiday calendar.
+    /// * `interp` - Interpolation of levels. Log-linear requires positive levels.
+    /// * `extrapolation` - Policy before the first or after the last price pillar.
+    ///
+    /// # Errors
+    /// Rejects an unsupported clock, a malformed grid, or levels outside the
+    /// domain of the selected source or interpolation.
+    pub fn from_dates(
+        id: impl Into<CurveId>,
+        base_date: Date,
+        points: &[(Date, f64)],
+        kind: PriceCurveKind,
+        day_count: DayCount,
+        interp: InterpStyle,
+        extrapolation: ExtrapolationPolicy,
+    ) -> crate::Result<Self> {
+        let id = id.into();
+        let calendar = validate_curve_clock("PriceCurve", id.as_str(), day_count, None)?;
+        let knots = dated_points_to_knots(
+            "PriceCurve",
+            base_date,
+            points,
+            day_count,
+            calendar.as_ref(),
+        )?;
+        Self::builder(id)
+            .base_date(base_date)
+            .kind(kind)
+            .day_count(day_count)
+            .interp(interp)
+            .extrapolation(extrapolation)
+            .knots(knots)
+            .build()
     }
 
     /// Forward price at time `t` (in years from base date).
@@ -889,14 +952,7 @@ mod tests {
     #[test]
     fn percentage_bump() {
         let curve = sample_wti_curve();
-        let bumped = curve
-            .apply_bump(BumpSpec {
-                mode: BumpMode::Multiplicative,
-                units: BumpUnits::Percent,
-                value: 10.0,
-                bump_type: BumpType::Parallel,
-            })
-            .expect("Bump should succeed");
+        let bumped = curve.bump_parallel_pct(10.0).expect("Bump should succeed");
         // 75.0 * 1.10 = 82.5
         assert!((bumped.price(0.0).unwrap() - 82.5).abs() < 1e-10);
     }

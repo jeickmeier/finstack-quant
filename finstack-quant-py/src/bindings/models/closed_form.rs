@@ -17,10 +17,10 @@
 //!   `vega` is per unit volatility change.
 //! - `bs_greeks` and the barrier / Asian / lookback / quanto prices take the
 //!   serde form of the Rust `OptionMarketParams` as one `market` dict;
-//!   `heston_price` takes `HestonPricingParams` as `params`.
+//!   `heston_price` takes the option contract and Heston variance dynamics separately.
 
 use crate::bindings::macros::wire_methods;
-use crate::bindings::module_utils::spec_from_py;
+use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
 use crate::bindings::pandas_utils::{
     labeled_values_to_series, serde_object_to_single_row_dataframe,
 };
@@ -30,22 +30,178 @@ use crate::errors::core_to_py;
 use finstack_quant_core::wire::serde_parse;
 use finstack_quant_models::closed_form::{
     BsGreeks, DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE, DEFAULT_THETA_DAYS_PER_YEAR,
-    ForwardGreeks, HestonPricingParams, OptionCalculation, OptionCalculationResult, OptionGreeks,
+    ForwardGreeks, HestonFourierSettings, OptionCalculation, OptionCalculationResult, OptionGreeks,
     asian_option_price, bachelier_greeks, bachelier_price, barrier_option_price,
     black_shifted_price, black_shifted_vega, black76_greeks, black76_implied_vol, black76_price,
     bs_greeks, bs_implied_vol, bs_price, heston_price, lookback_option_price, option_calculation,
     quanto_option_price, vanilla_expiry_payoff,
 };
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
-use finstack_quant_models::types::{OptionMarketParams, OptionType};
+use finstack_quant_models::types::{OptionContractParams, OptionMarketParams, OptionType};
+use finstack_quant_models::volatility::heston::HestonParams;
+use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
 use pyo3::prelude::*;
 
-/// Parse a `market` argument (dict or JSON text) as an [`OptionMarketParams`].
+/// Extract a typed market, or parse it from a dictionary or canonical JSON.
 ///
 /// Shared by the closed-form and Monte Carlo option bindings.
 pub(crate) fn option_market(market: &Bound<'_, PyAny>) -> PyResult<OptionMarketParams> {
+    if let Ok(typed) = market.cast::<PyOptionMarketParams>() {
+        return Ok(typed.borrow().inner.clone());
+    }
     spec_from_py(market.py(), market, "OptionMarketParams")
 }
+
+#[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams")]
+#[pyclass(
+    name = "OptionMarketParams",
+    module = "finstack_quant.models",
+    frozen,
+    eq,
+    from_py_object
+)]
+#[derive(Clone, PartialEq)]
+struct PyOptionMarketParams {
+    inner: OptionMarketParams,
+}
+
+#[pymethods]
+impl PyOptionMarketParams {
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.__init__")]
+    #[new]
+    #[pyo3(signature = (*, spot, strike, rate, dividend_yield, volatility, time_to_expiry, option_type))]
+    fn new(
+        spot: f64,
+        strike: f64,
+        rate: f64,
+        dividend_yield: f64,
+        volatility: f64,
+        time_to_expiry: f64,
+        option_type: &str,
+    ) -> PyResult<Self> {
+        let inner = OptionMarketParams {
+            spot,
+            strike,
+            rate,
+            volatility,
+            time_to_expiry,
+            dividend_yield,
+            option_type: serde_parse(option_type).map_err(core_to_py)?,
+        };
+        inner.validate_allow_zero_vol().map_err(core_to_py)?;
+        Ok(Self { inner })
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.contract")]
+    fn contract(&self) -> PyOptionContractParams {
+        PyOptionContractParams {
+            inner: self.inner.contract(),
+        }
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.option_type")]
+    #[getter]
+    fn option_type(&self) -> String {
+        self.inner.option_type.to_string()
+    }
+}
+
+crate::bindings::macros::py_getters!(PyOptionMarketParams |market| {
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.spot")]
+    spot -> f64 = market.inner.spot;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.strike")]
+    strike -> f64 = market.inner.strike;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.rate")]
+    rate -> f64 = market.inner.rate;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.dividend_yield")]
+    dividend_yield -> f64 = market.inner.dividend_yield;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.volatility")]
+    volatility -> f64 = market.inner.volatility;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionMarketParams.time_to_expiry")]
+    time_to_expiry -> f64 = market.inner.time_to_expiry;
+
+});
+
+pub(crate) fn option_contract(contract: &Bound<'_, PyAny>) -> PyResult<OptionContractParams> {
+    if let Ok(typed) = contract.cast::<PyOptionContractParams>() {
+        return Ok(typed.get().inner);
+    }
+    spec_from_py(contract.py(), contract, "OptionContractParams")
+}
+
+#[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams")]
+#[pyclass(
+    name = "OptionContractParams",
+    module = "finstack_quant.models",
+    frozen,
+    eq,
+    from_py_object
+)]
+#[derive(Clone, PartialEq)]
+struct PyOptionContractParams {
+    inner: OptionContractParams,
+}
+
+#[pymethods]
+impl PyOptionContractParams {
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams.__init__")]
+    #[new]
+    #[pyo3(signature = (*, spot, strike, rate, dividend_yield, time_to_expiry, option_type))]
+    fn new(
+        spot: f64,
+        strike: f64,
+        rate: f64,
+        dividend_yield: f64,
+        time_to_expiry: f64,
+        option_type: &str,
+    ) -> PyResult<Self> {
+        let inner = OptionContractParams {
+            spot,
+            strike,
+            rate,
+            time_to_expiry,
+            dividend_yield,
+            option_type: serde_parse(option_type).map_err(core_to_py)?,
+        };
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams.with_volatility")]
+    fn with_volatility(&self, volatility: f64) -> PyResult<PyOptionMarketParams> {
+        let inner = self.inner.with_volatility(volatility).map_err(core_to_py)?;
+        Ok(PyOptionMarketParams { inner })
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams.option_type")]
+    #[getter]
+    fn option_type(&self) -> String {
+        self.inner.option_type.to_string()
+    }
+}
+
+crate::bindings::macros::py_getters!(PyOptionContractParams |market| {
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams.spot")]
+    spot -> f64 = market.inner.spot;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams.strike")]
+    strike -> f64 = market.inner.strike;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams.rate")]
+    rate -> f64 = market.inner.rate;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams.dividend_yield")]
+    dividend_yield -> f64 = market.inner.dividend_yield;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionContractParams.time_to_expiry")]
+    time_to_expiry -> f64 = market.inner.time_to_expiry;
+
+});
 
 const BS_GREEK_LABELS: [&str; 6] = ["delta", "gamma", "vega", "theta", "rho_r", "rho_q"];
 
@@ -276,30 +432,85 @@ fn option_calculation_wrapper(request: &Bound<'_, PyAny>) -> PyResult<PyOptionCa
     })
 }
 
+fn option_axis(obj: Option<&Bound<'_, PyAny>>, label: &str) -> PyResult<Option<Vec<f64>>> {
+    let Some(obj) = obj else {
+        return Ok(None);
+    };
+    if let Ok(value) = obj.extract::<f64>() {
+        return Ok(Some(vec![value]));
+    }
+    let py = obj.py();
+    let kwargs = pyo3::types::PyDict::new(py);
+    kwargs.set_item("dtype", "float64")?;
+    let array = py
+        .import("numpy")?
+        .getattr("asarray")?
+        .call((obj,), Some(&kwargs))?;
+    let array = array.extract::<PyReadonlyArray1<'_, f64>>().map_err(|_| {
+        crate::errors::value_error(format!(
+            "{label} must be a scalar or a one-dimensional array"
+        ))
+    })?;
+    Ok(Some(array.as_array().iter().copied().collect()))
+}
+
+#[doc = pydoc!("finstack_quant.models._closed_form", "bs_price_many")]
+#[pyfunction]
+#[pyo3(signature = (market, spots=None, strikes=None))]
+fn bs_price_many<'py>(
+    market: &Bound<'py, PyAny>,
+    spots: Option<&Bound<'py, PyAny>>,
+    strikes: Option<&Bound<'py, PyAny>>,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let py = market.py();
+    let market = option_market(market)?;
+    let spots = option_axis(spots, "spots")?;
+    let strikes = option_axis(strikes, "strikes")?;
+    py.detach(|| {
+        finstack_quant_models::closed_form::bs_price_many(
+            &market,
+            spots.as_deref(),
+            strikes.as_deref(),
+        )
+    })
+    .map(|prices| prices.into_pyarray(py))
+    .map_err(core_to_py)
+}
+
+#[doc = pydoc!("finstack_quant.models._closed_form", "bs_greeks_many")]
+#[pyfunction]
+#[pyo3(
+    signature = (market, spots=None, strikes=None, theta_days_per_year=DEFAULT_THETA_DAYS_PER_YEAR),
+    text_signature = "(market, spots=None, strikes=None, theta_days_per_year=365.0)"
+)]
+fn bs_greeks_many(
+    market: &Bound<'_, PyAny>,
+    spots: Option<&Bound<'_, PyAny>>,
+    strikes: Option<&Bound<'_, PyAny>>,
+    theta_days_per_year: f64,
+) -> PyResult<Vec<PyBsGreeks>> {
+    let py = market.py();
+    let market = option_market(market)?;
+    let spots = option_axis(spots, "spots")?;
+    let strikes = option_axis(strikes, "strikes")?;
+    py.detach(|| {
+        finstack_quant_models::closed_form::bs_greeks_many(
+            &market,
+            spots.as_deref(),
+            strikes.as_deref(),
+            theta_days_per_year,
+        )
+    })
+    .map(|rows| rows.into_iter().map(PyBsGreeks::from_inner).collect())
+    .map_err(core_to_py)
+}
+
 // bs_price
 
 #[doc = pydoc!("finstack_quant.models._closed_form", "bs_price")]
 #[pyfunction(name = "bs_price")]
-#[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call))]
-fn bs_price_wrapper(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
-    is_call: bool,
-) -> PyResult<f64> {
-    bs_price(
-        spot,
-        strike,
-        rate,
-        div_yield,
-        vol,
-        expiry,
-        OptionType::from(is_call),
-    )
-    .map_err(core_to_py)
+fn bs_price_wrapper(market: &Bound<'_, PyAny>) -> PyResult<f64> {
+    bs_price(&option_market(market)?).map_err(core_to_py)
 }
 
 #[doc = pydoc!("finstack_quant.models._closed_form", "vanilla_expiry_payoff")]
@@ -540,32 +751,113 @@ fn quanto_option_wrapper(
         .map_err(core_to_py)
 }
 
-// heston_price
+/// Extract native Heston variance dynamics from the typed or structured host value.
+pub(crate) fn heston_params(params: &Bound<'_, PyAny>) -> PyResult<HestonParams> {
+    if let Ok(params) = params.cast::<PyHestonParams>() {
+        return Ok(params.borrow().inner);
+    }
+    spec_from_py(params.py(), params, "HestonParams")
+}
+
+#[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams")]
+#[pyclass(
+    name = "HestonParams",
+    module = "finstack_quant.models",
+    frozen,
+    eq,
+    from_py_object
+)]
+#[derive(Clone, PartialEq)]
+struct PyHestonParams {
+    inner: HestonParams,
+}
+
+#[pymethods]
+impl PyHestonParams {
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.__init__")]
+    #[new]
+    #[pyo3(signature = (*, v0, kappa, theta, vol_of_vol, rho))]
+    fn new(v0: f64, kappa: f64, theta: f64, vol_of_vol: f64, rho: f64) -> PyResult<Self> {
+        let inner = HestonParams::new(v0, kappa, theta, vol_of_vol, rho).map_err(core_to_py)?;
+        Ok(Self { inner })
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.v0")]
+    #[getter]
+    fn v0(&self) -> f64 {
+        self.inner.v0
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.kappa")]
+    #[getter]
+    fn kappa(&self) -> f64 {
+        self.inner.kappa
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.theta")]
+    #[getter]
+    fn theta(&self) -> f64 {
+        self.inner.theta
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.vol_of_vol")]
+    #[getter]
+    fn vol_of_vol(&self) -> f64 {
+        self.inner.vol_of_vol
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.rho")]
+    #[getter]
+    fn rho(&self) -> f64 {
+        self.inner.rho
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.satisfies_feller")]
+    fn satisfies_feller(&self) -> bool {
+        self.inner.satisfies_feller()
+    }
+
+    fn __repr__(&self) -> String {
+        repr_from_serde("HestonParams", &self.inner)
+    }
+}
+
+wire_methods!(
+    PyHestonParams,
+    HestonParams,
+    "HestonParams",
+    module = "finstack_quant.models._closed_form"
+);
 
 #[doc = pydoc!("finstack_quant.models._closed_form", "heston_price")]
 #[pyfunction(name = "heston_price")]
-#[pyo3(signature = (spot, strike, expiry, params, is_call=true))]
+#[pyo3(signature = (contract, heston, settings=None))]
 fn heston_price_wrapper(
     py: Python<'_>,
-    spot: f64,
-    strike: f64,
-    expiry: f64,
-    params: &Bound<'_, PyAny>,
-    is_call: bool,
+    contract: &Bound<'_, PyAny>,
+    heston: &Bound<'_, PyAny>,
+    settings: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<f64> {
-    let params: HestonPricingParams = spec_from_py(py, params, "HestonPricingParams")?;
-    let option_type = OptionType::from(is_call);
-    py.detach(move || heston_price(spot, strike, expiry, &params, option_type, None))
+    let contract = option_contract(contract)?;
+    let heston = heston_params(heston)?;
+    let settings: Option<HestonFourierSettings> =
+        opt_spec_from_py(py, settings, "HestonFourierSettings")?;
+    py.detach(move || heston_price(&contract, &heston, settings.as_ref()))
         .map_err(core_to_py)
 }
 
 /// Register the analytic option primitives on the models submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyBsGreeks>()?;
+    m.add_class::<PyOptionMarketParams>()?;
+    m.add_class::<PyOptionContractParams>()?;
+    m.add_class::<PyHestonParams>()?;
     m.add_class::<PyForwardGreeks>()?;
     m.add_class::<PyOptionCalculationResult>()?;
     m.add_function(wrap_pyfunction!(option_calculation_wrapper, m)?)?;
     m.add_function(wrap_pyfunction!(bs_price_wrapper, m)?)?;
+    m.add_function(wrap_pyfunction!(bs_price_many, m)?)?;
+    m.add_function(wrap_pyfunction!(bs_greeks_many, m)?)?;
     m.add_function(wrap_pyfunction!(vanilla_expiry_payoff_wrapper, m)?)?;
     m.add_function(wrap_pyfunction!(bs_greeks_wrapper, m)?)?;
     m.add_function(wrap_pyfunction!(bs_implied_vol_wrapper, m)?)?;

@@ -413,15 +413,15 @@ mod tests {
                     Some(Currency::USD),
                 )
                 .expect("pricing should succeed");
-            let expected = crate::closed_form::bs_price(
-                case.spot,
-                case.strike,
-                case.rate,
-                case.div_yield,
-                case.vol,
-                case.expiry,
+            let expected = crate::closed_form::bs_price(&crate::types::OptionMarketParams {
+                spot: case.spot,
+                strike: case.strike,
+                rate: case.rate,
+                dividend_yield: case.div_yield,
+                volatility: case.vol,
+                time_to_expiry: case.expiry,
                 option_type,
-            )
+            })
             .expect("valid Black-Scholes inputs");
 
             assert!(

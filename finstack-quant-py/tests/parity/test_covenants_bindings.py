@@ -81,6 +81,7 @@ def test_evaluate_engine_report_dataframe_and_pickle() -> None:
         "actual_value",
         "threshold",
         "headroom",
+        "headroom_raw",
         "details",
     ]
     assert len(frame) == 1
@@ -298,6 +299,7 @@ def test_evaluate_series_and_reports_to_dataframe() -> None:
         "actual_value",
         "threshold",
         "headroom",
+        "headroom_raw",
         "details",
     ]
     assert len(out) == 6
@@ -330,6 +332,7 @@ def test_forecast_covenant_and_breaches_from_dataframe() -> None:
         "projected_value",
         "threshold",
         "headroom",
+        "headroom_raw",
         "breach_probability",
         "breach_probability_stderr",
     ]

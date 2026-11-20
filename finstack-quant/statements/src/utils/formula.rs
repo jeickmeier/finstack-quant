@@ -109,6 +109,9 @@ pub(crate) fn collect_identifiers_from_ast(
         StmtExpr::UnaryOp { operand, .. } => {
             collect_identifiers_from_ast(operand, identifiers, ignore_lag);
         }
+        StmtExpr::AsMoney { value, .. } => {
+            collect_identifiers_from_ast(value, identifiers, ignore_lag);
+        }
         StmtExpr::Call { func, args } => {
             // A `lag`/`shift` value is read from history only when its offset
             // is a positive integer literal. Zero, a non-integer literal and

@@ -1,5 +1,10 @@
 {
   "$defs": {
+    "DecimalWire": {
+      "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
+      "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+      "type": "string"
+    },
     "EclBucket": {
       "description": "ECL result for a single time bucket.",
       "properties": {
@@ -102,6 +107,101 @@
         "ecl",
         "horizon",
         "buckets"
+      ],
+      "type": "object"
+    },
+    "EclScenarioMeasurement": {
+      "description": "Availability of one scenario allowance.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Weight was exactly zero. No forecast or repricing was run.",
+          "properties": {
+            "status": {
+              "const": "zero_weight",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Positive-weight scenario with measured allowance and bucket detail.",
+          "properties": {
+            "result": {
+              "$ref": "#/$defs/EclResult",
+              "description": "Complete same-basis allowance from the admitted PD and LGD."
+            },
+            "status": {
+              "const": "measured",
+              "type": "string"
+            },
+            "weighted_allowance": {
+              "description": "Weighted contribution to the total on the same basis.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "status",
+            "result",
+            "weighted_allowance"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Positive-weight scenario whose measurement evidence is incomplete.",
+          "properties": {
+            "reason": {
+              "description": "Explanation of the required source evidence that is missing.",
+              "type": "string"
+            },
+            "status": {
+              "const": "unavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EclScenarioOutcome": {
+      "additionalProperties": false,
+      "description": "One admissible macro-scenario row and its measured or missing allowance.",
+      "properties": {
+        "id": {
+          "description": "Explicit scenario identity in the portfolio policy's declared order.",
+          "type": "string"
+        },
+        "lgd_override": {
+          "description": "Elected scenario LGD override as a decimal fraction.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "measurement": {
+          "$ref": "#/$defs/EclScenarioMeasurement",
+          "description": "Underlying reserve calculation and status."
+        },
+        "weight": {
+          "$ref": "#/$defs/DecimalWire",
+          "description": "Exact scenario probability as supplied, including any zero-weight rows."
+        }
+      },
+      "required": [
+        "id",
+        "weight",
+        "measurement"
       ],
       "type": "object"
     },
@@ -273,12 +373,16 @@
   },
   "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/weighted_ecl_result.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Probability-weighted ECL across macro scenarios with the per-scenario audit trail.",
   "properties": {
     "ecl": {
-      "description": "Probability-weighted ECL.",
+      "description": "Aggregate allowance, absent when any positive-probability scenario is missing.",
       "format": "double",
-      "type": "number"
+      "type": [
+        "number",
+        "null"
+      ]
     },
     "exposure_id": {
       "description": "Exposure identifier.",
@@ -299,38 +403,23 @@
         },
         "version": "0.11.0"
       },
-      "description": "Audit stamp: numeric mode, rounding context, and FX policy in force."
+      "description": "Numeric and reporting provenance of the complete or partial calculation."
     },
     "scenario_breakdown": {
-      "description": "Per-scenario breakdown: (scenario_id, weight, result).",
+      "description": "Elected scenarios in caller order, including zero-weight entries.",
       "items": {
-        "maxItems": 3,
-        "minItems": 3,
-        "prefixItems": [
-          {
-            "type": "string"
-          },
-          {
-            "format": "double",
-            "type": "number"
-          },
-          {
-            "$ref": "#/$defs/EclResult"
-          }
-        ],
-        "type": "array"
+        "$ref": "#/$defs/EclScenarioOutcome"
       },
       "type": "array"
     },
     "stage": {
       "$ref": "#/$defs/Stage",
-      "description": "Assigned IFRS 9 stage."
+      "description": "Assigned impairment stage."
     }
   },
   "required": [
     "exposure_id",
     "stage",
-    "ecl",
     "scenario_breakdown"
   ],
   "title": "WeightedEclResult",

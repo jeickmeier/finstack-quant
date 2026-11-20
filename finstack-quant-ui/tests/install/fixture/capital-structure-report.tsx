@@ -13,7 +13,7 @@ export function InstalledItem() {
       <CapitalStructureReport
         defaultConfig={cases.full.config}
         nodeIds={Object.keys(model.nodes)}
-        periodIds={model.periods.map((period) => period.id)}
+        periodIds={model.periods.periods.map((period) => period.id)}
         onSubmit={() => {}}
         summary={cases.full.summary as unknown as CapitalStructureSummary}
       />

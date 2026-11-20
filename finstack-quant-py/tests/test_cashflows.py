@@ -17,7 +17,7 @@ from finstack_quant.cashflows import (
 )
 from finstack_quant.cashflows.accrual import AccrualConfig, accrued_interest_amount
 from finstack_quant.cashflows.builder import CashFlowSchedule
-from finstack_quant.valuations.instruments import bond_from_cashflows_json, price_instrument
+from finstack_quant.valuations.instruments import Bond, price_instrument
 
 
 def accrued_interest(schedule_json: str, as_of: object, config_json: str | None = None) -> float:
@@ -157,11 +157,13 @@ def test_cashflows_namespace_build_validate_accrual_and_price_bond() -> None:
     assert len(flows) == len(schedule["flows"])
     assert accrued_interest(schedule_json, "2025-02-28") > 0.0
 
-    instrument_json = bond_from_cashflows_json("CUSTOM-CF", schedule_json, "quarterly", "USD-OIS", 99.0)
-    instrument = json.loads(instrument_json)
+    bond = Bond.from_cashflows("CUSTOM-CF", CashFlowSchedule.from_json(schedule_json), "quarterly", "USD-OIS", 99.0)
+    instrument = json.loads(bond.to_json())
     assert instrument["instrument"]["type"] == "bond"
 
-    result = price_instrument(instrument_json, _market_json(), "2024-09-03", "discounting")
+    result = price_instrument(bond, _market_json(), "2024-09-03", "discounting")
+    wire_result = price_instrument(bond.to_json(), _market_json(), "2024-09-03", "discounting")
+    assert result.value.amount == wire_result.value.amount
     assert result.instrument_id == "CUSTOM-CF"
     assert result.currency == "USD"
 
@@ -314,8 +316,10 @@ def test_cashflows_accrued_interest_rejects_unknown_config_json_fields() -> None
 
 def test_cashflows_bond_from_cashflows_allows_missing_quoted_clean_price_pct() -> None:
     schedule_json = build_cashflow_schedule_json(_cashflow_spec())
-    instrument_json = bond_from_cashflows_json("CUSTOM-CF-NO-QUOTE", schedule_json, "periodic(1)", "USD-OIS")
-    instrument = json.loads(instrument_json)
+    bond = Bond.from_cashflows(
+        "CUSTOM-CF-NO-QUOTE", CashFlowSchedule.from_json(schedule_json), "periodic(1)", "USD-OIS"
+    )
+    instrument = json.loads(bond.to_json())
 
     assert instrument["instrument"]["type"] == "bond"
     assert instrument["instrument"]["spec"]["id"] == "CUSTOM-CF-NO-QUOTE"

@@ -146,7 +146,81 @@ pub struct OptionMarketParams {
     pub option_type: OptionType,
 }
 
+/// Model-independent spot, strike, carry, expiry and payoff inputs for an option.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct OptionContractParams {
+    /// Current spot or forward price in the instrument's quote units.
+    pub spot: f64,
+    /// Strike price in the same quote units as `spot`.
+    pub strike: f64,
+    /// Continuously compounded annual risk-free rate as a decimal.
+    pub rate: f64,
+    /// Time to expiry in years.
+    pub time_to_expiry: f64,
+    /// Continuous dividend yield or cost of carry as a decimal.
+    pub dividend_yield: f64,
+    /// Call or put payoff direction.
+    pub option_type: OptionType,
+}
+
+impl OptionContractParams {
+    /// Validate positive prices and finite continuous rates over a nonnegative expiry.
+    ///
+    /// # Errors
+    /// Rejects nonfinite values, nonpositive spot or strike, and negative expiry.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        use finstack_quant_core::validation::{
+            validate_f64_finite, validate_f64_non_negative, validate_f64_positive,
+        };
+        validate_f64_positive(self.spot, "OptionContractParams.spot")?;
+        validate_f64_positive(self.strike, "OptionContractParams.strike")?;
+        validate_f64_finite(self.time_to_expiry, "OptionContractParams.time_to_expiry")?;
+        validate_f64_non_negative(self.time_to_expiry, "OptionContractParams.time_to_expiry")?;
+        validate_f64_finite(self.rate, "OptionContractParams.rate")?;
+        validate_f64_finite(self.dividend_yield, "OptionContractParams.dividend_yield")
+    }
+
+    /// Supply an annualized volatility for pricing under a constant-volatility model.
+    ///
+    /// # Arguments
+    /// * `volatility` - Finite decimal annual volatility; zero is allowed for
+    ///   deterministic pricing.
+    ///
+    /// # Errors
+    /// Rejects negative or nonfinite volatility or an invalid contract.
+    pub fn with_volatility(
+        &self,
+        volatility: f64,
+    ) -> finstack_quant_core::Result<OptionMarketParams> {
+        let market = OptionMarketParams {
+            spot: self.spot,
+            strike: self.strike,
+            rate: self.rate,
+            dividend_yield: self.dividend_yield,
+            time_to_expiry: self.time_to_expiry,
+            option_type: self.option_type,
+            volatility,
+        };
+        market.validate_allow_zero_vol()?;
+        Ok(market)
+    }
+}
+
 impl OptionMarketParams {
+    /// Read the model-independent option contract inputs.
+    pub fn contract(&self) -> OptionContractParams {
+        OptionContractParams {
+            spot: self.spot,
+            strike: self.strike,
+            rate: self.rate,
+            dividend_yield: self.dividend_yield,
+            time_to_expiry: self.time_to_expiry,
+            option_type: self.option_type,
+        }
+    }
+
     /// Validate the structural invariants required by option models.
     ///
     /// # Errors
@@ -154,16 +228,24 @@ impl OptionMarketParams {
     /// Returns a core validation error for non-positive prices or volatility,
     /// negative expiry time, or non-finite rate/carry inputs.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        use finstack_quant_core::validation::{
-            validate_f64_finite, validate_f64_non_negative, validate_f64_positive,
-        };
-        validate_f64_positive(self.volatility, "OptionMarketParams.volatility")?;
-        validate_f64_positive(self.spot, "OptionMarketParams.spot")?;
-        validate_f64_positive(self.strike, "OptionMarketParams.strike")?;
-        validate_f64_finite(self.time_to_expiry, "OptionMarketParams.time_to_expiry")?;
-        validate_f64_non_negative(self.time_to_expiry, "OptionMarketParams.time_to_expiry")?;
-        validate_f64_finite(self.rate, "OptionMarketParams.rate")?;
-        validate_f64_finite(self.dividend_yield, "OptionMarketParams.dividend_yield")
+        self.validate_allow_zero_vol()?;
+        finstack_quant_core::validation::validate_f64_positive(
+            self.volatility,
+            "OptionMarketParams.volatility",
+        )
+    }
+
+    /// Validate the market inputs for models that admit zero volatility.
+    ///
+    /// # Errors
+    /// Rejects nonfinite values, nonpositive spot or strike, and negative
+    /// expiry or volatility.
+    pub fn validate_allow_zero_vol(&self) -> finstack_quant_core::Result<()> {
+        self.contract().validate()?;
+        finstack_quant_core::validation::validate_f64_non_negative(
+            self.volatility,
+            "OptionMarketParams.volatility",
+        )
     }
 }
 

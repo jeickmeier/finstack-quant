@@ -11,4 +11,4 @@ pub(crate) mod types;
 
 pub use pricer::CommoditySpotOptionMcPricer;
 pub use types::CommodityMcParams;
-pub use types::{CommoditySpotOption, CommoditySpotOptionExercise};
+pub use types::{CommoditySpotOption, CommoditySpotOptionBuilder, CommoditySpotOptionExercise};

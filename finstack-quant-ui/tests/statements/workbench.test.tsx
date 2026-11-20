@@ -196,7 +196,7 @@ beforeEach(() => {
       case "evaluateCovenants": {
         const engine = native.CovenantEngine.fromJson(arg.engineJson);
         try {
-          return native.evaluateCovenants(arg.resultsJson, engine);
+          return native.evaluateCovenants(engine, arg.resultsJson);
         } finally {
           engine.free();
         }
@@ -205,8 +205,8 @@ beforeEach(() => {
         const engine = native.CovenantEngine.fromJson(arg.engineJson);
         try {
           return native.statementsAnalyticsForecastBreaches(
-            arg.resultsJson,
             engine,
+            arg.resultsJson,
             arg.configJson,
           );
         } finally {
@@ -214,15 +214,26 @@ beforeEach(() => {
         }
       }
       case "goalSeek":
-        return native.goalSeek(arg.modelJson, {
-          target_node: arg.targetNode,
-          target_period: arg.targetPeriod,
-          target_value: arg.targetValue,
-          driver_node: arg.driverNode,
-          driver_period: arg.driverPeriod,
-          update_model: arg.updateModel,
-          bounds: arg.bounds,
-        });
+        return native.goalSeek(
+          arg.modelJson,
+          {
+            target: { node: arg.targetNode, period: arg.targetPeriod },
+            target_value: arg.targetValue,
+            target_tolerance: arg.targetTolerance,
+            driver: { node: arg.driverNode, period: arg.driverPeriod },
+            driver_tolerance: arg.driverTolerance,
+            max_iterations: arg.maxIterations,
+            as_of: arg.asOf,
+            observed_through: arg.observedThrough,
+            update_model: arg.updateModel,
+            search: {
+              kind: "bracket",
+              lower: arg.bounds[0],
+              upper: arg.bounds[1],
+            },
+          },
+          arg.marketJson,
+        );
       default:
         throw new Error(`Unexpected worker call: ${method}`);
     }
@@ -966,6 +977,18 @@ it("runs a native sensitivity and applies a goal-seek solution only on explicit 
   fireEvent.change(within(seek).getByRole("textbox", { name: "Upper bound" }), {
     target: { value: "500000000" },
   });
+  for (const [label, value] of [
+    ["Target currency", "USD"],
+    ["Target tolerance", "0.01"],
+    ["Driver tolerance", "0.000000001"],
+    ["Maximum iterations", "100"],
+    ["Valuation date", "2025-04-01"],
+    ["Observed through", "2025-04-01"],
+  ]) {
+    fireEvent.change(within(seek).getByLabelText(label!), {
+      target: { value },
+    });
+  }
   expect(lastCall("goalSeek")).toBeUndefined();
   fireEvent.click(within(seek).getByRole("button", { name: "Solve" }));
   await waitFor(() => expect(lastCall("goalSeek")).toBeDefined());
@@ -973,7 +996,13 @@ it("runs a native sensitivity and applies a goal-seek solution only on explicit 
     modelJson,
     targetNode: "ebitda",
     targetPeriod: "2025Q4",
-    targetValue: 70000000,
+    marketJson: undefined,
+    targetValue: { amount: "70000000", currency: "USD" },
+    targetTolerance: { amount: "0.01", currency: "USD" },
+    driverTolerance: 1e-9,
+    maxIterations: 100,
+    asOf: "2025-04-01",
+    observedThrough: "2025-04-01",
     driverNode: "revenue",
     driverPeriod: "2025Q4",
     updateModel: true,
@@ -988,9 +1017,10 @@ it("runs a native sensitivity and applies a goal-seek solution only on explicit 
   const before = accepted.mock.calls.length;
   fireEvent.click(apply);
   await waitFor(() => expect(accepted.mock.calls.length).toBe(before + 1));
-  expect(
-    JSON.parse(accepted.mock.lastCall![0]).nodes.revenue.values["2025Q4"],
-  ).toEqual({ amount: "244390239.98913205", currency: "USD" });
+  const solvedDriver = JSON.parse(accepted.mock.lastCall![0]).nodes.revenue
+    .values["2025Q4"];
+  expect(solvedDriver.currency).toBe("USD");
+  expect(Number(solvedDriver.amount)).toBeCloseTo(244390239.98913205, 2);
   await within(seek).findByText("Applied to the model.");
   // The solve is not repeated on the applied model, and the sensitivity of the old model is hidden.
   expect(

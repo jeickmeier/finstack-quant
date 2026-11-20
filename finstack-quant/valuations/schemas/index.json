@@ -146,7 +146,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/floating_bond_params.schema.json",
-      "bytes": 5246,
+      "bytes": 5277,
       "kind": "input",
       "path": "schemas/common/1/floating_bond_params.schema.json",
       "summary": "Identifier, notional, index, spread, dates, frequency, day count and curve of a floating-rate note.",
@@ -200,7 +200,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
-      "bytes": 1018330,
+      "bytes": 1020457,
       "kind": "component",
       "path": "schemas/common/1/instrument_json.schema.json",
       "summary": "The instrument union embedded by portfolio positions and candidates; the same branches as the instrument envelope's `instrument` field.",
@@ -281,7 +281,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/price_extras.schema.json",
-      "bytes": 10300,
+      "bytes": 10785,
       "kind": "input",
       "path": "schemas/common/1/price_extras.schema.json",
       "summary": "Metric-pricing override patch, market history and step-trace flag of one price call.",
@@ -434,7 +434,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1026177,
+      "bytes": 1028376,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -497,7 +497,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json",
-      "bytes": 15521,
+      "bytes": 17033,
       "kind": "input",
       "path": "schemas/instruments/1/equity/discounted_cash_flow.schema.json",
       "summary": "Enterprise DCF valuation with an explicit forecast and terminal value.",
@@ -632,7 +632,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1025154,
+      "bytes": 1027353,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -784,6 +784,15 @@
       "type_name": "SingleInstrumentEnvelope"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit_tranche.schema.json",
+      "bytes": 407379,
+      "kind": "input",
+      "path": "schemas/instruments/1/fixed_income/structured_credit_tranche.schema.json",
+      "summary": "Individual note priced on its originating collateral waterfall.",
+      "title": "structured_credit_tranche",
+      "type_name": "SingleInstrumentEnvelope"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json",
       "bytes": 70518,
       "kind": "input",
@@ -911,7 +920,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1117087,
+      "bytes": 1124784,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -1072,6 +1081,15 @@
       "type_name": "SingleInstrumentEnvelope"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/bond_breakeven_ladder.schema.json",
+      "bytes": 6790,
+      "kind": "output",
+      "path": "schemas/results/1/bond_breakeven_ladder.schema.json",
+      "summary": "Carry, sensitivity, and signed breakeven across the requested bond horizons.",
+      "title": "BondBreakevenLadder",
+      "type_name": "BondBreakevenLadder"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/bond_quote_set.schema.json",
       "bytes": 3895,
       "kind": "output",
@@ -1109,7 +1127,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
-      "bytes": 1027785,
+      "bytes": 1029984,
       "kind": "output",
       "path": "schemas/results/1/composite_rebalance_result.schema.json",
       "summary": "Result of resolving a new composite holdings state.",
@@ -1190,7 +1208,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/listed_product_coverage.schema.json",
-      "bytes": 17465,
+      "bytes": 17641,
       "kind": "output",
       "path": "schemas/results/1/listed_product_coverage.schema.json",
       "summary": "Listed-product catalog coverage for one exchange product.",
@@ -1352,7 +1370,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
-      "bytes": 65027,
+      "bytes": 65274,
       "kind": "output",
       "path": "schemas/results/1/valuation_result.schema.json",
       "summary": "PV plus requested measures, with rounding and FX policy stamps.",

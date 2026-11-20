@@ -6,7 +6,7 @@ use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::extract::extract_market_ref;
 use crate::bindings::extract::extract_portfolio_ref;
-use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::valuations::PyValuationResult;
 use crate::errors::core_to_py;
 use crate::errors::display_to_py;
 use crate::errors::portfolio_to_py;
@@ -116,15 +116,13 @@ impl PyPositionValue {
             .collect()
     }
 
-    /// Full instrument ``ValuationResult`` as a JSON-shaped ``dict`` (metrics
-    /// included), or ``None`` when it was not retained.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._valuation", "PositionValue.valuation_result")]
     #[getter]
-    fn valuation_result<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+    fn valuation_result(&self) -> Option<PyValuationResult> {
         self.inner
             .valuation_result
-            .as_ref()
-            .map(|r| serde_to_py(py, r))
-            .transpose()
+            .clone()
+            .map(|inner| PyValuationResult { inner })
     }
 
     fn __repr__(&self) -> String {
@@ -203,6 +201,12 @@ impl PyPortfolioValuation {
     #[getter]
     fn total_value(&self) -> f64 {
         self.inner.total_base_currency.amount()
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._valuation", "PortfolioValuation.total_base_currency")]
+    #[getter]
+    fn total_base_currency(&self) -> PyMoney {
+        PyMoney::from_inner(self.inner.total_base_currency)
     }
 
     /// Base currency of the total.

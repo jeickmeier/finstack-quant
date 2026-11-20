@@ -659,6 +659,7 @@
         "threshold": 7,
         "details": null,
         "headroom": 0.2857142857142857,
+        "headroom_raw": 2,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -681,6 +682,7 @@
         "threshold": 4.5,
         "details": null,
         "headroom": 0.3333333333333333,
+        "headroom_raw": 1.5,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -727,6 +729,7 @@
         "threshold": 7,
         "details": null,
         "headroom": -0.07142857142857142,
+        "headroom_raw": -0.5,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -749,6 +752,7 @@
         "threshold": 4.5,
         "details": null,
         "headroom": 0.3333333333333333,
+        "headroom_raw": 1.5,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -861,6 +865,7 @@
         "threshold": 4.5,
         "details": null,
         "headroom": -0.1111111111111111,
+        "headroom_raw": -0.5,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -898,6 +903,7 @@
         "threshold": 5.5,
         "details": null,
         "headroom": 0.09090909090909091,
+        "headroom_raw": 0.5,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
@@ -982,6 +988,7 @@
           "threshold": 4.5,
           "details": null,
           "headroom": -0.06666666666666662,
+          "headroom_raw": -0.2999999999999998,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -1009,6 +1016,7 @@
           "threshold": 4.5,
           "details": null,
           "headroom": 0.1111111111111111,
+          "headroom_raw": 0.5,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -1036,6 +1044,7 @@
           "threshold": 4.5,
           "details": null,
           "headroom": 0.022222222222222143,
+          "headroom_raw": 0.09999999999999964,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -1062,6 +1071,7 @@
       "projected_values": [4, 4.8, 4.4],
       "thresholds": [4.5, 4.5, 4.5],
       "headroom": [0.1111111111111111, -0.06666666666666662, 0.022222222222222143],
+      "headroom_raw": [0.5, -0.2999999999999998, 0.09999999999999964],
       "breach_probability": [0, 1, 0],
       "breach_probability_stderr": [0, 0, 0],
       "first_breach_date": "2026-06-30",
@@ -1076,6 +1086,7 @@
       "projected_values": [4, 4.8, 4.4],
       "thresholds": [4.5, 4.5, 4.5],
       "headroom": [0.1111111111111111, -0.06666666666666662, 0.022222222222222143],
+      "headroom_raw": [0.5, -0.2999999999999998, 0.09999999999999964],
       "breach_probability": [0.10822426867134848, 0.650993781376768, 0.4143286668688083],
       "breach_probability_stderr": [0, 0, 0],
       "first_breach_date": "2026-06-30",
@@ -1090,6 +1101,7 @@
       "projected_values": [4, 4.8, 4.4],
       "thresholds": [4.5, 4.5, 4.5],
       "headroom": [0.1111111111111111, -0.06666666666666662, 0.022222222222222143],
+      "headroom_raw": [0.5, -0.2999999999999998, 0.09999999999999964],
       "breach_probability": [0.1135, 0.6585, 0.4065],
       "breach_probability_stderr": [
         0.006626587482381988, 0.007360837719440086, 0.006168127414037084
@@ -1106,6 +1118,7 @@
         "projected_value": 4.8,
         "threshold": 4.5,
         "headroom": -0.06666666666666662,
+        "headroom_raw": -0.2999999999999998,
         "breach_probability": 1
       }
     ],
@@ -1117,6 +1130,7 @@
         "projected_value": 4.8,
         "threshold": 4.5,
         "headroom": -0.06666666666666662,
+        "headroom_raw": -0.2999999999999998,
         "breach_probability": 0.650993781376768
       },
       {
@@ -1126,6 +1140,7 @@
         "projected_value": 4.4,
         "threshold": 4.5,
         "headroom": 0.022222222222222143,
+        "headroom_raw": 0.09999999999999964,
         "breach_probability": 0.4143286668688083
       }
     ],

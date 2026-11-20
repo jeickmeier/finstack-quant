@@ -1,7 +1,7 @@
 //! Pricer bindings — European, Path-Dependent, LSMC.
 
 use super::engine::extract_optional_currency;
-use super::results::{PyLrmGreeks, PyMoneyEstimate};
+use super::results::{PyLrmGreeks, PyLsmcResult, PyMoneyEstimate};
 use crate::bindings::models::closed_form::option_market;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
@@ -287,14 +287,14 @@ impl PyLsmcPricer {
         num_steps: Option<usize>,
         basis: Option<&str>,
         basis_degree: Option<usize>,
-    ) -> PyResult<PyMoneyEstimate> {
+    ) -> PyResult<PyLsmcResult> {
         let market = option_market(market)?;
         let currency = extract_optional_currency(currency)?;
         py.detach(|| {
             self.inner
                 .price_american(&market, num_steps, currency, basis, basis_degree)
         })
-        .map(PyMoneyEstimate::from_inner)
+        .map(PyLsmcResult::from_inner)
         .map_err(core_to_py)
     }
 
@@ -310,7 +310,7 @@ impl PyLsmcPricer {
         num_steps: Option<usize>,
         basis: Option<&str>,
         basis_degree: Option<usize>,
-    ) -> PyResult<PyMoneyEstimate> {
+    ) -> PyResult<PyLsmcResult> {
         let market = option_market(market)?;
         let currency = extract_optional_currency(currency)?;
         let pricer = &slf.inner;
@@ -325,7 +325,7 @@ impl PyLsmcPricer {
                     pricing_seed,
                 )
             })
-            .map(PyMoneyEstimate::from_inner)
+            .map(PyLsmcResult::from_inner)
             .map_err(core_to_py)
     }
 

@@ -1,6 +1,9 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/valuations/instruments.rs``."""
 
 from __future__ import annotations
+from finstack_quant.valuations.instruments._pricing import PriceExtras
+
+from finstack_quant.cashflows.builder import CashFlowSchedule
 
 import datetime
 from typing import Any, Literal
@@ -45,6 +48,56 @@ class Bond:
     >>> bond.notional.amount
     1000000.0
     """
+
+    @staticmethod
+    def from_cashflows(
+        id: str,
+        schedule: CashFlowSchedule,
+        quote_compounding: str,
+        discount_curve_id: str,
+        quoted_clean_price_pct: float | None = None,
+    ) -> Bond:
+        """Construct a bond from an explicit cashflow schedule.
+
+        Parameters
+        ----------
+        id : str
+            Stable bond identifier used for pricing and metric keys.
+        schedule : CashFlowSchedule
+            Validated principal and coupon schedule, copied into the bond.
+        quote_compounding : str
+            Compounding of spread quotes. Use continuous, simple, semi_annual,
+            quarterly, monthly, or periodic(n). Supply it independently of
+            coupon frequency.
+        discount_curve_id : str
+            Market discount curve used to value the scheduled cashflows.
+        quoted_clean_price_pct : float or None
+            Observed clean price in percent of par (99.5 means 99.5%).
+            Omit to calculate prices without an observed clean-price override.
+
+        Returns
+        -------
+        Bond
+            Typed bond ready to price against the discount curve.
+
+        Raises
+        ------
+        ValueError
+            If the schedule is invalid or the quote convention or bond terms are invalid.
+
+        Examples
+        --------
+        >>> from datetime import date
+        >>> from finstack_quant.cashflows.builder import CashFlowSchedule
+        >>> from finstack_quant.core.money import Money
+        >>> from finstack_quant.valuations.instruments import Bond
+        >>> schedule = (
+        ...     CashFlowSchedule.builder().principal(Money(100, "USD"), date(2025, 1, 1), date(2026, 1, 1)).build()
+        ... )
+        >>> Bond.from_cashflows("custom", schedule, "semi_annual", "USD-OIS").id
+        'custom'
+        """
+        ...
 
     @staticmethod
     def builder() -> BondBuilder:
@@ -251,7 +304,7 @@ class Bond:
               currency is the coupon and redemption currency.
             - ``forward_curve_id`` (str): forward curve of the coupon index
               (e.g. ``"USD-SOFR-3M"``).
-            - ``spread_bp`` (int): spread over the index in whole basis points
+            - ``spread_bp``: spread over the index in basis points. The exact wire form is a decimal string such as ``"25.125"``. Python mappings also accept Decimal, Rate, Bps, or a finite number.
               (``125`` = 1.25%); a fractional value raises ``ValueError`` (use
               :meth:`Bond.from_json` for sub-bp margins).
             - ``issue_date`` / ``maturity`` (datetime.date | str): start of the
@@ -322,7 +375,7 @@ class Bond:
               currency is the coupon and redemption currency.
             - ``forward_curve_id`` (str): forward curve of the coupon index
               (e.g. ``"USD-SOFR-3M"``).
-            - ``spread_bp`` (int): spread over the index in whole basis points
+            - ``spread_bp``: spread over the index in basis points. The exact wire form is a decimal string such as ``"25.125"``. Python mappings also accept Decimal, Rate, Bps, or a finite number.
               (``125`` = 1.25%); a fractional value raises ``ValueError`` (use
               :meth:`Bond.from_json` for sub-bp margins).
             - ``issue_date`` / ``maturity`` (datetime.date | str): start of the
@@ -580,7 +633,7 @@ class Bond:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        extras: dict[str, Any] | str | None = None,
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this bond and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -602,7 +655,7 @@ class Bond:
             call, put, and return-floor rights jointly with credit risk.
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        extras : dict[str, Any] or str, optional
+        extras : PriceExtras or dict[str, Any] or str, optional
             The rarer pricing inputs, as a dict or JSON text in the shape of the
             Rust ``PriceExtras``; every key is optional and an unknown key raises
             ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
@@ -615,6 +668,9 @@ class Bond:
             require; omitted prices without history. ``explain`` (bool, default
             ``False``) attaches a step trace as ``result.explanation`` when
             ``True``. ``None`` (the default) means no extras.
+            ``instrument_pricing_overrides`` optionally patches stored quote or model
+            fields for this call. Absent fields keep stored values, and an explicit
+            ``None`` clears a nullable field.
 
         Returns
         -------
@@ -1791,7 +1847,7 @@ class TermLoan:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        extras: dict[str, Any] | str | None = None,
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this term loan and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -1808,7 +1864,7 @@ class TermLoan:
             Model key (``"discounting"``, ``"hazard_rate"``, ``"tree"``).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        extras : dict[str, Any] or str, optional
+        extras : PriceExtras or dict[str, Any] or str, optional
             The rarer pricing inputs, as a dict or JSON text in the shape of the
             Rust ``PriceExtras``; every key is optional and an unknown key raises
             ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``

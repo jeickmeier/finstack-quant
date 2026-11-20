@@ -358,8 +358,8 @@ fn test_dcf_excludes_historical_periods_from_explicit_flows() {
         2,
         "only forecast periods should feed DCF flows"
     );
-    assert_eq!(dcf.flows[0].1, 120_000.0);
-    assert_eq!(dcf.flows[1].1, 130_000.0);
+    assert_eq!(dcf.flows[0].1.amount(), 120_000.0);
+    assert_eq!(dcf.flows[1].1.amount(), 130_000.0);
 }
 
 #[test]
@@ -670,7 +670,10 @@ fn quarterly_gordon_terminal_value_uses_annualized_flow() {
 
     let dcf = result.dcf_instrument.expect("instrument");
     let annual_flow = 100_000.0 + 110_000.0 + 120_000.0 + 130_000.0;
-    assert_eq!(dcf.terminal_flow_override, Some(annual_flow));
+    assert_eq!(
+        dcf.normalized_annual_fcff.map(|flow| flow.amount()),
+        Some(annual_flow)
+    );
 
     let tv = dcf.calculate_terminal_value().expect("terminal value");
     let expected_tv = annual_flow * 1.02 / (0.10 - 0.02);
@@ -726,7 +729,10 @@ fn annual_gordon_terminal_value_unchanged() {
     .expect("DCF evaluation");
 
     let dcf = result.dcf_instrument.expect("instrument");
-    assert_eq!(dcf.terminal_flow_override, Some(480_000.0));
+    assert_eq!(
+        dcf.normalized_annual_fcff.map(|flow| flow.amount()),
+        Some(480_000.0)
+    );
 
     let tv = dcf.calculate_terminal_value().expect("terminal value");
     let expected_tv = 480_000.0 * 1.02 / (0.10 - 0.02);
@@ -980,7 +986,7 @@ fn evaluate_dcf_uses_curve_for_cs_interest() {
     // period's UFCF must be revenue minus curve-priced interest.
     let q3_ufcf = dcf.flows[1].1;
     assert!(
-        q3_ufcf < 1_200_000.0,
+        q3_ufcf.amount() < 1_200_000.0,
         "Q3 UFCF must deduct the July coupon, got {q3_ufcf}"
     );
     let no_market_flows = no_market.dcf_instrument.expect("instrument").flows;

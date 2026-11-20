@@ -43,7 +43,14 @@ pub enum SnowballVariant {
 /// # References
 ///
 /// - Brigo, D., & Mercurio, F. (2006). *Interest Rate Models*. Chapter 14. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`
-#[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+    finstack_quant_valuations_macros::FinancialBuilder,
+    PartialEq,
+    Clone,
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Snowball {
@@ -101,6 +108,7 @@ pub struct Snowball {
         default,
         skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
+    #[builder(default)]
     pub instrument_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
@@ -108,6 +116,7 @@ pub struct Snowball {
         default,
         skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
+    #[builder(default)]
     pub metric_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
@@ -115,6 +124,7 @@ pub struct Snowball {
         default,
         skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
+    #[builder(default)]
     pub scenario_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes.
@@ -122,6 +132,31 @@ pub struct Snowball {
 }
 
 impl Snowball {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> SnowballBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .variant(self.variant)
+            .initial_coupon(self.initial_coupon)
+            .fixed_rate(self.fixed_rate)
+            .gearing(self.gearing)
+            .coupon_floor(self.coupon_floor)
+            .coupon_cap_opt(self.coupon_cap)
+            .notional(self.notional)
+            .start_date(self.start_date)
+            .payment_dates(self.payment_dates.clone())
+            .forward_curve_id(self.forward_curve_id.clone())
+            .index_tenor(self.index_tenor)
+            .discount_curve_id(self.discount_curve_id.clone())
+            .vol_surface_id_opt(self.vol_surface_id.clone())
+            .call_provision_opt(self.call_provision.clone())
+            .day_count(self.day_count)
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Validate the snowball parameters.
     ///
     /// Checks:

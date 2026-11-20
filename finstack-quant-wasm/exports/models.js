@@ -14,7 +14,7 @@ import { volatility } from './models/volatility.js';
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * console.log(models.bsPrice(100, 100, 0.03, 0, 0.2, 1, true));
+ * console.log(models.bsPrice({ spot: 100, strike: 100, rate: 0.03, dividend_yield: 0, volatility: 0.2, time_to_expiry: 1, option_type: 'call' }));
  * ```
  */
 export const models = {
@@ -27,8 +27,16 @@ export const models = {
   volatility,
   optionCalculation: wasm.optionCalculation,
   bsPrice: wasm.bsPrice,
+  bsPriceMany: wasm.bsPriceMany,
+  optionMarketParams: wasm.optionMarketParams,
+  optionContractParams: wasm.optionContractParams,
+  hestonParams: wasm.hestonParams,
+  hestonParamsSatisfiesFeller: wasm.hestonParamsSatisfiesFeller,
+  optionMarketParamsContract: wasm.optionMarketParamsContract,
+  optionContractParamsWithVolatility: wasm.optionContractParamsWithVolatility,
   vanillaExpiryPayoff: wasm.vanillaExpiryPayoff,
   bsGreeks: wasm.bsGreeks,
+  bsGreeksMany: wasm.bsGreeksMany,
   bsGreeksIsValid: wasm.bsGreeksIsValid,
   bsImpliedVol: wasm.bsImpliedVol,
   black76ImpliedVol: wasm.black76ImpliedVol,

@@ -221,6 +221,24 @@ pub struct BondFuture {
 }
 
 impl BondFuture {
+    /// Copy the listed terms, selected deliverable and pricing settings into a new builder.
+    pub fn to_builder(&self) -> BondFutureBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .terms(self.terms.clone())
+            .delivery_start(self.delivery_start)
+            .contract_specs(self.contract_specs.clone())
+            .deliverable_basket(self.deliverable_basket.clone())
+            .ctd_bond_id_opt(self.ctd_bond_id.clone())
+            .ctd_bond_opt(self.ctd_bond.clone())
+            .discount_curve_id(self.discount_curve_id.clone())
+            .repo_curve_id_opt(self.repo_curve_id.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+            .attributes(self.attributes.clone())
+    }
+
     /// Create a representative UST 10Y bond future example.
     ///
     /// Long position, 10 contracts ($1M face), 2 deliverable bonds
@@ -1197,14 +1215,35 @@ impl finstack_quant_valuations_core::instruments::Instrument for BondFuture {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        let (ctd_bond, conversion_factor) = self.embedded_ctd()?;
-        super::pricer::BondFuturePricer::calculate_npv(
-            self,
-            ctd_bond,
-            conversion_factor,
-            market,
-            as_of,
-        )
+        let npv = self
+            .terms
+            .npv_from_model_price(self.id.as_str(), as_of, || {
+                let (ctd_bond, conversion_factor) = self.embedded_ctd()?;
+                super::pricer::BondFuturePricer::fair_price_for_future(
+                    self,
+                    ctd_bond,
+                    conversion_factor,
+                    market,
+                    as_of,
+                )
+            })?;
+        Money::from_model_value(npv, self.terms.currency)
+    }
+
+    fn applicable_metrics(
+        &self,
+        menu: &[finstack_quant_valuations_core::metrics::MetricId],
+        registry: &finstack_quant_valuations_core::metrics::MetricRegistry,
+    ) -> Vec<finstack_quant_valuations_core::metrics::MetricId> {
+        use finstack_quant_valuations_core::metrics::MetricId;
+        let mut metrics = registry.applicable_subset(menu, self.key());
+        if self.ctd_bond.is_none()
+            && self.terms.quoted_price.is_none()
+            && self.terms.settlement_price.is_none()
+        {
+            metrics.retain(|metric| *metric != MetricId::Theta);
+        }
+        metrics
     }
 
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {

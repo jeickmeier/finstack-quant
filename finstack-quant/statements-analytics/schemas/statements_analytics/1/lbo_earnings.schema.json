@@ -1,0 +1,58 @@
+{
+  "$defs": {
+    "DecimalWire": {
+      "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
+      "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
+      "type": "string"
+    },
+    "LboEarningsBasis": {
+      "description": "How a matched earnings observation is read.",
+      "oneOf": [
+        {
+          "const": "as_observed",
+          "description": "Use one authored observation that already reflects the multiple's basis.",
+          "type": "string"
+        },
+        {
+          "const": "trailing_additive",
+          "description": "Sum twelve contiguous months of additive statement earnings.",
+          "type": "string"
+        }
+      ]
+    },
+    "PeriodId": {
+      "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_earnings.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Matched earnings basis and purchase or exit multiple.",
+  "properties": {
+    "basis": {
+      "$ref": "#/$defs/LboEarningsBasis",
+      "description": "Earnings dimension matched to the multiple's convention."
+    },
+    "multiple": {
+      "$ref": "#/$defs/DecimalWire",
+      "description": "Price divided by earnings, in positive multiple turns."
+    },
+    "node": {
+      "description": "Exact node name supplying the elected earnings amount in transaction currency.",
+      "type": "string"
+    },
+    "period": {
+      "$ref": "#/$defs/PeriodId",
+      "description": "Existing statement period containing the closing observation."
+    }
+  },
+  "required": [
+    "node",
+    "period",
+    "multiple",
+    "basis"
+  ],
+  "title": "LboEarnings",
+  "type": "object"
+}

@@ -226,7 +226,7 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         .build()
         .unwrap();
 
-    let hazard_knots = [(0.0, 0.01), (1.0, 0.01), (5.0, 0.02), (10.0, 0.025)];
+    let hazard_knots = [(1.0, 0.01), (5.0, 0.02), (10.0, 0.025)];
     let hazard = HazardCurve::builder("CORP-HAZARD")
         .base_date(base)
         .knots(hazard_knots)

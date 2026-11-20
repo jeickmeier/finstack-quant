@@ -34,9 +34,9 @@
           "period": "2025Q4",
           "metric": "revenue",
           "baseline": 231384660.02999997,
-          "comparison": 196050293.6,
-          "abs_var": -35334366.42999998,
-          "pct_var": -0.1527083360902954
+          "comparison": 231384660.02999997,
+          "abs_var": 0,
+          "pct_var": 0
         },
         {
           "period": "2025Q1",
@@ -66,9 +66,9 @@
           "period": "2025Q4",
           "metric": "cogs",
           "baseline": 78092322.760125,
-          "comparison": 66166974.09,
-          "abs_var": -11925348.670124993,
-          "pct_var": -0.1527083360902954
+          "comparison": 78092322.760125,
+          "abs_var": 0,
+          "pct_var": 0
         },
         {
           "period": "2025Q1",
@@ -98,9 +98,9 @@
           "period": "2025Q4",
           "metric": "gross_profit",
           "baseline": 153292337.269875,
-          "comparison": 129883319.51,
-          "abs_var": -23409017.759874985,
-          "pct_var": -0.15270833609029538
+          "comparison": 153292337.269875,
+          "abs_var": 0,
+          "pct_var": 0
         },
         {
           "period": "2025Q1",
@@ -162,9 +162,9 @@
           "period": "2025Q4",
           "metric": "ebitda",
           "baseline": 61383803.27707497,
-          "comparison": 37974785.51719999,
-          "abs_var": -23409017.759874977,
-          "pct_var": -0.3813549586396767
+          "comparison": 61383803.27707497,
+          "abs_var": 0,
+          "pct_var": 0
         },
         {
           "period": "2025Q1",
@@ -194,9 +194,9 @@
           "period": "2025Q4",
           "metric": "net_income",
           "baseline": 30285257.205054354,
-          "comparison": 12377358.618749993,
-          "abs_var": -17907898.58630436,
-          "pct_var": -0.5913074624083325
+          "comparison": 30285257.205054354,
+          "abs_var": 0,
+          "pct_var": 0
         }
       ]
     }
@@ -235,10 +235,10 @@
         {
           "period": "2025Q4",
           "metric": "revenue",
-          "baseline": 196050293.6,
-          "comparison": 173010647.2,
-          "abs_var": -23039646.400000006,
-          "pct_var": -0.1175190609354946
+          "baseline": 231384660.02999997,
+          "comparison": 231384660.02999997,
+          "abs_var": 0,
+          "pct_var": 0
         },
         {
           "period": "2025Q1",
@@ -267,10 +267,10 @@
         {
           "period": "2025Q4",
           "metric": "cogs",
-          "baseline": 66166974.09,
-          "comparison": 58391093.43,
-          "abs_var": -7775880.660000004,
-          "pct_var": -0.11751906093549462
+          "baseline": 78092322.760125,
+          "comparison": 78092322.760125,
+          "abs_var": 0,
+          "pct_var": 0
         },
         {
           "period": "2025Q1",
@@ -299,10 +299,10 @@
         {
           "period": "2025Q4",
           "metric": "gross_profit",
-          "baseline": 129883319.51,
-          "comparison": 114619553.77,
-          "abs_var": -15263765.74000001,
-          "pct_var": -0.11751906093549463
+          "baseline": 153292337.269875,
+          "comparison": 153292337.269875,
+          "abs_var": 0,
+          "pct_var": 0
         },
         {
           "period": "2025Q1",
@@ -363,10 +363,10 @@
         {
           "period": "2025Q4",
           "metric": "ebitda",
-          "baseline": 37974785.51719999,
-          "comparison": 17768763.37,
-          "abs_var": -20206022.147199992,
-          "pct_var": -0.5320904877276539
+          "baseline": 61383803.27707497,
+          "comparison": 56441546.86987498,
+          "abs_var": -4942256.407199994,
+          "pct_var": -0.08051401417555663
         },
         {
           "period": "2025Q1",
@@ -395,10 +395,10 @@
         {
           "period": "2025Q4",
           "metric": "net_income",
-          "baseline": 12377358.618749993,
-          "comparison": -3080248.323858,
-          "abs_var": -15457606.942607993,
-          "pct_var": -1.2488615235880658
+          "baseline": 30285257.205054354,
+          "comparison": 26504431.05354636,
+          "abs_var": -3780826.1515079923,
+          "pct_var": -0.1248404834705186
         }
       ]
     }

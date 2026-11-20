@@ -1046,7 +1046,7 @@
                     "absolute": 1.0,
                     "reference_label": "denominator",
                     "reference_value": 100.0,
-                    "relative_pct": null
+                    "relative": null
                   },
                   "message": "Coverage ratio 1.00x in 2025Q1 below Warning floor 1.50x",
                   "nodes": [
@@ -1062,7 +1062,7 @@
                     "absolute": 1.0,
                     "reference_label": "denominator",
                     "reference_value": 100.0,
-                    "relative_pct": null
+                    "relative": null
                   },
                   "message": "Coverage ratio 1.00x in 2025Q2 below Warning floor 1.50x",
                   "nodes": [
@@ -1078,7 +1078,7 @@
                     "absolute": 1.0,
                     "reference_label": "denominator",
                     "reference_value": 100.0,
-                    "relative_pct": null
+                    "relative": null
                   },
                   "message": "Coverage ratio 1.00x in 2025Q3 below Warning floor 1.50x",
                   "nodes": [
@@ -1094,7 +1094,7 @@
                     "absolute": 1.0,
                     "reference_label": "denominator",
                     "reference_value": 100.0,
-                    "relative_pct": null
+                    "relative": null
                   },
                   "message": "Coverage ratio 1.00x in 2025Q4 below Warning floor 1.50x",
                   "nodes": [
@@ -1110,7 +1110,7 @@
                     "absolute": 1.0,
                     "reference_label": "denominator",
                     "reference_value": 120.0,
-                    "relative_pct": null
+                    "relative": null
                   },
                   "message": "Coverage ratio 1.00x in 2026Q1 below Warning floor 1.50x",
                   "nodes": [
@@ -2076,7 +2076,6 @@
       },
       {
         "multiple": 8.5,
-        "terminal_metric": 0.0,
         "type": "exit_multiple"
       },
       {

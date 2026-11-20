@@ -102,11 +102,11 @@ PATH_SPECS = {
             "q": 0.01,
             "kappa": 2.0,
             "theta": 0.05,
-            "sigma_v": 0.3,
+            "vol_of_vol": 0.3,
             "rho": -0.7,
             "v0": 0.03,
         },
-        "initial_state": [100.0, 0.03],
+        "initial_state": [100.0],
         "antithetic": True,
         **PATH_GRID,
     },
@@ -721,10 +721,10 @@ def _monte_carlo_cases() -> dict[str, Callable[[], Any]]:
             _numeric_amounts(json.loads(asian().price_with_lrm_greeks(_gbm("put"), 12, "EUR").to_json())),
         ],
         "monte_carlo.lsmc": lambda: [
-            _money(lsmc().price_american(_gbm("put"))),
-            _money(lsmc().price_american(_gbm("call"), num_steps=10, basis="polynomial", basis_degree=2)),
-            _money(lsmc().price_american_unbiased(_gbm("put"), 99)),
-            _money(lsmc().price_american_unbiased(_gbm("call"), 99)),
+            _money(lsmc().price_american(_gbm("put")).estimate),
+            _money(lsmc().price_american(_gbm("call"), num_steps=10, basis="polynomial", basis_degree=2).estimate),
+            _money(lsmc().price_american_unbiased(_gbm("put"), 99).estimate),
+            _money(lsmc().price_american_unbiased(_gbm("call"), 99).estimate),
             lsmc().basis,
             lsmc().basis_degree,
         ],
@@ -850,10 +850,10 @@ def _volatility_cases() -> dict[str, Callable[[], Any]]:
             svi().implied_vol(0.1, 1.0),
         ],
         "volatility.arbitrage": lambda: [
-            _json(volatility.check_surface_grid(STRIKES, EXPIRIES, VOLS, [100.0, 100.0])),
-            len(volatility.check_butterfly_grid(STRIKES, EXPIRIES, VOLS, [100.0, 100.0])),
-            len(volatility.check_calendar_spread_grid(STRIKES, EXPIRIES, VOLS, [100.0, 100.0])),
-            len(volatility.check_local_vol_density_grid(STRIKES, EXPIRIES, VOLS, [100.0, 100.0])),
+            _json(volatility.check_surface_grid(EXPIRIES, STRIKES, VOLS, [100.0, 100.0])),
+            len(volatility.check_butterfly_grid(EXPIRIES, STRIKES, VOLS, [100.0, 100.0])),
+            len(volatility.check_calendar_spread_grid(EXPIRIES, STRIKES, VOLS, [100.0, 100.0])),
+            len(volatility.check_local_vol_density_grid(EXPIRIES, STRIKES, VOLS, [100.0, 100.0])),
         ],
         "volatility.cube_slices": lambda: [
             _surface_vols(tenor_slice()),
@@ -949,17 +949,26 @@ def _analytic_cases() -> dict[str, Callable[[], Any]]:
         ],
         "fourier.heston": lambda: [
             models.heston_price(
-                100.0,
-                100.0,
-                1.0,
-                {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.3, "rho": -0.7},
+                {
+                    "spot": 100.0,
+                    "strike": 100.0,
+                    "rate": 0.05,
+                    "dividend_yield": 0.0,
+                    "time_to_expiry": 1.0,
+                    "option_type": "call",
+                },
+                {"v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7},
             ),
             models.heston_price(
-                100.0,
-                110.0,
-                1.0,
-                {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.3, "rho": -0.7},
-                False,
+                {
+                    "spot": 100.0,
+                    "strike": 110.0,
+                    "rate": 0.05,
+                    "dividend_yield": 0.0,
+                    "time_to_expiry": 1.0,
+                    "option_type": "put",
+                },
+                {"v0": 0.04, "kappa": 2.0, "theta": 0.04, "vol_of_vol": 0.3, "rho": -0.7},
             ),
         ],
         "fourier.cos": lambda: [
@@ -984,11 +993,11 @@ def _analytic_cases() -> dict[str, Callable[[], Any]]:
                     "dividend_yield": 0.0,
                     "time_to_expiry": 1.0,
                     "option_type": "put",
-                    "n_terms": 512,
                 },
                 0.2,
                 -0.14,
                 0.2,
+                n_terms=512,
             ),
             models.merton_jump_cos_price(
                 {
@@ -1012,12 +1021,12 @@ def _analytic_cases() -> dict[str, Callable[[], Any]]:
                     "dividend_yield": 0.0,
                     "time_to_expiry": 1.0,
                     "option_type": "put",
-                    "n_terms": 512,
                 },
                 0.2,
                 -0.1,
                 0.15,
                 0.5,
+                n_terms=512,
             ),
         ],
         "volatility.convert_atm": lambda: [
@@ -1084,3 +1093,34 @@ def test_golden_file_lists_exactly_these_cases() -> None:
 def test_python_matches_the_cross_host_golden(name: str) -> None:
     expected = json.loads(GOLDEN.read_text())[name]
     _assert_close(_plain(CASES[name]()), expected, name)
+
+
+def test_bs_batch_pairs_strided_axes_and_broadcasts_scalar() -> None:
+    import numpy as np
+
+    from finstack_quant.models import bs_greeks, bs_greeks_many, bs_price, bs_price_many
+
+    market = {
+        "spot": 100.0,
+        "strike": 95.0,
+        "rate": 0.025,
+        "volatility": 0.21,
+        "time_to_expiry": 1.3,
+        "dividend_yield": 0.015,
+        "option_type": "put",
+    }
+    spots = np.asarray([71.0, 99.0, 118.0, 37.0, 135.0])[::2]
+    strikes = [80.0, 98.0, 121.0]
+    expected = [bs_price({**market, "spot": s, "strike": k}) for s, k in zip(spots, strikes, strict=True)]
+    np.testing.assert_array_equal(bs_price_many(market, spots, strikes), expected)
+    np.testing.assert_array_equal(
+        bs_price_many(market, spots, 115.0),
+        [bs_price({**market, "spot": s, "strike": 115.0}) for s in spots],
+    )
+    rows = bs_greeks_many(market, spots, strikes, theta_days_per_year=360.0)
+    assert [row.to_json() for row in rows] == [
+        bs_greeks({**market, "spot": s, "strike": k}, theta_days_per_year=360.0).to_json()
+        for s, k in zip(spots, strikes, strict=True)
+    ]
+    with pytest.raises(ValueError, match="equal lengths"):
+        bs_price_many(market, spots, strikes[:2])

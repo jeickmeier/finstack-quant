@@ -39,4 +39,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 pub(crate) mod types;
 
-pub use types::CliquetOption;
+pub use types::{CliquetOption, CliquetOptionBuilder};

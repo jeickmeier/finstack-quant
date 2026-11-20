@@ -37,7 +37,14 @@ use rust_decimal::Decimal;
 ///
 /// - Hagan, P. S. (2003). "Convexity Conundrums." *Wilmott Magazine*. `docs/REFERENCES.md#hagan-2003-cms-convexity`
 /// - Antonov, A., Konikov, M., & Spector, M. (2013). "SABR Spreads." *Risk*. `docs/REFERENCES.md#hagan-2002-sabr`
-#[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+    finstack_quant_valuations_macros::FinancialBuilder,
+    PartialEq,
+    Clone,
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CmsSpreadOption {
@@ -132,6 +139,7 @@ pub struct CmsSpreadOption {
         default,
         skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
+    #[builder(default)]
     pub instrument_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
@@ -139,6 +147,7 @@ pub struct CmsSpreadOption {
         default,
         skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
+    #[builder(default)]
     pub metric_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
@@ -146,6 +155,7 @@ pub struct CmsSpreadOption {
         default,
         skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
+    #[builder(default)]
     pub scenario_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes.
@@ -153,6 +163,36 @@ pub struct CmsSpreadOption {
 }
 
 impl CmsSpreadOption {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> CmsSpreadOptionBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .long_cms_tenor(self.long_cms_tenor)
+            .short_cms_tenor(self.short_cms_tenor)
+            .strike(self.strike)
+            .option_type(self.option_type)
+            .notional(self.notional)
+            .expiry(self.expiry)
+            .payment_date(self.payment_date)
+            .long_vol_surface_id(self.long_vol_surface_id.clone())
+            .short_vol_surface_id(self.short_vol_surface_id.clone())
+            .discount_curve_id(self.discount_curve_id.clone())
+            .forward_curve_id(self.forward_curve_id.clone())
+            .correlation(self.correlation)
+            .day_count(self.day_count)
+            .index_id_opt(self.index_id.clone())
+            .long_cms_fixing_index_id_opt(self.long_cms_fixing_index_id.clone())
+            .short_cms_fixing_index_id_opt(self.short_cms_fixing_index_id.clone())
+            .swap_fixed_frequency_opt(self.swap_fixed_frequency)
+            .swap_float_frequency_opt(self.swap_float_frequency)
+            .swap_fixed_day_count_opt(self.swap_fixed_day_count)
+            .swap_float_day_count_opt(self.swap_float_day_count)
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Strike as an `f64` decimal rate for the pricing kernels.
     pub(crate) fn strike_rate(&self) -> f64 {
         self.strike.as_f64()

@@ -11,7 +11,7 @@ use wasm_bindgen::prelude::*;
 /// replay configuration. Returns a structured `ReplayResult` object.
 /// @param portfolio - Built `Portfolio` handle (from `Portfolio.fromSpec` or `Portfolio.builder`) to revalue at every snapshot.
 /// @param snapshotsJson - Market-snapshot JSON array.
-/// @param configJson - `ReplayConfig` JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected.
+/// @param configJson - ReplayConfig object or canonical JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected.
 ///
 /// Each position's `valuation_result` matches what `priceInstrument` returns:
 /// the 64-bit Monte Carlo `seed` is a `BigInt` and path counts are plain
@@ -33,7 +33,10 @@ pub fn replay_portfolio(
     portfolio: &JsPortfolio,
     #[wasm_bindgen(js_name = "snapshotsJson", unchecked_param_type = "JsonInput")]
     snapshots_json: JsValue,
-    #[wasm_bindgen(js_name = "configJson", unchecked_param_type = "JsonInput")]
+    #[wasm_bindgen(
+        js_name = "configJson",
+        unchecked_param_type = "generated.portfolio.ReplayConfig | JsonInput"
+    )]
     config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
     let snapshots_json: &str = &json_text(&snapshots_json, "snapshotsJson")?;

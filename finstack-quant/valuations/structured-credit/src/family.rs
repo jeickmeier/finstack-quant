@@ -4,7 +4,7 @@
 use indexmap::IndexMap;
 use std::sync::Arc;
 
-use crate::structured_credit::StructuredCredit;
+use crate::structured_credit::{StructuredCredit, StructuredCreditTranche};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{
@@ -24,6 +24,7 @@ pub static STRUCTURED_CREDIT: Family =
 
 fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
     registry.register(StructuredCreditDiscountingPricer)?;
+    registry.register(StructuredCreditTrancheDiscountingPricer)?;
     registry.register(StructuredCreditStochasticPricer)?;
     register_generic!(registry, InstrumentType::AgencyCmo, crate::cmo::AgencyCmo);
     register_generic!(
@@ -104,6 +105,37 @@ impl Pricer for StructuredCreditDiscountingPricer {
                         .model(ModelKey::Discounting),
                 )
             })
+    }
+}
+
+/// Deterministic pricing and per-note metric inputs from one waterfall pass.
+struct StructuredCreditTrancheDiscountingPricer;
+
+impl Pricer for StructuredCreditTrancheDiscountingPricer {
+    fn key(&self) -> PricerKey {
+        PricerKey::new(
+            InstrumentType::StructuredCreditTranche,
+            ModelKey::Discounting,
+        )
+    }
+
+    fn price_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> Result<ValuationResult, PricingError> {
+        let note = expect_inst::<StructuredCreditTranche>(
+            instrument,
+            InstrumentType::StructuredCreditTranche,
+        )?;
+        let (value, seed) = note.pricing_inputs(market, as_of).map_err(|error| {
+            PricingError::from_core(
+                error,
+                PricingErrorContext::from_instrument(note).model(ModelKey::Discounting),
+            )
+        })?;
+        Ok(ValuationResult::stamped(note.id(), as_of, value).with_metric_seed(Arc::new(seed)))
     }
 }
 

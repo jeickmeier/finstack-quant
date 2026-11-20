@@ -101,8 +101,8 @@ pub(crate) fn zero_rate_points_to_factors(
     Ok(knots)
 }
 
-/// Map strictly ascending dated positive factors onto a curve clock.
-pub(crate) fn dated_points_to_factors(
+/// Map dated quote levels to native times. The owning curve admits the resulting knots.
+pub(crate) fn dated_points_to_knots(
     curve_label: &str,
     base_date: Date,
     points: &[(Date, f64)],
@@ -113,14 +113,14 @@ pub(crate) fn dated_points_to_factors(
         return Err(crate::InputError::TooFewPoints.into());
     }
     let mut knots = Vec::with_capacity(points.len());
-    for &(date, factor) in points {
+    for &(date, level) in points {
         if date < base_date {
             return Err(crate::Error::Validation(format!(
                 "{curve_label}::from_dates pillar {date} precedes base date {base_date}"
             )));
         }
         let t = signed_curve_year_fraction(base_date, date, day_count, calendar)?;
-        knots.push((t, factor));
+        knots.push((t, level));
     }
     Ok(knots)
 }

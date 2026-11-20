@@ -12,10 +12,11 @@ mod quotes;
 mod report;
 mod result;
 mod schema;
+mod step_params;
 mod validation;
 
 use config::{PyCalibrationConfig, PyRateBounds, PySolverConfig, PyValidationConfig};
-use envelope::{PyCalibrationEnvelope, PyCalibrationPlan, PyCalibrationStep};
+use envelope::{PyCalibrationEnvelope, PyCalibrationPlan, PyCalibrationStep, PyStepWithQuotes};
 use quotes::{
     PyCdsQuote, PyCdsTrancheQuote, PyFxSpotDatum, PyInflationQuote, PyPriceDatum, PyRateQuote,
     PyVolQuote, PyXccyQuote,
@@ -269,6 +270,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCalibrationReport>()?;
     m.add_class::<PyCalibrationResult>()?;
     m.add_class::<PyCalibrationStep>()?;
+    step_params::register(&m)?;
     m.add_class::<PyCalibrationValidationReport>()?;
     m.add_class::<PyCdsQuote>()?;
     m.add_class::<PyCdsTrancheQuote>()?;
@@ -279,6 +281,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyRateBounds>()?;
     m.add_class::<PyRateQuote>()?;
     m.add_class::<PySolverConfig>()?;
+    m.add_class::<PyStepWithQuotes>()?;
     m.add_class::<PyValidationConfig>()?;
     m.add_class::<PyVolQuote>()?;
     m.add_class::<PyXccyQuote>()?;
@@ -315,6 +318,19 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "CalibrationReport",
                 "CalibrationResultEnvelope",
                 "CalibrationStep",
+                "DiscountCurveParams",
+                "ForwardCurveParams",
+                "HazardCurveParams",
+                "InflationCurveParams",
+                "VolSurfaceParams",
+                "SwaptionVolParams",
+                "BaseCorrelationParams",
+                "StudentTParams",
+                "HullWhiteStepParams",
+                "CapFloorHullWhiteStepParams",
+                "SviSurfaceParams",
+                "XccyBasisParams",
+                "ParametricCurveParams",
                 "CalibrationValidationReport",
                 "CdsQuote",
                 "CdsTrancheQuote",
@@ -325,6 +341,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "RateBounds",
                 "RateQuote",
                 "SolverConfig",
+                "StepWithQuotes",
                 "ValidationConfig",
                 "VolQuote",
                 "XccyQuote",

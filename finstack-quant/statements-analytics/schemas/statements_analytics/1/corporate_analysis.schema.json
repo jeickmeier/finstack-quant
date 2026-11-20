@@ -24,7 +24,7 @@
               "type": "null"
             }
           ],
-          "description": "EV-to-equity bridge whose net adjustment is\n[`net_debt`](Self::net_debt): gross debt (`total_debt`) and `cash`\nseparately, plus preferred equity, minority interest, non-operating\nassets and other adjustments, all in the model currency.\n\n`net_debt = total_debt - cash + preferred_equity + minority_interest -\nnon_operating_assets - Σ other_adjustments`, so `total_debt - cash`\nequals `net_debt` whenever the remaining components are zero (always\nthe case unless `DcfOptions::equity_bridge` supplies them). Under a\nflat `net_debt_override` the override is reported as `total_debt` with\n`cash` zero. `None` only for a result deserialized from JSON written\nbefore this field existed."
+          "description": "Gross debt, cash, preferred equity, minority interest, non-operating\nassets and named adjustments, in model currency.\nAn authored flat net debt amount is recorded as debt with zero cash."
         },
         "equity_value": {
           "$ref": "#/$defs/Money",
@@ -40,7 +40,11 @@
         },
         "net_debt": {
           "$ref": "#/$defs/Money",
-          "description": "Net debt (or effective bridge amount) used in calculation"
+          "description": "Interest-bearing debt less cash in model currency."
+        },
+        "other_equity_claims": {
+          "$ref": "#/$defs/Money",
+          "description": "Net non-debt claims to deduct from enterprise value in model currency.\nA negative balance increases common equity."
         },
         "periods": {
           "description": "One row per explicit forecast period that was discounted, in date\norder: the free cash flow, its discounting tenor and factor, and its\npresent value.\n\nThe `present_value` column sums to [`pv_explicit`](Self::pv_explicit),\nand that sum plus [`terminal_value_pv`](Self::terminal_value_pv) is\n[`enterprise_value`](Self::enterprise_value). Rows carry unrounded\n`f64` amounts while the `Money` totals are rounded to the currency's\nminor unit, so the reconciliation holds to within one minor unit.\nEmpty only for a result deserialized from JSON written before this\nfield existed.",
@@ -85,7 +89,7 @@
         },
         "valuation_discount": {
           "$ref": "#/$defs/Money",
-          "description": "Total valuation discount (DLOM, DLOC, other) deducted after the\nEV-to-equity bridge; zero when `DcfOptions::valuation_discounts` is unset.\n\n`enterprise_value - net_debt - valuation_discount` equals\n`equity_value`, so a bridge built from these three steps reconciles to\nthe reported equity value."
+          "description": "Total valuation discount (DLOM, DLOC, other) deducted after the\nEV-to-equity bridge; zero when `DcfOptions::valuation_discounts` is unset.\n\n`enterprise_value - net_debt - other_equity_claims - valuation_discount` equals\n`equity_value`, so a bridge built from these three steps reconciles to\nthe reported equity value."
         },
         "wacc": {
           "description": "Discount rate (WACC) applied to every explicit flow and to the\nterminal value, as an annually compounded decimal (`0.10` = 10%).\n\n`None` only for a result deserialized from JSON written before this\nfield existed.",
@@ -100,6 +104,7 @@
         "equity_value",
         "enterprise_value",
         "net_debt",
+        "other_equity_claims",
         "valuation_discount",
         "terminal_value_pv"
       ],
@@ -213,7 +218,7 @@
           ]
         },
         "ltv": {
-          "description": "LTV by period: `debt_balance[t] / reference_value[t]`.\n\nA scalar DCF enterprise value is broadcast as the same denominator\non every requested period (current valuation versus forward debt,\nnot a rolled enterprise-value path). A per-period statement node\nsupplies a varying value path; a missing period omits LTV for that\nperiod only.",
+          "description": "LTV by period: current debt face divided by the selected same-date collateral value.\nA missing value leaves LTV unavailable for that period.",
           "items": {
             "maxItems": 2,
             "minItems": 2,
@@ -1212,10 +1217,6 @@
       ],
       "description": "Equity valuation result (if DCF was configured)"
     },
-    "ev_suppressed_non_positive": {
-      "description": "`true` when a DCF enterprise value was computed but suppressed as the\nLTV reference because it was non-positive. Credit metrics are then\ncomputed without an enterprise-value reference.",
-      "type": "boolean"
-    },
     "statement": {
       "$ref": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
       "description": "Full statement evaluation (all nodes, all periods)"
@@ -1223,8 +1224,7 @@
   },
   "required": [
     "statement",
-    "credit",
-    "ev_suppressed_non_positive"
+    "credit"
   ],
   "title": "CorporateAnalysis",
   "type": "object"

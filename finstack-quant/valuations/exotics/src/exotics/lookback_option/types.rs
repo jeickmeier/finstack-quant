@@ -171,6 +171,32 @@ pub struct LookbackOption {
 }
 
 impl LookbackOption {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> LookbackOptionBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .underlying_ticker(self.underlying_ticker.clone())
+            .strike_opt(self.strike)
+            .option_type(self.option_type)
+            .lookback_type(self.lookback_type)
+            .expiry(self.expiry)
+            .expiry_fixing_opt(self.expiry_fixing)
+            .quantity(self.quantity)
+            .currency(self.currency)
+            .day_count(self.day_count)
+            .discount_curve_id(self.discount_curve_id.clone())
+            .spot_id(self.spot_id.clone())
+            .vol_surface_id(self.vol_surface_id.clone())
+            .div_yield_id_opt(self.div_yield_id.clone())
+            .monitoring(self.monitoring.clone())
+            .observed_min_opt(self.observed_min)
+            .observed_max_opt(self.observed_max)
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Create a canonical example lookback option (fixed strike call).
     pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;

@@ -33,6 +33,7 @@ from finstack_quant.valuations.instruments import (
     BondBuilder,
     CapFloor,
     CapFloorBuilder,
+    Deposit,
     FixedLegSpec,
     FloatLegSpec,
     InterestRateSwap,
@@ -296,11 +297,10 @@ def test_leg_spec_decimal_fields_take_exact_decimal_strings() -> None:
         date_regime="standard",
     )
     assert premium.coupon_bp == pytest.approx(100.0)
-    # One spelling per value: a float, a ``Rate`` or a percent label is not the
-    # exact-decimal wire form.
-    for rate in (0.04, Rate(0.04), "4%"):
-        with pytest.raises(ValueError, match="invalid FixedLegSpec"):
-            _fixed_leg(rate=rate)
+    for rate in (0.04, Rate(0.04)):
+        assert _fixed_leg(rate=rate).rate == pytest.approx(0.04)
+    with pytest.raises(ValueError, match="invalid decimal"):
+        _fixed_leg(rate="4%")
 
 
 def test_leg_specs_accept_iso_string_dates_and_stub_names() -> None:
@@ -810,3 +810,49 @@ def test_bond_builder_quoted_price_drives_ytm_like_the_wire_field() -> None:
     ytm_plain = plain.price(market, AS_OF, metrics=["ytm"]).metrics["ytm"]
     assert ytm_quoted == ytm_wire
     assert abs(ytm_quoted - ytm_plain) > 1e-4
+
+
+def test_deposit_builder_retains_exact_rate_and_matches_wire_pricing() -> None:
+    rate = Decimal("0.050500123456789123")
+    deposit = (
+        Deposit
+        .builder()
+        .id("DEP")
+        .notional(Money(1_000_000, "USD"))
+        .start_date("2025-01-15")
+        .maturity("2025-04-15")
+        .day_count("act_360")
+        .fixed_rate(rate)
+        .discount_curve_id("USD-OIS")
+        .build()
+    )
+    assert deposit.fixed_rate == rate
+    assert Deposit.from_json(deposit.to_json()).fixed_rate == rate
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", "2025-01-15", 0.05, day_count="act_365f"))
+    direct = deposit.price(market, "2025-01-15", metrics=["dv01"])
+    wire = price_instrument(deposit.to_json(), market, "2025-01-15", metrics=["dv01"])
+    assert direct.value == wire.value
+    assert direct.metrics == wire.metrics
+
+    moved = deposit.to_builder().maturity("2025-07-15").build()
+    assert moved.maturity.isoformat() == "2025-07-15"
+    assert moved.fixed_rate == rate
+    assert deposit.maturity.isoformat() == "2025-04-15"
+
+
+def test_forward_rate_agreement_builder_preserves_fixing_and_exact_rate() -> None:
+    from decimal import Decimal
+
+    from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
+    from finstack_quant.valuations.instruments import ForwardRateAgreement, price_instrument
+
+    base = "2024-01-01"
+    market = MarketContext()
+    market.insert(DiscountCurve.flat("USD-OIS", base, 0.04, "act_365f"))
+    market.insert(ForwardCurve.flat("USD-SOFR-3M", base, 0.05, "act_360"))
+    fra = ForwardRateAgreement.example().to_builder().id("FRA").fixed_rate(Decimal("0.047505")).build()
+    assert fra.fixed_rate == Decimal("0.047505")
+    assert fra.fixing_date == ForwardRateAgreement.example().fixing_date
+    assert fra.forward_curve_id == "USD-SOFR-3M"
+    assert fra.price(market, base).value == price_instrument(fra.to_json(), market, base).value
+    assert fra.to_builder().build().to_json() == fra.to_json()

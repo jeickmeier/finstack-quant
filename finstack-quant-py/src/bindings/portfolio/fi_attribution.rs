@@ -11,7 +11,7 @@ use crate::bindings::pandas_utils::{
     ColumnSchema, serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::bindings::portfolio::attribution::PyReconciliationReport;
-use crate::errors::{portfolio_to_py, serde_json_to_py};
+use crate::errors::portfolio_to_py;
 
 /// Column schema for [`PyFiAttributionResult::to_dataframe`] (per-sector
 /// effects).
@@ -21,11 +21,12 @@ const FI_SECTOR_COLUMNS: &[ColumnSchema<'static>] = &[
     ("benchmark_weight", "float64"),
     ("portfolio_return", "float64"),
     ("benchmark_return", "float64"),
+    ("benchmark_comparator", "float64"),
     ("allocation", "float64"),
     ("active_carry", "float64"),
     ("active_treasury", "float64"),
     ("active_spread", "float64"),
-    ("selection", "float64"),
+    ("residual", "float64"),
     ("total_active", "float64"),
 ];
 
@@ -37,13 +38,11 @@ const FI_LINKED_SECTOR_COLUMNS: &[ColumnSchema<'static>] = &[
     ("active_carry", "float64"),
     ("active_treasury", "float64"),
     ("active_spread", "float64"),
-    ("selection", "float64"),
+    ("residual", "float64"),
     ("total_active", "float64"),
 ];
 
-/// Single-period Campisi benchmark-relative attribution result.
-///
-/// Returned by :func:`campisi_attribution`.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "FiAttributionResult")]
 #[pyclass(
     name = "FiAttributionResult",
     module = "finstack_quant.portfolio",
@@ -63,14 +62,14 @@ crate::bindings::macros::wire_methods!(
 
 #[pymethods]
 impl PyFiAttributionResult {
-    /// Per-sector effects as a list of dicts, in first-seen order.
+    /// Per-sector effects as a list of dicts, in declared sector order.
     #[getter]
     fn sectors<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.sectors)
     }
 
     /// Portfolio-side absolute Campisi split (``carry``, ``treasury``,
-    /// ``spread``, ``selection``, ``total``).
+    /// ``spread``, ``residual``, ``total``).
     #[getter]
     fn portfolio_components<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.portfolio_components)
@@ -124,10 +123,10 @@ impl PyFiAttributionResult {
         self.inner.total_active_spread
     }
 
-    /// Sum of sector selection effects.
+    /// Sum of sector residual effects.
     #[getter]
-    fn total_selection(&self) -> f64 {
-        self.inner.total_selection
+    fn total_residual(&self) -> f64 {
+        self.inner.total_residual
     }
 
     /// Per-sector effects as a :class:`pandas.DataFrame`.
@@ -135,31 +134,18 @@ impl PyFiAttributionResult {
     /// Columns: ``sector``, ``portfolio_weight``, ``benchmark_weight``,
     /// ``portfolio_return``, ``benchmark_return``, ``allocation``,
     /// ``active_carry``, ``active_treasury``, ``active_spread``,
-    /// ``selection``, ``total_active``.
+    /// ``residual``, ``total_active``.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_rows_to_dataframe_with_schema(py, &self.inner.sectors, FI_SECTOR_COLUMNS)
     }
 
-    /// Reconcile the five Campisi effect totals against the active return.
-    ///
-    /// Binds the Rust method ``FiAttributionResult::reconciliation_check``.
-    ///
-    /// Parameters
-    /// ----------
-    /// tolerance : float
-    ///     Absolute tolerance in return units (``1e-10`` is appropriate for
-    ///     return-space values).
-    ///
-    /// Returns
-    /// -------
-    /// ReconciliationReport
-    ///     Typed report with ``total_residual``, ``is_reconciled`` and
-    ///     ``tolerance``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "FiAttributionResult.reconciliation_check")]
     #[pyo3(text_signature = "(self, tolerance)")]
-    fn reconciliation_check(&self, tolerance: f64) -> PyReconciliationReport {
-        PyReconciliationReport {
-            inner: self.inner.reconciliation_check(tolerance),
-        }
+    fn reconciliation_check(&self, tolerance: f64) -> PyResult<PyReconciliationReport> {
+        self.inner
+            .reconciliation_check(tolerance)
+            .map(|inner| PyReconciliationReport { inner })
+            .map_err(portfolio_to_py)
     }
 
     fn __repr__(&self) -> String {
@@ -171,9 +157,7 @@ impl PyFiAttributionResult {
     }
 }
 
-/// Multi-period Carino-linked Campisi attribution result.
-///
-/// Returned by :func:`campisi_carino_link`.
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "FiCarinoLinkedResult")]
 #[pyclass(
     name = "FiCarinoLinkedResult",
     module = "finstack_quant.portfolio",
@@ -212,6 +196,12 @@ impl PyFiCarinoLinkedResult {
         self.inner.benchmark_return_compounded
     }
 
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "FiCarinoLinkedResult.active_return_compounded")]
+    fn active_return_compounded(&self) -> f64 {
+        self.inner.active_return_compounded
+    }
+
     /// Per-sector linked effects as a list of dicts.
     #[getter]
     fn linked_sectors<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -242,16 +232,16 @@ impl PyFiCarinoLinkedResult {
         self.inner.linked_active_spread
     }
 
-    /// Sum of linked selection effects.
+    /// Sum of linked residual effects.
     #[getter]
-    fn linked_selection(&self) -> f64 {
-        self.inner.linked_selection
+    fn linked_residual(&self) -> f64 {
+        self.inner.linked_residual
     }
 
     /// Linked per-sector effects as a :class:`pandas.DataFrame`.
     ///
     /// Columns: ``sector``, ``allocation``, ``active_carry``,
-    /// ``active_treasury``, ``active_spread``, ``selection``,
+    /// ``active_treasury``, ``active_spread``, ``residual``,
     /// ``total_active``.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_rows_to_dataframe_with_schema(
@@ -270,127 +260,243 @@ impl PyFiCarinoLinkedResult {
     }
 }
 
-/// Compute a single-period Campisi fixed-income attribution from JSON.
-///
-/// Parameters
-/// ----------
-/// portfolio_json : str | dict | list | pandas.DataFrame
-///     JSON array of ``FiPositionSnapshot`` objects (``sector``, ``weight``,
-///     ``total_return``, ``yield_annual``, ``modified_duration``,
-///     ``spread_duration``, ``spread``, ``delta_treasury_yield``,
-///     ``delta_spread``). ``spread_duration`` must be the canonical
-///     quote-reproducing Z-spread duration, while ``spread`` and
-///     ``delta_spread`` must use the matching ``z_spread`` basis. OAS,
-///     G-spread, and discount-margin values must not be mixed into these
-///     fields. Because the direct JSON shape carries numeric values but no
-///     metric IDs, the binding cannot detect mislabeled spread provenance.
-/// benchmark_json : str | dict | list | pandas.DataFrame
-///     JSON array of ``FiPositionSnapshot`` objects for the benchmark, subject
-///     to the same quote-reproducing Z-spread basis contract.
-/// config_json : str | dict | list | pandas.DataFrame
-///     JSON ``FiAttributionConfig``; ``period_years`` is its only field and is
-///     required (no default). Unknown keys are rejected.
-///
-/// Returns
-/// -------
-/// FiAttributionResult
-///     Typed result with per-sector effects and the five effect totals. Use
-///     :meth:`to_json` for the raw wire string.
-///
-/// Raises
-/// ------
-/// PortfolioError
-///     If canonical Rust validation rejects empty sides, non-finite values,
-///     invalid weights, period length, or a sector present on either side has
-///     ``|net sector weight| <= 1e-6 * gross absolute sector weight``.
-///     Spread-basis provenance cannot be validated from the numeric JSON shape.
-/// ValueError
-///     If an input JSON string is malformed or does not match its schema.
+use finstack_quant_portfolio::fi_attribution::{
+    FiAttributionConfig, FiPositionSnapshot, FiQuote, FiQuoteLeg, FiReportingBasis,
+};
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "FiQuote")]
+#[pyclass(
+    name = "FiQuote",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+struct PyFiQuote {
+    inner: FiQuote,
+}
+
+#[pymethods]
+impl PyFiQuote {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "FiQuote.__init__")]
+    #[new]
+    fn new(basis: String, rate: f64) -> Self {
+        Self {
+            inner: FiQuote { basis, rate },
+        }
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "FiQuoteLeg")]
+#[pyclass(
+    name = "FiQuoteLeg",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+struct PyFiQuoteLeg {
+    inner: FiQuoteLeg,
+}
+
+#[pymethods]
+impl PyFiQuoteLeg {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "FiQuoteLeg.__init__")]
+    #[new]
+    fn new(
+        sensitivity_basis: String,
+        duration: f64,
+        opening: &PyFiQuote,
+        closing: &PyFiQuote,
+    ) -> Self {
+        Self {
+            inner: FiQuoteLeg {
+                sensitivity_basis,
+                duration,
+                opening: opening.inner.clone(),
+                closing: closing.inner.clone(),
+            },
+        }
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "FiReportingBasis")]
+#[pyclass(
+    name = "FiReportingBasis",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+struct PyFiReportingBasis {
+    inner: FiReportingBasis,
+}
+
+#[pymethods]
+impl PyFiReportingBasis {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "FiReportingBasis.__init__")]
+    #[new]
+    fn new(
+        portfolio_series_id: String,
+        benchmark_series_id: String,
+        return_policy: String,
+        valuation: String,
+        fx: String,
+        fees: String,
+    ) -> Self {
+        Self {
+            inner: FiReportingBasis {
+                portfolio_series_id,
+                benchmark_series_id,
+                return_policy,
+                valuation,
+                fx,
+                fees,
+            },
+        }
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "FiAttributionConfig")]
+#[pyclass(
+    name = "FiAttributionConfig",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+struct PyFiAttributionConfig {
+    inner: FiAttributionConfig,
+}
+
+#[pymethods]
+impl PyFiAttributionConfig {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "FiAttributionConfig.__init__")]
+    #[new]
+    fn new(
+        start: &Bound<'_, PyAny>,
+        end: &Bound<'_, PyAny>,
+        currency: &Bound<'_, PyAny>,
+        basis: &PyFiReportingBasis,
+        sectors: Vec<String>,
+    ) -> PyResult<Self> {
+        let start = crate::bindings::date_utils::py_to_date(start)?;
+        let end = crate::bindings::date_utils::py_to_date(end)?;
+        let currency = crate::bindings::core::currency::extract_currency(currency)?;
+        Ok(Self {
+            inner: FiAttributionConfig {
+                start,
+                end,
+                currency,
+                basis: basis.inner.clone(),
+                sectors,
+            },
+        })
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "FiPositionSnapshot")]
+#[pyclass(
+    name = "FiPositionSnapshot",
+    module = "finstack_quant.portfolio",
+    frozen,
+    skip_from_py_object
+)]
+struct PyFiPositionSnapshot {
+    inner: FiPositionSnapshot,
+}
+
+#[pymethods]
+impl PyFiPositionSnapshot {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "FiPositionSnapshot.__init__")]
+    #[new]
+    fn new(
+        id: String,
+        sector: String,
+        weight: &Bound<'_, PyAny>,
+        total_return: f64,
+        opening_market_value: &crate::bindings::core::money::PyMoney,
+        annual_coupon: &crate::bindings::core::money::PyMoney,
+    ) -> PyResult<Self> {
+        let weight = crate::bindings::core::money::extract_exact_decimal(
+            weight,
+            "weight must be int, decimal string or decimal.Decimal",
+        )?;
+        Ok(Self {
+            inner: FiPositionSnapshot {
+                id,
+                sector,
+                weight: finstack_quant_core::wire::DecimalWire(weight),
+                total_return,
+                opening_market_value: opening_market_value.inner,
+                annual_coupon: annual_coupon.inner,
+                treasury: None,
+                spread: None,
+            },
+        })
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "FiPositionSnapshot.with_quote_legs")]
+    #[pyo3(signature = (*, treasury=None, spread=None))]
+    fn with_quote_legs(
+        &self,
+        treasury: Option<&PyFiQuoteLeg>,
+        spread: Option<&PyFiQuoteLeg>,
+    ) -> Self {
+        Self {
+            inner: FiPositionSnapshot {
+                treasury: treasury.map(|leg| leg.inner.clone()),
+                spread: spread.map(|leg| leg.inner.clone()),
+                ..self.inner.clone()
+            },
+        }
+    }
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "campisi_attribution")]
 #[pyfunction]
-#[pyo3(text_signature = "(portfolio_json, benchmark_json, config_json)")]
 fn campisi_attribution(
     py: Python<'_>,
-    portfolio_json: &Bound<'_, PyAny>,
-    benchmark_json: &Bound<'_, PyAny>,
-    config_json: &Bound<'_, PyAny>,
+    portfolio: Vec<Py<PyFiPositionSnapshot>>,
+    benchmark: Vec<Py<PyFiPositionSnapshot>>,
+    config: &PyFiAttributionConfig,
 ) -> PyResult<PyFiAttributionResult> {
-    let portfolio_json =
-        crate::bindings::extract::extract_records_json(py, portfolio_json, "portfolio")?;
-    let benchmark_json =
-        crate::bindings::extract::extract_records_json(py, benchmark_json, "benchmark")?;
-    let config_json = crate::bindings::extract::extract_records_json(py, config_json, "config")?;
-    Ok(PyFiAttributionResult {
-        inner: py.detach(move || {
-            let portfolio: Vec<finstack_quant_portfolio::fi_attribution::FiPositionSnapshot> =
-                serde_json::from_str(&portfolio_json)
-                    .map_err(|err| serde_json_to_py(err, "invalid Campisi portfolio JSON"))?;
-            let benchmark: Vec<finstack_quant_portfolio::fi_attribution::FiPositionSnapshot> =
-                serde_json::from_str(&benchmark_json)
-                    .map_err(|err| serde_json_to_py(err, "invalid Campisi benchmark JSON"))?;
-            let config: finstack_quant_portfolio::fi_attribution::FiAttributionConfig =
-                serde_json::from_str(&config_json)
-                    .map_err(|err| serde_json_to_py(err, "invalid Campisi config JSON"))?;
-            finstack_quant_portfolio::fi_attribution::campisi_attribution(
-                &portfolio, &benchmark, &config,
-            )
-            .map_err(portfolio_to_py)
-        })?,
+    let snapshots = |side: Vec<Py<PyFiPositionSnapshot>>| {
+        side.into_iter()
+            .map(|position| position.get().inner.clone())
+            .collect::<Vec<_>>()
+    };
+    let portfolio = snapshots(portfolio);
+    let benchmark = snapshots(benchmark);
+    let config = config.inner.clone();
+    py.detach(move || {
+        finstack_quant_portfolio::fi_attribution::campisi_attribution(
+            &portfolio, &benchmark, &config,
+        )
+        .map(|inner| PyFiAttributionResult { inner })
+        .map_err(portfolio_to_py)
     })
 }
-/// Carino-link already-computed single-period Campisi attribution results.
-///
-/// Binds Rust `finstack_quant_portfolio::fi_attribution::campisi_carino_link`. Attribute
-/// each period with :func:`campisi_attribution` first; because each period
-/// carries its own already-applied ``period_years``, periods of *different*
-/// lengths (e.g. act/365 calendar months) link correctly.
-///
-/// Parameters
-/// ----------
-/// periods_json : list[FiAttributionResult] | str | list[dict]
-///     Chronological ``FiAttributionResult`` values (typed results from
-///     :func:`campisi_attribution`, or their JSON).
-///
-/// Returns
-/// -------
-/// FiCarinoLinkedResult
-///     Typed result with linked per-sector effects and compounded returns.
-///     Use :meth:`to_json` for the raw wire string.
-///
-/// Raises
-/// ------
-/// PortfolioError
-///     If no periods are supplied, sector ordering differs, a consumed
-///     top-level return/effect, per-sector linked effect, or sector
-///     ``total_active`` is non-finite; ``active_return`` disagrees with the
-///     portfolio-minus-benchmark return; a sector ``total_active`` disagrees
-///     with its five effects; sector effects do not reconcile to their
-///     declared top-level totals; the five totals do not reconcile to
-///     ``active_return`` within the overflow-safe scaled-L1 tolerance; a
-///     reconciliation residual is non-finite; or a return is outside the
-///     Carino domain.
-/// ValueError
-///     If ``periods_json`` is malformed or does not match the
-///     ``FiAttributionResult`` schema.
+
 #[pyfunction]
-#[pyo3(text_signature = "(periods_json)")]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "campisi_carino_link")]
 fn campisi_carino_link(
     py: Python<'_>,
-    periods_json: &Bound<'_, PyAny>,
+    periods: Vec<Py<PyFiAttributionResult>>,
 ) -> PyResult<PyFiCarinoLinkedResult> {
-    let periods_json = crate::bindings::extract::extract_records_json(py, periods_json, "periods")?;
-    Ok(PyFiCarinoLinkedResult {
-        inner: py.detach(move || {
-            let periods: Vec<finstack_quant_portfolio::fi_attribution::FiAttributionResult> =
-                serde_json::from_str(&periods_json)
-                    .map_err(|err| serde_json_to_py(err, "invalid Campisi period results JSON"))?;
-            finstack_quant_portfolio::fi_attribution::campisi_carino_link(&periods)
-                .map_err(portfolio_to_py)
-        })?,
-    })
+    let periods = periods
+        .into_iter()
+        .map(|period| period.borrow(py).inner.clone())
+        .collect::<Vec<_>>();
+    let inner = py
+        .detach(|| finstack_quant_portfolio::fi_attribution::campisi_carino_link(&periods))
+        .map_err(portfolio_to_py)?;
+    Ok(PyFiCarinoLinkedResult { inner })
 }
 /// Register Campisi attribution functions on the portfolio submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFiAttributionResult>()?;
+    m.add_class::<PyFiAttributionConfig>()?;
+    m.add_class::<PyFiPositionSnapshot>()?;
+    m.add_class::<PyFiQuote>()?;
+    m.add_class::<PyFiQuoteLeg>()?;
+    m.add_class::<PyFiReportingBasis>()?;
     m.add_class::<PyFiCarinoLinkedResult>()?;
     m.add_function(wrap_pyfunction!(campisi_attribution, m)?)?;
     m.add_function(wrap_pyfunction!(campisi_carino_link, m)?)?;

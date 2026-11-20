@@ -1,6 +1,5 @@
 //! AssetPool characteristic metrics for structured credit.
 
-use crate::structured_credit::StructuredCredit;
 use crate::structured_credit::types::pool::weighted_avg_rating_factor;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
@@ -71,9 +70,8 @@ pub(crate) struct WamCalculator;
 
 impl MetricCalculator for WamCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let deal = context
-            .instrument_as::<StructuredCredit>()?
-            .resolved_for_pricing()?;
+        let deal =
+            crate::structured_credit::metrics::metric_deal(context)?.resolved_for_pricing()?;
         // A metric is a number: a zero-balance pool reports zero.
         Ok(deal
             .pool
@@ -102,9 +100,8 @@ pub struct CprCalculator;
 
 impl MetricCalculator for CprCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let deal = context
-            .instrument_as::<StructuredCredit>()?
-            .resolved_for_pricing()?;
+        let deal =
+            crate::structured_credit::metrics::metric_deal(context)?.resolved_for_pricing()?;
         let age = deal
             .pool
             .seasoning_months(context.as_of, deal.closing_date)
@@ -135,9 +132,8 @@ pub struct CdrCalculator;
 
 impl MetricCalculator for CdrCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let deal = context
-            .instrument_as::<StructuredCredit>()?
-            .resolved_for_pricing()?;
+        let deal =
+            crate::structured_credit::metrics::metric_deal(context)?.resolved_for_pricing()?;
         let age = deal
             .pool
             .seasoning_months(context.as_of, deal.closing_date)

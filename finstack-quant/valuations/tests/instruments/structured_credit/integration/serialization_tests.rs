@@ -660,7 +660,7 @@ fn waterfall_rules_round_trip_and_price_through_json() {
                 .unwrap(),
         )
         .expect("insert market curve");
-    let instrument = parse_boxed_instrument_from_json(&json, None).expect("parse envelope");
+    let instrument = parse_boxed_instrument_from_json(&json, None, None).expect("parse envelope");
     price_instrument(
         &instrument,
         &market,

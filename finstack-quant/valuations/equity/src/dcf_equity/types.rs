@@ -17,21 +17,76 @@ use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::MarketDependencies;
 use finstack_quant_valuations_core::pricer::InstrumentType;
 
-/// Spread `WACC − g` below which Gordon Growth is near-singular: the terminal
-/// multiplier `(1+g)/(WACC−g)` becomes extremely sensitive to small parameter
-/// errors. 10 bp is the standard practitioner threshold (Damodaran):
-/// `(1.03)/0.001 ≈ 1030×`, vs `(1.03)/0.05 ≈ 21×` for a healthy spread.
-const GORDON_GROWTH_NEAR_SINGULARITY_THRESHOLD: f64 = 0.001;
+/// Timing election for the dates of the explicit FCFF projection.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ForecastTiming {
+    /// Discount every cash flow on its individually authored receipt date.
+    DatedReceipts,
+    /// Discount each signed FCFF observation on the exact elapsed midpoint
+    /// of its authored period on ACT/365.25.
+    Midpoints {
+        /// Actual start date for each forecast period, aligned to its authored
+        /// flow end date. A forward stub begins on the valuation date.
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+        )]
+        period_starts: Vec<Date>,
+    },
+}
 
-/// Average flow spacing (in years) below which the explicit grid is treated
-/// as sub-annual. Growth-perpetuity terminal values (Gordon, H-Model)
-/// capitalize an *annual* flow; capitalizing a sub-annual period flow
-/// silently understates the terminal value by roughly the number of periods
-/// per year (e.g. ~4x for a quarterly grid), so validation requires
-/// [`DiscountedCashFlow::terminal_flow_override`] in that case. 0.75 years
-/// keeps annual grids (with calendar jitter) valid while catching
-/// semi-annual, quarterly, and monthly grids.
-const SUB_ANNUAL_GRID_SPACING_THRESHOLD_YEARS: f64 = 0.75;
+impl ForecastTiming {
+    fn validate(
+        &self,
+        valuation_date: Date,
+        flows: &[(Date, Money)],
+    ) -> finstack_quant_core::Result<()> {
+        if flows.windows(2).any(|rows| rows[0].0 >= rows[1].0)
+            || flows.iter().any(|(date, _)| *date <= valuation_date)
+        {
+            return Err(Error::Validation(
+                "DCF receipts must be strictly ordered and after the valuation date".into(),
+            ));
+        }
+        let Self::Midpoints { period_starts } = self else {
+            return Ok(());
+        };
+        if period_starts.len() != flows.len() {
+            return Err(Error::Validation(
+                "DCF midpoint timing needs an explicit start for every forecast flow".into(),
+            ));
+        }
+        let mut previous = valuation_date;
+        for (&start, &(end, _)) in period_starts.iter().zip(flows) {
+            if start < previous || start >= end {
+                return Err(Error::Validation("DCF midpoint periods must be positive and nonoverlapping; split a period crossing valuation into an authored forward stub".into()));
+            }
+            previous = end;
+        }
+        Ok(())
+    }
+
+    fn years(
+        &self,
+        valuation_date: Date,
+        end: Date,
+        index: usize,
+    ) -> finstack_quant_core::Result<f64> {
+        let end_days = (end - valuation_date).whole_days() as f64;
+        match self {
+            Self::DatedReceipts => Ok(end_days / 365.25),
+            Self::Midpoints { period_starts } => {
+                let start = period_starts.get(index).ok_or_else(|| {
+                    Error::Validation("DCF midpoint period start is missing".into())
+                })?;
+                let start_days = (*start - valuation_date).whole_days() as f64;
+                Ok((start_days + end_days) / (2.0 * 365.25))
+            }
+        }
+    }
+}
 
 /// Terminal value calculation method for DCF.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -46,8 +101,10 @@ pub enum TerminalValueSpec {
     },
     /// Exit Multiple: TV = Terminal_Metric × Multiple
     ExitMultiple {
-        /// Terminal metric value (e.g., EBITDA)
-        terminal_metric: f64,
+        /// Terminal metric in major currency units (for example, EBITDA).
+        /// Required for standalone pricing. A statement DCF can resolve it from a metric node.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        terminal_metric: Option<f64>,
         /// Multiple to apply (e.g., 10.0 for 10x EBITDA)
         multiple: f64,
     },
@@ -164,11 +221,24 @@ impl ValuationDiscounts {
         Ok(())
     }
 
-    /// Apply all discounts multiplicatively to an equity value.
+    /// Apply the selected discounts to a positive common-equity pool.
     ///
-    /// Returns `Err` if any discount is outside `[0.0, 1.0]`.
+    /// # Arguments
+    /// * `equity_value` - Finite signed common-equity residual in its native
+    ///   currency. A nonpositive residual is retained at its reported amount.
+    ///
+    /// # Errors
+    /// Rejects an unrepresentable input or a discount outside [0, 1].
     pub fn apply(&self, equity_value: f64) -> finstack_quant_core::Result<f64> {
         self.validate()?;
+        if !equity_value.is_finite() {
+            return Err(Error::Validation(
+                "DCF common-equity residual must be finite".into(),
+            ));
+        }
+        if equity_value <= 0.0 {
+            return Ok(equity_value);
+        }
         let mut val = equity_value;
         if let Some(dloc) = self.dloc {
             val *= 1.0 - dloc;
@@ -209,14 +279,9 @@ pub struct DilutionSecurity {
 /// [`equity_bridge`](Self::equity_bridge) is the single EV-to-equity channel; a
 /// flat net-debt deduction sets only its `total_debt` and `cash`.
 ///
-/// # Mid-Year Convention
-///
-/// When [`mid_year_convention`](Self::mid_year_convention) is `true`, cash flows are
-/// discounted at `t` minus half the average flow spacing instead of `t` years,
-/// reflecting the assumption that cash flows arrive mid-period (standard IB/PE
-/// practice). For annual grids this is the classic `(t - 0.5)`; for sub-annual
-/// grids the shift is half a period. `ExitMultiple` terminal values always
-/// discount at the full horizon (a point-in-time sale price).
+/// # Discounting dates
+/// Forecast receipts use their authored dates or exact period midpoints.
+/// Terminal value uses its own date on the same ACT/365.25 clock.
 ///
 /// # Valuation Discounts
 ///
@@ -242,9 +307,9 @@ pub struct DiscountedCashFlow {
     /// Explicit period free cash flows (date, amount pairs).
     #[cfg_attr(
         feature = "json-schema",
-        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
+        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
     )]
-    pub flows: Vec<(Date, f64)>,
+    pub flows: Vec<(Date, Money)>,
     /// Weighted Average Cost of Capital (discount rate).
     pub wacc: f64,
     /// Terminal value specification.
@@ -255,30 +320,18 @@ pub struct DiscountedCashFlow {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub valuation_date: Date,
-    /// Mid-year discounting convention (default: `false` = end-of-period).
-    ///
-    /// When `true`, each flow is discounted at `t` minus half the average
-    /// flow spacing instead of `t` (the classic `t - 0.5` for annual
-    /// grids; half a period for sub-annual grids), reflecting the
-    /// assumption that cash flows arrive mid-period. This is the standard
-    /// convention in IB/PE practice (Koller et al.). Exit-multiple
-    /// terminal values are not shifted (point-in-time sale at the horizon).
-    #[builder(default)]
-    #[serde(default)]
-    pub mid_year_convention: bool,
-    /// Annualized terminal flow used by growth-perpetuity terminal values.
-    ///
-    /// Gordon Growth and H-Model capitalize an *annual* flow with annual
-    /// WACC and growth rates. When the explicit `flows` grid is sub-annual
-    /// (e.g. quarterly), the last flow is a period flow, not an annual one;
-    /// set this to the trailing-twelve-month aggregate of the final
-    /// explicit year so the terminal value is computed on a consistent
-    /// annual basis (Koller et al., Damodaran). When `None`, the last
-    /// explicit flow is used directly (correct for annual grids).
-    ///
-    /// Ignored by `ExitMultiple` terminal values.
+    /// Authored receipt or actual midpoint timing for the explicit projection.
+    pub forecast_timing: ForecastTiming,
+    /// Terminal horizon on or after the final forecast end, independently discounted.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub terminal_date: Date,
+    /// Normalized signed annual FCFF at the terminal date, in instrument currency.
+    /// Required for Gordon and H-model, and absent for exit-multiple valuation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub terminal_flow_override: Option<f64>,
+    pub normalized_annual_fcff: Option<Money>,
     /// Equity bridge from enterprise value to equity value (debt, cash,
     /// preferred equity, minority interest, non-operating assets and other
     /// adjustments), in instrument currency.
@@ -331,17 +384,11 @@ impl DiscountedCashFlow {
     /// Returns an error if:
     /// - `wacc` is non-finite or `wacc <= -1.0` (would yield `(1+wacc) <= 0`,
     ///   producing infinite / NaN present values)
-    /// - `wacc` is outside the conservative sanity band: at or below `-0.5`
-    ///   (−50%), or at or above `1.0` (100%) — the latter catches typical
-    ///   typos (e.g. `wacc = 10` instead of `0.10`) before they silently
-    ///   drive valuations to ~0
-    /// - the terminal value is a growth perpetuity (`GordonGrowth`/`HModel`),
-    ///   the explicit flow grid is sub-annual (average spacing below 0.75
-    ///   years), and `terminal_flow_override` is not set — capitalizing a
-    ///   period flow as an annual flow would silently understate the
-    ///   terminal value
+    /// - the terminal horizon precedes the final forecast receipt
+    /// - a growth terminal has no same-currency normalized annual FCFF
+    /// - an exit-multiple terminal has no nonnegative metric or multiple
     /// - any `equity_bridge` amount (including `other_adjustments`) is non-finite
-    /// - any explicit `flows` amount is non-finite
+    /// - any explicit cash flow differs from the instrument currency
     /// - `flows` are not sorted by date (strictly increasing)
     /// - any flow date is on or before `valuation_date`
     /// - `shares_outstanding` is set but non-positive or non-finite
@@ -368,23 +415,6 @@ impl DiscountedCashFlow {
                 "DCF '{}' wacc = {} would make (1 + wacc) <= 0; must be > -1.0",
                 self.id.as_str(),
                 self.wacc
-            )));
-        }
-        if self.wacc <= -0.5 {
-            return Err(Error::Validation(format!(
-                "DCF '{}' wacc = {} is at or below the sanity floor -0.5 (-50%); \
-                 typical WACC is 0.05 - 0.20 (5% - 20%)",
-                self.id.as_str(),
-                self.wacc
-            )));
-        }
-        if self.wacc >= 1.0 {
-            return Err(Error::Validation(format!(
-                "DCF '{}' wacc = {} is at or above the sanity ceiling 1.0 (100%); \
-                 typical WACC is 0.05 - 0.20 (5% - 20%). Did you mean {}?",
-                self.id.as_str(),
-                self.wacc,
-                self.wacc / 100.0
             )));
         }
         let bridge = &self.equity_bridge;
@@ -414,38 +444,17 @@ impl DiscountedCashFlow {
                 )));
             }
         }
-        for (i, (date, amount)) in self.flows.iter().enumerate() {
-            if !amount.is_finite() {
-                return Err(Error::Validation(format!(
-                    "DCF '{}' flows[{}] amount on {} must be finite, got {}",
-                    self.id.as_str(),
-                    i,
-                    date,
-                    amount
-                )));
-            }
+        if self
+            .flows
+            .iter()
+            .any(|(_, money)| money.currency() != self.currency)
+        {
+            return Err(Error::Validation(
+                "DCF explicit FCFF must match the instrument currency".into(),
+            ));
         }
-        for window in self.flows.windows(2) {
-            if window[0].0 >= window[1].0 {
-                return Err(Error::Validation(format!(
-                    "DCF '{}' flow dates must be strictly increasing; got {} >= {}",
-                    self.id.as_str(),
-                    window[0].0,
-                    window[1].0
-                )));
-            }
-        }
-        for (i, (date, _)) in self.flows.iter().enumerate() {
-            if *date <= self.valuation_date {
-                return Err(Error::Validation(format!(
-                    "DCF '{}' flows[{}] date {} must be strictly after valuation_date {}",
-                    self.id.as_str(),
-                    i,
-                    date,
-                    self.valuation_date
-                )));
-            }
-        }
+        self.forecast_timing
+            .validate(self.valuation_date, &self.flows)?;
         if let Some(shares) = self.shares_outstanding
             && (!shares.is_finite() || shares <= 0.0)
         {
@@ -476,97 +485,7 @@ impl DiscountedCashFlow {
         if let Some(d) = &self.valuation_discounts {
             d.validate()?;
         }
-        if let Some(tf) = self.terminal_flow_override
-            && !tf.is_finite()
-        {
-            return Err(Error::Validation(format!(
-                "DCF '{}' terminal_flow_override must be finite, got {}",
-                self.id.as_str(),
-                tf
-            )));
-        }
-        self.validate_terminal_value_spec()?;
-        if matches!(
-            self.terminal_value,
-            TerminalValueSpec::GordonGrowth { .. } | TerminalValueSpec::HModel { .. }
-        ) && self.terminal_flow_override.is_none()
-            && let Some(spacing) = self.average_flow_spacing_years()
-            && spacing < SUB_ANNUAL_GRID_SPACING_THRESHOLD_YEARS
-        {
-            return Err(Error::Validation(format!(
-                "DCF '{}' has a sub-annual flow grid (average spacing {:.2}y) with a \
-                         growth-perpetuity terminal value and no terminal_flow_override; the \
-                         last period flow would be capitalized as an annual flow, understating \
-                         the terminal value by ~{:.0}x. Set terminal_flow_override to the \
-                         trailing-twelve-month aggregate of the final explicit year",
-                self.id.as_str(),
-                spacing,
-                1.0 / spacing
-            )));
-        }
-        Ok(())
-    }
-
-    /// Validate that the terminal-value parameters are finite (and, for
-    /// exit multiples, sign-consistent).
-    ///
-    /// NaN parameters would otherwise slip through the `wacc > g` guards
-    /// (any comparison with NaN is false) and silently produce NaN
-    /// valuations.
-    fn validate_terminal_value_spec(&self) -> finstack_quant_core::Result<()> {
-        match &self.terminal_value {
-            TerminalValueSpec::GordonGrowth { stable_growth_rate } => {
-                if !stable_growth_rate.is_finite() {
-                    return Err(Error::Validation(format!(
-                        "DCF '{}' terminal_value.stable_growth_rate (gordon_growth) must be finite, got {}",
-                        self.id.as_str(),
-                        stable_growth_rate
-                    )));
-                }
-            }
-            TerminalValueSpec::ExitMultiple {
-                terminal_metric,
-                multiple,
-            } => {
-                if !terminal_metric.is_finite() || !multiple.is_finite() {
-                    return Err(Error::Validation(format!(
-                        "DCF '{}' ExitMultiple terminal_metric ({}) and multiple ({}) must be finite",
-                        self.id.as_str(),
-                        terminal_metric,
-                        multiple
-                    )));
-                }
-                if terminal_metric * multiple < 0.0 {
-                    return Err(Error::Validation(format!(
-                        "DCF '{}' ExitMultiple terminal_metric ({}) x multiple ({}) is negative; \
-                         a negative terminal sale price is not meaningful — check the metric and \
-                         multiple signs",
-                        self.id.as_str(),
-                        terminal_metric,
-                        multiple
-                    )));
-                }
-            }
-            TerminalValueSpec::HModel {
-                high_growth_rate,
-                stable_growth_rate,
-                half_life_years,
-            } => {
-                if !high_growth_rate.is_finite()
-                    || !stable_growth_rate.is_finite()
-                    || !half_life_years.is_finite()
-                {
-                    return Err(Error::Validation(format!(
-                        "DCF '{}' H-Model parameters must be finite: high_growth_rate ({}), \
-                         stable_growth_rate ({}), half_life_years ({})",
-                        self.id.as_str(),
-                        high_growth_rate,
-                        stable_growth_rate,
-                        half_life_years
-                    )));
-                }
-            }
-        }
+        self.calculate_terminal_value()?;
         Ok(())
     }
 
@@ -577,12 +496,27 @@ impl DiscountedCashFlow {
     pub fn example() -> finstack_quant_core::Result<Self> {
         let valuation_date = time::macros::date!(2025 - 01 - 01);
 
-        let flows: Vec<(Date, f64)> = vec![
-            (time::macros::date!(2026 - 01 - 01), 5_000_000.0),
-            (time::macros::date!(2027 - 01 - 01), 5_750_000.0),
-            (time::macros::date!(2028 - 01 - 01), 6_500_000.0),
-            (time::macros::date!(2029 - 01 - 01), 7_250_000.0),
-            (time::macros::date!(2030 - 01 - 01), 8_000_000.0),
+        let flows: Vec<(Date, Money)> = vec![
+            (
+                time::macros::date!(2026 - 01 - 01),
+                Money::from((5_000_000_i64, Currency::USD)),
+            ),
+            (
+                time::macros::date!(2027 - 01 - 01),
+                Money::from((5_750_000_i64, Currency::USD)),
+            ),
+            (
+                time::macros::date!(2028 - 01 - 01),
+                Money::from((6_500_000_i64, Currency::USD)),
+            ),
+            (
+                time::macros::date!(2029 - 01 - 01),
+                Money::from((7_250_000_i64, Currency::USD)),
+            ),
+            (
+                time::macros::date!(2030 - 01 - 01),
+                Money::from((8_000_000_i64, Currency::USD)),
+            ),
         ];
 
         Self::builder()
@@ -598,205 +532,173 @@ impl DiscountedCashFlow {
                 ..EquityBridge::default()
             })
             .valuation_date(valuation_date)
-            .mid_year_convention(true)
+            .forecast_timing(ForecastTiming::Midpoints {
+                period_starts: vec![
+                    valuation_date,
+                    time::macros::date!(2026 - 01 - 01),
+                    time::macros::date!(2027 - 01 - 01),
+                    time::macros::date!(2028 - 01 - 01),
+                    time::macros::date!(2029 - 01 - 01),
+                ],
+            })
+            .terminal_date(time::macros::date!(2030 - 01 - 01))
+            .normalized_annual_fcff(Money::from((8_000_000_i64, Currency::USD)))
             .shares_outstanding_opt(Some(10_000_000.0))
             .attributes(Attributes::default())
             .build()
     }
 
-    /// Calculate present value of explicit period cash flows using WACC.
-    ///
-    /// Respects [`mid_year_convention`](Self::mid_year_convention): when `true`,
-    /// each flow's tenor is reduced by half the average flow spacing (0.5 years
-    /// for annual grids).
-    pub fn calculate_pv_explicit_flows(&self) -> f64 {
-        self.flows
-            .iter()
-            .map(|(date, amount)| {
-                let years = self.explicit_flow_discount_years(*date);
-                amount / (1.0 + self.wacc).powf(years)
-            })
-            .sum()
-    }
-
-    /// Discounting tenor, in years, that
-    /// [`calculate_pv_explicit_flows`](Self::calculate_pv_explicit_flows)
-    /// applies to an explicit flow dated `date`.
-    ///
-    /// The tenor is ACT/365.25 from
-    /// [`valuation_date`](Self::valuation_date), less the mid-year shift (half
-    /// the average flow spacing, floored at zero) when
-    /// [`mid_year_convention`](Self::mid_year_convention) is set. A flow of
-    /// `amount` contributes `amount / (1 + wacc)^years` to the explicit-period
-    /// present value.
-    ///
-    /// # Arguments
-    ///
-    /// * `date` - Date of the explicit flow, normally one of the dates in
-    ///   [`flows`](Self::flows).
-    pub fn explicit_flow_discount_years(&self, date: Date) -> f64 {
-        self.discount_years(self.valuation_date, date)
-    }
-
-    /// Calculate terminal value (undiscounted).
-    ///
-    /// Growth-perpetuity variants (`GordonGrowth`, `HModel`) capitalize
-    /// [`terminal_flow_override`](Self::terminal_flow_override) when set,
-    /// otherwise the last explicit flow. See the field docs for the
-    /// sub-annual-grid annualization convention.
+    /// Present value of all explicit forecast FCFF on the authored ACT/365.25 calendar.
     ///
     /// # Errors
+    /// Returns an error for an invalid date, discount rate or nonrepresentable value.
+    pub fn calculate_pv_explicit_flows(&self) -> finstack_quant_core::Result<f64> {
+        let mut total = finstack_quant_core::math::summation::NeumaierAccumulator::new();
+        for &(date, amount) in &self.flows {
+            total.add(super::pricer::discount_cashflow(
+                amount.amount(),
+                self.wacc,
+                self.explicit_flow_discount_years(date)?,
+            )?)?;
+        }
+        total.get_total()
+    }
+
+    /// ACT/365.25 discount tenor for an explicit forecast receipt.
     ///
-    /// - `GordonGrowth` / `HModel`: returns `Err` if flows are empty (last FCF is needed).
-    /// - `GordonGrowth`: WACC must be > stable_growth_rate.
-    /// - `HModel`: WACC must be > stable_growth_rate; high_growth_rate must be
-    ///   >= stable_growth_rate; half_life_years must be > 0.
-    /// - `ExitMultiple`: never fails (does not depend on flows).
+    /// # Arguments
+    /// * `date` - Exact end or receipt date identifying a forecast cash flow.
+    ///
+    /// # Errors
+    /// Rejects an absent receipt date or missing midpoint start.
+    pub fn explicit_flow_discount_years(&self, date: Date) -> finstack_quant_core::Result<f64> {
+        let index = self
+            .flows
+            .binary_search_by_key(&date, |(receipt, _)| *receipt)
+            .map_err(|_| {
+                Error::Validation(format!(
+                    "DCF cash flow on {date} is not in the explicit forecast"
+                ))
+            })?;
+        self.forecast_timing.years(self.valuation_date, date, index)
+    }
+
+    /// Undiscounted enterprise terminal value at the explicitly authored horizon.
+    ///
+    /// # Errors
+    /// Returns an error for a missing terminal basis, invalid growth or multiple
+    /// assumptions, wrong currency or an unrepresentable value.
     pub fn calculate_terminal_value(&self) -> finstack_quant_core::Result<f64> {
+        self.terminal_discount_years()?;
         self.terminal_value_at_wacc(self.wacc)
     }
 
-    /// Terminal value (undiscounted) capitalized at an explicit `wacc`
-    /// (absolute decimal rate) instead of [`Self::wacc`].
-    ///
-    /// Used by rate-sensitivity bumps (`pv_with_rf_bump`) so the risk-free
-    /// component bump flows through the perpetuity capitalization without
-    /// cloning the instrument. Enforces the same `wacc > g` guards as
-    /// [`Self::calculate_terminal_value`].
     pub(crate) fn terminal_value_at_wacc(&self, wacc: f64) -> finstack_quant_core::Result<f64> {
-        match &self.terminal_value {
+        if !wacc.is_finite() || wacc <= -1.0 {
+            return Err(Error::Validation(
+                "DCF WACC must be finite and above -100%".into(),
+            ));
+        }
+        let value = match self.terminal_value {
             TerminalValueSpec::GordonGrowth { stable_growth_rate } => {
-                let (_, last_fcf) = self.flows.last().ok_or_else(|| {
-                    Error::Validation(
-                        "DCF has no explicit flows; cannot compute terminal value".into(),
-                    )
-                })?;
-                let g = *stable_growth_rate;
-                // Fail-closed: NaN parameters compare as None and must
-                // error rather than silently producing NaN values.
-                if wacc.partial_cmp(&g) != Some(std::cmp::Ordering::Greater) {
-                    return Err(Error::Validation(format!(
-                        "Gordon Growth requires WACC ({:.6}) > stable_growth_rate ({:.6})",
-                        wacc, g
-                    )));
+                self.normalized_fcff()? * (1.0 + stable_growth_rate)
+                    / Self::growth_spread(wacc, stable_growth_rate)?
+            }
+            TerminalValueSpec::HModel {
+                stable_growth_rate,
+                high_growth_rate,
+                half_life_years,
+            } => {
+                if !(high_growth_rate.is_finite()
+                    && high_growth_rate >= stable_growth_rate
+                    && half_life_years.is_finite()
+                    && half_life_years > 0.0)
+                {
+                    return Err(Error::Validation("DCF H-model requires finite high growth at least stable growth and a positive finite half-life".into()));
                 }
-                // Warn on near-singularity: the multiplier (1 + g) / (WACC − g)
-                // blows up as the spread closes. A 1 bp WACC/g typo at spread
-                // ≈ 10 bp swings TV by ~10×; trader/analyst should see this.
-                let spread = wacc - g;
-                if spread < GORDON_GROWTH_NEAR_SINGULARITY_THRESHOLD {
-                    tracing::warn!(
-                        wacc,
-                        stable_growth_rate = g,
-                        wacc_minus_g = spread,
-                        "Gordon Growth: WACC − g = {:.4} bp is within near-singularity \
-                         threshold ({:.0} bp); terminal value is extremely sensitive to \
-                         small parameter changes",
-                        spread * 10_000.0,
-                        GORDON_GROWTH_NEAR_SINGULARITY_THRESHOLD * 10_000.0
-                    );
-                }
-                let terminal_flow = self.terminal_flow_override.unwrap_or(*last_fcf);
-                Ok(terminal_flow * (1.0 + g) / spread)
+                let factor = 1.0
+                    + stable_growth_rate
+                    + half_life_years * (high_growth_rate - stable_growth_rate);
+                self.normalized_fcff()? * factor / Self::growth_spread(wacc, stable_growth_rate)?
             }
             TerminalValueSpec::ExitMultiple {
                 terminal_metric,
                 multiple,
-            } => Ok(terminal_metric * multiple),
-            TerminalValueSpec::HModel {
-                high_growth_rate,
-                stable_growth_rate,
-                half_life_years,
             } => {
-                let (_, last_fcf) = self.flows.last().ok_or_else(|| {
+                if self.normalized_annual_fcff.is_some() {
+                    return Err(Error::Validation(
+                        "DCF exit multiple does not use normalized annual FCFF".into(),
+                    ));
+                }
+                let metric = terminal_metric.ok_or_else(|| {
                     Error::Validation(
-                        "DCF has no explicit flows; cannot compute terminal value".into(),
+                        "DCF exit multiple requires an enterprise metric at the terminal horizon"
+                            .into(),
                     )
                 })?;
-                let g_s = *stable_growth_rate;
-                let g_h = *high_growth_rate;
-                let h = *half_life_years;
-                // Fail-closed guards: NaN parameters compare as None and
-                // must error instead of silently passing.
-                use std::cmp::Ordering;
-                if wacc.partial_cmp(&g_s) != Some(Ordering::Greater) {
-                    return Err(Error::Validation(format!(
-                        "H-Model requires WACC ({:.6}) > stable_growth_rate ({:.6})",
-                        wacc, g_s
-                    )));
+                if !(metric.is_finite() && metric >= 0.0 && multiple.is_finite() && multiple >= 0.0)
+                {
+                    return Err(Error::Validation(
+                        "DCF exit metric and multiple must both be finite and nonnegative".into(),
+                    ));
                 }
-                if !matches!(
-                    g_h.partial_cmp(&g_s),
-                    Some(Ordering::Greater | Ordering::Equal)
-                ) {
-                    return Err(Error::Validation(format!(
-                        "H-Model requires high_growth_rate ({:.6}) >= stable_growth_rate ({:.6})",
-                        g_h, g_s
-                    )));
-                }
-                if h.partial_cmp(&0.0) != Some(Ordering::Greater) {
-                    return Err(Error::Validation(format!(
-                        "H-Model requires half_life_years > 0, got {:.6}",
-                        h
-                    )));
-                }
-                let terminal_flow = self.terminal_flow_override.unwrap_or(*last_fcf);
-                // Standard Gordon Growth stable-state value
-                let stable_tv = terminal_flow * (1.0 + g_s) / (wacc - g_s);
-                // Growth premium from the H-model (Damodaran)
-                let growth_premium = terminal_flow * h * (g_h - g_s) / (wacc - g_s);
-                Ok(stable_tv + growth_premium)
+                metric * multiple
             }
+        };
+        if !value.is_finite() {
+            return Err(Error::Validation(
+                "DCF terminal value cannot be represented".into(),
+            ));
         }
+        Ok(value)
     }
 
-    /// Discount terminal value to present value using WACC.
-    ///
-    /// # Mid-year convention
-    ///
-    /// Gordon-growth and H-model terminal values are flow-stream proxies
-    /// (capitalized perpetuities of cash flows arriving throughout each
-    /// year), so they inherit the mid-year shift when
-    /// [`mid_year_convention`](Self::mid_year_convention) is enabled. When
-    /// [`terminal_flow_override`](Self::terminal_flow_override) is provided,
-    /// the override is treated as a normalized annual terminal flow and uses
-    /// the standard 0.5-year shift rather than the explicit projection grid's
-    /// sub-annual spacing. An `ExitMultiple` terminal value is a
-    /// *point-in-time* sale price realized at the horizon date `t_n`, so it
-    /// always discounts at the full `t_n` regardless of the mid-year
-    /// convention.
+    fn growth_spread(wacc: f64, growth: f64) -> finstack_quant_core::Result<f64> {
+        if !(growth.is_finite() && growth > -1.0 && growth < wacc) {
+            return Err(Error::Validation(
+                "DCF stable growth must be finite, above -100% and below WACC".into(),
+            ));
+        }
+        Ok(wacc - growth)
+    }
+
+    fn normalized_fcff(&self) -> finstack_quant_core::Result<f64> {
+        let amount = self.normalized_annual_fcff.ok_or_else(|| {
+            Error::Validation("DCF growth terminal value requires normalized annual FCFF".into())
+        })?;
+        if amount.currency() != self.currency {
+            return Err(Error::Validation(
+                "DCF normalized annual FCFF must match the instrument currency".into(),
+            ));
+        }
+        Ok(amount.amount())
+    }
+
+    /// Present value of the terminal component at the authored date.
     ///
     /// # Arguments
+    /// * `terminal_value` - Undiscounted enterprise terminal value in instrument currency.
     ///
-    /// * `terminal_value` - Undiscounted terminal value at the end of the
-    ///   explicit horizon, in the instrument's currency units.
-    ///
-    /// Returns `Err` if flows are empty.
+    /// # Errors
+    /// Rejects an invalid horizon, WACC or unrepresentable discount factor or result.
     pub fn discount_terminal_value(&self, terminal_value: f64) -> finstack_quant_core::Result<f64> {
-        let years = self.terminal_discount_years()?;
-        Ok(terminal_value / (1.0 + self.wacc).powf(years))
+        super::pricer::discount_cashflow(terminal_value, self.wacc, self.terminal_discount_years()?)
     }
 
-    /// Discounting tenor (in years) for the terminal value.
+    /// Terminal ACT/365.25 tenor from the authored valuation date.
     ///
-    /// `ExitMultiple` discounts at the full horizon `t_n` (point-in-time sale
-    /// proceeds); Gordon-growth and H-model use the mid-year-adjusted tenor
-    /// (flow-stream proxies). See [`Self::discount_terminal_value`].
-    ///
-    /// Returns `Err` if flows are empty.
+    /// # Errors
+    /// Rejects an empty projection or a terminal date before its final cash flow.
     pub fn terminal_discount_years(&self) -> finstack_quant_core::Result<f64> {
-        let (terminal_date, _) = self.flows.last().ok_or_else(|| {
-            Error::Validation("DCF has no explicit flows; cannot discount terminal value".into())
-        })?;
-        Ok(
-            if matches!(self.terminal_value, TerminalValueSpec::ExitMultiple { .. }) {
-                self.year_fraction(self.valuation_date, *terminal_date)
-            } else if self.mid_year_convention && self.terminal_flow_override.is_some() {
-                (self.year_fraction(self.valuation_date, *terminal_date) - 0.5).max(0.0)
-            } else {
-                self.discount_years(self.valuation_date, *terminal_date)
-            },
-        )
+        if self
+            .flows
+            .last()
+            .is_none_or(|(end, _)| self.terminal_date < *end)
+            || self.terminal_date <= self.valuation_date
+        {
+            return Err(Error::Validation("DCF terminal date must be after valuation and at or after the final forecast cash flow".into()));
+        }
+        Ok(self.year_fraction(self.valuation_date, self.terminal_date))
     }
 
     /// Effective net debt amount for the EV-to-equity bridge.
@@ -839,13 +741,14 @@ impl DiscountedCashFlow {
     ///
     /// # Arguments
     /// * `equity_value` - Post-discount equity value in the instrument currency,
-    ///   before treasury-stock dilution. Non-positive values retain basic shares.
+    ///   before treasury-stock dilution. Zero retains basic shares and a
+    ///   negative residual has no diluted share count under this method.
     ///
     /// Returns `None` when basic shares are absent or invalid, security inputs
     /// are invalid, or finite arithmetic cannot satisfy the valuation equation.
     pub fn diluted_shares(&self, equity_value: f64) -> Option<f64> {
         let basic = self.shares_outstanding?;
-        if !basic.is_finite() || basic <= 0.0 || !equity_value.is_finite() {
+        if !basic.is_finite() || basic <= 0.0 || !equity_value.is_finite() || equity_value < 0.0 {
             return None;
         }
         let mut securities: Vec<_> = self.dilution_securities.iter().collect();
@@ -857,7 +760,7 @@ impl DiscountedCashFlow {
         }) {
             return None;
         }
-        if equity_value <= 0.0 {
+        if equity_value == 0.0 {
             return Some(basic);
         }
         securities.sort_by(|left, right| left.exercise_price.total_cmp(&right.exercise_price));
@@ -896,7 +799,11 @@ impl DiscountedCashFlow {
 
     /// Equity value per diluted share.
     ///
-    /// Returns `None` if `shares_outstanding` is not set or diluted shares is zero.
+    /// # Arguments
+    /// * `equity_value` - Finite signed post-discount common equity in instrument currency.
+    ///
+    /// Returns `None` for negative equity or an unavailable diluted share count.
+    /// At zero equity with positive basic shares the per-share price is zero.
     pub fn equity_value_per_share(&self, equity_value: f64) -> Option<f64> {
         let diluted = self.diluted_shares(equity_value)?;
         if diluted <= 0.0 {
@@ -921,47 +828,6 @@ impl DiscountedCashFlow {
     pub(crate) fn year_fraction(&self, start: Date, end: Date) -> f64 {
         let days = (end - start).whole_days() as f64;
         days / 365.25
-    }
-
-    /// Year fraction adjusted for mid-year convention.
-    ///
-    /// When `mid_year_convention` is `true`, subtracts half the average
-    /// period spacing (see [`Self::mid_year_shift`]) from the raw year
-    /// fraction to reflect cash flows arriving mid-period. For annual
-    /// flow grids this is the standard 0.5-year shift; for sub-annual
-    /// grids (e.g. quarterly) the shift is half a period, so the
-    /// convention does not over-discount short periods.
-    pub(crate) fn discount_years(&self, start: Date, end: Date) -> f64 {
-        let raw = self.year_fraction(start, end);
-        if self.mid_year_convention {
-            (raw - self.mid_year_shift()).max(0.0)
-        } else {
-            raw
-        }
-    }
-
-    /// Mid-year discount shift in years: half the average spacing of the
-    /// explicit flow grid.
-    ///
-    /// The average spacing is computed from consecutive flow dates
-    /// (`(t_n - t_1) / (n - 1)`). With fewer than two flows the grid
-    /// frequency is unknown and the conventional annual half-year (0.5)
-    /// is used, matching the historical behavior.
-    pub(crate) fn mid_year_shift(&self) -> f64 {
-        self.average_flow_spacing_years()
-            .map_or(0.5, |spacing| 0.5 * spacing)
-    }
-
-    /// Average spacing of the explicit flow grid in years
-    /// (`(t_n - t_1) / (n - 1)`), or `None` with fewer than two flows
-    /// (grid frequency unknown).
-    fn average_flow_spacing_years(&self) -> Option<f64> {
-        match (self.flows.first(), self.flows.last()) {
-            (Some((first, _)), Some((last, _))) if self.flows.len() >= 2 => {
-                Some(self.year_fraction(*first, *last) / (self.flows.len() - 1) as f64)
-            }
-            _ => None,
-        }
     }
 }
 
@@ -1013,8 +879,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for DiscountedCashFlow {
             .flows
             .iter()
             .filter(|(date, _)| *date >= as_of)
-            .map(|(date, amount)| Money::new(*amount, self.currency).map(|money| (*date, money)))
-            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
+            .copied()
+            .collect();
 
         finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
@@ -1054,14 +920,15 @@ mod tests {
         DiscountedCashFlow {
             id: InstrumentId::new("TEST-DCF-GORDON"),
             currency: Currency::USD,
-            flows: vec![(cf_date, 100.0)],
+            flows: vec![(cf_date, Money::from((100_i64, Currency::USD)))],
             wacc: 0.10,
             terminal_value: TerminalValueSpec::GordonGrowth {
                 stable_growth_rate: 0.02,
             },
             valuation_date,
-            mid_year_convention: false,
-            terminal_flow_override: None,
+            forecast_timing: ForecastTiming::DatedReceipts,
+            terminal_date: cf_date,
+            normalized_annual_fcff: Some(Money::from((100_i64, Currency::USD))),
             equity_bridge: EquityBridge::default(),
             shares_outstanding: None,
             dilution_securities: Vec::new(),
@@ -1094,28 +961,20 @@ mod tests {
     }
 
     #[test]
-    fn validate_rejects_wacc_above_sanity_band() {
-        // 10 (1000%) is a typical typo for 0.10; the sanity ceiling catches it.
+    fn validate_accepts_finite_positive_wacc_above_one() {
         let mut dcf = build_simple_dcf_gordon();
-        dcf.wacc = 10.0;
-        let err = dcf.validate().expect_err("wacc=10 must error");
-        assert!(err.to_string().contains("sanity ceiling"));
-        assert!(err.to_string().contains("Did you mean 0.1?"));
-
-        // The ceiling is inclusive: exactly 1.0 (100%) is rejected.
-        dcf.wacc = 1.0;
-        assert!(dcf.validate().is_err(), "wacc=1.0 must error");
+        dcf.wacc = 1.1;
+        assert!(dcf.validate().is_ok());
     }
 
     #[test]
-    fn validate_rejects_wacc_at_or_below_sanity_floor() {
-        // The floor is inclusive: exactly -0.5 (-50%) is rejected, and the
-        // message does not suggest a nonsensical /100 correction.
+    fn validate_accepts_wacc_above_minus_one_when_growth_is_lower() {
         let mut dcf = build_simple_dcf_gordon();
-        dcf.wacc = -0.5;
-        let err = dcf.validate().expect_err("wacc=-0.5 must error");
-        assert!(err.to_string().contains("sanity floor"));
-        assert!(!err.to_string().contains("Did you mean"));
+        dcf.wacc = -0.70;
+        dcf.terminal_value = TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: -0.80,
+        };
+        assert!(dcf.validate().is_ok());
     }
 
     #[test]
@@ -1124,25 +983,25 @@ mod tests {
         dcf.flows = vec![
             (
                 Date::from_calendar_date(2027, Month::January, 1).unwrap(),
-                100.0,
+                Money::from((100_i64, Currency::USD)),
             ),
             (
                 Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-                100.0,
+                Money::from((100_i64, Currency::USD)),
             ),
         ];
         let err = dcf.validate().expect_err("unsorted must error");
-        assert!(err.to_string().contains("strictly increasing"));
+        assert!(err.to_string().contains("strictly ordered"));
     }
 
     #[test]
     fn validate_rejects_flow_on_or_before_valuation_date() {
         let mut dcf = build_simple_dcf_gordon();
-        dcf.flows = vec![(dcf.valuation_date, 100.0)];
+        dcf.flows = vec![(dcf.valuation_date, Money::from((100_i64, Currency::USD)))];
         let err = dcf
             .validate()
             .expect_err("flow on valuation_date must error");
-        assert!(err.to_string().contains("strictly after valuation_date"));
+        assert!(err.to_string().contains("after the valuation date"));
     }
 
     #[test]
@@ -1175,80 +1034,59 @@ mod tests {
         // Non-finite exit-multiple inputs must fail validation.
         let mut dcf = build_simple_dcf_gordon();
         dcf.terminal_value = TerminalValueSpec::ExitMultiple {
-            terminal_metric: f64::INFINITY,
+            terminal_metric: Some(f64::INFINITY),
             multiple: 10.0,
         };
         assert!(dcf.validate().is_err());
     }
 
     #[test]
+    fn standalone_exit_multiple_requires_a_resolved_metric() {
+        let mut dcf = build_simple_dcf_gordon();
+        dcf.normalized_annual_fcff = None;
+        dcf.terminal_value = TerminalValueSpec::ExitMultiple {
+            terminal_metric: None,
+            multiple: 10.0,
+        };
+        let error = dcf.validate().expect_err("unresolved terminal metric");
+        assert!(error.to_string().contains("requires an enterprise metric"));
+    }
+
+    #[test]
     fn validate_rejects_negative_exit_multiple_product() {
         let mut dcf = build_simple_dcf_gordon();
+        dcf.normalized_annual_fcff = None;
         dcf.terminal_value = TerminalValueSpec::ExitMultiple {
-            terminal_metric: -100.0,
+            terminal_metric: Some(-100.0),
             multiple: 10.0,
         };
         let err = dcf.validate().expect_err("negative TV product must error");
-        assert!(err.to_string().contains("negative"));
+        assert!(err.to_string().contains("nonnegative"));
 
         // A sign-consistent (non-negative) product passes.
         dcf.terminal_value = TerminalValueSpec::ExitMultiple {
-            terminal_metric: 100.0,
+            terminal_metric: Some(100.0),
             multiple: 10.0,
         };
         assert!(dcf.validate().is_ok());
     }
 
     #[test]
-    fn validate_rejects_sub_annual_grid_growth_perpetuity_without_override() {
-        // Quarterly grid + Gordon Growth without terminal_flow_override would
-        // capitalize a period flow as an annual flow (~4x TV understatement).
+    fn growth_requires_authored_normalized_annual_fcff_regardless_of_grid() {
         let mut dcf = build_simple_dcf_gordon();
-        dcf.flows = vec![
-            (
-                Date::from_calendar_date(2025, Month::March, 31).unwrap(),
-                100.0,
-            ),
-            (
-                Date::from_calendar_date(2025, Month::June, 30).unwrap(),
-                100.0,
-            ),
-            (
-                Date::from_calendar_date(2025, Month::September, 30).unwrap(),
-                100.0,
-            ),
-            (
-                Date::from_calendar_date(2025, Month::December, 31).unwrap(),
-                100.0,
-            ),
-        ];
-        let err = dcf
+        dcf.normalized_annual_fcff = None;
+        let error = dcf
             .validate()
-            .expect_err("quarterly Gordon grid must error");
-        assert!(err.to_string().contains("terminal_flow_override"));
-
-        // Setting the override (TTM aggregate) makes the DCF valid.
-        dcf.terminal_flow_override = Some(400.0);
+            .expect_err("annual forecast does not establish terminal basis");
+        assert!(error.to_string().contains("normalized annual FCFF"));
+        dcf.normalized_annual_fcff = Some(Money::from((100_i64, Currency::USD)));
         assert!(dcf.validate().is_ok());
-
-        // ExitMultiple terminal values do not capitalize a flow; no override
-        // is needed on a sub-annual grid.
-        dcf.terminal_flow_override = None;
-        dcf.terminal_value = TerminalValueSpec::ExitMultiple {
-            terminal_metric: 100.0,
-            multiple: 8.0,
-        };
-        assert!(dcf.validate().is_ok());
-
-        // Annual grids remain valid without an override.
-        let dcf_annual = build_simple_dcf_gordon();
-        assert!(dcf_annual.validate().is_ok());
     }
 
     #[test]
-    fn validate_rejects_non_finite_terminal_flow_override() {
+    fn validate_rejects_terminal_fcff_in_a_different_currency() {
         let mut dcf = build_simple_dcf_gordon();
-        dcf.terminal_flow_override = Some(f64::NAN);
+        dcf.normalized_annual_fcff = Some(Money::from((100_i64, Currency::GBP)));
         assert!(dcf.validate().is_err());
     }
 
@@ -1271,9 +1109,9 @@ mod tests {
     }
 
     #[test]
-    fn terminal_flow_override_drives_growth_perpetuity_tv() {
+    fn normalized_annual_fcff_drives_growth_perpetuity_tv() {
         let mut dcf = build_simple_dcf_gordon();
-        dcf.terminal_flow_override = Some(400.0);
+        dcf.normalized_annual_fcff = Some(Money::from((400_i64, Currency::USD)));
 
         let tv = dcf.calculate_terminal_value().expect("terminal value");
         let expected = 400.0 * 1.02 / (0.10 - 0.02);
@@ -1282,94 +1120,58 @@ mod tests {
             "TV should capitalize the override, expected {expected}, got {tv}"
         );
 
-        // ExitMultiple ignores the override.
+        // Exit multiples require their own separately authored metric.
         dcf.terminal_value = TerminalValueSpec::ExitMultiple {
-            terminal_metric: 50.0,
+            terminal_metric: Some(50.0),
             multiple: 10.0,
         };
+        assert!(dcf.calculate_terminal_value().is_err());
+        dcf.normalized_annual_fcff = None;
         let tv = dcf.calculate_terminal_value().expect("terminal value");
         assert!((tv - 500.0).abs() < 1e-12);
     }
 
     #[test]
-    fn mid_year_shift_is_half_average_flow_spacing() {
-        // Annual grid: classic 0.5-year shift.
+    fn asymmetric_forecast_periods_use_exact_midpoints_and_independent_terminal_date() {
         let mut dcf = build_simple_dcf_gordon();
+        let date = dcf.valuation_date;
+        let first_end = date + time::Duration::days(90);
+        let final_end = date + time::Duration::days(365);
         dcf.flows = vec![
-            (
-                Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-                100.0,
-            ),
-            (
-                Date::from_calendar_date(2027, Month::January, 1).unwrap(),
-                100.0,
-            ),
+            (first_end, Money::from((15_i64, Currency::USD))),
+            (final_end, Money::from((85_i64, Currency::USD))),
         ];
-        assert!((dcf.mid_year_shift() - 0.5).abs() < 0.01);
-
-        // Quarterly grid: half a quarter (~0.125 years).
-        dcf.flows = vec![
-            (
-                Date::from_calendar_date(2025, Month::March, 31).unwrap(),
-                100.0,
-            ),
-            (
-                Date::from_calendar_date(2025, Month::June, 30).unwrap(),
-                100.0,
-            ),
-            (
-                Date::from_calendar_date(2025, Month::September, 30).unwrap(),
-                100.0,
-            ),
-            (
-                Date::from_calendar_date(2025, Month::December, 31).unwrap(),
-                100.0,
-            ),
-        ];
-        assert!(
-            (dcf.mid_year_shift() - 0.125).abs() < 0.01,
-            "quarterly mid-year shift should be ~0.125, got {}",
-            dcf.mid_year_shift()
+        dcf.forecast_timing = ForecastTiming::Midpoints {
+            period_starts: vec![date, first_end],
+        };
+        dcf.terminal_date = final_end;
+        dcf.normalized_annual_fcff = Some(Money::from((120_i64, Currency::USD)));
+        dcf.wacc = 0.08;
+        assert_eq!(
+            dcf.explicit_flow_discount_years(first_end).unwrap(),
+            45.0 / 365.25
         );
-
-        // Single flow falls back to the conventional 0.5.
-        dcf.flows = vec![(
-            Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-            100.0,
-        )];
-        assert!((dcf.mid_year_shift() - 0.5).abs() < 1e-12);
+        assert_eq!(
+            dcf.explicit_flow_discount_years(final_end).unwrap(),
+            227.5 / 365.25
+        );
+        assert_eq!(dcf.terminal_discount_years().unwrap(), 365.0 / 365.25);
+        assert!((dcf.calculate_pv_explicit_flows().unwrap() - 95.879998631628).abs() < 1e-10);
+        let value = crate::dcf_equity::pricer::pv_with_rf_bump(&dcf, &|_| 0.0).unwrap();
+        assert!((value - 1984.868391069042).abs() < 1e-9);
+        let up = crate::dcf_equity::pricer::pv_with_rf_bump(&dcf, &|_| 0.0001).unwrap();
+        let down = crate::dcf_equity::pricer::pv_with_rf_bump(&dcf, &|_| -0.0001).unwrap();
+        assert!(((up - down) / 2.0 + 3.327952064358).abs() < 1e-9);
     }
 
     #[test]
-    fn terminal_flow_override_uses_standard_half_year_terminal_discount_shift() {
+    fn terminal_date_may_follow_the_explicit_forecast_but_cannot_precede_it() {
         let mut dcf = build_simple_dcf_gordon();
-        dcf.mid_year_convention = true;
-        dcf.terminal_flow_override = Some(400.0);
-        dcf.flows = vec![
-            (
-                Date::from_calendar_date(2025, Month::March, 31).unwrap(),
-                100.0,
-            ),
-            (
-                Date::from_calendar_date(2025, Month::June, 30).unwrap(),
-                100.0,
-            ),
-            (
-                Date::from_calendar_date(2025, Month::September, 30).unwrap(),
-                100.0,
-            ),
-            (
-                Date::from_calendar_date(2025, Month::December, 31).unwrap(),
-                100.0,
-            ),
-        ];
-
-        let raw_years = dcf.year_fraction(dcf.valuation_date, dcf.flows.last().unwrap().0);
-        let terminal_years = dcf.terminal_discount_years().unwrap();
-        assert!(
-            (terminal_years - (raw_years - 0.5)).abs() < 1e-12,
-            "terminal override should use the standard half-year terminal shift, got {terminal_years}"
-        );
+        let receipt = dcf.flows[0].0;
+        dcf.terminal_date = receipt + time::Duration::days(2);
+        assert_eq!(dcf.terminal_discount_years().unwrap(), 367.0 / 365.25);
+        dcf.terminal_date = receipt - time::Duration::days(1);
+        assert!(dcf.validate().is_err());
     }
 
     #[test]
@@ -1402,15 +1204,16 @@ mod tests {
         let dcf = DiscountedCashFlow {
             id: InstrumentId::new("TEST-DCF-EXIT"),
             currency: Currency::USD,
-            flows: vec![(cf_date, 100.0)],
+            flows: vec![(cf_date, Money::from((100_i64, Currency::USD)))],
             wacc: 0.10,
             terminal_value: TerminalValueSpec::ExitMultiple {
-                terminal_metric: 150.0,
+                terminal_metric: Some(150.0),
                 multiple: 8.0,
             },
             valuation_date,
-            mid_year_convention: false,
-            terminal_flow_override: None,
+            forecast_timing: ForecastTiming::DatedReceipts,
+            terminal_date: cf_date,
+            normalized_annual_fcff: None,
             equity_bridge: EquityBridge::default(),
             shares_outstanding: None,
             dilution_securities: Vec::new(),
@@ -1472,15 +1275,16 @@ mod tests {
         let dcf = DiscountedCashFlow {
             id: InstrumentId::new("TEST-DCF-BAD-G"),
             currency: Currency::USD,
-            flows: vec![(cf_date, 100.0)],
+            flows: vec![(cf_date, Money::from((100_i64, Currency::USD)))],
             // WACC <= stable_growth_rate should be rejected
             wacc: 0.02,
             terminal_value: TerminalValueSpec::GordonGrowth {
                 stable_growth_rate: 0.03,
             },
             valuation_date,
-            mid_year_convention: false,
-            terminal_flow_override: None,
+            forecast_timing: ForecastTiming::DatedReceipts,
+            terminal_date: cf_date,
+            normalized_annual_fcff: Some(Money::from((100_i64, Currency::USD))),
             equity_bridge: EquityBridge::default(),
             shares_outstanding: None,
             dilution_securities: Vec::new(),
@@ -1563,7 +1367,7 @@ mod tests {
 
         // And the WACC discounting must reconstruct exactly.
         let tv = dcf.calculate_terminal_value().expect("terminal value");
-        let expected = dcf.calculate_pv_explicit_flows()
+        let expected = dcf.calculate_pv_explicit_flows().unwrap()
             + dcf.discount_terminal_value(tv).expect("terminal pv");
         assert!((pv_no_curve.amount() - expected).abs() < 1e-6);
     }
@@ -1636,7 +1440,7 @@ mod tests {
         let t = {
             let mut d = build_simple_dcf_gordon();
             d.valuation_date = as_of;
-            d.discount_years(d.valuation_date, d.flows[0].0)
+            d.explicit_flow_discount_years(d.flows[0].0).unwrap()
         };
         let pv = |w: f64| (f + f * (1.0 + g) / (w - g)) / (1.0 + w).powf(t);
         let h = 1e-7;
@@ -1675,7 +1479,7 @@ mod tests {
         assert_eq!(schedule.get_flows()[0].get_date(), dcf.flows[0].0);
         assert_eq!(
             schedule.get_flows()[0].get_amount().amount(),
-            dcf.flows[0].1
+            dcf.flows[0].1.amount()
         );
         assert_eq!(
             schedule.get_flows()[0].get_amount().currency(),
@@ -1686,83 +1490,20 @@ mod tests {
     //  Mid-year convention tests
 
     #[test]
-    fn mid_year_convention_increases_pv() {
-        let dcf_end = build_simple_dcf_gordon();
-        let mut dcf_mid = build_simple_dcf_gordon();
-        dcf_mid.mid_year_convention = true;
-
-        let market = MarketContext::new();
-        let val_end = dcf_end
-            .value(&market, dcf_end.valuation_date)
-            .expect("end-of-year value");
-        let val_mid = dcf_mid
-            .value(&market, dcf_mid.valuation_date)
-            .expect("mid-year value");
-
-        // Mid-year discounts at (t-0.5), so PV should be higher
-        assert!(
-            val_mid.amount() > val_end.amount(),
-            "mid-year PV ({}) should exceed end-of-year PV ({})",
-            val_mid.amount(),
-            val_end.amount()
-        );
-
-        // The difference should be approximately (1+WACC)^0.5 - 1 ≈ 4.88%
-        let ratio = val_mid.amount() / val_end.amount();
-        let expected_ratio = (1.10_f64).powf(0.5);
-        let diff = (ratio - expected_ratio).abs();
-        assert!(
-            diff < 0.01,
-            "mid-year / end-of-year ratio ({:.4}) should be ~{:.4} (diff {})",
-            ratio,
-            expected_ratio,
-            diff
-        );
-    }
-
-    #[test]
-    fn exit_multiple_terminal_value_ignores_mid_year_shift() {
-        // An ExitMultiple TV is point-in-time sale proceeds at t_n, so its
-        // discounting tenor must be the full t_n regardless of the mid-year
-        // convention; Gordon-growth (a flow-stream proxy) keeps the shift.
-        let mut dcf_exit = build_simple_dcf_gordon();
-        dcf_exit.terminal_value = TerminalValueSpec::ExitMultiple {
-            terminal_metric: 500.0,
-            multiple: 8.0,
+    fn midpoint_timing_changes_only_the_explicit_forecast_pv() {
+        let mut dcf = build_simple_dcf_gordon();
+        let pv_end = dcf.calculate_pv_explicit_flows().unwrap();
+        let terminal_value = dcf.calculate_terminal_value().unwrap();
+        let terminal_pv_end = dcf.discount_terminal_value(terminal_value).unwrap();
+        dcf.forecast_timing = ForecastTiming::Midpoints {
+            period_starts: vec![dcf.valuation_date],
         };
-        let mut dcf_exit_mid = dcf_exit.clone();
-        dcf_exit_mid.mid_year_convention = true;
-
-        let pv_end = dcf_exit
-            .discount_terminal_value(4_000.0)
-            .expect("exit TV pv");
-        let pv_mid = dcf_exit_mid
-            .discount_terminal_value(4_000.0)
-            .expect("exit TV pv (mid-year)");
-        assert!(
-            (pv_end - pv_mid).abs() < 1e-12,
-            "ExitMultiple TV must discount at full t_n under mid-year: {pv_end} vs {pv_mid}"
-        );
-
-        // Gordon-growth TV keeps the mid-year shift (discounts at t_n − ½).
-        let dcf_gordon = build_simple_dcf_gordon();
-        let mut dcf_gordon_mid = dcf_gordon.clone();
-        dcf_gordon_mid.mid_year_convention = true;
-        let pv_g_end = dcf_gordon
-            .discount_terminal_value(4_000.0)
-            .expect("gordon TV pv");
-        let pv_g_mid = dcf_gordon_mid
-            .discount_terminal_value(4_000.0)
-            .expect("gordon TV pv (mid-year)");
-        assert!(
-            pv_g_mid > pv_g_end,
-            "Gordon TV must keep the mid-year shift: {pv_g_mid} vs {pv_g_end}"
-        );
-        let expected_ratio = (1.0 + dcf_gordon.wacc).powf(0.5);
-        let ratio = pv_g_mid / pv_g_end;
-        assert!(
-            (ratio - expected_ratio).abs() < 1e-12,
-            "Gordon mid-year TV ratio {ratio} should be (1+wacc)^0.5 = {expected_ratio}"
+        let expected_pv = 100.0 / 1.1_f64.powf(182.5 / 365.25);
+        assert!((dcf.calculate_pv_explicit_flows().unwrap() - expected_pv).abs() < 1e-10);
+        assert!(expected_pv > pv_end);
+        assert_eq!(
+            dcf.discount_terminal_value(terminal_value).unwrap(),
+            terminal_pv_end
         );
     }
 
@@ -2000,6 +1741,22 @@ mod tests {
     }
 
     #[test]
+    fn discounts_and_dilution_preserve_signed_negative_common_equity() {
+        let mut dcf = build_simple_dcf_gordon();
+        dcf.shares_outstanding = Some(100.0);
+        dcf.valuation_discounts = Some(ValuationDiscounts {
+            dlom: Some(0.20),
+            ..ValuationDiscounts::default()
+        });
+        assert_eq!(dcf.apply_valuation_discounts(-25.0).unwrap(), -25.0);
+        assert_eq!(dcf.apply_valuation_discounts(25.0).unwrap(), 20.0);
+        assert_eq!(dcf.diluted_shares(-25.0), None);
+        assert_eq!(dcf.equity_value_per_share(-25.0), None);
+        assert_eq!(dcf.diluted_shares(0.0), Some(100.0));
+        assert_eq!(dcf.equity_value_per_share(0.0), Some(0.0));
+    }
+
+    #[test]
     fn diluted_shares_none_when_no_shares() {
         let dcf = build_simple_dcf_gordon();
         assert!(dcf.diluted_shares(1000.0).is_none());
@@ -2014,7 +1771,7 @@ mod tests {
         let json = serde_json::to_string(&dcf).expect("serialize");
         let dcf2: DiscountedCashFlow = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(dcf.id, dcf2.id);
-        assert!(!dcf2.mid_year_convention);
+        assert_eq!(dcf2.forecast_timing, ForecastTiming::DatedReceipts);
         assert_eq!(dcf2.equity_bridge.net_adjustment(), 0.0);
         assert!(dcf2.shares_outstanding.is_none());
         assert!(dcf2.dilution_securities.is_empty());
@@ -2024,7 +1781,9 @@ mod tests {
     #[test]
     fn serde_roundtrip_full_dcf() {
         let mut dcf = build_simple_dcf_gordon();
-        dcf.mid_year_convention = true;
+        dcf.forecast_timing = ForecastTiming::Midpoints {
+            period_starts: vec![dcf.valuation_date],
+        };
         dcf.equity_bridge = EquityBridge {
             total_debt: 100.0,
             cash: 20.0,
@@ -2047,7 +1806,7 @@ mod tests {
 
         let json = serde_json::to_string_pretty(&dcf).expect("serialize");
         let dcf2: DiscountedCashFlow = serde_json::from_str(&json).expect("deserialize");
-        assert!(dcf2.mid_year_convention);
+        assert_eq!(dcf2.forecast_timing, dcf.forecast_timing);
         assert_eq!(dcf2.equity_bridge.other_adjustments.len(), 1);
         assert_eq!(dcf2.shares_outstanding, Some(1_000_000.0));
         assert_eq!(dcf2.dilution_securities.len(), 1);
@@ -2060,28 +1819,10 @@ mod tests {
     }
 
     #[test]
-    fn optional_feature_fields_default_when_absent() {
-        // The minimal required field set deserializes through the unchecked
-        // mirror, and every optional feature lands on its documented default.
-        let json = r#"{
-            "id": "TEST-OLD",
-            "currency": "USD",
-            "flows": [["2026-01-01", 100.0]],
-            "wacc": 0.10,
-            "terminal_value": {"type": "gordon_growth", "stable_growth_rate": 0.02},
-            "equity_bridge": {"total_debt": 50.0},
-            "valuation_date": "2025-01-01",
-            "attributes": {"tags": [], "meta": {}}
-        }"#;
-
-        let dcf: DiscountedCashFlow =
-            serde_json::from_str(json).expect("minimal DCF JSON should parse");
-        assert_eq!(dcf.id.as_str(), "TEST-OLD");
-        assert!(!dcf.mid_year_convention);
-        assert_eq!(dcf.equity_bridge.net_adjustment(), 50.0);
-        assert!(dcf.shares_outstanding.is_none());
-        assert!(dcf.dilution_securities.is_empty());
-        assert!(dcf.valuation_discounts.is_none());
+    fn old_wire_requires_authored_timing_and_terminal_basis() {
+        let mut value = serde_json::to_value(build_simple_dcf_gordon()).unwrap();
+        value.as_object_mut().unwrap().remove("forecast_timing");
+        assert!(serde_json::from_value::<DiscountedCashFlow>(value).is_err());
     }
 
     #[test]
@@ -2282,13 +2023,17 @@ mod tests {
         let dcf = DiscountedCashFlow::builder()
             .id(InstrumentId::new("BUILDER-TEST"))
             .currency(Currency::USD)
-            .flows(vec![(cf_date, 100.0)])
+            .flows(vec![(cf_date, Money::from((100_i64, Currency::USD)))])
             .wacc(0.10)
             .terminal_value(TerminalValueSpec::GordonGrowth {
                 stable_growth_rate: 0.02,
             })
             .valuation_date(valuation_date)
-            .mid_year_convention(true)
+            .forecast_timing(ForecastTiming::Midpoints {
+                period_starts: vec![valuation_date],
+            })
+            .terminal_date(cf_date)
+            .normalized_annual_fcff(Money::from((100_i64, Currency::USD)))
             .equity_bridge(EquityBridge {
                 total_debt: 80.0,
                 cash: 30.0,
@@ -2302,7 +2047,10 @@ mod tests {
             .build()
             .expect("builder should succeed");
 
-        assert!(dcf.mid_year_convention);
+        assert!(matches!(
+            dcf.forecast_timing,
+            ForecastTiming::Midpoints { .. }
+        ));
         assert_eq!(dcf.equity_bridge.net_adjustment(), 50.0);
         assert_eq!(dcf.shares_outstanding, Some(1_000_000.0));
         assert!(dcf.valuation_discounts.is_some());
@@ -2331,17 +2079,15 @@ mod tests {
     }
 
     #[test]
-    fn exit_multiple_terminal_value_succeeds_with_empty_flows() {
+    fn exit_multiple_requires_an_explicit_projection() {
         let mut dcf = build_simple_dcf_gordon();
         dcf.flows.clear();
+        dcf.normalized_annual_fcff = None;
         dcf.terminal_value = TerminalValueSpec::ExitMultiple {
-            terminal_metric: 500.0,
+            terminal_metric: Some(500.0),
             multiple: 8.0,
         };
-        let tv = dcf
-            .calculate_terminal_value()
-            .expect("ExitMultiple does not need flows");
-        assert!((tv - 4000.0).abs() < 1e-10);
+        assert!(dcf.calculate_terminal_value().is_err());
     }
 
     #[test]
@@ -2361,7 +2107,7 @@ mod tests {
             .expect_err("expected validation error when high_growth_rate < stable_growth_rate")
             .to_string();
         assert!(
-            msg.contains("high_growth_rate"),
+            msg.contains("high growth"),
             "Error should mention high_growth_rate: {}",
             msg
         );

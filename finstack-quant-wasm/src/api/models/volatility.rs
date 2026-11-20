@@ -1387,8 +1387,8 @@ fn grid_tolerance(tolerance: Option<&JsValue>) -> Result<f64, JsValue> {
 }
 
 /// Butterfly-arbitrage check on a strike by expiry volatility grid.
-/// @param strikes - Strictly increasing strike grid shared by every row.
 /// @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+/// @param strikes - Strictly increasing strike grid shared by every row.
 /// @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
 /// @param forwardPrices - One forward price to broadcast, or one per expiry.
 /// @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
@@ -1400,16 +1400,16 @@ fn grid_tolerance(tolerance: Option<&JsValue>) -> Result<f64, JsValue> {
 /// tolerance is negative or non-finite.
 #[wasm_bindgen(js_name = checkButterflyGrid, unchecked_return_type = "generated.models.ArbitrageViolation[]")]
 pub fn check_butterfly_grid(
-    #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] expiries: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
     #[wasm_bindgen(unchecked_param_type = "NumericArray[]")] vols: JsValue,
     #[wasm_bindgen(js_name = "forwardPrices", unchecked_param_type = "NumericArray")]
     forward_prices: JsValue,
     #[wasm_bindgen(unchecked_optional_param_type = "number")] tolerance: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let violations = model_arbitrage::check_butterfly_grid(
-        &js_f64_seq(&strikes, "strikes")?,
         &js_f64_seq(&expiries, "expiries")?,
+        &js_f64_seq(&strikes, "strikes")?,
         &js_f64_matrix(&vols, "vols")?,
         js_f64_seq(&forward_prices, "forwardPrices")?,
         grid_tolerance(tolerance.as_ref())?,
@@ -1419,8 +1419,8 @@ pub fn check_butterfly_grid(
 }
 
 /// Calendar-spread arbitrage check on a strike by expiry volatility grid.
-/// @param strikes - Strictly increasing strike grid shared by every row.
 /// @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+/// @param strikes - Strictly increasing strike grid shared by every row.
 /// @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
 /// @param forwardPrices - One forward price to broadcast, or one per expiry.
 /// @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
@@ -1432,16 +1432,16 @@ pub fn check_butterfly_grid(
 /// tolerance is negative or non-finite.
 #[wasm_bindgen(js_name = checkCalendarSpreadGrid, unchecked_return_type = "generated.models.ArbitrageViolation[]")]
 pub fn check_calendar_spread_grid(
-    #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] expiries: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
     #[wasm_bindgen(unchecked_param_type = "NumericArray[]")] vols: JsValue,
     #[wasm_bindgen(js_name = "forwardPrices", unchecked_param_type = "NumericArray")]
     forward_prices: JsValue,
     #[wasm_bindgen(unchecked_optional_param_type = "number")] tolerance: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let violations = model_arbitrage::check_calendar_spread_grid(
-        &js_f64_seq(&strikes, "strikes")?,
         &js_f64_seq(&expiries, "expiries")?,
+        &js_f64_seq(&strikes, "strikes")?,
         &js_f64_matrix(&vols, "vols")?,
         js_f64_seq(&forward_prices, "forwardPrices")?,
         grid_tolerance(tolerance.as_ref())?,
@@ -1451,8 +1451,8 @@ pub fn check_calendar_spread_grid(
 }
 
 /// Local-volatility density check (Dupire denominator positivity) on a volatility grid.
-/// @param strikes - Strictly increasing strike grid shared by every row.
 /// @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+/// @param strikes - Strictly increasing strike grid shared by every row.
 /// @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
 /// @param forwardPrices - One forward price per expiry.
 /// @returns The `ArbitrageViolation` objects found (empty when the grid is clean).
@@ -1463,15 +1463,15 @@ pub fn check_calendar_spread_grid(
 /// match the expiries.
 #[wasm_bindgen(js_name = checkLocalVolDensityGrid, unchecked_return_type = "generated.models.ArbitrageViolation[]")]
 pub fn check_local_vol_density_grid(
-    #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] expiries: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
     #[wasm_bindgen(unchecked_param_type = "NumericArray[]")] vols: JsValue,
     #[wasm_bindgen(js_name = "forwardPrices", unchecked_param_type = "NumericArray")]
     forward_prices: JsValue,
 ) -> Result<JsValue, JsValue> {
     let violations = model_arbitrage::check_local_vol_density_grid(
-        &js_f64_seq(&strikes, "strikes")?,
         &js_f64_seq(&expiries, "expiries")?,
+        &js_f64_seq(&strikes, "strikes")?,
         &js_f64_matrix(&vols, "vols")?,
         js_f64_seq(&forward_prices, "forwardPrices")?,
     )
@@ -1480,8 +1480,8 @@ pub fn check_local_vol_density_grid(
 }
 
 /// Run every static-arbitrage check on a strike by expiry volatility grid.
-/// @param strikes - Strictly increasing strike grid shared by every row.
 /// @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+/// @param strikes - Strictly increasing strike grid shared by every row.
 /// @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
 /// @param forwardPrices - One forward price to broadcast, or one per expiry.
 /// @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
@@ -1493,16 +1493,16 @@ pub fn check_local_vol_density_grid(
 /// tolerance is negative or non-finite.
 #[wasm_bindgen(js_name = checkSurfaceGrid, unchecked_return_type = "generated.models.ArbitrageReport")]
 pub fn check_surface_grid(
-    #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] expiries: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
     #[wasm_bindgen(unchecked_param_type = "NumericArray[]")] vols: JsValue,
     #[wasm_bindgen(js_name = "forwardPrices", unchecked_param_type = "NumericArray")]
     forward_prices: JsValue,
     #[wasm_bindgen(unchecked_optional_param_type = "number")] tolerance: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let report = model_arbitrage::check_surface_grid(
-        &js_f64_seq(&strikes, "strikes")?,
         &js_f64_seq(&expiries, "expiries")?,
+        &js_f64_seq(&strikes, "strikes")?,
         &js_f64_matrix(&vols, "vols")?,
         js_f64_seq(&forward_prices, "forwardPrices")?,
         grid_tolerance(tolerance.as_ref())?,

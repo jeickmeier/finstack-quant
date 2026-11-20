@@ -249,6 +249,48 @@ impl PyFinstackConfig {
             .map_err(core_to_py)
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.core.config", "FinstackConfig.with_rounding_mode")]
+    #[pyo3(signature = (mode))]
+    fn with_rounding_mode(&self, mode: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
+        Ok(Self {
+            inner: self
+                .inner
+                .with_rounding_mode(mode.map(extract_rounding_mode).transpose()?),
+        })
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.core.config", "FinstackConfig.with_output_scale")]
+    fn with_output_scale(&self, currency: &Bound<'_, PyAny>, scale: i64) -> PyResult<Self> {
+        let scale = u32::try_from(scale)
+            .map_err(|_| crate::errors::value_error("scale must be in 0..=28"))?;
+        self.inner
+            .with_output_scale(extract_currency(currency)?, scale)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.core.config", "FinstackConfig.with_ingest_scale")]
+    fn with_ingest_scale(&self, currency: &Bound<'_, PyAny>, scale: i64) -> PyResult<Self> {
+        let scale = u32::try_from(scale)
+            .map_err(|_| crate::errors::value_error("scale must be in 0..=28"))?;
+        self.inner
+            .with_ingest_scale(extract_currency(currency)?, scale)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.core.config", "FinstackConfig.patch_extension")]
+    fn patch_extension(
+        &mut self,
+        py: Python<'_>,
+        key: &str,
+        patch: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
+        self.inner
+            .patch_extension(key, py_to_serde(py, patch, "extension patch")?)
+            .map_err(core_to_py)
+    }
+
     /// Explicit output-scale overrides as ``{iso_code: scale}``.
     #[pyo3(text_signature = "(self)")]
     fn output_scale_overrides(&self) -> BTreeMap<String, u32> {

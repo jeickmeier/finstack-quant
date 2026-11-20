@@ -136,6 +136,15 @@ impl FxMatrix {
         )
     }
 
+    /// Create an empty matrix backed by in-memory quotes with direct routing.
+    ///
+    /// Direct quotes and their reciprocals are available after insertion.
+    /// Cross-currency triangulation requires an explicit pivot.
+    #[must_use]
+    pub fn direct() -> Self {
+        Self::new(Arc::new(super::SimpleFxProvider::new()), None)
+    }
+
     /// Build a matrix over an empty [`SimpleFxProvider`](super::SimpleFxProvider) holding `quotes` as
     /// pair-global quotes.
     ///

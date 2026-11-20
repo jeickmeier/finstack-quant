@@ -70,7 +70,7 @@ from finstack_quant.models.monte_carlo import (
 from finstack_quant.portfolio import (
     InstrumentArtifactCache,
     Portfolio,
-    PortfolioValuation,
+    ReplayConfig,
     aggregate_full_cashflows,
     aggregate_metrics,
     attribute_portfolio_pnl,
@@ -101,6 +101,7 @@ from finstack_quant.statements import (
 )
 from finstack_quant.statements_analytics import (
     DependencyTracer,
+    GoalSeekSpec,
     backtest_forecast,
     evaluate_scenario_set,
     explain_formula,
@@ -323,7 +324,7 @@ def _build_bench_market(rate: float = 0.05, as_of: date = date(2025, 1, 15)) -> 
     """
     # Flat act/360 rate ≈ df = exp(-rate * t) for a reasonable approximation.
     knots = [(t, math.exp(-rate * t)) for t in (0.0, 0.25, 0.5, 1.0, 2.0)]
-    curve = DiscountCurve("USD-OIS", as_of, knots)
+    curve = DiscountCurve("USD-OIS", as_of, knots, interp="log_linear", extrapolation="extend", day_count="act_360")
     return MarketContext().insert(curve)
 
 
@@ -349,8 +350,8 @@ def _assert_deposit_valuation(valuation, n_positions: int, *, standard_risk: boo
         assert math.isfinite(position.value_base.amount)
         result = position.valuation_result
         assert result is not None
-        assert result["value"]["currency"] == "USD"
-        measures = result["measures"]
+        assert result.currency == "USD"
+        measures = result.metrics
         assert all(math.isfinite(value) for value in measures.values())
         if standard_risk:
             assert "dv01" in measures
@@ -456,6 +457,7 @@ _HISTORICAL_PNLS_NUMPY = np.asarray(_HISTORICAL_PNLS_LIST, dtype=np.float64)
 def _build_model_spec() -> FinancialModelSpec:
     """Build a small model spec via ModelBuilder (correct wire format)."""
     b = ModelBuilder("bench-model")
+    b.source_snapshot("benchmark-forecast")
     b.periods("2025Q1..Q2", None)
     b.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
     b.value("cogs", [("2025Q1", 60.0), ("2025Q2", 65.0)])
@@ -568,6 +570,7 @@ class TestCoreBenchmarks:
             date(2024, 1, 1),
             [(0.0, 1.0), (1.0, 0.95), (5.0, 0.75), (10.0, 0.50)],
             interp="monotone_convex",
+            extrapolation="extend",
             day_count="act_365f",
         )
         knots = [(0.0, 1.0), (1.0, 0.95), (5.0, 0.75), (10.0, 0.50)]
@@ -607,7 +610,6 @@ class TestCoreBenchmarks:
             "interp": "log_linear",
             "extrapolation": "extend",
             "day_count": "act_360",
-            "index_tenor": "3M",
         })
         assert curve.interp_style == "log_linear"
         # Log-linear on [1, 5]: ln P falls by (0.275 - 0.05) / 4 per year.
@@ -622,7 +624,6 @@ class TestCoreBenchmarks:
                 "zero_rates": zero_rates,
                 "interp": "log_linear",
                 "day_count": curve.day_count,
-                "index_tenor": "3M",
                 "t1": 2.5,
                 "t2": 2.75,
                 "accrual_year_fraction": 0.25,
@@ -882,7 +883,15 @@ class TestMonteCarloBenchmarks:
     def test_black_scholes_call(self, benchmark) -> None:
         _ccm_bench(
             benchmark,
-            lambda: bs_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True),
+            lambda: bs_price({
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "volatility": 0.2,
+                "time_to_expiry": 1.0,
+                "option_type": "call",
+            }),
             _ccm._scalar(_ccm._bs_reference(), abs_tol=_ccm._BS_ABS_TOL),
             parameters={
                 "spot": 100.0,
@@ -1071,7 +1080,15 @@ class TestMonteCarloBenchmarks:
     def test_black_scholes_put(self, benchmark) -> None:
         _ccm_bench(
             benchmark,
-            lambda: bs_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, False),
+            lambda: bs_price({
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "volatility": 0.2,
+                "time_to_expiry": 1.0,
+                "option_type": "put",
+            }),
             _ccm._scalar(_ccm._bs_reference(is_call=False), abs_tol=_ccm._BS_ABS_TOL),
             parameters={
                 "spot": 100.0,
@@ -1222,14 +1239,18 @@ class TestStatementsAnalyticsBenchmarks:
         def _seek():
             return goal_seek(
                 _MODEL_JSON,
-                {
-                    "target_node": "gross_profit",
-                    "target_period": "2025Q1",
-                    "target_value": 50.0,
-                    "driver_node": "revenue",
-                    "driver_period": "2025Q1",
-                    "update_model": False,
-                },
+                GoalSeekSpec(
+                    target={"node": "gross_profit", "period": "2025Q1"},
+                    target_value=50.0,
+                    target_tolerance=1e-7,
+                    driver={"node": "revenue", "period": "2025Q1"},
+                    driver_tolerance=1e-10,
+                    max_iterations=100,
+                    search={"kind": "bracket", "lower": 0.0, "upper": 200_000.0},
+                    as_of="2024-12-31",
+                    observed_through="2024-12-31",
+                    update_model=False,
+                ),
             )
 
         benchmark.pedantic(_seek, rounds=10, warmup_rounds=1)
@@ -1238,14 +1259,18 @@ class TestStatementsAnalyticsBenchmarks:
         def _seek():
             return goal_seek(
                 _MODEL_SPEC,
-                {
-                    "target_node": "gross_profit",
-                    "target_period": "2025Q1",
-                    "target_value": 50.0,
-                    "driver_node": "revenue",
-                    "driver_period": "2025Q1",
-                    "update_model": False,
-                },
+                GoalSeekSpec(
+                    target={"node": "gross_profit", "period": "2025Q1"},
+                    target_value=50.0,
+                    target_tolerance=1e-7,
+                    driver={"node": "revenue", "period": "2025Q1"},
+                    driver_tolerance=1e-10,
+                    max_iterations=100,
+                    search={"kind": "bracket", "lower": 0.0, "upper": 200_000.0},
+                    as_of="2024-12-31",
+                    observed_through="2024-12-31",
+                    update_model=False,
+                ),
             )
 
         benchmark.pedantic(_seek, rounds=10, warmup_rounds=1)
@@ -1477,20 +1502,19 @@ class TestPortfolioReleaseControls:
         """PV-only 500-deposit replay through twenty prebuilt snapshots."""
         portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
         snapshots_json = _build_replay_snapshots_json(20)
+        config = ReplayConfig(
+            "pv_only",
+            valuation_options={"strict_risk": True, "metrics": {"mode": "only", "metrics": []}},
+        )
 
         def _run():
-            return replay_portfolio(
-                portfolio,
-                snapshots_json,
-                ('{"mode":"pv_only","valuation_options":{"strict_risk":true,"metrics":{"mode":"only","metrics":[]}}}'),
-            )
+            return replay_portfolio(portfolio, snapshots_json, config)
 
         def _check(result):
             assert not result.skipped_dates
             assert len(result.steps) == 20
             for step in result.steps:
-                valuation = PortfolioValuation.from_json(json.dumps(step["valuation"]))
-                _assert_deposit_valuation(valuation, 500, standard_risk=False)
+                _assert_deposit_valuation(step.valuation, 500, standard_risk=False)
 
         _check(_run())
         _check(benchmark.pedantic(_run, rounds=5, warmup_rounds=1))

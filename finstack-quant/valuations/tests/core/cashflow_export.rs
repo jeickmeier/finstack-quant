@@ -32,8 +32,11 @@ fn instrument_cashflows_json(
     as_of: &str,
     model: &str,
 ) -> finstack_quant_core::Result<String> {
-    let instrument =
-        finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(instrument_json, None)?;
+    let instrument = finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
+        instrument_json,
+        None,
+        None,
+    )?;
     let envelope = instrument_cashflows(instrument.as_instrument(), market, as_of, model)?;
     Ok(serde_json::to_string(&envelope).expect("serialize cashflow envelope"))
 }
@@ -718,7 +721,7 @@ fn issue_funding_row_keeps_the_opening_balance() {
 fn amortizing_term_loan_balances_match_the_schedule_path() {
     let json = include_str!("../instruments/json_examples/term_loan.json");
     let instrument =
-        finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(json, None)
+        finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(json, None, None)
             .expect("example loan");
     let as_of = Date::from_calendar_date(2025, Month::February, 1).expect("date");
     let envelope = export(instrument.as_instrument(), as_of);

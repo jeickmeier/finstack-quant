@@ -1,0 +1,61 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/margin/1/margin_funding_spread.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Explicit flat or dated basis-point funding spread for posted IM.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "Apply one finite nonnegative spread at all dates.",
+      "properties": {
+        "kind": {
+          "const": "flat",
+          "type": "string"
+        },
+        "spread_bp": {
+          "description": "Spread in basis points (for example 25 represents 0.25%).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "spread_bp"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Linear interpolation of nonnegative basis-point spreads across a complete dated interval.",
+      "properties": {
+        "kind": {
+          "const": "dated",
+          "type": "string"
+        },
+        "knots": {
+          "description": "Calendar dates and spread quotes in basis points. The dates must\ncover the open and close of the admitted IM horizon.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "knots"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "MarginFundingSpread"
+}

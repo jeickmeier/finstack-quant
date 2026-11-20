@@ -14,7 +14,8 @@ import json
 import pytest
 
 from finstack_quant.core.market_data import MarketContext
-from finstack_quant.models.factor.risk import decompose_factors
+from finstack_quant.models.factor import FactorCovarianceMatrix
+from finstack_quant.models.factor.risk import RiskMeasure, decompose_factors
 from finstack_quant.portfolio import Portfolio, SensitivityMatrix, compute_factor_sensitivities
 
 SENSITIVITY_WIRE = {
@@ -32,6 +33,8 @@ def test_wire_round_trips_exactly_and_decomposes_like_wasm() -> None:
     assert matrix.position_deltas(1) == [3.0, -1.0]
 
     variance = decompose_factors(matrix, SENSITIVITY_COVARIANCE)
+    typed_covariance = FactorCovarianceMatrix(["F1", "F2"], [[0.04, 0.01], [0.01, 0.09]])
+    assert decompose_factors(matrix, covariance=typed_covariance).to_json() == variance.to_json()
     # exposures e = [4, 1]; e' S e = 16*0.04 + 2*4*0.01 + 0.09 = 0.81
     assert variance.total_risk == pytest.approx(0.81, abs=1e-12)
     assert variance.measure == "variance"
@@ -74,3 +77,26 @@ def test_engine_output_uses_the_wire_form() -> None:
         "factor_ids": [],
         "data": [],
     }
+
+
+def test_typed_tail_measure_matches_its_canonical_wire() -> None:
+    matrix = SensitivityMatrix.from_json(json.dumps(SENSITIVITY_WIRE))
+    measure = RiskMeasure.expected_shortfall(0.975)
+    typed = decompose_factors(matrix, SENSITIVITY_COVARIANCE, measure)
+    wire = decompose_factors(matrix, SENSITIVITY_COVARIANCE, {"expected_shortfall": {"confidence": 0.975}})
+    assert typed.to_json() == wire.to_json()
+    with pytest.raises(ValueError, match="confidence"):
+        RiskMeasure.var(1.0)
+
+
+def test_typed_factor_inputs_match_their_canonical_serialization() -> None:
+    from finstack_quant.core.market_data import DiscountCurve
+    from finstack_quant.models.factor import FactorDefinition, MarketMapping
+
+    book = Portfolio.builder("book", "USD", "2025-01-15").build()
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", "2025-01-15", 0.04, "act_365f"))
+    factor = FactorDefinition("usd_rates", "rates", MarketMapping.curve_parallel(["USD-OIS"], "rate_bp"))
+    matrix = compute_factor_sensitivities(book, [factor], market, "2025-01-15")
+    rebuilt = compute_factor_sensitivities(book, [json.loads(factor.to_json())], market, "2025-01-15")
+    assert matrix.factor_ids == ["usd_rates"]
+    assert matrix.to_json() == rebuilt.to_json()

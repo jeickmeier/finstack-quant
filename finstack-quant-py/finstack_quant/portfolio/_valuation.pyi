@@ -9,6 +9,7 @@ from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.core.table import ArrowTable
 from finstack_quant.portfolio._container import Portfolio
+from finstack_quant.valuations import ValuationResult
 
 class PositionValue:
     """
@@ -256,19 +257,17 @@ class PositionValue:
         ...
 
     @property
-    def valuation_result(self) -> dict[str, Any] | None:
-        """
-        Full instrument valuation result as a JSON-shaped dict, if retained.
+    def valuation_result(self) -> ValuationResult | None:
+        """Return the instrument valuation retained for this position.
 
         Returns
         -------
-        dict[str, Any] or None
-            Metrics-inclusive valuation payload, or ``None`` when omitted.
+        ValuationResult or None
+            Typed valuation with computed metrics, or None if storage was disabled.
 
-        Raises
-        ------
-        ValueError
-            If the retained result cannot be converted to a Python object.
+        Notes
+        -----
+        This accessor does not raise.
         """
         ...
 
@@ -375,6 +374,21 @@ class PortfolioValuation:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def total_base_currency(self) -> Money:
+        """Return the total valuation as an exact monetary amount.
+
+        Returns
+        -------
+        Money
+            Portfolio total in the reporting currency.
+
+        Notes
+        -----
+        This accessor does not raise.
         """
         ...
 

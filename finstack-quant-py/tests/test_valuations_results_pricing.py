@@ -487,6 +487,8 @@ def test_term_loan_cs01_uses_the_quote_anchor(quote_field: str, low_quote: float
 
 def test_every_pricing_entry_point_accepts_the_same_metric_pricing_overrides_types() -> None:
     """``price_instrument``, typed ``.price()`` and ``validate_instrument_json`` share one coercion."""
+    from finstack_quant.valuations.instruments import PriceExtras
+
     market = _market()
     bond = _bond()
     typed = MetricPricingOverrides(theta_period="1W")
@@ -495,6 +497,8 @@ def test_every_pricing_entry_point_accepts_the_same_metric_pricing_overrides_typ
         "theta"
     ]
     for extras in (
+        PriceExtras(metric_pricing_overrides=typed),
+        PriceExtras(metric_pricing_overrides=as_dict),
         {"metric_pricing_overrides": typed},
         {"metric_pricing_overrides": as_dict},
         json.dumps({"metric_pricing_overrides": as_dict}),
@@ -504,6 +508,46 @@ def test_every_pricing_entry_point_accepts_the_same_metric_pricing_overrides_typ
     for value in (typed, as_dict, json.dumps(as_dict)):
         prepared = json.loads(validate_instrument_json(bond.to_json(), metric_pricing_overrides=value))
         assert prepared["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"] == as_dict["theta_period"]
+
+
+def test_call_time_market_quote_overrides_match_typed_and_wire_pricing() -> None:
+    from finstack_quant.valuations.instruments import PriceExtras
+
+    market = _market()
+    bond = _bond()
+    wire = bond.to_json()
+    extras = {"instrument_pricing_overrides": {"market_quotes": {"quoted_clean_price_pct": 98.25}}}
+    metrics = ["clean_price", "ytm"]
+
+    typed = bond.price(market, AS_OF, metrics=metrics, extras=PriceExtras(**extras))
+    assert typed["clean_price"] == pytest.approx(float(bond.notional.amount) * 0.9825)
+    assert price_instrument(bond, market, AS_OF, metrics=metrics, extras=extras)["ytm"] == typed["ytm"]
+    assert price_instrument(wire, market, AS_OF, metrics=metrics, extras=json.dumps(extras))["ytm"] == typed["ytm"]
+    assert bond.to_json() == wire
+    original = bond.price(market, AS_OF, metrics=metrics)
+    assert original["clean_price"] != typed["clean_price"]
+    marked = json.loads(wire)
+    marked["instrument"]["spec"]["instrument_pricing_overrides"] = extras["instrument_pricing_overrides"]
+    stored = Bond.from_json(json.dumps(marked))
+    before = stored.to_json()
+    cleared = stored.price(
+        market,
+        AS_OF,
+        metrics=metrics,
+        extras=PriceExtras(instrument_pricing_overrides={"market_quotes": {"quoted_clean_price_pct": None}}),
+    )
+    assert cleared["clean_price"] == original["clean_price"]
+    assert stored.to_json() == before
+    for instrument in [bond, wire]:
+        with pytest.raises(ValueError, match="instrument_pricing_overrides"):
+            price_instrument(
+                instrument,
+                market,
+                AS_OF,
+                extras={
+                    "instrument_pricing_overrides": {"market_quotes": {"quoted_clean_pirce_pct": 98.25}},
+                },
+            )
 
 
 def test_price_extras_rejects_unknown_keys_and_the_retired_keywords() -> None:

@@ -7,7 +7,7 @@ import * as wasm from '../pkg/finstack_quant_wasm.js';
  * import init, { statements_analytics } from "finstack-quant-wasm";
  * await init();
  * console.log(
- *   statements_analytics.wacc({ equity_weight: 0.6, cost_of_equity: 0.1, debt_weight: 0.4, cost_of_debt: 0.05, tax_rate: 0.25 })
+ *   statements_analytics.wacc({ equity_weight: '0.6', cost_of_equity: 0.1, debt_weight: '0.4', cost_of_debt: 0.05, tax_rate: 0.25 })
  * );
  * ```
  */
@@ -23,16 +23,23 @@ export const statements_analytics = {
   backtestForecast: wasm.backtestForecast,
   generateTornadoEntries: wasm.generateTornadoEntries,
   dcfSensitivity: wasm.dcfSensitivity,
+  evaluateDatedLbo: wasm.evaluateDatedLbo,
   evaluateLbo: wasm.evaluateLbo,
   wacc: wasm.wacc,
   goalSeek: wasm.goalSeek,
+  goalSeekSpec: wasm.goalSeekSpec,
   explainFormula: wasm.explainFormula,
   explainFormulaText: wasm.explainFormulaText,
   plSummaryReportText: wasm.plSummaryReportText,
   creditAssessmentReportText: wasm.creditAssessmentReportText,
+  evaluateCreditContext: wasm.evaluateCreditContext,
+  scoreStatement: wasm.scoreStatement,
+  scoreStatementSeries: wasm.scoreStatementSeries,
   creditAssessment: wasm.creditAssessment,
   capitalStructureSummary: wasm.capitalStructureSummary,
   capitalStructureSummaryTable: wasm.capitalStructureSummaryTable,
+  assessStatementCovenants: wasm.assessStatementCovenants,
+  forecastStatementCovenants: wasm.forecastStatementCovenants,
   evaluateCovenants: wasm.evaluateCovenants,
   // Raw export is prefixed: `forecastBreaches` is also the covenants
   // namespace's forecast over dated metric rows, so the raw names must differ.
@@ -52,6 +59,8 @@ export const statements_analytics = {
   relativeValueReportTable: wasm.relativeValueReportTable,
   validateScorecardConfig: wasm.validateScorecardConfig,
   classifyStage: wasm.classifyStage,
+  computeImpairedEclWeighted: wasm.computeImpairedEclWeighted,
+  computeImpairedEcl: wasm.computeImpairedEcl,
   computeEcl: wasm.computeEcl,
   computeEclWeighted: wasm.computeEclWeighted,
   addVintageBuildup: wasm.addVintageBuildup,
@@ -63,6 +72,14 @@ export const statements_analytics = {
   addPropertyOperatingStatement: wasm.addPropertyOperatingStatement,
   validateLeaseSpecJson: wasm.validateLeaseSpecJson,
   validateRenewalSpecJson: wasm.validateRenewalSpecJson,
+  dcfInputs: wasm.dcfInputs,
+  dcfOptions: wasm.dcfOptions,
+  dcfSensitivityGridSpec: wasm.dcfSensitivityGridSpec,
+  dcfSensitivityOnResults: wasm.dcfSensitivityOnResults,
+  dcfSensitivityGrid: wasm.dcfSensitivityGrid,
+  evaluateCorporateDcf: wasm.evaluateCorporateDcf,
+  evaluateDcfFromResults: wasm.evaluateDcfFromResults,
+  evaluateDcfMonteCarlo: wasm.evaluateDcfMonteCarlo,
   evaluateDcf: wasm.evaluateDcf,
   runCorporateAnalysis: wasm.runCorporateAnalysis,
   scenarioDiff: wasm.scenarioDiff,

@@ -50,7 +50,7 @@ macro_rules! instrument_class {
             /// @returns Stable instrument identifier used in metric keys.
             #[wasm_bindgen(getter)]
             pub fn id(&self) -> String {
-                self.inner.id.to_string()
+                finstack_quant_valuations::instruments::Instrument::id(&self.inner).to_string()
             }
         }
     };
@@ -116,7 +116,7 @@ macro_rules! instrument_pricing {
             /// @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
             /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
             /// @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
-            /// @param extras - Optional `PriceExtras` (plain object or JSON text); omit, `null`, or `undefined` for none. Keys, each optional: `metric_pricing_overrides` - a `MetricPricingOverrides` JSON object patch merged into the envelope before validation (only supplied fields replace stored overrides, `bump_config` fields merge, an explicit `null` clears a nullable field; omitted keeps the stored configuration); `market_history` - a `MarketHistory` object required by historical risk metrics such as `"hvar"` and `"expected_shortfall"` (omitted prices without history); `explain` - boolean, default `false`; `true` attaches a step trace as `result.explanation`.
+            /// @param extras - Optional `PriceExtras` (plain object or JSON text); omit, `null`, or `undefined` for none. Keys, each optional: `metric_pricing_overrides` - a `MetricPricingOverrides` JSON object patch merged into the envelope before validation (only supplied fields replace stored overrides, `bump_config` fields merge, an explicit `null` clears a nullable field; omitted keeps the stored configuration); `instrument_pricing_overrides` - object patch for instrument-owned quotes and model settings, applied only to this request; `market_history` - a `MarketHistory` object required by historical risk metrics such as `"hvar"` and `"expected_shortfall"` (omitted prices without history); `explain` - boolean, default `false`; `true` attaches a step trace as `result.explanation`.
             /// @returns Structured `ValuationResult` for the selected model.
             /// @throws Error - Throws with kind `validation` if a payload (including an unknown `extras` key), `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
             #[wasm_bindgen(unchecked_return_type = "ValuationResult")]

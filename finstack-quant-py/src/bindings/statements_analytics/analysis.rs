@@ -657,58 +657,125 @@ fn backtest_forecast(actual: Vec<f64>, forecast: Vec<f64>) -> PyResult<PyForecas
     Ok(PyForecastMetrics { inner })
 }
 
-/// Result of a goal-seek solve (the Rust ``GoalSeekResult``).
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.statements import ModelBuilder
-/// >>> from finstack_quant.statements_analytics import GoalSeekResult, goal_seek
-/// >>> b = ModelBuilder("m")
-/// >>> _ = b.periods("2025Q1..Q1", None)
-/// >>> _ = b.value("revenue", [("2025Q1", 100.0)])
-/// >>> _ = b.compute("profit", "revenue * 0.5")
-/// >>> spec = {
-/// ...     "target_node": "profit",
-/// ...     "target_period": "2025Q1",
-/// ...     "target_value": 60.0,
-/// ...     "driver_node": "revenue",
-/// ...     "driver_period": "2025Q1",
-/// ...     "update_model": True,
-/// ... }
-/// >>> result = goal_seek(b.build(), spec)
-/// >>> round(result.solved_value, 6), result.model is None
-/// (120.0, False)
-/// >>> round(GoalSeekResult.from_json(result.to_json()).solved_value, 6)
-/// 120.0
+#[pyclass(
+    name = "GoalSeekSpec",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekSpec")]
+#[derive(Clone)]
+struct PyGoalSeekSpec {
+    inner: finstack_quant_statements_analytics::analysis::GoalSeekSpec,
+}
+
+#[pymethods]
+impl PyGoalSeekSpec {
+    #[new]
+    #[pyo3(
+        signature = (**fields),
+        text_signature = "(*, driver, target, target_value, target_tolerance, driver_tolerance, max_iterations, search, as_of, observed_through, update_model)"
+    )]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekSpec.__init__")]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: finstack_quant_statements_analytics::analysis::GoalSeekSpec =
+            crate::bindings::module_utils::fields_from_py(py, fields, "GoalSeekSpec")?;
+        inner.validate().map_err(statements_to_py)?;
+        Ok(Self { inner })
+    }
+}
+
 #[pyclass(
     name = "GoalSeekResult",
     module = "finstack_quant.statements_analytics",
     frozen,
     from_py_object
 )]
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekResult")]
 #[derive(Clone)]
 pub struct PyGoalSeekResult {
     pub(crate) inner: GoalSeekResult,
 }
 
-impl PyGoalSeekResult {
-    /// Wrap the Rust goal-seek result.
-    pub(crate) fn from_inner(inner: GoalSeekResult) -> Self {
-        Self { inner }
+fn goal_value_to_py<'py>(
+    py: Python<'py>,
+    value: finstack_quant_statements::types::AmountOrScalar,
+) -> PyResult<Bound<'py, PyAny>> {
+    use finstack_quant_statements::types::AmountOrScalar;
+    match value {
+        AmountOrScalar::Amount(amount) => Ok(Bound::new(
+            py,
+            crate::bindings::core::money::PyMoney::from_inner(amount),
+        )?
+        .into_any()),
+        AmountOrScalar::Scalar(scalar) => Ok(pyo3::types::PyFloat::new(py, scalar).into_any()),
     }
 }
 
 #[pymethods]
 impl PyGoalSeekResult {
-    /// Driver value that reaches the target, in the driver node's units.
     #[getter]
-    fn solved_value(&self) -> f64 {
-        self.inner.solved_value
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekResult.solved_value")]
+    fn solved_value<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        goal_value_to_py(py, self.inner.solved_value)
     }
 
-    /// Model with the solved driver written in, or ``None`` when
-    /// ``update_model=False``.
     #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekResult.target_value")]
+    fn target_value<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        goal_value_to_py(py, self.inner.target_value)
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekResult.achieved_value")]
+    fn achieved_value<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        goal_value_to_py(py, self.inner.achieved_value)
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekResult.residual")]
+    fn residual<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        goal_value_to_py(py, self.inner.residual)
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekResult.target_tolerance")]
+    fn target_tolerance<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        goal_value_to_py(py, self.inner.target_tolerance)
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekResult.driver_tolerance")]
+    fn driver_tolerance(&self) -> f64 {
+        self.inner.driver_tolerance
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekResult.evaluations")]
+    fn evaluations(&self) -> usize {
+        self.inner.evaluations
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekResult.original_run")]
+    fn original_run<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.original_run)
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekResult.solved_run")]
+    fn solved_run<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.solved_run)
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekResult.market_hash")]
+    fn market_hash(&self) -> &str {
+        &self.inner.market_hash
+    }
+
+    #[getter]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekResult.model")]
     fn model(&self) -> Option<PyFinancialModelSpec> {
         self.inner
             .model
@@ -716,100 +783,45 @@ impl PyGoalSeekResult {
             .map(PyFinancialModelSpec::from_inner)
     }
 
-    /// Signed residual at ``solved_value``: the target node's value minus the
-    /// requested target, in the target node's units.
-    #[getter]
-    fn residual(&self) -> f64 {
-        self.inner.residual
-    }
-
-    /// Absolute acceptance tolerance on ``residual``, in the target node's
-    /// units (``1e-9 * max(abs(target_value), 1)``).
-    #[getter]
-    fn tolerance(&self) -> f64 {
-        self.inner.tolerance
-    }
-
-    /// Number of model evaluations the solve used, including the final
-    /// residual check; ``0`` only for a result loaded from JSON written
-    /// before diagnostics were recorded.
-    #[getter]
-    fn evaluations(&self) -> usize {
-        self.inner.evaluations
-    }
-
-    /// Whether ``abs(residual) <= tolerance``; always ``True`` for a result
-    /// returned by ``goal_seek``.
-    #[getter]
-    fn converged(&self) -> bool {
-        self.inner.converged
-    }
-
-    /// Serialize to canonical JSON (``{"solved_value", "model", "residual",
-    /// "tolerance", "evaluations", "converged"}``; ``model`` is ``null`` when
-    /// it was not requested), identical to the WASM ``goalSeek`` result.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekResult.to_json")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "GoalSeekResult"))
+        serde_json::to_string(&self.inner)
+            .map_err(|error| serde_json_to_py(error, "GoalSeekResult"))
     }
 
-    /// Deserialize from canonical JSON; the embedded model is validated like
-    /// ``FinancialModelSpec.from_json``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``GoalSeekResult`` document (unknown
-    ///     fields are rejected) or its model fails validation.
     #[staticmethod]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekResult.from_json")]
     fn from_json(json: &str) -> PyResult<Self> {
         GoalSeekResult::from_json(json)
             .map(|inner| Self { inner })
             .map_err(statements_to_py)
     }
 
-    /// Support ``pickle`` through the canonical JSON representation.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekResult.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    fn __float__(&self) -> f64 {
-        self.inner.solved_value
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "GoalSeekResult(solved_value={}, residual={}, evaluations={}, converged={}, model={})",
-            self.inner.solved_value,
-            self.inner.residual,
-            self.inner.evaluations,
-            crate::bindings::statements_analytics::py_bool(self.inner.converged),
-            if self.inner.model.is_some() {
-                "FinancialModelSpec(...)"
-            } else {
-                "None"
-            }
-        )
     }
 }
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "goal_seek")]
 #[pyfunction]
-#[pyo3(signature = (model, spec))]
+#[pyo3(signature = (model, spec, market=None))]
 fn goal_seek(
     py: Python<'_>,
     model: &Bound<'_, PyAny>,
-    spec: &Bound<'_, PyAny>,
+    spec: &PyGoalSeekSpec,
+    market: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyGoalSeekResult> {
     let model = extract_model_ref(model)?.into_owned();
-    let spec: finstack_quant_statements_analytics::analysis::GoalSeekSpec =
-        crate::bindings::module_utils::spec_from_py(py, spec, "GoalSeekSpec")?;
-
-    py.detach(move || {
-        finstack_quant_statements_analytics::analysis::goal_seek(&model, &spec)
-            .map(PyGoalSeekResult::from_inner)
-            .map_err(statements_to_py)
-    })
+    let spec = spec.inner.clone();
+    let market = crate::bindings::extract::extract_market_opt(py, market)?.unwrap_or_default();
+    let inner = py
+        .detach(move || {
+            finstack_quant_statements_analytics::analysis::goal_seek(&model, &spec, &market)
+        })
+        .map_err(statements_to_py)?;
+    Ok(PyGoalSeekResult { inner })
 }
 
 /// Cached dependency tracer that builds the model graph once.
@@ -1245,6 +1257,7 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDependencyTracer>()?;
     m.add_class::<PyDependencyTree>()?;
     m.add_class::<PyForecastMetrics>()?;
+    m.add_class::<PyGoalSeekSpec>()?;
     m.add_class::<PyGoalSeekResult>()?;
     m.add_class::<PyExplanationStep>()?;
     m.add_class::<PyExplanation>()?;

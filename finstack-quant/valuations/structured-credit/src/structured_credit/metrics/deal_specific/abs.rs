@@ -1,6 +1,5 @@
 //! ABS-specific metrics (speed, delinquency, excess spread, credit enhancement).
 
-use crate::structured_credit::StructuredCredit;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::math::units::DECIMAL_TO_PERCENT;
 use finstack_quant_valuations_core::metrics::MetricContext;
@@ -13,9 +12,8 @@ pub(crate) struct AbsDelinquencyCalculator;
 
 impl finstack_quant_valuations_core::metrics::MetricCalculator for AbsDelinquencyCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let abs = context
-            .instrument_as::<StructuredCredit>()?
-            .resolved_for_pricing()?;
+        let abs =
+            crate::structured_credit::metrics::metric_deal(context)?.resolved_for_pricing()?;
         let total_balance = abs.pool.total_balance()?;
         if total_balance.amount() <= 0.0 {
             return Ok(0.0);
@@ -40,9 +38,8 @@ pub struct AbsExcessSpreadCalculator;
 
 impl finstack_quant_valuations_core::metrics::MetricCalculator for AbsExcessSpreadCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let abs = context
-            .instrument_as::<StructuredCredit>()?
-            .resolved_for_pricing()?;
+        let abs =
+            crate::structured_credit::metrics::metric_deal(context)?.resolved_for_pricing()?;
         let Some(card) = abs.credit_model.card else {
             return Err(finstack_quant_core::Error::Validation(
                 "abs_excess_spread requires credit_model.card (a card portfolio model)".to_string(),
@@ -94,9 +91,8 @@ pub struct AbsPaymentRateCalculator;
 
 impl finstack_quant_valuations_core::metrics::MetricCalculator for AbsPaymentRateCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let abs = context
-            .instrument_as::<StructuredCredit>()?
-            .resolved_for_pricing()?;
+        let abs =
+            crate::structured_credit::metrics::metric_deal(context)?.resolved_for_pricing()?;
         let Some(card) = abs.credit_model.card else {
             return Err(finstack_quant_core::Error::Validation(
                 "abs_payment_rate requires credit_model.card (a card portfolio model)".to_string(),
@@ -111,9 +107,8 @@ pub struct AbsChargeOffCalculator;
 
 impl finstack_quant_valuations_core::metrics::MetricCalculator for AbsChargeOffCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let abs = context
-            .instrument_as::<StructuredCredit>()?
-            .resolved_for_pricing()?;
+        let abs =
+            crate::structured_credit::metrics::metric_deal(context)?.resolved_for_pricing()?;
 
         let total_balance = abs.pool.total_balance()?;
         if total_balance.amount() > 0.0 {
@@ -131,9 +126,8 @@ pub struct AbsCreditEnhancementCalculator;
 
 impl finstack_quant_valuations_core::metrics::MetricCalculator for AbsCreditEnhancementCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let abs = context
-            .instrument_as::<StructuredCredit>()?
-            .resolved_for_pricing()?;
+        let abs =
+            crate::structured_credit::metrics::metric_deal(context)?.resolved_for_pricing()?;
         let pool = &abs.pool;
         let mut collateral = pool
             .performing_balance()?

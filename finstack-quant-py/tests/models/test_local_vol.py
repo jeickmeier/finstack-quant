@@ -179,7 +179,15 @@ def test_local_vol_process_with_a_flat_surface_reprices_black_scholes() -> None:
     ]
     mean = sum(pairs) / len(pairs)
     stderr = math.sqrt(sum((x - mean) ** 2 for x in pairs) / (len(pairs) - 1) / len(pairs))
-    exact = bs_price(100.0, 100.0, rate, div_yield, sigma, expiry, True)
+    exact = bs_price({
+        "spot": 100.0,
+        "strike": 100.0,
+        "rate": rate,
+        "dividend_yield": div_yield,
+        "volatility": sigma,
+        "time_to_expiry": expiry,
+        "option_type": "call",
+    })
     assert abs(math.exp(-rate * expiry) * mean - exact) < 4 * stderr
 
     with pytest.raises(ValueError, match="scheme 'milstein' is not available for process 'local_vol'"):

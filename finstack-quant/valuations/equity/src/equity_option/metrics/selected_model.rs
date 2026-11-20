@@ -129,7 +129,7 @@ mod tests {
             .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let surface = VolSurface::builder("EQUITY-VOL")
+        let surface = VolSurface::builder("EQ-VOL")
             .expiries(&[1.0])
             .secondary_values(&[100.0])
             .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
@@ -145,7 +145,7 @@ mod tests {
             .expect("insert market curve")
             .insert_surface(surface)
             .insert_price(
-                "EQUITY-SPOT",
+                "EQ-SPOT",
                 MarketScalar::unitless(100.0).expect("valid scalar"),
             )
             .insert_price(
@@ -191,7 +191,7 @@ mod tests {
         let up = price(
             &option,
             &market.clone().insert_price(
-                "EQUITY-SPOT",
+                "EQ-SPOT",
                 MarketScalar::unitless(100.01).expect("valid scalar"),
             ),
             model,
@@ -199,7 +199,7 @@ mod tests {
         let down = price(
             &option,
             &market.clone().insert_price(
-                "EQUITY-SPOT",
+                "EQ-SPOT",
                 MarketScalar::unitless(99.99).expect("valid scalar"),
             ),
             model,
@@ -289,7 +289,7 @@ mod tests {
             let up = price(
                 &option,
                 &market.clone().insert_price(
-                    "EQUITY-SPOT",
+                    "EQ-SPOT",
                     MarketScalar::unitless(101.0).expect("valid scalar"),
                 ),
                 model,
@@ -297,7 +297,7 @@ mod tests {
             let down = price(
                 &option,
                 &market.clone().insert_price(
-                    "EQUITY-SPOT",
+                    "EQ-SPOT",
                     MarketScalar::unitless(99.0).expect("valid scalar"),
                 ),
                 model,

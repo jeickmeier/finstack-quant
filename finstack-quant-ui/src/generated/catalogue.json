@@ -367,6 +367,14 @@
     "exampleId": "RCF-USD-3Y"
   },
   {
+    "type": "structured_credit_tranche",
+    "title": "structured_credit_tranche",
+    "group": "fixed_income",
+    "schemaGroup": "fixed_income",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit_tranche.json",
+    "exampleId": "STRUCTURED-CREDIT-NOTE-EXAMPLE"
+  },
+  {
     "type": "structured_credit",
     "title": "structured_credit",
     "group": "fixed_income",

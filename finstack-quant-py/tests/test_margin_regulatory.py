@@ -186,7 +186,7 @@ def test_ead_result_wire_and_frame_surfaces() -> None:
 def test_sa_ccr_engine_calculate_ead_returns_typed_result() -> None:
     config = unmargined_config()
 
-    result = SaCcrEngine(alpha=1.5).calculate_ead(config, [])
+    result = SaCcrEngine(alpha=1.5).calculate_ead([], config)
 
     assert isinstance(result, EadResult)
     assert result.alpha == pytest.approx(1.5)
@@ -196,7 +196,7 @@ def test_sa_ccr_engine_calculate_ead_returns_typed_result() -> None:
 
 def sample_sensitivities() -> FrtbSensitivities:
     sens = FrtbSensitivities("USD")
-    sens.add_girr_delta("USD", "5Y", 25_000.0)
+    sens.add_girr_delta("USD", "USD-OIS", "5Y", 25_000.0)
     sens.add_equity_delta("ACME", 1, 12_000.0)
     sens.add_rrao_position("EXOTIC-1", 5_000_000.0, True)
     return sens
@@ -262,7 +262,7 @@ def test_saccr_ead_is_a_thin_engine_wrapper() -> None:
     assert "mpor_days=5" in repr(config)
 
     via_function = saccr_ead([trade], config, alpha=1.5)
-    via_engine = SaCcrEngine(alpha=1.5).calculate_ead(config, [trade])
+    via_engine = SaCcrEngine(alpha=1.5).calculate_ead([trade], config)
     assert via_function.to_json() == via_engine.to_json()
     assert SaCcrEngine(alpha=1.5).alpha == 1.5
     assert via_function.meta["numeric_mode"] is not None
@@ -296,7 +296,7 @@ def test_frtb_engine_configuration_and_scenario_frame() -> None:
 
 def test_frtb_sensitivities_adders_and_dataframe_round_trip() -> None:
     sens = FrtbSensitivities("USD")
-    sens.add_girr_delta("USD", "5Y", 25_000.0)
+    sens.add_girr_delta("USD", "USD-OIS", "5Y", 25_000.0)
     sens.add_girr_inflation_delta("USD", 1_000.0)
     sens.add_girr_xccy_basis_delta("EUR", 500.0)
     sens.add_girr_vega("USD", "1Y", "5Y", 2_000.0)
@@ -378,7 +378,7 @@ def test_frtb_basis_repo_and_option_categories_round_trip() -> None:
 def test_frtb_dataframe_round_trips_drc_positions_and_base_currency() -> None:
     """MSAF-002: ``drc`` rows carry every position field, so the frame round-trips."""
     sens = FrtbSensitivities("EUR")
-    sens.add_girr_delta("EUR", "5Y", 25_000.0)
+    sens.add_girr_delta("EUR", "EUR-ESTR", "5Y", 25_000.0)
     sens.add_drc_position({
         "issuer": "ACME",
         "jtd_amount": 1_000_000.0,
@@ -398,7 +398,7 @@ def test_frtb_dataframe_round_trips_drc_positions_and_base_currency() -> None:
         "pnl_adjustment": 0.0,
     })
     frame = sens.to_dataframe()
-    assert list(frame.columns)[6:] == ["sector", "seniority", "maturity_years", "pnl_adjustment"]
+    assert list(frame.columns)[6:] == ["curve_id", "sector", "seniority", "maturity_years", "pnl_adjustment"]
     drc = frame[frame["risk_class"] == "drc"]
     assert set(drc["sector"]) == {"corporate", "sovereign"}
 
@@ -448,8 +448,8 @@ def test_girr_requires_explicit_risk_currency() -> None:
     sens = FrtbSensitivities("USD")
     with pytest.raises(TypeError):
         sens.add_girr_delta("5Y", 100.0)  # type: ignore[call-arg,arg-type]
-    sens.add_girr_delta("EUR", "5Y", 100.0)
-    assert json.loads(sens.to_json())["girr_delta"] == [["EUR", "5Y", 100.0]]
+    sens.add_girr_delta("EUR", "EUR-ESTR", "5Y", 100.0)
+    assert json.loads(sens.to_json())["girr_delta"] == [["EUR", "EUR-ESTR", "5Y", 100.0]]
 
 
 def test_structured_drc_input_uses_complete_rust_validation() -> None:

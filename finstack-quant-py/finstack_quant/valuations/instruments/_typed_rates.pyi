@@ -1,6 +1,8 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/valuations/typed_rates.rs``."""
 
 from __future__ import annotations
+from finstack_quant.margin import OtcMarginSpec
+from finstack_quant.valuations.instruments._pricing import PriceExtras
 
 import datetime
 from typing import Any, Literal
@@ -219,7 +221,7 @@ class InterestRateSwap:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        extras: dict[str, Any] | str | None = None,
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this swap and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -236,7 +238,7 @@ class InterestRateSwap:
             Model key (``"discounting"``, ``"hull_white_1f"``, ...).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        extras : dict[str, Any] or str, optional
+        extras : PriceExtras or dict[str, Any] or str, optional
             The rarer pricing inputs, as a dict or JSON text in the shape of the
             Rust ``PriceExtras``; every key is optional and an unknown key raises
             ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
@@ -706,7 +708,7 @@ class InterestRateSwapBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def margin_spec(self, value: dict[str, object] | str) -> InterestRateSwapBuilder:
+    def margin_spec(self, value: OtcMarginSpec | dict[str, object] | str) -> InterestRateSwapBuilder:
         """
         Set the OTC margin (CSA / initial-margin) specification.
 
@@ -1035,7 +1037,7 @@ class Swaption:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        extras: dict[str, Any] | str | None = None,
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this swaption and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -1052,7 +1054,7 @@ class Swaption:
             Model key (``"black76"``, ``"normal"``, ``"hull_white_1f"``, ...).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        extras : dict[str, Any] or str, optional
+        extras : PriceExtras or dict[str, Any] or str, optional
             The rarer pricing inputs, as a dict or JSON text in the shape of the
             Rust ``PriceExtras``; every key is optional and an unknown key raises
             ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
@@ -2007,7 +2009,7 @@ class CapFloor:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        extras: dict[str, Any] | str | None = None,
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this cap/floor and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -2024,7 +2026,7 @@ class CapFloor:
             Model key (``"black76"``, ``"normal"``, ``"hull_white_1f"``, ...).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        extras : dict[str, Any] or str, optional
+        extras : PriceExtras or dict[str, Any] or str, optional
             The rarer pricing inputs, as a dict or JSON text in the shape of the
             Rust ``PriceExtras``; every key is optional and an unknown key raises
             ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``

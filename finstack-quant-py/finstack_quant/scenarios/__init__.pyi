@@ -11,7 +11,11 @@ Examples
 from __future__ import annotations
 
 from finstack_quant.scenarios import schema as schema
-from finstack_quant.scenarios._spec import ScenarioSpec as ScenarioSpec, TemplateMetadata as TemplateMetadata
+from finstack_quant.scenarios._spec import (
+    ScenarioSpec as ScenarioSpec,
+    ScenarioValidationReport as ScenarioValidationReport,
+    TemplateMetadata as TemplateMetadata,
+)
 from finstack_quant.scenarios._engine import (
     ApplicationReport as ApplicationReport,
     ApplicationResult as ApplicationResult,
@@ -49,6 +53,7 @@ __all__ = [
     "OperationSpec",
     "RateBindingSpec",
     "ScenarioSpec",
+    "ScenarioValidationReport",
     "TemplateMetadata",
     "CurveKind",
     "TenorMatchMode",
@@ -95,33 +100,31 @@ def compose_scenarios(specs: list[ScenarioSpec]) -> ScenarioSpec:
     """
     ...
 
-def validate_scenario_spec(scenario: ScenarioSpec | str) -> None:
-    """
-    Validate a scenario specification without applying it.
+def validate_scenario_spec(scenario: ScenarioSpec | str) -> ScenarioValidationReport:
+    """Check scenario structure and report its diagnostics without applying it.
 
     Parameters
     ----------
     scenario : ScenarioSpec | str
-        Typed scenario or JSON-serialized ``ScenarioSpec``.
+        Typed scenario or JSON text in the canonical ScenarioSpec shape.
 
     Returns
     -------
-    None
-        Returns nothing on success. An invalid spec raises instead, so
-        ``if validate_scenario_spec(s):`` is not a validity check.
+    ScenarioValidationReport
+        Structural errors, advisory diagnostics, instrument requirements, and operation count.
 
     Raises
     ------
     ValueError
-        If ``scenario`` is not valid JSON or fails validation; the message is
-        the one ``ScenarioSpec.validate()`` raises.
+        If scenario JSON cannot be decoded into the canonical shape.
+    TypeError
+        If the input is neither a ScenarioSpec nor a string.
 
     Examples
     --------
     >>> from finstack_quant.scenarios import validate_scenario_spec
-    >>> spec = '{"id":"s","name":"S","operations":[]}'
-    >>> validate_scenario_spec(spec) is None
-    True
+    >>> validate_scenario_spec('{"id":"","operations":[]}').valid
+    False
     """
     ...
 
@@ -268,7 +271,7 @@ def parallel_bp_many(
     curve_ids : list[str]
         Identifiers in execution order; an empty list produces no operations.
     bp : float
-        Additive basis points, or percent of forward for commodity curves.
+        Additive rate basis points.
     discount_curve_id : str | None, default None
         Optional ParCDS discount curve copied onto each operation.
 
@@ -280,7 +283,7 @@ def parallel_bp_many(
     Raises
     ------
     ValueError
-        If the curve family label is unknown.
+        If the curve family is unsupported, bp is non-finite, or an identifier is invalid.
     TypeError
         If identifiers are not strings or bp is not numeric.
 

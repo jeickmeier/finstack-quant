@@ -159,7 +159,15 @@ def test_index_payer_front_end_protection_and_convertible_limit(tracks: ModuleTy
     assert nonko > ko > 0
     payload = tracks.convertible_limit()
     tree = price_instrument(json.dumps(payload), market, tracks.AS_OF, model="tree").value.amount
-    analytical = 1000 * math.exp(-0.04) + 10 * bs_price(100, 100, 0.04, 0.0, 0.25, 1.0, True)
+    analytical = 1000 * math.exp(-0.04) + 10 * bs_price({
+        "spot": 100,
+        "strike": 100,
+        "rate": 0.04,
+        "dividend_yield": 0.0,
+        "volatility": 0.25,
+        "time_to_expiry": 1.0,
+        "option_type": "call",
+    })
     assert tree >= 1000 * math.exp(-0.04)
     assert tree == pytest.approx(analytical, abs=0.20)
 

@@ -326,7 +326,7 @@ impl PyCreditDefaultSwapBuilder {
         py: Python<'py>,
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let spec = crate::bindings::module_utils::py_to_serde(py, value, "margin_spec")?;
+        let spec = crate::bindings::margin::types::extract_otc_margin_spec(py, value)?;
         let shown = value.repr()?.to_string();
         builder_set!(slf, margin_spec, shown, |b: CreditDefaultSwapBuilder| b
             .margin_spec(spec))

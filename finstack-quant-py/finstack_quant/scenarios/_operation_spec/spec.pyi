@@ -16,9 +16,7 @@ class OperationSpec:
     constructor name:
 
     - ``*_pct`` fields are percentage points (``5.0`` = +5%).
-    - ``*_bp`` fields are additive basis points (1 bp = 1e-4) — except on
-      ``CurveKind.commodity()`` curves, where ``bp`` is **percent of the
-      forward** (a commodity price curve has no rate to shift).
+    - ``*_bp`` fields are additive rate basis points (1 bp = 1e-4).
     - Vol-index ``*_pts`` are index points (``1.0`` on 18.5 → 19.5).
     - Correlation and base-correlation ``*_pts`` are **decimal correlation**
       (``0.02`` = +0.02, not percentage points).
@@ -144,14 +142,12 @@ class OperationSpec:
         ----------
         curve_kind : CurveKind | str
             Curve family: ``"discount"``, ``"forward"``, ``"par_cds"``,
-            ``"inflation"`` or ``"commodity"``.
+            or ``"inflation"``.
         curve_id : str
             Identifier of the one curve to shock, as registered in the
             market context (for example ``"USD-OIS"``).
         bp : float
-            Additive shift in basis points applied to every node; for
-            ``CurveKind.commodity()`` the value is **percent of the
-            forward** rather than basis points.
+            Additive rate shift in basis points applied to every node.
         discount_curve_id : str, optional
             Discount curve used when re-bootstrapping shocked ParCDS
             quotes. ``None`` (the default) leaves the curve's own
@@ -195,8 +191,7 @@ class OperationSpec:
         curve_id : str
             Curve identifier in ``MarketContext``.
         nodes : list[tuple[str, float]]
-            List of ``(tenor, bp)`` pairs (percent of forward for commodity
-            curves).
+            List of tenor and additive rate-basis-point pairs.
         match_mode : TenorMatchMode | str, optional
             Tenor alignment strategy (``"exact"`` or ``"interpolate"``).
             Defaults to ``"interpolate"`` (key-rate bump at the requested
@@ -219,6 +214,74 @@ class OperationSpec:
         >>> from finstack_quant.scenarios import CurveKind, OperationSpec
         >>> OperationSpec.curve_node_bp(CurveKind.discount(), "USD-OIS", [("5Y", 10.0)]).kind
         'curve_node_bp'
+        """
+        ...
+
+    @classmethod
+    def commodity_curve_parallel_pct(cls, curve_id: str, pct: float) -> OperationSpec:
+        """
+        Shift all commodity forward prices by a relative percentage.
+
+        Parameters
+        ----------
+        curve_id : str
+            Commodity price-curve identifier.
+        pct : float
+            Relative percentage price change (5.0 is a five percent rise).
+
+        Returns
+        -------
+        OperationSpec
+            The ``commodity_curve_parallel_pct`` operation.
+
+        Notes
+        -----
+        This factory constructs a spec object and does not raise; validation occurs when the spec is applied.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> OperationSpec.commodity_curve_parallel_pct("WTI", 2.0).kind
+        'commodity_curve_parallel_pct'
+        """
+        ...
+
+    @classmethod
+    def commodity_curve_node_pct(
+        cls,
+        curve_id: str,
+        nodes: list[tuple[str, float]],
+        match_mode: TenorMatchMode | str | None = None,
+    ) -> OperationSpec:
+        """
+        Shift commodity curve prices by relative percentages at selected tenors.
+
+        Parameters
+        ----------
+        curve_id : str
+            Commodity price-curve identifier.
+        nodes : list[tuple[str, float]]
+            List of ``(tenor, pct)`` pairs.
+        match_mode : TenorMatchMode | str, optional
+            Tenor alignment strategy (``"exact"`` or ``"interpolate"``).
+            Defaults to ``"interpolate"`` (key-rate bump at the requested
+            tenor); ``"exact"`` requires a matching pillar.
+
+        Returns
+        -------
+        OperationSpec
+            The ``commodity_curve_node_pct`` operation.
+
+        Raises
+        ------
+        ValueError
+            If ``match_mode`` is not an accepted label.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> OperationSpec.commodity_curve_node_pct("WTI", [("1M", 2.0)]).kind
+        'commodity_curve_node_pct'
         """
         ...
 
@@ -670,8 +733,7 @@ class OperationSpec:
         discount_curve_id: str | None = None,
     ) -> OperationSpec:
         """
-        Hierarchy-targeted parallel curve shift (basis points; percent of
-        forward for commodity curves).
+        Hierarchy-targeted parallel rate shift in basis points.
 
         Parameters
         ----------
@@ -702,6 +764,36 @@ class OperationSpec:
         >>> from finstack_quant.scenarios import CurveKind, HierarchyTarget, OperationSpec
         >>> OperationSpec.hierarchy_curve_parallel_bp(CurveKind.discount(), HierarchyTarget(["Credit"]), 10.0).kind
         'hierarchy_curve_parallel_bp'
+        """
+        ...
+
+    @classmethod
+    def hierarchy_commodity_curve_parallel_pct(cls, target: HierarchyTarget | str, pct: float) -> OperationSpec:
+        """
+        Hierarchy-targeted commodity price-curve percent shift.
+
+        Parameters
+        ----------
+        target : HierarchyTarget | str
+            Typed target or its JSON string.
+        pct : float
+            Relative percentage price change for each matched commodity forward curve.
+
+        Returns
+        -------
+        OperationSpec
+            The ``hierarchy_commodity_curve_parallel_pct`` operation.
+
+        Raises
+        ------
+        ValueError
+            If ``target`` is not valid JSON for a ``HierarchyTarget``.
+
+        Examples
+        --------
+        >>> from finstack_quant.scenarios import OperationSpec
+        >>> OperationSpec.hierarchy_commodity_curve_parallel_pct('{"path":["Equity"]}', 10.0).kind
+        'hierarchy_commodity_curve_parallel_pct'
         """
         ...
 

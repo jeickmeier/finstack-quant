@@ -27,6 +27,7 @@ use finstack_quant_valuations_core::impl_instrument_base;
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields, remote = "Self")]
+#[builder(validate = FxSwap::validate)]
 pub struct FxSwap {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -136,6 +137,27 @@ pub struct FxSwapTradeDateParams {
 }
 
 impl FxSwap {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> FxSwapBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .base_currency(self.base_currency)
+            .quote_currency(self.quote_currency)
+            .near_date(self.near_date)
+            .far_date(self.far_date)
+            .notional(self.notional)
+            .domestic_discount_curve_id(self.domestic_discount_curve_id.clone())
+            .foreign_discount_curve_id(self.foreign_discount_curve_id.clone())
+            .near_rate_opt(self.near_rate)
+            .far_rate_opt(self.far_rate)
+            .base_calendar_id_opt(self.base_calendar_id.clone())
+            .quote_calendar_id_opt(self.quote_calendar_id.clone())
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Validate FX swap economics at construction boundaries.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         finstack_quant_core::validation::validate_distinct_currencies(

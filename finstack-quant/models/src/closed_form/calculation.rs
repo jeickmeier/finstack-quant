@@ -182,15 +182,15 @@ fn price_at(model: &OptionModel, vol: f64) -> Result<f64> {
             expiry,
             is_call,
             ..
-        } => bs_price(
+        } => bs_price(&crate::types::OptionMarketParams {
             spot,
             strike,
             rate,
-            div_yield,
-            vol,
-            expiry,
-            OptionType::from(is_call),
-        ),
+            dividend_yield: div_yield,
+            volatility: vol,
+            time_to_expiry: expiry,
+            option_type: OptionType::from(is_call),
+        }),
         OptionModel::Black76 {
             forward,
             strike,
@@ -315,7 +315,15 @@ mod tests {
         let put = OptionType::Put;
         assert_eq!(
             result.price,
-            bs_price(100.0, 105.0, 0.03, 0.01, 0.25, 0.75, put)?
+            bs_price(&crate::types::OptionMarketParams {
+                spot: 100.0,
+                strike: 105.0,
+                rate: 0.03,
+                dividend_yield: 0.01,
+                volatility: 0.25,
+                time_to_expiry: 0.75,
+                option_type: put
+            })?
         );
         assert_eq!(result.implied_vol, 0.25);
         assert_eq!(

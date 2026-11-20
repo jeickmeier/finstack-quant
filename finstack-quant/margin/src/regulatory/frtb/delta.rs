@@ -66,12 +66,11 @@ pub fn delta_charge(
 /// yield-curve tenors, inflation and cross-currency basis. Modelling
 /// them with a single `f64` tenor axis (and sentinel values for the
 /// special factors) is fragile; the tag makes the discriminator explicit
-/// inside the aggregation routine without altering the public
-/// [`FrtbSensitivities`] map shapes.
+/// inside the currency aggregation routine.
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum GirrFactor {
+enum GirrFactor<'a> {
     /// A specific yield-curve tenor, expressed in years.
-    Tenor(f64),
+    Tenor(f64, &'a finstack_quant_core::types::CurveId),
     /// The currency's inflation risk factor.
     Inflation,
     /// The currency's cross-currency basis risk factor.
@@ -87,15 +86,15 @@ fn girr_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
     }
 
     // Group by currency (bucket = currency for GIRR).
-    let mut by_currency: FxHashMap<_, Vec<(f64, GirrFactor)>> = FxHashMap::default();
-    for ((ccy, tenor), delta) in &sens.girr_delta {
+    let mut by_currency: FxHashMap<_, Vec<(f64, GirrFactor<'_>)>> = FxHashMap::default();
+    for ((ccy, curve_id, tenor), delta) in &sens.girr_delta {
         let rw = girr_risk_weight(tenor);
         let ws = delta * rw;
         let tenor_years = girr::tenor_to_years(tenor).unwrap_or(f64::NAN);
         by_currency
             .entry(*ccy)
             .or_default()
-            .push((ws, GirrFactor::Tenor(tenor_years)));
+            .push((ws, GirrFactor::Tenor(tenor_years, curve_id)));
     }
 
     for (ccy, delta) in &sens.girr_inflation_delta {
@@ -130,8 +129,8 @@ fn girr_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
 
 /// Intra-GIRR correlation between two risk factors (MAR21.46-21.49).
 fn intra_girr_correlation(
-    fac_i: GirrFactor,
-    fac_j: GirrFactor,
+    fac_i: GirrFactor<'_>,
+    fac_j: GirrFactor<'_>,
     scenario: CorrelationScenario,
 ) -> f64 {
     use GirrFactor::{Inflation, Tenor, XccyBasis};
@@ -139,10 +138,17 @@ fn intra_girr_correlation(
     // regulatory text even where values coincide.
     #[allow(clippy::match_same_arms)]
     let base_rho = match (fac_i, fac_j) {
-        (Tenor(t_i), Tenor(t_j)) => girr::girr_tenor_correlation(t_i, t_j),
+        (Tenor(t_i, curve_i), Tenor(t_j, curve_j)) => {
+            let tenor_correlation = girr::girr_tenor_correlation(t_i, t_j);
+            if curve_i == curve_j {
+                tenor_correlation
+            } else {
+                tenor_correlation * 0.999
+            }
+        }
         (Inflation, Inflation) | (XccyBasis, XccyBasis) => 1.0,
-        (Inflation, Tenor(_)) | (Tenor(_), Inflation) => girr::GIRR_INFLATION_CORRELATION,
-        (XccyBasis, Tenor(_)) | (Tenor(_), XccyBasis) => girr::GIRR_XCCY_BASIS_CORRELATION,
+        (Inflation, Tenor(..)) | (Tenor(..), Inflation) => girr::GIRR_INFLATION_CORRELATION,
+        (XccyBasis, Tenor(..)) | (Tenor(..), XccyBasis) => girr::GIRR_XCCY_BASIS_CORRELATION,
         (Inflation, XccyBasis) | (XccyBasis, Inflation) => girr::GIRR_XCCY_BASIS_CORRELATION,
     };
     scenario.scale_correlation(base_rho)

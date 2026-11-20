@@ -104,7 +104,7 @@ impl Check for WorkingCapitalConsistency {
 
             if diff.abs() > tolerance {
                 let reference = expected_wc_change.abs().max(1.0);
-                let relative = (diff / reference).abs() * 100.0;
+                let relative = (diff / reference).abs();
                 if !relative.is_finite() {
                     return Err(Error::eval(format!(
                         "Working-capital relative difference is not finite in {curr_pid}"
@@ -125,7 +125,7 @@ impl Check for WorkingCapitalConsistency {
                     period: Some(*curr_pid),
                     materiality: Some(Materiality {
                         absolute: diff.abs(),
-                        relative_pct: Some(relative),
+                        relative: Some(relative),
                         reference_value: expected_wc_change,
                         reference_label: "expected_wc_change".to_string(),
                     }),

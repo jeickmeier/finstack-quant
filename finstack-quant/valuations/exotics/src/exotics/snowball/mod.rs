@@ -20,4 +20,4 @@ pub(crate) mod pricer;
 pub(crate) mod types;
 
 pub use pricer::{SnowballDiscountingPricer, SnowballHw1fMcPricer};
-pub use types::{Snowball, SnowballVariant};
+pub use types::{Snowball, SnowballBuilder, SnowballVariant};

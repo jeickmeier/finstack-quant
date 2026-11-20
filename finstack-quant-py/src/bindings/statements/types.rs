@@ -988,6 +988,35 @@ impl PyFinancialModelSpec {
 
 #[pymethods]
 impl PyFinancialModelSpec {
+    #[doc = pydoc!("finstack_quant.statements._types", "FinancialModelSpec.to_builder")]
+    fn to_builder(&self) -> PyResult<super::builder::PyModelBuilder> {
+        self.inner
+            .to_builder()
+            .map(super::builder::PyModelBuilder::from_inner)
+            .map_err(statements_to_py)
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._types", "FinancialModelSpec.with_meta")]
+    fn with_meta(&self, key: &str, value: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let value = crate::bindings::module_utils::py_to_serde(value.py(), value, "value")?;
+        Ok(Self::from_inner(self.inner.with_meta(key, value)))
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._types", "FinancialModelSpec.with_currency")]
+    fn with_currency(&self, currency: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let currency = crate::bindings::core::currency::extract_currency(currency)?;
+        Ok(Self::from_inner(self.inner.with_currency(currency)))
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._types", "FinancialModelSpec.with_reporting_currency")]
+    fn with_reporting_currency(&self, currency: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let currency = crate::bindings::core::currency::extract_currency(currency)?;
+        self.inner
+            .with_reporting_currency(currency)
+            .map(Self::from_inner)
+            .map_err(statements_to_py)
+    }
+
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
     ///
     /// Reconstruction goes through the same strict serde round-trip as

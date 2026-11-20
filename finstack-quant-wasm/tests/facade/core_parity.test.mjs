@@ -60,6 +60,15 @@ const price = () =>
     interp: 'linear',
     extrapolation: 'flat',
   });
+test('price curve percent bumps preserve pillars and the source curve', () => {
+  const curve = price();
+  const bumped = curve.bumpParallelPct(-2.5);
+  assert.deepEqual(Array.from(bumped.knots), Array.from(curve.knots));
+  assert.ok(Math.abs(bumped.price(0) - 70.2) < 1e-12);
+  assert.equal(curve.price(0), 72.0);
+  assert.throws(() => curve.bumpParallelPct(Number.NaN), /finite/);
+});
+
 const baseCorrelation = () => new core.BaseCorrelationCurve('CDX-IG', [3.0, 0.25, 7.0, 0.45]);
 const surface = () =>
   new core.VolSurface(
@@ -879,6 +888,66 @@ test('MarketContext keeps volatility registries namespace-local, rejects cross-f
   assert.throws(() => context.condition('not-a-date'), kind('validation', /.+/));
 });
 
+test('FinstackConfig derives scale policies and merges native JSON patches', () => {
+  const source = new core.FinstackConfig();
+  const rounded = source.withRoundingMode('bankers');
+  const output = rounded.withOutputScale('JPY', 2);
+  const configured = output.withIngestScale('JPY', 3);
+  const key = 'core.example.v1';
+  try {
+    assert.equal(source.outputScale('JPY'), 0);
+    assert.equal(output.ingestScale('JPY'), undefined);
+    assert.equal(configured.ingestScale('JPY'), 3);
+    assert.equal(configured.outputScale('JPY'), 2);
+    configured.setExtension(key, { opts: { keep: 1, drop: 2 }, list: [1] });
+    configured.patchExtension(key, { opts: { drop: null, add: 'null' }, list: [2] });
+    assert.deepEqual(configured.getExtension(key), { opts: { keep: 1, add: 'null' }, list: [2] });
+    assert.throws(() => configured.patchExtension(key, { invalid: Infinity }));
+    assert.deepEqual(configured.getExtension(key), { opts: { keep: 1, add: 'null' }, list: [2] });
+  } finally {
+    configured.free();
+    output.free();
+    rounded.free();
+    source.free();
+  }
+});
+
+test('dated price curves preserve signed knots and year fractions', () => {
+  const points = [
+    ['2024-01-01', -25],
+    ['2025-01-01', 10],
+  ];
+  const curve = core.PriceCurve.fromDates(
+    'WTI',
+    '2024-01-01',
+    points,
+    'price',
+    'act_365f',
+    'linear',
+    'flat'
+  );
+  try {
+    assert.equal(curve.price('2024-01-01'), -25);
+    assert.equal(curve.price('2025-01-01'), 10);
+    assert.equal(curve.price(366 / 365), 10);
+    assert.throws(
+      () =>
+        core.PriceCurve.fromDates(
+          'WTI',
+          '2024-01-02',
+          points,
+          'price',
+          'act_365f',
+          'linear',
+          'flat'
+        ),
+      /precedes base date/
+    );
+  } finally {
+    curve.free();
+  }
+});
+
 test('FinstackConfig extensions hold JSON values, not JSON text', () => {
   const cfg = new core.FinstackConfig(null, { generic_epsilon: 1e-9 });
   assert.deepEqual(cfg.tolerances, { generic_epsilon: 1e-9 });
@@ -952,4 +1021,56 @@ test('hazard market restoration rejects a 10Y risk quote attached to the 5Y sour
   risk.quote.pillar.date = risk.pillar_date = '2035-01-01';
   risk.pillar_time = 10;
   assert.throws(() => core.MarketContext.fromJson(JSON.stringify(state)));
+});
+
+test('expected shortfall weights the fractional boundary and leaves its sample unchanged', () => {
+  const data = new Float64Array([1.0, -4.0, -1.0, 2.0]);
+  assert.equal(core.expectedShortfall(data, 0.625), -3.0);
+  assert.deepEqual(Array.from(data), [1.0, -4.0, -1.0, 2.0]);
+  assert.throws(() => core.expectedShortfall([], 0.625), /nonempty/);
+  assert.throws(() => core.expectedShortfall(data, 1.0), /confidence/);
+});
+
+test('OLS fits a non-square predictor panel in observation order', () => {
+  const { coefficients, intercept, residuals } = core.ols(
+    [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 1],
+    ],
+    [5, 7, 2, 4]
+  );
+  assert.ok(Math.abs(coefficients[0] - 2) < 1e-12);
+  assert.ok(Math.abs(coefficients[1] + 3) < 1e-12);
+  assert.ok(Math.abs(intercept - 5) < 1e-12);
+  assert.ok(residuals.every((value) => Math.abs(value) < 1e-12));
+  assert.throws(() => core.ols([[1], [2, 3], [4]], [1, 2, 3]), /rectangular/);
+});
+
+test('dated hazard and inflation curves preserve distinct origins and quote units', () => {
+  const origin = '2024-01-01';
+  const pillar = '2025-01-01';
+  const hazard = core.HazardCurve.fromDates('ABC', origin, [[pillar, 0.02]], 'act_365f', 0.4);
+  const inflation = core.InflationCurve.fromDates(
+    'CPI',
+    origin,
+    [
+      [origin, 300],
+      [pillar, 306],
+    ],
+    'act_365f',
+    'log_linear',
+    'flat'
+  );
+  try {
+    assert.ok(Math.abs(hazard.sp(pillar) - Math.exp((-0.02 * 366) / 365)) < 1e-14);
+    assert.ok(Math.abs(inflation.cpi(pillar) - 306) < 1e-12);
+    assert.throws(() =>
+      core.HazardCurve.fromDates('ABC', origin, [[origin, 0.02]], 'act_365f', 0.4)
+    );
+  } finally {
+    hazard.free();
+    inflation.free();
+  }
 });

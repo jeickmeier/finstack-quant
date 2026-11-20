@@ -60,23 +60,34 @@ pub fn package_schema(schema: &mut Value) -> Result<()> {
 use crate::{
     analysis::BridgeChart, analysis::CapexReconciliation, analysis::CapitalStructureSummary,
     analysis::CapitalStructureSummaryConfig, analysis::CeclConfig, analysis::CeclResult,
-    analysis::CorporateAnalysis, analysis::CorporateAnalysisOptions, analysis::CoverageFloorCheck,
-    analysis::CreditAssessment, analysis::DcfInputs, analysis::DcfOptions,
-    analysis::DcfSensitivityResult, analysis::DependencyTree, analysis::DepreciationReconciliation,
-    analysis::DividendReconciliation, analysis::EclConfig, analysis::EffectiveTaxRateCheck,
+    analysis::CorporateAnalysis, analysis::CorporateAnalysisOptions, analysis::CorporateDcfRequest,
+    analysis::CoverageFloorCheck, analysis::CreditAssessment, analysis::CreditContextReport,
+    analysis::CreditContextSpec, analysis::CreditScoringModel, analysis::DatedLboRequest,
+    analysis::DatedLboResult, analysis::DcfDistributionResult, analysis::DcfInputs,
+    analysis::DcfOptions, analysis::DcfProjection, analysis::DcfSensitivityGridResult,
+    analysis::DcfSensitivityGridSpec, analysis::DcfSensitivityResult,
+    analysis::DcfSensitivityShocks, analysis::DcfShockReport, analysis::DependencyTree,
+    analysis::DepreciationReconciliation, analysis::DividendReconciliation, analysis::EclConfig,
+    analysis::EclScenario, analysis::EclScenarioOutcome, analysis::EffectiveTaxRateCheck,
     analysis::Explanation, analysis::Exposure, analysis::FcfSignCheck, analysis::ForecastMetrics,
     analysis::GoalSeekResult, analysis::GoalSeekSpec, analysis::GrowthRateConsistency,
-    analysis::InterestExpenseReconciliation, analysis::LboConfig, analysis::LboResult,
-    analysis::LeverageRangeCheck, analysis::LiquidityRunwayCheck, analysis::PeerFilter,
-    analysis::PeerSet, analysis::PeerStats, analysis::RatingPdMap, analysis::RegressionResult,
+    analysis::ImpairedEclResult, analysis::ImpairedEclScenario, analysis::ImpairedExposure,
+    analysis::InterestExpenseReconciliation, analysis::LboConfig, analysis::LboDebtFunding,
+    analysis::LboEarnings, analysis::LboExitBridge, analysis::LboFunding,
+    analysis::LboFundingResult, analysis::LboResult, analysis::LeverageRangeCheck,
+    analysis::LiquidityRunwayCheck, analysis::PeerFilter, analysis::PeerSet, analysis::PeerStats,
+    analysis::RatingPdMap, analysis::RecoveryEvidence, analysis::RegressionResult,
     analysis::RelativeValueReport, analysis::RelativeValueReportConfig,
     analysis::RelativeValueResult, analysis::ScenarioDiff, analysis::ScenarioResults,
     analysis::ScenarioSet, analysis::ScoringDimension, analysis::SensitivityResult,
-    analysis::StageResult, analysis::TrendCheck, analysis::VarianceConfig, analysis::WaccInputs,
-    analysis::WeightedEclResult, analysis::WorkingCapitalConsistency, extensions::CorkscrewConfig,
-    extensions::CorkscrewReport, extensions::ScorecardConfig, extensions::ScorecardReport,
-    templates::real_estate::LeaseSpec, templates::real_estate::ManagementFeeSpec,
-    templates::real_estate::PropertyTemplateNodes,
+    analysis::StageResult, analysis::StatementCovenantAssessment,
+    analysis::StatementCovenantForecast, analysis::StatementCovenantSpec,
+    analysis::StatementScoringMapping, analysis::StatementValuationCut,
+    analysis::TerminalFcffBasis, analysis::TrendCheck, analysis::VarianceConfig,
+    analysis::WaccInputs, analysis::WeightedEclResult, analysis::WeightedImpairedEclResult,
+    analysis::WorkingCapitalConsistency, extensions::CorkscrewConfig, extensions::CorkscrewReport,
+    extensions::ScorecardConfig, extensions::ScorecardReport, templates::real_estate::LeaseSpec,
+    templates::real_estate::ManagementFeeSpec, templates::real_estate::PropertyTemplateNodes,
 };
 
 /// The crate's complete schema registry.
@@ -170,11 +181,171 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(
+        CreditContextSpec,
+        "statements_analytics",
+        "credit_context_spec",
+        Input,
+        "Explicit same-run borrowing, ratio selections and reference valuations."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        CreditContextReport,
+        "statements_analytics",
+        "credit_context_report",
+        Output,
+        "Borrower credit observations and available minima on selected periods."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        CreditScoringModel,
+        "statements_analytics",
+        "credit_scoring_model",
+        Input,
+        "Elected statistical credit model and any matching market-equity observation."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        StatementScoringMapping,
+        "statements_analytics",
+        "statement_scoring_mapping",
+        Input,
+        "Annual monetary statement sources for a canonical credit score."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
         CreditAssessment,
         "statements_analytics",
         "credit_assessment",
         Component,
         "Structured credit assessment: leverage, interest coverage, and free cash flow at a `period` plus a per-period series for trend display."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        CorporateDcfRequest,
+        "statements_analytics",
+        "corporate_dcf_request",
+        Input,
+        "Named cash-flow and terminal assumptions on an explicit statement valuation cut."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        StatementValuationCut,
+        "statements_analytics",
+        "statement_valuation_cut",
+        Component,
+        "Effective valuation and information dates and a reporting currency."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        DcfProjection,
+        "statements_analytics",
+        "dcf_projection",
+        Input,
+        "Authored terminal horizon, cash-flow basis and optional forward remainder."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        TerminalFcffBasis,
+        "statements_analytics",
+        "terminal_fcff_basis",
+        Component,
+        "Explicit annual cash flow or the complete additive trailing forecast."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        DcfShockReport,
+        "statements_analytics",
+        "dcf_shock_report",
+        Output,
+        "Ranked DCF sensitivity pairs preserving unavailable endpoints."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        DcfSensitivityShocks,
+        "statements_analytics",
+        "dcf_sensitivity_shocks",
+        Input,
+        "Independent WACC and terminal value assumption shocks."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        DcfSensitivityGridSpec,
+        "statements_analytics",
+        "dcf_sensitivity_grid_spec",
+        Input,
+        "Ordered WACC and terminal parameter axes."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        DcfSensitivityGridResult,
+        "statements_analytics",
+        "dcf_sensitivity_grid_result",
+        Output,
+        "Rectangular enterprise-value results and unavailable endpoints."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        DcfDistributionResult,
+        "statements_analytics",
+        "dcf_distribution_result",
+        Output,
+        "Coherent repriced Monte Carlo enterprise and equity values by path and quantile."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        DatedLboRequest,
+        "statements_analytics",
+        "dated_lbo_request",
+        Input,
+        "Acquisition and exit dates, recognized funding and projected exit assumptions."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        DatedLboResult,
+        "statements_analytics",
+        "dated_lbo_result",
+        Output,
+        "Reconciled sources and uses and qualified sponsor returns."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        LboEarnings,
+        "statements_analytics",
+        "lbo_earnings",
+        Component,
+        "Matched earnings basis and purchase or exit multiple."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        LboDebtFunding,
+        "statements_analytics",
+        "lbo_debt_funding",
+        Component,
+        "Actual closing proceeds and contractual opening face."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        LboFunding,
+        "statements_analytics",
+        "lbo_funding",
+        Component,
+        "Dated closing cash sources and uses."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        LboFundingResult,
+        "statements_analytics",
+        "lbo_funding_result",
+        Component,
+        "Reconciled funding gap and identified debt proportions."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        LboExitBridge,
+        "statements_analytics",
+        "lbo_exit_bridge",
+        Component,
+        "Signed exit equity and available sized and funded returns."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(
@@ -303,6 +474,70 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "interest_expense_reconciliation",
         Component,
         "Reconciles interest expense against debt balances or the capital-structure interest schedule."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        StatementCovenantForecast,
+        "statements_analytics",
+        "statement_covenant_forecast",
+        Output,
+        "Qualified forecast, breach evidence and per-period coverage."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        StatementCovenantAssessment,
+        "statements_analytics",
+        "statement_covenant_assessment",
+        Output,
+        "Effective covenant terms and available evidence by dated period."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        StatementCovenantSpec,
+        "statements_analytics",
+        "statement_covenant_spec",
+        Input,
+        "Named covenants, result periods, publication cutoff and units."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        ImpairedEclResult,
+        "statements_analytics",
+        "impaired_ecl_result",
+        Output,
+        "Signed recovery shortfall and nonnegative credit-impaired allowance."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        RecoveryEvidence,
+        "statements_analytics",
+        "recovery_evidence",
+        Input,
+        "Sourced expected recovery and dated receipt."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        ImpairedExposure,
+        "statements_analytics",
+        "impaired_exposure",
+        Input,
+        "Sourced carrying exposure, qualified report date, original effective rate and clock."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        WeightedImpairedEclResult,
+        "statements_analytics",
+        "weighted_impaired_ecl_result",
+        Output,
+        "Weighted impairment and dated recovery scenario contributions."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        ImpairedEclScenario,
+        "statements_analytics",
+        "impaired_ecl_scenario",
+        Input,
+        "Exact scenario probability and its scoped dated expected recovery."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(
@@ -511,6 +746,22 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "wacc_inputs",
         Input,
         "Capital-structure inputs of a weighted-average cost of capital calculation."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        EclScenario,
+        "statements_analytics",
+        "ecl_scenario",
+        Input,
+        "Named cumulative-PD and LGD assumptions with an exact scenario probability."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        EclScenarioOutcome,
+        "statements_analytics",
+        "ecl_scenario_outcome",
+        Output,
+        "A scenario weight and its measured or unavailable allowance."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(

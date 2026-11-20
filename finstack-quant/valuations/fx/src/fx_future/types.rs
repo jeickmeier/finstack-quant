@@ -35,6 +35,7 @@ use finstack_quant_valuations_core::instruments::ListedFutureTerms;
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
+#[builder(validate = FxFuture::validate)]
 pub struct FxFuture {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -81,6 +82,21 @@ pub struct FxFuture {
 }
 
 impl FxFuture {
+    /// Seed an independent builder with the complete listed contract.
+    pub fn to_builder(&self) -> FxFutureBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .terms(self.terms.clone())
+            .base_currency(self.base_currency)
+            .domestic_discount_curve_id(self.domestic_discount_curve_id.clone())
+            .foreign_discount_curve_id(self.foreign_discount_curve_id.clone())
+            .quoted_spot_opt(self.quoted_spot)
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+            .attributes(self.attributes.clone())
+    }
+
     /// Validate currency, price, and position invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         self.terms.validate()?;

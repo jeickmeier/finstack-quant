@@ -229,7 +229,7 @@ class FactorBrinsonResult:
         ...
 
 def factor_brinson_attribution(
-    input_json: str | dict[str, Any] | list[Any] | pd.DataFrame, factor_returns: list[float]
+    input: str | dict[str, Any] | list[Any] | pd.DataFrame, factor_returns: list[float]
 ) -> FactorBrinsonResult:
     """
     Compute Jeet-Partani (2023) factor-Brinson unified attribution.
@@ -242,7 +242,7 @@ def factor_brinson_attribution(
 
     Parameters
     ----------
-    input_json : str | dict | list | pandas.DataFrame
+    input : str | dict | list | pandas.DataFrame
         JSON ``FactorBrinsonInput`` with ``asset_ids``, ``asset_returns``,
         ``exposures`` (row-major ``n_assets x n_factors``), ``factor_names``,
         ``portfolio_weights`` and ``benchmark_weights``. Each weight vector
@@ -273,7 +273,7 @@ def factor_brinson_attribution(
         error directs callers to
         :func:`finstack_quant.analytics.constrained_least_squares`.
     ValueError
-        If ``input_json`` is malformed or carries unknown fields.
+        If ``input`` is malformed or carries unknown fields.
 
     Sources
     -------

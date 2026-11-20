@@ -2,14 +2,82 @@ use numpy::{PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use finstack_quant_factor::risk as model_risk;
+use finstack_quant_factor::{RiskMeasure, risk as model_risk};
 
-use crate::errors::{core_to_py, display_to_py, value_error};
+use crate::bindings::pydoc::pydoc;
+use crate::errors::{core_to_py, value_error};
 
+use super::super::credit::PyFactorCovarianceMatrix;
 use super::contributions::{PyPositionRiskDecomposition, PyRiskDecomposition};
 use crate::bindings::matrix_input::{PositionPnlMatrix, extract_position_pnls};
 use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::portfolio::sensitivity::PySensitivityMatrix;
+
+#[doc = pydoc!("finstack_quant.models.factor.risk._functions", "RiskMeasure")]
+#[pyclass(
+    name = "RiskMeasure",
+    module = "finstack_quant.models.factor.risk",
+    frozen,
+    skip_from_py_object
+)]
+pub(in crate::bindings::models::factor) struct PyRiskMeasure {
+    inner: RiskMeasure,
+}
+
+#[pymethods]
+impl PyRiskMeasure {
+    #[doc = pydoc!("finstack_quant.models.factor.risk._functions", "RiskMeasure.variance")]
+    #[staticmethod]
+    fn variance() -> Self {
+        Self {
+            inner: RiskMeasure::Variance,
+        }
+    }
+
+    #[doc = pydoc!("finstack_quant.models.factor.risk._functions", "RiskMeasure.volatility")]
+    #[staticmethod]
+    fn volatility() -> Self {
+        Self {
+            inner: RiskMeasure::Volatility,
+        }
+    }
+
+    #[doc = pydoc!("finstack_quant.models.factor.risk._functions", "RiskMeasure.var")]
+    #[staticmethod]
+    fn var(confidence: f64) -> PyResult<Self> {
+        RiskMeasure::var(confidence)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
+    }
+
+    #[doc = pydoc!("finstack_quant.models.factor.risk._functions", "RiskMeasure.expected_shortfall")]
+    #[staticmethod]
+    fn expected_shortfall(confidence: f64) -> PyResult<Self> {
+        RiskMeasure::expected_shortfall(confidence)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
+    }
+}
+
+pub(in crate::bindings::models::factor) fn extract_risk_measure(
+    py: Python<'_>,
+    value: Option<&Bound<'_, PyAny>>,
+) -> PyResult<RiskMeasure> {
+    let Some(value) = value else {
+        return Ok(RiskMeasure::default());
+    };
+    match value.cast::<PyRiskMeasure>() {
+        Ok(typed) => Ok(typed.borrow().inner),
+        Err(_)
+            if value
+                .extract::<&str>()
+                .is_ok_and(|text| !matches!(text, "variance" | "volatility")) =>
+        {
+            crate::bindings::module_utils::spec_from_py(py, value, "risk_measure")
+        }
+        Err(_) => py_to_serde(py, value, "risk_measure"),
+    }
+}
 
 /// `True` when `obj` is a `pandas.DataFrame` (checked by module + type name so
 /// pandas is not imported when it is not already loaded).
@@ -110,10 +178,9 @@ pub(super) fn position_component_var(
 /// Args:
 ///     sensitivities: Weighted position x factor ``SensitivityMatrix``, as
 ///         returned by ``finstack_quant.portfolio.compute_factor_sensitivities``.
-///     covariance_json: ``FactorCovarianceMatrix`` as JSON text or a dict
-///         (``{"factor_ids", "n", "data"}``, ``data`` row-major). Must use the
+///     covariance: ``FactorCovarianceMatrix`` or its wire representation. Must use the
 ///         same factor IDs and ordering as the sensitivity matrix.
-///     risk_measure: ``RiskMeasure`` wire value: ``"variance"``,
+///     risk_measure: Typed ``RiskMeasure`` or its wire value: ``"variance"``,
 ///         ``"volatility"``, ``{"var": {"confidence": 0.99}}`` or
 ///         ``{"expected_shortfall": {"confidence": 0.975}}``. ``None`` uses
 ///         the Rust default (``"variance"``).
@@ -127,24 +194,21 @@ pub(super) fn position_component_var(
 ///         axes of the sensitivities and covariance disagree, or the
 ///         decomposition produces a non-finite value.
 #[pyfunction]
-#[pyo3(signature = (sensitivities, covariance_json, risk_measure=None))]
+#[pyo3(signature = (sensitivities, covariance, risk_measure=None))]
 pub(super) fn decompose_factors(
     py: Python<'_>,
     sensitivities: &PySensitivityMatrix,
-    covariance_json: &Bound<'_, PyAny>,
+    covariance: &Bound<'_, PyAny>,
     risk_measure: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyRiskDecomposition> {
-    let covariance_json =
-        crate::bindings::extract::extract_records_json(py, covariance_json, "covariance")?;
-    let measure: finstack_quant_factor::RiskMeasure = match risk_measure {
-        Some(obj) => py_to_serde(py, obj, "risk_measure")?,
-        None => finstack_quant_factor::RiskMeasure::default(),
+    let covariance = match covariance.cast::<PyFactorCovarianceMatrix>() {
+        Ok(matrix) => matrix.borrow().inner.clone(),
+        Err(_) => crate::bindings::module_utils::spec_from_py(py, covariance, "covariance")?,
     };
+    let measure = extract_risk_measure(py, risk_measure)?;
 
     let matrix = sensitivities.inner.clone();
     py.detach(move || {
-        let covariance: finstack_quant_factor::FactorCovarianceMatrix =
-            serde_json::from_str(&covariance_json).map_err(display_to_py)?;
         let result =
             model_risk::decompose_factors(&matrix, &covariance, &measure).map_err(core_to_py)?;
         Ok(PyRiskDecomposition::from_inner(result))

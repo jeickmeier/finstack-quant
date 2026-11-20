@@ -24,6 +24,7 @@ use finstack_quant_valuations_core::instruments::Monitoring;
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
+#[builder(validate = FxBarrierOption::validate)]
 pub struct FxBarrierOption {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -134,6 +135,34 @@ pub struct FxBarrierOption {
 
 // FxBarrierOption uses both domestic and foreign curves for FX carry calculation
 impl FxBarrierOption {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> FxBarrierOptionBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .strike(self.strike)
+            .barrier(self.barrier)
+            .rebate_opt(self.rebate)
+            .rebate_timing_opt(self.rebate_timing)
+            .option_type(self.option_type)
+            .barrier_type(self.barrier_type)
+            .expiry(self.expiry)
+            .monitoring_start_date_opt(self.monitoring_start_date)
+            .observed_barrier_breached_opt(self.observed_barrier_breached)
+            .notional(self.notional)
+            .base_currency(self.base_currency)
+            .quote_currency(self.quote_currency)
+            .day_count(self.day_count)
+            .monitoring(self.monitoring.clone())
+            .domestic_discount_curve_id(self.domestic_discount_curve_id.clone())
+            .foreign_discount_curve_id(self.foreign_discount_curve_id.clone())
+            .fx_spot_id_opt(self.fx_spot_id.clone())
+            .vol_surface_id(self.vol_surface_id.clone())
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Rebate per unit of base notional (quote currency per base unit), the
     /// scale the per-unit closed form and Monte Carlo payoff work in.
     pub(crate) fn rebate_per_unit(&self) -> Option<f64> {

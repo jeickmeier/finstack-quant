@@ -146,7 +146,7 @@ mod gbm_barrier {
             .expect("vol surface");
 
         // Degenerate Heston parameters. v0 = theta = VOL^2 pins the variance at
-        // the GBM variance; sigma_v ~ 0 removes vol-of-vol; rho = 0 removes the
+        // the GBM variance; vol_of_vol ~ 0 removes vol-of-vol; rho = 0 removes the
         // spot/variance correlation (and hence the QE variance-correction term).
         let variance = VOL * VOL;
         MarketContext::new()

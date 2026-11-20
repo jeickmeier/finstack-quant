@@ -6,6 +6,7 @@ accepted on one path what Rust rejects on another.
 
 from __future__ import annotations
 
+from decimal import Decimal
 import json
 import math
 import pickle
@@ -15,7 +16,43 @@ import pytest
 from finstack_quant import statements
 from finstack_quant.calibration import VolQuote
 from finstack_quant.models import liquidity, volatility
-from finstack_quant.statements_analytics import GoalSeekResult, TerminalValueSpec, evaluate_dcf
+from finstack_quant.portfolio import Portfolio
+from finstack_quant.statements_analytics import TerminalValueSpec, evaluate_dcf
+
+
+def test_metadata_keeps_json_like_strings_literal() -> None:
+    model = statements.ModelBuilder("metadata").periods("2025Q1..Q1", "2025Q1")
+    model.value("revenue", [("2025Q1", 100.0)])
+    book = Portfolio.builder("metadata", "USD", "2025-01-01")
+    metadata = {"ticker": "123", "description": '{"active":true}', "nested": {"value": "null"}}
+
+    for key, value in metadata.items():
+        model.with_meta(key, value)
+        book.meta(key, value)
+
+    with pytest.raises(ValueError, match="non-finite"):
+        model.with_meta("invalid", float("nan"))
+    with pytest.raises(ValueError, match="non-finite"):
+        book.meta("invalid", {"rate": float("inf")})
+
+    assert json.loads(model.build().to_json())["meta"] == metadata
+    assert book.build().meta == metadata
+
+
+def test_contractual_spreads_keep_fractional_basis_points() -> None:
+    from finstack_quant.cashflows.builder import FloatingRateSpec
+    from finstack_quant.core.types import Bps, Rate
+
+    spread = Decimal("25.125")
+    assert FloatingRateSpec.sofr(spread).spread_bp == spread
+    assert FloatingRateSpec.sofr("25.125").spread_bp == spread
+    assert FloatingRateSpec.sofr(Rate(0.0025125)).spread_bp == spread
+    assert FloatingRateSpec.sofr(Bps(25)).spread_bp == Decimal(25)
+    assert FloatingRateSpec.sofr(0).spread_bp == Decimal(0)
+    with pytest.raises(TypeError, match="bool"):
+        FloatingRateSpec.sofr(True)
+    with pytest.raises(ValueError, match="Non-finite value"):
+        FloatingRateSpec.sofr(float("inf"))
 
 
 def _dcf_model() -> statements.FinancialModelSpec:
@@ -24,13 +61,12 @@ def _dcf_model() -> statements.FinancialModelSpec:
     builder = statements.ModelBuilder("dcf")
     builder.periods("2025..2026")
     builder.value_money("ufcf", [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))])
-    builder.with_meta("currency", '"USD"')
+    builder.with_meta("currency", "USD")
     return builder.build()
 
 
-def test_exit_multiple_requires_terminal_metric_and_rejects_a_zero_placeholder() -> None:
-    with pytest.raises(TypeError):
-        TerminalValueSpec.exit_multiple(9.0)  # type: ignore[call-arg]
+def test_exit_multiple_requires_a_literal_metric_or_statement_metric_node() -> None:
+    assert "terminal_metric" not in json.loads(TerminalValueSpec.exit_multiple(9.0).to_json())
     priced = evaluate_dcf(
         _dcf_model(),
         {
@@ -40,16 +76,12 @@ def test_exit_multiple_requires_terminal_metric_and_rejects_a_zero_placeholder()
         },
     )
     assert priced.terminal_value_pv.amount > 0.0
-    # Without exit_multiple_metric_node a zero metric would price a zero terminal value.
-    with pytest.raises(ValueError, match="terminal_metric"):
-        evaluate_dcf(
-            _dcf_model(),
-            {
-                "wacc": 0.10,
-                "terminal_value": TerminalValueSpec.exit_multiple(9.0, 0.0),
-                "net_debt_override": 0.0,
-            },
-        )
+    for terminal in (TerminalValueSpec.exit_multiple(9.0), TerminalValueSpec.exit_multiple(9.0, 0.0)):
+        with pytest.raises(ValueError, match="terminal_metric"):
+            evaluate_dcf(
+                _dcf_model(),
+                {"wacc": 0.10, "terminal_value": terminal, "net_debt_override": 0.0},
+            )
 
 
 @pytest.mark.parametrize(
@@ -100,16 +132,9 @@ def test_arbitrage_grid_checks_default_to_the_rust_tolerance() -> None:
     # calendar-spread arbitrage that a 1e-6 tolerance would hide.
     rows = [[0.30, 0.25, 0.20, 0.25, 0.30], [0.29, 0.245, math.sqrt(0.02 - 5e-8), 0.245, 0.29]]
     forwards = [100.0, 100.0]
-    default = volatility.check_calendar_spread_grid(strikes, expiries, rows, forwards)
-    explicit = volatility.check_calendar_spread_grid(strikes, expiries, rows, forwards, tolerance=1e-10)
+    default = volatility.check_calendar_spread_grid(expiries, strikes, rows, forwards)
+    explicit = volatility.check_calendar_spread_grid(expiries, strikes, rows, forwards, tolerance=1e-10)
     assert len(default) == len(explicit) == 1
-
-
-def test_goal_seek_result_from_json_validates_the_embedded_model() -> None:
-    empty_model = {"id": "m", "periods": {"calendar": "gregorian", "periods": []}, "nodes": {}, "schema_version": 1}
-    with pytest.raises(ValueError, match="at least one period"):
-        GoalSeekResult.from_json(json.dumps({"solved_value": 1.0, "model": empty_model}))
-    assert GoalSeekResult.from_json('{"solved_value": 2.5, "model": null}').solved_value == 2.5
 
 
 def test_per_position_metric_json_rejects_unknown_metric_ids() -> None:

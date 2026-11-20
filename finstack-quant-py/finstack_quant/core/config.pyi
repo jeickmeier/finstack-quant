@@ -468,6 +468,103 @@ class FinstackConfig:
         """
         ...
 
+    def with_rounding_mode(self, mode: RoundingMode | str | None) -> FinstackConfig:
+        """Copy the configuration with a different rounding mode.
+
+        Parameters
+        ----------
+        mode : RoundingMode or str or None
+            Rounding policy or its exact lowercase label, such as bankers.
+            None clears the rounding mode.
+
+        Returns
+        -------
+        FinstackConfig
+            Independent copy with the selected mode.
+
+        Raises
+        ------
+        ValueError
+            If the label is unknown.
+        TypeError
+            If mode has an incompatible Python type.
+        """
+        ...
+
+    def with_output_scale(self, currency: Currency | str, scale: int) -> FinstackConfig:
+        """Copy the configuration with an output scale override.
+
+        Parameters
+        ----------
+        currency : Currency or str
+            Currency object or its ISO-4217 code.
+        scale : int
+            Number of output decimal places from 0 through 28.
+
+        Returns
+        -------
+        FinstackConfig
+            Independent copy with the given currency's output override.
+
+        Raises
+        ------
+        ValueError
+            If the currency code is unknown or the scale is outside 0 through 28.
+        TypeError
+            If argument types are incompatible.
+        OverflowError
+            If scale is outside the host's signed 64-bit integer range.
+        """
+        ...
+
+    def with_ingest_scale(self, currency: Currency | str, scale: int) -> FinstackConfig:
+        """Copy the configuration with an input scale override.
+
+        Parameters
+        ----------
+        currency : Currency or str
+            Currency object or its ISO-4217 code.
+        scale : int
+            Number of ingest decimal places from 0 through 28. Applying this
+            override requires that the completed configuration selects a rounding mode.
+
+        Returns
+        -------
+        FinstackConfig
+            Independent copy with the given currency's ingest override.
+
+        Raises
+        ------
+        ValueError
+            If the currency code is unknown or the scale is outside 0 through 28.
+        TypeError
+            If argument types are incompatible.
+        OverflowError
+            If scale is outside the host's signed 64-bit integer range.
+        """
+        ...
+
+    def patch_extension(self, key: str, patch: Any) -> None:
+        """Update one configured extension using JSON merge-patch semantics.
+
+        Parameters
+        ----------
+        key : str
+            Versioned extension key, for example core.rating_scales.v1.
+        patch : Any
+            Native JSON-compatible data. Dictionary members merge recursively.
+            A None member removes that member. Other values replace the
+            section. Strings are stored literally.
+
+        Raises
+        ------
+        TypeError
+            If key is not a string or the patch cannot be serialized as JSON data.
+        ValueError
+            If the key has an invalid versioned namespace or the patch contains a non-finite number.
+        """
+        ...
+
     def output_scale_overrides(self) -> dict[str, int]:
         """
         Explicit output-scale overrides.

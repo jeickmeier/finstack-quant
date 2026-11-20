@@ -39,6 +39,22 @@ def test_model_builder_from_spec_preserves_state_and_accepts_transformations() -
     assert transformed.to_json() != model.to_json()
 
 
+def test_model_spec_derivations_preserve_literal_metadata_and_source() -> None:
+    builder = statements.ModelBuilder("model-copy")
+    builder.periods("2025Q1..Q1")
+    builder.value("revenue", [("2025Q1", 100.0)])
+    original = builder.build()
+    derived = original.with_meta("literal", '{"revision":1}').with_currency("USD")
+    assert derived.meta == {"literal": '{"revision":1}', "currency": "USD"}
+    assert original.meta == {}
+    resumed = derived.to_builder()
+    resumed.compute("margin", "revenue * 0.5")
+    assert resumed.build().has_node("margin")
+    assert not derived.has_node("margin")
+    with pytest.raises(ValueError, match="needs a capital structure"):
+        derived.with_reporting_currency("EUR")
+
+
 class TestBuilderSurvivesBadInput:
     def test_bad_compute_does_not_brick_the_builder(self) -> None:
         b = statements.ModelBuilder("brick")
@@ -86,3 +102,46 @@ class TestMalformedJsonRaisesValueError:
         # inconsistent with model.from_json above.
         with pytest.raises(ValueError, match="Serialization error"):
             statements.Registry().load_from_json_str("not json")
+
+
+def test_model_builder_constant_broadcasts_only_over_declared_periods() -> None:
+    from decimal import Decimal
+    import json
+
+    from finstack_quant.core.money import Money
+
+    builder = statements.ModelBuilder("constant-inputs")
+    with pytest.raises(ValueError, match="Set model periods"):
+        builder.constant("cash", 3)
+    builder.periods("2025Q1..Q2")
+    with pytest.raises(ValueError, match="finite"):
+        builder.constant("invalid", float("inf"))
+    model = (
+        builder
+        .constant("tax_rate", 0.23)
+        .constant("cash", Money.from_decimal(Decimal("104.00000000000000001"), "USD"))
+        .build()
+    )
+    nodes = json.loads(model.to_json())["nodes"]
+    assert nodes["tax_rate"]["values"] == {"2025Q1": 0.23, "2025Q2": 0.23}
+    assert nodes["cash"]["values"] == {
+        period: {"amount": "104.00000000000000001", "currency": "USD"} for period in ("2025Q1", "2025Q2")
+    }
+
+
+def test_as_money_uses_declared_currency_without_an_auxiliary_node() -> None:
+    builder = statements.ModelBuilder("denomination")
+    builder.periods("2025Q1..Q1")
+    builder.value("revenue", [("2025Q1", 100.0)])
+    with pytest.raises(ValueError, match="needs an explicit currency"):
+        builder.as_money("money_revenue", "revenue")
+    builder.currency("USD").as_money("money_revenue", "revenue * 2")
+    model = builder.build()
+    assert model.periods == ["2025Q1"]
+    assert len(model.node_ids()) == 2
+    assert statements.Evaluator().evaluate(model).get("money_revenue", "2025Q1") == 200.0
+    assert model.get_node("money_revenue").currency == "USD"
+    invalid = statements.ModelBuilder.from_spec(model)
+    invalid.currency("EUR").as_money("relabelled", "money_revenue")
+    with pytest.raises(ValueError, match="unitless scalar"):
+        invalid.build()

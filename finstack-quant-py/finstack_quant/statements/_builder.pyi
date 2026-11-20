@@ -129,6 +129,31 @@ class ModelBuilder:
         """
         ...
 
+    def constant(self, node_id: str, value: Money | float) -> ModelBuilder:
+        """Broadcast a scalar or monetary observation across the model timeline.
+
+        Parameters
+        ----------
+        node_id : str
+            Unique identifier for the new value node.
+        value : Money or float
+            Monetary amount in its explicit currency or finite unitless scalar.
+            Every modeled period receives the same value.
+
+        Returns
+        -------
+        ModelBuilder
+            The builder with the constant node added.
+
+        Raises
+        ------
+        ValueError
+            If periods are unset, the scalar is nonfinite, or the builder was consumed.
+        TypeError
+            If the value is neither Money nor numeric.
+        """
+        ...
+
     def value(self, node_id: str, values: list[tuple[str, float]]) -> ModelBuilder:
         """
         Add a value node with explicit per-period scalars.
@@ -370,9 +395,63 @@ class ModelBuilder:
         """
         ...
 
+    def currency(self, currency: Currency | str) -> ModelBuilder:
+        """Set the statement model currency used by statement analytics.
+
+        Parameters
+        ----------
+        currency : Currency | str
+            Currency handle or ISO 4217 code for the model's amounts.
+
+        Returns
+        -------
+        ModelBuilder
+            This builder, for fluent construction.
+
+        Raises
+        ------
+        ValueError
+            If the currency code is invalid or the builder has been consumed.
+        TypeError
+            If the value is neither a currency handle nor a string.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ModelBuilder
+        >>> builder = ModelBuilder("income").currency("USD")
+        >>> builder is builder.currency("EUR")
+        True
+        """
+        ...
+
+    def as_money(self, node_id: str, source: str, currency: Currency | str | None = None) -> ModelBuilder:
+        """Denominate a scalar expression as money in the stated currency.
+
+        Parameters
+        ----------
+        node_id : str
+            Unique identifier of the new calculated node.
+        source : str
+            Scalar formula or source node in units of the selected currency.
+        currency : Currency or str or None
+            Explicit ISO denomination, or None to use the stored model currency.
+
+        Returns
+        -------
+        ModelBuilder
+            The current builder with the new monetary expression.
+
+        Raises
+        ------
+        ValueError
+            If IDs or syntax are invalid, or no valid currency is available.
+            Build rejects a source that already has money or Boolean units.
+        """
+        ...
+
     def with_meta(self, key: str, value: Any) -> ModelBuilder:
         """
-        Add model-level metadata from a JSON payload.
+        Add model-level metadata from a Python value.
 
         Parameters
         ----------
@@ -381,7 +460,8 @@ class ModelBuilder:
             value in serialized model output. ``currency`` selects the model's
             reporting currency.
         value:
-            JSON-serializable metadata value. For ``currency``, supply a supported
+            JSON-serializable metadata value. Strings are stored verbatim. For
+            ``currency``, supply a supported
             three-letter currency-code string such as ``"USD"``; ``build()``
             raises ``ValueError`` for malformed currency metadata.
 
@@ -393,8 +473,10 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If ``value`` is not JSON-serialisable, periods are not configured, or the builder
-            has already been consumed.
+            If ``value`` contains a non-finite float, periods are not configured, or
+            the builder has already been consumed.
+        TypeError
+            If ``value`` cannot be serialized as JSON.
 
         """
         ...
@@ -513,15 +595,14 @@ class ModelBuilder:
         """
         ...
 
-    def reporting_currency(self, currency: Currency) -> ModelBuilder:
+    def reporting_currency(self, currency: Currency | str) -> ModelBuilder:
         """
         Set the reporting currency used for capital-structure totals.
 
         Parameters
         ----------
         currency:
-            A :class:`Currency` instance. A bare ISO-4217 string is not
-            accepted; construct ``Currency("USD")`` first.
+            Currency handle or ISO 4217 currency code such as ``"USD"``.
 
         Returns
         -------
@@ -531,7 +612,9 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If the builder has already been consumed.
+            If the builder has already been consumed or the code is unknown.
+        TypeError
+            If the currency is neither a handle nor a string.
 
         """
         ...

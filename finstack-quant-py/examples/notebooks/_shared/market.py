@@ -6,7 +6,6 @@ from datetime import date, timedelta
 from itertools import pairwise
 import math
 
-from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import (
     DiscountCurve,
     ForwardCurve,
@@ -89,15 +88,15 @@ def build_demo_market(as_of: date = DEMO_AS_OF) -> MarketContext:
         elapsed = max((current - date(2024, 1, 1)).days, 0) / 365.0
         fixings.append((current, 0.045 + 0.003 * min(elapsed, 1.0)))
         current += timedelta(days=1)
-    market.insert_series(ScalarTimeSeries("FIXING:USD-SOFR-3M", fixings, "step", "error"))
+    market.insert_fixing("USD-SOFR-3M", ScalarTimeSeries("USD-SOFR-3M", fixings, "step", "error"))
 
     market.insert_price("AAPL-SPOT", 185.0, "USD")
     market.insert_price("AAPL-DIV", 0.005)
     market.insert_price("SPX-SPOT", 5200.0, "USD")
     market.insert_price("SPX-DIV", 0.015)
 
-    fx = FxMatrix(None)
-    fx.set_quotes([(Currency("EUR"), Currency("USD"), 1.08)])
+    fx = FxMatrix.direct()
+    fx.set_quotes([("EUR", "USD", 1.08)])
     market.insert_fx(fx)
     return market
 

@@ -1,0 +1,32 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/heston_fourier_settings.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Numerical settings for Heston Fourier integration.",
+  "properties": {
+    "gl_order": {
+      "description": "Gauss-Legendre order per panel (default: 16)",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "panels": {
+      "description": "Number of panels for composite Gauss-Legendre (default: 100)",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "u_max": {
+      "description": "Upper limit for Fourier integral (default: 100)",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "u_max",
+    "panels",
+    "gl_order"
+  ],
+  "title": "HestonFourierSettings",
+  "type": "object"
+}

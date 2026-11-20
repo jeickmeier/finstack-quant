@@ -604,13 +604,18 @@ fn frtb_sensitivities_schema_matches_its_sorted_tuple_wire() {
     use finstack_quant_margin::regulatory::frtb::FrtbSensitivities;
 
     let mut sensitivities = FrtbSensitivities::new(Currency::USD);
-    sensitivities.add_girr_delta(Currency::USD, "5Y", 1_250.0);
+    sensitivities
+        .add_girr_delta(Currency::USD, "USD-OIS", "5Y", 1_250.0)
+        .expect("valid GIRR delta");
     sensitivities.add_csr_nonsec_delta("ACME", 3, "5Y", "bond", -400.0);
     sensitivities.add_equity_delta("SPX", 11, 900.0);
     sensitivities.add_fx_delta(Currency::EUR, Currency::USD, 50.0);
     sensitivities.add_girr_curvature(Currency::USD, 10.0, -12.0);
     let wire = assert_wire_matches_registered_schema("FrtbSensitivities", &sensitivities);
-    assert_eq!(wire["girr_delta"], json!([["USD", "5Y", 1250.0]]));
+    assert_eq!(
+        wire["girr_delta"],
+        json!([["USD", "USD-OIS", "5Y", 1250.0]])
+    );
 }
 
 #[test]

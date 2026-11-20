@@ -37,6 +37,11 @@ pub(crate) enum ScenarioEffect {
     Warning(Warning),
     /// Replace a curve in the market (discount, forward, hazard, inflation, or vol-index).
     UpdateCurve(CurveStorage),
+    /// Publish the native surface validated by the volatility adapter.
+    UpdateVolSurface {
+        surface: std::sync::Arc<finstack_quant_core::market_data::surfaces::VolSurface>,
+        expiries_years: Option<Vec<f64>>,
+    },
 }
 
 /// Dispatch one operation to its adapter and produce effects.
@@ -83,6 +88,20 @@ fn generate_effects(
             *match_mode,
             &CurveApplyCtx::new(ctx, env),
         ),
+        OperationSpec::CommodityCurveParallelPct { curve_id, pct } => {
+            adapters::curves::commodity_curve_parallel_pct_effects(curve_id, *pct, ctx.market)
+        }
+        OperationSpec::CommodityCurveNodePct {
+            curve_id,
+            nodes,
+            match_mode,
+        } => adapters::curves::commodity_curve_node_pct_effects(
+            curve_id,
+            nodes,
+            *match_mode,
+            ctx.market,
+            ctx.as_of,
+        ),
         OperationSpec::VolIndexParallelPts { curve_id, points } => {
             adapters::curves::vol_index_parallel_effects(curve_id, *points, ctx)
         }
@@ -106,7 +125,7 @@ fn generate_effects(
         OperationSpec::VolSurfaceParallelPct {
             vol_surface_id,
             pct,
-        } => adapters::vol::vol_effects(vol_surface_id, None, None, *pct, false, ctx),
+        } => adapters::vol::vol_effects(vol_surface_id, None, None, *pct, ctx),
         OperationSpec::VolSurfaceBucketPct {
             vol_surface_id,
             tenors,
@@ -117,7 +136,6 @@ fn generate_effects(
             tenors.as_deref(),
             strikes.as_deref(),
             *pct,
-            true,
             ctx,
         ),
         OperationSpec::StmtForecastPercent { .. }
@@ -131,6 +149,7 @@ fn generate_effects(
         | OperationSpec::PrepayDefaultCorrelationPts { .. }
         | OperationSpec::TimeRollForward { .. }
         | OperationSpec::HierarchyCurveParallelBp { .. }
+        | OperationSpec::HierarchyCommodityCurveParallelPct { .. }
         | OperationSpec::HierarchyVolSurfaceParallelPct { .. }
         | OperationSpec::HierarchyEquityPricePct { .. }
         | OperationSpec::HierarchyBaseCorrParallelPts { .. } => {
@@ -151,6 +170,11 @@ fn market_target_for_id(op: &OperationSpec, id: &CurveId) -> Option<ScenarioMark
         OperationSpec::CurveParallelBp { curve_kind, .. }
         | OperationSpec::CurveNodeBp { curve_kind, .. } => Some(ScenarioMarketTarget::Curve {
             curve_kind: *curve_kind,
+            curve_id: id.clone(),
+        }),
+        OperationSpec::CommodityCurveParallelPct { .. }
+        | OperationSpec::CommodityCurveNodePct { .. } => Some(ScenarioMarketTarget::Curve {
+            curve_kind: CurveKind::Commodity,
             curve_id: id.clone(),
         }),
         OperationSpec::VolIndexParallelPts { .. } | OperationSpec::VolIndexNodePts { .. } => {
@@ -179,6 +203,7 @@ fn market_target_for_id(op: &OperationSpec, id: &CurveId) -> Option<ScenarioMark
         | OperationSpec::AssetCorrelationPts { .. }
         | OperationSpec::PrepayDefaultCorrelationPts { .. }
         | OperationSpec::HierarchyCurveParallelBp { .. }
+        | OperationSpec::HierarchyCommodityCurveParallelPct { .. }
         | OperationSpec::HierarchyVolSurfaceParallelPct { .. }
         | OperationSpec::HierarchyEquityPricePct { .. }
         | OperationSpec::HierarchyBaseCorrParallelPts { .. }
@@ -194,26 +219,12 @@ fn market_target_for_bump(op: &OperationSpec, bump: &MarketBump) -> Option<Scena
                 quote: *quote,
             })
         }
-        (_, MarketBump::VolBucketPct { vol_surface_id, .. }) => {
-            market_target_for_id(op, vol_surface_id)
-        }
         (_, MarketBump::BaseCorrBucketPts { surface_id, .. }) => {
             market_target_for_id(op, surface_id)
         }
         (_, other) => other
             .target_and_spec()
             .and_then(|(target, _)| market_target_for_id(op, target.id())),
-    }
-}
-
-/// Unit of the sizes on a curve operation: commodity price curves are shocked
-/// in percent of the forward, every other curve kind in basis points.
-fn curve_shock_unit(curve_kind: CurveKind) -> ShockUnit {
-    match curve_kind {
-        CurveKind::Commodity => ShockUnit::Percent,
-        CurveKind::Discount | CurveKind::Forward | CurveKind::ParCDS | CurveKind::Inflation => {
-            ShockUnit::Bp
-        }
     }
 }
 
@@ -240,15 +251,14 @@ fn requested_shock(op: &OperationSpec) -> Option<ShockMagnitude> {
     match op {
         OperationSpec::MarketFxPct { pct, .. }
         | OperationSpec::EquityPricePct { pct, .. }
+        | OperationSpec::CommodityCurveParallelPct { pct, .. }
         | OperationSpec::VolSurfaceParallelPct { pct, .. }
         | OperationSpec::InstrumentPricePctByType { pct, .. }
         | OperationSpec::InstrumentPricePctByAttr { pct, .. } => uniform(*pct, ShockUnit::Percent),
-        OperationSpec::CurveParallelBp { curve_kind, bp, .. } => {
-            uniform(*bp, curve_shock_unit(*curve_kind))
+        OperationSpec::CurveNodeBp { nodes, .. } => Some(node_shock(nodes, ShockUnit::Bp)),
+        OperationSpec::CommodityCurveNodePct { nodes, .. } => {
+            Some(node_shock(nodes, ShockUnit::Percent))
         }
-        OperationSpec::CurveNodeBp {
-            curve_kind, nodes, ..
-        } => Some(node_shock(nodes, curve_shock_unit(*curve_kind))),
         OperationSpec::VolIndexParallelPts { points, .. }
         | OperationSpec::BaseCorrParallelPts { points, .. } => {
             uniform(*points, ShockUnit::Absolute)
@@ -276,7 +286,8 @@ fn requested_shock(op: &OperationSpec) -> Option<ShockMagnitude> {
                 unit: ShockUnit::Percent,
             })
         }
-        OperationSpec::InstrumentSpreadBpByType { bp, .. }
+        OperationSpec::CurveParallelBp { bp, .. }
+        | OperationSpec::InstrumentSpreadBpByType { bp, .. }
         | OperationSpec::InstrumentSpreadBpByAttr { bp, .. } => uniform(*bp, ShockUnit::Bp),
         OperationSpec::AssetCorrelationPts { delta_pts }
         | OperationSpec::PrepayDefaultCorrelationPts { delta_pts } => {
@@ -286,6 +297,7 @@ fn requested_shock(op: &OperationSpec) -> Option<ShockMagnitude> {
         | OperationSpec::StmtForecastAssign { .. }
         | OperationSpec::RateBinding { .. }
         | OperationSpec::HierarchyCurveParallelBp { .. }
+        | OperationSpec::HierarchyCommodityCurveParallelPct { .. }
         | OperationSpec::HierarchyVolSurfaceParallelPct { .. }
         | OperationSpec::HierarchyEquityPricePct { .. }
         | OperationSpec::HierarchyBaseCorrParallelPts { .. }
@@ -299,37 +311,18 @@ fn requested_shock(op: &OperationSpec) -> Option<ShockMagnitude> {
 /// snapped surface expiries of a bucket bump) reports that location; every
 /// other bump reports the operation's request.
 fn shock_for_bump(op: &OperationSpec, bump: &MarketBump) -> Option<ShockMagnitude> {
-    match (op, bump.target_and_spec(), bump) {
-        (OperationSpec::CurveNodeBp { curve_kind, .. }, Some((_, spec)), _) => {
-            match spec.bump_type {
-                BumpType::TriangularKeyRate { target_bucket, .. } => {
-                    Some(ShockMagnitude::KeyRate {
-                        time_years: target_bucket,
-                        value: spec.value,
-                        unit: curve_shock_unit(*curve_kind),
-                    })
-                }
-                BumpType::Parallel => Some(ShockMagnitude::Uniform {
-                    value: spec.value,
-                    unit: curve_shock_unit(*curve_kind),
-                }),
-            }
-        }
-        (
-            OperationSpec::VolSurfaceBucketPct { .. },
-            _,
-            MarketBump::VolBucketPct {
-                expiries,
-                secondary_values,
-                pct,
-                ..
-            },
-        ) => Some(ShockMagnitude::VolBucket {
-            expiries_years: expiries.clone(),
-            strikes: secondary_values.clone(),
-            value: *pct,
-            unit: ShockUnit::Percent,
-        }),
+    match (op, bump.target_and_spec()) {
+        (OperationSpec::CurveNodeBp { .. }, Some((_, spec))) => match spec.bump_type {
+            BumpType::TriangularKeyRate { target_bucket, .. } => Some(ShockMagnitude::KeyRate {
+                time_years: target_bucket,
+                value: spec.value,
+                unit: ShockUnit::Bp,
+            }),
+            BumpType::Parallel => Some(ShockMagnitude::Uniform {
+                value: spec.value,
+                unit: ShockUnit::Bp,
+            }),
+        },
         _ => requested_shock(op),
     }
 }
@@ -528,6 +521,30 @@ pub(super) fn apply_generated_effects(
                 *sink.applied += 1;
             }
             ScenarioEffect::Warning(w) => sink.warnings.push(w),
+            ScenarioEffect::UpdateVolSurface {
+                surface,
+                expiries_years,
+            } => {
+                flush_pending_bumps(sink.pending_bumps, ctx.market)?;
+                let target = market_target_for_id(op, surface.id());
+                ctx.market.insert_surface_mut(surface);
+                let shock = match op {
+                    OperationSpec::VolSurfaceBucketPct { strikes, pct, .. } => {
+                        Some(ShockMagnitude::VolBucket {
+                            expiries_years,
+                            strikes: strikes.clone(),
+                            value: *pct,
+                            unit: ShockUnit::Percent,
+                        })
+                    }
+                    _ => requested_shock(op),
+                };
+                match target {
+                    Some(target) => sink.record_market_shock(target, shock, None),
+                    None => sink.changes.all_dirty = true,
+                }
+                *sink.applied += 1;
+            }
             ScenarioEffect::UpdateCurve(storage) => {
                 flush_pending_bumps(sink.pending_bumps, ctx.market)?;
                 let target = market_target_for_id(op, storage.id());

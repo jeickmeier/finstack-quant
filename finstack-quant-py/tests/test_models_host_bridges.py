@@ -230,3 +230,52 @@ def test_exposure_json_cannot_bypass_checked_construction() -> None:
             lgd.EadCalculator.from_json(wire)
     wire = '{"drawn":100,"undrawn":20,"ccf":{"ccf":0.75}}'
     assert lgd.EadCalculator.from_json(wire).ead == 115.0
+
+
+def test_option_market_params_share_the_checked_greeks_pipeline() -> None:
+    from finstack_quant.models import OptionMarketParams, bs_greeks
+
+    inputs = {
+        "spot": 101.0,
+        "strike": 94.0,
+        "rate": 0.037,
+        "dividend_yield": 0.011,
+        "volatility": 0.24,
+        "time_to_expiry": 0.65,
+        "option_type": "put",
+    }
+    market = OptionMarketParams(
+        spot=101.0,
+        strike=94.0,
+        rate=0.037,
+        dividend_yield=0.011,
+        volatility=0.24,
+        time_to_expiry=0.65,
+        option_type="put",
+    )
+    assert market.option_type == "put"
+    assert market.time_to_expiry == 0.65
+    assert bs_greeks(market) == bs_greeks(inputs)
+
+    zero_vol = OptionMarketParams(
+        spot=101.0,
+        strike=94.0,
+        rate=0.037,
+        dividend_yield=0.011,
+        volatility=0.0,
+        time_to_expiry=0.65,
+        option_type="put",
+    )
+    assert zero_vol.volatility == 0.0
+    with pytest.raises(ValueError, match="positive vol"):
+        bs_greeks(zero_vol)
+    with pytest.raises(ValueError, match="volatility"):
+        OptionMarketParams(
+            spot=101.0,
+            strike=94.0,
+            rate=0.037,
+            dividend_yield=0.011,
+            volatility=float("nan"),
+            time_to_expiry=0.65,
+            option_type="put",
+        )

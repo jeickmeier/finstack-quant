@@ -6,6 +6,7 @@
 
 use super::config::extract_config;
 use super::quotes::extract_market_datum;
+use super::step_params;
 use crate::bindings::macros::wire_methods;
 use crate::bindings::module_utils::{py_to_json_value, spec_from_py};
 use crate::bindings::pandas_utils::serde_to_py;
@@ -15,7 +16,7 @@ use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_calibration::api::market_datum::MarketDatum;
 use finstack_quant_calibration::api::prior_market::PriorMarketObject;
 use finstack_quant_calibration::api::schema::{
-    CalibrationEnvelope, CalibrationPlan, CalibrationStep,
+    CalibrationEnvelope, CalibrationPlan, CalibrationStep, StepWithQuotes,
 };
 use indexmap::IndexMap;
 use pyo3::prelude::*;
@@ -111,6 +112,15 @@ impl PyCalibrationStep {
 
 #[pymethods]
 impl PyCalibrationStep {
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.__init__")]
+    #[new]
+    #[pyo3(signature = (id, params, quote_set=None))]
+    fn new(id: &str, params: &Bound<'_, PyAny>, quote_set: Option<&str>) -> PyResult<Self> {
+        CalibrationStep::new(id, step_params::extract(params)?, quote_set)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
+    }
+
     #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.discount")]
     #[staticmethod]
     #[pyo3(signature = (id, params, quote_set = None))]
@@ -460,8 +470,86 @@ impl PyCalibrationEnvelope {
     }
 }
 
+#[doc = pydoc!("finstack_quant.calibration._envelope", "StepWithQuotes")]
+#[pyclass(
+    name = "StepWithQuotes",
+    module = "finstack_quant.calibration",
+    frozen,
+    skip_from_py_object
+)]
+#[derive(Clone)]
+pub struct PyStepWithQuotes {
+    inner: StepWithQuotes,
+}
+
+#[pymethods]
+impl PyStepWithQuotes {
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "StepWithQuotes.__init__")]
+    #[new]
+    fn new(step: PyRef<'_, PyCalibrationStep>, quotes: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Ok(Self {
+            inner: StepWithQuotes {
+                step: step.inner.clone(),
+                quotes: extract_market_data(quotes.py(), Some(quotes))?,
+            },
+        })
+    }
+
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "StepWithQuotes.step")]
+    #[getter]
+    fn step(&self) -> PyCalibrationStep {
+        PyCalibrationStep::from_inner(self.inner.step.clone())
+    }
+}
+
 #[pymethods]
 impl PyCalibrationEnvelope {
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationEnvelope.from_steps")]
+    #[staticmethod]
+    #[pyo3(signature = (id, steps, *, settings=None, prior_market=None))]
+    fn from_steps(
+        py: Python<'_>,
+        id: &str,
+        steps: Vec<PyRef<'_, PyStepWithQuotes>>,
+        settings: Option<&Bound<'_, PyAny>>,
+        prior_market: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
+        let steps = steps.iter().map(|step| step.inner.clone()).collect();
+        CalibrationEnvelope::from_steps(
+            id,
+            steps,
+            extract_config(py, settings)?,
+            extract_prior_market(py, prior_market)?,
+        )
+        .map(Self::from_inner)
+        .map_err(core_to_py)
+    }
+
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationEnvelope.with_step")]
+    fn with_step(&self, entry: PyRef<'_, PyStepWithQuotes>) -> PyResult<Self> {
+        self.inner
+            .with_step(entry.inner.clone())
+            .map(Self::from_inner)
+            .map_err(core_to_py)
+    }
+
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationEnvelope.without_quote")]
+    fn without_quote(&self, quote_id: &str) -> PyResult<Self> {
+        self.inner
+            .without_quote(quote_id)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
+    }
+
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationEnvelope.bump_quotes_bp")]
+    #[pyo3(signature=(bp, *, quote_set=None))]
+    fn bump_quotes_bp(&self, bp: f64, quote_set: Option<&str>) -> PyResult<Self> {
+        self.inner
+            .bump_quotes_bp(quote_set, bp)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
+    }
+
     #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationEnvelope.__init__")]
     #[new]
     #[pyo3(signature = (plan, market_data = None, prior_market = None))]

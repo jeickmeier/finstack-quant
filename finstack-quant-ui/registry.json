@@ -2483,6 +2483,52 @@
       }
     },
     {
+      "name": "contract-structured-credit-tranche",
+      "type": "registry:lib",
+      "title": "Structured credit tranche contract",
+      "description": "Generated schema, wire types, metadata, validator module and example for the canonical Rust structured_credit_tranche contract. Validation is structural; native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/structured_credit_tranche.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/structured_credit_tranche.json"
+        },
+        {
+          "path": "src/generated/types/structured_credit_tranche.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/structured_credit_tranche.ts"
+        },
+        {
+          "path": "src/generated/meta/structured_credit_tranche.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/structured_credit_tranche.ts"
+        },
+        {
+          "path": "src/generated/instrument/structured_credit_tranche.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/structured_credit_tranche.ts"
+        },
+        {
+          "path": "src/generated/examples/structured_credit_tranche.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/structured_credit_tranche.json"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-codec",
+        "@finstack/shared-schema-defs"
+      ],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit_tranche.schema.json"
+        ]
+      }
+    },
+    {
       "name": "contract-structured-credit",
       "type": "registry:lib",
       "title": "Structured credit contract",
@@ -5481,6 +5527,7 @@
         "@finstack/contract-dollar-roll",
         "@finstack/contract-inflation-linked-bond",
         "@finstack/contract-revolving-credit",
+        "@finstack/contract-structured-credit-tranche",
         "@finstack/contract-structured-credit",
         "@finstack/contract-term-loan",
         "@finstack/contract-trs-fixed-income-index",
@@ -5567,6 +5614,7 @@
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit_tranche.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/fx/fx_barrier_option.schema.json",

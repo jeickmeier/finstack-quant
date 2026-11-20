@@ -118,7 +118,7 @@ fn twrr_modified_dietz(py: Python<'_>, period: &Bound<'_, PyAny>) -> PyResult<f6
 ///
 /// Parameters
 /// ----------
-/// returns_json : str | dict | list | pandas.DataFrame
+/// returns : str | dict | list | pandas.DataFrame
 ///     JSON array of sub-period returns as decimal fractions.
 /// horizon_years : float
 ///     Full elapsed horizon in 365-day calendar years; must be finite. Values
@@ -139,16 +139,16 @@ fn twrr_modified_dietz(py: Python<'_>, period: &Bound<'_, PyAny>) -> PyResult<f6
 ///     non-finite or at most -1, or the compounded growth factor is
 ///     non-positive.
 #[pyfunction]
-#[pyo3(text_signature = "(returns_json, horizon_years)")]
+#[pyo3(text_signature = "(returns, horizon_years)")]
 fn twrr_linked(
     py: Python<'_>,
-    returns_json: &Bound<'_, PyAny>,
+    returns: &Bound<'_, PyAny>,
     horizon_years: f64,
 ) -> PyResult<PyLinkedReturn> {
-    let returns_json = crate::bindings::extract::extract_records_json(py, returns_json, "returns")?;
+    let returns = crate::bindings::extract::extract_records_json(py, returns, "returns")?;
     Ok(PyLinkedReturn {
         inner: py.detach(move || {
-            let returns: Vec<f64> = serde_json::from_str(&returns_json)
+            let returns: Vec<f64> = serde_json::from_str(&returns)
                 .map_err(|err| serde_json_to_py(err, "invalid TWRR returns JSON"))?;
             finstack_quant_portfolio::performance::twrr_linked(&returns, horizon_years)
                 .map_err(core_to_py)

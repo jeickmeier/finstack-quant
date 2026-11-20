@@ -179,3 +179,40 @@ test('typed quanto theta preserves configured period P&L and the capped horizon'
     }
   }
 });
+
+test('FX authoring preserves observed lifecycle and exact contractual terms on copy', () => {
+  const names = [
+    'FxSwap',
+    'Ndf',
+    'QuantoOption',
+    'FxDigitalOption',
+    'FxTouchOption',
+    'FxBarrierOption',
+  ];
+  for (const name of names) {
+    const original = valuations.instruments[name].example();
+    const before = original.toDict();
+    const updated = original.toBuilder().id('EDITED-FX').build();
+    try {
+      assert.deepEqual(original.toDict(), before);
+      assert.deepEqual(updated.toDict(), { ...before, id: 'EDITED-FX' });
+    } finally {
+      updated.free();
+      original.free();
+    }
+  }
+});
+
+test('Repo authoring preserves the exact decimal annual rate on copy and wire', () => {
+  const original = valuations.instruments.Repo.example();
+  const rate = '0.052501234567890123';
+  const updated = original.toBuilder().repoRate(rate).build();
+  try {
+    assert.equal(updated.repoRate, rate);
+    assert.equal(updated.toDict().repo_rate, rate);
+    assert.notEqual(original.repoRate, rate);
+  } finally {
+    updated.free();
+    original.free();
+  }
+});

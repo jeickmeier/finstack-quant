@@ -2,8 +2,9 @@
 import { useState } from "react";
 import type { GoalSeekResult } from "finstack-quant-wasm";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import type { GoalSeekRequest } from "@/workers/finstack-contract";
-import { formatExact } from "@/lib/finstack/format/format";
+import { formatExact, groupDecimal } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
@@ -13,12 +14,18 @@ import { typedNumber } from "@/components/finstack/shared/primitives/native-disp
 /** The solve as submitted, without the model and update flag the caller supplies. */
 export type GoalSeekSubmission = Omit<
   GoalSeekRequest,
-  "modelJson" | "updateModel"
+  "modelJson" | "marketJson" | "updateModel"
 >;
 /** Initial form values; every omitted field starts empty. */
 export type GoalSeekDefaults = Partial<GoalSeekSubmission>;
 const text = (value: number | undefined) =>
   value === undefined ? "" : String(value);
+const amount = (value: GoalSeekSubmission["targetValue"] | undefined) =>
+  typeof value === "object" ? value.amount : text(value);
+const display = (value: GoalSeekSubmission["targetValue"]) =>
+  typeof value === "number"
+    ? formatExact(value)
+    : `${groupDecimal(value.amount)} ${value.currency}`;
 export interface GoalSeekFormProps {
   /** Model node ids offered for the target and driver nodes. */
   nodeIds: readonly string[];
@@ -47,7 +54,7 @@ export interface GoalSeekFormProps {
 }
 /**
  * Edits the arguments of statements_analytics.goalSeek: target node, period
- * and value, driver node and period, and an optional search bracket. Solve is
+ * and value, driver node and period, dated observation cut, and explicit tolerances and search bracket. Solve is
  * explicit and passes the arguments to the caller; the native GoalSeekResult
  * is shown as returned. Apply is a second, explicit action that hands the
  * returned model to the caller (for example the workbench's commit); there
@@ -71,7 +78,25 @@ export function GoalSeekForm({
     defaultValues?.targetPeriod ?? "",
   );
   const [targetValue, setTargetValue] = useState(
-    text(defaultValues?.targetValue),
+    amount(defaultValues?.targetValue),
+  );
+  const [targetTolerance, setTargetTolerance] = useState(
+    amount(defaultValues?.targetTolerance),
+  );
+  const [currency, setCurrency] = useState(
+    typeof defaultValues?.targetValue === "object"
+      ? defaultValues.targetValue.currency
+      : "",
+  );
+  const [asOf, setAsOf] = useState(defaultValues?.asOf ?? "");
+  const [observedThrough, setObservedThrough] = useState(
+    defaultValues?.observedThrough ?? "",
+  );
+  const [driverTolerance, setDriverTolerance] = useState(
+    text(defaultValues?.driverTolerance),
+  );
+  const [maxIterations, setMaxIterations] = useState(
+    text(defaultValues?.maxIterations),
   );
   const [driverNode, setDriverNode] = useState(defaultValues?.driverNode ?? "");
   const [driverPeriod, setDriverPeriod] = useState(
@@ -89,13 +114,19 @@ export function GoalSeekForm({
     onSubmit({
       targetNode,
       targetPeriod,
-      targetValue: typedNumber(targetValue),
+      targetValue: currency
+        ? { amount: targetValue, currency }
+        : typedNumber(targetValue),
+      targetTolerance: currency
+        ? { amount: targetTolerance, currency }
+        : typedNumber(targetTolerance),
       driverNode,
       driverPeriod,
-      // Both empty leaves the bracket unset; one empty is sent as NaN.
-      ...(lower.trim() === "" && upper.trim() === ""
-        ? {}
-        : { bounds: [typedNumber(lower), typedNumber(upper)] as const }),
+      driverTolerance: typedNumber(driverTolerance),
+      maxIterations: typedNumber(maxIterations),
+      asOf,
+      observedThrough,
+      bounds: [typedNumber(lower), typedNumber(upper)],
     });
   };
   const apply = async () => {
@@ -131,6 +162,20 @@ export function GoalSeekForm({
           value={targetValue}
           onValueChange={setTargetValue}
         />
+        <DecimalInput
+          label="Target tolerance"
+          help="Absolute permitted difference from the target, in its stated units."
+          value={targetTolerance}
+          onValueChange={setTargetTolerance}
+        />
+        <label className="grid gap-2">
+          Target currency
+          <Input
+            value={currency}
+            onChange={(event) => setCurrency(event.target.value)}
+            placeholder="Leave empty for a scalar"
+          />
+        </label>
       </fieldset>
       <fieldset className="grid gap-4 rounded-md border border-border p-3 @lg:grid-cols-3">
         <legend className="px-1 text-sm font-medium">Driver</legend>
@@ -150,17 +195,48 @@ export function GoalSeekForm({
         <div className="grid grid-cols-2 gap-3">
           <DecimalInput
             label="Lower bound"
-            help="Search bracket in the driver node's units; leave both bounds empty for Rust's bracket."
+            help="Search bracket in the driver node's units."
             value={lower}
             onValueChange={setLower}
           />
           <DecimalInput
             label="Upper bound"
-            help="Search bracket in the driver node's units; leave both bounds empty for Rust's bracket."
+            help="Search bracket in the driver node's units."
             value={upper}
             onValueChange={setUpper}
           />
         </div>
+        <DecimalInput
+          label="Driver tolerance"
+          help="Positive root tolerance in the driver's units."
+          value={driverTolerance}
+          onValueChange={setDriverTolerance}
+        />
+        <DecimalInput
+          label="Maximum iterations"
+          help="Positive solver iteration budget."
+          value={maxIterations}
+          onValueChange={setMaxIterations}
+        />
+      </fieldset>
+      <fieldset className="grid gap-4 rounded-md border border-border p-3 @lg:grid-cols-2">
+        <legend className="px-1 text-sm font-medium">Information cut</legend>
+        <label className="grid gap-2">
+          Valuation date
+          <Input
+            type="date"
+            value={asOf}
+            onChange={(event) => setAsOf(event.target.value)}
+          />
+        </label>
+        <label className="grid gap-2">
+          Observed through
+          <Input
+            type="date"
+            value={observedThrough}
+            onChange={(event) => setObservedThrough(event.target.value)}
+          />
+        </label>
       </fieldset>
       <Button type="button" onClick={submit} disabled={disabled}>
         Solve
@@ -181,11 +257,11 @@ export function GoalSeekForm({
           >
             {(
               [
-                ["solved_value", formatExact(result.solved_value)],
-                ["residual", formatExact(result.residual ?? Number.NaN)],
-                ["tolerance", formatExact(result.tolerance ?? Number.NaN)],
-                ["evaluations", String(result.evaluations ?? "—")],
-                ["converged", result.converged ? "Yes" : "No"],
+                ["solved_value", display(result.solved_value)],
+                ["achieved_value", display(result.achieved_value)],
+                ["residual", display(result.residual)],
+                ["target_tolerance", display(result.target_tolerance)],
+                ["evaluations", String(result.evaluations)],
               ] as const
             ).map(([name, value]) => (
               <div key={name} className="contents">

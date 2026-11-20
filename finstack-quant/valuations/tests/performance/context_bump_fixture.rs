@@ -116,13 +116,15 @@ pub fn market(unrelated_curves: usize) -> MarketContext {
 /// * `volatility` - Annualized lognormal decimal volatility at the FD endpoint.
 pub fn reference_price(spot: f64, volatility: f64) -> f64 {
     finstack_quant_models::closed_form::bs_price(
-        spot,
-        100.0,
-        0.05,
-        0.02,
-        volatility,
-        1.0,
-        OptionType::Call,
+        &finstack_quant_models::types::OptionMarketParams {
+            spot,
+            strike: 100.0,
+            rate: 0.05,
+            dividend_yield: 0.02,
+            volatility,
+            time_to_expiry: 1.0,
+            option_type: OptionType::Call,
+        },
     )
     .expect("valid analytic CCM endpoint")
 }

@@ -102,6 +102,46 @@ fn extract_dataframe_panel(df: &Bound<'_, PyAny>, error_message: &str) -> PyResu
     })
 }
 
+fn align_factor_panel(df: &Bound<'_, PyAny>, active_dates: &[Date]) -> PyResult<Vec<Vec<f64>>> {
+    let message = "factor_returns must be factor-major sequences or a DataFrame";
+    if !df.is_instance(&df.py().import("pandas")?.getattr("DataFrame")?)? {
+        return Err(PyTypeError::new_err(message));
+    }
+    let labels: Vec<Bound<'_, PyAny>> = df.getattr("index")?.call_method0("tolist")?.extract()?;
+    let mut rows = finstack_quant_core::FxHashMap::default();
+    for (row, label) in labels.iter().enumerate() {
+        let date = py_to_date(label)?;
+        if rows.insert(date, row).is_some() {
+            return Err(crate::errors::value_error(format!(
+                "duplicate factor date {date}"
+            )));
+        }
+    }
+    let positions = active_dates
+        .iter()
+        .map(|date| {
+            rows.get(date).copied().ok_or_else(|| {
+                pyo3::exceptions::PyKeyError::new_err(format!(
+                    "factor_returns is missing active date {date}"
+                ))
+            })
+        })
+        .collect::<PyResult<Vec<_>>>()?;
+    let selected = df.getattr("iloc")?.get_item(positions)?;
+    let panel = extract_dataframe_panel(&selected, message)?;
+    if panel
+        .columns
+        .iter()
+        .flatten()
+        .any(|value| !value.is_finite())
+    {
+        return Err(crate::errors::value_error(
+            "each aligned factor return must be finite",
+        ));
+    }
+    Ok(panel.columns)
+}
+
 /// Pull a `Series` column out as a contiguous `Vec<f64>` via the NumPy buffer
 /// protocol. Returns explicit `PyTypeError` / `PyValueError` instead of
 /// silently coercing through `Series.tolist()`.
@@ -981,11 +1021,20 @@ impl PyPerformance {
         &self,
         py: Python<'_>,
         ticker_idx: &Bound<'_, PyAny>,
-        factor_returns: Vec<Vec<f64>>,
+        factor_returns: &Bound<'_, PyAny>,
         risk_free_rate: f64,
     ) -> PyResult<PyMultiFactorResult> {
         let ticker_idx = self.resolve_ticker(ticker_idx)?;
-        let refs: Vec<&[f64]> = factor_returns.iter().map(|v| v.as_slice()).collect();
+        let factor_returns = match factor_returns.extract::<Vec<Vec<f64>>>() {
+            Ok(factors) => factors,
+            Err(_) => align_factor_panel(
+                factor_returns,
+                self.inner
+                    .get_active_dates_for_ticker(ticker_idx)
+                    .map_err(analytics_to_py)?,
+            )?,
+        };
+        let refs: Vec<&[f64]> = factor_returns.iter().map(Vec::as_slice).collect();
         py.detach(|| {
             self.inner
                 .multi_factor_greeks(ticker_idx, &refs, risk_free_rate)

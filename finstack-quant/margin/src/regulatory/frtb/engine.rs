@@ -253,7 +253,8 @@ mod tests {
                 .expect("build");
 
         let mut sens = FrtbSensitivities::new(Currency::USD);
-        sens.add_girr_delta(Currency::USD, "5Y", 100_000.0);
+        sens.add_girr_delta(Currency::USD, "USD-OIS", "5Y", 100_000.0)
+            .expect("valid GIRR delta");
 
         let result = engine.calculate(&sens).expect("calculate");
         // RW for 5Y = 1.1, so WS = 100K * 1.1 = 110K.
@@ -272,11 +273,56 @@ mod tests {
     }
 
     #[test]
+    fn same_tenor_distinct_yield_curves_retain_basis_risk() {
+        let engine =
+            FrtbSbaEngine::new(vec![CorrelationScenario::Medium], vec![FrtbRiskClass::Girr])
+                .expect("build");
+        let mut sensitivities = FrtbSensitivities::new(Currency::USD);
+        let amount = 100.0 / 1.1;
+        sensitivities
+            .add_girr_delta(Currency::USD, "USD-OIS", "5Y", amount)
+            .expect("admit OIS risk");
+        sensitivities
+            .add_girr_delta(Currency::USD, "USD-SOFR-3M", "5Y", -amount)
+            .expect("admit term risk");
+        let result = engine.calculate(&sensitivities).expect("calculate");
+        assert!((result.total - 20.0_f64.sqrt()).abs() < 1e-10);
+
+        let rows = sensitivities.to_rows().expect("table rows");
+        assert_eq!(
+            FrtbSensitivities::from_rows(Currency::USD, &rows).expect("restore table"),
+            sensitivities,
+        );
+        let mut document = serde_json::to_value(&sensitivities).expect("serialize");
+        assert_eq!(
+            serde_json::from_value::<FrtbSensitivities>(document.clone()).expect("restore JSON"),
+            sensitivities,
+        );
+        let entries = document["girr_delta"].as_array_mut().expect("yield rows");
+        entries.push(entries[0].clone());
+        let error = serde_json::from_value::<FrtbSensitivities>(document).expect_err("duplicate");
+        assert!(error.to_string().contains("duplicate FRTB girr_delta"));
+        assert!(
+            sensitivities
+                .add_girr_delta(Currency::USD, "", "5Y", amount)
+                .is_err()
+        );
+        assert!(
+            sensitivities
+                .add_girr_delta(Currency::USD, "USD-OIS", "7Y", amount)
+                .is_err()
+        );
+        assert_eq!(sensitivities.girr_delta.len(), 2);
+    }
+
+    #[test]
     fn calculate_rejects_unknown_labels_buckets_and_non_finite_values() {
         let engine = FrtbSbaEngine::default();
 
         let mut unknown_tenor = FrtbSensitivities::new(Currency::USD);
-        unknown_tenor.add_girr_delta(Currency::USD, "0.25y", 100.0);
+        unknown_tenor
+            .girr_delta
+            .insert((Currency::USD, "USD-OIS".into(), "0.25y".into()), 100.0);
         assert!(engine.calculate(&unknown_tenor).is_err());
 
         let mut unknown_bucket = FrtbSensitivities::new(Currency::USD);
@@ -284,7 +330,9 @@ mod tests {
         assert!(engine.calculate(&unknown_bucket).is_err());
 
         let mut non_finite = FrtbSensitivities::new(Currency::USD);
-        non_finite.add_girr_delta(Currency::USD, "5Y", f64::NAN);
+        non_finite
+            .girr_delta
+            .insert((Currency::USD, "USD-OIS".into(), "5Y".into()), f64::NAN);
         assert!(engine.calculate(&non_finite).is_err());
     }
 
@@ -347,8 +395,10 @@ mod tests {
         let engine = FrtbSbaEngine::default();
 
         let mut sens = FrtbSensitivities::new(Currency::USD);
-        sens.add_girr_delta(Currency::USD, "5Y", 100_000.0);
-        sens.add_girr_delta(Currency::EUR, "10Y", 80_000.0);
+        sens.add_girr_delta(Currency::USD, "USD-OIS", "5Y", 100_000.0)
+            .expect("valid GIRR delta");
+        sens.add_girr_delta(Currency::EUR, "EUR-ESTR", "10Y", 80_000.0)
+            .expect("valid GIRR delta");
 
         let result = engine.calculate(&sens).expect("calculate");
         // With multiple factors, different scenarios should produce different charges.
@@ -564,7 +614,8 @@ mod tests {
         .expect("build");
 
         let mut sens = FrtbSensitivities::new(Currency::USD);
-        sens.add_girr_delta(Currency::USD, "5Y", 100_000.0);
+        sens.add_girr_delta(Currency::USD, "USD-OIS", "5Y", 100_000.0)
+            .expect("valid GIRR delta");
         sens.add_equity_delta("AAPL", 1, 200_000.0);
         sens.add_fx_delta(Currency::EUR, Currency::USD, 50_000.0);
 
@@ -720,9 +771,12 @@ mod tests {
     #[test]
     fn scenario_breakdown_reconciles_with_scenario_charges() {
         let mut sens = FrtbSensitivities::new(Currency::USD);
-        sens.add_girr_delta(Currency::USD, "5Y", 1_000_000.0);
-        sens.add_girr_delta(Currency::USD, "10Y", -600_000.0);
-        sens.add_girr_delta(Currency::EUR, "5Y", 400_000.0);
+        sens.add_girr_delta(Currency::USD, "USD-OIS", "5Y", 1_000_000.0)
+            .expect("valid GIRR delta");
+        sens.add_girr_delta(Currency::USD, "USD-OIS", "10Y", -600_000.0)
+            .expect("valid GIRR delta");
+        sens.add_girr_delta(Currency::EUR, "EUR-ESTR", "5Y", 400_000.0)
+            .expect("valid GIRR delta");
         sens.add_equity_delta("AAPL", 1, 250_000.0);
         sens.add_equity_delta("MSFT", 1, -150_000.0);
         sens.add_girr_vega(Currency::USD, "1Y", "5Y", 500_000.0);
@@ -765,7 +819,8 @@ mod tests {
     #[test]
     fn frtb_sba_charge_matches_the_engine_for_one_and_all_scenarios() {
         let mut sens = FrtbSensitivities::new(Currency::USD);
-        sens.add_girr_delta(Currency::USD, "5Y", 1_000_000.0);
+        sens.add_girr_delta(Currency::USD, "USD-OIS", "5Y", 1_000_000.0)
+            .expect("valid GIRR delta");
         sens.add_equity_delta("AAPL", 1, 250_000.0);
 
         let all = frtb_sba_charge(&sens, None).expect("all scenarios");

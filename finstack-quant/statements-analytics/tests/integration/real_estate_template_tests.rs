@@ -11,100 +11,43 @@ use finstack_quant_statements_analytics::templates::real_estate::{
 
 #[test]
 fn real_estate_noi_and_ncf_templates_compute_expected_values() {
-    let model = real_estate::add_ncf_buildup(
-        real_estate::add_noi_buildup(
-            {
-                let mut model_builder = ModelBuilder::new("re_template");
-                model_builder
-                    .periods("2025Q1..Q2", None)
-                    .expect("periods should parse");
-                model_builder.value(
-                    "rent",
-                    &[
-                        (
-                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                            AmountOrScalar::scalar(100.0),
-                        ),
-                        (
-                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                            AmountOrScalar::scalar(110.0),
-                        ),
-                    ],
-                );
-                model_builder.value(
-                    "other_income",
-                    &[
-                        (
-                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                            AmountOrScalar::scalar(10.0),
-                        ),
-                        (
-                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                            AmountOrScalar::scalar(12.0),
-                        ),
-                    ],
-                );
-                model_builder.value(
-                    "taxes",
-                    &[
-                        (
-                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                            AmountOrScalar::scalar(20.0),
-                        ),
-                        (
-                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                            AmountOrScalar::scalar(22.0),
-                        ),
-                    ],
-                );
-                model_builder.value(
-                    "repairs",
-                    &[
-                        (
-                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                            AmountOrScalar::scalar(5.0),
-                        ),
-                        (
-                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                            AmountOrScalar::scalar(6.0),
-                        ),
-                    ],
-                );
-                model_builder.value(
-                    "capex",
-                    &[
-                        (
-                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                            AmountOrScalar::scalar(3.0),
-                        ),
-                        (
-                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                            AmountOrScalar::scalar(4.0),
-                        ),
-                    ],
-                );
-                model_builder
-            },
-            "total_revenue",
-            &["rent", "other_income"],
-            "total_expenses",
-            &["taxes", "repairs"],
-            "noi",
-        )
-        .expect("noi template"),
+    let mut model_builder = ModelBuilder::new("re_template");
+    model_builder
+        .periods("2025Q1..Q2", None)
+        .expect("periods should parse");
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
+    for (node, first, second) in [
+        ("rent", 100.0, 110.0),
+        ("other_income", 10.0, 12.0),
+        ("taxes", 20.0, 22.0),
+        ("repairs", 5.0, 6.0),
+        ("capex", 3.0, 4.0),
+    ] {
+        model_builder.value(
+            node,
+            &[
+                (q1, AmountOrScalar::scalar(first)),
+                (q2, AmountOrScalar::scalar(second)),
+            ],
+        );
+    }
+
+    real_estate::add_noi_buildup(
+        &mut model_builder,
+        "total_revenue",
+        &["rent", "other_income"],
+        "total_expenses",
+        &["taxes", "repairs"],
         "noi",
-        &["capex"],
-        "ncf",
     )
-    .expect("ncf template")
-    .build()
-    .expect("build");
+    .expect("NOI template");
+    real_estate::add_ncf_buildup(&mut model_builder, "noi", &["capex"], "ncf")
+        .expect("NCF template");
+    let model = model_builder.build().expect("build");
 
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).expect("evaluate");
-
-    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
     let noi = results.numeric_series("noi").expect("noi node");
     let ncf = results.numeric_series("ncf").expect("ncf node");
@@ -165,20 +108,13 @@ fn real_estate_rent_roll_handles_steps_free_rent_and_renewal_downtime() {
         },
     ];
 
-    let model = real_estate::add_rent_roll(
-        {
-            let mut model_builder = ModelBuilder::new("re_rent_roll");
-            model_builder
-                .periods("2025Q1..Q4", None)
-                .expect("periods should parse");
-            model_builder
-        },
-        &leases,
-        &nodes,
-    )
-    .expect("rent roll v2 template")
-    .build()
-    .expect("build");
+    let mut model_builder = ModelBuilder::new("re_rent_roll");
+    model_builder
+        .periods("2025Q1..Q4", None)
+        .expect("periods should parse");
+
+    real_estate::add_rent_roll(&mut model_builder, &leases, &nodes).expect("rent roll v2 template");
+    let model = model_builder.build().expect("build");
 
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).expect("evaluate");
@@ -243,17 +179,12 @@ fn real_estate_rich_rent_roll_rejects_non_finite_growth_output() {
         renewal: None,
     }];
 
-    let result = real_estate::add_rent_roll(
-        {
-            let mut model_builder = ModelBuilder::new("re_rent_roll_overflow");
-            model_builder
-                .periods("2025Q1..Q4", None)
-                .expect("periods should parse");
-            model_builder
-        },
-        &leases,
-        &nodes,
-    );
+    let mut model_builder = ModelBuilder::new("re_rent_roll_overflow");
+    model_builder
+        .periods("2025Q1..Q4", None)
+        .expect("periods should parse");
+
+    let result = real_estate::add_rent_roll(&mut model_builder, &leases, &nodes);
 
     assert!(result.is_err());
     assert!(
@@ -297,66 +228,65 @@ fn real_estate_full_property_template_computes_egi_noi_ncf() {
 
     let nodes = PropertyTemplateNodes::default();
 
-    let model = real_estate::add_property_operating_statement(
-        {
-            let mut model_builder = ModelBuilder::new("re_full_property");
-            model_builder
-                .periods("2025Q1..Q2", None)
-                .expect("periods should parse");
-            model_builder.value(
-                "parking_income",
-                &[
-                    (
-                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                        AmountOrScalar::scalar(10.0),
-                    ),
-                    (
-                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                        AmountOrScalar::scalar(10.0),
-                    ),
-                ],
-            );
-            model_builder.value(
-                "taxes",
-                &[
-                    (
-                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                        AmountOrScalar::scalar(5.0),
-                    ),
-                    (
-                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                        AmountOrScalar::scalar(5.0),
-                    ),
-                ],
-            );
-            model_builder.value(
-                "repairs",
-                &[
-                    (
-                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                        AmountOrScalar::scalar(2.0),
-                    ),
-                    (
-                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                        AmountOrScalar::scalar(2.0),
-                    ),
-                ],
-            );
-            model_builder.value(
-                "capex",
-                &[
-                    (
-                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                        AmountOrScalar::scalar(3.0),
-                    ),
-                    (
-                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                        AmountOrScalar::scalar(3.0),
-                    ),
-                ],
-            );
-            model_builder
-        },
+    let mut model_builder = ModelBuilder::new("re_full_property");
+    model_builder
+        .periods("2025Q1..Q2", None)
+        .expect("periods should parse");
+    model_builder.value(
+        "parking_income",
+        &[
+            (
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(10.0),
+            ),
+            (
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                AmountOrScalar::scalar(10.0),
+            ),
+        ],
+    );
+    model_builder.value(
+        "taxes",
+        &[
+            (
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(5.0),
+            ),
+            (
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                AmountOrScalar::scalar(5.0),
+            ),
+        ],
+    );
+    model_builder.value(
+        "repairs",
+        &[
+            (
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(2.0),
+            ),
+            (
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                AmountOrScalar::scalar(2.0),
+            ),
+        ],
+    );
+    model_builder.value(
+        "capex",
+        &[
+            (
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(3.0),
+            ),
+            (
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                AmountOrScalar::scalar(3.0),
+            ),
+        ],
+    );
+
+    real_estate::add_property_operating_statement(
+        &mut model_builder,
         &leases,
         &["parking_income"],
         &["taxes", "repairs"],
@@ -367,9 +297,8 @@ fn real_estate_full_property_template_computes_egi_noi_ncf() {
         }),
         &nodes,
     )
-    .expect("property template")
-    .build()
-    .expect("build");
+    .expect("property template");
+    let model = model_builder.build().expect("build");
 
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).expect("evaluate");
@@ -418,20 +347,13 @@ fn real_estate_annual_escalator_bumps_on_lease_anniversary() {
         renewal: None,
     }];
 
-    let model = real_estate::add_rent_roll(
-        {
-            let mut model_builder = ModelBuilder::new("re_annual_esc");
-            model_builder
-                .periods("2025Q1..2026Q4", None)
-                .expect("periods should parse");
-            model_builder
-        },
-        &leases,
-        &nodes,
-    )
-    .expect("rent roll v2 template")
-    .build()
-    .expect("build");
+    let mut model_builder = ModelBuilder::new("re_annual_esc");
+    model_builder
+        .periods("2025Q1..2026Q4", None)
+        .expect("periods should parse");
+
+    real_estate::add_rent_roll(&mut model_builder, &leases, &nodes).expect("rent roll v2 template");
+    let model = model_builder.build().expect("build");
 
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).expect("evaluate");
@@ -490,20 +412,13 @@ fn real_estate_annual_escalator_resets_at_rent_step() {
         renewal: None,
     }];
 
-    let model = real_estate::add_rent_roll(
-        {
-            let mut model_builder = ModelBuilder::new("re_annual_step_reset");
-            model_builder
-                .periods("2025Q1..2026Q4", None)
-                .expect("periods should parse");
-            model_builder
-        },
-        &leases,
-        &nodes,
-    )
-    .expect("rent roll v2 template")
-    .build()
-    .expect("build");
+    let mut model_builder = ModelBuilder::new("re_annual_step_reset");
+    model_builder
+        .periods("2025Q1..2026Q4", None)
+        .expect("periods should parse");
+
+    real_estate::add_rent_roll(&mut model_builder, &leases, &nodes).expect("rent roll v2 template");
+    let model = model_builder.build().expect("build");
 
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).expect("evaluate");
@@ -605,20 +520,13 @@ fn real_estate_default_growth_convention_is_annual_escalator() {
         renewal: None,
     }];
 
-    let model = real_estate::add_rent_roll(
-        {
-            let mut model_builder = ModelBuilder::new("re_default_annual");
-            model_builder
-                .periods("2025Q1..2026Q4", None)
-                .expect("periods should parse");
-            model_builder
-        },
-        &leases,
-        &nodes,
-    )
-    .expect("rent roll template")
-    .build()
-    .expect("build");
+    let mut model_builder = ModelBuilder::new("re_default_annual");
+    model_builder
+        .periods("2025Q1..2026Q4", None)
+        .expect("periods should parse");
+
+    real_estate::add_rent_roll(&mut model_builder, &leases, &nodes).expect("rent roll template");
+    let model = model_builder.build().expect("build");
 
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).expect("evaluate");
@@ -664,20 +572,13 @@ fn real_estate_per_period_growth_convention_compounds_each_period() {
         renewal: None,
     }];
 
-    let model = real_estate::add_rent_roll(
-        {
-            let mut model_builder = ModelBuilder::new("re_per_period");
-            model_builder
-                .periods("2025Q1..Q4", None)
-                .expect("periods should parse");
-            model_builder
-        },
-        &leases,
-        &nodes,
-    )
-    .expect("rent roll v2 template")
-    .build()
-    .expect("build");
+    let mut model_builder = ModelBuilder::new("re_per_period");
+    model_builder
+        .periods("2025Q1..Q4", None)
+        .expect("periods should parse");
+
+    real_estate::add_rent_roll(&mut model_builder, &leases, &nodes).expect("rent roll v2 template");
+    let model = model_builder.build().expect("build");
 
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).expect("evaluate");

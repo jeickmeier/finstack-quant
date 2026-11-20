@@ -281,6 +281,11 @@ impl MarketContext {
         self.get_cloned(&self.surfaces, id.as_ref())
     }
 
+    /// Iterate over stored scalar market inputs and their lookup identifiers.
+    pub fn prices(&self) -> impl ExactSizeIterator<Item = (&CurveId, &MarketScalar)> {
+        self.prices.iter()
+    }
+
     /// Borrow a market price/scalar by identifier.
     ///
     /// Scalars are borrowed rather than cloned because they are typically small

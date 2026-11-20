@@ -15,6 +15,7 @@ FactorContribution = _risk.FactorContribution
 PositionFactorContribution = _risk.PositionFactorContribution
 PositionResidualContribution = _risk.PositionResidualContribution
 RiskDecomposition = _risk.RiskDecomposition
+RiskMeasure = _risk.RiskMeasure
 PositionVarContribution = _risk.PositionVarContribution
 PositionEsContribution = _risk.PositionEsContribution
 PositionRiskDecomposition = _risk.PositionRiskDecomposition
@@ -24,6 +25,9 @@ StressPositionEntry = _risk.StressPositionEntry
 TailScenarioBreakdown = _risk.TailScenarioBreakdown
 StressAttribution = _risk.StressAttribution
 PositionRiskReport = _risk.PositionRiskReport
+PositionRiskBudget = _risk.PositionRiskBudget
+PositionRiskRequest = _risk.PositionRiskRequest
+PositionRiskSource = _risk.PositionRiskSource
 DEFAULT_UTILIZATION_THRESHOLD = _risk.DEFAULT_UTILIZATION_THRESHOLD
 position_risk_report = _risk.position_risk_report
 evaluate_risk_budget = _risk.evaluate_risk_budget
@@ -39,11 +43,15 @@ __all__: list[str] = [
     "PositionEsContribution",
     "PositionFactorContribution",
     "PositionResidualContribution",
+    "PositionRiskBudget",
     "PositionRiskDecomposition",
     "PositionRiskReport",
+    "PositionRiskRequest",
+    "PositionRiskSource",
     "PositionVarContribution",
     "RiskBudgetResult",
     "RiskDecomposition",
+    "RiskMeasure",
     "StressAttribution",
     "StressPositionEntry",
     "TailScenarioBreakdown",

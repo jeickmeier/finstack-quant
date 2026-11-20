@@ -33,6 +33,10 @@ pub struct CovenantReport {
     /// Cushion relative to threshold (positive => passing buffer)
     pub headroom: Option<f64>,
 
+    /// Signed cushion in the covenant metric's own units when numerically meaningful.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub headroom_raw: Option<f64>,
+
     /// Audit stamp: numeric mode, rounding context, and FX policy in force.
     #[serde(default)]
     pub meta: finstack_quant_core::config::ResultsMeta,
@@ -48,6 +52,7 @@ impl CovenantReport {
             threshold: None,
             details: None,
             headroom: None,
+            headroom_raw: None,
             meta: finstack_quant_core::config::results_meta(
                 &finstack_quant_core::config::FinstackConfig::default(),
             ),

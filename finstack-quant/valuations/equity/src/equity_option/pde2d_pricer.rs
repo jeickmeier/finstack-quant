@@ -80,7 +80,7 @@ impl EquityOptionHestonPdePricer {
         // Validation is still enforced inside `HestonParams::new`.
         let cf_params =
             finstack_quant_valuations_core::instruments::pricing::heston_market::heston_params_from_market_strict(
-                market, r, q,
+                market,
             )
             .map_err(|e| {
                 PricingError::model_failure_with_context(
@@ -88,24 +88,24 @@ impl EquityOptionHestonPdePricer {
                     PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),
                 )
             })?;
-        let theta_v = cf_params.model.theta;
-        let v0 = cf_params.model.v0;
+        let theta_v = cf_params.theta;
+        let v0 = cf_params.v0;
 
         let is_call = matches!(inst.option_type, OptionType::Call);
 
         let pde = HestonPde {
-            r: cf_params.r,
-            q: cf_params.q,
-            kappa: cf_params.model.kappa,
-            theta_v: cf_params.model.theta,
-            sigma_v: cf_params.model.sigma_v,
-            rho: cf_params.model.rho,
+            r,
+            q,
+            kappa: cf_params.kappa,
+            theta_v: cf_params.theta,
+            vol_of_vol: cf_params.vol_of_vol,
+            rho: cf_params.rho,
             strike: inst.strike,
             is_call,
         };
 
-        let mean_reversion_fraction = -(-cf_params.model.kappa * t).exp_m1();
-        let initial_variance_weight = mean_reversion_fraction / cf_params.model.kappa;
+        let mean_reversion_fraction = -(-cf_params.kappa * t).exp_m1();
+        let initial_variance_weight = mean_reversion_fraction / cf_params.kappa;
         let mean_integrated_variance =
             v0 * initial_variance_weight + theta_v * (t - initial_variance_weight).max(0.0);
         // High accepted v0 also widens the log-spot distribution. A fixed
@@ -138,11 +138,11 @@ impl EquityOptionHestonPdePricer {
         // Divide the small exponential factors first: sigma²/kappa can
         // overflow for valid near-zero kappa even though the variance has a
         // finite continuous limit.
-        let variance_bound = cf_params.model.sigma_v.powi(2)
-            * (v0 * (initial_variance_factor / cf_params.model.kappa)
+        let variance_bound = cf_params.vol_of_vol.powi(2)
+            * (v0 * (initial_variance_factor / cf_params.kappa)
                 + 0.5
                     * theta_v
-                    * (mean_reversion_fraction / cf_params.model.kappa)
+                    * (mean_reversion_fraction / cf_params.kappa)
                     * mean_reversion_fraction);
         let v_min = 0.0;
         let v_max = 1.5_f64
@@ -345,10 +345,26 @@ mod tests {
     }
 
     fn reference(v0: f64, sigma: f64) -> f64 {
-        use finstack_quant_models::closed_form::{HestonPricingParams, heston_call_price_fourier};
-        let params = HestonPricingParams::new(0.03, 0.0, 2.0, 0.04, sigma, -0.7, v0)
+        use finstack_quant_models::closed_form::heston_call_price_fourier;
+        use finstack_quant_models::monte_carlo::process::heston::HestonProcessParams;
+        let params = HestonProcessParams::new(0.03, 0.0, 2.0, 0.04, sigma, -0.7, v0)
             .expect("Heston parameters");
-        heston_call_price_fourier(100.0, 100.0, 1.0, &params, None).expect("Fourier reference")
+        {
+            let dynamics = &params;
+            heston_call_price_fourier(
+                &finstack_quant_models::types::OptionContractParams {
+                    spot: 100.0,
+                    strike: 100.0,
+                    rate: dynamics.r,
+                    dividend_yield: dynamics.q,
+                    time_to_expiry: 1.0,
+                    option_type: finstack_quant_models::types::OptionType::Call,
+                },
+                &dynamics.model,
+                None,
+            )
+        }
+        .expect("Fourier reference")
     }
 
     #[test]

@@ -132,6 +132,326 @@
       ],
       "type": "object"
     },
+    "ImDecayProfile": {
+      "description": "Deterministic decay applied to today's SIMM IM to approximate `E[IM(t)]`.\n\n`IM(t) = IM(0) × factor(t)`. This is the standard first-order practitioner\napproximation for MVA (Green 2015, ch. 10): IM shrinks as the portfolio's\nremaining risk runs off.\n\n# Variants\n\n| Variant | `factor(t)` | Use case |\n|---|---|---|\n| `Constant` | `1` | Evergreen / constantly re-hedged books |\n| `LinearToMaturity` | `max(1 − t/T, 0)` | Amortizing linear-risk books |\n| `SqrtTime` | `sqrt(max(1 − t/T, 0))` | DV01-style risk ∝ √(remaining time) |",
+      "oneOf": [
+        {
+          "const": "constant",
+          "description": "IM stays at today's level for the whole horizon.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "IM decays linearly to zero at `maturity_years`.",
+          "properties": {
+            "linear_to_maturity": {
+              "additionalProperties": false,
+              "properties": {
+                "maturity_years": {
+                  "description": "Portfolio maturity `T` in years (must be positive and finite).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "maturity_years"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "linear_to_maturity"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "IM decays like the square root of remaining time to `maturity_years`.",
+          "properties": {
+            "sqrt_time": {
+              "additionalProperties": false,
+              "properties": {
+                "maturity_years": {
+                  "description": "Portfolio maturity `T` in years (must be positive and finite).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "maturity_years"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "sqrt_time"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ImProfile": {
+      "additionalProperties": false,
+      "description": "Complete dated expected posted initial margin in one currency and netting set.",
+      "properties": {
+        "as_of": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Reporting date and first observation."
+        },
+        "basis": {
+          "$ref": "#/$defs/ImProjectionBasis",
+          "description": "Legal scope, source and election for the expected IM."
+        },
+        "currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Currency of the opening and every projected amount."
+        },
+        "dates": {
+          "description": "Calendar observations starting with the valuation date and ending at the horizon.",
+          "items": {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+          },
+          "type": "array"
+        },
+        "im_values": {
+          "description": "Expected posted IM in major units of the calculation currency, nonnegative.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "as_of",
+        "currency",
+        "basis",
+        "dates",
+        "im_values"
+      ],
+      "type": "object"
+    },
+    "ImProjectionBasis": {
+      "description": "Source of the expected posted initial margin on a dated grid.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Qualified expected posted IM from a supplied risk calculation.",
+          "properties": {
+            "kind": {
+              "const": "external",
+              "type": "string"
+            },
+            "netting_set": {
+              "$ref": "#/$defs/NettingSetId",
+              "description": "Legal portfolio scope measured by the supplied calculation."
+            },
+            "source_id": {
+              "description": "Permanent identifier of the supplied evidence and methodology.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "source_id",
+            "netting_set"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Deterministic runoff from a single dated, historical SIMM calculation.",
+          "properties": {
+            "decay": {
+              "$ref": "#/$defs/ImDecayProfile",
+              "description": "Elected deterministic approximation applied to the opening margin."
+            },
+            "kind": {
+              "const": "simm_decay",
+              "type": "string"
+            },
+            "netting_set": {
+              "$ref": "#/$defs/NettingSetId",
+              "description": "Legal portfolio scope supplying the opening margin."
+            },
+            "source_id": {
+              "description": "Fingerprint of the admitted inputs, calculation and projection.",
+              "type": "string"
+            },
+            "version": {
+              "const": "v2_6",
+              "description": "Selected historical margin parameter version.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "source_id",
+            "netting_set",
+            "version",
+            "decay"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "MvaInterval": {
+      "additionalProperties": false,
+      "description": "Replayable interval on the merged IM and funding-spread grid.",
+      "properties": {
+        "contribution": {
+          "description": "Funding cost contributed by this interval, in profile currency.",
+          "format": "double",
+          "type": "number"
+        },
+        "end": {
+          "$ref": "#/$defs/MvaPoint",
+          "description": "Factors at the end of the interval."
+        },
+        "start": {
+          "$ref": "#/$defs/MvaPoint",
+          "description": "Factors at the start of the interval."
+        },
+        "years": {
+          "description": "Year fraction of this interval on ACT/365 Fixed.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "years",
+        "contribution"
+      ],
+      "type": "object"
+    },
+    "MvaPoint": {
+      "additionalProperties": false,
+      "description": "Full set of observed dated factors at one end of an MVA interval.",
+      "properties": {
+        "counterparty_survival": {
+          "description": "Counterparty survival relative to valuation, or one when excluded.",
+          "format": "double",
+          "type": "number"
+        },
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Calendar date at which each curve is sampled on its own clock."
+        },
+        "discount_factor": {
+          "description": "Risk-free discount factor relative to the valuation date.",
+          "format": "double",
+          "type": "number"
+        },
+        "expected_im": {
+          "description": "Expected posted IM in major units of the result currency.",
+          "format": "double",
+          "type": "number"
+        },
+        "own_survival": {
+          "description": "Institution's survival probability relative to valuation, or one when excluded.",
+          "format": "double",
+          "type": "number"
+        },
+        "spread_bp": {
+          "description": "Elected funding spread in basis points.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "date",
+        "expected_im",
+        "spread_bp",
+        "discount_factor",
+        "own_survival",
+        "counterparty_survival"
+      ],
+      "type": "object"
+    },
+    "MvaResult": {
+      "additionalProperties": false,
+      "description": "Posted-margin funding cost, coverage, and arithmetic evidence.",
+      "properties": {
+        "average_im": {
+          "description": "Mean IM weighted only by elapsed time, in reporting currency.",
+          "format": "double",
+          "type": "number"
+        },
+        "im_profile": {
+          "$ref": "#/$defs/ImProfile",
+          "description": "Dated and identified expected posted IM used for the cost."
+        },
+        "intervals": {
+          "description": "Exact merged grid with start and end factors and costs contributed.",
+          "items": {
+            "$ref": "#/$defs/MvaInterval"
+          },
+          "type": "array"
+        },
+        "mva": {
+          "description": "Expected funding cost in reporting currency per calculation horizon.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "mva",
+        "average_im",
+        "im_profile",
+        "intervals"
+      ],
+      "type": "object"
+    },
+    "NettingSetId": {
+      "description": "Identifies a margin netting set.\n\nInstruments in the same netting set can offset each other for margin\ncalculation purposes. The netting set is typically defined by the\nCSA agreement (bilateral) or by CCP membership (cleared) — these two\nshapes are mutually exclusive, so the type encodes them as enum\nvariants rather than as a struct with two `Option<String>` fields\nthat could in principle both be set or both be unset.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A bilateral netting set scoped by counterparty + CSA.",
+          "properties": {
+            "counterparty_id": {
+              "description": "Counterparty identifier",
+              "type": "string"
+            },
+            "csa_id": {
+              "description": "CSA identifier",
+              "type": "string"
+            },
+            "kind": {
+              "const": "bilateral",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "counterparty_id",
+            "csa_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A cleared netting set scoped by CCP membership.",
+          "properties": {
+            "ccp_id": {
+              "description": "CCP identifier (also used as the counterparty id)",
+              "type": "string"
+            },
+            "kind": {
+              "const": "cleared",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "ccp_id"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "PositiveF64Wire": {
       "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
       "exclusiveMinimum": 0.0,
@@ -379,12 +699,12 @@
       ]
     },
     "effective_epe": {
-      "description": "Time-weighted average of Effective EPE (regulatory scalar metric).\n\nComputed as:\n```text\nEffective_EPE_avg = (1 / min(1, M)) × Σₖ Effective_EPE(tₖ) × Δtₖ\n```\n\nwhere `M` is the portfolio maturity and `Δtₖ = tₖ - tₖ₋₁`.\nThis is the key input for EAD under SA-CCR.\n\n# References\n\n- BCBS 279 (2014). \"The standardised approach for measuring\n  counterparty credit risk exposures.\" `docs/REFERENCES.md#bcbs-279-saccr`",
+      "description": "Time-weighted diagnostic of the right-endpoint running maximum of EPE.\n\nComputed as:\n```text\nEffective_EPE_avg = (1 / min(1, M)) × Σₖ Effective_EPE(tₖ) × Δtₖ\n```\n\nwhere `M` is the portfolio maturity and `Δtₖ = tₖ - tₖ₋₁`.\nThis is the key input for EAD under SA-CCR.\n\n# References\n\n- BCBS 279 (2014). \"The standardised approach for measuring\n  counterparty credit risk exposures.\" `docs/REFERENCES.md#bcbs-279-saccr`",
       "format": "double",
       "type": "number"
     },
     "effective_epe_profile": {
-      "description": "Effective EPE profile: `(time, Effective_EPE(t))`.\n\nNon-decreasing version of EPE, per Basel III SA-CCR:\n`Effective_EPE(t_k) = max(Effective_EPE(t_{k-1}), EPE(t_k))`\n\n# References\n\n- BCBS 279 (2014). \"The standardised approach for measuring\n  counterparty credit risk exposures.\" `docs/REFERENCES.md#bcbs-279-saccr`",
+      "description": "Effective EPE profile: `(time, Effective_EPE(t))`.\n\nRunning maximum of expected positive exposure:\n`Effective_EPE(t_k) = max(Effective_EPE(t_{k-1}), EPE(t_k))`\n\n# References\n\n- BCBS 279 (2014). \"The standardised approach for measuring\n  counterparty credit risk exposures.\" `docs/REFERENCES.md#bcbs-279-saccr`",
       "items": {
         "maxItems": 2,
         "minItems": 2,
@@ -487,6 +807,17 @@
         "number",
         "null"
       ]
+    },
+    "mva_detail": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MvaResult"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Dated expected IM, average IM and replayable funding intervals when MVA was computed."
     },
     "total_xva": {
       "description": "All-in valuation adjustment: `CVA − DVA + FVA + MVA`.\n\nUncomputed components contribute zero. This is the quantity subtracted\nfrom the risk-free value of the netting set.\n\n# References\n\n- Gregory, J. (2020). *The xVA Challenge*, 4th ed. Wiley. Chapter 14. `docs/REFERENCES.md#gregory-xva-challenge`\n- Green, A. (2015). *XVA*. Wiley. Chapters 9-10. `docs/REFERENCES.md#green-xva`",

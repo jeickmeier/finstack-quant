@@ -23,6 +23,19 @@ CalibrationPlan = _calibration.CalibrationPlan
 CalibrationReport = _calibration.CalibrationReport
 CalibrationResultEnvelope = _calibration.CalibrationResultEnvelope
 CalibrationStep = _calibration.CalibrationStep
+DiscountCurveParams = _calibration.DiscountCurveParams
+ForwardCurveParams = _calibration.ForwardCurveParams
+HazardCurveParams = _calibration.HazardCurveParams
+InflationCurveParams = _calibration.InflationCurveParams
+VolSurfaceParams = _calibration.VolSurfaceParams
+SwaptionVolParams = _calibration.SwaptionVolParams
+BaseCorrelationParams = _calibration.BaseCorrelationParams
+StudentTParams = _calibration.StudentTParams
+HullWhiteStepParams = _calibration.HullWhiteStepParams
+CapFloorHullWhiteStepParams = _calibration.CapFloorHullWhiteStepParams
+SviSurfaceParams = _calibration.SviSurfaceParams
+XccyBasisParams = _calibration.XccyBasisParams
+ParametricCurveParams = _calibration.ParametricCurveParams
 CalibrationValidationReport = _calibration.CalibrationValidationReport
 CdsQuote = _calibration.CdsQuote
 CdsTrancheQuote = _calibration.CdsTrancheQuote
@@ -33,6 +46,7 @@ QuoteQuality = _calibration.QuoteQuality
 RateBounds = _calibration.RateBounds
 RateQuote = _calibration.RateQuote
 SolverConfig = _calibration.SolverConfig
+StepWithQuotes = _calibration.StepWithQuotes
 ValidationConfig = _calibration.ValidationConfig
 VolQuote = _calibration.VolQuote
 XccyQuote = _calibration.XccyQuote
@@ -48,6 +62,7 @@ hull_white = _calibration.hull_white
 schema = _calibration.schema
 
 __all__ = [
+    "BaseCorrelationParams",
     "CalibrationConfig",
     "CalibrationDiagnostics",
     "CalibrationEnvelope",
@@ -57,17 +72,30 @@ __all__ = [
     "CalibrationResultEnvelope",
     "CalibrationStep",
     "CalibrationValidationReport",
+    "CapFloorHullWhiteStepParams",
     "CdsQuote",
     "CdsTrancheQuote",
+    "DiscountCurveParams",
+    "ForwardCurveParams",
     "FxSpotDatum",
+    "HazardCurveParams",
+    "HullWhiteStepParams",
+    "InflationCurveParams",
     "InflationQuote",
+    "ParametricCurveParams",
     "PriceDatum",
     "QuoteQuality",
     "RateBounds",
     "RateQuote",
     "SolverConfig",
+    "StepWithQuotes",
+    "StudentTParams",
+    "SviSurfaceParams",
+    "SwaptionVolParams",
     "ValidationConfig",
     "VolQuote",
+    "VolSurfaceParams",
+    "XccyBasisParams",
     "XccyQuote",
     "calibrate",
     "calibrate_bermudan_lmm_base_vol",

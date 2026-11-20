@@ -1480,9 +1480,12 @@
               "type": "number"
             },
             "terminal_metric": {
-              "description": "Terminal metric value (e.g., EBITDA)",
+              "description": "Terminal metric in major currency units (for example, EBITDA).\nRequired for standalone pricing. A statement DCF can resolve it from a metric node.",
               "format": "double",
-              "type": "number"
+              "type": [
+                "number",
+                "null"
+              ]
             },
             "type": {
               "const": "exit_multiple",
@@ -1491,7 +1494,6 @@
           },
           "required": [
             "type",
-            "terminal_metric",
             "multiple"
           ],
           "type": "object"
@@ -1577,7 +1579,7 @@
     },
     "ltv_value_node": {
       "default": null,
-      "description": "Statement node supplying a per-period LTV denominator; `None`\nbroadcasts a positive DCF enterprise value instead.",
+      "description": "Same-date monetary collateral value for each LTV observation.\nOmitting the node leaves LTV unavailable.",
       "type": [
         "string",
         "null"

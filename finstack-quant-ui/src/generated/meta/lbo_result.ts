@@ -100,13 +100,13 @@ export default [
   {
     "path": "#/$defs/d_60e7f94bf13dea34e179/properties/reference_value",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/Materiality/properties/reference_value",
-    "description": "The reference (denominator) value used when computing `relative_pct`.",
+    "description": "The reference (denominator) value used when computing `relative`.",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_60e7f94bf13dea34e179/properties/relative_pct",
-    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/Materiality/properties/relative_pct",
-    "description": "Discrepancy as a percentage of the reference value; `None` when the\npercentage is undefined (a zero reference) or does not apply.",
+    "path": "#/$defs/d_60e7f94bf13dea34e179/properties/relative",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/Materiality/properties/relative",
+    "description": "Discrepancy as a decimal fraction of the reference value (0.025 is 2.5%);\n`None` when the fraction is undefined (a zero reference) or does not apply.",
     "format": "double"
   },
   {
@@ -1437,7 +1437,7 @@ export default [
   {
     "path": "#/properties/entry_metric",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/properties/entry_metric",
-    "description": "Entry metric value read from the model at the first period.",
+    "description": "Entry metric value read from the explicitly selected period.",
     "format": "double"
   },
   {

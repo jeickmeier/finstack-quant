@@ -125,13 +125,16 @@ await write(
   "analyst-goal-seek.json",
   serializeHost(
     native.goalSeek(modelJson, {
-      target_node: seek.targetNode,
-      target_period: seek.targetPeriod,
+      target: { node: seek.targetNode, period: seek.targetPeriod },
       target_value: seek.targetValue,
-      driver_node: seek.driverNode,
-      driver_period: seek.driverPeriod,
+      target_tolerance: seek.targetTolerance,
+      driver: { node: seek.driverNode, period: seek.driverPeriod },
+      driver_tolerance: seek.driverTolerance,
+      max_iterations: seek.maxIterations,
+      as_of: seek.asOf,
+      observed_through: seek.observedThrough,
       update_model: false,
-      bounds: seek.bounds,
+      search: { kind: "bracket", lower: seek.bounds[0], upper: seek.bounds[1] },
     }),
   ),
 );

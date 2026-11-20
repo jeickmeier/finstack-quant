@@ -194,18 +194,32 @@ fn opening_exposure_is_not_halved_in_funding_integral() {
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    for times in [vec![1.0], vec![0.0, 1.0]] {
-        let n = times.len();
-        let profile = ExposureProfile {
-            times,
-            mtm_values: vec![1e6; n],
-            epe: vec![1e6; n],
-            ene: vec![0.0; n],
-            diagnostics: None,
-        };
-        let fva = compute_fva(&profile, &curve, 100.0, 0.0).expect("FVA");
-        assert!((fva - 10_000.0).abs() < 1e-8);
-    }
+    let mut profile = ExposureProfile {
+        as_of: date,
+        currency: finstack_quant_core::currency::Currency::USD,
+        basis: finstack_quant_margin::xva::types::ExposureBasis::External {
+            source_id: "opening-exposure-pin".into(),
+            policy_id: "unsecured".into(),
+        },
+        dates: vec![date, time::macros::date!(2026 - 01 - 10)],
+        times: vec![0.0, 1.0],
+        mtm_values: vec![1e6; 2],
+        epe: vec![1e6; 2],
+        ene: vec![0.0; 2],
+        diagnostics: finstack_quant_margin::xva::types::ExposureDiagnostics {
+            total_time_points: 2,
+            ..Default::default()
+        },
+    };
+    let fva = compute_fva(&profile, &curve, 100.0, 0.0).expect("FVA");
+    assert!((fva - 10_000.0).abs() < 1e-8);
+    profile.dates.remove(0);
+    profile.times.remove(0);
+    profile.mtm_values.remove(0);
+    profile.epe.remove(0);
+    profile.ene.remove(0);
+    profile.diagnostics.total_time_points = 1;
+    assert!(compute_fva(&profile, &curve, 100.0, 0.0).is_err());
 }
 
 #[test]
@@ -279,24 +293,24 @@ fn saccr_categories_mpor_and_unmargined_cap_match_prescribed_stages() {
     };
     let engine = SaCcrEngine::default();
     let power = engine
-        .calculate_ead(&config, std::slice::from_ref(&trade))
+        .calculate_ead(std::slice::from_ref(&trade), &config)
         .expect("power");
     assert!((power.add_on_aggregate - 400_000.0).abs() < 1e-8);
     trade.asset_class = SaCcrAssetClass::Credit;
     trade.supervisory_category = Some(SaCcrSupervisoryCategory::CreditBbb);
     let credit = engine
-        .calculate_ead(&config, std::slice::from_ref(&trade))
+        .calculate_ead(std::slice::from_ref(&trade), &config)
         .expect("credit");
     let expected = 1e6 * 0.0054 * (1.0 - (-0.05_f64).exp()) / 0.05;
     assert!((credit.add_on_aggregate - expected).abs() < 1e-8);
     let mut margined =
         SaCcrNettingSetConfig::margined(config.netting_set_id, 0.0, 1e6, 0.0, 0.0, 10, as_of);
     assert_eq!(
-        engine.calculate_ead(&margined, &[]).expect("empty").ead,
+        engine.calculate_ead(&[], &margined).expect("empty").ead,
         0.0
     );
     margined.mpor_days = 1;
-    assert!(engine.calculate_ead(&margined, &[trade]).is_err());
+    assert!(engine.calculate_ead(&[trade], &margined).is_err());
 }
 
 #[test]

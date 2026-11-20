@@ -9,7 +9,7 @@ use super::{ModelKey, STANDARD, parse_model_key};
 use crate::instruments::Instrument;
 use crate::instruments::envelope::{MAX_JSON_BYTES, instrument_load_error};
 use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
-use crate::instruments::pricing_overrides::MetricPricingOverrides;
+use crate::instruments::pricing_overrides::{InstrumentPricingOverrides, MetricPricingOverrides};
 use crate::metrics::MetricId;
 use crate::metrics::risk::MarketHistory;
 use crate::results::ValuationResult;
@@ -50,6 +50,10 @@ impl ParsedInstrument {
     ///   retain stored controls, nested bump fields merge, and explicit null
     ///   clears optional controls. Rates and bumps use the canonical Rust units.
     ///
+    /// * `instrument_pricing_overrides` - Optional instrument-owned JSON patch.
+    ///   Supplied market quotes and model controls replace stored values for this
+    ///   request only, using canonical instrument units.
+    ///
     /// # Errors
     ///
     /// Returns a validation error for malformed overrides, unsupported controls,
@@ -57,6 +61,7 @@ impl ParsedInstrument {
     pub fn from_instrument(
         mut instrument: Box<dyn Instrument>,
         metric_pricing_overrides: Option<&str>,
+        instrument_pricing_overrides: Option<&Value>,
     ) -> finstack_quant_core::Result<Self> {
         if let Some(patch) = metric_pricing_overrides {
             let id = instrument.id().to_owned();
@@ -72,6 +77,9 @@ impl ParsedInstrument {
             merge_metric_patch(&mut value, patch, Some(&id))?;
             *current =
                 serde_json::from_value(value).map_err(|e| Error::Validation(e.to_string()))?;
+        }
+        if let Some(patch) = instrument_pricing_overrides {
+            apply_instrument_pricing_overrides(instrument.as_mut(), patch)?;
         }
         instrument.validate_for_pricing()?;
         Ok(Self { instrument })
@@ -90,6 +98,10 @@ impl ParsedInstrument {
     /// * `metric_pricing_overrides` - Optional JSON object patch with the same
     ///   merge semantics as [`Self::from_instrument`].
     ///
+    /// * `instrument_pricing_overrides` - Optional instrument-owned JSON patch.
+    ///   Supplied market quotes and model controls replace stored values for this
+    ///   request only, using canonical instrument units.
+    ///
     /// # Errors
     ///
     /// Returns a validation error for malformed overrides, unsupported controls,
@@ -97,8 +109,13 @@ impl ParsedInstrument {
     pub fn from_instrument_json(
         instrument: InstrumentJson,
         metric_pricing_overrides: Option<&str>,
+        instrument_pricing_overrides: Option<&Value>,
     ) -> finstack_quant_core::Result<Self> {
-        Self::from_instrument(instrument.into_boxed_unchecked(), metric_pricing_overrides)
+        Self::from_instrument(
+            instrument.into_boxed_unchecked(),
+            metric_pricing_overrides,
+            instrument_pricing_overrides,
+        )
     }
 
     /// Borrow the validated instrument trait object.
@@ -268,7 +285,7 @@ pub fn validate_typed_instrument_json(
 ///
 /// * `json` - Required canonical v1 instrument envelope.
 /// * `metric_pricing_overrides` - Optional `MetricPricingOverrides` JSON merged
-///   into `instrument.spec.metric_pricing_overrides` by the
+///   into the instrument’s stored metric controls by the
 ///   canonical pricing path before instrument validation; `None` retains the
 ///   envelope configuration. Only supplied fields replace stored values;
 ///   omitted fields, including individual `bump_config` fields, are retained.
@@ -295,9 +312,13 @@ pub fn validate_instrument_json(
 ///
 /// * `instrument_json` - Required canonical v1 instrument envelope.
 /// * `metric_pricing_overrides` - Optional `MetricPricingOverrides` JSON merged
-///   into `instrument.spec.metric_pricing_overrides` before validation. Only
+///   into the instrument’s stored metric controls before validation. Only
 ///   supplied fields replace stored values; omitted fields, including individual
 ///   `bump_config` fields, are retained. Explicit `null` clears optional fields.
+///
+/// * `instrument_pricing_overrides` - Optional instrument-owned JSON patch.
+///   Supplied market quotes and model controls replace stored values for this
+///   request only, using canonical instrument units.
 ///
 /// # Errors
 ///
@@ -306,9 +327,10 @@ pub fn validate_instrument_json(
 pub fn parse_boxed_instrument_from_json(
     instrument_json: &str,
     metric_pricing_overrides: Option<&str>,
+    instrument_pricing_overrides: Option<&Value>,
 ) -> finstack_quant_core::Result<ParsedInstrument> {
     let envelope = decode_pricing_envelope(instrument_json, metric_pricing_overrides)?;
-    ParsedInstrument::from_instrument_json(envelope.instrument, None)
+    ParsedInstrument::from_instrument_json(envelope.instrument, None, instrument_pricing_overrides)
 }
 
 /// Parse a JSON array of canonical instrument envelopes into validated
@@ -387,7 +409,7 @@ fn resolve_model_key(
 /// Python `price_instrument(..., extras=...)`, WASM `priceInstrument(...,
 /// extras)` and every typed instrument's `price` take this beside `model` and
 /// `metrics`. The bindings read it once and route its fields to two places:
-/// `metric_pricing_overrides` is merged into the instrument when it is parsed
+/// Both pricing override patches merge into the instrument when it is prepared
 /// ([`ParsedInstrument::from_instrument`] / [`parse_boxed_instrument_from_json`]),
 /// while `market_history` and `explain` apply at the [`price_instrument`] call.
 /// The bindings map `explain` onto
@@ -414,7 +436,7 @@ fn resolve_model_key(
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PriceExtras {
-    /// JSON object patch merged into `instrument.spec.metric_pricing_overrides`
+    /// JSON object patch merged into the instrument’s stored metric controls
     /// before validation, in the shape of [`MetricPricingOverrides`]. Only the
     /// keys present replace stored controls (an explicit `null` clears an
     /// optional control) and `bump_config` keys merge into the stored bump
@@ -427,6 +449,15 @@ pub struct PriceExtras {
         schemars(with = "Option<MetricPricingOverrides>")
     )]
     pub metric_pricing_overrides: Option<Value>,
+    /// Call-time JSON object patch for instrument-owned market quotes and model
+    /// controls. Only supplied fields replace stored values. Setting a nullable
+    /// leaf to null clears it, while omitted leaves keep their original values.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<InstrumentPricingOverrides>")
+    )]
+    pub instrument_pricing_overrides: Option<Value>,
     /// Historical market scenarios for the historical risk metrics (`hvar`,
     /// `expected_shortfall`). `None` prices without history; requesting
     /// those metrics then fails.
@@ -685,6 +716,48 @@ fn merge_metric_patch(
     Ok(())
 }
 
+fn apply_instrument_pricing_overrides(
+    instrument: &mut dyn Instrument,
+    patch: &Value,
+) -> finstack_quant_core::Result<()> {
+    let id = instrument.id().to_owned();
+    let current = instrument
+        .get_instrument_pricing_overrides_mut()
+        .ok_or_else(|| {
+            Error::Validation(with_id_suffix(
+                "instrument does not support instrument pricing overrides".into(),
+                Some(&id),
+            ))
+        })?;
+    let error = |error: serde_json::Error| {
+        Error::Validation(with_id_suffix(
+            format!("invalid instrument_pricing_overrides JSON: {error}"),
+            Some(&id),
+        ))
+    };
+    if !patch.is_object() {
+        return Err(Error::Validation(with_id_suffix(
+            "instrument pricing overrides must be an object".into(),
+            Some(&id),
+        )));
+    }
+    let _: InstrumentPricingOverrides = serde_json::from_value(patch.clone()).map_err(error)?;
+    let mut value = serde_json::to_value(&*current).map_err(error)?;
+    merge_override_values(&mut value, patch);
+    *current = serde_json::from_value(value).map_err(error)?;
+    Ok(())
+}
+
+fn merge_override_values(current: &mut Value, patch: &Value) {
+    if let (Some(current), Some(patch)) = (current.as_object_mut(), patch.as_object()) {
+        for (key, value) in patch {
+            merge_override_values(current.entry(key.clone()).or_insert(Value::Null), value);
+        }
+    } else {
+        *current = patch.clone();
+    }
+}
+
 fn pricing_document(
     instrument_json: &str,
     metric_pricing_overrides: Option<&str>,
@@ -704,11 +777,20 @@ fn pricing_document(
         let id = instrument_id.as_deref();
         let spec = document
             .get_mut("instrument")
-            .and_then(|v| v.get_mut("spec"))
+            .and_then(|instrument| {
+                let embedded_deal =
+                    instrument.get("type").and_then(Value::as_str) == Some("structured_credit_tranche");
+                let spec = instrument.get_mut("spec")?;
+                if embedded_deal {
+                    spec.get_mut("deal")
+                } else {
+                    Some(spec)
+                }
+            })
             .and_then(Value::as_object_mut)
             .ok_or_else(|| {
                 Error::Validation(with_id_suffix(
-                    "instrument envelope must contain an object instrument.spec".into(),
+                    "instrument envelope must contain an object instrument.spec (and an object deal for a structured credit tranche)".into(),
                     id,
                 ))
             })?;
@@ -778,7 +860,7 @@ mod tests {
         market_history: Option<&MarketHistory>,
     ) -> finstack_quant_core::Result<ValuationResult> {
         let instrument =
-            parse_boxed_instrument_from_json(instrument_json, metric_pricing_overrides_json)?;
+            parse_boxed_instrument_from_json(instrument_json, metric_pricing_overrides_json, None)?;
         price_instrument(
             &instrument,
             market,
@@ -797,7 +879,7 @@ mod tests {
         model: &str,
         metric: &str,
     ) -> finstack_quant_core::Result<f64> {
-        let instrument = parse_boxed_instrument_from_json(instrument_json, None)?;
+        let instrument = parse_boxed_instrument_from_json(instrument_json, None, None)?;
         metric_value(
             &instrument,
             market,
@@ -1146,6 +1228,7 @@ mod tests {
         let Err(err) = parse_boxed_instrument_from_json(
             &equity_option_json_with_negative_vol_override(),
             None,
+            None,
         ) else {
             panic!("negative implied volatility override must be rejected")
         };
@@ -1340,13 +1423,13 @@ mod tests {
             "bump_config": {"rate_bump_bp": -2.0, "vol_bump_decimal": 0.02}
         }))
         .expect("stored controls");
-        assert!(ParsedInstrument::from_instrument(Box::new(bond.clone()), None).is_err());
+        assert!(ParsedInstrument::from_instrument(Box::new(bond.clone()), None, None).is_err());
         let wire = envelope_json(InstrumentJson::Bond(bond.clone()));
         let patch = r#"{"bump_config":{"rate_bump_bp":3.0},"theta_period":null}"#;
-        let native = ParsedInstrument::from_instrument(Box::new(bond), Some(patch))
+        let native = ParsedInstrument::from_instrument(Box::new(bond), Some(patch), None)
             .expect("repair before validation");
-        let decoded =
-            parse_boxed_instrument_from_json(&wire, Some(patch)).expect("same wire preparation");
+        let decoded = parse_boxed_instrument_from_json(&wire, Some(patch), None)
+            .expect("same wire preparation");
         let native_controls = native
             .as_instrument()
             .get_metric_pricing_overrides()
@@ -1404,7 +1487,7 @@ mod tests {
         );
 
         let bare: Value = serde_json::from_str::<Value>(&json).expect("json")["instrument"].clone();
-        let single = parse_boxed_instrument_from_json(&bare.to_string(), None)
+        let single = parse_boxed_instrument_from_json(&bare.to_string(), None, None)
             .err()
             .expect("bare instrument must be rejected")
             .to_string();
@@ -1452,7 +1535,7 @@ mod tests {
     #[test]
     fn parse_boxed_instrument_from_json_rejects_domain_invariants() {
         let Err(err) =
-            parse_boxed_instrument_from_json(&equity_option_json_with_invalid_strike(), None)
+            parse_boxed_instrument_from_json(&equity_option_json_with_invalid_strike(), None, None)
         else {
             panic!("negative equity-option strike must be rejected")
         };
@@ -1522,7 +1605,7 @@ mod tests {
 
     #[test]
     fn json_pricing_preserves_custom_registry_for_base_and_metric_repricing() {
-        let parsed = parse_boxed_instrument_from_json(&bond_instrument_json(), None)
+        let parsed = parse_boxed_instrument_from_json(&bond_instrument_json(), None, None)
             .expect("validated bond JSON");
         let calls = Arc::new(AtomicUsize::new(0));
         let mut pricers = PricerRegistry::new();

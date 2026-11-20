@@ -12,16 +12,18 @@ mod checks;
 mod comps;
 mod corkscrew;
 mod covenants;
+mod credit_context;
 pub(crate) mod ecl;
+mod lbo;
 mod relative_value;
 mod reports;
 mod scorecards;
-mod templates_common;
+mod scoring;
 pub(crate) mod templates_real_estate;
 mod templates_roll_forward;
 mod templates_vintage;
 mod typed;
-mod valuation;
+pub(crate) mod valuation;
 
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -64,15 +66,18 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
 
     analysis::register(py, &m)?;
     typed::register(py, &m)?;
+    lbo::register(&m)?;
     valuation::register(py, &m)?;
     checks::register(py, &m)?;
     capital_structure::register(py, &m)?;
     relative_value::register(py, &m)?;
     covenants::register(py, &m)?;
+    credit_context::register(&m)?;
     reports::register(py, &m)?;
     ecl::register(py, &m)?;
     comps::register(py, &m)?;
     scorecards::register(py, &m)?;
+    scoring::register(&m)?;
     corkscrew::register(py, &m)?;
     templates_vintage::register(py, &m)?;
     templates_roll_forward::register(py, &m)?;
@@ -93,6 +98,15 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "CorkscrewReport",
             "CorporateAnalysis",
             "CorporateValuationResult",
+            "CreditContextSpec",
+            "CreditContextReport",
+            "CreditContextMetrics",
+            "CreditMeasureRow",
+            "evaluate_credit_context",
+            "StatementScoringMapping",
+            "CreditScoringModel",
+            "score_statement",
+            "score_statement_series",
             "CreditAssessment",
             "CreditAssessmentPoint",
             "CreditMapping",
@@ -110,6 +124,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "ForecastMetrics",
             "FreeRentWindowSpec",
             "GoalSeekResult",
+            "GoalSeekSpec",
             "LboCheckMappings",
             "LboResult",
             "LeaseGrowthConvention",
@@ -153,6 +168,15 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "VarianceConfig",
             "VarianceReport",
             "VarianceRow",
+            "ImpairedEclScenario",
+            "WeightedImpairedEclResult",
+            "compute_impaired_ecl_weighted",
+            "ImpairedExposure",
+            "RecoveryEvidence",
+            "ImpairedEclResult",
+            "compute_impaired_ecl",
+            "EclScenario",
+            "EclScenarioOutcome",
             "WeightedEclResult",
             "add_ncf_buildup",
             "add_noi_buildup",
@@ -170,8 +194,35 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "credit_assessment",
             "credit_assessment_report_text",
             "dcf_sensitivity",
+            "StatementCovenantSpec",
+            "StatementCovenantAssessment",
+            "StatementCovenantForecast",
+            "assess_statement_covenants",
+            "forecast_statement_covenants",
             "evaluate_covenants",
+            "DcfInputs",
+            "DcfOptions",
+            "StatementValuationCut",
+            "TerminalFcffBasis",
+            "DcfProjection",
+            "CorporateDcfRequest",
+            "DcfSensitivityGridSpec",
+            "DcfSensitivityGridResult",
+            "evaluate_corporate_dcf",
+            "evaluate_dcf_from_results",
+            "dcf_sensitivity_grid",
+            "dcf_sensitivity_on_results",
+            "DcfDistributionResult",
+            "evaluate_dcf_monte_carlo",
             "evaluate_dcf",
+            "LboEarnings",
+            "LboDebtFunding",
+            "LboFunding",
+            "DatedLboRequest",
+            "LboFundingResult",
+            "LboExitBridge",
+            "DatedLboResult",
+            "evaluate_dated_lbo",
             "evaluate_lbo",
             "evaluate_scenario_set",
             "evaluate_scenario_set_with_market",

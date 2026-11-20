@@ -14,6 +14,7 @@ _VAL: dict[str, Any] = {
     "equity_value": {"amount": "850.00", "currency": "USD"},
     "enterprise_value": {"amount": "1000.00", "currency": "USD"},
     "net_debt": {"amount": "150.00", "currency": "USD"},
+    "other_equity_claims": {"amount": "0.00", "currency": "USD"},
     "valuation_discount": {"amount": "0.00", "currency": "USD"},
     "terminal_value_pv": {"amount": "600.00", "currency": "USD"},
     "equity_value_per_share": 8.5,
@@ -124,7 +125,7 @@ def test_bridge_reconciles_to_rust_equity_value_with_valuation_discounts() -> No
     builder = statements.ModelBuilder("dcf")
     builder.periods("2025..2026")
     builder.value_money("ufcf", [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))])
-    builder.with_meta("currency", '"USD"')
+    builder.with_meta("currency", "USD")
     result = evaluate_dcf(
         builder.build(),
         {
@@ -137,12 +138,20 @@ def test_bridge_reconciles_to_rust_equity_value_with_valuation_discounts() -> No
         },
     )
     equity = result.equity_value.amount
-    bridge = result.enterprise_value.amount - result.net_debt.amount - result.valuation_discount.amount
+    assert result.net_debt.amount == 400.0
+    assert result.other_equity_claims.amount == 50.0
+    bridge = (
+        result.enterprise_value.amount
+        - result.net_debt.amount
+        - result.other_equity_claims.amount
+        - result.valuation_discount.amount
+    )
     assert bridge == pytest.approx(equity, abs=0.01)
     assert result.valuation_discount.amount > 0.0
 
     html = dcf_tearsheet(result, sections=["bridge"]).to_html()
     bars = dict(re.findall(r'data-label="([^"]+)" data-val="([^"]+)"', html))
+    assert "− Other Equity Claims" in bars
     assert "− Valuation Discounts" in bars
     assert float(bars["Equity Value"].replace(",", "")) == pytest.approx(equity, abs=1.0)
 

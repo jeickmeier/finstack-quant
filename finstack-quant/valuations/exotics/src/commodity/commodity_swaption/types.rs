@@ -185,6 +185,30 @@ pub struct CommoditySwaption {
 }
 
 impl CommoditySwaption {
+    /// Seed an independent builder with the complete existing contract.
+    pub fn to_builder(&self) -> CommoditySwaptionBuilder {
+        Self::builder()
+            .id(self.id.clone())
+            .underlying(self.underlying.clone())
+            .option_type(self.option_type)
+            .expiry(self.expiry)
+            .underlying_start_date(self.underlying_start_date)
+            .underlying_maturity(self.underlying_maturity)
+            .swap_frequency(self.swap_frequency)
+            .fixed_price(self.fixed_price)
+            .quantity(self.quantity)
+            .forward_curve_id(self.forward_curve_id.clone())
+            .discount_curve_id(self.discount_curve_id.clone())
+            .vol_surface_id(self.vol_surface_id.clone())
+            .calendar_id_opt(self.calendar_id.clone())
+            .business_day_convention(self.business_day_convention)
+            .day_count(self.day_count)
+            .attributes(self.attributes.clone())
+            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
+            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
+            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
+    }
+
     /// Validate commodity swaption input invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         self.underlying.validate("CommoditySwaption")?;

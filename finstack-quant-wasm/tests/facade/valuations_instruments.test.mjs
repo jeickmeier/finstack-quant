@@ -531,3 +531,105 @@ test('IRS accrual flags use typed independent fields', () => {
   assert.equal(built.adjustFixedAccrualDates, false);
   assert.equal(built.adjustFloatAccrualDates, true);
 });
+
+test('Deposit builds and reprices with an exact contractual rate', () => {
+  const { Deposit, priceInstrument } = valuations.instruments;
+  const usd = new core.Currency('USD');
+  const market = new core.MarketContext();
+  market.insert(core.DiscountCurve.flat('USD-OIS', '2025-01-15', 0.05, 'act_365f'));
+  const deposit = Deposit.builder()
+    .id('DEP')
+    .notional(new core.Money(1_000_000, usd))
+    .startDate('2025-01-15')
+    .maturity('2025-04-15')
+    .dayCount('act_360')
+    .fixedRate('0.050500123456789123')
+    .discountCurveId('USD-OIS')
+    .build();
+  assert.equal(deposit.fixedRate, '0.050500123456789123');
+  const serialized = deposit.toJson();
+  assert.equal(Deposit.fromJson(serialized).fixedRate, deposit.fixedRate);
+  assert.deepEqual(
+    deposit.price(market.toJson(), '2025-01-15'),
+    priceInstrument(serialized, market.toJson(), '2025-01-15')
+  );
+  const moved = deposit.toBuilder().maturity('2025-07-15').build();
+  assert.equal(moved.maturity, '2025-07-15');
+  assert.equal(deposit.maturity, '2025-04-15');
+});
+
+test('typed FRA retains fixing and exact strike rate through a builder copy', () => {
+  const contract = valuations.instruments.ForwardRateAgreement.example();
+  const builder = contract.toBuilder();
+  const fra = builder.id('FRA').fixedRate('0.047505').build();
+  assert.equal(fra.fixedRate, '0.047505');
+  assert.equal(fra.fixingDate, contract.fixingDate);
+  assert.equal(fra.forwardCurveId, 'USD-SOFR-3M');
+  assert.equal(fra.toBuilder().build().toJson(), fra.toJson());
+  fra.free();
+  contract.free();
+});
+
+test('bond breakeven ladder retains horizon order and its signed spread units', () => {
+  const instruments = valuations.instruments;
+  const bond = instruments.Bond.example();
+  const spec = JSON.parse(bond.toJson()).instrument.spec;
+  const market = new core.MarketContext();
+  const curve = new core.DiscountCurve({
+    id: spec.discount_curve_id,
+    baseDate: spec.issue_date,
+    knots: [0.0, 1.0, 10.0, 0.7],
+    interp: 'log_linear',
+    extrapolation: 'extend',
+    dayCount: 'act_365f',
+  });
+  try {
+    market.insert(curve);
+    const options = { target: 'z_spread', mode: 'linear' };
+    const ladder = instruments.bondBreakevenLadder(
+      bond,
+      market,
+      spec.issue_date,
+      ['6M', '3M'],
+      options
+    );
+    assert.deepEqual(
+      ladder.rows.map(({ horizon }) => horizon.count),
+      [6, 3]
+    );
+    for (const row of ladder.rows) {
+      assert.ok(Math.abs(row.breakeven_bp + row.carry / row.sensitivity) < 1e-10);
+    }
+    const table = instruments.bondBreakevenLadderTable(ladder);
+    assert.equal(table.row_count, 2);
+    assert.equal(table.columns[0].name, 'horizon');
+  } finally {
+    curve.free();
+    market.free();
+    bond.free();
+  }
+});
+
+test('typed rates and inflation builders preserve the canonical trade when changing its id', () => {
+  const names = [
+    'BasisSwap',
+    'BermudanSwaption',
+    'CmsOption',
+    'CmsSpreadOption',
+    'CmsSwap',
+    'InflationCapFloor',
+    'InflationSwap',
+    'XccySwap',
+    'YoYInflationSwap',
+  ];
+  for (const name of names) {
+    const trade = valuations.instruments[name].example();
+    const newId = '{"literal":"trade id"}';
+    const copy = trade.toBuilder().id(newId).build();
+    const expected = JSON.parse(trade.toJson());
+    expected.instrument.spec.id = newId;
+    assert.equal(copy.id, newId, name);
+    assert.deepEqual(JSON.parse(copy.toJson()), expected, name);
+    assert.notEqual(trade.id, newId, name);
+  }
+});

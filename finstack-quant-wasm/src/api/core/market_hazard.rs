@@ -1,6 +1,8 @@
 //! WASM binding for `finstack_quant_core::market_data::term_structures::HazardCurve`.
 
-use crate::utils::input::{from_js_json, js_f64, js_f64_seq, js_string, js_string_seq};
+use crate::utils::input::{
+    from_js_json, from_js_json_exact, js_f64, js_f64_seq, js_string, js_string_seq,
+};
 use std::sync::Arc;
 
 use crate::api::core::currency::JsCurrency;
@@ -12,7 +14,7 @@ use finstack_quant_core::market_data::term_structures::HazardCurve as RustHazard
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
-use crate::api::core::curve_args::{TimePoint, flat_pairs, flatten_pairs, js_time_point};
+use crate::api::core::curve_args::{TimePoint, flat_pairs, js_time_point};
 
 /// Credit hazard-rate curve for default-probability modelling.
 ///
@@ -90,6 +92,49 @@ impl JsHazardCurve {
 
 #[wasm_bindgen(js_class = HazardCurve)]
 impl JsHazardCurve {
+    /// Construct an annual default-intensity curve from dated segment ends.
+    /// @param id - Market source identifier.
+    /// @param baseDate - ISO-8601 date defining zero curve time.
+    /// @param points - ISO date and quote pairs. Strictly increasing segment end dates after the base date. Each intensity applies to the interval ending at its date. Annual default intensities as finite nonnegative decimal rates.
+    /// @param dayCount - Date-to-year-fraction convention such as act_365f.
+    /// @param recoveryRate - Recovered fraction of par in [0, 1].
+    /// @param calendarId - Holiday calendar, required for calendar-dependent day counts.
+    /// @returns The validated curve on the supplied clock.
+    /// @throws TypeError for mistyped fields or FinstackError for invalid curves or clock conventions.
+    #[wasm_bindgen(js_name = fromDates)]
+    pub fn from_dates(
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "readonly (readonly [string, number])[] | string")]
+        points: JsValue,
+        #[wasm_bindgen(js_name = "dayCount", unchecked_param_type = "string")] day_count: JsValue,
+        #[wasm_bindgen(js_name = "recoveryRate", unchecked_param_type = "number")]
+        recovery_rate: JsValue,
+        #[wasm_bindgen(js_name = "calendarId", unchecked_optional_param_type = "string")]
+        calendar_id: Option<JsValue>,
+    ) -> Result<JsHazardCurve, JsValue> {
+        let points = from_js_json_exact::<Vec<(String, f64)>>(&points, "points")?
+            .into_iter()
+            .map(|(date, quote)| Ok((parse_iso_date(&date)?, quote)))
+            .collect::<Result<Vec<_>, JsValue>>()?;
+        let calendar_id = calendar_id
+            .as_ref()
+            .map(|id| js_string(id, "calendarId"))
+            .transpose()?;
+        RustHazardCurve::from_dates(
+            js_string(&id, "id")?,
+            js_date(&base_date, "baseDate")?,
+            &points,
+            js_string(&day_count, "dayCount")?
+                .parse::<DayCount>()
+                .map_err(to_js_err)?,
+            js_f64(&recovery_rate, "recoveryRate")?,
+            calendar_id.as_deref(),
+        )
+        .map(Self::from_inner)
+        .map_err(to_js_err)
+    }
+
     /// Construct a hazard curve from named options.
     ///
     /// # Arguments
@@ -393,10 +438,18 @@ impl JsHazardCurve {
         self.inner.recovery_rate()
     }
 
-    /// Knots as a flat `[t0, lambda0, t1, lambda1, …]` array (years, decimal intensities).
-    #[wasm_bindgen(getter, js_name = knotPoints)]
-    pub fn knot_points(&self) -> Box<[f64]> {
-        flatten_pairs(self.inner.knot_points())
+    /// Knot coordinates in years from the base date, in increasing order.
+    /// @returns A Float64Array of dates expressed as years from the base date.
+    #[wasm_bindgen(getter)]
+    pub fn knots(&self) -> Box<[f64]> {
+        self.inner.knots().into()
+    }
+
+    /// Continuous decimal hazard intensities per year, aligned with the knots.
+    /// @returns A Float64Array of hazard intensities.
+    #[wasm_bindgen(getter, js_name = hazardRates)]
+    pub fn hazard_rates(&self) -> Box<[f64]> {
+        self.inner.hazard_rates().into()
     }
 
     /// Day-count convention label (e.g. `"act_365f"`).
@@ -470,7 +523,8 @@ mod tests {
     #[test]
     fn hazard_curve_options_reach_the_rust_builder() {
         let curve = JsHazardCurve::build(hazard_options()).expect("hazard curve");
-        assert_eq!(&*curve.knot_points(), &[1.0, 0.02, 5.0, 0.03]);
+        assert_eq!(&*curve.knots(), &[1.0, 5.0]);
+        assert_eq!(&*curve.hazard_rates(), &[0.02, 0.03]);
         assert_eq!(curve.day_count(), "act_365f");
         assert_eq!(curve.calendar_id(), None);
         assert_eq!(curve.issuer().as_deref(), Some("ACME"));

@@ -7,13 +7,14 @@ despite a notebook exercising it.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 import json
 
 import pandas as pd
 import pytest
 
 from finstack_quant.attribution import (
+    AttributionInputs,
     PnlAttribution,
     ReturnContributionResult,
     attribute_pnl,
@@ -107,6 +108,26 @@ def test_attribute_pnl_accepts_bare_method_strings() -> None:
     assert attr.total_pnl != 0.0
     # Rates moved between T0 and T1; the parallel method must attribute it.
     assert attr.rates_curves_pnl != 0.0
+
+
+def test_attribution_inputs_use_local_calendar_dates_without_mutation() -> None:
+    opening = pd.Timestamp("2025-01-15T23:30:00", tz="America/Toronto")
+    closing = datetime(2025, 1, 16, 17, 30)
+    inputs = {
+        "market_t0": _market_state(AS_OF_T0),
+        "market_t1": _market_state(AS_OF_T1, shift=0.002),
+        "as_of_t0": opening,
+        "as_of_t1": closing,
+        "method": "parallel",
+    }
+    instrument = _bond_json()
+    expected = attribute_pnl(instrument, {**inputs, "as_of_t0": AS_OF_T0, "as_of_t1": AS_OF_T1})
+    actual = attribute_pnl(instrument, inputs)
+    assert (str(actual.t0), str(actual.t1)) == (AS_OF_T0, AS_OF_T1)
+    assert actual.total_pnl == expected.total_pnl
+    assert len(attribute_pnl_many(inputs, [instrument])) == 1
+    assert inputs["as_of_t0"] is opening
+    assert inputs["as_of_t1"] is closing
 
 
 def test_attribution_rejects_legacy_pascal_case_method() -> None:
@@ -602,3 +623,22 @@ def test_taylor_sensitivity_steps_rebuild_rates_bucket() -> None:
     assert rates_raw["move_unit"] == "basis_point"
     assert len(rates_raw["buckets"]) == 11
     assert PnlAttribution.from_json(attr.to_json()).sensitivity_steps == raw
+
+
+def test_typed_attribution_reuses_snapshots_in_single_and_batch_calls() -> None:
+    opening = MarketContext.from_json(_market_json(AS_OF_T0))
+    closing = MarketContext.from_json(_market_json(AS_OF_T1, shift=0.002))
+    instrument = _bond_json()
+    wire = {
+        "market_t0": opening,
+        "market_t1": closing,
+        "as_of_t0": AS_OF_T0,
+        "as_of_t1": AS_OF_T1,
+        "method": {"waterfall": default_waterfall_order()},
+    }
+    inputs = AttributionInputs(opening, closing, date.fromisoformat(AS_OF_T0), AS_OF_T1, wire["method"])
+    expected = attribute_pnl(instrument, wire)
+    assert attribute_pnl(instrument, inputs).to_json() == expected.to_json()
+    pd.testing.assert_frame_equal(attribute_pnl_many(inputs, [instrument]), attribute_pnl_many(wire, [instrument]))
+    closing.insert(DiscountCurve.flat("USD-OIS", AS_OF_T1, 0.08, "act_365f"))
+    assert attribute_pnl(instrument, inputs).to_json() == expected.to_json()

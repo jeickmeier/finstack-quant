@@ -250,6 +250,7 @@ pub(crate) fn evaluate_value(
     };
     match &expr.node {
         ExprNode::Literal(val) => Ok(Value::Scalar(*val)),
+        ExprNode::MoneyLiteral(money) => Ok(Value::Money(*money)),
         ExprNode::CsRef {
             component,
             instrument_or_total,

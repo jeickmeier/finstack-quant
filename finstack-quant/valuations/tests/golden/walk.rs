@@ -243,7 +243,7 @@ fn validate_pricing_body(fixture: &GoldenFixture) -> Result<(), String> {
     validate_swaption_underlying_tenor(&pricing.instrument)?;
     let instrument_json = serde_json::to_string(&pricing.instrument)
         .map_err(|err| format!("serialize instrument: {err}"))?;
-    parse_boxed_instrument_from_json(&instrument_json, None)
+    parse_boxed_instrument_from_json(&instrument_json, None, None)
         .map_err(|err| format!("instrument is not a valid instrument: {err}"))?;
 
     for metric in requested_metrics(fixture) {
@@ -731,7 +731,7 @@ fn stripped_default_instrument_parse_error(path: &Path) -> Option<String> {
         Err(err) => return Some(format!("serialize stripped instrument: {err}")),
     };
 
-    parse_boxed_instrument_from_json(&instrument_json, None)
+    parse_boxed_instrument_from_json(&instrument_json, None, None)
         .err()
         .map(|err| format!("stripped default instrument inputs failed to parse: {err}"))
 }

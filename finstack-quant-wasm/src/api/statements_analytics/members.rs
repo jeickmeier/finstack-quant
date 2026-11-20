@@ -68,7 +68,7 @@ pub fn evaluate_dcf(
 /// @param model - `FinancialModelSpec` (object or JSON); its metadata must carry a `currency` when a DCF is requested.
 /// @param options - Optional Rust `CorporateAnalysisOptions`; every field is optional: `wacc` (decimal; enables the DCF and requires `terminal_value`), `terminal_value`, `net_debt_override` (model currency), `cfads_node`, `interest_coverage_node` (default `"ebitda"`), `check_suite` (`CheckSuiteSpec`; DCF and capital-structure analyses need one including the `non_finite` check), `as_of` (ISO date) and `ltv_value_node`. Unknown keys are rejected (object or JSON).
 /// @param market - Optional `MarketContext` state for statement evaluation and instrument pricing; requires `options.as_of` (object or JSON).
-/// @returns `CorporateAnalysis`: the `statement` result, the `equity` valuation (or `null`), per-instrument `credit` metrics and `ev_suppressed_non_positive`.
+/// @returns `CorporateAnalysis`: the `statement` result, the `equity` valuation (or `null`), and per-instrument `credit` metrics.
 ///
 /// # Errors
 ///
@@ -461,4 +461,271 @@ pub fn forecast_metrics_summary_text(
 ) -> Result<String, JsValue> {
     let metrics: fa::ForecastMetrics = from_js_json(&metrics, "metrics")?;
     Ok(metrics.summary())
+}
+
+/// Decode and validate a set of standalone DCF assumptions.
+/// @param inputs - Named cashflow, terminal specification and WACC as an annual decimal rate.
+/// @returns Validated assumptions in the canonical wire shape, with Rust defaults.
+/// @throws If a field is malformed, the WACC is outside the supported range, or the cashflow node is empty.
+#[wasm_bindgen(js_name = dcfInputs, unchecked_return_type = "generated.statements_analytics.DcfInputs")]
+pub fn dcf_inputs(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.DcfInputs | string")]
+    inputs: JsValue,
+) -> Result<JsValue, JsValue> {
+    let inputs: fa::DcfInputs = from_js_json(&inputs, "inputs")?;
+    inputs.validate().map_err(to_js_err)?;
+    to_js_value(&inputs)
+}
+
+/// Resolve optional DCF controls to their canonical settings.
+/// @param options - DCF options object with optional bridge, timing and discount terms.
+/// @returns Canonical DCF options with all Rust defaults applied.
+/// @throws If any field is malformed or unknown.
+#[wasm_bindgen(js_name = dcfOptions, unchecked_return_type = "generated.statements_analytics.DcfOptions")]
+pub fn dcf_options(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.DcfOptions | string")]
+    options: JsValue,
+) -> Result<JsValue, JsValue> {
+    let options: fa::DcfOptions = from_js_json(&options, "options")?;
+    to_js_value(&options)
+}
+
+/// Value a company's named forecast cashflows on an explicit observation cutoff.
+/// @param model - Identified model with publication dates and a reporting currency.
+/// @param request - Statement valuation date and closed observation cutoff, WACC, authored terminal horizon and basis.
+/// @param market - Optional market state for statements with linked capital-structure instruments.
+/// @returns Enterprise and common-equity values with the exact period and terminal timing.
+/// @throws If required statement evidence is missing, the currency is inconsistent, or the DCF assumptions cannot be valued.
+#[wasm_bindgen(js_name = evaluateCorporateDcf, unchecked_return_type = "generated.statements_analytics.CorporateValuationResult")]
+pub fn evaluate_corporate_dcf(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.FinancialModelSpec | string")]
+    model: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.CorporateDcfRequest | string"
+    )]
+    request: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "JsonInput | null")] market: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let model = crate::api::statements::load_model(&model, "model")?;
+    let request: fa::CorporateDcfRequest = from_js_json(&request, "request")?;
+    let market = crate::utils::wire::js_opt_wire(market.as_ref(), "market")?;
+    to_js_value(&fa::evaluate_corporate_dcf(&model, &request, market.as_ref()).map_err(to_js_err)?)
+}
+
+/// Value a company using an already evaluated statement snapshot.
+/// @param model - Unchanged model that produced the supplied results.
+/// @param results - Verified statement result on the requested publication cutoff and effective valuation date.
+/// @param request - Identified DCF assumptions, currency, date and terminal basis.
+/// @returns Enterprise and common-equity values from the reused statement run.
+/// @throws If the run identity or valuation cut differs from the request, or the DCF assumptions fail validation.
+#[wasm_bindgen(js_name = evaluateDcfFromResults, unchecked_return_type = "generated.statements_analytics.CorporateValuationResult")]
+pub fn evaluate_dcf_from_results(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.FinancialModelSpec | string")]
+    model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.CorporateDcfRequest | string"
+    )]
+    request: JsValue,
+) -> Result<JsValue, JsValue> {
+    let model = crate::api::statements::load_model(&model, "model")?;
+    let results: StatementResult = from_js_json(&results, "results")?;
+    let request: fa::CorporateDcfRequest = from_js_json(&request, "request")?;
+    to_js_value(&fa::evaluate_dcf_from_results(&model, &results, &request).map_err(to_js_err)?)
+}
+
+/// Validate a rectangular grid's ordered axes.
+/// @param axes - Lists of unique, nonempty finite WACC rates and growth rates or exit multiples.
+/// @returns Grid axes in their original ordering.
+/// @throws If either axis is empty, repeats a level, or contains a non-finite level.
+#[wasm_bindgen(js_name = dcfSensitivityGridSpec, unchecked_return_type = "generated.statements_analytics.DcfSensitivityGridSpec")]
+pub fn dcf_sensitivity_grid_spec(
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.DcfSensitivityGridSpec | string"
+    )]
+    axes: JsValue,
+) -> Result<JsValue, JsValue> {
+    let axes: fa::DcfSensitivityGridSpec = from_js_json(&axes, "axes")?;
+    axes.validate().map_err(to_js_err)?;
+    to_js_value(&axes)
+}
+
+/// Reprice independent low and high WACC and terminal shocks from an admitted statement run.
+/// @param model - Unchanged model identified by the admitted statement result.
+/// @param results - Statements at the requested valuation and information dates.
+/// @param request - Baseline corporate DCF valuation assumptions.
+/// @param shocks - Positive independent decimal shock distances in the elected parameter dimensions.
+/// @returns Baseline enterprise value and signed deltas or unavailability for each requested endpoint.
+/// @throws If the inputs or baseline are invalid, the shock dimensions disagree, or an admissible endpoint fails to price.
+#[wasm_bindgen(js_name = dcfSensitivityOnResults, unchecked_return_type = "generated.statements_analytics.DcfShockReport")]
+pub fn dcf_sensitivity_on_results(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.FinancialModelSpec | string")]
+    model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.CorporateDcfRequest | string"
+    )]
+    request: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.DcfSensitivityShocks | string"
+    )]
+    shocks: JsValue,
+) -> Result<JsValue, JsValue> {
+    let model = crate::api::statements::load_model(&model, "model")?;
+    let results: StatementResult = from_js_json(&results, "results")?;
+    let request = from_js_json(&request, "request")?;
+    let shocks = from_js_json(&shocks, "shocks")?;
+    to_js_value(
+        &fa::dcf_sensitivity_on_results(&model, &results, &request, &shocks).map_err(to_js_err)?,
+    )
+}
+
+/// Reprice a rectangular grid of DCF assumptions on the same statement run.
+/// @param model - Unchanged source statement model identified in the results.
+/// @param results - Statement result at the requested cutoff and valuation date.
+/// @param request - Corporate DCF inputs at the baseline WACC and terminal assumption.
+/// @param axes - WACC decimal rates in row order and terminal rates or multiples in column order.
+/// @returns Rectangular grid with same-currency values and reasons for unavailable endpoints.
+/// @throws If the baseline or axes are invalid or pricing an admissible cell fails.
+#[wasm_bindgen(js_name = dcfSensitivityGrid, unchecked_return_type = "generated.statements_analytics.DcfSensitivityGridResult")]
+pub fn dcf_sensitivity_grid(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.FinancialModelSpec | string")]
+    model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.CorporateDcfRequest | string"
+    )]
+    request: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.DcfSensitivityGridSpec | string"
+    )]
+    axes: JsValue,
+) -> Result<JsValue, JsValue> {
+    let model = crate::api::statements::load_model(&model, "model")?;
+    let results: StatementResult = from_js_json(&results, "results")?;
+    let request: fa::CorporateDcfRequest = from_js_json(&request, "request")?;
+    let axes: fa::DcfSensitivityGridSpec = from_js_json(&axes, "axes")?;
+    to_js_value(&fa::dcf_sensitivity_grid(&model, &results, &request, &axes).map_err(to_js_err)?)
+}
+
+/// Reprice retained, coherent statement forecast paths as one valuation distribution.
+/// @param model - Original statement model supplying the model identity and reporting calendar.
+/// @param results - Verified baseline observations and opening balances on the matching information cutoff.
+/// @param paths - Complete Monte Carlo results retaining the selected monetary forecast samples and path identities.
+/// @param request - Common WACC, dated cash-flow terms and terminal assumptions.
+/// @returns Same-currency values per path and R-7 sample quantiles at the elected probabilities.
+/// @throws If verified provenance differs, the retained paths are incomplete, or a sampled path cannot price.
+#[wasm_bindgen(js_name = evaluateDcfMonteCarlo, unchecked_return_type = "generated.statements_analytics.DcfDistributionResult")]
+pub fn evaluate_dcf_monte_carlo(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.FinancialModelSpec | string")]
+    model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.MonteCarloResults | string")]
+    paths: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.CorporateDcfRequest | string"
+    )]
+    request: JsValue,
+) -> Result<JsValue, JsValue> {
+    let model = crate::api::statements::load_model(&model, "model")?;
+    let results: StatementResult = from_js_json(&results, "results")?;
+    let paths: finstack_quant_statements::evaluator::MonteCarloResults =
+        from_js_json(&paths, "paths")?;
+    let request: fa::CorporateDcfRequest = from_js_json(&request, "request")?;
+    to_js_value(
+        &fa::evaluate_dcf_monte_carlo(&model, &results, &paths, &request).map_err(to_js_err)?,
+    )
+}
+
+/// Reconstruct a dated leveraged acquisition and calculate qualified exit returns.
+/// @param model - Identified statement model containing admitted actuals and projected exit observations.
+/// @param request - Closing uses, cash sources, exit assumptions and elected check suite.
+/// @param market - Market data for any instruments linked to statement observations.
+/// @returns Reconciled sources and uses, signed exit bridge and any supportable sponsor returns.
+/// @throws If dates, dates of observation, monetary inputs, source data or required checks are invalid.
+#[wasm_bindgen(js_name = evaluateDatedLbo, unchecked_return_type = "generated.statements_analytics.DatedLboResult")]
+pub fn evaluate_dated_lbo(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.FinancialModelSpec | string")]
+    model: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.DatedLboRequest | string"
+    )]
+    request: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "JsonInput | null")] market: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let model = crate::api::statements::load_model(&model, "model")?;
+    let request = from_js_json(&request, "request")?;
+    let market = crate::utils::wire::js_opt_wire(market.as_ref(), "market")?;
+    to_js_value(&fa::evaluate_dated_lbo(&model, &request, market.as_ref()).map_err(to_js_err)?)
+}
+
+/// Measure qualified same-currency credit ratios for one borrowing in a dated statement run.
+/// @param results - Statement run and capital cash flows with verified observation metadata.
+/// @param spec - Explicit borrowing, expected run identity, currency, periods and selected credit measures.
+/// @returns Dated measurements with numerator and denominator or explicit availability, and coverage by measure.
+/// @throws If source provenance, dates, borrowing scope, monetary units or requested measures are invalid.
+#[wasm_bindgen(js_name = evaluateCreditContext, unchecked_return_type = "generated.statements_analytics.CreditContextReport")]
+pub fn evaluate_credit_context(
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.CreditContextSpec | string"
+    )]
+    spec: JsValue,
+) -> Result<JsValue, JsValue> {
+    let results = from_js_json(&results, "results")?;
+    let spec = from_js_json(&spec, "spec")?;
+    to_js_value(&fa::evaluate_credit_context(&results, &spec).map_err(to_js_err)?)
+}
+
+/// Calculate the elected credit score from admitted annual monetary statement observations.
+/// @param results - Evaluated statements and reporting periods.
+/// @param period - Exact full-year period label with matched stocks and flows.
+/// @param mapping - Monetary node IDs required by the selected statistical model.
+/// @param model - Scoring model, including dated market equity where required.
+/// @returns Canonical score, classification zone and model-implied PD when present.
+/// @throws If observations, units, dates, model inputs or resulting ratios are inadmissible.
+#[wasm_bindgen(js_name = scoreStatement, unchecked_return_type = "generated.models.ScoringResult")]
+pub fn score_statement(
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] period: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.StatementScoringMapping | string"
+    )]
+    mapping: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.CreditScoringModel | string"
+    )]
+    model: JsValue,
+) -> Result<JsValue, JsValue> {
+    let results: StatementResult = from_js_json(&results, "results")?;
+    let period = crate::utils::input::js_string(&period, "period")?
+        .parse()
+        .map_err(to_js_err)?;
+    let mapping = from_js_json(&mapping, "mapping")?;
+    let model = from_js_json(&model, "model")?;
+    to_js_value(&fa::score_statement(&results, &period, &mapping, &model).map_err(to_js_err)?)
+}
+
+/// Calculate one credit score for each explicitly elected annual reporting period.
+/// @param results - Evaluated statements and their authoritative period plan.
+/// @param rows - Distinct full-year labels and the selected score model for each.
+/// @param mapping - Names of monetary statement inputs shared by the requested periods.
+/// @returns Canonical score results in request order.
+/// @throws If any selected year repeats or lacks an admissible scoring observation.
+#[wasm_bindgen(js_name = scoreStatementSeries, unchecked_return_type = "generated.models.ScoringResult[]")]
+pub fn score_statement_series(
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "readonly [string, generated.statements_analytics.CreditScoringModel][] | string"
+    )]
+    rows: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.StatementScoringMapping | string"
+    )]
+    mapping: JsValue,
+) -> Result<JsValue, JsValue> {
+    let results: StatementResult = from_js_json(&results, "results")?;
+    let rows = from_js_json::<Vec<(PeriodId, fa::CreditScoringModel)>>(&rows, "rows")?;
+    let mapping = from_js_json(&mapping, "mapping")?;
+    to_js_value(&fa::score_statement_series(&results, &rows, &mapping).map_err(to_js_err)?)
 }

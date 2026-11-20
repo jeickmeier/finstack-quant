@@ -345,3 +345,94 @@ def test_irs_accrual_flags_round_trip_and_builder() -> None:
     restored = InterestRateSwap.from_json(adjusted.to_json())
     assert restored.adjust_fixed_accrual_dates is True
     assert restored.adjust_float_accrual_dates is False
+
+
+def test_inflation_linked_bond_preserves_exact_contract_during_edits() -> None:
+    from decimal import Decimal
+
+    from finstack_quant.valuations.instruments import InflationLinkedBond
+
+    source = InflationLinkedBond.example()
+    coupon = Decimal("0.025000000000000000000000001")
+    changed = source.to_builder().id("TIPS-EDITED").real_coupon(coupon).lag("90D").build()
+    assert changed.id == "TIPS-EDITED"
+    assert changed.real_coupon == coupon
+    assert changed.lag == "90D"
+    assert source.lag == "3M"
+    restored = InflationLinkedBond.from_json(changed.to_json())
+    assert restored.real_coupon == coupon
+    assert restored.to_json() == changed.to_json()
+
+
+def test_bond_future_uses_typed_terms_and_live_and_final_marks() -> None:
+    import json
+    import pickle
+
+    from finstack_quant.core.market_data import MarketContext
+    from finstack_quant.valuations.instruments import BondFuture, ListedFutureTerms
+
+    initial = BondFuture.example()
+    terms = ListedFutureTerms(2, 1000, "USD", 112.25, "2025-09-19", "2025-09-30", "long")
+    edited = initial.to_builder().terms(terms.with_marks(112.75, 112.50)).build()
+    assert edited.price(MarketContext(), "2025-09-01").value.amount == 1000.0
+    assert edited.price(MarketContext(), "2025-09-23").value.amount == 500.0
+    assert json.loads(initial.terms.to_json())["contracts"] == 10.0
+    assert BondFuture.from_json(edited.to_json()).to_json() == edited.to_json()
+    assert pickle.loads(pickle.dumps(edited.terms)).to_json() == edited.terms.to_json()  # noqa: S301
+    with pytest.raises(ValueError, match="must be finite"):
+        terms.with_marks(float("nan"), None)
+
+
+def test_listed_options_use_native_typed_terms_and_preserve_price() -> None:
+    from finstack_quant.core.market_data import DiscountCurve, MarketContext
+    from finstack_quant.valuations.instruments import (
+        EquityFutureOption,
+        FutureOptionTerms,
+        FxFutureOption,
+        InterestRateFutureOption,
+        VolatilityIndexFutureOption,
+    )
+
+    as_of = datetime.date(2026, 10, 1)
+    market = MarketContext()
+    for curve_id in ("USD-OIS", "EUR-OIS"):
+        market.insert(
+            DiscountCurve(
+                curve_id,
+                as_of,
+                [(0.0, 1.0), (1.0, 0.96), (2.0, 0.92)],
+                interp="log_linear",
+                extrapolation="extend",
+                day_count=DayCount.ACT_365F,
+            )
+        )
+
+    for instrument in (EquityFutureOption, FxFutureOption, InterestRateFutureOption, VolatilityIndexFutureOption):
+        option = instrument.example()
+        terms = FutureOptionTerms(**option.terms.to_dict())
+        edited = option.to_builder().id("EDITED").terms(terms).build()
+        assert option.id != edited.id
+        assert option.terms.to_dict() == edited.terms.to_dict()
+        price = edited.price(market, as_of).value
+        wire_price = price_instrument(edited.to_json(), market, as_of).value
+        assert price == wire_price == option.price(market, as_of).value
+
+
+def test_other_listed_futures_roundtrip_typed_terms_at_exchange_marks() -> None:
+    from finstack_quant.core.market_data import MarketContext
+    from finstack_quant.valuations.instruments import (
+        EquityFuture,
+        FxFuture,
+        InterestRateFuture,
+        VolatilityIndexFuture,
+    )
+
+    for cls in (EquityFuture, FxFuture, InterestRateFuture, VolatilityIndexFuture):
+        original = cls.example()
+        terms = original.terms.with_marks(99.0, None)
+        edited = original.to_builder().id("EDITED").terms(terms).build()
+        assert original.id != edited.id
+        assert edited.terms.to_json() == terms.to_json()
+        as_of = datetime.date(2025, 1, 2)
+        market = MarketContext()
+        assert edited.price(market, as_of).value == price_instrument(edited.to_json(), market, as_of).value

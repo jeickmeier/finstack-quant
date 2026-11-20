@@ -29,6 +29,7 @@ from finstack_quant.core import FinstackError
 __all__ = [
     "CholeskyError",
     "apply_lower_triangular",
+    "apply_lower_triangular_many",
     "cholesky_decomposition",
     "cholesky_solve",
     "ledoit_wolf_shrinkage",
@@ -94,6 +95,42 @@ def apply_lower_triangular(
     >>> linalg.apply_lower_triangular([[2.0, 0.0], [1.0, 3.0]], [1.0, 2.0])
     [2.0, 7.0]
 
+    """
+    ...
+
+def apply_lower_triangular_many(
+    l: Sequence[Sequence[float]] | npt.NDArray[np.float64],
+    z: Sequence[Sequence[float]] | npt.NDArray[np.float64],
+) -> npt.NDArray[np.float64]:
+    """Apply one lower-triangular factor to rows of independent draws.
+
+    Parameters
+    ----------
+    l : array-like
+        A square factor in row-major order. Only its lower triangle is read.
+    z : array-like
+        Draw matrix of shape ``(n_draws, n_variables)``. Each row contains one
+        finite observation per variable in factor order.
+
+    Returns
+    -------
+    numpy.ndarray
+        Float64 transformed draws with the original shape and row order.
+
+    Raises
+    ------
+    TypeError
+        If an input contains Boolean or non-numeric elements.
+    ValueError
+        If the factor or draws have incompatible shapes or non-finite data.
+    RuntimeError
+        If a transformed value overflows.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.math.linalg import apply_lower_triangular_many
+    >>> apply_lower_triangular_many([[2.0, 0.0], [1.0, 3.0]], [[1.0, 2.0], [-1.0, 1.0]]).tolist()
+    [[2.0, 7.0], [-2.0, 2.0]]
     """
     ...
 

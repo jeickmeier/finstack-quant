@@ -1,13 +1,15 @@
 use super::params::HESTON_TAIL_LOG_TARGET;
-use super::{HestonFourierSettings, HestonPricingParams, HestonStripPricer};
+use super::{HestonFourierSettings, HestonStripPricer};
 #[cfg(test)]
 use crate::closed_form::bs_price_unchecked;
-use crate::types::OptionType;
+use crate::monte_carlo::process::heston::HestonProcessParams;
+use crate::types::{OptionContractParams, OptionType};
+use crate::volatility::heston::HestonParams;
 use finstack_quant_core::{Error, Result};
 
 fn resolve_heston_settings(
     time: f64,
-    params: &HestonPricingParams,
+    params: &HestonProcessParams,
     settings: Option<&HestonFourierSettings>,
 ) -> HestonFourierSettings {
     if let Some(settings) = settings {
@@ -19,61 +21,17 @@ fn resolve_heston_settings(
     // Gaussian short-time bound. Neither bound alone covers both regimes.
     let c_inf = (1.0 - params.model.rho * params.model.rho).sqrt()
         * (params.model.v0 + params.model.kappa * params.model.theta * time)
-        / params.model.sigma_v;
+        / params.model.vol_of_vol;
     settings.u_max = settings.u_max.max(HESTON_TAIL_LOG_TARGET / c_inf);
     settings.panels = settings.u_max.ceil() as usize;
     settings
 }
 
-/// Price a European call option under the Heston model using Fourier inversion.
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option quote currency.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `time` - Remaining time to maturity in years.
-/// * `params` - Validated Heston rate, carry, variance, mean-reversion,
-///   volatility-of-variance, and correlation parameters.
-/// * `settings` - Optional Fourier integration grid, truncation, and damping
-///   settings. `None` uses [`HestonFourierSettings::for_maturity`]
-///   so short-dated and low-variance options get a wider/finer grid.
-///
-/// # Returns
-///
-/// Call option price
-///
-/// # Formula
-///
-/// C = S * exp(-qT) * P1 - K * exp(-rT) * P2
-///
-/// where P1 and P2 are risk-neutral probabilities computed via Fourier inversion.
-///
-/// # Example
-///
-/// ```text
-/// use finstack_quant_models::closed_form::{
-///     heston_call_price_fourier, HestonPricingParams,
-/// };
-///
-/// let params = HestonPricingParams::new(
-///     0.05,  // risk-free rate
-///     0.02,  // dividend yield
-///     2.0,   // kappa (mean reversion)
-///     0.04,  // theta (long-run variance)
-///     0.3,   // sigma_v (vol-of-vol)
-///     -0.7,  // rho (correlation)
-///     0.04,  // v0 (initial variance)
-/// )
-/// .unwrap();
-///
-/// let price = heston_call_price_fourier(100.0, 100.0, 1.0, &params, None).unwrap();
-/// assert!(price > 0.0 && price < 100.0);
-/// ```
-pub fn heston_call_price_fourier(
+pub(super) fn call_strike(
     spot: f64,
     strike: f64,
     time: f64,
-    params: &HestonPricingParams,
+    params: &HestonProcessParams,
     settings: Option<&HestonFourierSettings>,
 ) -> Result<f64> {
     heston_call_prices_fourier(spot, &[strike], time, params, settings)?
@@ -86,14 +44,14 @@ pub fn heston_call_price_fourier(
 pub(super) fn validate_heston_inputs(
     spot: f64,
     time: f64,
-    params: &HestonPricingParams,
+    params: &HestonProcessParams,
 ) -> Result<()> {
     for (name, value) in [
         ("spot", spot),
         ("v0", params.model.v0),
         ("kappa", params.model.kappa),
         ("theta", params.model.theta),
-        ("sigma_v", params.model.sigma_v),
+        ("vol_of_vol", params.model.vol_of_vol),
     ] {
         if !value.is_finite() || value <= 0.0 {
             return Err(Error::Validation(format!(
@@ -146,7 +104,7 @@ pub(crate) fn heston_call_prices_fourier(
     spot: f64,
     strikes: &[f64],
     time: f64,
-    params: &HestonPricingParams,
+    params: &HestonProcessParams,
     settings: Option<&HestonFourierSettings>,
 ) -> Result<Vec<f64>> {
     validate_heston_inputs(spot, time, params)?;
@@ -232,10 +190,10 @@ pub(crate) fn heston_put_price_fourier(
     spot: f64,
     strike: f64,
     time: f64,
-    params: &HestonPricingParams,
+    params: &HestonProcessParams,
     settings: Option<&HestonFourierSettings>,
 ) -> Result<f64> {
-    let call_price = heston_call_price_fourier(spot, strike, time, params, settings)?;
+    let call_price = call_strike(spot, strike, time, params, settings)?;
     let forward = spot * (-params.q * time.max(0.0)).exp();
     let discount_k = strike * (-params.r * time.max(0.0)).exp();
     let put_price = call_price - forward + discount_k;
@@ -251,56 +209,88 @@ pub(crate) fn heston_put_price_fourier(
     Ok(put_price.max(0.0))
 }
 
-/// Price a European call or put under the Heston model using Fourier inversion.
-///
-/// Routes to `heston_call_price_fourier` or `heston_put_price_fourier` from
-/// `option_type`, so host bindings share one call/put branch.
-///
+/// Price a European option under the Heston model using Fourier inversion.
 /// # Arguments
 ///
-/// * `spot` - Current underlying spot price in the option quote currency.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `time` - Remaining time to maturity in years; a non-positive value
-///   returns intrinsic value.
-/// * `params` - Validated Heston rate, carry, variance, mean-reversion,
-///   volatility-of-variance, and correlation parameters.
-/// * `option_type` - Call or put payoff.
-/// * `settings` - Optional Fourier integration settings. `None` uses
-///   [`HestonFourierSettings::for_maturity`].
-///
-/// # Returns
-///
-/// Option price per unit of the underlying.
+/// * `contract` - Spot and strike in quote currency, annual continuous
+///   rate and carry, nonnegative expiry in years, and the payoff direction.
+/// * `heston` - Instantaneous opening variance and canonical annual variance
+///   dynamics, including the spot/variance correlation in `(-1, 1)`.
+/// * `settings` - Optional Fourier integration limits and quadrature
+///   settings. Omitted settings are chosen from maturity and variance.
 ///
 /// # Errors
 ///
-/// Returns `Error::Calibration` (category `heston_fourier`) when the Fourier
-/// integration or the put-call parity step produces a non-finite price.
+/// Returns a validation error for invalid inputs or unrepresentable
+/// discounting. Returns a calibration error when integration or put-call
+/// parity cannot produce a finite resolved price.
 ///
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_models::types::OptionType;
-/// use finstack_quant_models::closed_form::{heston_price, HestonPricingParams};
+/// use finstack_quant_models::closed_form::heston_price;
+/// use finstack_quant_models::types::{OptionContractParams, OptionType};
+/// use finstack_quant_models::volatility::heston::HestonParams;
 ///
-/// let params = HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04)?;
-/// let call = heston_price(100.0, 100.0, 1.0, &params, OptionType::Call, None)?;
-/// let put = heston_price(100.0, 100.0, 1.0, &params, OptionType::Put, None)?;
-/// assert!(call > 5.0 && call < 15.0 && put > 0.0);
+/// let contract = OptionContractParams {
+///     spot: 100.0, strike: 100.0, rate: 0.05, dividend_yield: 0.02,
+///     time_to_expiry: 1.0, option_type: OptionType::Call,
+/// };
+/// let model = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.7)?;
+/// let price = heston_price(&contract, &model, None)?;
+/// assert!(price > 5.0 && price < 15.0);
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn heston_price(
-    spot: f64,
-    strike: f64,
-    time: f64,
-    params: &HestonPricingParams,
-    option_type: OptionType,
+    contract: &OptionContractParams,
+    heston: &HestonParams,
     settings: Option<&HestonFourierSettings>,
 ) -> Result<f64> {
+    contract.validate()?;
+    let OptionContractParams {
+        spot,
+        strike,
+        rate,
+        dividend_yield,
+        time_to_expiry,
+        option_type,
+    } = *contract;
+    heston.validate()?;
+    let dynamics = HestonProcessParams {
+        r: rate,
+        q: dividend_yield,
+        model: *heston,
+    };
     match option_type {
-        OptionType::Call => heston_call_price_fourier(spot, strike, time, params, settings),
-        OptionType::Put => heston_put_price_fourier(spot, strike, time, params, settings),
+        OptionType::Call => call_strike(spot, strike, time_to_expiry, &dynamics, settings),
+        OptionType::Put => {
+            heston_put_price_fourier(spot, strike, time_to_expiry, &dynamics, settings)
+        }
     }
+}
+
+/// Price one European call under the Heston model using Fourier inversion.
+///
+/// # Arguments
+///
+/// * `contract` - Call payoff, positive spot and strike in quote units, annual
+///   continuous carry rates and nonnegative time to expiry in years.
+/// * `heston` - Validated annual Heston variance dynamics and spot/variance correlation.
+/// * `settings` - Optional integration settings. Omit to use the maturity-based defaults.
+///
+/// # Errors
+/// Rejects non-call contracts, invalid input domains, or unresolved integration.
+pub fn heston_call_price_fourier(
+    contract: &OptionContractParams,
+    heston: &HestonParams,
+    settings: Option<&HestonFourierSettings>,
+) -> Result<f64> {
+    if contract.option_type != OptionType::Call {
+        return Err(Error::Validation(
+            "Heston call pricing requires a call payoff".into(),
+        ));
+    }
+    heston_price(contract, heston, settings)
 }
 
 /// Black-Scholes reference for deterministic-variance regression tests.

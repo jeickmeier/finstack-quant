@@ -6300,6 +6300,20 @@ export interface PiecewiseSigmaCalibrationConfig {
   sigma_min: number;
 }
 /**
+ * One typed calibration step with inline observations.
+ */
+export interface StepWithQuotes {
+  /**
+   * Inputs to register in the named quote set, in calibration order.
+   * A later step can pass an empty list to reuse a previously registered set.
+   */
+  quotes: MarketDatum[];
+  /**
+   * Typed step containing its parameters and quote-set identifier.
+   */
+  step: CalibrationStep;
+}
+/**
  * ATM swaption volatility quote in year fractions for the direct Hull-White calibrator.
  */
 export interface SwaptionQuote {

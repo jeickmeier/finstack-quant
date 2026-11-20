@@ -1,8 +1,19 @@
 {
   "targetNode": "ebitda",
   "targetPeriod": "2025Q4",
-  "targetValue": 70000000,
+  "targetValue": {
+    "amount": "70000000",
+    "currency": "USD"
+  },
   "driverNode": "revenue",
   "driverPeriod": "2025Q4",
-  "bounds": [100000000, 500000000]
+  "bounds": [100000000, 500000000],
+  "targetTolerance": {
+    "amount": "0.01",
+    "currency": "USD"
+  },
+  "driverTolerance": 1e-9,
+  "maxIterations": 100,
+  "asOf": "2025-04-01",
+  "observedThrough": "2025-04-01"
 }

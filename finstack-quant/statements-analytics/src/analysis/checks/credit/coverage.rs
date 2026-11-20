@@ -84,7 +84,7 @@ impl Check for CoverageFloorCheck {
                     period: Some(*pid),
                     materiality: Some(Materiality {
                         absolute: denom,
-                        relative_pct: None,
+                        relative: None,
                         reference_value: denom,
                         reference_label: "denominator".to_string(),
                     }),
@@ -130,7 +130,7 @@ impl Check for CoverageFloorCheck {
                     period: Some(*pid),
                     materiality: Some(Materiality {
                         absolute: ratio,
-                        relative_pct: None,
+                        relative: None,
                         reference_value: denom,
                         reference_label: "denominator".to_string(),
                     }),

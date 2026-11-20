@@ -178,44 +178,36 @@ fn test_corkscrew_with_multiple_accounts() {
 
 #[test]
 fn roll_forward_inventory_pairs_with_corkscrew_decreases() {
-    let model = roll_forward::add_roll_forward(
-        {
-            let mut model_builder = ModelBuilder::new("inventory_roll");
-            model_builder.periods("2025Q1..Q2", None).unwrap();
-            model_builder.value(
-                "additions",
-                &[
-                    (
-                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                        AmountOrScalar::scalar(100.0),
-                    ),
-                    (
-                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                        AmountOrScalar::scalar(50.0),
-                    ),
-                ],
-            );
-            model_builder.value(
-                "disposals",
-                &[
-                    (
-                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                        AmountOrScalar::scalar(0.0),
-                    ),
-                    (
-                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                        AmountOrScalar::scalar(20.0),
-                    ),
-                ],
-            );
-            model_builder
-        },
-        "inventory",
-        &["additions"],
-        &["disposals"],
-    )
-    .build()
-    .unwrap();
+    let mut builder = ModelBuilder::new("inventory_roll");
+    builder.periods("2025Q1..Q2", None).unwrap();
+    builder.value(
+        "additions",
+        &[
+            (
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            ),
+            (
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                AmountOrScalar::scalar(50.0),
+            ),
+        ],
+    );
+    builder.value(
+        "disposals",
+        &[
+            (
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(0.0),
+            ),
+            (
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                AmountOrScalar::scalar(20.0),
+            ),
+        ],
+    );
+    roll_forward::add_roll_forward(&mut builder, "inventory", &["additions"], &["disposals"]);
+    let model = builder.build().unwrap();
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();

@@ -275,7 +275,7 @@ impl EquityOption {
     /// # Arguments
     ///
     /// * `id` - Trade identifier stored on the option and used in results and serialization.
-    /// * `ticker` - Underlying equity label (not used for market lookups).
+    /// * `ticker` - Underlying equity ticker used to derive the spot and volatility identifiers.
     /// * `option_params` - Strike (in `currency` per underlying unit), expiry, call/put,
     ///   exercise style, settlement type, quantity and currency; build it with
     ///   [`EquityOptionParams::call`] or [`EquityOptionParams::put`].
@@ -397,9 +397,9 @@ impl EquityOption {
 
     /// Create a cash-settled European option with the generic default market-data ids.
     ///
-    /// The option binds to `USD-OIS` (discount), `EQUITY-SPOT` (spot),
-    /// `EQUITY-VOL` (volatility surface) and `EQUITY-DIVYIELD` (continuous
-    /// dividend yield). Use [`Self::european_with_market_data`] to bind other ids.
+    /// Discount uses `{currency}-OIS`, spot uses `{ticker}-SPOT` and volatility
+    /// uses `{ticker}-VOL`. The default has zero continuous dividend yield.
+    /// Use [`Self::european_with_market_data`] to designate other market inputs.
     ///
     /// # Errors
     ///
@@ -408,7 +408,7 @@ impl EquityOption {
     /// # Arguments
     ///
     /// * `id` - Trade identifier stored on the option and used in results and serialization.
-    /// * `ticker` - Underlying equity label (not used for market lookups).
+    /// * `ticker` - Underlying equity ticker used to derive the spot and volatility identifiers.
     /// * `strike` - Option strike in `currency` per underlying unit.
     /// * `expiry` - Option expiry date.
     /// * `quantity` - Number of underlying units; PV scales linearly with it.
@@ -427,13 +427,13 @@ impl EquityOption {
         let option_params =
             EquityOptionParams::new(strike, expiry, option_type, quantity, currency)
                 .with_settlement(SettlementType::Cash);
-        Self::european_with_market_data(
-            id,
-            ticker,
-            option_params,
-            EquityOptionMarketData::new("USD-OIS", "EQUITY-SPOT", "EQUITY-VOL")
-                .with_div_yield_id("EQUITY-DIVYIELD"),
-        )
+        let ticker = ticker.into();
+        let market_data = EquityOptionMarketData::new(
+            format!("{currency}-OIS"),
+            format!("{ticker}-SPOT"),
+            format!("{ticker}-VOL"),
+        );
+        Self::european_with_market_data(id, ticker, option_params, market_data)
     }
 
     /// Recover decimal annualized volatility using the option's exercise and dividend model.

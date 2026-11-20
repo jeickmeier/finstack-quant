@@ -287,6 +287,30 @@ impl PyMarketContext {
         slf
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.core.market_data._context", "MarketContext.insert_fixing")]
+    fn insert_fixing<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        index_id: &str,
+        series: &PyScalarTimeSeries,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        slf.inner
+            .insert_fixing(index_id, series.inner.clone())
+            .map_err(core_to_py)?;
+        Ok(slf)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.core.market_data._context", "MarketContext.insert_dividend_yield")]
+    fn insert_dividend_yield<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        id: &str,
+        yield_rate: f64,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        slf.inner
+            .insert_dividend_yield(id, yield_rate)
+            .map_err(core_to_py)?;
+        Ok(slf)
+    }
+
     /// Insert an inflation index under its own id (fluent, returns ``self``).
     ///
     /// Parameters
@@ -369,6 +393,24 @@ impl PyMarketContext {
     fn get_vol_index_curve(&self, id: &str) -> PyResult<PyPriceCurve> {
         let arc = self.inner.get_vol_index_curve(id).map_err(core_to_py)?;
         Ok(PyPriceCurve::from_inner(arc))
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.core.market_data._context", "MarketContext.copy")]
+    fn copy(&self) -> Self {
+        self.clone()
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.core.market_data._context", "MarketContext.prices")]
+    fn prices<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyDict>> {
+        let prices = pyo3::types::PyDict::new(py);
+        for (id, scalar) in self.inner.prices() {
+            if let Some(money) = scalar.get_price() {
+                prices.set_item(id.as_str(), PyMoney::from_inner(money))?;
+            } else if let Some(value) = scalar.get_unitless() {
+                prices.set_item(id.as_str(), value)?;
+            }
+        }
+        Ok(prices)
     }
 
     /// Retrieve a scalar market price as ``(value, currency)``.

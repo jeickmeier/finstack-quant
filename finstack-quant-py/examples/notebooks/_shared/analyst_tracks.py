@@ -872,7 +872,13 @@ def build_book(stage: str, *, core_stage: str | None = None) -> Portfolio:
     >>> len(build_book("credit").position_ids)
     12
     """
-    return Portfolio.from_spec(json.dumps(book_spec(stage, core_stage=core_stage)))
+    resolved_core_stage = _resolve_core_stage(stage, core_stage)
+    extension = credit_extension() if stage == "credit" else vol_extension()
+    builder = Portfolio.builder(f"ANALYST-{stage.upper()}", "USD", AS_OF).entity("FUND").tag("stage", stage)
+    for instruments in (common.instruments(resolved_core_stage), extension):
+        for iid, instrument in instruments.items():
+            builder.position(iid, instrument, 1.0, entity_id="FUND")
+    return builder.build()
 
 
 def ohlc_observations() -> dict[str, list[tuple[date, float]]]:

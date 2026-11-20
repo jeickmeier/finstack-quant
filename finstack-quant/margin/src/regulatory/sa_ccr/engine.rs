@@ -82,8 +82,8 @@ impl SaCcrEngine {
     /// - BCBS 279 SA-CCR: `docs/REFERENCES.md#bcbs-279-saccr`
     pub fn calculate_ead(
         &self,
-        config: &SaCcrNettingSetConfig,
         trades: &[SaCcrTrade],
+        config: &SaCcrNettingSetConfig,
     ) -> Result<EadResult> {
         config.validate()?;
         for trade in trades {
@@ -107,7 +107,7 @@ impl SaCcrEngine {
         if config.is_margined {
             let mut unmargined = config.clone();
             unmargined.is_margined = false;
-            let cap = self.calculate_ead(&unmargined, trades)?.ead;
+            let cap = self.calculate_ead(trades, &unmargined)?.ead;
             ead = ead.min(cap);
         }
 
@@ -170,7 +170,7 @@ pub fn saccr_ead(
         Some(alpha) => SaCcrEngine::with_alpha(alpha)?,
         None => SaCcrEngine::default(),
     };
-    engine.calculate_ead(config, trades)
+    engine.calculate_ead(trades, config)
 }
 
 #[cfg(test)]
@@ -264,10 +264,10 @@ mod tests {
         let engine = SaCcrEngine::default();
         let mut config = margined_config(0.0, 0.0, 0.0, 0.0);
         config.mpor_days = 0;
-        assert!(engine.calculate_ead(&config, &[]).is_err());
+        assert!(engine.calculate_ead(&[], &config).is_err());
         config.mpor_days = 10;
         config.mta = f64::NAN;
-        assert!(engine.calculate_ead(&config, &[]).is_err());
+        assert!(engine.calculate_ead(&[], &config).is_err());
     }
 
     // Empty netting set
@@ -276,7 +276,7 @@ mod tests {
     fn empty_netting_set_zero_ead() {
         let engine = SaCcrEngine::default();
         let config = unmargined_config(0.0);
-        let result = engine.calculate_ead(&config, &[]).expect("calculate");
+        let result = engine.calculate_ead(&[], &config).expect("calculate");
         assert!(
             result.ead.abs() < 1e-10,
             "empty netting set: EAD = {}",
@@ -292,7 +292,7 @@ mod tests {
         let engine = SaCcrEngine::default();
         let config = unmargined_config(0.0);
         let trade = simple_ir_trade("T1", 100_000_000.0, 1.0, 2_500_000.0);
-        let result = engine.calculate_ead(&config, &[trade]).expect("calculate");
+        let result = engine.calculate_ead(&[trade], &config).expect("calculate");
         // RC = max(V - C, 0) = max(2.5M - 0, 0) = 2.5M.
         assert!(
             (result.rc - 2_500_000.0).abs() < 1.0,
@@ -306,7 +306,7 @@ mod tests {
         let engine = SaCcrEngine::default();
         let config = unmargined_config(5_000_000.0);
         let trade = simple_ir_trade("T1", 100_000_000.0, 1.0, 2_500_000.0);
-        let result = engine.calculate_ead(&config, &[trade]).expect("calculate");
+        let result = engine.calculate_ead(&[trade], &config).expect("calculate");
         // RC = max(2.5M - 5M, 0) = 0.
         assert!(
             result.rc.abs() < 1e-10,
@@ -322,7 +322,7 @@ mod tests {
         let engine = SaCcrEngine::default();
         let config = margined_config(5_000_000.0, 0.0, 500_000.0, 1_000_000.0);
         let trade = simple_ir_trade("T1", 100_000_000.0, 1.0, 2_500_000.0);
-        let result = engine.calculate_ead(&config, &[trade]).expect("calculate");
+        let result = engine.calculate_ead(&[trade], &config).expect("calculate");
         // RC_margined = max(V - (VM + NICA), TH + MTA - NICA, 0)
         //             = max(2.5M - (5M + 1M), 0 + 0.5M - 1M, 0)
         //             = max(-3.5M, -0.5M, 0) = 0.
@@ -346,10 +346,10 @@ mod tests {
         let config_with_nica = margined_config(5_000_000.0, 0.0, 500_000.0, 3_000_000.0);
 
         let result_no = engine
-            .calculate_ead(&config_no_nica, std::slice::from_ref(&trade))
+            .calculate_ead(std::slice::from_ref(&trade), &config_no_nica)
             .expect("no NICA");
         let result_with = engine
-            .calculate_ead(&config_with_nica, std::slice::from_ref(&trade))
+            .calculate_ead(std::slice::from_ref(&trade), &config_with_nica)
             .expect("with NICA");
 
         // Adding NICA reduces V - C (more negative), which pushes the
@@ -442,7 +442,7 @@ mod tests {
         let engine = SaCcrEngine::default();
         let config = unmargined_config(0.0);
         let trade = simple_ir_trade("T1", 100_000_000.0, 1.0, 2_500_000.0);
-        let result = engine.calculate_ead(&config, &[trade]).expect("calculate");
+        let result = engine.calculate_ead(&[trade], &config).expect("calculate");
         assert!((result.alpha - 1.4).abs() < 1e-10);
         // EAD = 1.4 * (RC + PFE).
         let expected_ead = 1.4 * (result.rc + result.pfe);
@@ -458,7 +458,7 @@ mod tests {
         let engine = SaCcrEngine::default();
         let config = unmargined_config(0.0);
         let trade = simple_ir_trade("T1", 100_000_000.0, 1.0, 2_500_000.0);
-        let result = engine.calculate_ead(&config, &[trade]).expect("calculate");
+        let result = engine.calculate_ead(&[trade], &config).expect("calculate");
         assert!(result.ead > 0.0, "EAD should be positive");
         assert!(result.pfe > 0.0, "PFE should be positive");
     }
@@ -477,12 +477,12 @@ mod tests {
         // Unmargined with zero collateral.
         let unmargined = unmargined_config(0.0);
         let result_u = engine
-            .calculate_ead(&unmargined, &trades)
+            .calculate_ead(&trades, &unmargined)
             .expect("unmargined");
 
         // Margined with matching collateral.
         let margined = margined_config(2_000_000.0, 0.0, 100_000.0, 500_000.0);
-        let result_m = engine.calculate_ead(&margined, &trades).expect("margined");
+        let result_m = engine.calculate_ead(&trades, &margined).expect("margined");
 
         assert!(
             result_m.ead < result_u.ead,
@@ -499,7 +499,7 @@ mod tests {
         let engine = SaCcrEngine::default();
         let config = unmargined_config(0.0);
         let trade = simple_ir_trade("T1", 100_000_000.0, 1.0, 1_000_000.0);
-        let result = engine.calculate_ead(&config, &[trade]).expect("calculate");
+        let result = engine.calculate_ead(&[trade], &config).expect("calculate");
 
         // Only IR should have an add-on.
         assert!(
@@ -543,7 +543,7 @@ mod tests {
         };
 
         let result = engine
-            .calculate_ead(&config, &[ir_trade, fx_trade])
+            .calculate_ead(&[ir_trade, fx_trade], &config)
             .expect("calculate");
 
         assert!(
@@ -571,7 +571,7 @@ mod tests {
         // Linear long direction with short supervisory_delta: caller bug.
         bad.supervisory_delta = -1.0;
         let err = engine
-            .calculate_ead(&config, &[bad])
+            .calculate_ead(&[bad], &config)
             .expect_err("sign mismatch must bubble up at the engine boundary");
         let msg = err.to_string();
         assert!(
@@ -587,7 +587,7 @@ mod tests {
         // Trade with negative MTM and large collateral.
         let config = unmargined_config(10_000_000.0);
         let trade = simple_ir_trade("T1", 100_000_000.0, -1.0, -5_000_000.0);
-        let result = engine.calculate_ead(&config, &[trade]).expect("calculate");
+        let result = engine.calculate_ead(&[trade], &config).expect("calculate");
         assert!(
             result.ead >= 0.0,
             "EAD must be non-negative, got {}",
@@ -602,7 +602,7 @@ mod tests {
 
         let default = saccr_ead(&trades, &config, None).expect("default alpha");
         let engine = SaCcrEngine::default()
-            .calculate_ead(&config, &trades)
+            .calculate_ead(&trades, &config)
             .expect("engine");
         assert_eq!(default.ead, engine.ead);
         assert_eq!(default.alpha, 1.4);

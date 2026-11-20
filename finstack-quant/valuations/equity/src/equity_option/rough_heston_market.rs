@@ -16,7 +16,7 @@ pub struct RoughHestonScalars {
     /// Long-run variance level.
     pub theta: f64,
     /// Vol-of-vol.
-    pub sigma_v: f64,
+    pub vol_of_vol: f64,
     /// Spot/variance correlation.
     pub rho: f64,
     /// Hurst exponent.
@@ -33,7 +33,7 @@ impl RoughHestonScalars {
             v0: get_unitless_scalar_strict(market, "ROUGH_HESTON_V0", "rough Heston")?,
             kappa: get_unitless_scalar_strict(market, "ROUGH_HESTON_KAPPA", "rough Heston")?,
             theta: get_unitless_scalar_strict(market, "ROUGH_HESTON_THETA", "rough Heston")?,
-            sigma_v: get_unitless_scalar_strict(market, "ROUGH_HESTON_SIGMA_V", "rough Heston")?,
+            vol_of_vol: get_unitless_scalar_strict(market, "ROUGH_HESTON_SIGMA_V", "rough Heston")?,
             rho: get_unitless_scalar_strict(market, "ROUGH_HESTON_RHO", "rough Heston")?,
             hurst: get_unitless_scalar_strict(market, "ROUGH_HESTON_HURST", "rough Heston")?,
         })
@@ -89,7 +89,7 @@ mod tests {
         assert_eq!(s.v0, 0.05);
         assert_eq!(s.kappa, 1.5);
         assert_eq!(s.theta, 0.06);
-        assert_eq!(s.sigma_v, 0.4);
+        assert_eq!(s.vol_of_vol, 0.4);
         assert_eq!(s.rho, -0.5);
         assert_eq!(s.hurst, 0.08);
     }

@@ -58,4 +58,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricing_helper;
 mod types;
 
-pub use types::{FxSwap, FxSwapTradeDateParams};
+pub use types::{FxSwap, FxSwapBuilder, FxSwapTradeDateParams};

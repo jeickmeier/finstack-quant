@@ -242,11 +242,11 @@ def test_scenario_diff_rejects_empty_metrics_and_periods() -> None:
 def test_monetary_goal_seek_round_trip_and_variance_currency_boundary() -> None:
     from finstack_quant.core.money import Money
     from finstack_quant.statements import FinancialModelSpec
-    from finstack_quant.statements_analytics import goal_seek
+    from finstack_quant.statements_analytics import GoalSeekSpec, goal_seek
 
     models = []
     for currency in ["USD", "EUR"]:
-        builder = ModelBuilder("typed-boundary")
+        builder = ModelBuilder("typed-boundary").source_snapshot("goal-seek-test-forecast")
         builder.periods("2025..2026", None)
         builder.value_money("revenue", [("2025", Money(100.0, currency)), ("2026", Money(110.0, currency))])
         builder.compute("profit", "revenue * 0.5")
@@ -254,15 +254,18 @@ def test_monetary_goal_seek_round_trip_and_variance_currency_boundary() -> None:
 
     outcome = goal_seek(
         models[0],
-        {
-            "target_node": "profit",
-            "target_period": "2025",
-            "target_value": 60.0,
-            "driver_node": "revenue",
-            "driver_period": "2025",
-            "update_model": True,
-            "bounds": (1.0, 200.0),
-        },
+        GoalSeekSpec(
+            target={"node": "profit", "period": "2025"},
+            target_value=Money(60.0, "USD"),
+            target_tolerance=Money(0.000001, "USD"),
+            driver={"node": "revenue", "period": "2025"},
+            driver_tolerance=1e-10,
+            max_iterations=100,
+            search={"kind": "bracket", "lower": 1.0, "upper": 200.0},
+            as_of="2024-12-31",
+            observed_through="2024-12-31",
+            update_model=True,
+        ),
     )
     assert outcome.model is not None
     restored = FinancialModelSpec.from_json(outcome.model.to_json())

@@ -38,8 +38,3 @@ pub(crate) fn flat_pairs(values: &[f64], label: &str) -> Result<Vec<(f64, f64)>,
     }
     Ok(values.chunks_exact(2).map(|c| (c[0], c[1])).collect())
 }
-
-/// Flatten `(x, y)` pairs into `[x0, y0, x1, y1, …]`.
-pub(crate) fn flatten_pairs(points: impl Iterator<Item = (f64, f64)>) -> Box<[f64]> {
-    points.flat_map(|(x, y)| [x, y]).collect()
-}

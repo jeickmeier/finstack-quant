@@ -56,15 +56,15 @@ def main() -> None:
     volatility = 0.20
     expiry = 1.0
 
-    closed_form_price = packages["models"].bs_price(
-        spot,
-        strike,
-        rate,
-        dividend_yield,
-        volatility,
-        expiry,
-        True,
-    )
+    closed_form_price = packages["models"].bs_price({
+        "spot": spot,
+        "strike": strike,
+        "rate": rate,
+        "dividend_yield": dividend_yield,
+        "volatility": volatility,
+        "time_to_expiry": expiry,
+        "option_type": "call",
+    })
     estimate = (
         packages["models"]
         .monte_carlo.EuropeanPricer(

@@ -136,16 +136,17 @@ mod tests {
         assert_eq!(STREAM_VERSION, 1);
         let derived = key(42, "revenue", None).derive().unwrap();
         assert_eq!(derived, PINNED);
-        // The draws of the stream are part of the version, not only its key.
         let mut rng = key(42, "revenue", None).rng().unwrap();
-        let normals: Vec<u64> = (0..3)
-            .map(|_| rng.normal(0.0, 1.0).unwrap().to_bits())
-            .collect();
-        let indices: Vec<usize> = (0..6).map(|_| rng.index(3)).collect();
-        assert_eq!(
-            (normals, indices),
-            (PINNED_NORMALS.to_vec(), PINNED_INDICES.to_vec())
-        );
+        // Box–Muller uses platform math functions. Allow one ULP across
+        // platforms while the replay test above still checks exact draw bits.
+        for expected in PINNED_NORMALS {
+            let actual = rng.normal(0.0, 1.0).unwrap().to_bits();
+            assert!(
+                actual.abs_diff(expected) <= 1,
+                "normal draw bits {actual} differ from {expected} by more than one ULP"
+            );
+        }
+        assert_eq!(std::array::from_fn(|_| rng.index(3)), PINNED_INDICES);
     }
 
     const PINNED_NORMALS: [u64; 3] = [

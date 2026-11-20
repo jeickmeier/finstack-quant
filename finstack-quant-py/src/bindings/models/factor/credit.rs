@@ -1031,6 +1031,25 @@ impl PyFactorCovarianceMatrix {
         Ok(Self { inner })
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.models.factor", "FactorCovarianceMatrix.from_dataframe")]
+    #[staticmethod]
+    fn from_dataframe(df: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let pandas = df.py().import("pandas")?;
+        if !df.is_instance(&pandas.getattr("DataFrame")?)? {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "df must be a pandas DataFrame",
+            ));
+        }
+        let names: Vec<String> = df.getattr("columns")?.call_method0("tolist")?.extract()?;
+        let rows: Vec<String> = df.getattr("index")?.call_method0("tolist")?.extract()?;
+        if rows != names {
+            return Err(crate::errors::value_error(
+                "DataFrame row and column factor identifiers must match in order",
+            ));
+        }
+        Self::new(names, &df.call_method1("to_numpy", ("float64",))?)
+    }
+
     /// Number of factors represented by the matrix.
     #[getter]
     fn n_factors(&self) -> usize {
@@ -1504,14 +1523,7 @@ impl PyFactorCovarianceForecast {
         risk_measure: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyFactorModelConfig> {
         let h = extract_vol_horizon(horizon)?;
-        let measure: finstack_quant_factor::RiskMeasure = match risk_measure {
-            Some(obj) if !obj.is_none() => {
-                let value = py_to_json_value(py, obj, "risk_measure")?;
-                serde_json::from_value(value)
-                    .map_err(|e| serde_json_to_py(e, "invalid risk_measure"))?
-            }
-            _ => finstack_quant_factor::RiskMeasure::default(),
-        };
+        let measure = super::risk::functions::extract_risk_measure(py, risk_measure)?;
         let config = py
             .detach(|| {
                 let forecast =

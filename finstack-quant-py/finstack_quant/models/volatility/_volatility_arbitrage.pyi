@@ -42,7 +42,7 @@ class ArbitrageReport:
     >>> from finstack_quant.models.volatility import check_surface_grid
     >>> strikes, expiries = [90.0, 100.0, 110.0], [1.0, 2.0]
     >>> vols, forwards = [[0.2, 0.2, 0.2], [0.2, 0.2, 0.2]], [100.0, 100.0]
-    >>> report = check_surface_grid(strikes, expiries, vols, forwards)
+    >>> report = check_surface_grid(expiries, strikes, vols, forwards)
     >>> (report.passed, report.total_violations)
     (True, 0)
     """
@@ -190,7 +190,7 @@ class ArbitrageReport:
         Examples
         --------
         >>> from finstack_quant.models.volatility import ArbitrageReport, check_surface_grid
-        >>> r = check_surface_grid([90.0, 100.0, 110.0], [1.0, 2.0], [[0.2] * 3, [0.2] * 3], [100.0])
+        >>> r = check_surface_grid([1.0, 2.0], [90.0, 100.0, 110.0], [[0.2] * 3, [0.2] * 3], [100.0])
         >>> ArbitrageReport.from_json(r.to_json()).passed
         True
         """
@@ -213,8 +213,8 @@ class ArbitrageReport:
         ...
 
 def check_butterfly_grid(
-    strikes: list[float],
     expiries: list[float],
+    strikes: list[float],
     vols: list[list[float]],
     forward_prices: list[float],
     tolerance: float = 1e-10,
@@ -257,15 +257,15 @@ def check_butterfly_grid(
     >>> from finstack_quant.models.volatility import check_butterfly_grid
     >>> strikes, expiries = [90.0, 100.0, 110.0], [1.0, 2.0]
     >>> vols, forwards = [[0.2, 0.2, 0.2], [0.2, 0.2, 0.2]], [100.0, 100.0]
-    >>> check_butterfly_grid(strikes, expiries, vols, forwards)
+    >>> check_butterfly_grid(expiries, strikes, vols, forwards)
     []
 
     """
     ...
 
 def check_calendar_spread_grid(
-    strikes: list[float],
     expiries: list[float],
+    strikes: list[float],
     vols: list[list[float]],
     forward_prices: list[float],
     tolerance: float = 1e-10,
@@ -301,15 +301,15 @@ def check_calendar_spread_grid(
     >>> from finstack_quant.models.volatility import check_calendar_spread_grid
     >>> strikes, expiries = [90.0, 100.0, 110.0], [1.0, 2.0]
     >>> vols, forwards = [[0.2, 0.2, 0.2], [0.2, 0.2, 0.2]], [100.0, 100.0]
-    >>> check_calendar_spread_grid(strikes, expiries, vols, forwards)
+    >>> check_calendar_spread_grid(expiries, strikes, vols, forwards)
     []
 
     """
     ...
 
 def check_local_vol_density_grid(
-    strikes: list[float],
     expiries: list[float],
+    strikes: list[float],
     vols: list[list[float]],
     forward_prices: list[float],
 ) -> list[_ArbitrageViolation]:
@@ -346,7 +346,7 @@ def check_local_vol_density_grid(
     >>> from finstack_quant.models.volatility import check_local_vol_density_grid
     >>> strikes, expiries = [90.0, 100.0, 110.0], [1.0, 2.0]
     >>> vols, forwards = [[0.2, 0.2, 0.2], [0.2, 0.2, 0.2]], [100.0, 100.0]
-    >>> check_local_vol_density_grid(strikes, expiries, vols, forwards)
+    >>> check_local_vol_density_grid(expiries, strikes, vols, forwards)
     []
 
     """
@@ -418,8 +418,8 @@ def check_surface(surface: VolSurface, config: dict[str, Any] | str) -> Arbitrag
     ...
 
 def check_surface_grid(
-    strikes: list[float],
     expiries: list[float],
+    strikes: list[float],
     vols: list[list[float]],
     forward_prices: list[float],
     tolerance: float = 1e-10,
@@ -456,7 +456,7 @@ def check_surface_grid(
     >>> from finstack_quant.models.volatility import check_surface_grid
     >>> strikes, expiries = [90.0, 100.0, 110.0], [1.0, 2.0]
     >>> vols, forwards = [[0.2, 0.2, 0.2], [0.2, 0.2, 0.2]], [100.0, 100.0]
-    >>> check_surface_grid(strikes, expiries, vols, forwards).passed
+    >>> check_surface_grid(expiries, strikes, vols, forwards).passed
     True
 
     """

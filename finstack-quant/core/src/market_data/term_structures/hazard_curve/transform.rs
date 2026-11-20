@@ -39,7 +39,7 @@ impl HazardCurve {
     pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> HazardCurveBuilder {
         let mut builder = self
             .metadata_builder(new_id)
-            .knots(self.knot_points())
+            .knots(self.iter_knots())
             .hazard_calibration_opt(self.hazard_calibration.clone());
         builder.source = self.source.clone();
         builder
@@ -301,7 +301,7 @@ impl HazardCurve {
             .source
             .as_ref()
             .map(|src| src.knot_points.clone())
-            .unwrap_or_else(|| self.knot_points().collect());
+            .unwrap_or_else(|| self.iter_knots().collect());
         let surviving = surviving_source_knots(&src_knots, offset);
 
         let mut builder = self

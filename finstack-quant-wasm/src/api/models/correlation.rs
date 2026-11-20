@@ -538,7 +538,7 @@ pub fn nearest_correlation(
 /// import init, { models } from "finstack-quant-wasm";
 /// await init();
 /// const result = models.correlation.PortfolioLossResult.fromLosses([0, 1, 2, 5, 10], 0.75);
-/// const equity = result.trancheLossStatistics(0, 0.03, 100);
+/// const equity = result.trancheLossStatistics(0, 3, 100);
 /// console.log(result.var, equity.expected_loss_fraction);
 /// ```
 #[wasm_bindgen(js_name = PortfolioLossResult)]
@@ -618,8 +618,8 @@ impl JsPortfolioLossResult {
     /// `expected_loss_fraction`, `expected_loss_amount`, `var_fraction`,
     /// `var_amount`, `expected_shortfall_fraction`, `expected_shortfall_amount`,
     /// `prob_attachment_breached`, and `prob_full_writedown`.
-    /// @param attachment - Lower tranche boundary as a fraction of pool notional from 0 through 1.
-    /// @param detachment - Upper tranche boundary as a fraction of pool notional, strictly above the attachment and at most 1.
+    /// @param attachPct - Lower tranche boundary in percentage points of pool notional from 0 through 100.
+    /// @param detachPct - Upper tranche boundary in percentage points of pool notional, above attachPct and at most 100.
     /// @param poolNotional - Total pool notional, finite and strictly positive, in the same unit as the losses.
     ///
     /// # Errors
@@ -631,17 +631,17 @@ impl JsPortfolioLossResult {
     #[wasm_bindgen(js_name = trancheLossStatistics, unchecked_return_type = "TrancheLossStatistics")]
     pub fn tranche_loss_statistics(
         &self,
-        #[wasm_bindgen(unchecked_param_type = "number")] attachment: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] detachment: JsValue,
+        #[wasm_bindgen(js_name = "attachPct", unchecked_param_type = "number")] attach_pct: JsValue,
+        #[wasm_bindgen(js_name = "detachPct", unchecked_param_type = "number")] detach_pct: JsValue,
         #[wasm_bindgen(js_name = "poolNotional", unchecked_param_type = "number")]
         pool_notional: JsValue,
     ) -> Result<JsValue, JsValue> {
-        let attachment = js_f64(&attachment, "attachment")?;
-        let detachment = js_f64(&detachment, "detachment")?;
+        let attach_pct = js_f64(&attach_pct, "attachPct")?;
+        let detach_pct = js_f64(&detach_pct, "detachPct")?;
         let pool_notional = js_f64(&pool_notional, "poolNotional")?;
         let stats = self
             .inner
-            .tranche_loss_statistics(attachment, detachment, pool_notional)
+            .tranche_loss_statistics(attach_pct, detach_pct, pool_notional)
             .map_err(to_js_err)?;
         crate::utils::to_js_value(&stats)
     }

@@ -15,7 +15,6 @@
 //! `cdr`): the multiplier is bumped such that the peak CDR (0.60% at 100% SDA)
 //! shifts by 1bp. `Constant`/no-curve specs bump `cdr` directly.
 
-use crate::structured_credit::StructuredCredit;
 use finstack_quant_cashflows::builder::DefaultModelSpec;
 use finstack_quant_core::Result;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
@@ -131,9 +130,8 @@ pub(crate) struct Default01Calculator;
 
 impl MetricCalculator for Default01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let instrument = context
-            .instrument_as::<StructuredCredit>()?
-            .resolved_for_pricing()?;
+        let instrument =
+            crate::structured_credit::metrics::metric_deal(context)?.resolved_for_pricing()?;
         let as_of = context.as_of;
 
         let (default_up, default_down, achieved_bump) =

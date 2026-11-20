@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/exposure_profile.schema.json",
-      "bytes": 3073,
+      "bytes": 6862,
       "kind": "input",
       "path": "schemas/margin/1/exposure_profile.schema.json",
       "summary": "Exposure profile computed at each time grid point.",
@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/frtb_sensitivities.schema.json",
-      "bytes": 19361,
+      "bytes": 19509,
       "kind": "input",
       "path": "schemas/margin/1/frtb_sensitivities.schema.json",
       "summary": "FRTB sensitivity inputs organized by risk class.",
@@ -83,7 +83,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/funding_config.schema.json",
-      "bytes": 3272,
+      "bytes": 11548,
       "kind": "input",
       "path": "schemas/margin/1/funding_config.schema.json",
       "summary": "Funding cost/benefit configuration for FVA and MVA calculation.",
@@ -116,6 +116,15 @@
       "summary": "Deterministic decay applied to today's SIMM IM to approximate `E[IM(t)]`.",
       "title": "ImDecayProfile",
       "type_name": "ImDecayProfile"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/im_projection_spec.schema.json",
+      "bytes": 5566,
+      "kind": "input",
+      "path": "schemas/margin/1/im_projection_spec.schema.json",
+      "summary": "Dated admitted SIMM netting scope and deterministic projection election.",
+      "title": "ImProjectionSpec",
+      "type_name": "ImProjectionSpec"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/im_result.schema.json",
@@ -154,6 +163,15 @@
       "type_name": "MarginFundingCost"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/margin_funding_spread.schema.json",
+      "bytes": 1738,
+      "kind": "input",
+      "path": "schemas/margin/1/margin_funding_spread.schema.json",
+      "summary": "Explicit flat or dated basis-point funding spread for posted IM.",
+      "title": "MarginFundingSpread",
+      "type_name": "MarginFundingSpread"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/margin/1/margin_utilization.schema.json",
       "bytes": 757,
       "kind": "output",
@@ -164,7 +182,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/mva_result.schema.json",
-      "bytes": 1436,
+      "bytes": 12193,
       "kind": "output",
       "path": "schemas/margin/1/mva_result.schema.json",
       "summary": "Result of an MVA computation.",
@@ -236,7 +254,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/xva_result.schema.json",
-      "bytes": 19958,
+      "bytes": 31237,
       "kind": "output",
       "path": "schemas/margin/1/xva_result.schema.json",
       "summary": "Result of XVA calculations.",

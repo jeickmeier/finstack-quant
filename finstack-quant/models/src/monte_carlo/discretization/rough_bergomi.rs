@@ -574,15 +574,15 @@ mod tests {
         let mc_price = sum_payoff / num_paths as f64;
 
         // Analytic reference: Black-Scholes ATM call at σ = √ξ₀, r = q = 0.
-        let bs_price = crate::closed_form::bs_price(
-            s0,
+        let bs_price = crate::closed_form::bs_price(&crate::types::OptionMarketParams {
+            spot: s0,
             strike,
-            0.0,
-            0.0,
-            xi0.sqrt(),
-            t_end,
-            crate::types::OptionType::Call,
-        )
+            rate: 0.0,
+            dividend_yield: 0.0,
+            volatility: xi0.sqrt(),
+            time_to_expiry: t_end,
+            option_type: crate::types::OptionType::Call,
+        })
         .expect("valid Black-Scholes inputs");
 
         // MC standard error of an ATM call over 2e5 paths is ≈ 0.03 (price

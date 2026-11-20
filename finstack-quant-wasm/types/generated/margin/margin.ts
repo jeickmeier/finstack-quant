@@ -97,11 +97,123 @@ export type RoundingMode = "bankers" | "midpoint_away_from_zero" | "toward_zero"
  */
 export type PositiveF64Wire = number;
 /**
+ * Provenance and basis of all observations in an XVA exposure profile.
+ */
+export type ExposureBasis =
+  | {
+      kind: "external";
+      /**
+       * Identifier of the common netting, collateral and model-time policy.
+       */
+      policy_id: string;
+      /**
+       * Stable identifier of the source data and its completeness attestation.
+       */
+      source_id: string;
+    }
+  | {
+      kind: "simulated_uncollateralized";
+      /**
+       * Number of complete simulated paths including any antithetic partners.
+       */
+      path_count: number;
+      /**
+       * Fingerprint of the pricing, market, portfolio and process inputs.
+       */
+      source_id: string;
+    }
+  | {
+      kind: "simulated_cash_vm";
+      /**
+       * Number of complete paths including antithetic partners.
+       */
+      path_count: number;
+      /**
+       * Fingerprint of the market, priced book, simulation and CSA.
+       */
+      source_id: string;
+    };
+/**
  * FRTB risk classes per BCBS d457.
  */
 export type FrtbRiskClass = "girr" | "csr_non_sec" | "csr_sec_ctp" | "csr_sec_non_ctp" | "equity" | "commodity" | "fx";
 /**
+ * Source of the expected posted initial margin on a dated grid.
+ */
+export type ImProjectionBasis =
+  | {
+      kind: "external";
+      /**
+       * Legal portfolio scope measured by the supplied calculation.
+       */
+      netting_set: NettingSetId;
+      /**
+       * Permanent identifier of the supplied evidence and methodology.
+       */
+      source_id: string;
+    }
+  | {
+      /**
+       * Elected deterministic approximation applied to the opening margin.
+       */
+      decay: ImDecayProfile;
+      kind: "simm_decay";
+      /**
+       * Legal portfolio scope supplying the opening margin.
+       */
+      netting_set: NettingSetId;
+      /**
+       * Fingerprint of the admitted inputs, calculation and projection.
+       */
+      source_id: string;
+      /**
+       * Selected historical margin parameter version.
+       */
+      version: "v2_6";
+    };
+/**
+ * Identifies a margin netting set.
+ *
+ * Instruments in the same netting set can offset each other for margin
+ * calculation purposes. The netting set is typically defined by the
+ * CSA agreement (bilateral) or by CCP membership (cleared) — these two
+ * shapes are mutually exclusive, so the type encodes them as enum
+ * variants rather than as a struct with two `Option<String>` fields
+ * that could in principle both be set or both be unset.
+ */
+export type NettingSetId =
+  | {
+      /**
+       * Counterparty identifier
+       */
+      counterparty_id: string;
+      /**
+       * CSA identifier
+       */
+      csa_id: string;
+      kind: "bilateral";
+    }
+  | {
+      /**
+       * CCP identifier (also used as the counterparty id)
+       */
+      ccp_id: string;
+      kind: "cleared";
+    };
+/**
  * Deterministic decay applied to today's SIMM IM to approximate `E[IM(t)]`.
+ *
+ * `IM(t) = IM(0) × factor(t)`. This is the standard first-order practitioner
+ * approximation for MVA (Green 2015, ch. 10): IM shrinks as the portfolio's
+ * remaining risk runs off.
+ *
+ * # Variants
+ *
+ * | Variant | `factor(t)` | Use case |
+ * |---|---|---|
+ * | `Constant` | `1` | Evergreen / constantly re-hedged books |
+ * | `LinearToMaturity` | `max(1 − t/T, 0)` | Amortizing linear-risk books |
+ * | `SqrtTime` | `sqrt(max(1 − t/T, 0))` | DV01-style risk ∝ √(remaining time) |
  */
 export type ImDecayProfile =
   | "constant"
@@ -120,6 +232,25 @@ export type ImDecayProfile =
          */
         maturity_years: number;
       };
+    };
+/**
+ * Funding-spread election in basis points for a dated IM profile.
+ */
+export type MarginFundingSpread =
+  | {
+      kind: "flat";
+      /**
+       * Spread in basis points (for example 25 represents 0.25%).
+       */
+      spread_bp: number;
+    }
+  | {
+      kind: "dated";
+      /**
+       * Calendar dates and spread quotes in basis points. The dates must
+       * cover the open and close of the admitted IM horizon.
+       */
+      knots: [valuations.DateWire, number][];
     };
 /**
  * Risk classes for SIMM categorization.
@@ -211,35 +342,6 @@ export type SimmCreditSector =
  * Typed value of the required margin schema marker.
  */
 export type MarginSchema = "finstack_quant.margin/1";
-/**
- * Identifies a margin netting set.
- *
- * Instruments in the same netting set can offset each other for margin
- * calculation purposes. The netting set is typically defined by the
- * CSA agreement (bilateral) or by CCP membership (cleared) — these two
- * shapes are mutually exclusive, so the type encodes them as enum
- * variants rather than as a struct with two `Option<String>` fields
- * that could in principle both be set or both be unset.
- */
-export type NettingSetId =
-  | {
-      /**
-       * Counterparty identifier
-       */
-      counterparty_id: string;
-      /**
-       * CSA identifier
-       */
-      csa_id: string;
-      kind: "bilateral";
-    }
-  | {
-      /**
-       * CCP identifier (also used as the counterparty id)
-       */
-      ccp_id: string;
-      kind: "cleared";
-    };
 /**
  * Repo margin type.
  *
@@ -851,15 +953,33 @@ export interface ExposureDiagnostics {
  */
 export interface ExposureProfile {
   /**
-   * Simulation quality diagnostics (populated by the exposure engine).
+   * Valuation cut and required opening observation date.
    */
-  diagnostics?: ExposureDiagnostics | null;
+  as_of: valuations.DateWire;
   /**
-   * Expected Negative Exposure at each time point: max(-V(t), 0).
+   * Provenance of the exposure model and the complete observation grid.
+   */
+  basis: ExposureBasis;
+  /**
+   * Reporting currency shared by all marks, exposures and adjustments.
+   */
+  currency: valuations.Currency;
+  /**
+   * Strictly increasing calendar observations starting on the valuation cut.
+   */
+  dates: valuations.DateWire[];
+  /**
+   * Completeness counters for the admitted grid. Failed points or valuations invalidate it.
+   */
+  diagnostics: ExposureDiagnostics;
+  /**
+   * Expected positive part of the negated exposed mark at each date,
+   * after any settled collateral in the elected basis.
    */
   ene: number[];
   /**
-   * Expected Positive Exposure at each time point: max(V(t), 0).
+   * Expected positive part of the exposed mark at each date, after any
+   * settled collateral in the elected basis.
    */
   epe: number[];
   /**
@@ -867,9 +987,7 @@ export interface ExposureProfile {
    */
   mtm_values: number[];
   /**
-   * Nonnegative time points in years from valuation date. An explicit zero
-   * node supplies opening exposure; before the first node exposure is held
-   * flat at that node, consistently across CVA, DVA, FVA and MVA.
+   * Aligned model year fractions, starting at zero and strictly increasing.
    */
   times: number[];
 }
@@ -991,7 +1109,7 @@ export interface FrtbSensitivities {
   fx_delta: [valuations.Currency, valuations.Currency, number][];
   fx_vega: [valuations.Currency, valuations.Currency, string, number][];
   girr_curvature: [valuations.Currency, number, number][];
-  girr_delta: [valuations.Currency, string, number][];
+  girr_delta: [valuations.Currency, valuations.Id, string, number][];
   girr_inflation_delta: [valuations.Currency, number][];
   girr_vega: [valuations.Currency, string, string, number][];
   girr_xccy_basis_delta: [valuations.Currency, number][];
@@ -1054,30 +1172,35 @@ export interface FundingConfig {
    */
   im_profile?: ImProfile | null;
   /**
-   * Spread in basis points applied to posted initial margin (MVA).
-   *
-   * If `None`, MVA uses `funding_spread_bp` — the desk's unsecured
-   * funding spread, which is the standard assumption (Green 2015, ch. 10).
-   * Override when IM is funded at a different (typically term or partially
-   * secured) level than uncollateralized derivative exposure.
+   * Explicit, separately elected funding spread for posted IM.
+   * Supply it together with the IM profile to enable MVA.
    */
-  margin_funding_spread_bp?: number | null;
+  margin_funding_spread?: MarginFundingSpread | null;
 }
 /**
- * Expected initial-margin profile `E[IM(t)]` on a time grid.
- *
- * Values are in the aggregation currency chosen when the profile was built
- * (e.g. the `currency` argument of [`im_profile_from_simm`]).
+ * Complete dated expected posted initial margin in one currency and netting set.
  */
 export interface ImProfile {
   /**
-   * Expected IM at each time point (non-negative, finite).
+   * Reporting date and first observation.
+   */
+  as_of: valuations.DateWire;
+  /**
+   * Legal scope, source and election for the expected IM.
+   */
+  basis: ImProjectionBasis;
+  /**
+   * Currency of the opening and every projected amount.
+   */
+  currency: valuations.Currency;
+  /**
+   * Calendar observations starting with the valuation date and ending at the horizon.
+   */
+  dates: valuations.DateWire[];
+  /**
+   * Expected posted IM in major units of the calculation currency, nonnegative.
    */
   im_values: number[];
-  /**
-   * Time points in years from the valuation date (strictly increasing, positive).
-   */
-  times: number[];
 }
 /**
  * One time bucket of an FVA sum.
@@ -1182,6 +1305,35 @@ export interface ImCollateralResult {
    * Absolute transfers strictly below MTA are zero; equality triggers transfer.
    */
   transfer: valuations.Money;
+}
+/**
+ * Dated admitted SIMM netting scope and deterministic projection election.
+ */
+export interface ImProjectionSpec {
+  /**
+   * Day on which opening SIMM and the projected profile are measured.
+   */
+  as_of: valuations.DateWire;
+  /**
+   * Currency for aggregation and all values in the projection.
+   */
+  currency: valuations.Currency;
+  /**
+   * Dated projection grid, including valuation and horizon and any within-horizon runoff date.
+   */
+  dates: valuations.DateWire[];
+  /**
+   * Explicitly elected deterministic margin runoff approximation.
+   */
+  decay: ImDecayProfile;
+  /**
+   * Distinct, qualified bilateral netting scope with legal agreement identity.
+   */
+  netting_set: NettingSetId;
+  /**
+   * Identity of the admitted margin run or snapshot.
+   */
+  scope_source: string;
 }
 /**
  * Initial margin calculation result.
@@ -1564,20 +1716,73 @@ export interface MarginUtilization {
   required: valuations.Money;
 }
 /**
+ * Replayable interval on the merged IM and funding-spread grid.
+ */
+export interface MvaInterval {
+  /**
+   * Funding cost contributed by this interval, in profile currency.
+   */
+  contribution: number;
+  /**
+   * Factors at the end of the interval.
+   */
+  end: MvaPoint;
+  /**
+   * Factors at the start of the interval.
+   */
+  start: MvaPoint;
+  /**
+   * Year fraction of this interval on ACT/365 Fixed.
+   */
+  years: number;
+}
+/**
+ * Full set of observed dated factors at one end of an MVA interval.
+ */
+export interface MvaPoint {
+  /**
+   * Counterparty survival relative to valuation, or one when excluded.
+   */
+  counterparty_survival: number;
+  /**
+   * Calendar date at which each curve is sampled on its own clock.
+   */
+  date: valuations.DateWire;
+  /**
+   * Risk-free discount factor relative to the valuation date.
+   */
+  discount_factor: number;
+  /**
+   * Expected posted IM in major units of the result currency.
+   */
+  expected_im: number;
+  /**
+   * Institution's survival probability relative to valuation, or one when excluded.
+   */
+  own_survival: number;
+  /**
+   * Elected funding spread in basis points.
+   */
+  spread_bp: number;
+}
+/**
  * Result of an MVA computation.
  */
 export interface MvaResult {
   /**
-   * Time-weighted average IM over the profile horizon:
-   * `(1/T) ∫₀ᵀ IM(t) dt` under the same trapezoid convention as `mva`.
+   * Mean IM weighted only by elapsed time, in reporting currency.
    */
   average_im: number;
   /**
-   * Echo of the IM profile used: `(time, IM(t))` pairs.
+   * Dated and identified expected posted IM used for the cost.
    */
-  im_profile: [number, number][];
+  im_profile: ImProfile;
   /**
-   * MVA (positive = lifetime funding cost of posting IM).
+   * Exact merged grid with start and end factors and costs contributed.
+   */
+  intervals: MvaInterval[];
+  /**
+   * Expected funding cost in reporting currency per calculation horizon.
    */
   mva: number;
 }
@@ -1944,7 +2149,7 @@ export interface XvaResult {
    */
   dva_rows?: CreditXvaRow[] | null;
   /**
-   * Time-weighted average of Effective EPE (regulatory scalar metric).
+   * Time-weighted diagnostic of the right-endpoint running maximum of EPE.
    *
    * Computed as:
    * ```text
@@ -1963,7 +2168,7 @@ export interface XvaResult {
   /**
    * Effective EPE profile: `(time, Effective_EPE(t))`.
    *
-   * Non-decreasing version of EPE, per Basel III SA-CCR:
+   * Running maximum of expected positive exposure:
    * `Effective_EPE(t_k) = max(Effective_EPE(t_{k-1}), EPE(t_k))`
    *
    * # References
@@ -2027,6 +2232,10 @@ export interface XvaResult {
    * - Green, A. (2015). *XVA*. Wiley. Chapter 10. `docs/REFERENCES.md#green-xva`
    */
   mva?: number | null;
+  /**
+   * Dated expected IM, average IM and replayable funding intervals when MVA was computed.
+   */
+  mva_detail?: MvaResult | null;
   /**
    * All-in valuation adjustment: `CVA − DVA + FVA + MVA`.
    *

@@ -22,3 +22,33 @@ def test_regulatory_grid_mapping_and_single_bucket_reconciliation() -> None:
     namespace = {"__name__": "__main__"}
     for cell in cells:
         exec(compile(cell.source, cell.metadata.analyst_program.id, "exec"), namespace)
+
+
+def test_standalone_simm_nets_trades_and_rejects_unsupported_inputs() -> None:
+    import json
+
+    import pytest
+
+    from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
+    from finstack_quant.valuations import calculate_simm
+    from finstack_quant.valuations.instruments import Deposit, InterestRateSwap
+
+    as_of = "2023-12-20"
+    market = MarketContext()
+    market.insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_365f"))
+    market.insert(ForwardCurve.flat("USD-SOFR-3M", as_of, 0.045, "act_360"))
+    payer = InterestRateSwap.example()
+    receiver = json.loads(payer.to_json())
+    receiver["instrument"]["spec"]["id"] = "RECEIVER"
+    receiver["instrument"]["spec"]["side"] = "receive"
+    single = calculate_simm([payer], market, as_of)
+    assert single.amount > 0.0
+    assert single.approximation
+    assert calculate_simm([payer.to_json()], market, as_of).amount == single.amount
+    assert calculate_simm([payer, receiver], market, as_of).amount == pytest.approx(0.0, abs=1e-5)
+    with pytest.raises(ValueError, match="does not support SIMM"):
+        calculate_simm([Deposit.example()], market, as_of)
+    with pytest.raises(KeyError, match="USD-"):
+        calculate_simm([payer], MarketContext(), as_of)
+    with pytest.raises(ValueError, match="must be USD"):
+        calculate_simm([payer], market, as_of, currency="EUR")

@@ -375,7 +375,7 @@
     ],
     "financial_and_api_decisions": [
       "Correct metrics are accrued and duration_mod.",
-      "CashFlowSchedule.builder and bond_from_cashflows_json are the supported cashflow-to-bond route.",
+      "CashFlowSchedule.builder and Bond.from_cashflows are the supported cashflow-to-bond route.",
       "Callable OAS depth remains C1; the introductory call/ytw example is still required here."
     ],
     "authoring_started_utc": "2026-09-03T03:49:51Z",

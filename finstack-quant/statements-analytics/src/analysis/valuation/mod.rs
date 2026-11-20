@@ -6,13 +6,25 @@
 
 pub(crate) mod corporate;
 pub(crate) mod lbo;
+mod lbo_funding;
 pub(crate) mod orchestrator;
 
 pub use corporate::{
-    CorporateValuationResult, DEFAULT_UFCF_NODE, DcfInputs, DcfOptions, DcfPeriodRow,
-    DcfSensitivityResult, ExitMultipleBump, WaccInputs, dcf_sensitivity, evaluate_dcf, wacc,
+    CorporateDcfRequest, CorporateValuationResult, DEFAULT_UFCF_NODE, DcfDistributionResult,
+    DcfInputs, DcfMultipleShocks, DcfOptions, DcfPathQuantile, DcfPathValue, DcfPeriodRow,
+    DcfProjection, DcfRateShocks, DcfSensitivityEndpoint, DcfSensitivityGridResult,
+    DcfSensitivityGridSpec, DcfSensitivityPair, DcfSensitivityResult, DcfSensitivityShocks,
+    DcfShockReport, DcfTerminalShocks, ExitMultipleBump, StatementValuationCut, TerminalFcffBasis,
+    WaccInputs, dcf_sensitivity, dcf_sensitivity_grid, dcf_sensitivity_on_results,
+    evaluate_corporate_dcf, evaluate_dcf, evaluate_dcf_from_results, evaluate_dcf_monte_carlo,
+    wacc,
 };
 pub use lbo::{LboCheckMappings, LboConfig, LboResult, LboTranche, evaluate_lbo};
 pub use orchestrator::{
     CorporateAnalysis, CorporateAnalysisBuilder, CorporateAnalysisOptions, run_corporate_analysis,
+};
+
+pub use lbo_funding::{
+    DatedLboRequest, DatedLboResult, LboAcquisition, LboDebtFunding, LboEarnings, LboEarningsBasis,
+    LboExitBridge, LboFunding, LboFundingResult, LboQualification, evaluate_dated_lbo,
 };

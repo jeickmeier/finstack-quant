@@ -7,7 +7,7 @@ import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { GoalSeekRequest } from "@/workers/finstack-contract";
 export type { GoalSeekRequest } from "@/workers/finstack-contract";
 export type { GoalSeekResult } from "finstack-quant-wasm";
-/** Snapshot the model, target, driver, update flag and optional bounds. Null disables the solve. A non-finite input stays distinct in the key and reaches Rust as entered. */
+/** Snapshot the model, market, information cutoff, target, driver and explicit search controls. Null disables the solve. A non-finite input stays distinct in the key and reaches Rust as entered. */
 export function goalSeekOptions(
   client: FinstackClient | null,
   session: number,

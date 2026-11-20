@@ -39,6 +39,7 @@ mod specs;
 mod standard_deal_params;
 mod stochastic_result;
 mod structured_credit;
+mod structured_credit_tranche;
 mod tranche;
 pub(crate) mod tranche_analytics;
 mod tranche_cashflows;
@@ -63,6 +64,7 @@ pub(crate) use specs::{
 pub(crate) use standard_deal_params::PyStandardDealParams;
 pub(crate) use stochastic_result::PyStochasticPricingResult;
 pub(crate) use structured_credit::{PyStructuredCredit, PyStructuredCreditBuilder};
+pub(crate) use structured_credit_tranche::PyStructuredCreditTranche;
 pub(crate) use tranche::{PyTranche, PyTrancheBuilder};
 pub(crate) use tranche_cashflows::PyTrancheCashflows;
 pub(crate) use tranche_structure::PyTrancheStructure;
@@ -83,6 +85,7 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyWaterfall>()?;
     m.add_class::<PyStandardDealParams>()?;
     m.add_class::<PyStructuredCredit>()?;
+    m.add_class::<PyStructuredCreditTranche>()?;
     m.add_class::<PyStructuredCreditBuilder>()?;
     m.add_class::<PyStochasticPricingResult>()?;
     m.add_class::<PySimulationDiagnostics>()?;
@@ -133,6 +136,7 @@ pub(crate) const EXPORTS: &[&str] = &[
     "StandardDealParams",
     "StochasticPricingResult",
     "StructuredCredit",
+    "StructuredCreditTranche",
     "StructuredCreditBuilder",
     "Tranche",
     "TrancheBuilder",

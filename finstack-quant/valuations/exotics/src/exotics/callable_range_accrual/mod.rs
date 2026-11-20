@@ -15,4 +15,4 @@ pub(crate) mod pricer;
 pub(crate) mod types;
 
 pub use pricer::CallableRangeAccrualPricer;
-pub use types::CallableRangeAccrual;
+pub use types::{CallableRangeAccrual, CallableRangeAccrualBuilder};

@@ -17,6 +17,7 @@ Examples:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 import datetime as dt
 from typing import Any
 
@@ -46,9 +47,26 @@ def _section_tornado(tornado: Any, theme: Theme) -> Section | None:
 
 
 def _section_scenarios(scenarios: Any, theme: Theme) -> Section | None:
-    if not scenarios or not isinstance(scenarios, dict):
+    if scenarios is None:
         return None
-    items = [(k, v) for k, v in scenarios.items() if isinstance(v, (int, float))]
+    if isinstance(scenarios, dict):
+        named_results = scenarios.items()
+    elif isinstance(scenarios, Sequence) and not isinstance(scenarios, (str, bytes)):
+        if any(not hasattr(item, "scenario_id") or not hasattr(item, "pnl") for item in scenarios):
+            raise TypeError("scenario comparison sequences must contain labeled scenario batch items")
+        named_results = [(item.scenario_id, item.pnl) for item in scenarios]
+    else:
+        raise TypeError("scenarios must be a mapping or an ordered scenario batch")
+    items = []
+    currencies = set()
+    for label, result in named_results:
+        if hasattr(result, "total") and hasattr(result, "currency"):
+            currencies.add(result.currency)
+            items.append((label, result.total))
+        elif isinstance(result, (int, float)):
+            items.append((label, result))
+    if len(currencies) > 1:
+        raise ValueError("scenario P&L must use one base currency")
     if not items:
         return None
     labels = [k for k, _ in items]
@@ -106,16 +124,20 @@ def scenario_tearsheet(
     tornado : list[TornadoEntry | dict], optional
         ``generate_tornado_entries`` output (typed entries, dicts or JSON
         objects with ``parameter_id``/``downside``/``upside``), in Rust order.
-    scenarios : dict, optional
-        ``{scenario_name: target_metric_value}`` for the comparison bars.
-    monte_carlo : dict, optional
-        A pre-extracted fan: ``{"periods": [...], "p_low": [...], "p_mid": [...], "p_high": [...]}``.
+    scenarios : dict or sequence of ScenarioPnlBatchItem, optional
+        A mapping from scenario names to numeric metric values or typed
+        ScenarioPnl results, or an ordered portfolio scenario P&L batch.
+        Typed P&L uses the portfolio base currency, which must agree across
+        the comparison.
+    monte_carlo : MonteCarloResults or dict, optional
+        A typed result with the 5th, 50th and 95th percentiles configured, or a pre-extracted fan: ``{"periods": [...], "p_low": [...], "p_mid": [...], "p_high": [...]}``.
     variance : VarianceReport | dict | str, optional
         A ``run_variance`` result (typed, dict, or JSON).
     breach_probability : float, optional
         Fraction (e.g. ``0.12``) used for the breach KPI and the MC caption.
     target_metric : str, optional
-        Name of the metric being analysed (header subtitle only).
+        Metric for the report subtitle and typed Monte Carlo fan. Required for
+        a typed result with multiple metrics.
     title : str, optional
         Optional main report heading for the scenario analysis.
     subtitle : str, optional
@@ -128,8 +150,11 @@ def scenario_tearsheet(
         "Generated" stamp; pass a fixed date for reproducible output.
 
     Raises:
-        ValueError: If ``sections`` contains an unknown section name.
-        TypeError: If ``tornado`` is not a list of tornado entries or
+        ValueError: If ``sections`` contains an unknown section name or scenario
+            P&L mixes base currencies, or required Monte Carlo metrics or
+            percentiles are unavailable.
+        TypeError: If ``scenarios`` is neither a mapping nor a labeled scenario
+            batch, ``tornado`` does not supply tornado entries, or
             ``variance`` is not a variance report, dict, or JSON string.
 
     Returns:
@@ -150,8 +175,22 @@ def scenario_tearsheet(
         secs.append(s)
     if "scenarios" in wanted and (s := _section_scenarios(scenarios, theme)) is not None:
         secs.append(s)
-    if "montecarlo" in wanted and (s := _section_montecarlo(monte_carlo, breach_probability, theme)) is not None:
-        secs.append(s)
+    if "montecarlo" in wanted:
+        if hasattr(monte_carlo, "percentile_by_period"):
+            metrics = monte_carlo.metrics
+            metric = target_metric if target_metric is not None else (metrics[0] if len(metrics) == 1 else None)
+            if metric not in metrics:
+                raise ValueError("target_metric must select one of the simulated metrics")
+            periods = monte_carlo.forecast_periods
+            fan: dict[str, list[str] | list[float]] = {"periods": periods}
+            for key, level in (("p_low", 0.05), ("p_mid", 0.5), ("p_high", 0.95)):
+                values = monte_carlo.percentile_by_period(metric, level)
+                if values is None or any(period not in values for period in periods):
+                    raise ValueError(f"Monte Carlo fan requires percentile {level:g} for all forecast periods")
+                fan[key] = [values[period] for period in periods]
+            monte_carlo = fan
+        if (s := _section_montecarlo(monte_carlo, breach_probability, theme)) is not None:
+            secs.append(s)
     if "variance" in wanted and (s := _section_variance(variance)) is not None:
         secs.append(s)
 

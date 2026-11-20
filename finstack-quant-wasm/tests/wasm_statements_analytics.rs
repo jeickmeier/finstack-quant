@@ -18,6 +18,7 @@ fn test_model_json() -> String {
     let q2 = PeriodId::quarter(2024, 2).expect("valid period fixture");
     let model = {
         let mut model_builder = ModelBuilder::new("test_model");
+        model_builder.source_snapshot("forecast-basis");
         model_builder.periods("2024Q1..Q2", None).unwrap();
         model_builder.value(
             "revenue",
@@ -54,15 +55,23 @@ fn evaluated_results_json() -> String {
 fn goal_seek_finds_revenue_for_target_gross_profit() {
     let model_json = test_model_json();
     let spec = serde_json::json!({
-        "target_node": "gross_profit",
-        "target_period": "2024Q1",
+        "target": { "node": "gross_profit", "period": "2024Q1" },
+        "driver": { "node": "revenue", "period": "2024Q1" },
         "target_value": 80_000.0,
-        "driver_node": "revenue",
-        "driver_period": "2024Q1",
+        "target_tolerance": 1e-7,
+        "driver_tolerance": 1e-10,
+        "max_iterations": 100,
+        "as_of": "2023-12-31",
+        "observed_through": "2023-12-31",
         "update_model": true,
-        "bounds": [50_000.0, 200_000.0],
+        "search": { "kind": "bracket", "lower": 50_000.0, "upper": 200_000.0 },
     });
-    let result = goal_seek(JsValue::from(&model_json), JsValue::from(spec.to_string())).unwrap();
+    let result = goal_seek(
+        JsValue::from(&model_json),
+        JsValue::from(spec.to_string()),
+        None,
+    )
+    .unwrap();
     let obj: serde_json::Value = serde_wasm_bindgen::from_value(result).unwrap();
     let solved = obj["solved_value"].as_f64().unwrap();
     assert!(
@@ -231,6 +240,7 @@ fn monetary_goal_seek_returns_a_valid_updated_model() {
     let period = PeriodId::annual(2025).expect("valid annual period");
     let model = {
         let mut model_builder = ModelBuilder::new("monetary-goal");
+        model_builder.source_snapshot("forecast-basis");
         model_builder.periods("2025..2025", None).unwrap();
         model_builder.value(
             "revenue",
@@ -244,15 +254,18 @@ fn monetary_goal_seek_returns_a_valid_updated_model() {
     };
     let json = serde_json::to_string(&model).unwrap();
     let spec = serde_json::json!({
-        "target_node": "profit",
-        "target_period": "2025",
-        "target_value": 60.0,
-        "driver_node": "revenue",
-        "driver_period": "2025",
+        "target": { "node": "profit", "period": "2025" },
+        "driver": { "node": "revenue", "period": "2025" },
+        "target_value": {"amount":"60","currency":"USD"},
+        "target_tolerance": {"amount":"0.0000001","currency":"USD"},
+        "driver_tolerance": 1e-10,
+        "max_iterations": 100,
+        "as_of": "2024-12-31",
+        "observed_through": "2024-12-31",
         "update_model": true,
-        "bounds": [1.0, 200.0],
+        "search": { "kind": "bracket", "lower": 1.0, "upper": 200.0 },
     });
-    let result = goal_seek(JsValue::from(&json), JsValue::from(spec.to_string())).unwrap();
+    let result = goal_seek(JsValue::from(&json), JsValue::from(spec.to_string()), None).unwrap();
     let output: serde_json::Value = serde_wasm_bindgen::from_value(result).unwrap();
     let updated = {
         let model_builder =

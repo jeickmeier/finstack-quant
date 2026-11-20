@@ -75,9 +75,9 @@ export function WaccCalculator({
     event.preventDefault();
     setEdited(false);
     onSubmit({
-      equity_weight: typedNumber(values.equity_weight),
+      equity_weight: values.equity_weight.trim(),
       cost_of_equity: typedNumber(values.cost_of_equity),
-      debt_weight: typedNumber(values.debt_weight),
+      debt_weight: values.debt_weight.trim(),
       cost_of_debt: typedNumber(values.cost_of_debt),
       tax_rate: typedNumber(values.tax_rate),
     });

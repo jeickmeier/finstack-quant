@@ -362,12 +362,28 @@ mod tests {
     #[test]
     fn spot_price_at_zero_volatility_is_the_discounted_forward_payoff() {
         let spot_call = |spot, strike, rate, div_yield, vol, expiry| {
-            bs_price(spot, strike, rate, div_yield, vol, expiry, OptionType::Call)
-                .expect("valid Black-Scholes inputs")
+            bs_price(&crate::types::OptionMarketParams {
+                spot,
+                strike,
+                rate,
+                dividend_yield: div_yield,
+                volatility: vol,
+                time_to_expiry: expiry,
+                option_type: OptionType::Call,
+            })
+            .expect("valid Black-Scholes inputs")
         };
         let spot_put = |spot, strike, rate, div_yield, vol, expiry| {
-            bs_price(spot, strike, rate, div_yield, vol, expiry, OptionType::Put)
-                .expect("valid Black-Scholes inputs")
+            bs_price(&crate::types::OptionMarketParams {
+                spot,
+                strike,
+                rate,
+                dividend_yield: div_yield,
+                volatility: vol,
+                time_to_expiry: expiry,
+                option_type: OptionType::Put,
+            })
+            .expect("valid Black-Scholes inputs")
         };
         let call = spot_call(100.0, 102.0, 0.05, 0.0, 0.0, 1.0);
         let put = spot_put(100.0, 102.0, 0.05, 0.0, 0.0, 1.0);

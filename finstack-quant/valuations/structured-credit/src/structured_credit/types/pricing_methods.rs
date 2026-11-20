@@ -423,6 +423,18 @@ impl StructuredCredit {
         context: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
+        finstack_quant_valuations_core::instruments::common_impl::helpers::apply_scenario_value(
+            self,
+            self.value_tranche_cashflows_raw(cashflows, context, as_of)?,
+        )
+    }
+
+    pub(crate) fn value_tranche_cashflows_raw(
+        &self,
+        cashflows: &TrancheCashflows,
+        context: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Money> {
         let disc = context.get_discount(&self.discount_curve_id)?;
 
         let mut pv = Money::from((0_i64, self.pool.get_currency()));
@@ -447,9 +459,7 @@ impl StructuredCredit {
             }
         }
 
-        finstack_quant_valuations_core::instruments::common_impl::helpers::apply_scenario_value(
-            self, pv,
-        )
+        Ok(pv)
     }
 }
 

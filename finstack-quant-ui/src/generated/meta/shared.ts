@@ -15355,7 +15355,7 @@ export default [
   {
     "path": "#/$defs/DiscountedCashFlow",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DiscountedCashFlow",
-    "description": "Discounted Cash Flow instrument for corporate valuation.\n\nDCF values a company by discounting projected free cash flows and terminal value.\nThe equity value is calculated as: Enterprise Value - Net Debt (or structured bridge).\n\n# Equity Bridge\n\n[`equity_bridge`](Self::equity_bridge) is the single EV-to-equity channel; a\nflat net-debt deduction sets only its `total_debt` and `cash`.\n\n# Mid-Year Convention\n\nWhen [`mid_year_convention`](Self::mid_year_convention) is `true`, cash flows are\ndiscounted at `t` minus half the average flow spacing instead of `t` years,\nreflecting the assumption that cash flows arrive mid-period (standard IB/PE\npractice). For annual grids this is the classic `(t - 0.5)`; for sub-annual\ngrids the shift is half a period. `ExitMultiple` terminal values always\ndiscount at the full horizon (a point-in-time sale price).\n\n# Valuation Discounts\n\nPrivate company valuations can apply DLOM, DLOC, and other discounts via\n[`valuation_discounts`](Self::valuation_discounts). These discounts apply\nafter the EV-to-equity bridge, so the reported enterprise value remains a\npre-discount enterprise value and does not equal discounted equity value\nplus net debt."
+    "description": "Discounted Cash Flow instrument for corporate valuation.\n\nDCF values a company by discounting projected free cash flows and terminal value.\nThe equity value is calculated as: Enterprise Value - Net Debt (or structured bridge).\n\n# Equity Bridge\n\n[`equity_bridge`](Self::equity_bridge) is the single EV-to-equity channel; a\nflat net-debt deduction sets only its `total_debt` and `cash`.\n\n# Discounting dates\nForecast receipts use their authored dates or exact period midpoints.\nTerminal value uses its own date on the same ACT/365.25 clock.\n\n# Valuation Discounts\n\nPrivate company valuations can apply DLOM, DLOC, and other discounts via\n[`valuation_discounts`](Self::valuation_discounts). These discounts apply\nafter the EV-to-equity bridge, so the reported enterprise value remains a\npre-discount enterprise value and does not equal discounted equity value\nplus net debt."
   },
   {
     "path": "#/$defs/DiscountedCashFlow/properties/attributes",
@@ -15407,7 +15407,15 @@ export default [
   {
     "path": "#/$defs/DiscountedCashFlow/properties/flows/items/prefixItems/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DiscountedCashFlow/properties/flows/items/prefixItems/1",
-    "format": "double"
+    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+  },
+  {
+    "path": "#/$defs/DiscountedCashFlow/properties/forecast_timing",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DiscountedCashFlow/properties/forecast_timing",
+    "description": "Authored receipt or actual midpoint timing for the explicit projection.",
+    "ref": "#/$defs/ForecastTiming",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ForecastTiming"
   },
   {
     "path": "#/$defs/DiscountedCashFlow/properties/id",
@@ -15431,10 +15439,19 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/DiscountedCashFlow/properties/mid_year_convention",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DiscountedCashFlow/properties/mid_year_convention",
-    "default": false,
-    "description": "Mid-year discounting convention (default: `false` = end-of-period).\n\nWhen `true`, each flow is discounted at `t` minus half the average\nflow spacing instead of `t` (the classic `t - 0.5` for annual\ngrids; half a period for sub-annual grids), reflecting the\nassumption that cash flows arrive mid-period. This is the standard\nconvention in IB/PE practice (Koller et al.). Exit-multiple\nterminal values are not shifted (point-in-time sale at the horizon)."
+    "path": "#/$defs/DiscountedCashFlow/properties/normalized_annual_fcff",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DiscountedCashFlow/properties/normalized_annual_fcff",
+    "description": "Normalized signed annual FCFF at the terminal date, in instrument currency.\nRequired for Gordon and H-model, and absent for exit-multiple valuation."
+  },
+  {
+    "path": "#/$defs/DiscountedCashFlow/properties/normalized_annual_fcff/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DiscountedCashFlow/properties/normalized_annual_fcff/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+  },
+  {
+    "path": "#/$defs/DiscountedCashFlow/properties/normalized_annual_fcff/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DiscountedCashFlow/properties/normalized_annual_fcff/anyOf/1"
   },
   {
     "path": "#/$defs/DiscountedCashFlow/properties/scenario_pricing_overrides",
@@ -15450,10 +15467,11 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/DiscountedCashFlow/properties/terminal_flow_override",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DiscountedCashFlow/properties/terminal_flow_override",
-    "description": "Annualized terminal flow used by growth-perpetuity terminal values.\n\nGordon Growth and H-Model capitalize an *annual* flow with annual\nWACC and growth rates. When the explicit `flows` grid is sub-annual\n(e.g. quarterly), the last flow is a period flow, not an annual one;\nset this to the trailing-twelve-month aggregate of the final\nexplicit year so the terminal value is computed on a consistent\nannual basis (Koller et al., Damodaran). When `None`, the last\nexplicit flow is used directly (correct for annual grids).\n\nIgnored by `ExitMultiple` terminal values.",
-    "format": "double"
+    "path": "#/$defs/DiscountedCashFlow/properties/terminal_date",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DiscountedCashFlow/properties/terminal_date",
+    "description": "Terminal horizon on or after the final forecast end, independently discounted.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/DiscountedCashFlow/properties/terminal_value",
@@ -16863,107 +16881,118 @@ export default [
   {
     "path": "#/$defs/ExprNode/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/3",
-    "description": "Call a registered function with positional arguments."
+    "description": "Exact money literal for typed statement expressions."
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/3/properties/call",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/3/properties/call"
-  },
-  {
-    "path": "#/$defs/ExprNode/oneOf/3/properties/call/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/3/properties/call/prefixItems/0",
-    "ref": "#/$defs/Function",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function"
-  },
-  {
-    "path": "#/$defs/ExprNode/oneOf/3/properties/call/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/3/properties/call/prefixItems/1"
-  },
-  {
-    "path": "#/$defs/ExprNode/oneOf/3/properties/call/prefixItems/1/items",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/3/properties/call/prefixItems/1/items",
-    "ref": "#/$defs/Expr",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"
+    "path": "#/$defs/ExprNode/oneOf/3/properties/money_literal",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/3/properties/money_literal",
+    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
     "path": "#/$defs/ExprNode/oneOf/4",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4",
-    "description": "Binary operation (arithmetic, comparison, logical)."
+    "description": "Call a registered function with positional arguments."
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/4/properties/bin_op",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4/properties/bin_op"
+    "path": "#/$defs/ExprNode/oneOf/4/properties/call",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4/properties/call"
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/4/properties/bin_op/properties/left",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4/properties/bin_op/properties/left",
-    "description": "Left operand",
-    "ref": "#/$defs/Expr",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"
+    "path": "#/$defs/ExprNode/oneOf/4/properties/call/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4/properties/call/prefixItems/0",
+    "ref": "#/$defs/Function",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function"
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/4/properties/bin_op/properties/op",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4/properties/bin_op/properties/op",
-    "description": "Operator",
-    "ref": "#/$defs/BinOp",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BinOp"
+    "path": "#/$defs/ExprNode/oneOf/4/properties/call/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4/properties/call/prefixItems/1"
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/4/properties/bin_op/properties/right",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4/properties/bin_op/properties/right",
-    "description": "Right operand",
+    "path": "#/$defs/ExprNode/oneOf/4/properties/call/prefixItems/1/items",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/4/properties/call/prefixItems/1/items",
     "ref": "#/$defs/Expr",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"
   },
   {
     "path": "#/$defs/ExprNode/oneOf/5",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/5",
-    "description": "Unary operation."
+    "description": "Binary operation (arithmetic, comparison, logical)."
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/5/properties/unary_op",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/5/properties/unary_op"
+    "path": "#/$defs/ExprNode/oneOf/5/properties/bin_op",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/5/properties/bin_op"
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/5/properties/unary_op/properties/op",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/5/properties/unary_op/properties/op",
+    "path": "#/$defs/ExprNode/oneOf/5/properties/bin_op/properties/left",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/5/properties/bin_op/properties/left",
+    "description": "Left operand",
+    "ref": "#/$defs/Expr",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"
+  },
+  {
+    "path": "#/$defs/ExprNode/oneOf/5/properties/bin_op/properties/op",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/5/properties/bin_op/properties/op",
     "description": "Operator",
-    "ref": "#/$defs/UnaryOp",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/UnaryOp"
+    "ref": "#/$defs/BinOp",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BinOp"
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/5/properties/unary_op/properties/operand",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/5/properties/unary_op/properties/operand",
-    "description": "Operand",
+    "path": "#/$defs/ExprNode/oneOf/5/properties/bin_op/properties/right",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/5/properties/bin_op/properties/right",
+    "description": "Right operand",
     "ref": "#/$defs/Expr",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"
   },
   {
     "path": "#/$defs/ExprNode/oneOf/6",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/6",
+    "description": "Unary operation."
+  },
+  {
+    "path": "#/$defs/ExprNode/oneOf/6/properties/unary_op",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/6/properties/unary_op"
+  },
+  {
+    "path": "#/$defs/ExprNode/oneOf/6/properties/unary_op/properties/op",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/6/properties/unary_op/properties/op",
+    "description": "Operator",
+    "ref": "#/$defs/UnaryOp",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/UnaryOp"
+  },
+  {
+    "path": "#/$defs/ExprNode/oneOf/6/properties/unary_op/properties/operand",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/6/properties/unary_op/properties/operand",
+    "description": "Operand",
+    "ref": "#/$defs/Expr",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"
+  },
+  {
+    "path": "#/$defs/ExprNode/oneOf/7",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/7",
     "description": "If-then-else conditional."
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/6/properties/if_then_else",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/6/properties/if_then_else"
+    "path": "#/$defs/ExprNode/oneOf/7/properties/if_then_else",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/7/properties/if_then_else"
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/condition",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/condition",
+    "path": "#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/condition",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/condition",
     "description": "Condition expression",
     "ref": "#/$defs/Expr",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/else_expr",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/else_expr",
+    "path": "#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/else_expr",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/else_expr",
     "description": "Else branch",
     "ref": "#/$defs/Expr",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"
   },
   {
-    "path": "#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/then_expr",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/6/properties/if_then_else/properties/then_expr",
+    "path": "#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/then_expr",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExprNode/oneOf/7/properties/if_then_else/properties/then_expr",
     "description": "Then branch",
     "ref": "#/$defs/Expr",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr"
@@ -17814,6 +17843,42 @@ export default [
     "description": "Stub period handling rule",
     "ref": "#/$defs/StubKind",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StubKind"
+  },
+  {
+    "path": "#/$defs/ForecastTiming",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ForecastTiming",
+    "description": "Timing election for the dates of the explicit FCFF projection."
+  },
+  {
+    "path": "#/$defs/ForecastTiming/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ForecastTiming/oneOf/0",
+    "description": "Discount every cash flow on its individually authored receipt date."
+  },
+  {
+    "path": "#/$defs/ForecastTiming/oneOf/0/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ForecastTiming/oneOf/0/properties/kind",
+    "const": "dated_receipts"
+  },
+  {
+    "path": "#/$defs/ForecastTiming/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ForecastTiming/oneOf/1",
+    "description": "Discount each signed FCFF observation on the exact elapsed midpoint\nof its authored period on ACT/365.25."
+  },
+  {
+    "path": "#/$defs/ForecastTiming/oneOf/1/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ForecastTiming/oneOf/1/properties/kind",
+    "const": "midpoints"
+  },
+  {
+    "path": "#/$defs/ForecastTiming/oneOf/1/properties/period_starts",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ForecastTiming/oneOf/1/properties/period_starts",
+    "description": "Actual start date for each forecast period, aligned to its authored\nflow end date. A forward stub begins on the valuation date."
+  },
+  {
+    "path": "#/$defs/ForecastTiming/oneOf/1/properties/period_starts/items",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ForecastTiming/oneOf/1/properties/period_starts/items",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/ForwardRateAgreement",
@@ -22214,49 +22279,65 @@ export default [
   {
     "path": "#/$defs/InstrumentJson/oneOf/75",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/75",
-    "description": "Canonical `asset_backed_facility` instrument payload."
+    "description": "Canonical `structured_credit_tranche` instrument payload."
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/75/properties/spec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/75/properties/spec",
-    "ref": "#/$defs/AssetBackedFacility",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AssetBackedFacility"
+    "ref": "#/$defs/StructuredCreditTranche",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCreditTranche"
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/75/properties/type",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/75/properties/type",
-    "const": "asset_backed_facility"
+    "const": "structured_credit_tranche"
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/76",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/76",
-    "description": "Canonical `levered_real_estate_equity` instrument payload."
+    "description": "Canonical `asset_backed_facility` instrument payload."
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/76/properties/spec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/76/properties/spec",
-    "ref": "#/$defs/LeveredRealEstateEquity",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/LeveredRealEstateEquity"
+    "ref": "#/$defs/AssetBackedFacility",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AssetBackedFacility"
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/76/properties/type",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/76/properties/type",
-    "const": "levered_real_estate_equity"
+    "const": "asset_backed_facility"
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/77",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/77",
-    "description": "Canonical `composite` instrument payload."
+    "description": "Canonical `levered_real_estate_equity` instrument payload."
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/77/properties/spec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/77/properties/spec",
-    "ref": "#/$defs/CompositeInstrument",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CompositeInstrument"
+    "ref": "#/$defs/LeveredRealEstateEquity",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/LeveredRealEstateEquity"
   },
   {
     "path": "#/$defs/InstrumentJson/oneOf/77/properties/type",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/77/properties/type",
+    "const": "levered_real_estate_equity"
+  },
+  {
+    "path": "#/$defs/InstrumentJson/oneOf/78",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/78",
+    "description": "Canonical `composite` instrument payload."
+  },
+  {
+    "path": "#/$defs/InstrumentJson/oneOf/78/properties/spec",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/78/properties/spec",
+    "ref": "#/$defs/CompositeInstrument",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CompositeInstrument"
+  },
+  {
+    "path": "#/$defs/InstrumentJson/oneOf/78/properties/type",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InstrumentJson/oneOf/78/properties/type",
     "const": "composite"
   },
   {
@@ -29549,6 +29630,27 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCredit/properties/waterfall/anyOf/1"
   },
   {
+    "path": "#/$defs/StructuredCreditTranche",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCreditTranche",
+    "description": "An independently held note priced through its originating deal's waterfall."
+  },
+  {
+    "path": "#/$defs/StructuredCreditTranche/properties/deal",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCreditTranche/properties/deal",
+    "ref": "#/$defs/StructuredCredit",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCredit"
+  },
+  {
+    "path": "#/$defs/StructuredCreditTranche/properties/id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCreditTranche/properties/id",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/StructuredCreditTranche/properties/tranche_id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCreditTranche/properties/tranche_id"
+  },
+  {
     "path": "#/$defs/StubKind",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StubKind",
     "description": "Stub period handling when start/end dates don't align with payment frequency.\n\nControls how schedules are generated when the start and end dates don't\ndivide evenly by the payment frequency, resulting in an irregular period\n(stub) at the beginning or end of the schedule.\n\n# Variants\n\n- **`None`**: No stub allowed (default). Generates regular periods from\n  start to end and returns an error\n  ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide\n  evenly by the frequency. Use a stub variant for misaligned schedules.\n\n[`InputError::NonIntegerScheduleTenor`]: crate::InputError::NonIntegerScheduleTenor\n- **`ShortFront`**: Short stub period at the start. Schedule is built\n  backward from the end date, creating a short first period.\n- **`ShortBack`**: Short stub period at the end. Schedule is built forward\n  from the start date, creating a short final period.\n- **`LongFront`**: Long stub period at the start. Combines the first two\n  periods into a single longer period.\n- **`LongBack`**: Long stub period at the end. Combines the last two periods\n  into a single longer period.\n\n# Financial Context\n\nStub conventions are important for:\n- Interest accrual calculations (short/long first coupons)\n- Cash flow present value computations\n- Matching market conventions for specific instruments\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{GridMode, Schedule, StubKind, Tenor};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::January, 10)?;\nlet end = Date::from_calendar_date(2025, Month::December, 15)?;\n\n// Short stub at front\nlet sched = Schedule::builder(start, end)?\n    .frequency(Tenor::quarterly())\n    .stub_rule(StubKind::ShortFront)\n    .grid(GridMode::Natural)\n    .unadjusted()\n    .build()?;\n# Ok::<(), Box<dyn std::error::Error>>(())\n```\n\n# See Also\n\n- [`ScheduleBuilder::stub_rule`] to configure stub behavior"
@@ -29947,7 +30049,7 @@ export default [
   {
     "path": "#/$defs/TerminalValueSpec/oneOf/1/properties/terminal_metric",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TerminalValueSpec/oneOf/1/properties/terminal_metric",
-    "description": "Terminal metric value (e.g., EBITDA)",
+    "description": "Terminal metric in major currency units (for example, EBITDA).\nRequired for standalone pricing. A statement DCF can resolve it from a metric node.",
     "format": "double"
   },
   {
@@ -32814,6 +32916,12 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatLegSpec"
   },
   {
+    "path": "#/properties/ForecastTiming",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/ForecastTiming",
+    "ref": "#/$defs/ForecastTiming",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ForecastTiming"
+  },
+  {
     "path": "#/properties/ForwardRateAgreement",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/ForwardRateAgreement",
     "ref": "#/$defs/ForwardRateAgreement",
@@ -33790,6 +33898,12 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/StructuredCredit",
     "ref": "#/$defs/StructuredCredit",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCredit"
+  },
+  {
+    "path": "#/properties/StructuredCreditTranche",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/StructuredCreditTranche",
+    "ref": "#/$defs/StructuredCreditTranche",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCreditTranche"
   },
   {
     "path": "#/properties/StubKind",

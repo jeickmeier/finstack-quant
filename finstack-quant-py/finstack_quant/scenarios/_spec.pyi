@@ -39,8 +39,11 @@ class ScenarioSpec:
     'rates_up'
     >>> spec == ScenarioSpec.from_json(spec.to_json())
     True
+    >>> (spec + ScenarioSpec("rates_next", [operation])).id
+    'rates_up+rates_next'
     """
 
+    def __add__(self, other: ScenarioSpec) -> ScenarioSpec: ...
     def __init__(
         self,
         id: str,
@@ -451,5 +454,106 @@ class TemplateMetadata:
         ------
         ValueError
             If serialization fails.
+        """
+        ...
+
+class ScenarioValidationReport:
+    """Structural scenario diagnostics produced without applying shocks.
+
+    Examples
+    --------
+    >>> from finstack_quant.scenarios import ScenarioSpec, validate_scenario_spec
+    >>> report = validate_scenario_spec(ScenarioSpec("base", []))
+    >>> (report.valid, report.operation_count, report.errors)
+    (True, 0, [])
+    """
+
+    @property
+    def valid(self) -> bool:
+        """Whether every structural check passed.
+
+        Returns
+        -------
+        bool
+            Whether every structural check passed.
+
+        Notes
+        -----
+        This accessor reads the stored result and does not raise.
+        """
+        ...
+
+    @property
+    def errors(self) -> list[str]:
+        """Diagnostic errors in specification and operation order.
+
+        Returns
+        -------
+        list[str]
+            Diagnostic errors in specification and operation order.
+
+        Notes
+        -----
+        This accessor reads the stored result and does not raise.
+        """
+        ...
+
+    @property
+    def warnings(self) -> list[str]:
+        """Advisory diagnostics for the submitted specification.
+
+        Returns
+        -------
+        list[str]
+            Advisory diagnostics for the submitted specification.
+
+        Notes
+        -----
+        This accessor reads the stored result and does not raise.
+        """
+        ...
+
+    @property
+    def requires_instruments(self) -> bool:
+        """Whether an operation needs an instrument inventory.
+
+        Returns
+        -------
+        bool
+            Whether an operation needs an instrument inventory.
+
+        Notes
+        -----
+        This accessor reads the stored result and does not raise.
+        """
+        ...
+
+    @property
+    def mutates_instruments(self) -> bool:
+        """Whether applying an operation can modify the instruments.
+
+        Returns
+        -------
+        bool
+            Whether applying an operation can modify the instruments.
+
+        Notes
+        -----
+        This accessor reads the stored result and does not raise.
+        """
+        ...
+
+    @property
+    def operation_count(self) -> int:
+        """Number of operations submitted for validation.
+
+        Returns
+        -------
+        int
+            Number of operations submitted for validation.
+
+        Notes
+        -----
+        This accessor reads the stored result and does not raise.
         """
         ...

@@ -15,14 +15,12 @@ from __future__ import annotations
 
 from datetime import date
 from itertools import pairwise
-import json
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from finstack_quant.calibration import calibrate
-from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import FxMatrix, MarketContext
 
 from .analyst_book import AS_OF, book_spec, build_market, calibration_envelope
@@ -178,12 +176,12 @@ def history_market(as_of: date) -> MarketContext:
             quote["rate"] += quotes["rate_shift"]
         elif quote["kind"] == "cds_quote":
             quote["spread_bp"] += quotes["credit_shift_bp"]
-    calibrated = calibrate(json.dumps(envelope)).market
+    calibrated = calibrate(envelope).market
     market.insert(calibrated.get_discount("USD-OIS"))
     market.insert(calibrated.get_hazard("ACME-HZD"))
     market.insert_price("SPX-SPOT", quotes["spx"], "USD")
-    fx = FxMatrix(None)
-    fx.set_quotes([(Currency("EUR"), Currency("USD"), quotes["eur_usd"])])
+    fx = FxMatrix.direct()
+    fx.set_quotes([("EUR", "USD", quotes["eur_usd"])])
     market.insert_fx(fx)
     return market
 

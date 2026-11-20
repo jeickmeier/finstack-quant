@@ -51,4 +51,4 @@
 pub(crate) mod metrics;
 mod types;
 
-pub use types::Deposit;
+pub use types::{Deposit, DepositBuilder};

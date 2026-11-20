@@ -1,0 +1,30 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_grid_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Ordered WACC and terminal parameter axes.",
+  "properties": {
+    "terminal_values": {
+      "description": "Stable growth decimal rates or exit multiple turns, in column order.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "wacc_values": {
+      "description": "Annual effective WACC decimal rates, in row order.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "wacc_values",
+    "terminal_values"
+  ],
+  "title": "DcfSensitivityGridSpec",
+  "type": "object"
+}

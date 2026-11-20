@@ -73,12 +73,22 @@ test('statements_analytics matches the cross-host golden', () => {
     core.RatingScaleRegistry.fromJson(INPUTS.rating_scales)
   );
 
-  const rolled = sa.addRollForwardWithOpening(MODEL, 'debt', ['revenue'], ['cogs'], 10.0);
-  const vintage = sa.addVintageBuildup(MODEL, 'book', 'revenue', [1.0, 0.5]);
-  const noi = sa.addNoiBuildup(MODEL, 'total_rev', ['revenue'], 'total_exp', ['cogs'], 'noi');
-  const ncf = sa.addNcfBuildup(noi, 'noi', ['cogs'], 'ncf');
-  const rentRoll = sa.addRentRoll(MODEL, [INPUTS.lease]);
-  const property = sa.addPropertyOperatingStatement(MODEL, [INPUTS.lease], null, ['cogs']);
+  const rollBuilder = statements.ModelBuilder.fromSpec(MODEL);
+  sa.addRollForwardWithOpening(rollBuilder, 'debt', ['revenue'], ['cogs'], 10.0);
+  const rolled = rollBuilder.build();
+  const vintageBuilder = statements.ModelBuilder.fromSpec(MODEL);
+  sa.addVintageBuildup(vintageBuilder, 'book', 'revenue', [1.0, 0.5]);
+  const vintage = vintageBuilder.build();
+  const cashBuilder = statements.ModelBuilder.fromSpec(MODEL);
+  sa.addNoiBuildup(cashBuilder, 'total_rev', ['revenue'], 'total_exp', ['cogs'], 'noi');
+  sa.addNcfBuildup(cashBuilder, 'noi', ['cogs'], 'ncf');
+  const ncf = cashBuilder.build();
+  const rentBuilder = statements.ModelBuilder.fromSpec(MODEL);
+  sa.addRentRoll(rentBuilder, [INPUTS.lease]);
+  const rentRoll = rentBuilder.build();
+  const propertyBuilder = statements.ModelBuilder.fromSpec(MODEL);
+  sa.addPropertyOperatingStatement(propertyBuilder, [INPUTS.lease], [], ['cogs'], []);
+  const property = propertyBuilder.build();
 
   const exposure = INPUTS.exposure;
   const schedule = INPUTS.pd_schedule;
@@ -134,7 +144,7 @@ test('statements_analytics matches the cross-host golden', () => {
       'roll_forward.node_ids': statements.modelNodeIds(rolled),
       'roll_forward.end': [valueOf(rolled, 'debt_end', Q1), valueOf(rolled, 'debt_end', Q2)],
       'vintage.book': [valueOf(vintage, 'book', Q1), valueOf(vintage, 'book', Q2)],
-      noi: [valueOf(noi, 'noi', Q1), valueOf(noi, 'noi', Q2)],
+      noi: [valueOf(ncf, 'noi', Q1), valueOf(ncf, 'noi', Q2)],
       ncf: [valueOf(ncf, 'ncf', Q1), valueOf(ncf, 'ncf', Q2)],
       'rent_roll.node_ids': statements.modelNodeIds(rentRoll),
       'property.node_ids': statements.modelNodeIds(property),
@@ -147,8 +157,8 @@ test('statements_analytics matches the cross-host golden', () => {
       weighted: sa.computeEclWeighted(
         exposure,
         [
-          [0.6, schedule],
-          [0.4, stressed],
+          { id: 'base', weight: '0.6', pd_schedule: schedule },
+          { id: 'stress', weight: '0.4', pd_schedule: stressed },
         ],
         'stage2'
       ).ecl,
@@ -164,7 +174,7 @@ test('statements_analytics matches the cross-host golden', () => {
     },
     terminal_specs: [
       { type: 'gordon_growth', stable_growth_rate: 0.02 },
-      { type: 'exit_multiple', multiple: 8.5, terminal_metric: 0.0 },
+      { type: 'exit_multiple', multiple: 8.5 },
       { type: 'h_model', high_growth_rate: 0.08, stable_growth_rate: 0.02, half_life_years: 5.0 },
     ],
     scenario_diff: sa.scenarioDiff(scenarioSet, scenarioResults, 'base', 'down', ['profit'], [Q2]),
@@ -458,23 +468,26 @@ test('validateScorecardConfig and the spec validators run the Rust checks', () =
 });
 
 test('addRollForward opens at zero and the templates reject bad inputs', () => {
-  const rolled = sa.addRollForward(MODEL, 'debt', ['revenue'], ['cogs']);
+  const rollBuilder = statements.ModelBuilder.fromSpec(MODEL);
+  sa.addRollForward(rollBuilder, 'debt', ['revenue'], ['cogs']);
+  const rolled = rollBuilder.build();
   assert.equal(valueOf(rolled, 'debt_end', Q1), 60);
   assert.throws(
-    () => sa.addRentRoll(MODEL, []),
+    () => sa.addRentRoll(statements.ModelBuilder.fromSpec(MODEL), []),
     (e) => e.kind === 'validation'
   );
   assert.throws(
-    () => sa.addVintageBuildup(MODEL, 'book', 'revenue', ['x']),
+    () => sa.addVintageBuildup(statements.ModelBuilder.fromSpec(MODEL), 'book', 'revenue', ['x']),
     (e) => e instanceof TypeError && e.kind === 'invalid_type'
   );
-  const named = sa.addRentRoll(MODEL, [INPUTS.lease], {
+  const namedBuilder = statements.ModelBuilder.fromSpec(MODEL);
+  sa.addRentRoll(namedBuilder, [INPUTS.lease], {
     rent_pgi_node: 'pgi',
     free_rent_node: 'free',
     vacancy_loss_node: 'vacancy',
     rent_effective_node: 'effective',
   });
-  assert.ok(statements.modelNodeIds(named).includes('effective'));
+  assert.ok(statements.modelNodeIds(namedBuilder.build()).includes('effective'));
 });
 
 test('classifyStage honours a StagingConfig and rejects bad PDs', () => {
@@ -532,4 +545,171 @@ test('DependencyTracer and the extensions reject malformed inputs', () => {
       ),
     (e) => e.kind === 'validation'
   );
+});
+
+test('dated DCF reuses matching statements for its grid and coherent sample paths', () => {
+  const day = '2024-12-31';
+  const builder = new statements.ModelBuilder('qualified-dcf');
+  builder.periods('2025..2025');
+  builder.currency('USD');
+  builder.sourceSnapshot('forecast-at-2024-close');
+  const annual = { amount: '100', currency: 'USD' };
+  builder.valueMoney('ufcf', { 2025: annual });
+  const model = builder.build();
+  const evaluator = new statements.Evaluator();
+  const context = new core.MarketContext();
+  try {
+    const market = context.toJson();
+    const results = evaluator.evaluateWithMarket(model, market, day, day);
+    const request = {
+      cut: { as_of: day, observed_through: day, currency: 'USD' },
+      inputs: sa.dcfInputs({
+        wacc: 0.1,
+        terminal_value: { type: 'gordon_growth', stable_growth_rate: 0.02 },
+        net_debt_override: 50,
+      }),
+      options: sa.dcfOptions({}),
+      projection: {
+        terminal_date: '2026-01-01',
+        normalized_annual_fcff: { kind: 'authored', amount: annual },
+        stable_growth_ceiling: 0.08,
+      },
+    };
+    const baseline = sa.evaluateDcfFromResults(model, results, request).enterprise_value;
+    assert.ok(Math.abs(Number(baseline.amount) - 1249.77910868) < 1e-7);
+    const grid = sa.dcfSensitivityGrid(
+      model,
+      results,
+      request,
+      sa.dcfSensitivityGridSpec({ wacc_values: [0.09, 0.1], terminal_values: [0.015, 0.02, 0.095] })
+    );
+    assert.deepEqual(
+      grid.cells.map((row) => row.length),
+      [3, 3]
+    );
+    assert.deepEqual(grid.cells[1][1].enterprise_value, baseline);
+    assert.ok(grid.cells.every((row) => row[2].status === 'unavailable'));
+    const shocks = sa.dcfSensitivityOnResults(model, results, request, {
+      wacc: { low: '0.01', high: '0.02' },
+      terminal: { parameter: 'stable_growth', shocks: { low: '0.005', high: '0.07' } },
+    });
+    const growth = shocks.pairs.find((pair) => pair.parameter_id === 'terminal_growth');
+    assert.equal(growth.low.status, 'priced');
+    assert.equal(growth.high.status, 'unavailable');
+    assert.ok(Math.abs(growth.high.level - 0.09) < 1e-12);
+    const paths = evaluator.evaluateMonteCarlo(
+      model,
+      { n_paths: 3, seed: '7', metrics: ['ufcf'], percentiles: [0.5], include_path_data: true },
+      market,
+      day,
+      day
+    );
+    const distribution = sa.evaluateDcfMonteCarlo(model, results, paths, request);
+    assert.deepEqual(
+      distribution.paths.map((row) => row.path_id),
+      [0, 1, 2]
+    );
+    assert.ok(distribution.paths.every((row) => row.enterprise_value.amount === baseline.amount));
+    context.insertDividendYield('NEW-QUOTE', 0.03);
+    const otherPaths = evaluator.evaluateMonteCarlo(
+      model,
+      { n_paths: 3, seed: '7', metrics: ['ufcf'], percentiles: [0.5], include_path_data: true },
+      context.toJson(),
+      day,
+      day
+    );
+    assert.throws(
+      () => sa.evaluateDcfMonteCarlo(model, results, otherPaths, request),
+      /market snapshot/
+    );
+  } finally {
+    context.free();
+    evaluator.free();
+    builder.free();
+  }
+});
+
+test('statement credit scores use annual monetary sources and a string period', () => {
+  const builder = new statements.ModelBuilder('score-annual');
+  const evaluator = new statements.Evaluator();
+  try {
+    builder.periods('2025..2025');
+    builder.currency('USD');
+    for (const [node, amount] of Object.entries({
+      assets: '1000',
+      liabilities: '500',
+      income: '75',
+      liquid_assets: '200',
+      short_debt: '125',
+    })) {
+      builder.valueMoney(node, { 2025: { amount, currency: 'USD' } });
+    }
+    const results = evaluator.evaluate(builder.build());
+    const mapping = {
+      total_assets: 'assets',
+      total_liabilities: 'liabilities',
+      net_income: 'income',
+      current_assets: 'liquid_assets',
+      current_liabilities: 'short_debt',
+    };
+    const model = { model: 'zmijewski' };
+    const score = sa.scoreStatement(results, '2025', mapping, model);
+    assert.ok(Math.abs(score.score - (-4.336 - 4.513 * 0.075 + 5.679 * 0.5 + 0.004 * 1.6)) < 1e-12);
+    assert.throws(() => sa.scoreStatement(results, 2025, mapping, model), /period/);
+    assert.throws(() => sa.scoreStatement(results, '2025Q4', mapping, model), /full-year/);
+  } finally {
+    evaluator.free();
+    builder.free();
+  }
+});
+
+test('computeImpairedEcl discounts dated recovery without a default curve', () => {
+  const result = sa.computeImpairedEcl(
+    {
+      exposure_id: 'loan',
+      carrying_amount_source: 'ledger',
+      carrying_amount: { amount: '100', currency: 'USD' },
+      reporting_date: '2025-01-01',
+      effective_interest_rate: '0.10',
+      recovery_day_count: 'act_365f',
+    },
+    { source_id: 'approved workout', amount: { amount: '88', currency: 'USD' }, date: '2026-01-01' }
+  );
+  assert.equal(result.allowance.currency, 'USD');
+  assert.ok(Math.abs(Number(result.allowance.amount) - 20) < 1e-10);
+  assert.equal(result.recovery.source_id, 'approved workout');
+});
+
+test('weighted Stage 3 keeps measured recovery when another scenario is unavailable', () => {
+  const money = (amount) => ({ amount, currency: 'USD' });
+  const exposure = {
+    exposure_id: 'weighted-loan',
+    carrying_amount_source: 'ledger',
+    carrying_amount: money('100'),
+    reporting_date: '2025-01-01',
+    effective_interest_rate: '0',
+    recovery_day_count: 'act_365f',
+  };
+  const recovery = (amount) => ({
+    source_id: 'approved-workout',
+    amount: money(amount),
+    date: '2026-01-01',
+  });
+  const base = { id: 'base', weight: '0.70', recovery: recovery('80') };
+  const measured = sa.computeImpairedEclWeighted(exposure, [
+    base,
+    { id: 'stress', weight: '0.30', recovery: recovery('20') },
+  ]);
+  assert.equal(Number(measured.allowance.amount), 38);
+  const partial = sa.computeImpairedEclWeighted(exposure, [
+    base,
+    { id: 'stress', weight: '0.30' },
+    { id: 'ignored', weight: '0', recovery: recovery('-12') },
+  ]);
+  assert.equal(partial.allowance, null);
+  assert.deepEqual(
+    partial.outcomes.map((row) => row.status),
+    ['measured', 'unavailable', 'zero_weight']
+  );
+  assert.equal(Number(partial.outcomes[0].weighted_allowance.amount), 14);
 });
