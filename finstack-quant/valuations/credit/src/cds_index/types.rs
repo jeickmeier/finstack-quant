@@ -270,6 +270,7 @@ impl CdsIndex {
     ///         id: InstrumentId::new("CDX-IG-42"),
     ///         notional: Money::from((10_000_000_i64, Currency::USD)),
     ///         side: PayReceive::Pay,
+    ///         include_valuation_date_cashflows: false,
     ///         start: date!(2024 - 03 - 20),
     ///         end: date!(2029 - 06 - 20),
     ///         recovery_rate: 0.40,

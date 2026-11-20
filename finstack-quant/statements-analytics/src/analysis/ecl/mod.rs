@@ -50,7 +50,8 @@
 //! let ecl = compute_ecl_weighted_from_curves(&exposure, staging.stage, &pd_sources, &config)?;
 //!
 //! assert_eq!(staging.stage, Stage::Stage1);
-//! assert!(ecl.ecl > 0.0);
+//! // The total is absent if a positive-weight scenario could not be measured.
+//! assert!(ecl.ecl.is_some_and(|allowance| allowance > 0.0));
 //! # Ok(())
 //! # }
 //! ```
