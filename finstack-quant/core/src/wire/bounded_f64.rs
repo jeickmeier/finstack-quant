@@ -137,60 +137,6 @@ where
         .serialize(serializer)
 }
 
-/// Deserialize a finite, non-negative `f64` through [`NonNegativeF64Wire`].
-///
-/// # Arguments
-///
-/// * `deserializer` - Serde input containing a JSON number at least zero.
-pub fn deserialize_non_negative_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    NonNegativeF64Wire::deserialize(deserializer).map(NonNegativeF64Wire::into_inner)
-}
-
-/// Serialize a finite, non-negative `f64` through [`NonNegativeF64Wire`].
-///
-/// # Arguments
-///
-/// * `value` - Number that must be finite and at least zero.
-/// * `serializer` - Serde destination for the validated number.
-pub fn serialize_non_negative_f64<S>(value: &f64, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    NonNegativeF64Wire::try_from(*value)
-        .map_err(serde::ser::Error::custom)?
-        .serialize(serializer)
-}
-
-/// Deserialize a finite `f64` in the closed interval `[0, 1]`.
-///
-/// # Arguments
-///
-/// * `deserializer` - Serde input containing a JSON number in `[0, 1]`.
-pub fn deserialize_closed_unit_interval_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    ClosedUnitIntervalF64Wire::deserialize(deserializer).map(ClosedUnitIntervalF64Wire::into_inner)
-}
-
-/// Serialize a finite `f64` in the closed interval `[0, 1]`.
-///
-/// # Arguments
-///
-/// * `value` - Number that must lie in `[0, 1]`.
-/// * `serializer` - Serde destination for the validated number.
-pub fn serialize_closed_unit_interval_f64<S>(value: &f64, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    ClosedUnitIntervalF64Wire::try_from(*value)
-        .map_err(serde::ser::Error::custom)?
-        .serialize(serializer)
-}
-
 /// Deserialize a finite probability in the open interval `(0, 1)`.
 ///
 /// # Arguments
@@ -241,39 +187,6 @@ where
     S: serde::Serializer,
 {
     CorrelationWire::try_from(*value)
-        .map_err(serde::ser::Error::custom)?
-        .serialize(serializer)
-}
-
-/// Deserialize an optional finite, strictly positive `f64`.
-///
-/// # Arguments
-///
-/// * `deserializer` - Serde input containing a positive number or JSON `null`.
-pub fn deserialize_optional_positive_f64<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    Option::<PositiveF64Wire>::deserialize(deserializer)
-        .map(|value| value.map(PositiveF64Wire::into_inner))
-}
-
-/// Serialize an optional finite, strictly positive `f64`.
-///
-/// # Arguments
-///
-/// * `value` - Optional positive number; `None` is serialized as JSON `null`.
-/// * `serializer` - Serde destination for the validated optional number.
-pub fn serialize_optional_positive_f64<S>(
-    value: &Option<f64>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    value
-        .map(PositiveF64Wire::try_from)
-        .transpose()
         .map_err(serde::ser::Error::custom)?
         .serialize(serializer)
 }

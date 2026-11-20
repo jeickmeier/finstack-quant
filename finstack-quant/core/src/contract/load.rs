@@ -69,7 +69,8 @@ pub fn check_json_limits(bytes: &[u8], limits: &LoadLimits) -> Result<(), Contra
     Ok(())
 }
 
-/// Parse bounded UTF-8 JSON bytes into a generic value.
+/// Parse bounded UTF-8 JSON bytes as a [`serde_json::Value`] under explicit
+/// resource bounds, rejecting duplicate object keys at any nesting level.
 ///
 /// The encoded byte length and resulting container depth are checked against
 /// `limits`. JSON syntax failures are returned as structured parse diagnostics
@@ -80,16 +81,6 @@ pub fn check_json_limits(bytes: &[u8], limits: &LoadLimits) -> Result<(), Contra
 /// * `bytes` - Complete UTF-8 JSON document to parse.
 /// * `limits` - Resource policy bounding encoded bytes, nesting depth, and
 ///   retained diagnostics.
-///
-/// # Errors
-///
-/// Parse UTF-8 bytes as a [`serde_json::Value`] under explicit resource bounds,
-/// rejecting duplicate object keys at any nesting level.
-///
-/// # Arguments
-///
-/// * `bytes` - Raw UTF-8 JSON payload.
-/// * `limits` - Resource limits enforced before JSON parsing begins.
 ///
 /// # Errors
 ///
