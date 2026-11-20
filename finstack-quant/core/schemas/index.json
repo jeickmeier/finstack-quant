@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/math/1/ols_result.schema.json",
-      "bytes": 1891,
+      "bytes": 2186,
       "kind": "output",
       "path": "schemas/math/1/ols_result.schema.json",
       "summary": "Ordinary least-squares coefficients, residuals and fit diagnostics.",

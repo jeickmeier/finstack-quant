@@ -362,6 +362,26 @@ mod examples {
         })
     }
 
+    pub(super) fn im_projection_spec() -> Result<Vec<Value>> {
+        use crate::types::NettingSetId;
+        use crate::xva::mva::{ImDecayProfile, ImProjectionSpec};
+        use time::macros::date;
+
+        let as_of = date!(2025 - 01 - 01);
+        example(&ImProjectionSpec {
+            as_of,
+            currency: Currency::USD,
+            netting_set: NettingSetId::bilateral("bank", "agreement"),
+            scope_source: "simm-execution".into(),
+            dates: vec![as_of, date!(2025 - 07 - 01), date!(2026 - 01 - 01)],
+            decay: ImDecayProfile::linear_to_maturity(1.0)?,
+        })
+    }
+
+    pub(super) fn margin_funding_spread() -> Result<Vec<Value>> {
+        example(&crate::xva::mva::MarginFundingSpread::Flat { spread_bp: 50.0 })
+    }
+
     pub(super) fn im_result() -> Result<Vec<Value>> {
         example_from_json::<crate::calculators::ImResult>(json!({
             "amount": {"amount": "2500000", "currency": "USD"},
@@ -670,6 +690,7 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Input,
         "Dated admitted SIMM netting scope and deterministic projection election."
     )
+    .with_examples(examples::im_projection_spec)
     .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         MarginFundingSpread,
@@ -678,6 +699,7 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Input,
         "Explicit flat or dated basis-point funding spread for posted IM."
     )
+    .with_examples(examples::margin_funding_spread)
     .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         MvaResult,

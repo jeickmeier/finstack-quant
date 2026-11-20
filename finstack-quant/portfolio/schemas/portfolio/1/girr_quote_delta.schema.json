@@ -1813,6 +1813,676 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/girr_quote_delta.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Ordinary GIRR regulatory inputs and their signed position-level quote reprices.",
+  "examples": [
+    {
+      "as_of": "2024-01-02",
+      "market_hash": "example-market-fingerprint",
+      "portfolio_id": "example-trading-book",
+      "pricing_hash": "example-pricing-fingerprint",
+      "quote_risk": [
+        {
+          "positions": [
+            {
+              "center_native": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -10000.0,
+              "pnl_native_per_bp": {
+                "amount": "-100",
+                "currency": "USD"
+              },
+              "position_id": "BOND_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "999900",
+                "currency": "USD"
+              }
+            },
+            {
+              "center_native": {
+                "amount": "10000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -100.0,
+              "pnl_native_per_bp": {
+                "amount": "-1",
+                "currency": "USD"
+              },
+              "position_id": "CDS_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "9999",
+                "currency": "USD"
+              }
+            }
+          ],
+          "target": {
+            "quote": {
+              "pillar_date": "2024-04-02",
+              "quote_id": "USD-OIS-0.25Y"
+            },
+            "risk_currency": "USD",
+            "risk_curve_id": "USD-OIS",
+            "source": {
+              "curve_id": "USD-OIS",
+              "kind": "discount"
+            },
+            "vertex": "0.25Y"
+          }
+        },
+        {
+          "positions": [
+            {
+              "center_native": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -10000.0,
+              "pnl_native_per_bp": {
+                "amount": "-100",
+                "currency": "USD"
+              },
+              "position_id": "BOND_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "999900",
+                "currency": "USD"
+              }
+            },
+            {
+              "center_native": {
+                "amount": "10000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -100.0,
+              "pnl_native_per_bp": {
+                "amount": "-1",
+                "currency": "USD"
+              },
+              "position_id": "CDS_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "9999",
+                "currency": "USD"
+              }
+            }
+          ],
+          "target": {
+            "quote": {
+              "pillar_date": "2024-07-02",
+              "quote_id": "USD-OIS-0.5Y"
+            },
+            "risk_currency": "USD",
+            "risk_curve_id": "USD-OIS",
+            "source": {
+              "curve_id": "USD-OIS",
+              "kind": "discount"
+            },
+            "vertex": "0.5Y"
+          }
+        },
+        {
+          "positions": [
+            {
+              "center_native": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -10000.0,
+              "pnl_native_per_bp": {
+                "amount": "-100",
+                "currency": "USD"
+              },
+              "position_id": "BOND_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "999900",
+                "currency": "USD"
+              }
+            },
+            {
+              "center_native": {
+                "amount": "10000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -100.0,
+              "pnl_native_per_bp": {
+                "amount": "-1",
+                "currency": "USD"
+              },
+              "position_id": "CDS_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "9999",
+                "currency": "USD"
+              }
+            }
+          ],
+          "target": {
+            "quote": {
+              "pillar_date": "2025-01-02",
+              "quote_id": "USD-OIS-1Y"
+            },
+            "risk_currency": "USD",
+            "risk_curve_id": "USD-OIS",
+            "source": {
+              "curve_id": "USD-OIS",
+              "kind": "discount"
+            },
+            "vertex": "1Y"
+          }
+        },
+        {
+          "positions": [
+            {
+              "center_native": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -10000.0,
+              "pnl_native_per_bp": {
+                "amount": "-100",
+                "currency": "USD"
+              },
+              "position_id": "BOND_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "999900",
+                "currency": "USD"
+              }
+            },
+            {
+              "center_native": {
+                "amount": "10000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -100.0,
+              "pnl_native_per_bp": {
+                "amount": "-1",
+                "currency": "USD"
+              },
+              "position_id": "CDS_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "9999",
+                "currency": "USD"
+              }
+            }
+          ],
+          "target": {
+            "quote": {
+              "pillar_date": "2026-01-02",
+              "quote_id": "USD-OIS-2Y"
+            },
+            "risk_currency": "USD",
+            "risk_curve_id": "USD-OIS",
+            "source": {
+              "curve_id": "USD-OIS",
+              "kind": "discount"
+            },
+            "vertex": "2Y"
+          }
+        },
+        {
+          "positions": [
+            {
+              "center_native": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -10000.0,
+              "pnl_native_per_bp": {
+                "amount": "-100",
+                "currency": "USD"
+              },
+              "position_id": "BOND_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "999900",
+                "currency": "USD"
+              }
+            },
+            {
+              "center_native": {
+                "amount": "10000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -100.0,
+              "pnl_native_per_bp": {
+                "amount": "-1",
+                "currency": "USD"
+              },
+              "position_id": "CDS_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "9999",
+                "currency": "USD"
+              }
+            }
+          ],
+          "target": {
+            "quote": {
+              "pillar_date": "2027-01-02",
+              "quote_id": "USD-OIS-3Y"
+            },
+            "risk_currency": "USD",
+            "risk_curve_id": "USD-OIS",
+            "source": {
+              "curve_id": "USD-OIS",
+              "kind": "discount"
+            },
+            "vertex": "3Y"
+          }
+        },
+        {
+          "positions": [
+            {
+              "center_native": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -10000.0,
+              "pnl_native_per_bp": {
+                "amount": "-100",
+                "currency": "USD"
+              },
+              "position_id": "BOND_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "999900",
+                "currency": "USD"
+              }
+            },
+            {
+              "center_native": {
+                "amount": "10000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -100.0,
+              "pnl_native_per_bp": {
+                "amount": "-1",
+                "currency": "USD"
+              },
+              "position_id": "CDS_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "9999",
+                "currency": "USD"
+              }
+            }
+          ],
+          "target": {
+            "quote": {
+              "pillar_date": "2029-01-02",
+              "quote_id": "USD-OIS-5Y"
+            },
+            "risk_currency": "USD",
+            "risk_curve_id": "USD-OIS",
+            "source": {
+              "curve_id": "USD-OIS",
+              "kind": "discount"
+            },
+            "vertex": "5Y"
+          }
+        },
+        {
+          "positions": [
+            {
+              "center_native": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -10000.0,
+              "pnl_native_per_bp": {
+                "amount": "-100",
+                "currency": "USD"
+              },
+              "position_id": "BOND_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "999900",
+                "currency": "USD"
+              }
+            },
+            {
+              "center_native": {
+                "amount": "10000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -100.0,
+              "pnl_native_per_bp": {
+                "amount": "-1",
+                "currency": "USD"
+              },
+              "position_id": "CDS_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "9999",
+                "currency": "USD"
+              }
+            }
+          ],
+          "target": {
+            "quote": {
+              "pillar_date": "2034-01-02",
+              "quote_id": "USD-OIS-10Y"
+            },
+            "risk_currency": "USD",
+            "risk_curve_id": "USD-OIS",
+            "source": {
+              "curve_id": "USD-OIS",
+              "kind": "discount"
+            },
+            "vertex": "10Y"
+          }
+        },
+        {
+          "positions": [
+            {
+              "center_native": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -10000.0,
+              "pnl_native_per_bp": {
+                "amount": "-100",
+                "currency": "USD"
+              },
+              "position_id": "BOND_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "999900",
+                "currency": "USD"
+              }
+            },
+            {
+              "center_native": {
+                "amount": "10000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -100.0,
+              "pnl_native_per_bp": {
+                "amount": "-1",
+                "currency": "USD"
+              },
+              "position_id": "CDS_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "9999",
+                "currency": "USD"
+              }
+            }
+          ],
+          "target": {
+            "quote": {
+              "pillar_date": "2039-01-02",
+              "quote_id": "USD-OIS-15Y"
+            },
+            "risk_currency": "USD",
+            "risk_curve_id": "USD-OIS",
+            "source": {
+              "curve_id": "USD-OIS",
+              "kind": "discount"
+            },
+            "vertex": "15Y"
+          }
+        },
+        {
+          "positions": [
+            {
+              "center_native": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -10000.0,
+              "pnl_native_per_bp": {
+                "amount": "-100",
+                "currency": "USD"
+              },
+              "position_id": "BOND_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "999900",
+                "currency": "USD"
+              }
+            },
+            {
+              "center_native": {
+                "amount": "10000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -100.0,
+              "pnl_native_per_bp": {
+                "amount": "-1",
+                "currency": "USD"
+              },
+              "position_id": "CDS_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "9999",
+                "currency": "USD"
+              }
+            }
+          ],
+          "target": {
+            "quote": {
+              "pillar_date": "2044-01-02",
+              "quote_id": "USD-OIS-20Y"
+            },
+            "risk_currency": "USD",
+            "risk_curve_id": "USD-OIS",
+            "source": {
+              "curve_id": "USD-OIS",
+              "kind": "discount"
+            },
+            "vertex": "20Y"
+          }
+        },
+        {
+          "positions": [
+            {
+              "center_native": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -10000.0,
+              "pnl_native_per_bp": {
+                "amount": "-100",
+                "currency": "USD"
+              },
+              "position_id": "BOND_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "999900",
+                "currency": "USD"
+              }
+            },
+            {
+              "center_native": {
+                "amount": "10000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": -100.0,
+              "pnl_native_per_bp": {
+                "amount": "-1",
+                "currency": "USD"
+              },
+              "position_id": "CDS_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "9999",
+                "currency": "USD"
+              }
+            }
+          ],
+          "target": {
+            "quote": {
+              "pillar_date": "2054-01-02",
+              "quote_id": "USD-OIS-30Y"
+            },
+            "risk_currency": "USD",
+            "risk_curve_id": "USD-OIS",
+            "source": {
+              "curve_id": "USD-OIS",
+              "kind": "discount"
+            },
+            "vertex": "30Y"
+          }
+        }
+      ],
+      "sensitivities": {
+        "base_currency": "USD",
+        "commodity_curvature": [],
+        "commodity_delta": [],
+        "commodity_vega": [],
+        "csr_nonsec_curvature": [],
+        "csr_nonsec_delta": [],
+        "csr_nonsec_vega": [],
+        "csr_sec_ctp_curvature": [],
+        "csr_sec_ctp_delta": [],
+        "csr_sec_ctp_vega": [],
+        "csr_sec_nonctp_curvature": [],
+        "csr_sec_nonctp_delta": [],
+        "csr_sec_nonctp_vega": [],
+        "drc_positions": [],
+        "equity_curvature": [],
+        "equity_delta": [],
+        "equity_repo_delta": [],
+        "equity_vega": [],
+        "fx_curvature": [],
+        "fx_delta": [],
+        "fx_vega": [],
+        "girr_curvature": [],
+        "girr_delta": [
+          [
+            "USD",
+            "USD-OIS",
+            "0.25Y",
+            -10100.0
+          ],
+          [
+            "USD",
+            "USD-OIS",
+            "0.5Y",
+            -10100.0
+          ],
+          [
+            "USD",
+            "USD-OIS",
+            "10Y",
+            -10100.0
+          ],
+          [
+            "USD",
+            "USD-OIS",
+            "15Y",
+            -10100.0
+          ],
+          [
+            "USD",
+            "USD-OIS",
+            "1Y",
+            -10100.0
+          ],
+          [
+            "USD",
+            "USD-OIS",
+            "20Y",
+            -10100.0
+          ],
+          [
+            "USD",
+            "USD-OIS",
+            "2Y",
+            -10100.0
+          ],
+          [
+            "USD",
+            "USD-OIS",
+            "30Y",
+            -10100.0
+          ],
+          [
+            "USD",
+            "USD-OIS",
+            "3Y",
+            -10100.0
+          ],
+          [
+            "USD",
+            "USD-OIS",
+            "5Y",
+            -10100.0
+          ]
+        ],
+        "girr_inflation_delta": [],
+        "girr_vega": [],
+        "girr_xccy_basis_delta": [],
+        "rrao_exotic_notionals": []
+      }
+    }
+  ],
   "properties": {
     "as_of": {
       "$ref": "#/$defs/DateWire",

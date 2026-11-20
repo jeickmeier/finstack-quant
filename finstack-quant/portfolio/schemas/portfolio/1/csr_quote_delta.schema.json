@@ -1811,6 +1811,246 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/csr_quote_delta.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Ordinary non-securitisation CSR sensitivities and signed issuer CDS quote reprices.",
+  "examples": [
+    {
+      "as_of": "2024-01-02",
+      "market_hash": "example-market-fingerprint",
+      "portfolio_id": "example-trading-book",
+      "pricing_hash": "example-pricing-fingerprint",
+      "quote_risk": [
+        {
+          "curve_id": "EXAMPLE-CORP-CDS",
+          "positions": [
+            {
+              "center_native": {
+                "amount": "10000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": 5000.0,
+              "pnl_native_per_bp": {
+                "amount": "50",
+                "currency": "USD"
+              },
+              "position_id": "CDS_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "10050",
+                "currency": "USD"
+              }
+            }
+          ],
+          "vertex": "0.5Y"
+        },
+        {
+          "curve_id": "EXAMPLE-CORP-CDS",
+          "positions": [
+            {
+              "center_native": {
+                "amount": "10000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": 5000.0,
+              "pnl_native_per_bp": {
+                "amount": "50",
+                "currency": "USD"
+              },
+              "position_id": "CDS_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "10050",
+                "currency": "USD"
+              }
+            }
+          ],
+          "vertex": "1Y"
+        },
+        {
+          "curve_id": "EXAMPLE-CORP-CDS",
+          "positions": [
+            {
+              "center_native": {
+                "amount": "10000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": 5000.0,
+              "pnl_native_per_bp": {
+                "amount": "50",
+                "currency": "USD"
+              },
+              "position_id": "CDS_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "10050",
+                "currency": "USD"
+              }
+            }
+          ],
+          "vertex": "3Y"
+        },
+        {
+          "curve_id": "EXAMPLE-CORP-CDS",
+          "positions": [
+            {
+              "center_native": {
+                "amount": "10000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": 5000.0,
+              "pnl_native_per_bp": {
+                "amount": "50",
+                "currency": "USD"
+              },
+              "position_id": "CDS_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "10050",
+                "currency": "USD"
+              }
+            }
+          ],
+          "vertex": "5Y"
+        },
+        {
+          "curve_id": "EXAMPLE-CORP-CDS",
+          "positions": [
+            {
+              "center_native": {
+                "amount": "10000",
+                "currency": "USD"
+              },
+              "entity_id": "TRADING",
+              "fx_rate": null,
+              "fx_triangulated": null,
+              "pnl_base_per_pp": 5000.0,
+              "pnl_native_per_bp": {
+                "amount": "50",
+                "currency": "USD"
+              },
+              "position_id": "CDS_001",
+              "position_scale": 1.0,
+              "shocked_native": {
+                "amount": "10050",
+                "currency": "USD"
+              }
+            }
+          ],
+          "vertex": "10Y"
+        }
+      ],
+      "sensitivities": {
+        "base_currency": "USD",
+        "commodity_curvature": [],
+        "commodity_delta": [],
+        "commodity_vega": [],
+        "csr_nonsec_curvature": [],
+        "csr_nonsec_delta": [
+          [
+            "EXAMPLE-CORP",
+            4,
+            "0.5Y",
+            "EXAMPLE-CORP-CDS",
+            5000.0
+          ],
+          [
+            "EXAMPLE-CORP",
+            4,
+            "10Y",
+            "EXAMPLE-CORP-CDS",
+            5000.0
+          ],
+          [
+            "EXAMPLE-CORP",
+            4,
+            "1Y",
+            "EXAMPLE-CORP-CDS",
+            5000.0
+          ],
+          [
+            "EXAMPLE-CORP",
+            4,
+            "3Y",
+            "EXAMPLE-CORP-CDS",
+            5000.0
+          ],
+          [
+            "EXAMPLE-CORP",
+            4,
+            "5Y",
+            "EXAMPLE-CORP-CDS",
+            5000.0
+          ]
+        ],
+        "csr_nonsec_vega": [],
+        "csr_sec_ctp_curvature": [],
+        "csr_sec_ctp_delta": [],
+        "csr_sec_ctp_vega": [],
+        "csr_sec_nonctp_curvature": [],
+        "csr_sec_nonctp_delta": [],
+        "csr_sec_nonctp_vega": [],
+        "drc_positions": [],
+        "equity_curvature": [],
+        "equity_delta": [],
+        "equity_repo_delta": [],
+        "equity_vega": [],
+        "fx_curvature": [],
+        "fx_delta": [],
+        "fx_vega": [],
+        "girr_curvature": [],
+        "girr_delta": [],
+        "girr_inflation_delta": [],
+        "girr_vega": [],
+        "girr_xccy_basis_delta": [],
+        "rrao_exotic_notionals": []
+      },
+      "sources": [
+        {
+          "classification": {
+            "as_of": "2024-01-02",
+            "bucket": 4,
+            "currency": "USD",
+            "issuer": "EXAMPLE-CORP",
+            "seniority": "senior",
+            "source_id": "example-approved-classification"
+          },
+          "curve_id": "EXAMPLE-CORP-CDS",
+          "vertices": {
+            "0.5Y": {
+              "pillar_date": "2024-07-02",
+              "quote_id": "EXAMPLE-CORP-CDS-0.5Y"
+            },
+            "10Y": {
+              "pillar_date": "2034-01-02",
+              "quote_id": "EXAMPLE-CORP-CDS-10Y"
+            },
+            "1Y": {
+              "pillar_date": "2025-01-02",
+              "quote_id": "EXAMPLE-CORP-CDS-1Y"
+            },
+            "3Y": {
+              "pillar_date": "2027-01-02",
+              "quote_id": "EXAMPLE-CORP-CDS-3Y"
+            },
+            "5Y": {
+              "pillar_date": "2029-01-02",
+              "quote_id": "EXAMPLE-CORP-CDS-5Y"
+            }
+          }
+        }
+      ]
+    }
+  ],
   "properties": {
     "as_of": {
       "$ref": "#/$defs/DateWire",

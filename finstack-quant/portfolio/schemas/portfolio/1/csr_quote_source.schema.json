@@ -910,6 +910,41 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Qualified issuer curve and binding for each of five non-securitisation CSR vertices.",
+  "examples": [
+    {
+      "classification": {
+        "as_of": "2024-01-02",
+        "bucket": 4,
+        "currency": "USD",
+        "issuer": "EXAMPLE-CORP",
+        "seniority": "senior",
+        "source_id": "example-approved-classification"
+      },
+      "curve_id": "EXAMPLE-CORP-CDS",
+      "vertices": {
+        "0.5Y": {
+          "pillar_date": "2024-07-02",
+          "quote_id": "EXAMPLE-CORP-CDS-0.5Y"
+        },
+        "10Y": {
+          "pillar_date": "2034-01-02",
+          "quote_id": "EXAMPLE-CORP-CDS-10Y"
+        },
+        "1Y": {
+          "pillar_date": "2025-01-02",
+          "quote_id": "EXAMPLE-CORP-CDS-1Y"
+        },
+        "3Y": {
+          "pillar_date": "2027-01-02",
+          "quote_id": "EXAMPLE-CORP-CDS-3Y"
+        },
+        "5Y": {
+          "pillar_date": "2029-01-02",
+          "quote_id": "EXAMPLE-CORP-CDS-5Y"
+        }
+      }
+    }
+  ],
   "properties": {
     "classification": {
       "$ref": "#/$defs/CsrQuoteClassification",
