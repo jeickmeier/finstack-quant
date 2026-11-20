@@ -107,7 +107,7 @@ class FxDigitalOption:
         --------
         >>> from finstack_quant.valuations.instruments import FxDigitalOption
         >>> contract = FxDigitalOption.example()
-        >>> FxDigitalOption.from_json(future.to_json()).id == future.id != ""
+        >>> FxDigitalOption.from_json(contract.to_json()).id == contract.id != ""
         True
         """
         ...

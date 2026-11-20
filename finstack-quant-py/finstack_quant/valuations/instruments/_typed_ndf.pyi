@@ -106,7 +106,7 @@ class Ndf:
         --------
         >>> from finstack_quant.valuations.instruments import Ndf
         >>> contract = Ndf.example()
-        >>> Ndf.from_json(future.to_json()).id == future.id != ""
+        >>> Ndf.from_json(contract.to_json()).id == contract.id != ""
         True
         """
         ...

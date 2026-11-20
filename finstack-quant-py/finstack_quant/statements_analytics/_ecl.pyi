@@ -1229,20 +1229,18 @@ class StagingConfig:
 class EclScenario:
     """Named cumulative-PD curve and optional scenario-specific LGD.
 
-        Examples
-        --------
-        >>> from decimal import Decimal
-    from datetime import date
-    from finstack_quant.core.money import Money
-        >>> from finstack_quant.statements_analytics import EclScenario
-        >>> downside = EclScenario(
-        ...     id="downside",
-        ...     weight=Decimal("0.2"),
-        ...     pd_schedule=[(0.0, 0.0), (1.0, 0.08)],
-        ...     lgd_override=0.55,
-        ... )
-        >>> isinstance(downside, EclScenario)
-        True
+    Examples
+    --------
+    >>> from decimal import Decimal
+    >>> from finstack_quant.statements_analytics import EclScenario
+    >>> downside = EclScenario(
+    ...     id="downside",
+    ...     weight=Decimal("0.2"),
+    ...     pd_schedule=[(0.0, 0.0), (1.0, 0.08)],
+    ...     lgd_override=0.55,
+    ... )
+    >>> isinstance(downside, EclScenario)
+    True
     """
 
     def __init__(
@@ -1689,9 +1687,9 @@ def compute_ecl_weighted(
 class ImpairedExposure:
     """Carry the sourced and dated exposure for an impaired recovery assessment.
 
-    >>> from decimal import Decimal
     Examples
     --------
+    >>> from decimal import Decimal
     >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.statements_analytics import ImpairedExposure
     >>> exposure = ImpairedExposure(
@@ -1772,6 +1770,7 @@ class ImpairedEclResult:
 
     Examples
     --------
+    >>> from decimal import Decimal
     >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.statements_analytics import ImpairedExposure, RecoveryEvidence, compute_impaired_ecl
     >>> exposure = ImpairedExposure(
