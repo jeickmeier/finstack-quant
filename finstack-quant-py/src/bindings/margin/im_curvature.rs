@@ -1,5 +1,6 @@
 //! Expiry-resolved SIMM curvature input conversion.
 
+use crate::bindings::macros::py_getters;
 use crate::errors::core_to_py;
 use finstack_quant_margin::types::SimmCurvatureSensitivity;
 use pyo3::prelude::*;
@@ -42,12 +43,6 @@ impl PySimmCurvatureSensitivity {
         Ok(Self { inner })
     }
 
-    /// SIMM class selecting bucket and correlation rules.
-    #[getter]
-    fn risk_class(&self) -> String {
-        self.inner.risk_class.to_string()
-    }
-
     /// Currency, sector, commodity bucket, `fx`, or `residual` as appropriate.
     #[getter]
     fn bucket(&self) -> &str {
@@ -71,10 +66,11 @@ impl PySimmCurvatureSensitivity {
     fn expiry_tenor(&self) -> &str {
         &self.inner.expiry_tenor
     }
-
-    /// Signed base-currency `sigma * dPV/dsigma` before SF, HVR, VRW or concentration.
-    #[getter]
-    fn volatility_weighted_vega(&self) -> f64 {
-        self.inner.volatility_weighted_vega
-    }
 }
+
+py_getters!(PySimmCurvatureSensitivity |s| {
+    /// SIMM class selecting bucket and correlation rules.
+    risk_class -> String = s.inner.risk_class.to_string();
+    /// Signed base-currency `sigma * dPV/dsigma` before SF, HVR, VRW or concentration.
+    volatility_weighted_vega -> f64 = s.inner.volatility_weighted_vega;
+});

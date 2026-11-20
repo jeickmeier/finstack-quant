@@ -5,8 +5,9 @@
 //! each as the class constructor (the documented host idiom for
 //! compute-on-construct value objects).
 
+use crate::bindings::macros::{impl_repr_html_via_dataframe, py_getters, wire_methods};
 use crate::bindings::pandas_utils::dict_to_dataframe;
-use crate::errors::{core_to_py, display_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use pyo3::prelude::*;
@@ -28,6 +29,21 @@ pub struct PyMarginUtilization {
     inner: finstack_quant_margin::metrics::MarginUtilization,
 }
 
+wire_methods!(
+    PyMarginUtilization,
+    finstack_quant_margin::metrics::MarginUtilization,
+    "MarginUtilization"
+);
+impl_repr_html_via_dataframe!(PyMarginUtilization);
+py_getters!(PyMarginUtilization |s| {
+    /// Posted margin amount.
+    posted -> f64 = s.inner.posted.amount();
+    /// Required margin amount.
+    required -> f64 = s.inner.required.amount();
+    /// Utilization ratio (posted / required).
+    ratio -> f64 = s.inner.ratio;
+});
+
 #[pymethods]
 impl PyMarginUtilization {
     /// Compare posted and required margin in one currency.
@@ -43,43 +59,6 @@ impl PyMarginUtilization {
             )
             .map_err(core_to_py)?,
         })
-    }
-
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from the JSON produced by ``to_json``; raises
-    /// ``ValueError`` on malformed input.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Posted margin amount.
-    #[getter]
-    fn posted(&self) -> f64 {
-        self.inner.posted.amount()
-    }
-
-    /// Required margin amount.
-    #[getter]
-    fn required(&self) -> f64 {
-        self.inner.required.amount()
-    }
-
-    /// Utilization ratio (posted / required).
-    #[getter]
-    fn ratio(&self) -> f64 {
-        self.inner.ratio
     }
 
     /// Whether margin is adequate (ratio >= 1.0).
@@ -128,17 +107,6 @@ impl PyMarginUtilization {
             }
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
 
 /// Excess collateral result.
@@ -151,6 +119,21 @@ impl PyMarginUtilization {
 pub struct PyExcessCollateral {
     inner: finstack_quant_margin::metrics::ExcessCollateral,
 }
+
+wire_methods!(
+    PyExcessCollateral,
+    finstack_quant_margin::metrics::ExcessCollateral,
+    "ExcessCollateral"
+);
+impl_repr_html_via_dataframe!(PyExcessCollateral);
+py_getters!(PyExcessCollateral |s| {
+    /// Market value of posted collateral in the CSA currency.
+    collateral_value -> f64 = s.inner.collateral_value.amount();
+    /// Required collateral amount in the same currency as the mark.
+    required_value -> f64 = s.inner.required_value.amount();
+    /// Excess amount (positive) or shortfall (negative).
+    excess -> f64 = s.inner.excess.amount();
+});
 
 #[pymethods]
 impl PyExcessCollateral {
@@ -166,43 +149,6 @@ impl PyExcessCollateral {
             )
             .map_err(core_to_py)?,
         })
-    }
-
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from the JSON produced by ``to_json``; raises
-    /// ``ValueError`` on malformed input.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Market value of posted collateral in the CSA currency.
-    #[getter]
-    fn collateral_value(&self) -> f64 {
-        self.inner.collateral_value.amount()
-    }
-
-    /// Required collateral amount in the same currency as the mark.
-    #[getter]
-    fn required_value(&self) -> f64 {
-        self.inner.required_value.amount()
-    }
-
-    /// Excess amount (positive) or shortfall (negative).
-    #[getter]
-    fn excess(&self) -> f64 {
-        self.inner.excess.amount()
     }
 
     /// Whether there is excess collateral.
@@ -257,17 +203,6 @@ impl PyExcessCollateral {
             self.inner.excess_percentage()
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
 
 /// Margin funding cost result.
@@ -280,6 +215,23 @@ impl PyExcessCollateral {
 pub struct PyMarginFundingCost {
     inner: finstack_quant_margin::metrics::MarginFundingCost,
 }
+
+wire_methods!(
+    PyMarginFundingCost,
+    finstack_quant_margin::metrics::MarginFundingCost,
+    "MarginFundingCost"
+);
+impl_repr_html_via_dataframe!(PyMarginFundingCost);
+py_getters!(PyMarginFundingCost |s| {
+    /// Posted margin amount.
+    margin_posted -> f64 = s.inner.margin_posted.amount();
+    /// Funding rate (annualized decimal).
+    funding_rate -> f64 = s.inner.funding_rate;
+    /// Collateral return rate (annualized decimal).
+    collateral_rate -> f64 = s.inner.collateral_rate;
+    /// Annualized funding cost.
+    annual_cost -> f64 = s.inner.annual_cost.amount();
+});
 
 #[pymethods]
 impl PyMarginFundingCost {
@@ -304,49 +256,6 @@ impl PyMarginFundingCost {
             )
             .map_err(core_to_py)?,
         })
-    }
-
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from the JSON produced by ``to_json``; raises
-    /// ``ValueError`` on malformed input.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Posted margin amount.
-    #[getter]
-    fn margin_posted(&self) -> f64 {
-        self.inner.margin_posted.amount()
-    }
-
-    /// Funding rate (annualized decimal).
-    #[getter]
-    fn funding_rate(&self) -> f64 {
-        self.inner.funding_rate
-    }
-
-    /// Collateral return rate (annualized decimal).
-    #[getter]
-    fn collateral_rate(&self) -> f64 {
-        self.inner.collateral_rate
-    }
-
-    /// Annualized funding cost.
-    #[getter]
-    fn annual_cost(&self) -> f64 {
-        self.inner.annual_cost.amount()
     }
 
     /// Funding spread (funding rate - collateral rate), decimal.
@@ -400,17 +309,6 @@ impl PyMarginFundingCost {
             self.inner.annual_cost.amount()
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
 
 /// Haircut sensitivity: PV change for +1bp haircut change.
@@ -423,6 +321,21 @@ impl PyMarginFundingCost {
 pub struct PyHaircut01 {
     inner: finstack_quant_margin::metrics::Haircut01,
 }
+
+wire_methods!(
+    PyHaircut01,
+    finstack_quant_margin::metrics::Haircut01,
+    "Haircut01"
+);
+impl_repr_html_via_dataframe!(PyHaircut01);
+py_getters!(PyHaircut01 |s| {
+    /// Collateral value.
+    collateral_value -> f64 = s.inner.collateral_value.amount();
+    /// Current haircut (decimal).
+    current_haircut -> f64 = s.inner.current_haircut;
+    /// PV change for a +1bp haircut.
+    pv_change -> f64 = s.inner.pv_change.amount();
+});
 
 #[pymethods]
 impl PyHaircut01 {
@@ -440,43 +353,6 @@ impl PyHaircut01 {
             )
             .map_err(core_to_py)?,
         })
-    }
-
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from the JSON produced by ``to_json``; raises
-    /// ``ValueError`` on malformed input.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Collateral value.
-    #[getter]
-    fn collateral_value(&self) -> f64 {
-        self.inner.collateral_value.amount()
-    }
-
-    /// Current haircut (decimal).
-    #[getter]
-    fn current_haircut(&self) -> f64 {
-        self.inner.current_haircut
-    }
-
-    /// PV change for a +1bp haircut.
-    #[getter]
-    fn pv_change(&self) -> f64 {
-        self.inner.pv_change.amount()
     }
 
     /// Current haircut in basis points.
@@ -513,17 +389,6 @@ impl PyHaircut01 {
             self.inner.current_haircut,
             self.inner.pv_change.amount()
         )
-    }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
     }
 }
 

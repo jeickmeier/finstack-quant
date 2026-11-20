@@ -1,11 +1,12 @@
 //! Python wrappers for XVA types (CVA/DVA/FVA configuration and results).
 
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::macros::{impl_repr_html_via_dataframe, py_getters, wire_methods};
 use crate::bindings::module_utils::parse_currency;
 use crate::bindings::pandas_utils::{
     dict_to_dataframe, serde_object_to_single_row_dataframe_with_schema, serde_to_py,
 };
-use crate::errors::{core_to_py, display_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_margin::xva::types as xva;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -26,6 +27,29 @@ use crate::bindings::margin::im::{PySimmCalculator, PySimmSensitivities};
 pub struct PyFundingConfig {
     pub(super) inner: xva::FundingConfig,
 }
+
+wire_methods!(
+    PyFundingConfig,
+    xva::FundingConfig,
+    "FundingConfig",
+    validate
+);
+py_getters!(PyFundingConfig |s| {
+    /// Funding spread in basis points.
+    funding_spread_bp -> f64 = s.inner.funding_spread_bp;
+    /// Funding benefit spread in basis points (or None).
+    funding_benefit_bp -> Option<f64> = s.inner.funding_benefit_bp;
+    /// Expected IM profile driving MVA (or None).
+    im_profile -> Option<PyImProfile> = s.inner.im_profile.as_ref().map(|inner| PyImProfile {
+        inner: inner.clone(),
+    });
+    /// Elected funding spread for expected posted IM, if configured.
+    margin_funding_spread -> Option<PyMarginFundingSpread> = s
+        .inner
+        .margin_funding_spread
+        .clone()
+        .map(|inner| PyMarginFundingSpread { inner });
+});
 
 #[pymethods]
 impl PyFundingConfig {
@@ -72,55 +96,6 @@ impl PyFundingConfig {
         Ok(Self { inner })
     }
 
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from the JSON produced by ``to_json``; raises
-    /// ``ValueError`` on malformed input or a config that fails validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: xva::FundingConfig = serde_json::from_str(json).map_err(display_to_py)?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Funding spread in basis points.
-    #[getter]
-    fn funding_spread_bp(&self) -> f64 {
-        self.inner.funding_spread_bp
-    }
-
-    /// Funding benefit spread in basis points (or None).
-    #[getter]
-    fn funding_benefit_bp(&self) -> Option<f64> {
-        self.inner.funding_benefit_bp
-    }
-
-    /// Expected IM profile driving MVA (or None).
-    #[getter]
-    fn im_profile(&self) -> Option<PyImProfile> {
-        self.inner.im_profile.as_ref().map(|inner| PyImProfile {
-            inner: inner.clone(),
-        })
-    }
-
-    /// Elected funding spread for expected posted IM, if configured.
-    #[getter]
-    fn margin_funding_spread(&self) -> Option<PyMarginFundingSpread> {
-        self.inner
-            .margin_funding_spread
-            .clone()
-            .map(|inner| PyMarginFundingSpread { inner })
-    }
-
     /// Effective funding benefit spread in basis points.
     fn effective_benefit_bp(&self) -> f64 {
         self.inner.effective_benefit_bp()
@@ -157,6 +132,20 @@ pub struct PyExposureDiagnostics {
     pub(super) inner: xva::ExposureDiagnostics,
 }
 
+wire_methods!(
+    PyExposureDiagnostics,
+    xva::ExposureDiagnostics,
+    "ExposureDiagnostics"
+);
+py_getters!(PyExposureDiagnostics |s| {
+    /// Number of market-roll failures.
+    market_roll_failures -> usize = s.inner.market_roll_failures;
+    /// Total instrument valuation failures.
+    valuation_failures -> usize = s.inner.valuation_failures;
+    /// Total time grid points evaluated.
+    total_time_points -> usize = s.inner.total_time_points;
+});
+
 #[pymethods]
 impl PyExposureDiagnostics {
     /// Create a diagnostics record from its three counters (all default to
@@ -175,43 +164,6 @@ impl PyExposureDiagnostics {
                 total_time_points,
             },
         }
-    }
-
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from the JSON produced by ``to_json``; raises
-    /// ``ValueError`` on malformed input.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: xva::ExposureDiagnostics = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Number of market-roll failures.
-    #[getter]
-    fn market_roll_failures(&self) -> usize {
-        self.inner.market_roll_failures
-    }
-
-    /// Total instrument valuation failures.
-    #[getter]
-    fn valuation_failures(&self) -> usize {
-        self.inner.valuation_failures
-    }
-
-    /// Total time grid points evaluated.
-    #[getter]
-    fn total_time_points(&self) -> usize {
-        self.inner.total_time_points
     }
 
     fn __repr__(&self) -> String {
@@ -240,6 +192,34 @@ impl PyExposureProfile {
         Self { inner }
     }
 }
+
+wire_methods!(
+    @documented_json PyExposureProfile,
+    xva::ExposureProfile,
+    "ExposureProfile",
+    [],
+    |inner| inner,
+    crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.to_json"),
+    crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.from_json")
+);
+wire_methods!(@reduce PyExposureProfile);
+impl_repr_html_via_dataframe!(PyExposureProfile);
+py_getters!(PyExposureProfile |s| {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.currency")]
+    currency -> String = s.inner.currency.to_string();
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.diagnostics")]
+    diagnostics -> PyExposureDiagnostics = PyExposureDiagnostics {
+        inner: s.inner.diagnostics.clone(),
+    };
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.times")]
+    times -> Vec<f64> = s.inner.times.clone();
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.mtm_values")]
+    mtm_values -> Vec<f64> = s.inner.mtm_values.clone();
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.epe")]
+    epe -> Vec<f64> = s.inner.epe.clone();
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.ene")]
+    ene -> Vec<f64> = s.inner.ene.clone();
+});
 
 #[pymethods]
 impl PyExposureProfile {
@@ -287,12 +267,6 @@ impl PyExposureProfile {
     }
 
     #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.currency")]
-    fn currency(&self) -> String {
-        self.inner.currency.to_string()
-    }
-
-    #[getter]
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.basis")]
     fn basis<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.basis)
@@ -308,63 +282,9 @@ impl PyExposureProfile {
             .collect()
     }
 
-    #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.diagnostics")]
-    fn diagnostics(&self) -> PyExposureDiagnostics {
-        PyExposureDiagnostics {
-            inner: self.inner.diagnostics.clone(),
-        }
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[staticmethod]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.from_json")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: xva::ExposureProfile = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.to_json")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.validate")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(core_to_py)
-    }
-
-    #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.times")]
-    fn times(&self) -> Vec<f64> {
-        self.inner.times.clone()
-    }
-
-    #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.mtm_values")]
-    fn mtm_values(&self) -> Vec<f64> {
-        self.inner.mtm_values.clone()
-    }
-
-    #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.epe")]
-    fn epe(&self) -> Vec<f64> {
-        self.inner.epe.clone()
-    }
-
-    #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.ene")]
-    fn ene(&self) -> Vec<f64> {
-        self.inner.ene.clone()
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.__len__")]
@@ -400,17 +320,6 @@ impl PyExposureProfile {
             self.inner.times.len()
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
 
 /// Result of XVA calculations (CVA, DVA, FVA, MVA, exposure profiles).
@@ -424,102 +333,42 @@ pub struct PyXvaResult {
     pub(super) inner: xva::XvaResult,
 }
 
-#[pymethods]
-impl PyXvaResult {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: xva::XvaResult = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
+wire_methods!(PyXvaResult, xva::XvaResult, "XvaResult");
+impl_repr_html_via_dataframe!(PyXvaResult);
+py_getters!(PyXvaResult |s| {
     /// Unilateral CVA (positive = cost).
-    #[getter]
-    fn cva(&self) -> f64 {
-        self.inner.cva
-    }
-
+    cva -> f64 = s.inner.cva;
     /// DVA (own-default benefit, or None).
-    #[getter]
-    fn dva(&self) -> Option<f64> {
-        self.inner.dva
-    }
-
+    dva -> Option<f64> = s.inner.dva;
     /// FVA (net funding cost/benefit, or None).
-    #[getter]
-    fn fva(&self) -> Option<f64> {
-        self.inner.fva
-    }
-
+    fva -> Option<f64> = s.inner.fva;
     /// MVA (funding cost of posted initial margin, or None).
-    #[getter]
-    fn mva(&self) -> Option<f64> {
-        self.inner.mva
-    }
-
-    #[getter]
+    mva -> Option<f64> = s.inner.mva;
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "XvaResult.mva_detail")]
-    fn mva_detail(&self) -> Option<PyMvaResult> {
-        self.inner
-            .mva_detail
-            .clone()
-            .map(|inner| PyMvaResult { inner })
-    }
-
+    mva_detail -> Option<PyMvaResult> = s
+        .inner
+        .mva_detail
+        .clone()
+        .map(|inner| PyMvaResult { inner });
     /// All-in adjustment = CVA - DVA + FVA + MVA.
     ///
     /// Uncomputed legs contribute zero. This is the quantity subtracted from
     /// the risk-free value of the netting set.
-    #[getter]
-    fn total_xva(&self) -> f64 {
-        self.inner.total_xva
-    }
-
+    total_xva -> f64 = s.inner.total_xva;
     /// Maximum expected positive exposure across the profile, in reporting currency.
-    #[getter]
-    fn max_epe(&self) -> f64 {
-        self.inner.max_epe
-    }
-
+    max_epe -> f64 = s.inner.max_epe;
     /// Effective EPE (time-weighted average, regulatory metric).
-    #[getter]
-    fn effective_epe(&self) -> f64 {
-        self.inner.effective_epe
-    }
-
+    effective_epe -> f64 = s.inner.effective_epe;
     /// EPE profile as list of (time, value) tuples.
-    #[getter]
-    fn epe_profile(&self) -> Vec<(f64, f64)> {
-        self.inner.epe_profile.clone()
-    }
-
+    epe_profile -> Vec<(f64, f64)> = s.inner.epe_profile.clone();
     /// ENE profile as list of (time, value) tuples.
-    #[getter]
-    fn ene_profile(&self) -> Vec<(f64, f64)> {
-        self.inner.ene_profile.clone()
-    }
-
+    ene_profile -> Vec<(f64, f64)> = s.inner.ene_profile.clone();
     /// Effective EPE profile as list of (time, value) tuples.
-    #[getter]
-    fn effective_epe_profile(&self) -> Vec<(f64, f64)> {
-        self.inner.effective_epe_profile.clone()
-    }
+    effective_epe_profile -> Vec<(f64, f64)> = s.inner.effective_epe_profile.clone();
+});
 
+#[pymethods]
+impl PyXvaResult {
     /// Per-time-bucket terms of the CVA sum as a list of dicts with keys
     /// ``time``, ``discount_factor``, ``survival_probability``,
     /// ``marginal_default_probability``, ``exposure_mid``,
@@ -629,17 +478,6 @@ impl PyXvaResult {
             self.inner.max_epe
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
 
 /// Deterministic IM decay profile for MVA (Green 2015, ch. 10).
@@ -652,6 +490,8 @@ impl PyXvaResult {
 pub struct PyImDecayProfile {
     pub(super) inner: mva::ImDecayProfile,
 }
+
+wire_methods!(PyImDecayProfile, mva::ImDecayProfile, "ImDecayProfile");
 
 #[pymethods]
 impl PyImDecayProfile {
@@ -680,28 +520,6 @@ impl PyImDecayProfile {
     /// Decay factor at time ``t`` (years); always in ``[0, 1]``.
     fn factor(&self, t: f64) -> f64 {
         self.inner.factor(t)
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: mva::ImDecayProfile = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
     fn __repr__(&self) -> String {
@@ -797,6 +615,17 @@ pub struct PyImProfile {
     pub(super) inner: mva::ImProfile,
 }
 
+wire_methods!(PyImProfile, mva::ImProfile, "ImProfile", validate);
+impl_repr_html_via_dataframe!(PyImProfile);
+py_getters!(PyImProfile |s| {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ImProfile.currency")]
+    currency -> String = s.inner.currency.to_string();
+    /// Time points in years.
+    times -> Vec<f64> = s.inner.times();
+    /// Expected IM at each time point.
+    im_values -> Vec<f64> = s.inner.im_values.clone();
+});
+
 #[pymethods]
 impl PyImProfile {
     #[new]
@@ -824,29 +653,6 @@ impl PyImProfile {
         Ok(Self { inner })
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: mva::ImProfile = serde_json::from_str(json).map_err(display_to_py)?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// Validate internal consistency.
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(core_to_py)
@@ -856,12 +662,6 @@ impl PyImProfile {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ImProfile.as_of")]
     fn as_of<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.as_of)
-    }
-
-    #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ImProfile.currency")]
-    fn currency(&self) -> String {
-        self.inner.currency.to_string()
     }
 
     #[getter]
@@ -878,18 +678,6 @@ impl PyImProfile {
             .iter()
             .map(|&date| date_to_py(py, date))
             .collect()
-    }
-
-    /// Time points in years.
-    #[getter]
-    fn times(&self) -> Vec<f64> {
-        self.inner.times()
-    }
-
-    /// Expected IM at each time point.
-    #[getter]
-    fn im_values(&self) -> Vec<f64> {
-        self.inner.im_values.clone()
     }
 
     /// Number of time points.
@@ -911,17 +699,6 @@ impl PyImProfile {
     fn __repr__(&self) -> String {
         format!("ImProfile(points={})", self.inner.dates.len())
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
 
 /// Result of an MVA computation.
@@ -935,50 +712,21 @@ pub struct PyMvaResult {
     pub(super) inner: mva::MvaResult,
 }
 
+wire_methods!(PyMvaResult, mva::MvaResult, "MvaResult");
+impl_repr_html_via_dataframe!(PyMvaResult);
+py_getters!(PyMvaResult |s| {
+    /// MVA (positive = lifetime funding cost of posting IM).
+    mva -> f64 = s.inner.mva;
+    /// Time-weighted average IM over the profile horizon.
+    average_im -> f64 = s.inner.average_im;
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "MvaResult.im_profile")]
+    im_profile -> PyImProfile = PyImProfile {
+        inner: s.inner.im_profile.clone(),
+    };
+});
+
 #[pymethods]
 impl PyMvaResult {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: mva::MvaResult = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// MVA (positive = lifetime funding cost of posting IM).
-    #[getter]
-    fn mva(&self) -> f64 {
-        self.inner.mva
-    }
-
-    /// Time-weighted average IM over the profile horizon.
-    #[getter]
-    fn average_im(&self) -> f64 {
-        self.inner.average_im
-    }
-
-    #[getter]
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "MvaResult.im_profile")]
-    fn im_profile(&self) -> PyImProfile {
-        PyImProfile {
-            inner: self.inner.im_profile.clone(),
-        }
-    }
-
     #[getter]
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "MvaResult.intervals")]
     fn intervals<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -995,17 +743,6 @@ impl PyMvaResult {
             "MvaResult(mva={:.4}, average_im={:.2})",
             self.inner.mva, self.inner.average_im
         )
-    }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
     }
 }
 
