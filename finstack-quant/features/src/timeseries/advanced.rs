@@ -4,11 +4,7 @@ use crate::types::{f64_param, finite, mean, quantile_cont, sample_std, scaled_ce
 use finstack_quant_core::{Error, Result};
 use serde_json::Value;
 
-pub(super) fn drawdown(
-    values: &[Option<f64>],
-    indices: &[usize],
-    output: &mut [Option<f64>],
-) -> Result<()> {
+pub(super) fn drawdown(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>]) {
     let mut peak: Option<f64> = None;
     for &idx in indices {
         output[idx] = match finite(values[idx]) {
@@ -20,7 +16,6 @@ pub(super) fn drawdown(
             _ => None,
         };
     }
-    Ok(())
 }
 
 /// Current row's normalized exponential-decay weight over finite observations.
@@ -30,13 +25,12 @@ pub(super) fn exponential_decay_weights(
     window: usize,
     decay: f64,
     output: &mut [Option<f64>],
-) -> Result<()> {
-    for (pos, &idx) in indices.iter().enumerate() {
+) {
+    crate::index::for_each_trailing_window(indices, window, |idx, window_indices| {
         if finite(values[idx]).is_none() {
-            continue;
+            return;
         }
-        let start = pos.saturating_sub(window - 1);
-        let finite_count = indices[start..=pos]
+        let finite_count = window_indices
             .iter()
             .filter(|window_idx| finite(values[**window_idx]).is_some())
             .count();
@@ -44,8 +38,7 @@ pub(super) fn exponential_decay_weights(
             .map(|age| decay.powi(age as i32))
             .sum::<f64>();
         output[idx] = Some(1.0 / denominator);
-    }
-    Ok(())
+    });
 }
 
 pub(super) fn probability_param(params: Option<&Value>, key: &str, default: f64) -> Result<f64> {

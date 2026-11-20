@@ -6,6 +6,7 @@
 //! class members are functions taking that value.
 
 use crate::utils::input::{from_js_json, js_string};
+use crate::utils::wire::js_parse;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_features::{
     CrossSectionalOp, PairwiseOp, PanelTransformResult, PanelTransformSpec, TimeSeriesOp,
@@ -94,7 +95,7 @@ pub fn time_series_op_values() -> Result<JsValue, JsValue> {
 pub fn time_series_op_param_keys(
     #[wasm_bindgen(unchecked_param_type = "TimeSeriesOp")] op: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let op: TimeSeriesOp = js_string(&op, "op")?.parse().map_err(to_js_err)?;
+    let op: TimeSeriesOp = js_parse(&op, "op")?;
     to_js_value(&op.param_keys())
 }
 
@@ -126,7 +127,7 @@ pub fn cross_sectional_op_values() -> Result<JsValue, JsValue> {
 pub fn cross_sectional_op_param_keys(
     #[wasm_bindgen(unchecked_param_type = "CrossSectionalOp")] op: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let op: CrossSectionalOp = js_string(&op, "op")?.parse().map_err(to_js_err)?;
+    let op: CrossSectionalOp = js_parse(&op, "op")?;
     to_js_value(&op.param_keys())
 }
 
@@ -158,6 +159,6 @@ pub fn pairwise_op_values() -> Result<JsValue, JsValue> {
 pub fn pairwise_op_param_keys(
     #[wasm_bindgen(unchecked_param_type = "PairwiseOp")] op: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let op: PairwiseOp = js_string(&op, "op")?.parse().map_err(to_js_err)?;
+    let op: PairwiseOp = js_parse(&op, "op")?;
     to_js_value(&op.param_keys())
 }

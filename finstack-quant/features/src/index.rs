@@ -37,6 +37,18 @@ pub(crate) fn try_for_each_entity(
 ///
 /// `visit` receives the row index at the window end and the window's row
 /// indices (in `indices` order).
+pub(crate) fn for_each_trailing_window(
+    indices: &[usize],
+    window: usize,
+    mut visit: impl FnMut(usize, &[usize]),
+) {
+    for (pos, &idx) in indices.iter().enumerate() {
+        let start = pos.saturating_sub(window - 1);
+        visit(idx, &indices[start..=pos]);
+    }
+}
+
+/// Fallible variant of [`for_each_trailing_window`].
 pub(crate) fn try_for_each_trailing_window(
     indices: &[usize],
     window: usize,
@@ -49,26 +61,11 @@ pub(crate) fn try_for_each_trailing_window(
     Ok(())
 }
 
-/// Partition row indices by a single opaque key.
-pub(crate) fn partition_by_key(keys: &[String]) -> BTreeMap<&str, Vec<usize>> {
-    let mut partitions: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
-    for (idx, key) in keys.iter().enumerate() {
-        partitions.entry(key.as_str()).or_default().push(idx);
-    }
-    partitions
-}
-
-/// Partition row indices by a `(first, second)` key pair without concatenation.
-pub(crate) fn partition_by_pair<'a>(
-    first: &'a [String],
-    second: &'a [String],
-) -> BTreeMap<(&'a str, &'a str), Vec<usize>> {
-    let mut partitions: BTreeMap<(&'a str, &'a str), Vec<usize>> = BTreeMap::new();
-    for (idx, (a, b)) in first.iter().zip(second.iter()).enumerate() {
-        partitions
-            .entry((a.as_str(), b.as_str()))
-            .or_default()
-            .push(idx);
+/// Partition row indices into sorted buckets keyed by `K`, preserving row order.
+pub(crate) fn partition_by<K: Ord>(keys: impl Iterator<Item = K>) -> BTreeMap<K, Vec<usize>> {
+    let mut partitions: BTreeMap<K, Vec<usize>> = BTreeMap::new();
+    for (idx, key) in keys.enumerate() {
+        partitions.entry(key).or_default().push(idx);
     }
     partitions
 }
