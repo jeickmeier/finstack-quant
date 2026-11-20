@@ -137,11 +137,12 @@ impl PreparedHullWhiteModel {
 ///     PreparedHullWhiteModel,
 /// };
 /// use finstack_quant_core::market_data::term_structures::DiscountCurve;
+/// use finstack_quant_core::dates::DayCount;
 /// use time::macros::date;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let as_of = date!(2026-01-15);
 /// let swaption = BermudanSwaption::example().expect("example");
-/// let disc = DiscountCurve::flat("USD-OIS", as_of, 0.03)?;
+/// let disc = DiscountCurve::flat("USD-OIS", as_of, 0.03, DayCount::Act365F)?;
 /// let model = PreparedHullWhiteModel::prepare(
 ///     HullWhiteCalibrationParams::default(), 100, &disc, as_of,
 ///     swaption.time_to_maturity(as_of)?, &swaption.exercise_times(as_of)?,
