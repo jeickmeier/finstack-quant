@@ -31,18 +31,28 @@ use std::collections::BTreeMap;
 ///
 /// - BCBS FRTB Minimum Capital Requirements: `docs/REFERENCES.md#bcbs-frtb-minimum-capital-requirements`
 ///
-pub fn vega_charge(
+pub(super) fn vega_charge(
     risk_class: FrtbRiskClass,
     sensitivities: &FrtbSensitivities,
     scenario: CorrelationScenario,
 ) -> f64 {
     match risk_class {
         FrtbRiskClass::Girr => girr_vega(sensitivities, scenario),
-        FrtbRiskClass::CsrNonSec => csr_nonsec_vega(sensitivities, scenario),
-        FrtbRiskClass::CsrSecCtp => csr_sec_ctp_vega(sensitivities, scenario),
-        FrtbRiskClass::CsrSecNonCtp => csr_sec_nonctp_vega(sensitivities, scenario),
-        FrtbRiskClass::Equity => equity_vega(sensitivities, scenario),
-        FrtbRiskClass::Commodity => commodity_vega(sensitivities, scenario),
+        FrtbRiskClass::CsrNonSec => {
+            generic_bucketed_vega(&sensitivities.csr_nonsec_vega, risk_class, scenario)
+        }
+        FrtbRiskClass::CsrSecCtp => {
+            generic_bucketed_vega(&sensitivities.csr_sec_ctp_vega, risk_class, scenario)
+        }
+        FrtbRiskClass::CsrSecNonCtp => {
+            generic_bucketed_vega(&sensitivities.csr_sec_nonctp_vega, risk_class, scenario)
+        }
+        FrtbRiskClass::Equity => {
+            generic_bucketed_vega(&sensitivities.equity_vega, risk_class, scenario)
+        }
+        FrtbRiskClass::Commodity => {
+            generic_bucketed_vega(&sensitivities.commodity_vega, risk_class, scenario)
+        }
         FrtbRiskClass::Fx => fx_vega(sensitivities, scenario),
     }
 }
@@ -100,36 +110,6 @@ fn girr_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
 fn exp_decay_rho(t_i: f64, t_j: f64, alpha: f64) -> f64 {
     let min_t = t_i.min(t_j).max(1.0 / 365.0);
     (-alpha * (t_i - t_j).abs() / min_t).exp()
-}
-
-// CSR vega (non-sec, sec CTP, sec non-CTP)
-
-fn csr_nonsec_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    generic_bucketed_vega(&sens.csr_nonsec_vega, FrtbRiskClass::CsrNonSec, scenario)
-}
-
-fn csr_sec_ctp_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    generic_bucketed_vega(&sens.csr_sec_ctp_vega, FrtbRiskClass::CsrSecCtp, scenario)
-}
-
-fn csr_sec_nonctp_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    generic_bucketed_vega(
-        &sens.csr_sec_nonctp_vega,
-        FrtbRiskClass::CsrSecNonCtp,
-        scenario,
-    )
-}
-
-// Equity vega
-
-fn equity_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    generic_bucketed_vega(&sens.equity_vega, FrtbRiskClass::Equity, scenario)
-}
-
-// Commodity vega
-
-fn commodity_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    generic_bucketed_vega(&sens.commodity_vega, FrtbRiskClass::Commodity, scenario)
 }
 
 // FX vega

@@ -18,7 +18,6 @@
 //! | Review procedure | See `data/margin/README.md`, "FRTB parameter review" |
 //!
 pub mod commodity;
-pub mod correlation_scenarios;
 pub mod csr;
 pub mod equity;
 pub mod fx;

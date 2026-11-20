@@ -128,7 +128,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/im_result.schema.json",
-      "bytes": 13205,
+      "bytes": 13094,
       "kind": "output",
       "path": "schemas/margin/1/im_result.schema.json",
       "summary": "Initial margin calculation result.",

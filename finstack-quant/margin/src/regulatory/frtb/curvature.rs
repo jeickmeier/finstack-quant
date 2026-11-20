@@ -62,18 +62,30 @@ use std::collections::BTreeMap;
 ///
 /// - BCBS FRTB Minimum Capital Requirements: `docs/REFERENCES.md#bcbs-frtb-minimum-capital-requirements`
 ///
-pub fn curvature_charge(
+pub(super) fn curvature_charge(
     risk_class: FrtbRiskClass,
     sensitivities: &FrtbSensitivities,
     scenario: CorrelationScenario,
 ) -> f64 {
     match risk_class {
         FrtbRiskClass::Girr => girr_curvature(sensitivities, scenario),
-        FrtbRiskClass::CsrNonSec => csr_nonsec_curvature(sensitivities, scenario),
-        FrtbRiskClass::CsrSecCtp => csr_sec_ctp_curvature(sensitivities, scenario),
-        FrtbRiskClass::CsrSecNonCtp => csr_sec_nonctp_curvature(sensitivities, scenario),
-        FrtbRiskClass::Equity => equity_curvature(sensitivities, scenario),
-        FrtbRiskClass::Commodity => commodity_curvature(sensitivities, scenario),
+        FrtbRiskClass::CsrNonSec => {
+            generic_curvature_bucketed(&sensitivities.csr_nonsec_curvature, risk_class, scenario)
+        }
+        FrtbRiskClass::CsrSecCtp => {
+            generic_curvature_bucketed(&sensitivities.csr_sec_ctp_curvature, risk_class, scenario)
+        }
+        FrtbRiskClass::CsrSecNonCtp => generic_curvature_bucketed(
+            &sensitivities.csr_sec_nonctp_curvature,
+            risk_class,
+            scenario,
+        ),
+        FrtbRiskClass::Equity => {
+            generic_curvature_bucketed(&sensitivities.equity_curvature, risk_class, scenario)
+        }
+        FrtbRiskClass::Commodity => {
+            generic_curvature_bucketed(&sensitivities.commodity_curvature, risk_class, scenario)
+        }
         FrtbRiskClass::Fx => fx_curvature(sensitivities, scenario),
     }
 }
@@ -97,42 +109,6 @@ fn girr_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f6
 
     let gamma = scenario.scale_correlation(girr::GIRR_INTER_BUCKET_CORRELATION.powi(2));
     curvature_inter_bucket(&bucket_results, gamma)
-}
-
-fn csr_nonsec_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    generic_curvature_bucketed(
-        &sens.csr_nonsec_curvature,
-        FrtbRiskClass::CsrNonSec,
-        scenario,
-    )
-}
-
-fn csr_sec_ctp_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    generic_curvature_bucketed(
-        &sens.csr_sec_ctp_curvature,
-        FrtbRiskClass::CsrSecCtp,
-        scenario,
-    )
-}
-
-fn csr_sec_nonctp_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    generic_curvature_bucketed(
-        &sens.csr_sec_nonctp_curvature,
-        FrtbRiskClass::CsrSecNonCtp,
-        scenario,
-    )
-}
-
-fn equity_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    generic_curvature_bucketed(&sens.equity_curvature, FrtbRiskClass::Equity, scenario)
-}
-
-fn commodity_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    generic_curvature_bucketed(
-        &sens.commodity_curvature,
-        FrtbRiskClass::Commodity,
-        scenario,
-    )
 }
 
 fn fx_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {

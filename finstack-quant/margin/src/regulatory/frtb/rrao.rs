@@ -8,10 +8,10 @@
 use super::types::RraoPosition;
 
 /// Weight applied to exotic underlying instruments.
-pub const RRAO_EXOTIC_WEIGHT: f64 = 0.01;
+pub(super) const RRAO_EXOTIC_WEIGHT: f64 = 0.01;
 
 /// Weight applied to other residual risk instruments.
-pub const RRAO_OTHER_WEIGHT: f64 = 0.001;
+pub(super) const RRAO_OTHER_WEIGHT: f64 = 0.001;
 
 /// Compute the Residual Risk Add-On.
 ///
@@ -28,7 +28,7 @@ pub const RRAO_OTHER_WEIGHT: f64 = 0.001;
 ///
 /// - BCBS FRTB Minimum Capital Requirements: `docs/REFERENCES.md#bcbs-frtb-minimum-capital-requirements`
 ///
-pub fn rrao_charge(positions: &[RraoPosition]) -> f64 {
+pub(super) fn rrao_charge(positions: &[RraoPosition]) -> f64 {
     positions
         .iter()
         .map(|p| {

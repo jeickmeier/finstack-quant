@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// BCBS-IOSCO "Margin requirements for non-centrally cleared derivatives" (2020)
 /// Annex A: Standardized haircut schedule `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -531,7 +531,7 @@ impl EligibleCollateralSchedule {
                 && fraction > limit
             {
                 breaches.push(ConcentrationBreach {
-                    asset_class: asset_class.clone(),
+                    asset_class: *asset_class,
                     fraction,
                     limit,
                     excess: fraction - limit,

@@ -7,17 +7,7 @@
 
 use finstack_quant_core::{Error, Result};
 
-/// Reject negative, NaN, or infinite rates.
-pub(super) fn validate_rate(name: &str, v: f64) -> Result<()> {
-    if !v.is_finite() || v < 0.0 {
-        return Err(Error::Validation(format!(
-            "invalid rate '{name}': must be finite and >= 0"
-        )));
-    }
-    Ok(())
-}
-
-/// Reject negative, NaN, or infinite numeric inputs (risk weights,
+/// Reject negative, NaN, or infinite numeric inputs (rates, risk weights,
 /// vega weights, concentration thresholds, etc.).
 pub(super) fn validate_non_negative(name: &str, v: f64) -> Result<()> {
     if !v.is_finite() || v < 0.0 {

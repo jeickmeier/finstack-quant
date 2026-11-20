@@ -86,8 +86,7 @@ impl VmParameters {
     ///
     /// Returns an error if the embedded margin registry cannot be loaded.
     pub fn regulatory_standard(currency: Currency) -> Result<Self> {
-        let registry = embedded_registry()?;
-        Self::from_defaults(currency, &registry.defaults.vm)
+        embedded_registry()?.defaults.vm.to_vm_params(currency)
     }
 
     /// Create VM parameters with a threshold (bilateral thresholds).
@@ -282,12 +281,10 @@ impl VmParameters {
 
     /// Build from defaults resolved via a `FinstackConfig`.
     pub fn from_finstack_config(cfg: &FinstackConfig, currency: Currency) -> Result<Self> {
-        let registry = margin_registry_from_config(cfg)?;
-        Self::from_defaults(currency, &registry.defaults.vm)
-    }
-
-    fn from_defaults(currency: Currency, defaults: &crate::registry::VmDefaults) -> Result<Self> {
-        defaults.to_vm_params(currency)
+        margin_registry_from_config(cfg)?
+            .defaults
+            .vm
+            .to_vm_params(currency)
     }
 }
 

@@ -185,7 +185,7 @@ pub(super) fn inter_bucket_plus_undiversified(
 ///
 /// - BCBS FRTB Minimum Capital Requirements: `docs/REFERENCES.md#bcbs-frtb-minimum-capital-requirements`
 ///
-pub fn aggregate_sba(
+pub(super) fn aggregate_sba(
     delta_charges: &FxHashMap<FrtbRiskClass, f64>,
     vega_charges: &FxHashMap<FrtbRiskClass, f64>,
     curvature_charges: &FxHashMap<FrtbRiskClass, f64>,

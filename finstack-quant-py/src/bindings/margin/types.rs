@@ -458,7 +458,7 @@ pub(super) fn extract_asset_class(
     obj: &Bound<'_, PyAny>,
 ) -> PyResult<fm::types::CollateralAssetClass> {
     if let Ok(wrapped) = obj.cast::<PyCollateralAssetClass>() {
-        return Ok(wrapped.borrow().inner.clone());
+        return Ok(wrapped.borrow().inner);
     }
     let label: String = obj.extract().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(

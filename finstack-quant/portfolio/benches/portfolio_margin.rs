@@ -193,15 +193,17 @@ fn bench_expiry_resolved_curvature(c: &mut Criterion) {
                 })
             })
             .collect();
+        let as_of = date!(2025 - 01 - 15);
         group.bench_with_input(
             BenchmarkId::from_parameter(factor_count),
             &sensitivities,
             |b, sensitivities| {
                 b.iter(|| {
                     calculator
-                        .calculate_from_sensitivities_parts(
+                        .calculate_from_sensitivities(
                             std::hint::black_box(sensitivities),
                             Currency::USD,
+                            as_of,
                         )
                         .expect("valid expiry-resolved curvature inputs")
                 });

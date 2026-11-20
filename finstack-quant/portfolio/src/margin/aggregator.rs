@@ -435,13 +435,17 @@ impl MarginRun<'_> {
                     if let Some(sensitivities) = sensitivities {
                         let days = target_mpor.unwrap_or(self.simm_calculator.mpor_days());
                         let calculator = self.simm_calculator.clone().with_mpor(days);
-                        let (total, breakdown) = calculator.calculate_from_sensitivities_parts(
+                        let im_result = calculator.calculate_from_sensitivities(
                             sensitivities,
                             self.base_currency,
+                            self.as_of,
                         )?;
                         (
-                            Money::new(total, self.base_currency)?,
-                            Some((sensitivities.clone(), breakdown)),
+                            im_result.amount,
+                            Some((
+                                sensitivities.clone(),
+                                im_result.breakdown.into_iter().collect(),
+                            )),
                         )
                     } else {
                         (Money::from((0_i64, self.base_currency)), None)

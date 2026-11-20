@@ -269,14 +269,12 @@ impl HaircutImCalculator {
         as_of: Date,
         breakdown_key: impl Into<String>,
     ) -> ImResult {
-        let mut breakdown = finstack_quant_core::FxHashMap::default();
-        breakdown.insert(breakdown_key.into(), amount);
-        ImResult::with_breakdown(
+        ImResult::with_single_breakdown(
             amount,
             ImMethodology::Haircut,
             as_of,
             HAIRCUT_MPOR_DAYS,
-            breakdown,
+            breakdown_key,
         )
     }
 }
@@ -288,14 +286,13 @@ impl ImCalculator for HaircutImCalculator {
         context: &MarketContext,
         as_of: Date,
     ) -> Result<ImResult> {
-        let collateral_value = instrument
-            .im_exposure_base(context, as_of)?
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "Haircut IM requires an explicit im_exposure_base for instrument '{}'",
-                    instrument.id()
-                ))
-            })?;
+        let collateral_value = super::require_im_exposure_base(
+            "Haircut",
+            instrument,
+            context,
+            as_of,
+            "an explicit collateral exposure base",
+        )?;
 
         let currency_mismatch = self
             .posted_collateral_currency

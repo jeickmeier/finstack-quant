@@ -72,7 +72,9 @@ from the embedded registry.
 use finstack_quant_core::currency::Currency;
 use finstack_quant_margin::SimmVersion;
 use finstack_quant_margin::calculators::im::SimmCalculator;
+use finstack_quant_core::dates::Date;
 use finstack_quant_margin::types::SimmSensitivities;
+use time::Month;
 
 let calc = SimmCalculator::new(SimmVersion::V2_6)?;
 
@@ -80,17 +82,17 @@ let mut sensitivities = SimmSensitivities::new(Currency::USD);
 sensitivities.add_ir_delta(Currency::USD, "5Y", 50_000.0);
 sensitivities.add_equity_delta("AAPL", 100_000.0);
 
-// (total_im: f64, breakdown: HashMap<String, Money>)
-let (total_im, breakdown) = calc.calculate_from_sensitivities_parts(&sensitivities, Currency::USD)?;
-assert!(total_im >= 0.0);
-assert!(breakdown.contains_key("IR_Delta"));
+let as_of = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
+let result = calc.calculate_from_sensitivities(&sensitivities, Currency::USD, as_of)?;
+assert!(result.amount.amount() >= 0.0);
+assert!(result.breakdown.contains_key("IR_Delta"));
 # Ok::<(), finstack_quant_core::Error>(())
 ```
 
 `calculate_from_sensitivities(&sens, currency, as_of)` is the canonical entry
 point: it validates the container (unknown tenors and commodity buckets are
-rejected rather than priced as zero) and returns the same numbers wrapped in
-an `ImResult` with methodology and MPOR stamped.
+rejected rather than priced as zero) and returns the computed total and
+breakdown wrapped in an `ImResult` with methodology and MPOR stamped.
 
 ### Variation margin
 
@@ -225,7 +227,7 @@ currency-safety, and serde rules.
 | `VmCalculator` | `calculate(exposure, posted, as_of)` | Applies CSA threshold, MTA, rounding, and settlement dating. `generate_margin_calls` and `margin_call_dates` cover schedules. |
 | `SimmCalculator` | `calculate_from_sensitivities` | Indicative historical v2.6 parameters from the registry; USD inputs only and results explicitly approximate. Risk-class aggregation reduces in a canonical order so the quadratic form is bit-reproducible. |
 | `ScheduleImCalculator` | `calculate_for_notional` | BCBS-IOSCO grid (`BCBS_IOSCO_SCHEDULE_ID = "bcbs_iosco"`); the `ImCalculator` path uses `im_exposure_base`. |
-| `ClearingHouseImCalculator` | `calculate_conservative`, `with_input_source` | Accepts an external CCP value via `ExternalImSource`, or scales an exposure base by registry-backed proxy rates (`lch_swapclear`, `ice_clear_credit`, `cme`, `generic_proxy`). |
+| `ClearingHouseImCalculator` | `calculate_conservative` | Scales an explicit exposure base by registry-backed conservative proxy rates (`lch_swapclear`, `ice_clear_credit`, `cme`, `generic_proxy`). |
 | `HaircutImCalculator` | `calculate_for_collateral` | Uses `with_collateral_terms` to match maturity/rating eligibility and the matching entry’s haircut and FX add-on; rejects ineligible or negative collateral. |
 
 Repo margining rules are separate from the haircut IM engine: `RepoMarginSpec`

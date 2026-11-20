@@ -2,7 +2,7 @@
 
 use super::{
     SIMM_CURVATURE_Z, SimmBucketDetail, SimmCalculator, SimmComponentDetail, SimmCreditSector,
-    SimmRiskClass, SimmWeightedSensitivity, correlated_norm,
+    SimmRiskClass, SimmWeightedSensitivity, correlated_norm, inter_bucket_pairwise,
 };
 use crate::types::simm_curvature::{fx_pair, tenor_days};
 use crate::types::{SimmCurvatureSensitivity, commodity_bucket_id, ordered_tenor_pair};
@@ -42,7 +42,6 @@ impl SimmCalculator {
     ) -> Result<FxHashMap<SimmRiskClass, f64>> {
         let mut by_factor: FxHashMap<FactorKey, Vec<f64>> = FxHashMap::default();
         for input in inputs {
-            input.validate()?;
             let mut factor = input.factor.clone();
             let bucket = match input.risk_class {
                 SimmRiskClass::InterestRate => input
@@ -157,17 +156,55 @@ impl SimmCalculator {
                     non_residual.push(bucket);
                 }
             }
-            let mut variance: f64 = non_residual.iter().map(|b| b.k * b.k).sum();
-            for (i, a) in non_residual.iter().enumerate() {
-                for b in &non_residual[..i] {
-                    let rho = self.curvature_bucket_correlation(class, &a.bucket, &b.bucket)?;
-                    variance += 2.0 * rho * rho * a.signed * b.signed;
-                }
+            #[derive(Clone, Copy)]
+            enum CurvBucketKey {
+                Sector(SimmCreditSector),
+                Commodity(u8),
+                Other,
             }
+            let mut keys = Vec::with_capacity(non_residual.len());
+            let mut pair_inputs = Vec::with_capacity(non_residual.len());
+            for bucket in &non_residual {
+                let key = match class {
+                    SimmRiskClass::CreditQualifying => CurvBucketKey::Sector(
+                        bucket
+                            .bucket
+                            .parse::<SimmCreditSector>()
+                            .map_err(Error::Validation)?,
+                    ),
+                    SimmRiskClass::Commodity => CurvBucketKey::Commodity(
+                        bucket
+                            .bucket
+                            .parse::<u8>()
+                            .map_err(|e| Error::Validation(e.to_string()))?,
+                    ),
+                    _ => CurvBucketKey::Other,
+                };
+                keys.push(key);
+                pair_inputs.push((bucket.k, bucket.signed));
+            }
+            let inter_k = inter_bucket_pairwise(&pair_inputs, |i, j| {
+                let rho = match (class, keys[i], keys[j]) {
+                    (SimmRiskClass::InterestRate, _, _) => {
+                        self.params.ir_inter_currency_correlation
+                    }
+                    (
+                        SimmRiskClass::CreditQualifying,
+                        CurvBucketKey::Sector(a),
+                        CurvBucketKey::Sector(b),
+                    ) => self.params.cq_inter_bucket_correlation(a, b),
+                    (
+                        SimmRiskClass::Commodity,
+                        CurvBucketKey::Commodity(a),
+                        CurvBucketKey::Commodity(b),
+                    ) => self.params.commodity_inter_bucket_correlation(a, b),
+                    _ => 0.0,
+                };
+                rho * rho
+            });
             let sum = non_residual.iter().map(|b| b.sum).sum();
             let absolute_sum = non_residual.iter().map(|b| b.absolute_sum).sum();
-            let mut margin =
-                residual + curvature_charge(sum, absolute_sum, variance.max(0.0).sqrt());
+            let mut margin = residual + curvature_charge(sum, absolute_sum, inter_k);
             if class == SimmRiskClass::InterestRate {
                 margin /= self.params.ir_historical_volatility_ratio.powi(2);
             }
@@ -224,22 +261,5 @@ impl SimmCalculator {
             SimmRiskClass::Commodity => self.params.commodity_intra_bucket_correlations[&a.bucket],
             SimmRiskClass::Fx => 0.5,
         }
-    }
-
-    fn curvature_bucket_correlation(&self, class: SimmRiskClass, a: &str, b: &str) -> Result<f64> {
-        Ok(match class {
-            SimmRiskClass::InterestRate => self.params.ir_inter_currency_correlation,
-            SimmRiskClass::CreditQualifying => self.params.cq_inter_bucket_correlation(
-                a.parse::<SimmCreditSector>().map_err(Error::Validation)?,
-                b.parse::<SimmCreditSector>().map_err(Error::Validation)?,
-            ),
-            SimmRiskClass::Commodity => self.params.commodity_inter_bucket_correlation(
-                a.parse::<u8>()
-                    .map_err(|e| Error::Validation(e.to_string()))?,
-                b.parse::<u8>()
-                    .map_err(|e| Error::Validation(e.to_string()))?,
-            ),
-            _ => 0.0,
-        })
     }
 }

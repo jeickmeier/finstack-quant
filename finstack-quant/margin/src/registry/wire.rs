@@ -3,6 +3,8 @@
 //! Every type below is a deserialization target for an embedded registry JSON
 //! file.
 
+use super::{ClearedSettlementDefaults, ImDefaults, ScheduleBucketBoundaries, TimingDefaults};
+use crate::types::MaturityConstraints;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -31,13 +33,6 @@ pub(super) struct ScheduleImRecord {
     pub(super) default_maturity_years: f64,
     pub(super) mpor_days: u32,
     pub(super) rates: Vec<ScheduleImRate>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct ScheduleBucketBoundaries {
-    pub(super) short_to_medium: f64,
-    pub(super) medium_to_long: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -82,20 +77,11 @@ pub(super) struct CollateralEligibilityRecord {
     #[serde(default)]
     pub(super) min_rating: Option<String>,
     #[serde(default)]
-    pub(super) maturity_constraints: Option<MaturityConstraintsRecord>,
+    pub(super) maturity_constraints: Option<MaturityConstraints>,
     pub(super) haircut: f64,
     pub(super) fx_haircut_addon: f64,
     #[serde(default)]
     pub(super) concentration_limit: Option<f64>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct MaturityConstraintsRecord {
-    #[serde(default)]
-    pub(super) min_remaining_years: Option<f64>,
-    #[serde(default)]
-    pub(super) max_remaining_years: Option<f64>,
 }
 
 // Defaults (VM/IM thresholds, timing, settlement)
@@ -112,9 +98,9 @@ pub(super) struct DefaultsFile {
 #[serde(deny_unknown_fields)]
 pub(super) struct DefaultsRecord {
     pub(super) vm: VmDefaultsRecord,
-    pub(super) im: ImDefaultsRecord,
-    pub(super) timing: TimingDefaultsRecord,
-    pub(super) cleared_settlement: ClearedSettlementRecord,
+    pub(super) im: ImDefaults,
+    pub(super) timing: TimingDefaults,
+    pub(super) cleared_settlement: ClearedSettlementDefaults,
 }
 
 #[derive(Debug, Deserialize)]
@@ -125,48 +111,6 @@ pub(super) struct VmDefaultsRecord {
     pub(super) rounding: f64,
     pub(super) independent_amount: f64,
     pub(super) frequency: String,
-    pub(super) settlement_lag: u32,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct ImDefaultsRecord {
-    pub(super) simm: ImMethodDefaultsRecord,
-    pub(super) schedule: ImMethodDefaultsRecord,
-    pub(super) cleared: ImMethodDefaultsRecord,
-    pub(super) repo_haircut: ImMethodDefaultsRecord,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-#[serde(deny_unknown_fields)]
-pub(super) struct ImMethodDefaultsRecord {
-    pub(super) mpor_days: u32,
-    pub(super) threshold: f64,
-    pub(super) mta: f64,
-    pub(super) segregated: bool,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct TimingDefaultsRecord {
-    pub(super) standard: MarginCallTimingRecord,
-    pub(super) regulatory_vm: MarginCallTimingRecord,
-    pub(super) ccp: MarginCallTimingRecord,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-#[serde(deny_unknown_fields)]
-pub(super) struct MarginCallTimingRecord {
-    pub(super) notification_deadline_hours: u8,
-    pub(super) response_deadline_hours: u8,
-    pub(super) dispute_resolution_days: u8,
-    pub(super) delivery_grace_days: u8,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct ClearedSettlementRecord {
-    pub(super) rounding: f64,
     pub(super) settlement_lag: u32,
 }
 

@@ -58,9 +58,7 @@ pub use simm_types::{
     SIMM_COMMODITY_BUCKET_COUNT, SIMM_TENORS, SimmCreditSector, SimmRiskClass, SimmSensitivities,
     SimmSensitivitiesJson, commodity_bucket_id,
 };
-pub(crate) use simm_types::{
-    ordered_credit_sector_pair, ordered_risk_class_pair, ordered_tenor_pair,
-};
+pub(crate) use simm_types::{ordered_pair, ordered_tenor_pair};
 pub use thresholds::{ImCollateralResult, ImParameters, VmParameters};
 
 #[cfg(test)]

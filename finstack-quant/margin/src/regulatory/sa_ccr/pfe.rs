@@ -72,7 +72,7 @@ pub(super) fn pfe(
 /// # References
 ///
 /// - BCBS 279 SA-CCR: `docs/REFERENCES.md#bcbs-279-saccr`
-pub fn multiplier(v_minus_c: f64, add_on: f64) -> f64 {
+pub(super) fn multiplier(v_minus_c: f64, add_on: f64) -> f64 {
     if add_on <= 0.0 {
         return MULTIPLIER_FLOOR;
     }

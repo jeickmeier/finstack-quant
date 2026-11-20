@@ -150,7 +150,7 @@ fn ir_add_on(trades: &[SaCcrTrade], config: &SaCcrNettingSetConfig) -> f64 {
 ///
 /// - BCBS 279 SA-CCR: `docs/REFERENCES.md#bcbs-279-saccr`
 #[must_use]
-pub fn supervisory_duration(start_years: f64, end_years: f64) -> f64 {
+pub(super) fn supervisory_duration(start_years: f64, end_years: f64) -> f64 {
     let r = IR_SUPERVISORY_DISCOUNT_RATE;
     let s = start_years.max(0.0);
     let e = end_years.max(s);
