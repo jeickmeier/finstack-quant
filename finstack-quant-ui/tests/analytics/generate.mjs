@@ -62,9 +62,8 @@ const requests = [
 ];
 const series = (value) => ({ ...value, values: Array.from(value.values) });
 // Mirror the worker's AnalyticsApi.performanceReport using raw WASM exports.
-// Financial assumptions are explicit. Only the lookback date and fiscal
-// calendar are optional; the raw package exposes its fiscal lookback as
-// lookbackReturnsWithFiscalConfig, which the public facade joins into one method.
+// Financial assumptions are explicit; only the lookback date and fiscal
+// calendar are optional.
 function report(request) {
   const performance = new native.Performance(request.panel);
   let fiscal;
@@ -80,12 +79,10 @@ function report(request) {
     const cumulative = performance.cumulativeReturns();
     const drawdowns = performance.getDrawdownSeries();
     const tickerNames = performance.getTickerNames();
-    const lookback = fiscal
-      ? performance.lookbackReturnsWithFiscalConfig(
-          request.lookbackDate ?? undefined,
-          fiscal,
-        )
-      : performance.lookbackReturns(request.lookbackDate ?? undefined);
+    const lookback = performance.lookbackReturns(
+      request.lookbackDate ?? undefined,
+      fiscal,
+    );
     return {
       tickerNames,
       benchmarkIdx: request.panel.benchmark_ticker

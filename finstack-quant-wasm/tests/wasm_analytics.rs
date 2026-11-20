@@ -157,7 +157,9 @@ fn cagr_returns_per_ticker_vec() {
     let values = typed_vec(
         perf.cagr(
             None,
-            &JsDayCountContext::new(None, None, None, None, None).unwrap(),
+            Some(JsValue::from(
+                JsDayCountContext::new(None, None, None, None, None).unwrap(),
+            )),
         )
         .unwrap(),
     );
@@ -460,7 +462,7 @@ fn multi_factor_greeks_resolves_to_struct() {
 fn lookback_returns_emit_mtd_qtd_ytd_fytd_arrays() {
     let perf = build_perf();
     let raw = perf
-        .lookback_returns(Some(JsValue::from("2025-01-12")))
+        .lookback_returns(Some(JsValue::from("2025-01-12")), None)
         .unwrap();
     let value: serde_json::Value = serde_wasm_bindgen::from_value(raw).unwrap();
     assert_eq!(value["mtd"].as_array().unwrap().len(), 2);
@@ -473,7 +475,11 @@ fn lookback_returns_emit_mtd_qtd_ytd_fytd_arrays() {
 fn period_stats_emit_win_rate() {
     let perf = build_perf();
     let raw = perf
-        .period_stats(JsValue::from(0.0), JsValue::from("weekly".to_string()))
+        .period_stats(
+            JsValue::from(0.0),
+            JsValue::from("weekly".to_string()),
+            None,
+        )
         .unwrap();
     let value: serde_json::Value = serde_wasm_bindgen::from_value(raw).unwrap();
     assert!(value["win_rate"].as_f64().is_some());

@@ -797,17 +797,16 @@ fn type_name(value: &JsValue) -> String {
         .unwrap_or_else(|| "unknown".to_string())
 }
 
-/// Extract a string representation from a live wasm-bindgen handle identified by prototype.
+/// Validate and return a live wasm-bindgen handle identified by prototype.
 ///
 /// Returns `Ok(None)` when `value` is not an instance of the cached prototype;
 /// returns `Err` when a matching wrapper has already been freed (`__wbg_ptr == 0`).
-pub(crate) fn wasm_handle_string<T: Into<JsValue>>(
+pub(crate) fn wasm_handle_object<T: Into<JsValue>>(
     value: &JsValue,
     label: &str,
     cache: &'static std::thread::LocalKey<std::cell::OnceCell<js_sys::Object>>,
     sample: impl FnOnce() -> Result<T, JsValue>,
-    method: &str,
-) -> Result<Option<String>, JsValue> {
+) -> Result<Option<js_sys::Object>, JsValue> {
     use wasm_bindgen::JsCast as _;
 
     let Some(obj) = value.dyn_ref::<js_sys::Object>() else {
@@ -827,8 +826,20 @@ pub(crate) fn wasm_handle_string<T: Into<JsValue>>(
         });
     }
     let matches = cache.with(|slot| {
-        slot.get()
-            .is_some_and(|proto| js_sys::Object::is(&js_sys::Object::get_prototype_of(obj), proto))
+        slot.get().is_some_and(|proto| {
+            // Walk the prototype chain so thin JS subclasses (e.g. test/worker wrappers) match too.
+            let mut cur: JsValue = js_sys::Object::get_prototype_of(obj).into();
+            for _ in 0..16 {
+                if cur.is_null() || !cur.is_object() {
+                    break;
+                }
+                if js_sys::Object::is(&cur, proto) {
+                    return true;
+                }
+                cur = js_sys::Object::get_prototype_of(&cur).into();
+            }
+            false
+        })
     });
     if !matches {
         return Ok(None);
@@ -842,12 +853,35 @@ pub(crate) fn wasm_handle_string<T: Into<JsValue>>(
             "expected a live handle (already freed)",
         ));
     }
-    let func_val = js_sys::Reflect::get(obj, &JsValue::from_str(method))?;
+    Ok(Some(obj.clone()))
+}
+
+/// Extract a string representation from a live wasm-bindgen handle identified by prototype.
+///
+/// Returns `Ok(None)` when `value` is not an instance of the cached prototype;
+/// returns `Err` when a matching wrapper has already been freed (`__wbg_ptr == 0`).
+pub(crate) fn wasm_handle_string<T: Into<JsValue>>(
+    value: &JsValue,
+    label: &str,
+    cache: &'static std::thread::LocalKey<std::cell::OnceCell<js_sys::Object>>,
+    sample: impl FnOnce() -> Result<T, JsValue>,
+    method: &str,
+) -> Result<Option<String>, JsValue> {
+    use wasm_bindgen::JsCast as _;
+
+    let Some(obj) = wasm_handle_object(value, label, cache, sample)? else {
+        return Ok(None);
+    };
+    let func_val = js_sys::Reflect::get(&obj, &JsValue::from_str(method))?;
     let func = func_val
         .dyn_ref::<js_sys::Function>()
         .ok_or_else(|| invalid_type(label, &format!("missing `{method}()` method on handle")))?;
-    let out = func.call0(obj)?;
+    let out = func.call0(&obj)?;
     js_string(&out, &format!("{label}.{method}()")).map(Some)
+}
+
+pub(crate) fn js_object_prop(obj: &js_sys::Object, prop: &str) -> Result<JsValue, JsValue> {
+    js_sys::Reflect::get(obj, &JsValue::from_str(prop))
 }
 
 pub(crate) fn is_plain_object(value: &JsValue) -> bool {

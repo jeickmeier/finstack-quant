@@ -216,6 +216,15 @@ fn js_opt_day_count_context_state(
     ))
 }
 
+pub(crate) fn js_opt_day_count_context(
+    value: Option<&JsValue>,
+    label: &str,
+) -> Result<finstack_quant_core::dates::DayCountContext<'static>, JsValue> {
+    js_opt_day_count_context_state(value, label)?
+        .to_ctx()
+        .map_err(to_js_err)
+}
+
 /// Borrow a `VolatilityClock` from either a live `core.VolatilityClock` handle,
 /// a plain JSON object matching the wire schema, or `null`/`undefined`.
 ///

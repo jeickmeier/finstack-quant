@@ -475,6 +475,38 @@ impl JsFiscalConfig {
     }
 }
 
+thread_local! {
+    static FISCAL_CONFIG_PROTOTYPE: std::cell::OnceCell<js_sys::Object> =
+        const { std::cell::OnceCell::new() };
+}
+
+pub(crate) fn js_opt_fiscal_config(
+    value: Option<&JsValue>,
+    label: &str,
+) -> Result<Option<FiscalConfig>, JsValue> {
+    let Some(val) = value else {
+        return Ok(None);
+    };
+    if val.is_undefined() || val.is_null() {
+        return Ok(None);
+    }
+    if let Some(obj) =
+        crate::utils::input::wasm_handle_object(val, label, &FISCAL_CONFIG_PROTOTYPE, || {
+            Ok(JsFiscalConfig::calendar_year())
+        })?
+    {
+        let month_val = crate::utils::input::js_object_prop(&obj, "startMonth")?;
+        let day_val = crate::utils::input::js_object_prop(&obj, "startDay")?;
+        let month: u8 = js_uint(&month_val, "startMonth")?;
+        let day: u8 = js_uint(&day_val, "startDay")?;
+        return FiscalConfig::new(month, day).map(Some).map_err(to_js_err);
+    }
+    Err(crate::utils::input::invalid_type(
+        label,
+        "expected a FiscalConfig handle or null",
+    ))
+}
+
 /// Build a plan of calendar periods from a range expression (Rust `build_periods`).
 ///
 /// # Arguments

@@ -2,7 +2,7 @@
 
 use crate::bindings::core::dates::periods::PyFiscalConfig;
 use crate::bindings::date_utils::date_to_py;
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
+use crate::bindings::macros::{impl_repr_html_via_dataframe, py_getters, wire_methods};
 use crate::bindings::pandas_utils::{
     dates_to_datetime_index, dates_to_pylist, dict_to_dataframe, labeled_values_to_series,
 };
@@ -11,9 +11,22 @@ use finstack_quant_analytics::{
     BetaResult, CorrelationResult, DatedSeries, DrawdownEpisode, GreeksResult, LookbackReturns,
     LookbackSample, MultiFactorResult, PeriodStats, RollingGreeks,
 };
+use finstack_quant_core::dates::Date;
 use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+
+fn opt_date_to_py(py: Python<'_>, date: Option<Date>) -> PyResult<Option<Bound<'_, PyAny>>> {
+    date.map(|d| date_to_py(py, d)).transpose()
+}
+
+fn wrap_samples(samples: &[LookbackSample]) -> Vec<PyLookbackSample> {
+    samples
+        .iter()
+        .copied()
+        .map(|inner| PyLookbackSample { inner })
+        .collect()
+}
 
 #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats")]
 #[pyclass(name = "PeriodStats", module = "finstack_quant.analytics", frozen)]
@@ -21,84 +34,41 @@ pub struct PyPeriodStats {
     pub(super) inner: PeriodStats,
 }
 
+py_getters!(PyPeriodStats |s| {
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.n_obs")]
+    n_obs -> usize = s.inner.n_obs;
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.wins")]
+    wins -> usize = s.inner.wins;
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.losses")]
+    losses -> usize = s.inner.losses;
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.best")]
+    best -> f64 = s.inner.best;
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.worst")]
+    worst -> f64 = s.inner.worst;
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.consecutive_wins")]
+    consecutive_wins -> usize = s.inner.consecutive_wins;
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.consecutive_losses")]
+    consecutive_losses -> usize = s.inner.consecutive_losses;
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.win_rate")]
+    win_rate -> f64 = s.inner.win_rate;
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.avg_return")]
+    avg_return -> f64 = s.inner.avg_return;
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.avg_win")]
+    avg_win -> f64 = s.inner.avg_win;
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.avg_loss")]
+    avg_loss -> f64 = s.inner.avg_loss;
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.payoff_ratio")]
+    payoff_ratio -> f64 = s.inner.payoff_ratio;
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.profit_factor")]
+    profit_factor -> f64 = s.inner.profit_factor;
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.cpc_index")]
+    cpc_index -> f64 = s.inner.cpc_index;
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.kelly_risk_fraction")]
+    kelly_risk_fraction -> f64 = s.inner.kelly_risk_fraction;
+});
+
 #[pymethods]
 impl PyPeriodStats {
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.n_obs")]
-    #[getter]
-    fn n_obs(&self) -> usize {
-        self.inner.n_obs
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.wins")]
-    #[getter]
-    fn wins(&self) -> usize {
-        self.inner.wins
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.losses")]
-    #[getter]
-    fn losses(&self) -> usize {
-        self.inner.losses
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.best")]
-    #[getter]
-    fn best(&self) -> f64 {
-        self.inner.best
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.worst")]
-    #[getter]
-    fn worst(&self) -> f64 {
-        self.inner.worst
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.consecutive_wins")]
-    #[getter]
-    fn consecutive_wins(&self) -> usize {
-        self.inner.consecutive_wins
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.consecutive_losses")]
-    #[getter]
-    fn consecutive_losses(&self) -> usize {
-        self.inner.consecutive_losses
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.win_rate")]
-    #[getter]
-    fn win_rate(&self) -> f64 {
-        self.inner.win_rate
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.avg_return")]
-    #[getter]
-    fn avg_return(&self) -> f64 {
-        self.inner.avg_return
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.avg_win")]
-    #[getter]
-    fn avg_win(&self) -> f64 {
-        self.inner.avg_win
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.avg_loss")]
-    #[getter]
-    fn avg_loss(&self) -> f64 {
-        self.inner.avg_loss
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.payoff_ratio")]
-    #[getter]
-    fn payoff_ratio(&self) -> f64 {
-        self.inner.payoff_ratio
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.profit_factor")]
-    #[getter]
-    fn profit_factor(&self) -> f64 {
-        self.inner.profit_factor
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.cpc_index")]
-    #[getter]
-    fn cpc_index(&self) -> f64 {
-        self.inner.cpc_index
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.kelly_risk_fraction")]
-    #[getter]
-    fn kelly_risk_fraction(&self) -> f64 {
-        self.inner.kelly_risk_fraction
-    }
-
     #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.to_series")]
     fn to_series<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let (labels, values): (Vec<String>, Vec<f64>) = self
@@ -111,16 +81,21 @@ impl PyPeriodStats {
 
     #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let s = &self.inner;
         let data = PyDict::new(py);
         for (name, value) in self.fields() {
             data.set_item(name, PyArray1::from_slice(py, &[value]))?;
         }
         // Observation and streak counts stay integer columns.
-        data.set_item("n_obs", vec![self.inner.n_obs])?;
-        data.set_item("wins", vec![self.inner.wins])?;
-        data.set_item("losses", vec![self.inner.losses])?;
-        data.set_item("consecutive_wins", vec![self.inner.consecutive_wins])?;
-        data.set_item("consecutive_losses", vec![self.inner.consecutive_losses])?;
+        for (name, count) in [
+            ("n_obs", s.n_obs),
+            ("wins", s.wins),
+            ("losses", s.losses),
+            ("consecutive_wins", s.consecutive_wins),
+            ("consecutive_losses", s.consecutive_losses),
+        ] {
+            data.set_item(name, vec![count])?;
+        }
         dict_to_dataframe(py, &data, None)
     }
 
@@ -163,47 +138,35 @@ pub struct PyBetaResult {
     pub(super) inner: BetaResult,
 }
 
+py_getters!(PyBetaResult |s| {
+    #[doc = pydoc!("finstack_quant.analytics._types", "BetaResult.beta")]
+    beta -> f64 = s.inner.beta;
+    #[doc = pydoc!("finstack_quant.analytics._types", "BetaResult.std_err")]
+    std_err -> f64 = s.inner.std_err;
+    #[doc = pydoc!("finstack_quant.analytics._types", "BetaResult.ci_lower")]
+    ci_lower -> f64 = s.inner.ci_lower;
+    #[doc = pydoc!("finstack_quant.analytics._types", "BetaResult.ci_upper")]
+    ci_upper -> f64 = s.inner.ci_upper;
+    #[doc = pydoc!("finstack_quant.analytics._types", "BetaResult.n_obs")]
+    n_obs -> usize = s.inner.n_obs;
+    #[doc = pydoc!("finstack_quant.analytics._types", "BetaResult.confidence_level")]
+    confidence_level -> f64 = s.inner.confidence_level;
+});
+
 #[pymethods]
 impl PyBetaResult {
-    #[doc = pydoc!("finstack_quant.analytics._types", "BetaResult.beta")]
-    #[getter]
-    fn beta(&self) -> f64 {
-        self.inner.beta
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "BetaResult.std_err")]
-    #[getter]
-    fn std_err(&self) -> f64 {
-        self.inner.std_err
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "BetaResult.ci_lower")]
-    #[getter]
-    fn ci_lower(&self) -> f64 {
-        self.inner.ci_lower
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "BetaResult.ci_upper")]
-    #[getter]
-    fn ci_upper(&self) -> f64 {
-        self.inner.ci_upper
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "BetaResult.n_obs")]
-    #[getter]
-    fn n_obs(&self) -> usize {
-        self.inner.n_obs
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "BetaResult.confidence_level")]
-    #[getter]
-    fn confidence_level(&self) -> f64 {
-        self.inner.confidence_level
-    }
-
     #[doc = pydoc!("finstack_quant.analytics._types", "BetaResult.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let r = &self.inner;
         let data = PyDict::new(py);
-        data.set_item("beta", PyArray1::from_slice(py, &[r.beta]))?;
-        data.set_item("std_err", PyArray1::from_slice(py, &[r.std_err]))?;
-        data.set_item("ci_lower", PyArray1::from_slice(py, &[r.ci_lower]))?;
-        data.set_item("ci_upper", PyArray1::from_slice(py, &[r.ci_upper]))?;
+        for (name, val) in [
+            ("beta", r.beta),
+            ("std_err", r.std_err),
+            ("ci_lower", r.ci_lower),
+            ("ci_upper", r.ci_upper),
+        ] {
+            data.set_item(name, PyArray1::from_slice(py, &[val]))?;
+        }
         data.set_item("n_obs", PyArray1::from_slice(py, &[r.n_obs as i64]))?;
         data.set_item(
             "confidence_level",
@@ -226,45 +189,33 @@ pub struct PyGreeksResult {
     pub(super) inner: GreeksResult,
 }
 
+py_getters!(PyGreeksResult |s| {
+    #[doc = pydoc!("finstack_quant.analytics._types", "GreeksResult.alpha")]
+    alpha -> f64 = s.inner.alpha;
+    #[doc = pydoc!("finstack_quant.analytics._types", "GreeksResult.beta")]
+    beta -> f64 = s.inner.beta;
+    #[doc = pydoc!("finstack_quant.analytics._types", "GreeksResult.r_squared")]
+    r_squared -> f64 = s.inner.r_squared;
+    #[doc = pydoc!("finstack_quant.analytics._types", "GreeksResult.adjusted_r_squared")]
+    adjusted_r_squared -> f64 = s.inner.adjusted_r_squared;
+    #[doc = pydoc!("finstack_quant.analytics._types", "GreeksResult.n_obs")]
+    n_obs -> usize = s.inner.n_obs;
+});
+
 #[pymethods]
 impl PyGreeksResult {
-    #[doc = pydoc!("finstack_quant.analytics._types", "GreeksResult.alpha")]
-    #[getter]
-    fn alpha(&self) -> f64 {
-        self.inner.alpha
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "GreeksResult.beta")]
-    #[getter]
-    fn beta(&self) -> f64 {
-        self.inner.beta
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "GreeksResult.r_squared")]
-    #[getter]
-    fn r_squared(&self) -> f64 {
-        self.inner.r_squared
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "GreeksResult.adjusted_r_squared")]
-    #[getter]
-    fn adjusted_r_squared(&self) -> f64 {
-        self.inner.adjusted_r_squared
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "GreeksResult.n_obs")]
-    #[getter]
-    fn n_obs(&self) -> usize {
-        self.inner.n_obs
-    }
-
     #[doc = pydoc!("finstack_quant.analytics._types", "GreeksResult.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let r = &self.inner;
         let data = PyDict::new(py);
-        data.set_item("alpha", PyArray1::from_slice(py, &[r.alpha]))?;
-        data.set_item("beta", PyArray1::from_slice(py, &[r.beta]))?;
-        data.set_item("r_squared", PyArray1::from_slice(py, &[r.r_squared]))?;
-        data.set_item(
-            "adjusted_r_squared",
-            PyArray1::from_slice(py, &[r.adjusted_r_squared]),
-        )?;
+        for (name, val) in [
+            ("alpha", r.alpha),
+            ("beta", r.beta),
+            ("r_squared", r.r_squared),
+            ("adjusted_r_squared", r.adjusted_r_squared),
+        ] {
+            data.set_item(name, PyArray1::from_slice(py, &[val]))?;
+        }
         data.set_item("n_obs", PyArray1::from_slice(py, &[r.n_obs as i64]))?;
         dict_to_dataframe(py, &data, None)
     }
@@ -325,37 +276,25 @@ pub struct PyMultiFactorResult {
     pub(super) inner: MultiFactorResult,
 }
 
+py_getters!(PyMultiFactorResult |s| {
+    #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult.alpha")]
+    alpha -> f64 = s.inner.alpha;
+    #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult.r_squared")]
+    r_squared -> f64 = s.inner.r_squared;
+    #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult.adjusted_r_squared")]
+    adjusted_r_squared -> f64 = s.inner.adjusted_r_squared;
+    #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult.residual_vol")]
+    residual_vol -> f64 = s.inner.residual_vol;
+    #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult.n_obs")]
+    n_obs -> usize = s.inner.n_obs;
+});
+
 #[pymethods]
 impl PyMultiFactorResult {
-    #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult.alpha")]
-    #[getter]
-    fn alpha(&self) -> f64 {
-        self.inner.alpha
-    }
     #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult.betas")]
     #[getter]
     fn betas<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         PyArray1::from_slice(py, &self.inner.betas)
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult.r_squared")]
-    #[getter]
-    fn r_squared(&self) -> f64 {
-        self.inner.r_squared
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult.adjusted_r_squared")]
-    #[getter]
-    fn adjusted_r_squared(&self) -> f64 {
-        self.inner.adjusted_r_squared
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult.residual_vol")]
-    #[getter]
-    fn residual_vol(&self) -> f64 {
-        self.inner.residual_vol
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult.n_obs")]
-    #[getter]
-    fn n_obs(&self) -> usize {
-        self.inner.n_obs
     }
 
     #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult.to_dataframe")]
@@ -430,6 +369,13 @@ pub struct PyDrawdownEpisode {
     pub(super) inner: DrawdownEpisode,
 }
 
+py_getters!(PyDrawdownEpisode |s| {
+    #[doc = pydoc!("finstack_quant.analytics._types", "DrawdownEpisode.duration_days")]
+    duration_days -> i64 = s.inner.duration_days;
+    #[doc = pydoc!("finstack_quant.analytics._types", "DrawdownEpisode.max_drawdown")]
+    max_drawdown -> f64 = s.inner.max_drawdown;
+});
+
 #[pymethods]
 impl PyDrawdownEpisode {
     #[doc = pydoc!("finstack_quant.analytics._types", "DrawdownEpisode.start")]
@@ -445,20 +391,7 @@ impl PyDrawdownEpisode {
     #[doc = pydoc!("finstack_quant.analytics._types", "DrawdownEpisode.end")]
     #[getter]
     fn end<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        match self.inner.end {
-            Some(d) => date_to_py(py, d).map(Some),
-            None => Ok(None),
-        }
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "DrawdownEpisode.duration_days")]
-    #[getter]
-    fn duration_days(&self) -> i64 {
-        self.inner.duration_days
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "DrawdownEpisode.max_drawdown")]
-    #[getter]
-    fn max_drawdown(&self) -> f64 {
-        self.inner.max_drawdown
+        opt_date_to_py(py, self.inner.end)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._types", "DrawdownEpisode.to_dataframe")]
@@ -497,64 +430,27 @@ pub struct PyLookbackReturns {
     pub(super) inner: LookbackReturns,
 }
 
+py_getters!(PyLookbackReturns |s| {
+    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.ticker_names")]
+    ticker_names -> Vec<String> = s.inner.ticker_names.clone();
+    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.fiscal_config")]
+    fiscal_config -> PyFiscalConfig = PyFiscalConfig { inner: s.inner.fiscal_config };
+    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.mtd_samples")]
+    mtd_samples -> Vec<PyLookbackSample> = wrap_samples(&s.inner.mtd_samples);
+    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.qtd_samples")]
+    qtd_samples -> Vec<PyLookbackSample> = wrap_samples(&s.inner.qtd_samples);
+    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.ytd_samples")]
+    ytd_samples -> Vec<PyLookbackSample> = wrap_samples(&s.inner.ytd_samples);
+    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.fytd_samples")]
+    fytd_samples -> Vec<PyLookbackSample> = wrap_samples(&s.inner.fytd_samples);
+});
+
 #[pymethods]
 impl PyLookbackReturns {
     #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.ref_date")]
     #[getter]
     fn ref_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::date_utils::date_to_py(py, self.inner.ref_date)
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.ticker_names")]
-    #[getter]
-    fn ticker_names(&self) -> Vec<String> {
-        self.inner.ticker_names.clone()
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.fiscal_config")]
-    #[getter]
-    fn fiscal_config(&self) -> PyFiscalConfig {
-        PyFiscalConfig {
-            inner: self.inner.fiscal_config,
-        }
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.mtd_samples")]
-    #[getter]
-    fn mtd_samples(&self) -> Vec<PyLookbackSample> {
-        self.inner
-            .mtd_samples
-            .iter()
-            .cloned()
-            .map(|inner| PyLookbackSample { inner })
-            .collect()
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.qtd_samples")]
-    #[getter]
-    fn qtd_samples(&self) -> Vec<PyLookbackSample> {
-        self.inner
-            .qtd_samples
-            .iter()
-            .cloned()
-            .map(|inner| PyLookbackSample { inner })
-            .collect()
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.ytd_samples")]
-    #[getter]
-    fn ytd_samples(&self) -> Vec<PyLookbackSample> {
-        self.inner
-            .ytd_samples
-            .iter()
-            .cloned()
-            .map(|inner| PyLookbackSample { inner })
-            .collect()
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.fytd_samples")]
-    #[getter]
-    fn fytd_samples(&self) -> Vec<PyLookbackSample> {
-        self.inner
-            .fytd_samples
-            .iter()
-            .cloned()
-            .map(|inner| PyLookbackSample { inner })
-            .collect()
+        date_to_py(py, self.inner.ref_date)
     }
     #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.mtd")]
     #[getter]
@@ -608,6 +504,11 @@ pub struct PyDatedSeries {
     pub(super) inner: DatedSeries,
 }
 
+py_getters!(PyDatedSeries |s| {
+    #[doc = pydoc!("finstack_quant.analytics._types", "DatedSeries.value_column")]
+    value_column -> &'static str = s.inner.value_column.as_str();
+});
+
 #[pymethods]
 impl PyDatedSeries {
     #[doc = pydoc!("finstack_quant.analytics._types", "DatedSeries.values")]
@@ -619,11 +520,6 @@ impl PyDatedSeries {
     #[getter]
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
         dates_to_pylist(py, &self.inner.dates)
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "DatedSeries.value_column")]
-    #[getter]
-    fn value_column(&self) -> &'static str {
-        self.inner.value_column.as_str()
     }
 
     #[doc = pydoc!("finstack_quant.analytics._types", "DatedSeries.to_dataframe")]
@@ -652,28 +548,22 @@ pub struct PyLookbackSample {
     pub(super) inner: LookbackSample,
 }
 
+py_getters!(PyLookbackSample |s| {
+    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackSample.n_obs")]
+    n_obs -> usize = s.inner.n_obs;
+});
+
 #[pymethods]
 impl PyLookbackSample {
-    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackSample.n_obs")]
-    #[getter]
-    fn n_obs(&self) -> usize {
-        self.inner.n_obs
-    }
     #[doc = pydoc!("finstack_quant.analytics._types", "LookbackSample.holding_start")]
     #[getter]
     fn holding_start<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.inner
-            .holding_start
-            .map(|date| date_to_py(py, date))
-            .transpose()
+        opt_date_to_py(py, self.inner.holding_start)
     }
     #[doc = pydoc!("finstack_quant.analytics._types", "LookbackSample.holding_end")]
     #[getter]
     fn holding_end<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.inner
-            .holding_end
-            .map(|date| date_to_py(py, date))
-            .transpose()
+        opt_date_to_py(py, self.inner.holding_end)
     }
 }
 
@@ -687,23 +577,17 @@ pub struct PyCorrelationResult {
     pub(super) inner: CorrelationResult,
 }
 
+py_getters!(PyCorrelationResult |s| {
+    #[doc = pydoc!("finstack_quant.analytics._types", "CorrelationResult.tickers")]
+    tickers -> Vec<String> = s.inner.tickers.clone();
+    #[doc = pydoc!("finstack_quant.analytics._types", "CorrelationResult.matrix")]
+    matrix -> Vec<Vec<f64>> = s.inner.matrix.clone();
+    #[doc = pydoc!("finstack_quant.analytics._types", "CorrelationResult.n_obs")]
+    n_obs -> usize = s.inner.n_obs;
+});
+
 #[pymethods]
 impl PyCorrelationResult {
-    #[doc = pydoc!("finstack_quant.analytics._types", "CorrelationResult.tickers")]
-    #[getter]
-    fn tickers(&self) -> Vec<String> {
-        self.inner.tickers.clone()
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "CorrelationResult.matrix")]
-    #[getter]
-    fn matrix(&self) -> Vec<Vec<f64>> {
-        self.inner.matrix.clone()
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "CorrelationResult.n_obs")]
-    #[getter]
-    fn n_obs(&self) -> usize {
-        self.inner.n_obs
-    }
     #[doc = pydoc!("finstack_quant.analytics._types", "CorrelationResult.start_date")]
     #[getter]
     fn start_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {

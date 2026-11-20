@@ -1,13 +1,13 @@
 //! WASM performance analytics on an actual valuation grid.
 
-use crate::api::core::dates::JsDayCountContext;
-use crate::api::core::periods::JsFiscalConfig;
+use crate::api::core::dates::js_opt_day_count_context;
+use crate::api::core::periods::js_opt_fiscal_config;
 use crate::utils::input::{
-    from_js_json, js_bool, js_f64, js_f64_matrix, js_f64_seq, js_opt_string, js_opt_uint,
-    js_string, js_uint, json_text,
+    from_js_json, js_bool, js_f64, js_f64_matrix, js_f64_seq, js_opt_uint, js_string, js_uint,
 };
+use crate::utils::wire::{js_date, js_opt_date, js_opt_parse, js_parse};
 use crate::utils::{
-    date_to_iso, parse_iso_date, to_js_err, to_js_rows_numeric, to_js_table_numeric, to_js_value,
+    date_to_iso, to_js_err, to_js_rows_numeric, to_js_table_numeric, to_js_value,
     to_js_value_numeric,
 };
 use finstack_quant_analytics::{
@@ -17,8 +17,8 @@ use finstack_quant_core::dates::PeriodKind;
 use js_sys::{Array, Float64Array, Reflect};
 use wasm_bindgen::prelude::*;
 
-fn parse_frequency(value: &JsValue, label: &str) -> Result<PeriodKind, JsValue> {
-    js_string(value, label)?.parse().map_err(to_js_err)
+fn dates_to_iso(dates: &[finstack_quant_core::dates::Date]) -> Vec<String> {
+    dates.iter().map(|&d| date_to_iso(d)).collect()
 }
 
 /// Serialize a `Vec<f64>` as a JavaScript `Float64Array`.
@@ -143,8 +143,8 @@ impl JsPerformance {
         #[wasm_bindgen(unchecked_param_type = "string")] start: JsValue,
         #[wasm_bindgen(unchecked_param_type = "string")] end: JsValue,
     ) -> Result<(), JsValue> {
-        let start = parse_iso_date(&js_string(&start, "start")?)?;
-        let end = parse_iso_date(&js_string(&end, "end")?)?;
+        let start = js_date(&start, "start")?;
+        let end = js_date(&end, "end")?;
         self.inner.reset_date_range(start, end).map_err(to_js_err)
     }
 
@@ -201,22 +201,14 @@ impl JsPerformance {
     /// @returns Ascending ISO-8601 return-ending dates.
     #[wasm_bindgen(js_name = getDates)]
     pub fn get_dates(&self) -> Vec<String> {
-        self.inner
-            .get_dates()
-            .iter()
-            .map(|&d| date_to_iso(d))
-            .collect()
+        dates_to_iso(self.inner.get_dates())
     }
 
     /// Currently selected return-ending grid.
     /// @returns Ascending ISO-8601 return-ending dates.
     #[wasm_bindgen(js_name = getActiveDates)]
     pub fn get_active_dates(&self) -> Vec<String> {
-        self.inner
-            .get_active_dates()
-            .iter()
-            .map(|&d| date_to_iso(d))
-            .collect()
+        dates_to_iso(self.inner.get_active_dates())
     }
 
     /// Inspect one ticker's active return-ending dates.
@@ -229,13 +221,10 @@ impl JsPerformance {
         #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
     ) -> Result<Vec<String>, JsValue> {
         let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
-        Ok(self
-            .inner
+        self.inner
             .get_active_dates_for_ticker(ticker_idx)
-            .map_err(to_js_err)?
-            .iter()
-            .map(|&d| date_to_iso(d))
-            .collect())
+            .map(dates_to_iso)
+            .map_err(to_js_err)
     }
 
     /// Inspect exact active ticker/benchmark paired return-ending dates.
@@ -248,451 +237,39 @@ impl JsPerformance {
         #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
     ) -> Result<Vec<String>, JsValue> {
         let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
-        Ok(self
-            .inner
+        self.inner
             .get_paired_dates(ticker_idx)
-            .map_err(to_js_err)?
-            .iter()
-            .map(|&d| date_to_iso(d))
-            .collect())
+            .map(dates_to_iso)
+            .map_err(to_js_err)
     }
 
     /// Actual-date compound annual growth using ACT/365F unless another clock is selected.
     /// @param dayCount - Optional CagrDayCount label, default act_365f; act365_25 selects explicit actual-days/365.25.
-    /// @param ctx - Validated DayCountContext supplying calendar, reference periods or termination inputs needed by the selected clock. Empty context suffices for context-free clocks.
+    /// @param ctx - Optional validated DayCountContext; omission or null supplies the empty context. Required calendar/coupon inputs must be explicitly populated for clocks that use them.
     /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
     /// @throws Error - Rejects an unknown clock, missing/incompatible day-count context, invalid actual holding chronology, or unrepresentable growth. Empty history and a valid zero year fraction remain NaN per ticker.
     #[wasm_bindgen(unchecked_return_type = "Float64Array")]
     pub fn cagr(
         &self,
-        #[wasm_bindgen(js_name = "dayCount", unchecked_param_type = "string | undefined")]
+        #[wasm_bindgen(js_name = "dayCount", unchecked_optional_param_type = "string | null")]
         day_count: Option<JsValue>,
-        #[wasm_bindgen(unchecked_param_type = "DayCountContext")] ctx: &JsDayCountContext,
+        #[wasm_bindgen(unchecked_optional_param_type = "DayCountContext | null")] ctx: Option<
+            JsValue,
+        >,
     ) -> Result<JsValue, JsValue> {
-        let label = js_opt_string(day_count.as_ref(), "dayCount")?;
-        let day_count = label
-            .as_deref()
-            .map(str::parse::<CagrDayCount>)
-            .transpose()
-            .map_err(to_js_err)?
-            .unwrap_or_default();
-        result_vec_f64_to_js(
-            self.inner
-                .cagr(day_count, ctx.inner.to_ctx().map_err(to_js_err)?),
-        )
-    }
-
-    /// Equal-weight arithmetic mean return.
-    /// @param annualize - Required unit selection: true uses explicit stored frequency; false returns the observation-period statistic.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects a non-boolean unit selection, absent observation frequency when annualize is true, or an unrepresentable requested mean. Empty history remains NaN.
-    #[wasm_bindgen(js_name = meanReturn, unchecked_return_type = "Float64Array")]
-    pub fn mean_return(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "boolean")] annualize: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let annualize = js_bool(&annualize, "annualize")?;
-        result_vec_f64_to_js(self.inner.mean_return(annualize))
-    }
-
-    /// Sample standard deviation with n-1 denominator.
-    /// @param annualize - Required unit selection: true uses explicit stored frequency; false returns the observation-period statistic.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects a non-boolean unit selection, absent observation frequency when annualize is true, or unrepresentable requested sample risk. Fewer than two observations remain NaN.
-    #[wasm_bindgen(unchecked_return_type = "Float64Array")]
-    pub fn volatility(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "boolean")] annualize: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let annualize = js_bool(&annualize, "annualize")?;
-        result_vec_f64_to_js(self.inner.volatility(annualize))
-    }
-
-    /// Actual-date CAGR divided by maximum drawdown magnitude.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects an unrepresentable CAGR, drawdown denominator or finite-denominator ratio. Empty history and zero reward over zero drawdown remain NaN.
-    #[wasm_bindgen(unchecked_return_type = "Float64Array")]
-    pub fn calmar(&self) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.calmar())
-    }
-
-    /// Observation-weighted signed mean drawdown.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects an unrepresentable signed mean drawdown; empty history remains NaN.
-    #[wasm_bindgen(js_name = meanDrawdown, unchecked_return_type = "Float64Array")]
-    pub fn mean_drawdown(&self) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.mean_drawdown())
-    }
-
-    /// Maximum geometric peak-to-trough decline as a nonpositive fraction.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects an unrepresentable requested drawdown; empty history remains NaN.
-    #[wasm_bindgen(js_name = maxDrawdown, unchecked_return_type = "Float64Array")]
-    pub fn max_drawdown(&self) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.max_drawdown())
-    }
-
-    /// Annualized sample standard deviation of exact paired active returns.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects a missing explicit benchmark or observation frequency, or unrepresentable exact-paired statistics. Empty/insufficient populations and zero over zero remain NaN; no near-zero denominator cutoff is used.
-    #[wasm_bindgen(js_name = trackingError, unchecked_return_type = "Float64Array")]
-    pub fn tracking_error(&self) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.tracking_error())
-    }
-
-    /// Annualized arithmetic active mean divided by paired tracking error.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects a missing explicit benchmark or observation frequency, or unrepresentable exact-paired statistics. Empty/insufficient populations and zero over zero remain NaN; no near-zero denominator cutoff is used.
-    #[wasm_bindgen(js_name = informationRatio, unchecked_return_type = "Float64Array")]
-    pub fn information_ratio(&self) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.information_ratio())
-    }
-
-    /// Fisher-adjusted Type 2 sample skewness; unavailable with fewer than three observations or zero variance.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects unrepresentable requested shape statistics. Fewer than three observations or a constant history remain NaN.
-    #[wasm_bindgen(unchecked_return_type = "Float64Array")]
-    pub fn skewness(&self) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.skewness())
-    }
-
-    /// Fisher-adjusted Type 2 excess kurtosis; unavailable with fewer than four observations or zero variance.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects unrepresentable requested shape statistics. Fewer than four observations or a constant history remain NaN.
-    #[wasm_bindgen(unchecked_return_type = "Float64Array")]
-    pub fn kurtosis(&self) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.kurtosis())
-    }
-
-    /// Observation-period geometric mean investment return.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects an unrepresentable geometric mean. Empty history remains NaN; exact terminal loss yields -1.
-    #[wasm_bindgen(js_name = geometricMean, unchecked_return_type = "Float64Array")]
-    pub fn geometric_mean(&self) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.geometric_mean())
-    }
-
-    /// Signed geometric capture on strictly positive benchmark observations.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects a missing explicit benchmark or observation frequency, or unrepresentable exact-paired statistics. Empty/insufficient populations and zero over zero remain NaN; no near-zero denominator cutoff is used.
-    #[wasm_bindgen(js_name = upCapture, unchecked_return_type = "Float64Array")]
-    pub fn up_capture(&self) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.up_capture())
-    }
-
-    /// Signed geometric capture on strictly negative benchmark observations.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects a missing explicit benchmark or observation frequency, or unrepresentable exact-paired statistics. Empty/insufficient populations and zero over zero remain NaN; no near-zero denominator cutoff is used.
-    #[wasm_bindgen(js_name = downCapture, unchecked_return_type = "Float64Array")]
-    pub fn down_capture(&self) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.down_capture())
-    }
-
-    /// Up capture divided by down capture, preserving signed zero-risk outcomes.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects a missing explicit benchmark or observation frequency, or unrepresentable exact-paired statistics. Empty/insufficient populations and zero over zero remain NaN; no near-zero denominator cutoff is used.
-    #[wasm_bindgen(js_name = captureRatio, unchecked_return_type = "Float64Array")]
-    pub fn capture_ratio(&self) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.capture_ratio())
-    }
-
-    /// Arithmetic return sum divided by negative-return magnitudes.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects an unrepresentable requested arithmetic sum ratio. Empty or all-neutral history remains NaN; observed gains without losses yield infinity.
-    #[wasm_bindgen(js_name = gainToPain, unchecked_return_type = "Float64Array")]
-    pub fn gain_to_pain(&self) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.gain_to_pain())
-    }
-
-    /// Root mean squared percentage drawdown across return-ending observations.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects an unrepresentable endpoint root-mean-square drawdown. Empty history remains NaN.
-    #[wasm_bindgen(js_name = ulcerIndex, unchecked_return_type = "Float64Array")]
-    pub fn ulcer_index(&self) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.ulcer_index())
-    }
-
-    /// Total compounded return divided by maximum drawdown magnitude.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects unrepresentable total growth or a finite-denominator recovery ratio. Empty history and zero over zero remain NaN.
-    #[wasm_bindgen(js_name = recoveryFactor, unchecked_return_type = "Float64Array")]
-    pub fn recovery_factor(&self) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.recovery_factor())
-    }
-
-    /// Mean absolute percentage drawdown across return-ending observations.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects an unrepresentable mean endpoint drawdown magnitude. Empty history remains NaN.
-    #[wasm_bindgen(js_name = painIndex, unchecked_return_type = "Float64Array")]
-    pub fn pain_index(&self) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.pain_index())
-    }
-
-    /// Equal-weight paired intercept OLS squared correlation.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects a missing explicit benchmark or failed exact-paired numerical calculation. Empty or estimator-specific unavailable populations remain NaN.
-    #[wasm_bindgen(js_name = rSquared, unchecked_return_type = "Float64Array")]
-    pub fn r_squared(&self) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.r_squared())
-    }
-
-    /// Share of exact paired observations with strictly larger ticker return.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects a missing explicit benchmark or failed exact-paired numerical calculation. Empty or estimator-specific unavailable populations remain NaN.
-    #[wasm_bindgen(js_name = battingAverage, unchecked_return_type = "Float64Array")]
-    pub fn batting_average(&self) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.batting_average())
-    }
-
-    /// Annualized arithmetic excess mean over sample volatility.
-    /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects missing/invalid annual-effective cash, absent explicit observation frequency, or unrepresentable requested statistics. Unavailable or zero-over-zero estimates remain NaN; genuine nonzero-over-zero risk retains signed infinity.
-    #[wasm_bindgen(unchecked_return_type = "Float64Array")]
-    pub fn sharpe(
-        &self,
-        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_param_type = "number")]
-        risk_free_rate: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let risk_free_rate = js_f64(&risk_free_rate, "riskFreeRate")?;
-        result_vec_f64_to_js(self.inner.sharpe(risk_free_rate))
-    }
-
-    /// Annualized arithmetic excess mean divided by paired beta.
-    /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects missing/invalid annual-effective cash, absent explicit observation frequency, missing selected benchmark, or unrepresentable requested statistics. Unavailable or zero-over-zero estimates remain NaN; genuine nonzero-over-zero risk retains signed infinity.
-    #[wasm_bindgen(unchecked_return_type = "Float64Array")]
-    pub fn treynor(
-        &self,
-        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_param_type = "number")]
-        risk_free_rate: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let risk_free_rate = js_f64(&risk_free_rate, "riskFreeRate")?;
-        result_vec_f64_to_js(self.inner.treynor(risk_free_rate))
-    }
-
-    /// Cash-adjusted actual-date CAGR divided by Ulcer Index.
-    /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects missing/nonfinite annual-effective cash or cash at/below -1, unrepresentable actual-date CAGR/path denominators, or a finite-denominator result that cannot be represented. Empty histories and zero over zero remain NaN.
-    #[wasm_bindgen(js_name = martinRatio, unchecked_return_type = "Float64Array")]
-    pub fn martin_ratio(
-        &self,
-        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_param_type = "number")]
-        risk_free_rate: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let risk_free_rate = js_f64(&risk_free_rate, "riskFreeRate")?;
-        result_vec_f64_to_js(self.inner.martin_ratio(risk_free_rate))
-    }
-
-    /// Cash-adjusted actual-date CAGR divided by Pain Index.
-    /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects missing/nonfinite annual-effective cash or cash at/below -1, unrepresentable actual-date CAGR/path denominators, or a finite-denominator result that cannot be represented. Empty histories and zero over zero remain NaN.
-    #[wasm_bindgen(js_name = painRatio, unchecked_return_type = "Float64Array")]
-    pub fn pain_ratio(
-        &self,
-        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_param_type = "number")]
-        risk_free_rate: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let risk_free_rate = js_f64(&risk_free_rate, "riskFreeRate")?;
-        result_vec_f64_to_js(self.inner.pain_ratio(risk_free_rate))
-    }
-
-    /// Absolute benchmark-volatility adjusted return including cash.
-    /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects missing/invalid annual-effective cash, absent explicit observation frequency, missing selected benchmark, or unrepresentable requested statistics. Unavailable or zero-over-zero estimates remain NaN; genuine nonzero-over-zero risk retains signed infinity.
-    #[wasm_bindgen(js_name = mSquared, unchecked_return_type = "Float64Array")]
-    pub fn m_squared(
-        &self,
-        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_param_type = "number")]
-        risk_free_rate: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let risk_free_rate = js_f64(&risk_free_rate, "riskFreeRate")?;
-        result_vec_f64_to_js(self.inner.m_squared(risk_free_rate))
-    }
-
-    /// Modified Burke: cash-adjusted CAGR over the square root of all episode-depth squares divided by drawdown-path observation count.
-    /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects missing/nonfinite annual-effective cash or cash at/below -1, unrepresentable actual-date CAGR/path denominators, or a finite-denominator result that cannot be represented. Empty histories and zero over zero remain NaN.
-    #[wasm_bindgen(js_name = burkeRatio, unchecked_return_type = "Float64Array")]
-    pub fn burke_ratio(
-        &self,
-        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_param_type = "number")]
-        risk_free_rate: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let risk_free_rate = js_f64(&risk_free_rate, "riskFreeRate")?;
-        result_vec_f64_to_js(self.inner.burke_ratio(risk_free_rate))
-    }
-
-    /// Frequency-scaled arithmetic excess over all-observation downside deviation.
-    /// @param mar - Required finite per-observation minimum acceptable return, in the same units and periodicity as the returns.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects missing/nonfinite MAR, absent explicit frequency, or unrepresentable reward/downside calculations. Fewer than two observations or zero over zero remain NaN.
-    #[wasm_bindgen(unchecked_return_type = "Float64Array")]
-    pub fn sortino(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "number")] mar: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let mar = js_f64(&mar, "mar")?;
-        result_vec_f64_to_js(self.inner.sortino(mar))
+        let day_count =
+            js_opt_parse::<CagrDayCount>(day_count.as_ref(), "dayCount")?.unwrap_or_default();
+        let ctx = js_opt_day_count_context(ctx.as_ref(), "ctx")?;
+        result_vec_f64_to_js(self.inner.cagr(day_count, ctx))
     }
 
     /// Annualized all-observation downside deviation.
-    /// @param mar - Required finite per-observation minimum acceptable return, in the same units and periodicity as the returns.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects missing/nonfinite MAR, absent explicit frequency, or unrepresentable requested downside deviation. Empty history remains NaN.
-    #[wasm_bindgen(js_name = downsideDeviation, unchecked_return_type = "Float64Array")]
-    pub fn downside_deviation(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "number")] mar: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let mar = js_f64(&mar, "mar")?;
-        result_vec_f64_to_js(self.inner.downside_deviation(mar))
-    }
-
-    /// Unannualized empirical gains divided by shortfalls around an explicit hurdle.
-    /// @param threshold - Required finite per-observation decimal hurdle; no reuse of cash or MAR.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects a missing/nonfinite threshold or an unrepresentable two-sided gain/shortfall ratio. Empty/all-at-threshold histories remain NaN.
-    #[wasm_bindgen(js_name = omegaRatio, unchecked_return_type = "Float64Array")]
-    pub fn omega_ratio(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "number")] threshold: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let threshold = js_f64(&threshold, "threshold")?;
-        result_vec_f64_to_js(self.inner.omega_ratio(threshold))
-    }
-
     /// Longest observed drawdown duration in calendar days.
     /// @returns One calendar-day count per ticker, or null for an empty active history.
     /// @throws Error - Rejects an invalid derived drawdown path or serialization failure; empty ticker histories produce null durations.
     #[wasm_bindgen(js_name = maxDrawdownDuration, unchecked_return_type = "(number | null)[]")]
     pub fn max_drawdown_duration(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.max_drawdown_duration().map_err(to_js_err)?)
-    }
-
-    /// Historical signed R-7 return quantile.
-    /// @param confidence - Required finite tail confidence strictly between 0.5 and 1.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects missing/nonfinite confidence or confidence outside 0.5 < c < 1, and any unrepresentable requested tail statistic. Empty valid histories remain NaN; no tail-count cutoff is imposed.
-    #[wasm_bindgen(js_name = valueAtRisk, unchecked_return_type = "Float64Array")]
-    pub fn value_at_risk(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "number")] confidence: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let confidence = js_f64(&confidence, "confidence")?;
-        result_vec_f64_to_js(self.inner.value_at_risk(confidence))
-    }
-
-    /// Historical signed mean of exactly the worst 1-confidence empirical mass with fractional boundary weight.
-    /// @param confidence - Required finite tail confidence strictly between 0.5 and 1.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects missing/nonfinite confidence or confidence outside 0.5 < c < 1, and any unrepresentable requested tail statistic. Empty valid histories remain NaN; no tail-count cutoff is imposed.
-    #[wasm_bindgen(js_name = expectedShortfall, unchecked_return_type = "Float64Array")]
-    pub fn expected_shortfall(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "number")] confidence: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let confidence = js_f64(&confidence, "confidence")?;
-        result_vec_f64_to_js(self.inner.expected_shortfall(confidence))
-    }
-
-    /// Magnitude ratio of upper and lower R-7 return quantiles.
-    /// @param confidence - Required finite tail confidence strictly between 0.5 and 1.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects missing/nonfinite confidence or confidence outside 0.5 < c < 1, and any unrepresentable requested tail statistic. Empty valid histories remain NaN; no tail-count cutoff is imposed.
-    #[wasm_bindgen(js_name = tailRatio, unchecked_return_type = "Float64Array")]
-    pub fn tail_ratio(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "number")] confidence: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let confidence = js_f64(&confidence, "confidence")?;
-        result_vec_f64_to_js(self.inner.tail_ratio(confidence))
-    }
-
-    /// Nonpositive average of the worst percentage-drawdown empirical mass.
-    /// @param confidence - Required finite tail confidence strictly between 0.5 and 1.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects missing/nonfinite confidence or confidence outside 0.5 < c < 1, and any unrepresentable requested tail statistic. Empty valid histories remain NaN; no tail-count cutoff is imposed.
-    #[wasm_bindgen(unchecked_return_type = "Float64Array")]
-    pub fn cdar(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "number")] confidence: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let confidence = js_f64(&confidence, "confidence")?;
-        result_vec_f64_to_js(self.inner.cdar(confidence))
-    }
-
-    /// Additive i.i.d. Gaussian signed return quantile; outputs may extend below -1.
-    /// @param confidence - Required finite tail confidence strictly between 0.5 and 1.
-    /// @param horizonPeriods - Optional whole observation-period horizon in 1..=9007199254740991; omitted is one. No rounding or fractional horizons.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects missing/invalid confidence, horizons outside integral 1..=9007199254740991, or unrepresentable requested model estimates. Estimator-specific insufficient histories remain NaN; no fallback or output floor is applied.
-    #[wasm_bindgen(js_name = parametricVar, unchecked_return_type = "Float64Array")]
-    pub fn parametric_var(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "number")] confidence: JsValue,
-        #[wasm_bindgen(js_name = "horizonPeriods", unchecked_optional_param_type = "number")]
-        horizon_periods: Option<JsValue>,
-    ) -> Result<JsValue, JsValue> {
-        let confidence = js_f64(&confidence, "confidence")?;
-        let horizon_periods: Option<u64> = js_opt_uint(horizon_periods.as_ref(), "horizonPeriods")?;
-        result_vec_f64_to_js(self.inner.parametric_var(confidence, horizon_periods))
-    }
-
-    /// Classical Type 2 plug-in Cornish-Fisher signed quantile with global ordering validation and explicit rejection of invalid polynomials.
-    /// @param confidence - Required finite tail confidence strictly between 0.5 and 1.
-    /// @param horizonPeriods - Optional whole observation-period horizon in 1..=9007199254740991; omitted is one. No rounding or fractional horizons.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects missing/invalid confidence, horizons outside integral 1..=9007199254740991, a globally unordered Cornish-Fisher polynomial, or unrepresentable requested model estimates. Estimator-specific insufficient histories remain NaN; no fallback or output floor is applied.
-    #[wasm_bindgen(js_name = cornishFisherVar, unchecked_return_type = "Float64Array")]
-    pub fn cornish_fisher_var(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "number")] confidence: JsValue,
-        #[wasm_bindgen(js_name = "horizonPeriods", unchecked_optional_param_type = "number")]
-        horizon_periods: Option<JsValue>,
-    ) -> Result<JsValue, JsValue> {
-        let confidence = js_f64(&confidence, "confidence")?;
-        let horizon_periods: Option<u64> = js_opt_uint(horizon_periods.as_ref(), "horizonPeriods")?;
-        result_vec_f64_to_js(self.inner.cornish_fisher_var(confidence, horizon_periods))
-    }
-
-    /// Observation-period arithmetic cash excess divided by the negated total-return Cornish-Fisher quantile; no annualization.
-    /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
-    /// @param confidence - Required finite tail confidence strictly between 0.5 and 1.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects missing/invalid cash or confidence, absent explicit frequency, a globally unordered Cornish-Fisher polynomial, or unrepresentable requested results. Unavailable CF samples or nonpositive CF loss denominators remain NaN.
-    #[wasm_bindgen(js_name = modifiedSharpe, unchecked_return_type = "Float64Array")]
-    pub fn modified_sharpe(
-        &self,
-        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_param_type = "number")]
-        risk_free_rate: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] confidence: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let risk_free_rate = js_f64(&risk_free_rate, "riskFreeRate")?;
-        let confidence = js_f64(&confidence, "confidence")?;
-        result_vec_f64_to_js(self.inner.modified_sharpe(risk_free_rate, confidence))
-    }
-
-    /// Cash-adjusted actual-date CAGR divided by mean magnitude of the selected largest episode depths.
-    /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
-    /// @param n - Required positive count of largest episodes; fewer observed episodes uses all available episodes.
-    /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
-    /// @throws Error - Rejects missing/invalid cash, a nonpositive/fractional episode count, or unrepresentable reward/episode-denominator calculations. Empty history and zero over zero remain NaN.
-    #[wasm_bindgen(js_name = sterlingRatio, unchecked_return_type = "Float64Array")]
-    pub fn sterling_ratio(
-        &self,
-        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_param_type = "number")]
-        risk_free_rate: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] n: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let risk_free_rate = js_f64(&risk_free_rate, "riskFreeRate")?;
-        let n = js_uint(&n, "n")?;
-        result_vec_f64_to_js(self.inner.sterling_ratio(risk_free_rate, n))
     }
 
     /// Inspect own-ticker active compact simple-return histories.
@@ -798,7 +375,7 @@ impl JsPerformance {
         &self,
         #[wasm_bindgen(unchecked_param_type = "string")] frequency: JsValue,
     ) -> Result<JsValue, JsValue> {
-        let frequency = parse_frequency(&frequency, "frequency")?;
+        let frequency: PeriodKind = js_parse(&frequency, "frequency")?;
         to_js_value(&self.inner.periodic_returns(frequency).map_err(to_js_err)?)
     }
 
@@ -871,93 +448,6 @@ impl JsPerformance {
         rolling_greeks_to_js(&series)
     }
 
-    /// Rolling annualized sample standard deviation.
-    /// @param tickerIdx - Zero-based ticker column index; must be a finite non-negative integer in range.
-    /// @param window - Required positive integer observation count; overlong windows produce empty compact series.
-    /// @returns Compact DatedSeries with right-labeled dates and numeric unavailable/zero-risk values.
-    /// @throws Error - Rejects an invalid ticker/window, missing explicit observation frequency, or unrepresentable window calculations. Overlong windows return empty carriers; estimator-specific unavailable windows remain NaN.
-    #[wasm_bindgen(js_name = rollingVolatility, unchecked_return_type = "DatedSeries")]
-    pub fn rolling_volatility(
-        &self,
-        #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] window: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
-        let window = js_uint(&window, "window")?;
-        let series = self
-            .inner
-            .rolling_volatility(ticker_idx, window)
-            .map_err(to_js_err)?;
-        dated_series_to_js(&series)
-    }
-
-    /// Rolling annualized all-observation downside ratio.
-    /// @param tickerIdx - Zero-based ticker column index; must be a finite non-negative integer in range.
-    /// @param window - Required positive integer observation count; overlong windows produce empty compact series.
-    /// @param mar - Required finite per-observation minimum acceptable return, in the same units and periodicity as the returns.
-    /// @returns Compact DatedSeries with right-labeled dates and numeric unavailable/zero-risk values.
-    /// @throws Error - Rejects an invalid ticker/window, missing explicit observation frequency, missing/nonfinite MAR, or unrepresentable window calculations. Overlong windows return empty carriers; estimator-specific unavailable windows remain NaN.
-    #[wasm_bindgen(js_name = rollingSortino, unchecked_return_type = "DatedSeries")]
-    pub fn rolling_sortino(
-        &self,
-        #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] window: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] mar: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
-        let window = js_uint(&window, "window")?;
-        let mar = js_f64(&mar, "mar")?;
-        let series = self
-            .inner
-            .rolling_sortino(ticker_idx, window, mar)
-            .map_err(to_js_err)?;
-        dated_series_to_js(&series)
-    }
-
-    /// Rolling annualized arithmetic cash-excess ratio.
-    /// @param tickerIdx - Zero-based ticker column index; must be a finite non-negative integer in range.
-    /// @param window - Required positive integer observation count; overlong windows produce empty compact series.
-    /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
-    /// @returns Compact DatedSeries with right-labeled dates and numeric unavailable/zero-risk values.
-    /// @throws Error - Rejects an invalid ticker/window, missing explicit observation frequency, missing/invalid cash, or unrepresentable window calculations. Overlong windows return empty carriers; estimator-specific unavailable windows remain NaN.
-    #[wasm_bindgen(js_name = rollingSharpe, unchecked_return_type = "DatedSeries")]
-    pub fn rolling_sharpe(
-        &self,
-        #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] window: JsValue,
-        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_param_type = "number")]
-        risk_free_rate: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
-        let window = js_uint(&window, "window")?;
-        let risk_free_rate = js_f64(&risk_free_rate, "riskFreeRate")?;
-        let series = self
-            .inner
-            .rolling_sharpe(ticker_idx, window, risk_free_rate)
-            .map_err(to_js_err)?;
-        dated_series_to_js(&series)
-    }
-
-    /// Rolling geometric simple return.
-    /// @param tickerIdx - Zero-based ticker column index; must be a finite non-negative integer in range.
-    /// @param window - Required positive integer observation count; overlong windows produce empty compact series.
-    /// @returns Compact DatedSeries with right-labeled dates and numeric unavailable/zero-risk values.
-    /// @throws Error - Rejects an invalid ticker/window, or unrepresentable window calculations. Overlong windows return empty carriers; estimator-specific unavailable windows remain NaN.
-    #[wasm_bindgen(js_name = rollingReturns, unchecked_return_type = "DatedSeries")]
-    pub fn rolling_returns(
-        &self,
-        #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] window: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
-        let window = js_uint(&window, "window")?;
-        let series = self
-            .inner
-            .rolling_returns(ticker_idx, window)
-            .map_err(to_js_err)?;
-        dated_series_to_js(&series)
-    }
-
     /// Select largest strict-recovery drawdown episodes with actual dates.
     /// @param tickerIdx - Zero-based ticker column index; must be a finite non-negative integer in range.
     /// @param n - Required nonnegative display count; zero returns an empty array and fewer observed episodes returns all available.
@@ -1006,117 +496,384 @@ impl JsPerformance {
         )
     }
 
-    /// Calendar month/quarter/year and fiscal-year-to-date returns with observed sample coverage.
-    /// @param refDate - Optional ISO-8601 inclusive reference date; omitted uses last active date and errors if none.
-    /// @returns LookbackReturns including fiscal context and per-ticker window observation counts and actual holding bounds.
-    /// @throws Error - Rejects an invalid ISO reference date, an omitted reference while no dates are active, an unrepresentable calendar/fiscal boundary or compounded requested result. Empty windows remain NaN with zero-count coverage.
+    /// Period-to-date lookback returns.
+    ///
+    /// MTD, QTD and YTD start on the first calendar day of `refDate`'s month,
+    /// calendar quarter and year. FYTD is the first observation on or after the
+    /// fiscal calendar start of `fiscalConfig` through `refDate`. Holidays are not
+    /// skipped. The first included simple return still spans the prior close.
+    /// @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end. Omitted or `null` is the last active date; the result's `ref_date` states the date used.
+    /// @param fiscalConfig - Optional `FiscalConfig` handle for FYTD. Omitted or `null` selects the explicit January 1 rule (`FiscalConfig.calendarYear()`, ANALYTICS-003).
+    /// @returns LookbackReturns with return estimates, fiscal context and per-ticker counts and actual holding bounds for each selected window; unavailable numeric results remain NaN.
+    /// @throws Error - Rejects an invalid ISO `ref_date`, an omitted one while no dates are active, an invalid `fiscalConfig` handle, or a result that cannot be serialized to JavaScript.
     #[wasm_bindgen(js_name = lookbackReturns, unchecked_return_type = "LookbackReturns")]
     pub fn lookback_returns(
         &self,
-        #[wasm_bindgen(js_name = "refDate", unchecked_optional_param_type = "string")]
+        #[wasm_bindgen(js_name = "refDate", unchecked_optional_param_type = "string | null")]
         ref_date: Option<JsValue>,
+        #[wasm_bindgen(
+            js_name = "fiscalConfig",
+            unchecked_optional_param_type = "FiscalConfig | null"
+        )]
+        fiscal_config: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let ref_date = crate::utils::wire::js_opt_date(ref_date.as_ref(), "refDate")?;
+        let ref_date = js_opt_date(ref_date.as_ref(), "refDate")?;
+        let fiscal_config = js_opt_fiscal_config(fiscal_config.as_ref(), "fiscalConfig")?;
         let result = self
             .inner
-            .lookback_returns(ref_date, None)
+            .lookback_returns(ref_date, fiscal_config)
             .map_err(to_js_err)?;
         lookback_to_js(&result)
     }
 
-    /// Calendar month/quarter/year and fiscal-year-to-date returns with observed sample coverage.
-    /// @param refDate - Optional ISO-8601 inclusive reference date; omitted uses last active date and errors if none.
-    /// @param fiscalConfig - Explicit FiscalConfig selecting fiscal-year boundaries.
-    /// @returns LookbackReturns including fiscal context and per-ticker window observation counts and actual holding bounds.
-    /// @throws Error - Rejects an invalid reference date or fiscal handle, omitted reference on empty history, unrepresentable boundary or compounded result. Empty windows remain NaN with zero-count coverage.
-    #[wasm_bindgen(skip_typescript, js_name = lookbackReturnsWithFiscalConfig, unchecked_return_type = "LookbackReturns")]
-    pub fn lookback_returns_with_fiscal_config(
-        &self,
-        #[wasm_bindgen(js_name = "refDate", unchecked_param_type = "string | undefined")]
-        ref_date: Option<JsValue>,
-        #[wasm_bindgen(js_name = "fiscalConfig")] fiscal_config: &JsFiscalConfig,
-    ) -> Result<JsValue, JsValue> {
-        let ref_date = crate::utils::wire::js_opt_date(ref_date.as_ref(), "refDate")?;
-        let result = self
-            .inner
-            .lookback_returns(ref_date, Some(fiscal_config.inner))
-            .map_err(to_js_err)?;
-        lookback_to_js(&result)
-    }
-
-    /// Observed occupied-bucket win/loss statistics with explicit grouping.
-    /// @param tickerIdx - Zero-based ticker column index; must be a finite non-negative integer in range.
-    /// @param aggregationFrequency - Required explicit grouping frequency; no default or inference from observation frequency.
-    /// @returns PeriodStats including bucket/sample counts and unavailable conditional or zero-denominator estimates.
-    /// @throws Error - Rejects an invalid ticker index, absent/unknown grouping frequency, unrepresentable containing period boundary or requested statistic. Unavailable conditional/zero-denominator fields remain NaN.
+    /// Aggregated period statistics for one asset at the given frequency. Without
+    /// a fiscal calendar, Gregorian periods are bucketed with ISO weeks.
+    /// @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+    /// @param aggregationFrequency - Required explicit grouping frequency token; no inference from observation frequency.
+    /// @param fiscalConfig - Optional FiscalConfig handle; omitted or null buckets Gregorian periods with ISO weeks.
+    /// @returns Period statistics object for the selected ticker at the requested frequency.
+    /// @throws Error - Rejects an unsupported `aggregation_frequency`, an out-of-range `ticker_idx`, an invalid `fiscalConfig` handle, an unrepresentable period boundary, or period statistics that cannot be serialized to JavaScript.
     #[wasm_bindgen(js_name = periodStats, unchecked_return_type = "PeriodStats")]
     pub fn period_stats(
         &self,
         #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
         #[wasm_bindgen(js_name = "aggregationFrequency", unchecked_param_type = "string")]
         aggregation_frequency: JsValue,
+        #[wasm_bindgen(
+            js_name = "fiscalConfig",
+            unchecked_optional_param_type = "FiscalConfig | null"
+        )]
+        fiscal_config: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
-        let frequency = parse_frequency(&aggregation_frequency, "aggregationFrequency")?;
+        let frequency: PeriodKind = js_parse(&aggregation_frequency, "aggregationFrequency")?;
+        let fiscal_config = js_opt_fiscal_config(fiscal_config.as_ref(), "fiscalConfig")?;
         to_js_value_numeric(
             &self
                 .inner
-                .period_stats(ticker_idx, frequency, None)
+                .period_stats(ticker_idx, frequency, fiscal_config)
                 .map_err(to_js_err)?,
         )
-    }
-
-    /// Observed occupied-bucket win/loss statistics with explicit grouping.
-    /// @param tickerIdx - Zero-based ticker column index; must be a finite non-negative integer in range.
-    /// @param aggregationFrequency - Required explicit grouping frequency; no default or inference from observation frequency.
-    /// @param fiscalConfig - Explicit fiscal partition context applied to all grouping frequencies.
-    /// @returns PeriodStats including bucket/sample counts and unavailable conditional or zero-denominator estimates.
-    /// @throws Error - Rejects an invalid ticker/fiscal handle, absent/unknown grouping frequency, unrepresentable fiscal boundary or requested statistic. Unavailable conditional fields remain NaN.
-    #[wasm_bindgen(skip_typescript, js_name = periodStatsWithFiscalConfig, unchecked_return_type = "PeriodStats")]
-    pub fn period_stats_with_fiscal_config(
-        &self,
-        #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
-        #[wasm_bindgen(js_name = "aggregationFrequency", unchecked_param_type = "string")]
-        aggregation_frequency: JsValue,
-        #[wasm_bindgen(js_name = "fiscalConfig")] fiscal_config: &JsFiscalConfig,
-    ) -> Result<JsValue, JsValue> {
-        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
-        let frequency = parse_frequency(&aggregation_frequency, "aggregationFrequency")?;
-        to_js_value_numeric(
-            &self
-                .inner
-                .period_stats(ticker_idx, frequency, Some(fiscal_config.inner))
-                .map_err(to_js_err)?,
-        )
-    }
-
-    /// Serialize canonical validated panel source state.
-    /// @returns Compact JSON retaining actual dates, optional frequency/benchmark, spans and active selection.
-    /// @throws Error - Rejects serialization failure or invalid source state; no legacy state shape or saved derived cache is accepted.
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
-    /// Restore canonical panel state and rebuild all derived caches.
-    /// @param json - Canonical Performance source state; unknown keys and invalid nested domains are rejected.
-    /// @returns Validated restored Performance handle.
-    /// @throws Error - Rejects malformed JSON, unknown/nested invalid state, invalid actual dates/returns/spans, duplicate identities or out-of-range selection/context. Derived caches are rebuilt after validation.
-    /// @example
-    /// ```typescript
-    /// import init, { analytics } from "finstack-quant-wasm";
-    /// await init();
-    /// const p = new analytics.Performance({ dates: ["2025-01-01", "2025-01-02"], series: [[0.01]], kind: "returns", ticker_names: ["A"] });
-    /// const restored = analytics.Performance.fromJson(p.toJson());
-    /// console.log(restored.meanReturn(false)[0]);
-    /// restored.free(); p.free();
-    /// ```
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "string | Record<string, unknown>")] json: JsValue,
-    ) -> Result<JsPerformance, JsValue> {
-        let json = json_text(&json, "json")?;
-        let inner = serde_json::from_str(&json).map_err(to_js_err)?;
-        Ok(Self { inner })
     }
 }
+
+json_round_trip!(JsPerformance, Performance);
+
+macro_rules! perf_f64_methods {
+    (
+        zero { $( $(#[$zdoc:meta])* $zmethod:ident as $zjs:ident ),* $(,)? }
+        one { $( $(#[$odoc:meta])* $omethod:ident as $ojs:ident ($oarg:ident : $ojs_arg:literal => $oconv:ident : $ots:literal) ),* $(,)? }
+        two { $( $(#[$tdoc:meta])* $tmethod:ident as $tjs:ident ($ta:ident : $ta_js:literal => $ta_conv:ident : $ta_ts:literal, $tb:ident : $tb_js:literal => $tb_conv:ident : $tb_ts:literal) ),* $(,)? }
+        two_opt_uint { $( $(#[$pdoc:meta])* $pmethod:ident as $pjs:ident ($pa:ident : $pa_js:literal, $pb:ident : $pb_js:literal) ),* $(,)? }
+    ) => {
+        #[finstack_quant_wasm_macros::plain_docs]
+        #[wasm_bindgen(js_class = Performance)]
+        impl JsPerformance {
+            $(
+                $(#[$zdoc])*
+                #[wasm_bindgen(js_name = $zjs, unchecked_return_type = "Float64Array")]
+                pub fn $zmethod(&self) -> Result<JsValue, JsValue> {
+                    result_vec_f64_to_js(self.inner.$zmethod())
+                }
+            )*
+            $(
+                $(#[$odoc])*
+                #[wasm_bindgen(js_name = $ojs, unchecked_return_type = "Float64Array")]
+                pub fn $omethod(
+                    &self,
+                    #[wasm_bindgen(js_name = $ojs_arg, unchecked_param_type = $ots)]
+                    $oarg: JsValue,
+                ) -> Result<JsValue, JsValue> {
+                    let $oarg = $oconv(&$oarg, $ojs_arg)?;
+                    result_vec_f64_to_js(self.inner.$omethod($oarg))
+                }
+            )*
+            $(
+                $(#[$tdoc])*
+                #[wasm_bindgen(js_name = $tjs, unchecked_return_type = "Float64Array")]
+                pub fn $tmethod(
+                    &self,
+                    #[wasm_bindgen(js_name = $ta_js, unchecked_param_type = $ta_ts)]
+                    $ta: JsValue,
+                    #[wasm_bindgen(js_name = $tb_js, unchecked_param_type = $tb_ts)]
+                    $tb: JsValue,
+                ) -> Result<JsValue, JsValue> {
+                    let $ta = $ta_conv(&$ta, $ta_js)?;
+                    let $tb = $tb_conv(&$tb, $tb_js)?;
+                    result_vec_f64_to_js(self.inner.$tmethod($ta, $tb))
+                }
+            )*
+            $(
+                $(#[$pdoc])*
+                #[wasm_bindgen(js_name = $pjs, unchecked_return_type = "Float64Array")]
+                pub fn $pmethod(
+                    &self,
+                    #[wasm_bindgen(js_name = $pa_js, unchecked_param_type = "number")]
+                    $pa: JsValue,
+                    #[wasm_bindgen(js_name = $pb_js, unchecked_optional_param_type = "number")]
+                    $pb: Option<JsValue>,
+                ) -> Result<JsValue, JsValue> {
+                    let $pa = js_f64(&$pa, $pa_js)?;
+                    let $pb: Option<u64> = js_opt_uint($pb.as_ref(), $pb_js)?;
+                    result_vec_f64_to_js(self.inner.$pmethod($pa, $pb))
+                }
+            )*
+        }
+    };
+}
+
+macro_rules! perf_rolling_methods {
+    (
+        two { $( $(#[$rdoc2:meta])* $rmethod2:ident as $rjs2:ident ),* $(,)? }
+        three { $( $(#[$rdoc3:meta])* $rmethod3:ident as $rjs3:ident ($rarg:ident : $rjs_arg:literal) ),* $(,)? }
+    ) => {
+        #[finstack_quant_wasm_macros::plain_docs]
+        #[wasm_bindgen(js_class = Performance)]
+        impl JsPerformance {
+            $(
+                $(#[$rdoc2])*
+                #[wasm_bindgen(js_name = $rjs2, unchecked_return_type = "DatedSeries")]
+                pub fn $rmethod2(
+                    &self,
+                    #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")]
+                    ticker_idx: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "number")] window: JsValue,
+                ) -> Result<JsValue, JsValue> {
+                    let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+                    let window = js_uint(&window, "window")?;
+                    let series = self.inner.$rmethod2(ticker_idx, window).map_err(to_js_err)?;
+                    dated_series_to_js(&series)
+                }
+            )*
+            $(
+                $(#[$rdoc3])*
+                #[wasm_bindgen(js_name = $rjs3, unchecked_return_type = "DatedSeries")]
+                pub fn $rmethod3(
+                    &self,
+                    #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")]
+                    ticker_idx: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "number")] window: JsValue,
+                    #[wasm_bindgen(js_name = $rjs_arg, unchecked_param_type = "number")]
+                    $rarg: JsValue,
+                ) -> Result<JsValue, JsValue> {
+                    let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+                    let window = js_uint(&window, "window")?;
+                    let $rarg = js_f64(&$rarg, $rjs_arg)?;
+                    let series = self.inner.$rmethod3(ticker_idx, window, $rarg).map_err(to_js_err)?;
+                    dated_series_to_js(&series)
+                }
+            )*
+        }
+    };
+}
+
+perf_f64_methods!(
+    zero {
+        /// Actual-date CAGR divided by maximum drawdown magnitude.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects an unrepresentable CAGR, drawdown denominator or finite-denominator ratio. Empty history and zero reward over zero drawdown remain NaN.
+        calmar as calmar,
+        /// Observation-weighted signed mean drawdown.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects an unrepresentable signed mean drawdown; empty history remains NaN.
+        mean_drawdown as meanDrawdown,
+        /// Maximum geometric peak-to-trough decline as a nonpositive fraction.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects an unrepresentable requested drawdown; empty history remains NaN.
+        max_drawdown as maxDrawdown,
+        /// Annualized sample standard deviation of exact paired active returns.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects a missing explicit benchmark or observation frequency, or unrepresentable exact-paired statistics. Empty/insufficient populations and zero over zero remain NaN; no near-zero denominator cutoff is used.
+        tracking_error as trackingError,
+        /// Annualized arithmetic active mean divided by paired tracking error.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects a missing explicit benchmark or observation frequency, or unrepresentable exact-paired statistics. Empty/insufficient populations and zero over zero remain NaN; no near-zero denominator cutoff is used.
+        information_ratio as informationRatio,
+        /// Fisher-adjusted Type 2 sample skewness; unavailable with fewer than three observations or zero variance.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects unrepresentable requested shape statistics. Fewer than three observations or a constant history remain NaN.
+        skewness as skewness,
+        /// Fisher-adjusted Type 2 excess kurtosis; unavailable with fewer than four observations or zero variance.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects unrepresentable requested shape statistics. Fewer than four observations or a constant history remain NaN.
+        kurtosis as kurtosis,
+        /// Observation-period geometric mean investment return.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects an unrepresentable geometric mean. Empty history remains NaN; exact terminal loss yields -1.
+        geometric_mean as geometricMean,
+        /// Signed geometric capture on strictly positive benchmark observations.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects a missing explicit benchmark or observation frequency, or unrepresentable exact-paired statistics. Empty/insufficient populations and zero over zero remain NaN; no near-zero denominator cutoff is used.
+        up_capture as upCapture,
+        /// Signed geometric capture on strictly negative benchmark observations.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects a missing explicit benchmark or observation frequency, or unrepresentable exact-paired statistics. Empty/insufficient populations and zero over zero remain NaN; no near-zero denominator cutoff is used.
+        down_capture as downCapture,
+        /// Up capture divided by down capture, preserving signed zero-risk outcomes.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects a missing explicit benchmark or observation frequency, or unrepresentable exact-paired statistics. Empty/insufficient populations and zero over zero remain NaN; no near-zero denominator cutoff is used.
+        capture_ratio as captureRatio,
+        /// Arithmetic return sum divided by negative-return magnitudes.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects an unrepresentable requested arithmetic sum ratio. Empty or all-neutral history remains NaN; observed gains without losses yield infinity.
+        gain_to_pain as gainToPain,
+        /// Root mean squared percentage drawdown across return-ending observations.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects an unrepresentable endpoint root-mean-square drawdown. Empty history remains NaN.
+        ulcer_index as ulcerIndex,
+        /// Total compounded return divided by maximum drawdown magnitude.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects unrepresentable total growth or a finite-denominator recovery ratio. Empty history and zero over zero remain NaN.
+        recovery_factor as recoveryFactor,
+        /// Mean absolute percentage drawdown across return-ending observations.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects an unrepresentable mean endpoint drawdown magnitude. Empty history remains NaN.
+        pain_index as painIndex,
+        /// Equal-weight paired intercept OLS squared correlation.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects a missing explicit benchmark or failed exact-paired numerical calculation. Empty or estimator-specific unavailable populations remain NaN.
+        r_squared as rSquared,
+        /// Share of exact paired observations with strictly larger ticker return.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects a missing explicit benchmark or failed exact-paired numerical calculation. Empty or estimator-specific unavailable populations remain NaN.
+        batting_average as battingAverage,
+    }
+    one {
+        /// Equal-weight arithmetic mean return.
+        /// @param annualize - Required unit selection: true uses explicit stored frequency; false returns the observation-period statistic.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects a non-boolean unit selection, absent observation frequency when annualize is true, or an unrepresentable requested mean. Empty history remains NaN.
+        mean_return as meanReturn (annualize: "annualize" => js_bool : "boolean"),
+        /// Sample standard deviation with n-1 denominator.
+        /// @param annualize - Required unit selection: true uses explicit stored frequency; false returns the observation-period statistic.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects a non-boolean unit selection, absent observation frequency when annualize is true, or unrepresentable requested sample risk. Fewer than two observations remain NaN.
+        volatility as volatility (annualize: "annualize" => js_bool : "boolean"),
+        /// Annualized arithmetic excess mean over sample volatility.
+        /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects missing/invalid annual-effective cash, absent explicit observation frequency, or unrepresentable requested statistics. Unavailable or zero-over-zero estimates remain NaN; genuine nonzero-over-zero risk retains signed infinity.
+        sharpe as sharpe (risk_free_rate: "riskFreeRate" => js_f64 : "number"),
+        /// Annualized arithmetic excess mean divided by paired beta.
+        /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects missing/invalid annual-effective cash, absent explicit observation frequency, missing selected benchmark, or unrepresentable requested statistics. Unavailable or zero-over-zero estimates remain NaN; genuine nonzero-over-zero risk retains signed infinity.
+        treynor as treynor (risk_free_rate: "riskFreeRate" => js_f64 : "number"),
+        /// Cash-adjusted actual-date CAGR divided by Ulcer Index.
+        /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects missing/nonfinite annual-effective cash or cash at/below -1, unrepresentable actual-date CAGR/path denominators, or a finite-denominator result that cannot be represented. Empty histories and zero over zero remain NaN.
+        martin_ratio as martinRatio (risk_free_rate: "riskFreeRate" => js_f64 : "number"),
+        /// Cash-adjusted actual-date CAGR divided by Pain Index.
+        /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects missing/nonfinite annual-effective cash or cash at/below -1, unrepresentable actual-date CAGR/path denominators, or a finite-denominator result that cannot be represented. Empty histories and zero over zero remain NaN.
+        pain_ratio as painRatio (risk_free_rate: "riskFreeRate" => js_f64 : "number"),
+        /// Absolute benchmark-volatility adjusted return including cash.
+        /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects missing/invalid annual-effective cash, absent explicit observation frequency, missing selected benchmark, or unrepresentable requested statistics. Unavailable or zero-over-zero estimates remain NaN; genuine nonzero-over-zero risk retains signed infinity.
+        m_squared as mSquared (risk_free_rate: "riskFreeRate" => js_f64 : "number"),
+        /// Modified Burke: cash-adjusted CAGR over the square root of all episode-depth squares divided by drawdown-path observation count.
+        /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects missing/nonfinite annual-effective cash or cash at/below -1, unrepresentable actual-date CAGR/path denominators, or a finite-denominator result that cannot be represented. Empty histories and zero over zero remain NaN.
+        burke_ratio as burkeRatio (risk_free_rate: "riskFreeRate" => js_f64 : "number"),
+        /// Frequency-scaled arithmetic excess over all-observation downside deviation.
+        /// @param mar - Required finite per-observation minimum acceptable return, in the same units and periodicity as the returns.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects missing/nonfinite MAR, absent explicit frequency, or unrepresentable reward/downside calculations. Fewer than two observations or zero over zero remain NaN.
+        sortino as sortino (mar: "mar" => js_f64 : "number"),
+        /// Annualized all-observation downside deviation.
+        /// @param mar - Required finite per-observation minimum acceptable return, in the same units and periodicity as the returns.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects missing/nonfinite MAR, absent explicit frequency, or unrepresentable requested downside deviation. Empty history remains NaN.
+        downside_deviation as downsideDeviation (mar: "mar" => js_f64 : "number"),
+        /// Unannualized empirical gains divided by shortfalls around an explicit hurdle.
+        /// @param threshold - Required finite per-observation decimal hurdle; no reuse of cash or MAR.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects a missing/nonfinite threshold or an unrepresentable two-sided gain/shortfall ratio. Empty/all-at-threshold histories remain NaN.
+        omega_ratio as omegaRatio (threshold: "threshold" => js_f64 : "number"),
+        /// Historical signed R-7 return quantile.
+        /// @param confidence - Required finite tail confidence strictly between 0.5 and 1.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects missing/nonfinite confidence or confidence outside 0.5 < c < 1, and any unrepresentable requested tail statistic. Empty valid histories remain NaN; no tail-count cutoff is imposed.
+        value_at_risk as valueAtRisk (confidence: "confidence" => js_f64 : "number"),
+        /// Historical signed mean of exactly the worst 1-confidence empirical mass with fractional boundary weight.
+        /// @param confidence - Required finite tail confidence strictly between 0.5 and 1.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects missing/nonfinite confidence or confidence outside 0.5 < c < 1, and any unrepresentable requested tail statistic. Empty valid histories remain NaN; no tail-count cutoff is imposed.
+        expected_shortfall as expectedShortfall (confidence: "confidence" => js_f64 : "number"),
+        /// Magnitude ratio of upper and lower R-7 return quantiles.
+        /// @param confidence - Required finite tail confidence strictly between 0.5 and 1.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects missing/nonfinite confidence or confidence outside 0.5 < c < 1, and any unrepresentable requested tail statistic. Empty valid histories remain NaN; no tail-count cutoff is imposed.
+        tail_ratio as tailRatio (confidence: "confidence" => js_f64 : "number"),
+        /// Nonpositive average of the worst percentage-drawdown empirical mass.
+        /// @param confidence - Required finite tail confidence strictly between 0.5 and 1.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects missing/nonfinite confidence or confidence outside 0.5 < c < 1, and any unrepresentable requested tail statistic. Empty valid histories remain NaN; no tail-count cutoff is imposed.
+        cdar as cdar (confidence: "confidence" => js_f64 : "number"),
+    }
+    two {
+        /// Observation-period arithmetic cash excess divided by the negated total-return Cornish-Fisher quantile; no annualization.
+        /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
+        /// @param confidence - Required finite tail confidence strictly between 0.5 and 1.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects missing/invalid cash or confidence, absent explicit frequency, a globally unordered Cornish-Fisher polynomial, or unrepresentable requested results. Unavailable CF samples or nonpositive CF loss denominators remain NaN.
+        modified_sharpe as modifiedSharpe (risk_free_rate: "riskFreeRate" => js_f64 : "number", confidence: "confidence" => js_f64 : "number"),
+        /// Cash-adjusted actual-date CAGR divided by mean magnitude of the selected largest episode depths.
+        /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
+        /// @param n - Required positive count of largest episodes; fewer observed episodes uses all available episodes.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects missing/invalid cash, a nonpositive/fractional episode count, or unrepresentable reward/episode-denominator calculations. Empty history and zero over zero remain NaN.
+        sterling_ratio as sterlingRatio (risk_free_rate: "riskFreeRate" => js_f64 : "number", n: "n" => js_uint : "number"),
+    }
+    two_opt_uint {
+        /// Additive i.i.d. Gaussian signed return quantile; outputs may extend below -1.
+        /// @param confidence - Required finite tail confidence strictly between 0.5 and 1.
+        /// @param horizonPeriods - Optional whole observation-period horizon in 1..=9007199254740991; omitted is one. No rounding or fractional horizons.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects missing/invalid confidence, horizons outside integral 1..=9007199254740991, or unrepresentable requested model estimates. Estimator-specific insufficient histories remain NaN; no fallback or output floor is applied.
+        parametric_var as parametricVar (confidence: "confidence", horizon_periods: "horizonPeriods"),
+        /// Classical Type 2 plug-in Cornish-Fisher signed quantile with global ordering validation and explicit rejection of invalid polynomials.
+        /// @param confidence - Required finite tail confidence strictly between 0.5 and 1.
+        /// @param horizonPeriods - Optional whole observation-period horizon in 1..=9007199254740991; omitted is one. No rounding or fractional horizons.
+        /// @returns Per-ticker numeric values as Float64Array in supplied ticker order; NaN denotes unavailable estimates.
+        /// @throws Error - Rejects missing/invalid confidence, horizons outside integral 1..=9007199254740991, a globally unordered Cornish-Fisher polynomial, or unrepresentable requested model estimates. Estimator-specific insufficient histories remain NaN; no fallback or output floor is applied.
+        cornish_fisher_var as cornishFisherVar (confidence: "confidence", horizon_periods: "horizonPeriods"),
+    }
+);
+
+perf_rolling_methods!(
+    two {
+        /// Rolling annualized sample standard deviation.
+        /// @param tickerIdx - Zero-based ticker column index; must be a finite non-negative integer in range.
+        /// @param window - Required positive integer observation count; overlong windows produce empty compact series.
+        /// @returns Compact DatedSeries with right-labeled dates and numeric unavailable/zero-risk values.
+        /// @throws Error - Rejects an invalid ticker/window, missing explicit observation frequency, or unrepresentable window calculations. Overlong windows return empty carriers; estimator-specific unavailable windows remain NaN.
+        rolling_volatility as rollingVolatility,
+        /// Rolling geometric simple return.
+        /// @param tickerIdx - Zero-based ticker column index; must be a finite non-negative integer in range.
+        /// @param window - Required positive integer observation count; overlong windows produce empty compact series.
+        /// @returns Compact DatedSeries with right-labeled dates and numeric unavailable/zero-risk values.
+        /// @throws Error - Rejects an invalid ticker/window, or unrepresentable window calculations. Overlong windows return empty carriers; estimator-specific unavailable windows remain NaN.
+        rolling_returns as rollingReturns,
+    }
+    three {
+        /// Rolling annualized all-observation downside ratio.
+        /// @param tickerIdx - Zero-based ticker column index; must be a finite non-negative integer in range.
+        /// @param window - Required positive integer observation count; overlong windows produce empty compact series.
+        /// @param mar - Required finite per-observation minimum acceptable return, in the same units and periodicity as the returns.
+        /// @returns Compact DatedSeries with right-labeled dates and numeric unavailable/zero-risk values.
+        /// @throws Error - Rejects an invalid ticker/window, missing explicit observation frequency, missing/nonfinite MAR, or unrepresentable window calculations. Overlong windows return empty carriers; estimator-specific unavailable windows remain NaN.
+        rolling_sortino as rollingSortino (mar: "mar"),
+        /// Rolling annualized arithmetic cash-excess ratio.
+        /// @param tickerIdx - Zero-based ticker column index; must be a finite non-negative integer in range.
+        /// @param window - Required positive integer observation count; overlong windows produce empty compact series.
+        /// @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.
+        /// @returns Compact DatedSeries with right-labeled dates and numeric unavailable/zero-risk values.
+        /// @throws Error - Rejects an invalid ticker/window, missing explicit observation frequency, missing/invalid cash, or unrepresentable window calculations. Overlong windows return empty carriers; estimator-specific unavailable windows remain NaN.
+        rolling_sharpe as rollingSharpe (risk_free_rate: "riskFreeRate"),
+    }
+);
