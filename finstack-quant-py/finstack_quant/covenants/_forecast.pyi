@@ -260,7 +260,7 @@ class CovenantForecast:
     >>> forecast.first_breach_date.isoformat(), forecast.breach_probability
     ('2026-09-30', [0.0, 0.0, 1.0])
     >>> list(forecast.to_dataframe().columns)
-    ['test_date', 'projected_value', 'threshold', 'headroom', 'breach_probability', 'breach_probability_stderr']
+    ['test_date', 'projected_value', 'threshold', 'headroom', 'headroom_raw', 'breach_probability', 'breach_probability_stderr']
     """
 
     @staticmethod
@@ -824,5 +824,5 @@ def breaches_to_dataframe(breaches: list[FutureBreach]) -> pd.DataFrame:
     --------
     >>> from finstack_quant.covenants import breaches_to_dataframe
     >>> list(breaches_to_dataframe([]).columns)
-    ['covenant_id', 'covenant_description', 'breach_date', 'projected_value', 'threshold', 'headroom', 'breach_probability']
+    ['covenant_id', 'covenant_description', 'breach_date', 'projected_value', 'threshold', 'headroom', 'headroom_raw', 'breach_probability']
     """

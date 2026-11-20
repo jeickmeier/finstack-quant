@@ -106,7 +106,7 @@ class FxSwap:
         --------
         >>> from finstack_quant.valuations.instruments import FxSwap
         >>> contract = FxSwap.example()
-        >>> FxSwap.from_json(future.to_json()).id == future.id != ""
+        >>> FxSwap.from_json(contract.to_json()).id == contract.id != ""
         True
         """
         ...

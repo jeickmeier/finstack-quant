@@ -107,7 +107,7 @@ class Repo:
         --------
         >>> from finstack_quant.valuations.instruments import Repo
         >>> contract = Repo.example()
-        >>> Repo.from_json(future.to_json()).id == future.id != ""
+        >>> Repo.from_json(contract.to_json()).id == contract.id != ""
         True
         """
         ...

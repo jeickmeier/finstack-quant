@@ -220,9 +220,12 @@ class MonteCarloResults:
 
     Examples
     --------
-    >>> from finstack_quant.statements import MonteCarloResults
-    >>> payload = '{"percentile_results":{},"n_paths":2,"seed":"7","stream_version":1,"metrics":[],"percentiles":[0.5],"forecast_periods":[]}'
-    >>> MonteCarloResults.from_json(payload).n_paths
+    >>> from finstack_quant.statements import Evaluator, ModelBuilder, MonteCarloConfig
+    >>> builder = ModelBuilder("demo").periods("2025Q1..Q2", "2025Q1")
+    >>> _ = builder.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
+    >>> config = MonteCarloConfig(2, 7, ["revenue"], [0.5])
+    >>> results = Evaluator().evaluate_monte_carlo(builder.build(), config)
+    >>> results.n_paths
     2
 
     """
@@ -250,10 +253,13 @@ class MonteCarloResults:
 
         Examples
         --------
-        >>> from finstack_quant.statements import MonteCarloResults
-        >>> payload = '{"percentile_results":{},"n_paths":2,"seed":"7","stream_version":1,"metrics":[],"percentiles":[0.5],"forecast_periods":[]}'
-        >>> MonteCarloResults.from_json(payload).forecast_periods
-        []
+        >>> from finstack_quant.statements import Evaluator, ModelBuilder, MonteCarloConfig, MonteCarloResults
+        >>> builder = ModelBuilder("demo").periods("2025Q1..Q2", "2025Q1")
+        >>> _ = builder.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
+        >>> config = MonteCarloConfig(2, 7, ["revenue"], [0.5])
+        >>> results = Evaluator().evaluate_monte_carlo(builder.build(), config)
+        >>> MonteCarloResults.from_json(results.to_json()).forecast_periods
+        ['2025Q2']
 
         """
         ...

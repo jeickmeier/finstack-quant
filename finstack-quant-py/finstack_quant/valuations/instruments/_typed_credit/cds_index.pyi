@@ -812,6 +812,7 @@ class CdsIndexBuilder:
     ...     CdsIndex
     ...     .builder()
     ...     .id("CDX-IG-42")
+    ...     .include_valuation_date_cashflows(False)
     ...     .index_name("CDX.NA.IG")
     ...     .series(42)
     ...     .version(1)

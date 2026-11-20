@@ -220,8 +220,7 @@ def bond_breakeven_ladder(
     >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
     >>> from finstack_quant.valuations.instruments import Bond, bond_breakeven_ladder
     >>> bond = Bond.example()
-    >>> market = MarketContext()
-    >>> market.insert(
+    >>> market = MarketContext().insert(
     ...     DiscountCurve(
     ...         bond.discount_curve_id,
     ...         bond.issue_date,
