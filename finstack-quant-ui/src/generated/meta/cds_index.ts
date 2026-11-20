@@ -12,6 +12,7 @@ export default [
             "constituents": [],
             "convention": "isda_na",
             "id": "CDX-IG-42",
+            "include_valuation_date_cashflows": false,
             "index_factor": 1,
             "index_name": "CDX.NA.IG",
             "notional": {
@@ -1491,6 +1492,11 @@ export default [
     "description": "Unique instrument identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/include_valuation_date_cashflows",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/include_valuation_date_cashflows",
+    "description": "Whether scheduled premium and actual upfront payable on the valuation date\nare still due. A booked trade must explicitly elect this boundary."
   },
   {
     "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/index_factor",

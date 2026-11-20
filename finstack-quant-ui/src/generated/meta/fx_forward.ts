@@ -26,7 +26,10 @@ export default [
               "amount": "1000000",
               "currency": "EUR"
             },
-            "quote_currency": "USD"
+            "quote_currency": "USD",
+            "spot_basis": {
+              "type": "cash"
+            }
           },
           "type": "fx_forward"
         },
@@ -987,7 +990,7 @@ export default [
   {
     "path": "#/$defs/d_5f15f4bd684bc813ff88",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward",
-    "description": "FX forward (outright forward) instrument.\n\nRepresents a commitment to exchange one currency for another at a specified\nfuture date at a predetermined rate. The position is long base currency\n(foreign) and short quote currency (domestic).\n\n# Pricing\n\nForward value is calculated using covered interest rate parity:\n```text\nF_market = S × DF_foreign(T) / DF_domestic(T)\nPV = notional × (F_market - F_contract) × DF_domestic(T)\n```\nwhere:\n- S = spot FX rate (from FxMatrix or quoted_spot)\n- DF_foreign(T) = discount factor in base currency to maturity\n- DF_domestic(T) = discount factor in quote currency to maturity\n- F_contract = contract_rate (if provided, else F_market for at-market forward)\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fx::fx_forward::FxForward;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet forward = FxForward::builder()\n    .id(InstrumentId::new(\"EURUSD-FWD-6M\"))\n    .base_currency(Currency::EUR)\n    .quote_currency(Currency::USD)\n    .maturity(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .notional(Money::from((1_000_000_i64, Currency::EUR)))\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .foreign_discount_curve_id(CurveId::new(\"EUR-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```"
+    "description": "FX forward (outright forward) instrument.\n\nRepresents a commitment to exchange one currency for another at a specified\nfuture date at a predetermined rate. The position is long base currency\n(foreign) and short quote currency (domestic).\n\n# Pricing\n\nForward value is calculated using covered interest rate parity:\n```text\nF_market = S × DF_foreign(T) / DF_domestic(T)\nPV = notional × (F_market - F_contract) × DF_domestic(T)\n```\nwhere:\n- S = spot FX rate (from FxMatrix or quoted_spot)\n- DF_foreign(T) = discount factor in base currency to maturity\n- DF_domestic(T) = discount factor in quote currency to maturity\n- F_contract = contract_rate (if provided, else F_market for at-market forward)\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fx::fx_forward::FxForward;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet forward = FxForward::builder()\n    .spot_basis(finstack_quant_valuations_fx::FxSpotBasis::Cash)\n    .id(InstrumentId::new(\"EURUSD-FWD-6M\"))\n    .base_currency(Currency::EUR)\n    .quote_currency(Currency::USD)\n    .maturity(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .notional(Money::from((1_000_000_i64, Currency::EUR)))\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .foreign_discount_curve_id(CurveId::new(\"EUR-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```"
   },
   {
     "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/attributes",
@@ -1107,6 +1110,13 @@ export default [
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_5f15f4bd684bc813ff88/properties/spot_basis",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxForward/properties/spot_basis",
+    "description": "Basis of the selected spot quote, held fixed across reprices.",
+    "ref": "#/$defs/FxSpotBasis",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxSpotBasis"
   },
   {
     "path": "#/$defs/d_605c3b0b209df681efb9",
@@ -4453,6 +4463,38 @@ export default [
     "description": "Model selection and tree pricing parameters.",
     "ref": "#/$defs/ModelConfig",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig"
+  },
+  {
+    "path": "#/$defs/d_c120b552f8627ee5856a",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxSpotBasis",
+    "description": "Value-date basis of the selected ordered FX quote."
+  },
+  {
+    "path": "#/$defs/d_c120b552f8627ee5856a/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxSpotBasis/oneOf/0",
+    "description": "The selected quote is cash FX at the valuation date."
+  },
+  {
+    "path": "#/$defs/d_c120b552f8627ee5856a/oneOf/0/properties/type",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxSpotBasis/oneOf/0/properties/type",
+    "const": "cash"
+  },
+  {
+    "path": "#/$defs/d_c120b552f8627ee5856a/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxSpotBasis/oneOf/1",
+    "description": "The selected outright is quoted for a stated value date."
+  },
+  {
+    "path": "#/$defs/d_c120b552f8627ee5856a/oneOf/1/properties/date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxSpotBasis/oneOf/1/properties/date",
+    "description": "Fixed value date of the spot quote.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_c120b552f8627ee5856a/oneOf/1/properties/type",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json#/$defs/FxSpotBasis/oneOf/1/properties/type",
+    "const": "value_date"
   },
   {
     "path": "#/$defs/d_c428e03de1abac8e49c9",

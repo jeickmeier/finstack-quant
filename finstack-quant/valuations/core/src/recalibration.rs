@@ -24,6 +24,17 @@ pub enum QuoteBump {
     /// Each tuple is `(tenor_years, bump_bp)`. Repeated matching targets are
     /// additive and retain their input order.
     TenorsBp(Vec<(f64, f64)>),
+    /// Shock one identified market-rate quote in a recorded curve execution.
+    RateQuoteBp {
+        /// Curve whose market quote is shocked. Dependent curves may refit.
+        curve_id: CurveId,
+        /// Identifier from the authorized execution binding.
+        quote_id: String,
+        /// Original resolved contractual pillar date.
+        pillar_date: Date,
+        /// Signed quote shock in basis points.
+        bp: f64,
+    },
 }
 
 impl QuoteBump {
@@ -48,7 +59,15 @@ impl QuoteBump {
                 }
                 Ok(())
             }
-            Self::ParallelBp(_) => Ok(()),
+            Self::RateQuoteBp { quote_id, bp, .. }
+                if quote_id.trim().is_empty() || !bp.is_finite() =>
+            {
+                Err(finstack_quant_core::Error::Validation(
+                    "exact rate quote bump requires a quote ID and a finite basis-point shock"
+                        .into(),
+                ))
+            }
+            Self::ParallelBp(_) | Self::RateQuoteBp { .. } => Ok(()),
         }
     }
 
@@ -56,7 +75,7 @@ impl QuoteBump {
     #[must_use]
     pub fn is_zero(&self) -> bool {
         match self {
-            Self::ParallelBp(bp) => *bp == 0.0,
+            Self::ParallelBp(bp) | Self::RateQuoteBp { bp, .. } => *bp == 0.0,
             Self::TenorsBp(targets) => targets.iter().all(|(_, bp)| *bp == 0.0),
         }
     }

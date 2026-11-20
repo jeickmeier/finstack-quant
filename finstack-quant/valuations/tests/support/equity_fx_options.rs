@@ -133,6 +133,10 @@ pub fn fx_option_european_call(
     };
 
     FxOption::builder()
+        .spot_basis(finstack_quant_valuations::instruments::fx::fx_option::FxSpotBasis::Cash)
+        .delivery(
+            finstack_quant_valuations::instruments::fx::fx_option::FxOptionDelivery::CashAtExpiry,
+        )
         .id(id.into())
         .base_currency(fx_underlying.base_currency)
         .quote_currency(fx_underlying.quote_currency)
@@ -174,6 +178,10 @@ pub fn fx_option_european_put(
     };
 
     FxOption::builder()
+        .spot_basis(finstack_quant_valuations::instruments::fx::fx_option::FxSpotBasis::Cash)
+        .delivery(
+            finstack_quant_valuations::instruments::fx::fx_option::FxOptionDelivery::CashAtExpiry,
+        )
         .id(id.into())
         .base_currency(fx_underlying.base_currency)
         .quote_currency(fx_underlying.quote_currency)

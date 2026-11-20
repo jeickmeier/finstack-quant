@@ -46,10 +46,38 @@ pub struct MetricRegistry {
     entries: FxHashMap<MetricId, MetricEntry>,
 }
 
+pub(crate) fn validate_measure(
+    metric_id: &MetricId,
+    value: f64,
+) -> finstack_quant_core::Result<()> {
+    if value.is_finite() {
+        return Ok(());
+    }
+    Err(finstack_quant_core::Error::MetricCalculationFailed {
+        metric_id: metric_id.as_str().to_owned(),
+        cause: Box::new(finstack_quant_core::Error::Validation(format!(
+            "metric output must be finite, got {value}"
+        ))),
+    })
+}
+
+/// Linear measure basis declared by the instrument's metric owner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetricAggregation {
+    /// Monetary value or P&L in the producing instrument's value currency.
+    NativeMoney,
+    /// Monetary period total with the companion realized theta horizon.
+    ThetaPeriodMoney,
+    /// Quantity of the underlying identified by the qualified metric key.
+    FactorQuantity,
+}
+
 #[derive(Clone, Default)]
 struct MetricEntry {
     default: Option<Arc<dyn MetricCalculator>>,
+    default_aggregation: Option<MetricAggregation>,
     per_instrument: FxHashMap<InstrumentType, Arc<dyn MetricCalculator>>,
+    per_instrument_aggregation: FxHashMap<InstrumentType, MetricAggregation>,
 }
 
 impl MetricEntry {
@@ -121,6 +149,62 @@ impl MetricRegistry {
         Ok(())
     }
 
+    /// Register a calculator whose output the owner admits for linear aggregation.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Stable metric identifier with its published convention.
+    /// * `calculator` - Owner implementation of the declared measure.
+    /// * `applicable_to` - Instrument types covered by the declaration. An empty
+    ///   slice declares the policy on the universal calculator.
+    /// * `aggregation` - Units in which callers may scale and aggregate values.
+    pub fn register_aggregate_metric(
+        &mut self,
+        id: MetricId,
+        calculator: Arc<dyn MetricCalculator>,
+        applicable_to: &[InstrumentType],
+        aggregation: MetricAggregation,
+    ) -> std::result::Result<(), MetricRegistryError> {
+        self.register_metric(id.clone(), calculator, applicable_to)?;
+        let entry = self.entries.entry(id).or_default();
+        if applicable_to.is_empty() {
+            entry.default_aggregation = Some(aggregation);
+        } else {
+            for instrument in applicable_to {
+                entry
+                    .per_instrument_aggregation
+                    .insert(*instrument, aggregation);
+            }
+        }
+        Ok(())
+    }
+
+    /// Retrieve the producing calculator's aggregation declaration.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Full metric key. A series row inherits its owning base
+    ///   calculator's declaration. Callers emit factor quantities only under qualified keys.
+    /// * `instrument_type` - Concrete product type selecting its metric owner.
+    pub fn metric_aggregation(
+        &self,
+        id: &MetricId,
+        instrument_type: InstrumentType,
+    ) -> Option<MetricAggregation> {
+        let qualified = id.as_str().split_once("::");
+        let entry = self.entries.get(id).or_else(|| {
+            qualified.and_then(|(name, _)| self.entries.get(&MetricId::custom(name.to_owned())))
+        })?;
+        if entry.per_instrument.contains_key(&instrument_type) {
+            entry
+                .per_instrument_aggregation
+                .get(&instrument_type)
+                .copied()
+        } else {
+            entry.default_aggregation
+        }
+    }
+
     /// Deliberately replace metric registrations for tests or controlled overrides.
     ///
     /// # Arguments
@@ -138,8 +222,10 @@ impl MetricRegistry {
         let entry = self.entries.entry(id).or_default();
         if applicable_to.is_empty() {
             entry.default = Some(calculator);
+            entry.default_aggregation = None;
         } else {
             for instrument_type in applicable_to {
+                entry.per_instrument_aggregation.remove(instrument_type);
                 entry
                     .per_instrument
                     .insert(*instrument_type, Arc::clone(&calculator));
@@ -400,7 +486,8 @@ impl MetricRegistry {
         // reached here without a calculator are dependencies pulled in by the
         // topological sort, which are skipped rather than rejected.
         for metric_id in order.into_iter() {
-            if context.computed.contains_key(&metric_id) {
+            if let Some(&value) = context.computed.get(&metric_id) {
+                validate_measure(&metric_id, value)?;
                 continue;
             }
 
@@ -412,23 +499,21 @@ impl MetricRegistry {
                 continue;
             };
 
-            match calc.calculate(context) {
-                Ok(value) => {
-                    context.computed.insert(metric_id, value);
+            let value = calc.calculate(context).map_err(|err| {
+                finstack_quant_core::Error::MetricCalculationFailed {
+                    metric_id: metric_id.as_str().to_string(),
+                    cause: Box::new(err),
                 }
-                Err(err) => {
-                    return Err(finstack_quant_core::Error::MetricCalculationFailed {
-                        metric_id: metric_id.as_str().to_string(),
-                        cause: Box::new(err),
-                    });
-                }
-            }
+            })?;
+            validate_measure(&metric_id, value)?;
+            context.computed.insert(metric_id, value);
         }
 
         // Return only the requested metrics
         let mut results = FxHashMap::default();
         for id in metric_ids {
             if let Some(&value) = context.computed.get(id) {
+                validate_measure(id, value)?;
                 results.insert(id.clone(), value);
             }
         }
@@ -625,6 +710,7 @@ mod tests {
     struct MockInstrument {
         instrument_type: InstrumentType,
         attrs: Attributes,
+        dependencies: crate::instruments::MarketDependencies,
     }
 
     crate::impl_empty_cashflow_provider!(
@@ -637,16 +723,19 @@ mod tests {
             Self {
                 instrument_type,
                 attrs: Attributes::default(),
+                dependencies: crate::instruments::MarketDependencies::new(),
             }
         }
     }
 
     impl Instrument for MockInstrument {
-        /// Test mock: reads no market data.
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
         fn market_dependencies(
             &self,
         ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
-            Ok(crate::instruments::MarketDependencies::new())
+            Ok(self.dependencies.clone())
         }
 
         fn id(&self) -> &str {
@@ -839,6 +928,53 @@ mod tests {
         if let finstack_quant_core::Error::MetricCalculationFailed { metric_id, .. } = err {
             assert_eq!(metric_id, "dv01");
         }
+    }
+
+    #[test]
+    fn nonfinite_metric_output_names_the_metric() {
+        let mut registry = MetricRegistry::new();
+        registry
+            .register_metric(
+                MetricId::Dv01,
+                Arc::new(SuccessCalculator {
+                    value: f64::NAN,
+                    deps: Vec::new(),
+                }),
+                &[],
+            )
+            .unwrap();
+        let err = registry
+            .compute(&[MetricId::Dv01], &mut create_test_context())
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            finstack_quant_core::Error::MetricCalculationFailed { metric_id, .. }
+                if metric_id == "dv01"
+        ));
+    }
+
+    #[test]
+    fn dv01_rejects_one_missing_forward_curve() {
+        use crate::metrics::sensitivities::dv01::{Dv01CalculatorConfig, UnifiedDv01Calculator};
+        use finstack_quant_core::market_data::term_structures::ForwardCurve;
+        use time::macros::date;
+
+        let mut instrument = MockInstrument::new(InstrumentType::Bond);
+        instrument.dependencies.add_forward_curve("PRESENT");
+        instrument.dependencies.add_forward_curve("MISSING");
+        let forward = ForwardCurve::builder("PRESENT")
+            .base_date(date!(2026 - 01 - 01))
+            .day_count(finstack_quant_core::dates::DayCount::Act360)
+            .knots([(0.0, 1.0), (1.0, 0.97)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .unwrap();
+        let market = MarketContext::new().try_insert(forward).unwrap();
+        let err = UnifiedDv01Calculator::new(Dv01CalculatorConfig::parallel_combined())
+            .collect_curves(&instrument, &market)
+            .unwrap_err();
+        assert!(err.to_string().contains("MISSING"));
     }
 
     #[test]

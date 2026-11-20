@@ -14,8 +14,8 @@ use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use crate::instruments::pricing_overrides::{
     InstrumentPricingOverrides, MetricPricingOverrides, ScenarioPricingOverrides,
 };
-use crate::instruments::{Instrument, PricingOptions};
-use crate::metrics::{MetricId, is_additive_metric};
+use crate::instruments::{FxPair, Instrument, PricingOptions};
+use crate::metrics::{MetricAggregation, MetricId};
 use crate::results::composite::{
     CompositeExposureReport, CompositeLegValuation, CompositeValuationDetails, PrimitiveExposure,
 };
@@ -331,15 +331,9 @@ impl CompositeInstrument {
         options: PricingOptions,
         price_cache: &mut BTreeMap<String, crate::results::ValuationResult>,
     ) -> Result<CompositeExposureReport> {
-        if let Some(metric) = metrics.iter().find(|metric| !is_additive_metric(metric)) {
-            return Err(Error::Validation(format!(
-                "metric '{}' is not additive and cannot be aggregated for composite '{}'",
-                metric, self.spec.id
-            )));
-        }
         let flattened = self.flatten_primitives()?;
         let mut paths = Vec::with_capacity(flattened.len());
-        let mut supported = BTreeMap::<String, usize>::new();
+        let mut supported = BTreeMap::<String, (MetricAggregation, Option<u64>)>::new();
         for mut exposure in flattened {
             let instrument_json = exposure
                 .instrument()
@@ -356,8 +350,11 @@ impl CompositeInstrument {
                     if let Some(overrides) = instrument.get_metric_pricing_overrides_mut() {
                         overrides.apply_defaults(&exposure.metric_defaults);
                     }
-                    let leg_metrics =
+                    let mut leg_metrics =
                         metrics_supported_by_leg(instrument.as_ref(), metrics, &options);
+                    if leg_metrics.contains(&MetricId::Theta) {
+                        leg_metrics.push(MetricId::ThetaPeriodDays);
+                    }
                     Ok(instrument.price_with_metrics(
                         market,
                         as_of,
@@ -377,22 +374,77 @@ impl CompositeInstrument {
                 unit_value * exposure.quantity,
                 self.spec.reporting_currency,
             )?;
+            let instrument = exposure.instrument().ok_or_else(|| {
+                Error::Internal("primitive exposure lost its runtime instrument".into())
+            })?;
+            let basis = options
+                .metric_registry
+                .as_deref()
+                .unwrap_or_else(|| instrument.family().metrics());
+            let mut measures = IndexMap::new();
+            let horizon = result.measures.get(&MetricId::ThetaPeriodDays).copied();
             for (metric_id, value) in result.measures {
-                if !is_additive_metric(&metric_id) {
+                let requested = metrics.iter().any(|requested| {
+                    requested == &metric_id
+                        || metric_id
+                            .as_str()
+                            .strip_prefix(requested.as_str())
+                            .is_some_and(|suffix| suffix.starts_with("::"))
+                });
+                if !requested {
                     continue;
                 }
-                let converted = convert_amount(
-                    market,
-                    value,
-                    result.value.currency(),
-                    self.spec.reporting_currency,
-                    as_of,
-                )?;
-                exposure
-                    .measures
-                    .insert(metric_id.clone(), converted * exposure.quantity);
-                *supported.entry(metric_id.to_string()).or_default() += 1;
+                let aggregation = basis
+                    .metric_aggregation(&metric_id, instrument.key())
+                    .ok_or_else(|| {
+                        Error::Validation(format!(
+                            "metric '{metric_id}' is not additive on leg '{}'",
+                            instrument.id()
+                        ))
+                    })?;
+                if aggregation == MetricAggregation::FactorQuantity
+                    && !metric_id.as_str().contains("::")
+                {
+                    continue;
+                }
+                let horizon = if aggregation == MetricAggregation::ThetaPeriodMoney {
+                    Some(
+                        horizon
+                            .ok_or_else(|| {
+                                Error::Validation(format!(
+                                    "metric '{metric_id}' requires a reported horizon from '{}'",
+                                    instrument.id()
+                                ))
+                            })?
+                            .to_bits(),
+                    )
+                } else {
+                    None
+                };
+                let basis = (aggregation, horizon);
+                match supported.insert(metric_id.to_string(), basis) {
+                    Some(previous) if previous != basis => {
+                        return Err(Error::Validation(format!(
+                            "incompatible aggregation bases for '{metric_id}'"
+                        )));
+                    }
+                    _ => {}
+                }
+                let converted = match aggregation {
+                    MetricAggregation::NativeMoney | MetricAggregation::ThetaPeriodMoney => {
+                        convert_amount(
+                            market,
+                            value,
+                            result.value.currency(),
+                            self.spec.reporting_currency,
+                            as_of,
+                        )?
+                    }
+                    MetricAggregation::FactorQuantity => value,
+                };
+                measures.insert(metric_id, converted * exposure.quantity);
             }
+            exposure.measures = measures;
             paths.push(exposure);
         }
         for metric in metrics {
@@ -404,7 +456,7 @@ impl CompositeInstrument {
             });
             if !is_supported {
                 return Err(Error::Validation(format!(
-                    "metric '{}' is unsupported by every primitive in composite '{}'",
+                    "metric '{}' is not additive on any primitive in composite '{}'",
                     metric, self.spec.id
                 )));
             }
@@ -484,12 +536,23 @@ impl CompositeInstrument {
     }
 
     fn base_value_raw_impl(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+        self.value_legs(market, as_of, |instrument| {
+            instrument.value_raw_with_currency(market, as_of)
+        })
+    }
+
+    fn value_legs(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        mut reprice: impl FnMut(&dyn Instrument) -> Result<(f64, Currency)>,
+    ) -> Result<f64> {
         let values = self
             .boxed_legs()?
             .iter()
             .zip(&self.state.resolved_legs)
             .map(|(instrument, resolved)| {
-                let (amount, currency) = instrument.value_raw_with_currency(market, as_of)?;
+                let (amount, currency) = reprice(instrument.as_ref())?;
                 let converted = convert_amount(
                     market,
                     amount,
@@ -501,6 +564,62 @@ impl CompositeInstrument {
             })
             .collect::<Result<Vec<_>>>()?;
         neumaier_sum(values)
+    }
+
+    fn value_with_fx_shock(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        pair: FxPair,
+        relative: f64,
+    ) -> Result<f64> {
+        self.value_legs(market, as_of, |instrument| {
+            if let Some(nested) = instrument.as_any().downcast_ref::<CompositeInstrument>() {
+                let value = nested.value_with_fx_shock(market, as_of, pair, relative)?;
+                return Ok((value, nested.spec.reporting_currency));
+            }
+            if let Some((base, quote)) = instrument.fx_exposure() {
+                let oriented = if (base, quote) == (pair.base, pair.quote) {
+                    Some(relative)
+                } else if (quote, base) == (pair.base, pair.quote) {
+                    Some(1.0 / (1.0 + relative) - 1.0)
+                } else {
+                    None
+                };
+                if let Some(bumped) =
+                    oriented.and_then(|move_by| instrument.with_bumped_fx_quote(move_by))
+                {
+                    return bumped.value_raw_with_currency(market, as_of);
+                }
+            }
+            instrument.value_raw_with_currency(market, as_of)
+        })
+    }
+
+    fn fx01(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+        use finstack_quant_core::market_data::bumps::MarketBump;
+        use finstack_quant_core::money::fx::FxConversionPolicy;
+
+        let pair = self.spec.fx01_pair.ok_or_else(|| {
+            Error::Validation("composite FX01 requires a declared ordered FX pair".into())
+        })?;
+        let reprice = |pct| {
+            let shocked;
+            let market = if market.fx().is_some() {
+                shocked = market.bump([MarketBump::FxPct {
+                    base: pair.base,
+                    quote: pair.quote,
+                    pct,
+                    as_of,
+                    policy: FxConversionPolicy::CashflowDate,
+                }])?;
+                &shocked
+            } else {
+                market
+            };
+            self.value_with_fx_shock(market, as_of, pair, pct / 100.0)
+        };
+        Ok((reprice(1.0)? - reprice(-1.0)?) / 2.0)
     }
 }
 
@@ -530,6 +649,9 @@ fn cached_valuation(
 }
 
 impl Instrument for CompositeInstrument {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
     fn id(&self) -> &str {
         self.spec.id.as_str()
     }
@@ -549,21 +671,30 @@ impl Instrument for CompositeInstrument {
         metrics: &[MetricId],
         options: PricingOptions,
     ) -> Result<Option<(IndexMap<MetricId, f64>, crate::results::ValuationDetails)>> {
+        let fx01_requested = metrics.contains(&MetricId::Fx01);
+        let metrics: Vec<_> = metrics
+            .iter()
+            .filter(|metric| **metric != MetricId::Fx01)
+            .cloned()
+            .collect();
         let mut price_cache = BTreeMap::new();
         let report = self.primitive_exposures_with_cache(
             market,
             as_of,
-            metrics,
+            &metrics,
             options.clone(),
             &mut price_cache,
         )?;
         let leg_results =
-            self.top_level_leg_results(market, as_of, metrics, options, &mut price_cache)?;
+            self.top_level_leg_results(market, as_of, &metrics, options, &mut price_cache)?;
         let mut measures = IndexMap::<MetricId, f64>::new();
         for path in &report.paths {
             for (metric, value) in &path.measures {
                 *measures.entry(metric.clone()).or_default() += *value;
             }
+        }
+        if fx01_requested {
+            measures.insert(MetricId::Fx01, self.fx01(market, as_of)?);
         }
         let details = CompositeValuationDetails {
             state_effective_date: self.state.effective_date,
@@ -613,11 +744,14 @@ impl Instrument for CompositeInstrument {
         };
         menu.iter()
             .filter(|metric| {
-                is_additive_metric(metric)
-                    && legs.iter().any(|leg| {
-                        !leg.applicable_metrics(std::slice::from_ref(*metric), registry)
-                            .is_empty()
-                    })
+                if **metric == MetricId::Fx01 {
+                    return self.spec.fx01_pair.is_some();
+                }
+                legs.iter().any(|leg| {
+                    leg.applicable_metrics(std::slice::from_ref(*metric), registry)
+                        .iter()
+                        .any(|id| registry.metric_aggregation(id, leg.key()).is_some())
+                })
             })
             .cloned()
             .collect()
@@ -661,10 +795,24 @@ impl Instrument for CompositeInstrument {
         let mut dependencies = MarketDependencies::new();
         for instrument in self.boxed_legs()? {
             dependencies.merge(instrument.market_dependencies()?);
-            if let Some(notional) = instrument.notional()?
-                && notional.currency() != self.spec.reporting_currency
-            {
-                dependencies.add_fx_pair(notional.currency(), self.spec.reporting_currency);
+        }
+        if let Some(pair) = self.spec.fx01_pair {
+            dependencies.add_fx_pair(pair.base, pair.quote);
+        }
+        Ok(dependencies)
+    }
+
+    fn market_dependencies_at(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<MarketDependencies> {
+        let mut dependencies = MarketDependencies::new();
+        for instrument in self.boxed_legs()? {
+            dependencies.merge(instrument.market_dependencies_at(market, as_of)?);
+            let (_, currency) = instrument.value_raw_with_currency(market, as_of)?;
+            if currency != self.spec.reporting_currency {
+                dependencies.add_fx_pair(currency, self.spec.reporting_currency);
             }
         }
         Ok(dependencies)

@@ -179,6 +179,7 @@ class CdsIndex:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         metric_id: str,
         model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> float:
         """
         Compute one scalar metric for this instrument (e.g. ``"cs01"``).
@@ -193,6 +194,9 @@ class CdsIndex:
             Registered metric identifier (see :func:`list_standard_metrics`).
         model : str, default "default"
             Model key.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -370,6 +374,7 @@ class CdsIndex:
             - ``id`` (str): unique instrument identifier for the trade.
             - ``notional`` (Money | dict): index notional, a ``Money`` or its wire dict ``{"amount": "1000000", "currency": "USD"}``.
             - ``side`` (str): ``"pay"`` buys protection, ``"receive"`` sells it.
+            - ``include_valuation_date_cashflows`` (bool): True when same-day premium and upfront are still owed.
             - ``start`` (datetime.date | str): ISO 8601 date: premium accrual start (typically the last
               IMM roll).
             - ``end`` (datetime.date | str): ISO 8601 date: scheduled maturity (an IMM date).
@@ -404,6 +409,7 @@ class CdsIndex:
         ...         "end": "2029-06-20",
         ...         "recovery_rate": 0.4,
         ...         "discount_curve_id": "USD-OIS",
+        ...         "include_valuation_date_cashflows": False,
         ...         "credit_curve_id": "CDX.NA.IG.HAZARD",
         ...     },
         ... )
@@ -682,6 +688,19 @@ class CdsIndex:
         This accessor does not raise; it returns the stored value.
         """
         ...
+    @property
+    def include_valuation_date_cashflows(self) -> bool:
+        """Whether coupons and actual upfront due on the valuation date enter PV.
+
+        Returns:
+            True when same-day payments are still owed and False when they have settled.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
     @property
     def upfront(self) -> tuple[datetime.date, Money] | None:
         """
@@ -1070,6 +1089,20 @@ class CdsIndexBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
+    def include_valuation_date_cashflows(self, value: bool) -> CdsIndexBuilder:
+        """Elect how valuation-date premiums and actual upfront cash enter PV.
+
+        Args:
+            value: True for cash still owed on the valuation date. False for already-settled cash.
+
+        Returns:
+            This builder for chaining.
+
+        Raises:
+            ValueError: If the builder has already been consumed by build().
+        """
+        ...
+
     def upfront(self, value: tuple[datetime.date | datetime.datetime | pd.Timestamp | str, Money]) -> CdsIndexBuilder:
         """
         Set the contractual upfront payment.

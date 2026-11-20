@@ -64,6 +64,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique instrument identifier"
         },
+        "include_valuation_date_cashflows": {
+          "description": "Whether scheduled premium and actual upfront payable on the valuation date\nare still due. A booked trade must explicitly elect this boundary.",
+          "type": "boolean"
+        },
         "index_factor": {
           "description": "Index factor (fraction of surviving notional since series inception)",
           "format": "double",
@@ -159,6 +163,7 @@
         }
       },
       "required": [
+        "include_valuation_date_cashflows",
         "id",
         "index_name",
         "series",
@@ -972,6 +977,7 @@
           "constituents": [],
           "convention": "isda_na",
           "id": "CDX-IG-42",
+          "include_valuation_date_cashflows": false,
           "index_factor": 1.0,
           "index_name": "CDX.NA.IG",
           "notional": {

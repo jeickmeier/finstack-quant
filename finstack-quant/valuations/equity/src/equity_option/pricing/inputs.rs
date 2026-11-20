@@ -315,6 +315,16 @@ pub(crate) fn collect_inputs(
             inst.currency,
         )?;
 
+    if t_vol == 0.0 {
+        return Ok(EquityOptionInputs {
+            spot: raw_spot,
+            r,
+            q: 0.0,
+            sigma: 0.0,
+            t_vol,
+        });
+    }
+
     // Check for discrete dividends — if present, adjust spot and zero out q
     let future_divs = future_dividends(inst, disc_curve.as_ref(), as_of)?;
 
@@ -390,7 +400,11 @@ pub(crate) fn early_exercise_market_params(
         time_to_expiry: inputs.t_vol,
         option_type: inst.option_type,
     };
-    params.validate()?;
+    if params.time_to_expiry == 0.0 {
+        finstack_quant_core::validation::validate_f64_positive(params.spot, "option spot")?;
+    } else {
+        params.validate()?;
+    }
     Ok((params, dividends))
 }
 

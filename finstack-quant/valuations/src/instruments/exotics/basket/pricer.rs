@@ -1,6 +1,6 @@
 //! Basket NAV: constituent valuation, FX conversion and expense drag.
 
-use super::types::{Basket, BasketConstituent, ConstituentReference};
+use super::types::{Basket, BasketConstituent, BasketExpense, ConstituentReference};
 use finstack_quant_core::{
     Result,
     dates::Date,
@@ -8,54 +8,30 @@ use finstack_quant_core::{
     money::{Money, fx::FxQuery},
 };
 
-/// Net asset value per share of `basket`, after one day of expense drag.
-///
-/// Each constituent contributes `price × units / shares_outstanding` when it
-/// holds explicit units and `price × weight` otherwise, with every price
-/// converted into the basket's reporting currency.
-///
-/// # Arguments
-///
-/// * `basket` - Basket to value; its `pricing_config` supplies the fee day
-///   basis and the FX policy.
-/// * `market` - Market context supplying constituent prices and FX.
-/// * `as_of` - Valuation date for constituent pricing and FX lookups.
-/// * `shares_outstanding` - Shares that unit-based holdings are spread over;
-///   must be positive when any constituent holds units.
-///
-/// # Errors
-///
-/// Returns an error when a constituent price or FX rate is unavailable, or the
-/// share count is not positive while a constituent holds units.
-pub(crate) fn nav(
+/// Net asset value per basket unit after the elected accrued expense.
+pub(crate) fn nav(basket: &Basket, market: &MarketContext, as_of: Date) -> Result<Money> {
+    let mut total = Money::from((0_i64, basket.reporting_currency));
+    for (index, constituent) in basket.constituents.iter().enumerate() {
+        let mark = marked_constituent(basket, index, constituent, market, as_of)?;
+        total = total
+            .checked_add(mark.checked_mul_f64(constituent.units.unwrap_or(constituent.weight))?)?;
+    }
+    match basket.expense {
+        BasketExpense::None => Ok(total),
+        BasketExpense::Accrued { amount } => total.checked_sub(amount),
+    }
+}
+
+/// Resolve a constituent's mark in the basket reporting currency.
+pub(crate) fn marked_constituent(
     basket: &Basket,
+    index: usize,
+    constituent: &BasketConstituent,
     market: &MarketContext,
     as_of: Date,
-    shares_outstanding: f64,
 ) -> Result<Money> {
-    let mut per_share = 0.0;
-    for (index, constituent) in basket.constituents.iter().enumerate() {
-        let raw_value = constituent_price(basket, index, constituent, market, as_of)?;
-        let base_value = to_basket_currency(basket, raw_value, market, as_of)?;
-        let c = if let Some(units) = constituent.units {
-            if shares_outstanding <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(
-                    "basket share count must be positive".to_string(),
-                ));
-            }
-            base_value
-                .checked_mul_f64(units)?
-                .checked_div_f64(shares_outstanding)?
-        } else {
-            base_value.checked_mul_f64(constituent.weight)?
-        };
-        per_share += c.amount();
-    }
-
-    // Apply expense ratio drag to per-share value
-    let expense_drag = expense_drag(basket, per_share);
-    let per_share_after_fees = per_share - expense_drag;
-    Money::from_model_value(per_share_after_fees, basket.reporting_currency)
+    let mark = constituent_price(basket, index, constituent, market, as_of)?;
+    to_basket_currency(basket, mark, market, as_of)
 }
 
 /// Price of one constituent in its own currency.
@@ -90,16 +66,6 @@ fn constituent_price(
             }
         }
     }
-}
-
-/// One day of expense drag on `portfolio_value`.
-///
-/// ```text
-/// drag = portfolio_value × expense_ratio / days_in_year
-/// ```
-fn expense_drag(basket: &Basket, portfolio_value: f64) -> f64 {
-    let daily_expense_rate = basket.expense_ratio / basket.pricing_config.days_in_year;
-    portfolio_value * daily_expense_rate
 }
 
 /// Convert `money` into the basket's reporting currency under its FX policy.

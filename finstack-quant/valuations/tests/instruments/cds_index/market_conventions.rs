@@ -37,6 +37,7 @@ fn test_cdx_na_ig_standard_conventions() {
             id: finstack_quant_core::types::InstrumentId::new("CDX.NA.IG.42"),
             notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: TEST_RECOVERY,
@@ -64,6 +65,7 @@ fn test_cdx_na_hy_standard_conventions() {
             id: finstack_quant_core::types::InstrumentId::new("CDX.NA.HY.39"),
             notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: TEST_RECOVERY,
@@ -89,6 +91,7 @@ fn test_itraxx_europe_standard_conventions() {
             id: finstack_quant_core::types::InstrumentId::new("iTraxx.Europe.41"),
             notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: TEST_RECOVERY,
@@ -204,6 +207,7 @@ fn test_index_factor_application() {
             id: finstack_quant_core::types::InstrumentId::new("CDX-SEASONED"),
             notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: TEST_RECOVERY,
@@ -295,6 +299,7 @@ fn test_pricing_with_standard_conventions() {
             id: finstack_quant_core::types::InstrumentId::new("CDX.NA.IG.42"),
             notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: TEST_RECOVERY,
@@ -344,6 +349,7 @@ fn test_upfront_affects_dirty_npv_not_leg_pvs() {
         .expect("base metrics");
 
     let upfront = Money::new(100_000.0, Currency::USD).expect("valid money fixture");
+    idx.include_valuation_date_cashflows = true;
     idx.upfront = Some((as_of, upfront));
 
     let dirty_npv = idx.value(&ctx, as_of).expect("dirty index pricing");
@@ -390,6 +396,7 @@ fn test_fixed_coupon_in_premium_leg() {
             id: finstack_quant_core::types::InstrumentId::new("CDX-COUPON"),
             notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: TEST_RECOVERY,

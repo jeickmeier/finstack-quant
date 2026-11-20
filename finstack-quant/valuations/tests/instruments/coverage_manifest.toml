@@ -202,14 +202,14 @@ rationale = "The complete persisted repo spec implements PartialEq; registry cov
 [[instrument]]
 tag = "credit_default_swap"
 partial_eq_blocker = "CreditDefaultSwap.premium_leg: PremiumLegSpec"
-required_keys = ["id"]
+required_keys = ["include_valuation_date_cashflows", "id"]
 no_market_dependencies = false
 rationale = "CreditDefaultSwap.premium_leg: PremiumLegSpec lacks PartialEq across accrual-on-default conventions."
 
 [[instrument]]
 tag = "cds_index"
 partial_eq_blocker = "CdsIndex.premium_leg: PremiumLegSpec"
-required_keys = ["id"]
+required_keys = ["include_valuation_date_cashflows", "id"]
 no_market_dependencies = false
 rationale = "CdsIndex.premium_leg: PremiumLegSpec lacks PartialEq across index premium schedule conventions."
 

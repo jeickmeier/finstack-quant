@@ -158,6 +158,7 @@ export function converterSchema(schema, target = "zod") {
   }
   if (body.unevaluatedProperties !== undefined) {
     const allowed = new Set([
+      "$defs",
       "type",
       "properties",
       "required",

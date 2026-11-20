@@ -80,6 +80,9 @@ impl CdsIndexConstituent {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CdsIndex {
+    /// Whether scheduled premium and actual upfront payable on the valuation date
+    /// are still due. A booked trade must explicitly elect this boundary.
+    pub include_valuation_date_cashflows: bool,
     /// Unique instrument identifier
     pub id: InstrumentId,
     /// Index name, e.g., "CDX.NA.IG", "CDX.NA.HY", "iTraxx Europe"
@@ -197,6 +200,7 @@ impl CdsIndex {
 
         Ok(Self {
             id: InstrumentId::new("CDX-IG-42"),
+            include_valuation_date_cashflows: false,
             index_name: "CDX.NA.IG".to_string(),
             series: 42,
             version: 1,
@@ -291,6 +295,7 @@ impl CdsIndex {
             id,
             notional,
             side,
+            include_valuation_date_cashflows,
             start,
             end,
             recovery_rate,
@@ -311,6 +316,7 @@ impl CdsIndex {
             series: preset.series,
             version: preset.version,
             notional,
+            include_valuation_date_cashflows,
             index_factor: 1.0,
             side,
             convention,
@@ -405,6 +411,7 @@ impl CdsIndex {
     pub fn to_synthetic_cds(&self) -> finstack_quant_core::Result<CreditDefaultSwap> {
         Ok(CreditDefaultSwap {
             id: self.id.to_owned(),
+            include_valuation_date_cashflows: self.include_valuation_date_cashflows,
             notional: Money::new(
                 self.notional.amount() * self.index_factor,
                 self.notional.currency(),
@@ -441,6 +448,9 @@ impl CdsIndex {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for CdsIndex {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        self.include_valuation_date_cashflows
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CdsIndex,
         crate::CREDIT

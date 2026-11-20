@@ -327,12 +327,57 @@ fn base_correlation_rejects_thin_tranche_mispricing_above_ten_basis_points() {
 #[test]
 fn credit_performance_calibrated_off_grid_accuracy() {
     use finstack_quant_core::contract::LoadLimits;
-    let input = CalibrationEnvelope::from_slice_strict(
+    let mut input = CalibrationEnvelope::from_slice_strict(
         include_bytes!("../../examples/market_bootstrap/05_cdx_base_correlation.json"),
         &LoadLimits::default(),
     )
     .expect("example envelope")
     .0;
+    // Use the S0 frozen dependency market to isolate the tranche engine from
+    // later changes to discount and CDS quote materialization.
+    let s0: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../benchmarks/credit-calibration-evidence/s0/cdx_ig_46_base_correlation_isolated_last_step.json"
+    ))
+    .expect("S0 result");
+    let mut state = s0["result"]["final_market"].clone();
+    for curve in state["curves"].as_array_mut().expect("S0 curve list") {
+        let fields = curve.as_object_mut().expect("S0 curve object");
+        // This benchmark uses the recorded factors, not historical replay metadata.
+        for field in [
+            "par_points",
+            "par_interp",
+            "hazard_calibration",
+            "rate_calibration",
+            "allow_non_monotonic",
+            "min_forward_rate",
+            "min_forward_tenor",
+        ] {
+            fields.remove(field);
+        }
+        if fields
+            .get("extrapolation")
+            .and_then(serde_json::Value::as_str)
+            == Some("flat_forward")
+        {
+            fields.insert(
+                "extrapolation".into(),
+                serde_json::Value::String("extend".into()),
+            );
+        }
+    }
+    let frozen_state = serde_json::from_value::<
+        finstack_quant_core::market_data::context::MarketContextState,
+    >(state)
+    .expect("S0 frozen market state");
+    let frozen = MarketContext::try_from(frozen_state).expect("S0 frozen market");
+    let (prior, _) = cal_utils::split_market_context(&frozen);
+    input.prior_market = prior;
+    input
+        .plan
+        .steps
+        .retain(|step| matches!(step.params, StepParams::BaseCorrelation(_)));
+    let quote_set = input.plan.steps[0].quote_set.clone();
+    input.plan.quote_sets.retain(|name, _| name == &quote_set);
     let output = engine::calibrate(&input).expect("calibration");
     assert!(output.result.report.success);
     let market = MarketContext::try_from(output.result.final_market).expect("market");

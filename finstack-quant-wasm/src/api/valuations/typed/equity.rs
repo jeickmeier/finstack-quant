@@ -267,6 +267,7 @@ impl JsEquityOption {
     /// @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
     /// @param asOf - ISO-8601 valuation date.
     /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+    /// @param extras - Optional pricing configuration and overrides accepted by `price`.
     /// @returns Map of Greek name to value, with keys in the Rust `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`).
     /// @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed, and kind `computation` if pricing fails or a Greek is non-finite.
     #[wasm_bindgen(unchecked_return_type = "Record<string, number>")]
@@ -276,6 +277,10 @@ impl JsEquityOption {
         market_json: JsValue,
         #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
         #[wasm_bindgen(unchecked_optional_param_type = "string | null")] model: Option<JsValue>,
+        #[wasm_bindgen(
+            unchecked_optional_param_type = "generated.valuations.PriceExtras | JsonInput | null"
+        )]
+        extras: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let market_json = crate::utils::input::json_text(&market_json, "marketJson")?;
         let as_of = js_string(&as_of, "asOf")?;
@@ -285,6 +290,7 @@ impl JsEquityOption {
             &market_json,
             &as_of,
             model.as_deref(),
+            extras.as_ref(),
         )
     }
 }

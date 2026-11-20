@@ -43,6 +43,9 @@ impl FixedMetricInstrument {
 }
 
 impl Instrument for FixedMetricInstrument {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     /// Test mock: reads no market data.
     fn market_dependencies(
         &self,
@@ -114,6 +117,9 @@ finstack_quant_valuations::impl_empty_cashflow_provider!(
 );
 
 impl Instrument for MetricFailingInstrument {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     /// Test mock: reads no market data.
     fn market_dependencies(
         &self,

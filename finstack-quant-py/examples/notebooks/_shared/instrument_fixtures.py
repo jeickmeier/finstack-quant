@@ -215,6 +215,7 @@ def cds(idx: int) -> tuple[str, dict]:
         "type": "credit_default_swap",
         "spec": {
             "id": iid,
+            "include_valuation_date_cashflows": False,
             "notional": {"amount": "10000000", "currency": "USD"},
             "side": side,
             "convention": "isda_na",
@@ -245,6 +246,7 @@ def cds_index(idx: int) -> tuple[str, dict]:
         "type": "cds_index",
         "spec": {
             "id": iid,
+            "include_valuation_date_cashflows": False,
             "index_name": "CDX.NA.IG",
             "series": 42,
             "version": 1,

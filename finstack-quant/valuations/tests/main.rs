@@ -57,3 +57,5 @@ mod return_floor_example;
 mod sanity_invariants;
 #[path = "schema_audit.rs"]
 mod schema_audit;
+
+mod payment_boundaries;

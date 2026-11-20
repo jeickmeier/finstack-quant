@@ -184,7 +184,9 @@ pub(crate) struct YieldRiskBasis {
     pub(crate) yield_rate: f64,
     /// Risk cashflows with their year fractions from the quote date.
     pub(crate) timed: Vec<(Date, f64, Money)>,
-    /// Street-compounded price of `timed` at `yield_rate`.
+    /// Effective discount law for the dated yield experiment.
+    pub(crate) compounding: crate::bond::pricing::quote_conversions::YieldCompounding,
+    /// Quote-law price of `timed` at `yield_rate`.
     pub(crate) price: f64,
 }
 
@@ -207,7 +209,7 @@ pub(crate) fn yield_risk_basis(
         Some(path) => (path.yield_rate, std::borrow::Cow::Owned(path.flows)),
         None => (ytm, std::borrow::Cow::Borrowed(flows)),
     };
-    let timed = crate::bond::pricing::quote_conversions::bond_flow_times(
+    let (timed, compounding) = crate::bond::pricing::quote_conversions::street_flow_times(
         bond,
         risk_flows.as_ref(),
         quote_date,
@@ -216,11 +218,12 @@ pub(crate) fn yield_risk_basis(
         &timed,
         bond.cashflow_spec.frequency(),
         yield_rate,
-        crate::bond::pricing::quote_conversions::YieldCompounding::Street,
+        compounding,
     )?;
     Ok(YieldRiskBasis {
         yield_rate,
         timed,
+        compounding,
         price,
     })
 }
@@ -251,7 +254,7 @@ pub(crate) fn register_bond_metrics(
         registry: registry,
         instrument: InstrumentType::Bond,
         metrics: [
-            (Accrued, AccruedInterestCalculator),
+            (Accrued, AccruedInterestCalculator, NativeMoney),
             (DirtyPrice, DirtyPriceCalculator),
             (CleanPrice, CleanPriceCalculator),
             (Ytm, YtmCalculator { compounding: YieldCompounding::Street }),

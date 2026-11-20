@@ -161,7 +161,7 @@
       "description": "Explicit day-count clock translating calendar expiry dates into year fractions\nrelative to a surface or cube reference date.\n\nMarket data objects such as [`FxDeltaVolSurface`](crate::market_data::surfaces::FxDeltaVolSurface)\nattach an optional `VolatilityClock` so downstream pricers can validate that\nthe surface anchor matches `as_of` and bridge between instrument day-counts\nand surface variance time without silently assuming a day-count convention.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{DayCount, DayCountContextState, VolatilityClock};\nuse time::macros::date;\n\nlet clock = VolatilityClock::try_new(\n    date!(2025 - 01 - 15),\n    DayCount::Act365F,\n    DayCountContextState::default(),\n)?;\nlet t = clock.expiry_time(date!(2026 - 01 - 15))?;\nassert!((t - 1.0).abs() < 1e-12);\n# Ok::<(), finstack_quant_core::Error>(())\n```",
       "properties": {
         "context": {
-          "$ref": "#/$defs/d_cd1309ede7abd3f53244",
+          "$ref": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DayCountContextState",
           "default": {
             "bus_basis": null,
             "calendar_id": null,
@@ -345,7 +345,7 @@
             "cds_valuation_convention": {
               "anyOf": [
                 {
-                  "$ref": "#/$defs/d_3d7928f8797773779aed"
+                  "$ref": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsValuationConvention"
                 },
                 {
                   "type": "null"
@@ -746,7 +746,7 @@
               "description": "Currency used for synthetic tranche pricing."
             },
             "date_regime": {
-              "$ref": "#/$defs/d_33b593cc329bf757aee1",
+              "$ref": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsDateRegime",
               "description": "Contractual date regime of the synthetic tranches (record\nCALIBRATION-FRAMEWORK-007, O7): `standard` CDS roll dates (20th of\nMar/Jun/Sep/Dec) or `bespoke` for a schedule from the convention\nfrequency and stub. Required; there is no default regime."
             },
             "day_count": {
@@ -1256,21 +1256,6 @@
       ],
       "type": "object"
     },
-    "d_0d11ec5d3bb569cc9141": {
-      "description": "Option payoff direction used by analytical and numerical model engines.",
-      "oneOf": [
-        {
-          "const": "call",
-          "description": "Call option.",
-          "type": "string"
-        },
-        {
-          "const": "put",
-          "description": "Put option.",
-          "type": "string"
-        }
-      ]
-    },
     "d_149952dfbecf32b456eb": {
       "description": "Key to look up CDS conventions (Currency + DocClause).\n\nCDS conventions are identified by both currency and documentation clause, as different\nclauses have different market conventions. Used to look up [`CdsConventionSpec`](crate::market::conventions::CdsConventionSpec)\nfrom the convention registry.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};\nuse finstack_quant_core::currency::Currency;\n\nlet key = CdsConventionKey {\n    currency: Currency::USD,\n    doc_clause: CdsDocClause::Cr14,\n};\n```",
       "properties": {
@@ -1279,7 +1264,7 @@
           "description": "The currency of the CDS."
         },
         "doc_clause": {
-          "$ref": "#/$defs/d_973d7a036900fe27e69d",
+          "$ref": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsDocClause",
           "description": "The documentation clause (e.g. CR14, MM14)."
         }
       },
@@ -1468,21 +1453,6 @@
             "price"
           ],
           "type": "object"
-        }
-      ]
-    },
-    "d_33b593cc329bf757aee1": {
-      "description": "Named contractual date regime of a CDS product (record\nCALIBRATION-FRAMEWORK-007, O7).\n\nThe regime owns how the premium grid, its stub and its endpoints are\nderived; no regime is inferred and none is a default.",
-      "oneOf": [
-        {
-          "const": "standard",
-          "description": "Standard quarterly CDS roll dates (20 March, June, September and\nDecember): the premium grid runs quarterly from an accrual start on a\nroll date, with a short final period when the maturity is off the\ngrid. The leg's `frequency` must be quarterly; its `stub` is not used.",
-          "type": "string"
-        },
-        {
-          "const": "bespoke",
-          "description": "A bespoke schedule from the leg's own `frequency`, `stub` and\nboundaries.",
-          "type": "string"
         }
       ]
     },
@@ -1756,31 +1726,6 @@
             "global_solve"
           ],
           "type": "object"
-        }
-      ]
-    },
-    "d_3d7928f8797773779aed": {
-      "description": "Valuation presentation and pricing policy for CDS marks.\n\nEach variant bundles a coherent set of choices (premium-leg accrual schedule,\nAct/360 accrual day counting, accrual-on-default bias, clean/dirty NPV,\npar-spread denominator). Mixing those choices via separate boolean\noverrides is intentionally not supported — the variants here are the only\nconventions traded in practice.",
-      "oneOf": [
-        {
-          "const": "isda_dirty",
-          "description": "ISDA-style dirty model PV.\n\nPremium-leg cashflows accrue between unadjusted IMM dates, the final\ncoupon excludes the maturity day, and the reported NPV is the dirty\nmodel PV (no add-back of accrued premium). Par spread uses the risky\nannuity denominator. Use only for direct reproduction of academic ISDA\nStandard Model literature.",
-          "type": "string"
-        },
-        {
-          "const": "bloomberg_cdsw_clean",
-          "description": "Bloomberg CDSW clean principal presentation and premium-leg policy.\n\nThis is the industry-standard convention used by Bloomberg CDSW and\nthe ISDA Standard Upfront Model. It is the default for new\n`CreditDefaultSwap` instances:\n\n- Intermediate premium cashflows accrue between business-day-adjusted\n  dates. Final accrual ends on unadjusted maturity; the final payment\n  follows the business-day convention independently.\n- The final coupon period is inclusive of the maturity date (extra\n  day) per CDSW convention.\n- The reported NPV is the clean principal value (Bloomberg\n  \"Principal\" line). Cash settlement is `Principal + Accrued`.\n- Par spread uses the risky annuity denominator (matches the CDSW\n  screen for investment-grade credits).\n- Hazard rebootstrap inside risk metrics (CS01, recovery01, etc.)\n  inherits the same CDSW pricer convention so sensitivities are\n  self-consistent with the base PV.",
-          "type": "string"
-        },
-        {
-          "const": "bloomberg_cdsw_clean_full_premium",
-          "description": "Bloomberg CDSW clean principal with full premium leg in the par-spread\ndenominator (distressed-credit variant).\n\nIdentical to [`Self::BloombergCdswClean`] except the par spread\ndenominator includes accrual-on-default. The difference vs. risky\nannuity is typically < 1bp for investment grade and 2-5bps for\ndistressed credits (hazard rate > 3%).",
-          "type": "string"
-        },
-        {
-          "const": "quant_lib_isda_parity",
-          "description": "QuantLib `IsdaCdsEngine` parity convention.\n\nReproduces QuantLib's CDS output: dirty PV (no clean add-back),\nbusiness-day-adjusted premium accrual periods, full premium leg in\nthe par-spread denominator, QuantLib `Actual360(true)` accrual (every\nAct/360 premium period includes its end date) and the `IsdaCdsEngine`\n`HalfDayBias` accrual-on-default adjustment.",
-          "type": "string"
         }
       ]
     },
@@ -2092,7 +2037,7 @@
         "ois_compounding": {
           "anyOf": [
             {
-              "$ref": "#/$defs/d_9f40e937966e31f97b30"
+              "$ref": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding"
             },
             {
               "type": "null"
@@ -2131,21 +2076,6 @@
         {
           "const": "inverse_duration",
           "description": "Weight by inverse duration (1/DV01 approximation).",
-          "type": "string"
-        }
-      ]
-    },
-    "d_628e8bb89f248ce0647b": {
-      "description": "Interpolation strategy for [`ScalarTimeSeries`].\n\n# Examples\n```rust\nuse finstack_quant_core::market_data::scalars::{\n    ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,\n};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"TS\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\"), 100.0),\n        (Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\"), 105.0),\n    ],\n    None,\n    SeriesInterpolation::Step,\n    SeriesExtrapolation::Error,\n)\n.expect(\"Series creation should succeed\");\nlet mid_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nassert_eq!(series.get_value(mid_date).expect(\"Value lookup should succeed\"), 100.0);\n```",
-      "oneOf": [
-        {
-          "const": "step",
-          "description": "Last observation carried forward",
-          "type": "string"
-        },
-        {
-          "const": "linear",
-          "description": "Linear interpolation between observed points",
           "type": "string"
         }
       ]
@@ -2843,8 +2773,12 @@
                   "const": "cds_upfront",
                   "type": "string"
                 },
+                "upfront_basis": {
+                  "$ref": "#/$defs/d_ab1e87184ae9a3b1d069",
+                  "description": "Whether the fraction is a clean quote or actual buyer cash at settlement."
+                },
                 "upfront_pct": {
-                  "description": "Upfront payment percentage of notional (e.g. 0.01 for 1%).",
+                  "description": "Signed upfront fraction of notional (0.01 is 1%).",
                   "format": "double",
                   "type": "number"
                 }
@@ -2857,6 +2791,7 @@
                 "pillar",
                 "coupon_bp",
                 "upfront_pct",
+                "upfront_basis",
                 "recovery_rate"
               ],
               "type": "object"
@@ -3063,7 +2998,7 @@
                       "description": "Unique identifier for the quote."
                     },
                     "option_type": {
-                      "$ref": "#/$defs/d_0d11ec5d3bb569cc9141",
+                      "$ref": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OptionType",
                       "description": "Option type (Call or Put)."
                     },
                     "strike": {
@@ -3375,7 +3310,7 @@
               "type": "string"
             },
             "interpolation": {
-              "$ref": "#/$defs/d_628e8bb89f248ce0647b",
+              "$ref": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SeriesInterpolation",
               "description": "Interpolation method"
             },
             "kind": {
@@ -3923,61 +3858,6 @@
             "compounded_with_rate_cutoff"
           ],
           "type": "object"
-        }
-      ]
-    },
-    "d_973d7a036900fe27e69d": {
-      "description": "CDS market standard documentation clauses.\n\nRepresents the ISDA documentation clause used for CDS contracts. Different clauses\ndefine different restructuring events and settlement procedures. Used as part of\n[`CdsConventionKey`] to look up CDS conventions.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;\n\nlet clause = CdsDocClause::Cr14; // Cum-Restructuring 2014\n```",
-      "oneOf": [
-        {
-          "const": "cr14",
-          "description": "Cum-Restructuring 2014 (CR14)",
-          "type": "string"
-        },
-        {
-          "const": "mr14",
-          "description": "Modified-Restructuring 2014 (MR14)",
-          "type": "string"
-        },
-        {
-          "const": "mm14",
-          "description": "Modified-Modified-Restructuring 2014 (MM14)",
-          "type": "string"
-        },
-        {
-          "const": "xr14",
-          "description": "No-Restructuring 2014 (XR14)",
-          "type": "string"
-        },
-        {
-          "const": "isda_na",
-          "description": "ISDA North American Corporate (IsdaNa)",
-          "type": "string"
-        },
-        {
-          "const": "isda_eu",
-          "description": "ISDA European Corporate (IsdaEu)",
-          "type": "string"
-        },
-        {
-          "const": "isda_as",
-          "description": "ISDA Asia Corporate (IsdaAs)",
-          "type": "string"
-        },
-        {
-          "const": "isda_au",
-          "description": "ISDA Australia Corporate (IsdaAu)",
-          "type": "string"
-        },
-        {
-          "const": "isda_nz",
-          "description": "ISDA New Zealand Corporate (IsdaNz)",
-          "type": "string"
-        },
-        {
-          "const": "custom",
-          "description": "Custom / Other",
-          "type": "string"
         }
       ]
     },
@@ -4832,99 +4712,6 @@
       "title": "Id",
       "type": "string"
     },
-    "d_9f40e937966e31f97b30": {
-      "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```",
-      "oneOf": [
-        {
-          "const": "simple",
-          "description": "Simple term-rate projection: one fixing or forward over the period.\n\n`Coupon = Notional × (Forward_Rate + Spread) × DCF`. This is the\ndefault; a registered overnight RFR index rejects it.",
-          "type": "string"
-        },
-        {
-          "const": "simple_average",
-          "description": "Arithmetic average of daily overnight fixings weighted by accrual days,\n`Rate = (Σ rᵢ·dᵢ) / D`, for instruments that contractually specify a\nsimple-average overnight index.",
-          "type": "string"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Compounded in arrears (overnight RFR rates).\n\n`Coupon = Notional × [∏(1 + rᵢ·dᵢ/B) − 1]` over the daily observations\nof the accrual period.",
-          "properties": {
-            "compounded_in_arrears": {
-              "additionalProperties": false,
-              "properties": {
-                "lookback_days": {
-                  "description": "Business days by which observation dates move backward while the\nday-count weights stay on the original accrual dates (\"lookback\nwithout observation shift\", ISDA 2021 / ARRC). `0` is plain\nin-arrears, the cleared-OIS convention.",
-                  "format": "uint32",
-                  "maximum": 31,
-                  "minimum": 0,
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "lookback_days"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "compounded_in_arrears"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Compounded in arrears with ISDA 2021 observation shift: both the\nobservation dates and their day-count weights move back\n(ISDA 2021 Definitions Section 4.5(c)).",
-          "properties": {
-            "compounded_with_observation_shift": {
-              "additionalProperties": false,
-              "properties": {
-                "shift_days": {
-                  "description": "Business days to shift both observation dates and weights.",
-                  "format": "uint32",
-                  "maximum": 31,
-                  "minimum": 0,
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "shift_days"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "compounded_with_observation_shift"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThe last `cutoff_days` business-day observations are frozen at the\nfixing immediately preceding them: for fixings `b_1..b_n` the source is\n`b_{n-cutoff}`, so a positive cut-off must leave a preceding fixing.\nReference: ARRC, December 3, 2021 Statement, Appendix A (\"Lockout\").",
-          "properties": {
-            "compounded_with_rate_cutoff": {
-              "additionalProperties": false,
-              "properties": {
-                "cutoff_days": {
-                  "description": "Business days before period end over which the rate is frozen.",
-                  "format": "uint32",
-                  "maximum": 31,
-                  "minimum": 0,
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "cutoff_days"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "compounded_with_rate_cutoff"
-          ],
-          "type": "object"
-        }
-      ]
-    },
     "d_9ffaa1e088ad89c67a16": {
       "description": "How `CalibrationConfig` obtains rate bounds.\n\nMarket-standard bounds depend on currency/market regime. `AutoCurrency` makes this choice\nexplicit and avoids relying on `RateBounds::default()` as an implicit assumption.",
       "oneOf": [
@@ -4994,6 +4781,21 @@
         }
       },
       "type": "object"
+    },
+    "d_ab1e87184ae9a3b1d069": {
+      "description": "Representation of a single-name CDS upfront quote.",
+      "oneOf": [
+        {
+          "const": "clean",
+          "description": "Clean fraction of notional, before deducting the accrued premium rebate.",
+          "type": "string"
+        },
+        {
+          "const": "actual_cash",
+          "description": "Actual signed cash as a fraction of notional, including the rebate.",
+          "type": "string"
+        }
+      ]
     },
     "d_af96800aab5249199d14": {
       "additionalProperties": false,
@@ -5941,67 +5743,6 @@
         }
       ],
       "title": "Day Count"
-    },
-    "d_cd1309ede7abd3f53244": {
-      "additionalProperties": false,
-      "description": "Serializable snapshot of [`DayCountContext`] state for persistence and interchange.\n\nThis struct captures the optional context parameters (calendar, frequency, business-day basis)\nneeded to reconstruct a [`DayCountContext`] at runtime using the built-in calendar lookup.\n`Default` is the empty context (no calendar, frequency, basis, coupon\nperiod or termination status), the snapshot of\n[`DayCountContext::default`].",
-      "properties": {
-        "bus_basis": {
-          "description": "Optional custom business-day divisor (defaults to 252 when `None`).",
-          "format": "uint16",
-          "maximum": 65535,
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "calendar_id": {
-          "description": "Optional calendar code (e.g. \"target2\").",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "coupon_period": {
-          "default": null,
-          "description": "Optional unadjusted regular ICMA reference period or ACT/365L enclosing\ncoupon `(start, end)`, serialized as two ISO dates.\n\nRequired for exact ICMA accrual on round-trip. `None` selects the\nfrequency-only ICMA calculation path; ACT/365L requires these dates.",
-          "maxItems": 2,
-          "minItems": 2,
-          "prefixItems": [
-            {
-              "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
-            },
-            {
-              "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
-            }
-          ],
-          "type": [
-            "array",
-            "null"
-          ]
-        },
-        "end_is_termination_date": {
-          "default": null,
-          "description": "Whether the later accrual endpoint is the contractual termination\ndate; `None` (omitted or `null` on the wire) means unspecified, which\n30E/360 ISDA rejects.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "frequency": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_47e5e74524615b78a19f"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional coupon frequency, required for ACT/ACT ISMA."
-        }
-      },
-      "type": "object"
     },
     "d_cebddb4a91c1c968bece": {
       "additionalProperties": false,

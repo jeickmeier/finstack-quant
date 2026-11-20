@@ -53,7 +53,7 @@ pub(super) struct AodInputs<'a> {
 pub(crate) struct CouponPeriod {
     pub(super) accrual_start: Date,
     pub(super) accrual_end: Date,
-    pub(super) payment_date: Date,
+    pub(crate) payment_date: Date,
     pub(super) is_final: bool,
 }
 
@@ -264,8 +264,11 @@ impl CdsPricer {
             let end_date = period.accrual_end;
             let payment_date = period.payment_date;
 
-            // Payments on as_of are treated as settled throughout CDS pricing.
-            if payment_date <= as_of {
+            if !crate::cds::cash_is_eligible(
+                payment_date,
+                as_of,
+                cds.include_valuation_date_cashflows,
+            ) {
                 continue;
             }
 
@@ -430,7 +433,6 @@ pub struct PreparedCds {
     periods: Vec<(CouponPeriod, f64, f64)>,
     spread: f64,
     upfront_pv: f64,
-    clean_accrued: f64,
     grids: IsdaWindowCache,
 }
 
@@ -465,7 +467,11 @@ impl PreparedCds {
         let periods_raw = pricer.coupon_periods(cds, as_of)?;
         let mut periods = Vec::with_capacity(periods_raw.len());
         for period in periods_raw {
-            if period.payment_date <= as_of {
+            if !crate::cds::cash_is_eligible(
+                period.payment_date,
+                as_of,
+                cds.include_valuation_date_cashflows,
+            ) {
                 continue;
             }
             let accrual = pricer.coupon_accrual(cds, &period)?;
@@ -476,20 +482,16 @@ impl PreparedCds {
             Error::Validation("premium.coupon_bp cannot be represented as f64".into())
         })? / BASIS_POINTS_PER_UNIT;
         let upfront_pv = match cds.upfront {
-            Some((dt, amount)) if dt >= as_of => {
+            Some((dt, amount))
+                if crate::cds::cash_is_eligible(
+                    dt,
+                    as_of,
+                    cds.include_valuation_date_cashflows,
+                ) =>
+            {
                 amount.amount() * disc.as_ref().df_between_dates(as_of, dt)?
             }
             _ => 0.0,
-        };
-        let clean_accrued = if cds.uses_clean_price() {
-            let accrual_fraction = pricer.coupon_accrued_fraction(
-                cds,
-                as_of,
-                super::metrics::AccrualDayCountPolicy::CdswInclusive,
-            )?;
-            cds.notional.amount() * spread * accrual_fraction
-        } else {
-            0.0
         };
         Ok(Self {
             pricer,
@@ -499,7 +501,6 @@ impl PreparedCds {
             periods,
             spread,
             upfront_pv,
-            clean_accrued,
             grids: IsdaWindowCache::default(),
         })
     }
@@ -563,7 +564,6 @@ impl PreparedCds {
             protection_pv,
             premium_pv,
             self.upfront_pv,
-            self.clean_accrued,
         ))
     }
 }
@@ -573,20 +573,12 @@ pub(super) fn signed_npv(
     protection_pv: f64,
     premium_pv: f64,
     upfront_pv: f64,
-    clean_accrued: f64,
 ) -> f64 {
     use finstack_quant_valuations_core::instruments::PayReceive;
-    let mut value = match cds.side {
+    match cds.side {
         PayReceive::Pay => protection_pv - premium_pv - upfront_pv,
         PayReceive::Receive => premium_pv - protection_pv + upfront_pv,
-    };
-    if cds.uses_clean_price() {
-        value = match cds.side {
-            PayReceive::Pay => value + clean_accrued,
-            PayReceive::Receive => value - clean_accrued,
-        };
     }
-    value
 }
 
 // Protection-leg and accrual-on-default integration over the ISDA Standard
@@ -773,6 +765,7 @@ mod prepared_cds_tests {
                 id: InstrumentId::new("CACHE-TEST-CDS"),
                 notional: Money::from((10_000_000_i64, Currency::USD)),
                 side: PayReceive::Pay,
+                include_valuation_date_cashflows: false,
                 start: date!(2024 - 12 - 20),
                 end: date!(2030 - 03 - 20),
                 recovery_rate: 0.40,
@@ -872,10 +865,10 @@ mod prepared_cds_tests {
         let as_of = date!(2025 - 02 - 15);
         let cds = create_test_cds(CdsValuationConvention::BloombergCdswClean)?;
         let (market, hazard) = create_test_market()?;
-        let cache = assert_base_and_bumped_values_match(&cds, &market, &hazard, as_of)?;
+        assert_base_and_bumped_values_match(&cds, &market, &hazard, as_of)?;
 
         assert!(
-            cache.clean_accrued.abs() > 1.0e-8,
+            cds.clean_quote_accrual(as_of)? > 1.0e-8,
             "current-coupon Bloomberg clean fixture should have non-zero accrued premium"
         );
         Ok(())
@@ -1138,7 +1131,6 @@ mod prepared_cds_tests {
 mod cds_review_regression_tests {
     use super::{CdsPricer, PreparedCds};
     use crate::cds::CreditDefaultSwap;
-    use crate::cds::pricing::AccrualDayCountPolicy;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
@@ -1164,6 +1156,7 @@ mod cds_review_regression_tests {
                 id: InstrumentId::new("CDS-REVIEW"),
                 notional: Money::from((10_000_000_i64, Currency::USD)),
                 side: PayReceive::Pay,
+                include_valuation_date_cashflows: false,
                 start,
                 end,
                 recovery_rate: 0.4,
@@ -1387,15 +1380,9 @@ mod cds_review_regression_tests {
                     pricer.premium_leg_pv_per_bp(&cds, &disc, &surv, as_of)? * 100.0 * 10_000_000.0,
                     expected_premium,
                 );
-                let accrued = pricer.coupon_accrued_fraction(
-                    &cds,
-                    as_of,
-                    AccrualDayCountPolicy::CdswInclusive,
-                )? * 10_000_000.0
-                    * 0.01;
                 let expected_protection = 10_000_000.0 * 0.6 * (1.0 - (-lambda * t).exp());
                 let npv = pricer.npv_full(&cds, &disc, &surv, as_of)?;
-                close(npv, expected_protection - expected_premium + accrued);
+                close(npv, expected_protection - expected_premium);
                 let market = MarketContext::new()
                     .try_insert(disc.clone())
                     .expect("insert market curve")

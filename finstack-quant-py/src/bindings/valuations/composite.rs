@@ -334,6 +334,7 @@ pub struct PyCompositeSpec {
 #[pymethods]
 impl PyCompositeSpec {
     #[new]
+    #[pyo3(signature = (id, reporting_currency, capital, legs, weighting_method, rebalance_rule, *, fx01_pair=None))]
     fn new(
         id: &str,
         reporting_currency: &Bound<'_, PyAny>,
@@ -341,8 +342,9 @@ impl PyCompositeSpec {
         legs: Vec<PyRef<'_, PyCompositeLegSpec>>,
         weighting_method: PyRef<'_, PyWeightingMethod>,
         rebalance_rule: PyRef<'_, PyRebalanceRule>,
+        fx01_pair: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
-        let inner = CompositeSpec::new(
+        let mut inner = CompositeSpec::new(
             id,
             extract_currency(reporting_currency)?,
             capital.inner,
@@ -350,8 +352,19 @@ impl PyCompositeSpec {
             weighting_method.inner.clone(),
             rebalance_rule.inner.clone(),
         );
+        inner.fx01_pair = fx01_pair
+            .map(|value| {
+                crate::bindings::module_utils::spec_from_py(value.py(), value, "FX01 pair")
+            })
+            .transpose()?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
+    }
+
+    #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeSpec.fx01_pair")]
+    #[getter]
+    fn fx01_pair<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.fx01_pair)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeSpec.legs")]

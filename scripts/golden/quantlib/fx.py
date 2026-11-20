@@ -116,6 +116,7 @@ def build_fx_forward() -> dict[str, Any]:
             "instrument": {
                 "type": "fx_forward",
                 "spec": {
+                    "spot_basis": {"type": "cash"},
                     "id": "EURUSD-1Y-FORWARD-QUANTLIB",
                     "base_currency": "EUR",
                     "quote_currency": "USD",

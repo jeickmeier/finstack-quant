@@ -272,6 +272,9 @@ impl FxSpot {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for FxSpot {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     fn with_bumped_fx_quote(
         &self,
         relative: f64,

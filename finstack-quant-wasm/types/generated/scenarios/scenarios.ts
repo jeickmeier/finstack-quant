@@ -2311,6 +2311,20 @@ export type EquityPriceSeriesPolicy = "adjusted" | "raw";
  */
 export type RealizedVarMethod = "close_to_close" | "parkinson" | "garman_klass" | "rogers_satchell" | "yang_zhang";
 /**
+ * Value-date basis of the selected ordered FX quote.
+ */
+export type FxSpotBasis =
+  | {
+      type: "cash";
+    }
+  | {
+      /**
+       * Fixed value date of the spot quote.
+       */
+      date: DateWire;
+      type: "value_date";
+    };
+/**
  * Official NDF fixing source/benchmark.
  *
  * NDF settlements reference official fixing rates published by central banks
@@ -2365,6 +2379,32 @@ export type NdfFixingSource =
  * other FX instruments that quote in this direction.
  */
 export type NdfQuoteConvention = "base_per_settlement" | "settlement_per_base";
+/**
+ * Settlement profile of the FX option.
+ */
+export type FxOptionDelivery =
+  | {
+      type: "cash_at_expiry";
+    }
+  | {
+      /**
+       * Booked value date of both currency legs, on or after expiry.
+       */
+      date: DateWire;
+      /**
+       * Confirmed expiry outcome. The live option has no known outcome.
+       */
+      exercised?: boolean | null;
+      /**
+       * Signed holder position with positive base notional.
+       */
+      position: FxOptionPosition;
+      type: "physical";
+    };
+/**
+ * Holder direction of a physically delivered FX option.
+ */
+export type FxOptionPosition = "long" | "short";
 /**
  * Pair/venue FX delta quoting convention selected by the contract.
  */
@@ -2532,6 +2572,20 @@ export type ConstituentReference =
  * Type of asset in the basket
  */
 export type BasketAssetType = "equity" | "bond" | "etf" | "cash" | "commodity" | "derivative";
+/**
+ * Operating expense accrued at the basket's valuation cut.
+ */
+export type BasketExpense =
+  | {
+      type: "none";
+    }
+  | {
+      /**
+       * Nonnegative accrued cash per basket unit in the reporting currency.
+       */
+      amount: Money;
+      type: "accrued";
+    };
 /**
  * Provider-selection purpose of a point-date FX query (record
  * CORE-CONVENTIONS-013 #1/#2).
@@ -11204,6 +11258,11 @@ export interface CreditDefaultSwap {
    */
   id: Id;
   /**
+   * Whether scheduled premium and actual upfront payable on the valuation date
+   * are still due. A booked trade must explicitly elect this boundary.
+   */
+  include_valuation_date_cashflows: boolean;
+  /**
    * Instrument-owned pricing inputs.
    */
   instrument_pricing_overrides?: InstrumentPricingOverrides;
@@ -11357,6 +11416,11 @@ export interface CdsIndex {
    * Unique instrument identifier
    */
   id: Id;
+  /**
+   * Whether scheduled premium and actual upfront payable on the valuation date
+   * are still due. A booked trade must explicitly elect this boundary.
+   */
+  include_valuation_date_cashflows: boolean;
   /**
    * Index factor (fraction of surviving notional since series inception)
    */
@@ -12832,6 +12896,10 @@ export interface FxForward {
    * Scenario-only pricing adjustments.
    */
   scenario_pricing_overrides?: ScenarioPricingOverrides;
+  /**
+   * Basis of the selected spot quote, held fixed across reprices.
+   */
+  spot_basis: FxSpotBasis;
 }
 /**
  * Non-Deliverable Forward (NDF) instrument.
@@ -12969,10 +13037,7 @@ export interface Ndf {
   settlement_currency: Currency;
 }
 /**
- * European FX option with same-day cash settlement at expiry.
- *
- * Physical delivery is intentionally not represented: exercised payoff is a
- * quote-currency cash amount on `expiry`.
+ * European FX option with an explicit cash or physical settlement profile.
  */
 export interface FxOption {
   /**
@@ -12987,6 +13052,10 @@ export interface FxOption {
    * Day count convention
    */
   day_count?: DayCount;
+  /**
+   * Booked payoff and settlement profile.
+   */
+  delivery: FxOptionDelivery;
   /**
    * Pair/venue delta convention and premium currency.
    */
@@ -13031,6 +13100,10 @@ export interface FxOption {
    * Scenario-only pricing adjustments.
    */
   scenario_pricing_overrides?: ScenarioPricingOverrides;
+  /**
+   * Selected spot quote's fixed value-date basis.
+   */
+  spot_basis: FxSpotBasis;
   /**
    * Strike exchange rate (quote per base).
    *
@@ -15936,8 +16009,11 @@ export interface Basket {
    */
   discount_curve_id: Id;
   /**
-   * Total expense ratio (as decimal, e.g., 0.0025 = 0.25%)
-   * This affects pricing through expense drag calculations
+   * Explicit accrued expense election at the valuation cut.
+   */
+  expense: BasketExpense;
+  /**
+   * Annual expense-ratio disclosure in decimal units (0.0025 is 0.25%).
    */
   expense_ratio: number;
   /**
@@ -15999,10 +16075,6 @@ export interface BasketConstituent {
  * Configuration for basket pricing behaviour.
  */
 export interface BasketPricingConfig {
-  /**
-   * Day basis used for fee accrual (e.g., 365.0 or 365.25). Avoid hardcoding in logic.
-   */
-  days_in_year: number;
   /**
    * FX policy hint for conversions when constituent currency != basket currency.
    */
@@ -18782,6 +18854,10 @@ export interface CompositeSpec {
    */
   capital: Money;
   /**
+   * Ordered market FX direction for whole-composite FX01.
+   */
+  fx01_pair?: FxPair | null;
+  /**
    * Stable composite instrument identifier.
    */
   id: Id;
@@ -18801,6 +18877,19 @@ export interface CompositeSpec {
    * Rule used to resolve quantities at initialization and rebalance.
    */
   weighting_method: WeightingMethod;
+}
+/**
+ * FX pair identifier using base/quote currency ordering.
+ */
+export interface FxPair {
+  /**
+   * Base currency (numerator).
+   */
+  base: Currency;
+  /**
+   * Quote currency (denominator).
+   */
+  quote: Currency;
 }
 /**
  * One self-contained leg in a composite specification.

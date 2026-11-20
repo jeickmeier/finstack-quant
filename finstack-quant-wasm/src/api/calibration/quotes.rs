@@ -223,7 +223,8 @@ pub fn cds_quote_par_spread(
 ///   - `convention` (object): CDS convention key `{ currency, doc_clause }`; `currency` is an upper-case ISO-4217 code and `doc_clause` one of `"cr14"`, `"mr14"`, `"mm14"`, `"xr14"`, `"isda_na"`, `"isda_eu"`, `"isda_as"`, `"isda_au"`, `"isda_nz"` or `"custom"`.
 ///   - `pillar` (object): Maturity pillar in its serde form, a tenor `{ tenor: { count: 5, unit: "years" } }` (units `"days"`, `"weeks"`, `"months"`, `"years"`) or a date `{ date: "2029-06-20" }`.
 ///   - `coupon_bp` (number): Standard running coupon in basis points (for example `100.0`).
-///   - `upfront_pct` (number): Upfront payment as a decimal fraction of notional (`0.01` is 1%), positive when the protection buyer pays.
+///   - `upfront_pct` (number): Signed quote as a decimal fraction of notional (`0.01` is 1%).
+///   - `upfront_basis` (string): `"clean"` before the accrued rebate, or `"actual_cash"` for booked buyer cash.
 ///   - `recovery_rate` (number): Assumed recovery rate as a decimal in `[0, 1)`.
 /// @returns A validated `CdsQuote` object with `type: "cds_upfront"`.
 ///

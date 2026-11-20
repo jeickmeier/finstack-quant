@@ -119,6 +119,10 @@ macro_rules! impl_future_option_instrument {
         }
 
         impl $crate::instruments::Instrument for $ty {
+            fn includes_valuation_date_cashflows(&self) -> bool {
+                true
+            }
+
             $crate::impl_instrument_base!($key, $family);
 
             fn validate_invariants(&self) -> finstack_quant_core::Result<()> {

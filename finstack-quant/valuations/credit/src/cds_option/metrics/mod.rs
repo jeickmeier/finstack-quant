@@ -100,16 +100,16 @@ pub(crate) fn register_cds_option_metrics(
             (Vega, VegaCalculator),
             (Cs01, crate::cs01::CreditParallelCs01::<
                 crate::cds_option::CdsOption,
-            >::default()),
+            >::default(), NativeMoney),
             (BucketedCs01, crate::cs01::CreditBucketedCs01::<
                 crate::cds_option::CdsOption,
-            >::default()),
+            >::default(), NativeMoney),
             (SpreadDv01, UnderlyingSpreadDv01Calculator),
-            (Dv01, dv01::CdsOptionDv01Calculator),
+            (Dv01, dv01::CdsOptionDv01Calculator(false)),
             (Theta, ThetaCalculator),
             (ParSpread, ParSpreadCalculator),
             (ImpliedVol, ImpliedVolCalculator),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, dv01::CdsOptionDv01Calculator(true)),
             // Recovery01 (custom metric - recovery rate sensitivity)
             (Recovery01, recovery01::Recovery01Calculator),
         ]

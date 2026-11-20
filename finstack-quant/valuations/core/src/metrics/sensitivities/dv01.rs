@@ -160,6 +160,14 @@ impl Dv01CalculatorConfig {
         }
     }
 
+    /// Create config for triangular key-rate DV01 on discount curves only.
+    pub fn triangular_discount_only() -> Self {
+        Self {
+            curve_selection: RateCurveSelection::DiscountOnly,
+            ..Self::triangular_key_rate()
+        }
+    }
+
     /// Override the metric ID used for storing per-curve or per-bucket series.
     pub fn with_series_id(mut self, id: MetricId) -> Self {
         self.series_id = id;
@@ -224,65 +232,41 @@ impl MetricCalculator for UnifiedDv01Calculator {
 }
 
 impl UnifiedDv01Calculator {
-    /// Collect curves based on configuration and what exists in the market.
+    /// Collect the instrument's required curves for the selected rate roles.
+    ///
+    /// # Arguments
+    ///
+    /// * `instrument` - Instrument declaring its active discount and projection curves.
+    /// * `market` - Market snapshot holding the curves in their declared roles.
     ///
     /// # Errors
     ///
-    /// Returns an error if the instrument declares rate curve dependencies but
-    /// none of them are found in the market context. This ensures that missing
-    /// market data is surfaced explicitly rather than silently returning 0.0.
+    /// Returns an error if any selected rate curve cannot be found.
     pub fn collect_curves(
         &self,
         instrument: &dyn Instrument,
         market: &MarketContext,
     ) -> finstack_quant_core::Result<Vec<(CurveId, RatesCurveKind)>> {
         let deps = instrument.market_dependencies()?.curves;
-        let mut curves = Vec::new();
-        let mut missing_curves = Vec::new();
+        let (curves, missing_curves): (Vec<_>, Vec<_>) = deps
+            .all_with_kind()
+            .filter(|(_, kind)| self.config.includes_curve_kind(*kind))
+            .partition(|(id, kind)| match kind {
+                RatesCurveKind::Discount => market.get_discount(id.as_str()).is_ok(),
+                RatesCurveKind::Forward => market.get_forward(id.as_str()).is_ok(),
+                RatesCurveKind::Credit | RatesCurveKind::Inflation => false,
+            });
 
-        for (curve_id, kind) in deps.all_with_kind() {
-            let selected = self.config.includes_curve_kind(kind);
-            match kind {
-                RatesCurveKind::Discount => {
-                    if market.get_discount(curve_id.as_str()).is_ok() {
-                        if selected {
-                            curves.push((curve_id, kind));
-                        }
-                    } else if selected {
-                        missing_curves.push(curve_id.as_str().to_string());
-                    }
-                }
-                RatesCurveKind::Forward => {
-                    if market.get_forward(curve_id.as_str()).is_ok() {
-                        if selected {
-                            curves.push((curve_id, kind));
-                        }
-                    } else if selected {
-                        missing_curves.push(curve_id.as_str().to_string());
-                    }
-                }
-                RatesCurveKind::Credit | RatesCurveKind::Inflation => {
-                    // Credit and inflation factors have dedicated sensitivities.
-                }
-            }
-        }
-
-        // If the instrument declares rate curve dependencies but none are found,
-        // this is a market data error that should be surfaced explicitly.
-        let has_rate_deps = match self.config.curve_selection {
-            RateCurveSelection::All => {
-                !deps.discount_curves.is_empty() || !deps.forward_curves.is_empty()
-            }
-            RateCurveSelection::ForwardOnly => !deps.forward_curves.is_empty(),
-            RateCurveSelection::DiscountOnly => !deps.discount_curves.is_empty(),
-        };
-
-        if curves.is_empty() && has_rate_deps {
+        if !missing_curves.is_empty() {
             return Err(finstack_quant_core::Error::from(
                 finstack_quant_core::InputError::NotFound {
                     id: format!(
                         "rate_curves for DV01 (missing: {})",
-                        missing_curves.join(", ")
+                        missing_curves
+                            .iter()
+                            .map(|(id, _)| id.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
                     ),
                 },
             ));
@@ -396,11 +380,13 @@ impl UnifiedDv01Calculator {
             return Ok(0.0);
         }
 
+        let mut scratch = context.curves.condition(context.as_of)?;
         let mut curve_totals = Vec::with_capacity(curves.len());
         for (curve_id, _kind) in curves.iter() {
             let curve_metric_id = MetricId::composite(&self.config.series_id, &[curve_id.as_str()]);
             let curve_total = self.compute_triangular_for_curve(
                 context,
+                &mut scratch,
                 curve_id,
                 curve_metric_id,
                 bump_bp,
@@ -422,6 +408,7 @@ impl UnifiedDv01Calculator {
     fn compute_triangular_for_curve(
         &self,
         context: &mut MetricContext,
+        scratch: &mut MarketContext,
         curve_id: &CurveId,
         metric_id: MetricId,
         bump_bp: f64,
@@ -437,45 +424,102 @@ impl UnifiedDv01Calculator {
         let mut series: Vec<(std::borrow::Cow<'static, str>, f64)> =
             Vec::with_capacity(buckets.len());
 
-        context.with_market_scratch(|context, scratch| {
-            for (i, &target_time) in buckets.iter().enumerate() {
-                let label =
-                    std::borrow::Cow::Owned(crate::metrics::format_key_rate_label(target_time));
-                // Build bucket-shaped bumps with half-triangle wings at the
-                // first and last buckets so the bump-set partitions unity
-                // across the full curve. Using a finite `prev = 0.0` at the
-                // first bucket would produce a rising triangle from t=0 and
-                // understate short-end DV01 — see
-                // `BumpSpec::triangular_key_rate_first_bp` for the rationale.
-                let build = |bp: f64| -> BumpSpec {
-                    BumpSpec::triangular_key_rate_bucket_bp(
-                        buckets[..i].last().copied(),
-                        target_time,
-                        buckets.get(i + 1).copied(),
-                        bp,
-                    )
-                };
+        for (i, &target_time) in buckets.iter().enumerate() {
+            let label = std::borrow::Cow::Owned(crate::metrics::format_key_rate_label(target_time));
+            // Build bucket-shaped bumps with half-triangle wings at the
+            // first and last buckets so the bump-set partitions unity
+            // across the full curve. Using a finite `prev = 0.0` at the
+            // first bucket would produce a rising triangle from t=0 and
+            // understate short-end DV01 — see
+            // `BumpSpec::triangular_key_rate_first_bp` for the rationale.
+            let build = |bp: f64| -> BumpSpec {
+                BumpSpec::triangular_key_rate_bucket_bp(
+                    buckets[..i].last().copied(),
+                    target_time,
+                    buckets.get(i + 1).copied(),
+                    bp,
+                )
+            };
 
-                let spec_up = build(bump_bp);
-                let token_up = scratch.apply_curve_bump_in_place(curve_id, spec_up)?;
-                let pv_up = reprice_rate_risk(context, scratch, as_of)?;
-                scratch.revert_scratch_bump(token_up)?;
+            let spec_up = build(bump_bp);
+            let token_up = scratch.apply_curve_bump_in_place(curve_id, spec_up)?;
+            let pv_up = reprice_rate_risk(context, scratch, as_of)?;
+            scratch.revert_scratch_bump(token_up)?;
 
-                let spec_down = build(-bump_bp);
-                let token_down = scratch.apply_curve_bump_in_place(curve_id, spec_down)?;
-                let pv_down = reprice_rate_risk(context, scratch, as_of)?;
-                scratch.revert_scratch_bump(token_down)?;
+            let spec_down = build(-bump_bp);
+            let token_down = scratch.apply_curve_bump_in_place(curve_id, spec_down)?;
+            let pv_down = reprice_rate_risk(context, scratch, as_of)?;
+            scratch.revert_scratch_bump(token_down)?;
 
-                let dv01 = super::cs01::sensitivity_central_diff(pv_up, pv_down, bump_bp);
-                series.push((label, dv01));
-            }
-            Ok(())
-        })?;
+            let dv01 = super::cs01::sensitivity_central_diff(pv_up, pv_down, bump_bp);
+            series.push((label, dv01));
+        }
 
         let total: f64 = neumaier_sum(series.iter().map(|(_, v)| *v))?;
         context.store_bucketed_series(metric_id, series);
         Ok(total)
     }
+}
+
+/// Reprice each original rate quote independently in both directions.
+///
+/// # Arguments
+///
+/// * `curve_id` - Owning discount or projection curve. Dependent curves may
+///   recalibrate, but only one quote belonging to this source is moved.
+/// * `recipe` - The owning curve's original accepted calibration execution.
+/// * `bump_bp` - Positive symmetric quote shock in basis points.
+/// * `reprice` - Callback that replays the exact shock and returns signed
+///   instrument PV in its reporting currency.
+///
+/// # Errors
+///
+/// Returns an error if the execution is absent, if the reported coordinates
+/// collide, or if either scenario cannot be recalibrated and priced.
+pub fn rate_quote_dv01_series(
+    curve_id: &CurveId,
+    recipe: &finstack_quant_core::market_data::term_structures::RateCalibrationRecipe,
+    bump_bp: f64,
+    mut reprice: impl FnMut(crate::recalibration::QuoteBump) -> finstack_quant_core::Result<f64>,
+) -> finstack_quant_core::Result<Vec<(String, f64)>> {
+    let execution = recipe
+        .execution
+        .as_ref()
+        .filter(|execution| execution.accepted && !execution.bindings.is_empty())
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "bucketed DV01 requires an accepted quote replay for {curve_id}"
+            ))
+        })?;
+    let mut labels = finstack_quant_core::FxHashSet::default();
+    let mut series = Vec::with_capacity(execution.bindings.len());
+    for binding in &execution.bindings {
+        if !binding.pillar_time.is_finite() || binding.pillar_time <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "rate quote {} has invalid pillar time {} for {curve_id}",
+                binding.quote_id, binding.pillar_time
+            )));
+        }
+        let label = crate::metrics::format_key_rate_label(binding.pillar_time);
+        if !labels.insert(label.clone()) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "bucketed DV01 has multiple quote targets at {curve_id}::{label}"
+            )));
+        }
+        let shock = |bp| crate::recalibration::QuoteBump::RateQuoteBp {
+            curve_id: curve_id.clone(),
+            quote_id: binding.quote_id.clone(),
+            pillar_date: binding.pillar_date,
+            bp,
+        };
+        let up = reprice(shock(bump_bp))?;
+        let down = reprice(shock(-bump_bp))?;
+        series.push((
+            label,
+            super::cs01::sensitivity_central_diff(up, down, bump_bp),
+        ));
+    }
+    Ok(series)
 }
 
 #[cfg(test)]

@@ -72,6 +72,9 @@ def test_strict_mixed_book_risk_and_currency_reconciliation(fixtures: SimpleName
     assert not any(
         key.startswith("cs01") for key in wire["position_values"]["USD-CASH"]["valuation_result"]["measures"]
     )
+    for iid in ("USD-CORP", "EUR-GOVT"):
+        bond_measures = wire["position_values"][iid]["valuation_result"]["measures"]
+        assert not any(key.split("::", 1)[0] == "bucketed_cs01" for key in bond_measures)
     summed = sum(Decimal(position["value_base"]["amount"]) for position in wire["position_values"].values())
     assert abs(summed - Decimal(wire["total_base_currency"]["amount"])) <= Decimal("0.01")
     eur = wire["position_values"]["EUR-GOVT"]

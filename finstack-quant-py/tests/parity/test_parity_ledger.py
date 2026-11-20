@@ -383,7 +383,7 @@ def data_class_computed_properties(cls: Any, ts_type: str) -> set[str]:
 # of their TypeScript type nor recorded in the ledger; add a namespace here
 # once its properties are recorded (as a rename to a WASM function, or as
 # ``literal`` for a plain view of wire fields).
-PROPERTY_CHECKED_PREFIXES = ("finstack_quant.models.", "finstack_quant.cashflows.")
+PROPERTY_CHECKED_PREFIXES = ("finstack_quant.models.", "finstack_quant.cashflows.", "finstack_quant.valuations.")
 
 
 LITERAL = "literal"

@@ -3,7 +3,7 @@
   "sources": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "0b2dadbea985c1db3b433ecfdf8c26213cedda7ff60f7571cbb8e57b438cbd16"
+      "sha256": "1b1c97c1e978f6ddf018b5f38e16b7b0c407aac254f7443f76908d9c27a07162"
     }
   ],
   "base": {
@@ -108,12 +108,12 @@
               }
             },
             "pull_to_par": {
-              "amount": "3683.909087100884",
+              "amount": "3715.510902290469",
               "currency": "USD"
             },
             "roll_down": {
               "total": {
-                "amount": "-1596.049899721223",
+                "amount": "-1627.651714910808",
                 "currency": "USD"
               }
             }
@@ -1128,7 +1128,7 @@
             "currency": "USD"
           },
           "rates_curves_pnl": {
-            "amount": "-3808.019346892584",
+            "amount": "-3808.069011754394",
             "currency": "USD"
           },
           "credit_curves_pnl": {
@@ -1168,7 +1168,7 @@
             "currency": "USD"
           },
           "residual": {
-            "amount": "77.272649954179",
+            "amount": "77.322314815989",
             "currency": "USD"
           },
           "carry_detail": {
@@ -1300,7 +1300,7 @@
                 "currency": "USD"
               },
               "gamma_pnl": {
-                "amount": "10.562270265186866",
+                "amount": "10.512605403376487",
                 "currency": "USD"
               }
             }
@@ -1313,7 +1313,7 @@
             "num_repricings": 2,
             "tolerance_abs": 10,
             "tolerance_pct": 1,
-            "residual_pct": 0.8659541894963139,
+            "residual_pct": 0.8665107576375725,
             "rounding": {
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
@@ -1402,7 +1402,7 @@
           "currency": "USD",
           "factor_contributions": {
             "carry": 0.01275502978865086,
-            "rates_curves": -0.0038383748653773616,
+            "rates_curves": -0.0038384249261412123,
             "credit_curves": 0,
             "inflation_curves": 0,
             "correlations": 0,
@@ -1413,7 +1413,7 @@
           }
         }
       },
-      "explain": "Horizon Total Return: 0.8995%\nAnnualized: 3.6982%\nHorizon: 90 days\nInitial Value: USD 992091.57\nTerminal Value: USD 1001014.98\nTotal P&L: USD 8923.41\n  Carry: USD 12654.16\n  Rates: USD -3808.02\n  Credit: USD 0.00\n  Residual: USD 77.27\n",
+      "explain": "Horizon Total Return: 0.8995%\nAnnualized: 3.6982%\nHorizon: 90 days\nInitial Value: USD 992091.57\nTerminal Value: USD 1001014.98\nTotal P&L: USD 8923.41\n  Carry: USD 12654.16\n  Rates: USD -3808.07\n  Credit: USD 0.00\n  Residual: USD 77.32\n",
       "attributionBuckets": [
         {
           "field": "carry",
@@ -1426,10 +1426,10 @@
         {
           "field": "rates_curves_pnl",
           "amount": {
-            "amount": "-3808.019346892584",
+            "amount": "-3808.069011754394",
             "currency": "USD"
           },
-          "pct_of_total": -42.67448196845892
+          "pct_of_total": -42.67503853660018
         },
         {
           "field": "credit_curves_pnl",
@@ -1506,10 +1506,10 @@
         {
           "field": "residual",
           "amount": {
-            "amount": "77.272649954179",
+            "amount": "77.322314815989",
             "currency": "USD"
           },
-          "pct_of_total": 0.8659541894963139
+          "pct_of_total": 0.8665107576375725
         }
       ]
     }

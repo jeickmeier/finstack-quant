@@ -63,7 +63,7 @@ fn b11_quote_set_propagates_applicable_metric_failure() {
 }
 
 #[test]
-fn quote_set_reports_a_non_finite_metric_as_none() {
+fn quote_set_rejects_a_non_finite_metric_with_its_name() {
     struct Fixed(f64);
     impl MetricCalculator for Fixed {
         fn calculate(&self, _: &mut MetricContext) -> finstack_quant_core::Result<f64> {
@@ -84,30 +84,28 @@ fn quote_set_reports_a_non_finite_metric_as_none() {
                 .expect("curve"),
         )
         .expect("insert market curve");
-    let mut metrics = crate::FIXED_INCOME.metrics().clone();
     for (id, value) in [
         (MetricId::Ytw, f64::NEG_INFINITY),
         (MetricId::JapaneseSimpleYield, f64::INFINITY),
         (MetricId::MoosmullerYtm, f64::NAN),
     ] {
-        metrics.replace_metric(id, Arc::new(Fixed(value)), &[InstrumentType::Bond]);
+        let mut metrics = crate::FIXED_INCOME.metrics().clone();
+        metrics.replace_metric(id.clone(), Arc::new(Fixed(value)), &[InstrumentType::Bond]);
+        let message = compute_quotes(
+            &bond,
+            &market,
+            as_of,
+            BondQuoteInput::CleanPricePct(100.0),
+            PricingOptions::default().with_metric_registry(Arc::new(metrics)),
+        )
+        .expect_err("non-finite result")
+        .to_string();
+        assert!(message.contains(id.as_str()), "{message}");
+        assert!(
+            message.contains("metric output must be finite"),
+            "{message}"
+        );
     }
-    let quotes = compute_quotes(
-        &bond,
-        &market,
-        as_of,
-        BondQuoteInput::CleanPricePct(100.0),
-        PricingOptions::default().with_metric_registry(Arc::new(metrics)),
-    )
-    .expect("set");
-    assert_eq!(quotes.ytw, None);
-    assert_eq!(quotes.japanese_simple_yield, None);
-    assert_eq!(quotes.moosmuller_ytm, None);
-    assert!(quotes.ytm.is_some());
-    // JSON has no infinity: what crosses the wire reads back the same.
-    let wire = serde_json::to_string(&quotes).expect("to json");
-    let back: BondQuoteSet = serde_json::from_str(&wire).expect("from json");
-    assert_eq!(back, quotes);
 }
 
 struct LinearTreeOasPricer {

@@ -170,6 +170,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCreditTranch
 }
 
 impl Instrument for StructuredCreditTranche {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
     fn id(&self) -> &str {
         self.id.as_str()
     }

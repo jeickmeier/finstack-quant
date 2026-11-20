@@ -78,4 +78,43 @@ mod tests {
         // Value should be reasonable
         assert!(pv.amount().abs() < roll.notional.amount());
     }
+
+    #[test]
+    fn roll_mark_and_cash_reconcile_with_the_delivered_pool() {
+        use finstack_quant_valuations_core::instruments::Instrument;
+        use finstack_quant_valuations_core::metrics::collect_period_cash;
+
+        let roll = DollarRoll::example().expect("dollar roll");
+        let cases = [
+            (roll.front_leg().expect("front leg"), -1.0),
+            (roll.back_leg().expect("back leg"), 1.0),
+        ];
+        let base = time::macros::date!(2024 - 01 - 01);
+        let discount = DiscountCurve::builder("USD-OIS")
+            .base_date(base)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .knots([(0.0, 1.0), (40.0, 1.0)])
+            .build()
+            .expect("zero-rate curve");
+        let market = MarketContext::new()
+            .try_insert(discount)
+            .expect("discount curve");
+        assert!(!roll.includes_valuation_date_cashflows());
+        for (leg, delivered_sign) in cases {
+            let payment = leg.effective_settlement_date().expect("settlement date");
+            let start = payment.previous_day().expect("day before delivery");
+            let currency = roll.notional.currency();
+            let opening = roll.value(&market, start).expect("open dollar roll");
+            let closing = roll.value(&market, payment).expect("remaining dollar roll");
+            let cash = collect_period_cash(&roll, &market, start, payment, currency)
+                .expect("settlement invoice");
+            let pool = crate::tba::pricer::resolve_assumed_pool(&leg).expect("delivery pool");
+            let delivery = pool.value(&market, payment).expect("delivered pool value");
+            let closing_position = closing.amount() + delivered_sign * delivery.amount();
+            assert_ne!(cash.total.amount(), 0.0);
+            assert!((opening.amount() - closing_position - cash.total.amount()).abs() < 1e-6);
+        }
+    }
 }

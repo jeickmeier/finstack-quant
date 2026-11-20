@@ -19,7 +19,7 @@
         {
           "metric": "npv",
           "reason": "Residual after pricing the index on a flat curve at its quote; the remaining Bloomberg forward, exercise-amount and risk conventions are not identifiable from the captured screens. Source expectations and tolerances are preserved.",
-          "evidence": "Flat 53.6264 bp curve measurement: Finstack 118350.60724574 versus preserved target 118781.76; unchanged tolerance USD 6. See docs/audits/2026-09-09-cdso-reconciliation.md (2026-10-08 section)."
+          "evidence": "Flat 53.6264 bp curve measurement with dated accrued settlement: Finstack 118369.97215935 versus preserved target 118781.76; unchanged tolerance USD 6. See docs/audits/2026-09-09-cdso-reconciliation.md (2026-10-08 section)."
         },
         {
           "metric": "par_spread",

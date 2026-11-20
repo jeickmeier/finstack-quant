@@ -226,6 +226,9 @@ impl PrivateMarketsFund {
 // Attributable is provided via blanket impl for all Instrument types
 
 impl Instrument for PrivateMarketsFund {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::PrivateMarketsFund,
         crate::EQUITY

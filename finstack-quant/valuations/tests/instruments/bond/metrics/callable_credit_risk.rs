@@ -206,21 +206,26 @@ fn test_unquoted_callable_explicit_models_skip_quote_spread_dependencies() {
         .price_with_metrics(
             &market,
             as_of,
-            &[
-                MetricId::Cs01,
-                MetricId::BucketedCs01,
-                MetricId::BucketedDv01,
-            ],
+            &[MetricId::Cs01, MetricId::BucketedDv01],
             PricingOptions::default().with_model(ModelKey::Tree),
         )
         .expect("unquoted callable Tree risk should not require Z-spread");
-    for metric in ["cs01", "bucketed_cs01", "bucketed_dv01"] {
+    for metric in ["cs01", "bucketed_dv01"] {
         let value = tree.measures[metric];
         assert!(
             value.is_finite() && value.abs() > 1e-6,
             "Tree {metric} should be finite and non-zero, got {value}"
         );
     }
+    let unavailable = tree_bond
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::BucketedCs01],
+            PricingOptions::default().with_model(ModelKey::Tree),
+        )
+        .expect_err("the rates-only tree has no hazard-quote buckets");
+    assert!(unavailable.to_string().contains("bucketed_cs01"));
     let bucketed_dv01 = tree.measures["bucketed_dv01"];
     assert!(bucketed_dv01.is_finite() && bucketed_dv01.abs() > 1e-6);
     assert!(

@@ -446,6 +446,7 @@ fn external_quantlib_parity_fx_forward_npv() {
     let maturity = parse_iso_date(&fixture.spec.maturity_date);
 
     let forward = FxForward::builder()
+        .spot_basis(finstack_quant_valuations::instruments::fx::fx_forward::FxSpotBasis::Cash)
         .id(finstack_quant_core::types::InstrumentId::new(
             "QL-PARITY-EURUSD",
         ))

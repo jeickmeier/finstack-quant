@@ -256,28 +256,23 @@ fn a_workout_on_the_quote_date_is_the_same_error_as_i_spread() {
     bond.instrument_pricing_overrides = bond
         .instrument_pricing_overrides
         .with_quoted_clean_price_pct(100.0);
-    assert_eq!(
-        metrics(&bond, &market, &[MetricId::Ytw])[0],
-        f64::NEG_INFINITY
-    );
-    let wire = serde_json::to_value(
-        bond.price_with_metrics(&market, as_of, &[MetricId::Ytw], PricingOptions::default())
-            .expect("ytw"),
-    )
-    .expect("json");
-    assert!(wire["measures"]["ytw"].is_null(), "{}", wire["measures"]);
     let error = |id: MetricId| {
         bond.price_with_metrics(&market, as_of, &[id], PricingOptions::default())
             .expect_err("no par rate to the quote date")
             .to_string()
     };
     let (g, i) = (error(MetricId::GSpread), error(MetricId::ISpread));
+    let ytw = error(MetricId::Ytw);
+    assert!(
+        ytw.contains("ytw") && ytw.contains("must be finite"),
+        "{ytw}"
+    );
     assert!(g.contains("Invalid date range"), "{g}");
     assert!(i.contains("Invalid date range"), "{i}");
 }
 
-/// What naming a curve does to DV01: the curve is a dependency of the bond, so
-/// bucketed DV01 reports it at zero, and parallel DV01 ignores it when missing.
+/// A government benchmark belongs to the spread quote. Direct rate risk
+/// shocks the bond's active pricing curves and requires only those curves.
 #[test]
 fn a_named_curve_is_a_dependency_with_no_dv01_of_its_own() {
     let as_of = date!(2025 - 01 - 01);
@@ -303,19 +298,11 @@ fn a_named_curve_is_a_dependency_with_no_dv01_of_its_own() {
             PricingOptions::default(),
         )
         .expect("bucketed dv01");
-    let rows: Vec<(&str, f64)> = bucketed
-        .measures
-        .iter()
-        .map(|(key, value)| (key.as_str(), *value))
-        .collect();
-    let ust: Vec<f64> = rows
-        .iter()
-        .filter(|(key, _)| key.contains("UST"))
-        .map(|(_, value)| *value)
-        .collect();
     assert!(
-        !ust.is_empty() && ust.iter().all(|value| *value == 0.0),
-        "{rows:?}"
+        bucketed
+            .measures
+            .keys()
+            .all(|key| !key.as_str().contains("UST"))
     );
 
     let without_curve = MarketContext::new()

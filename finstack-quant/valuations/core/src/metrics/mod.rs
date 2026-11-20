@@ -80,7 +80,7 @@ pub use finite_difference::bump_surface_vol_absolute;
 pub use ids::closest_metric_names;
 pub use ids::{MetricGroup, MetricId, MetricUnit};
 pub use period_cash::{PeriodCash, collect_period_cash};
-pub use registry::{MetricRegistry, MetricRegistryError};
+pub use registry::{MetricAggregation, MetricRegistry, MetricRegistryError};
 pub use traits::{MetricCalculator, MetricContext, MetricSeed};
 #[doc(hidden)]
 pub use universal::{PricerPublishedMetric, register_universal_metrics};

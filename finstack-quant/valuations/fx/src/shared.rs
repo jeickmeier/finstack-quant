@@ -17,6 +17,44 @@ pub(crate) fn event_has_occurred(event_date: Date, as_of: Date) -> bool {
     event_date < as_of
 }
 
+/// Value-date basis of the selected ordered FX quote.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+pub enum FxSpotBasis {
+    /// The selected quote is cash FX at the valuation date.
+    Cash,
+    /// The selected outright is quoted for a stated value date.
+    ValueDate {
+        /// Fixed value date of the spot quote.
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::DateWire")
+        )]
+        date: Date,
+    },
+}
+
+impl FxSpotBasis {
+    pub(crate) fn cash_rate(
+        self,
+        spot: f64,
+        domestic: &impl Discounting,
+        foreign: &impl Discounting,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
+        let cash = match self {
+            Self::Cash => spot,
+            Self::ValueDate { date } => {
+                spot * (domestic.df_between_dates(as_of, date)?
+                    / foreign.df_between_dates(as_of, date)?)
+            }
+        };
+        finstack_quant_core::validation::validate_f64_positive(cash, "FX cash-equivalent rate")?;
+        Ok(cash)
+    }
+}
+
 /// Inputs for a covered-interest-parity FX forward rate.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct FxForwardRateRequest<'a> {
@@ -36,6 +74,8 @@ pub(crate) struct FxForwardRateRequest<'a> {
     pub(crate) foreign_discount_curve_id: &'a CurveId,
     /// Optional quote-per-base spot override.
     pub(crate) quoted_spot: Option<f64>,
+    /// Value-date basis of the spot number.
+    pub(crate) spot_basis: FxSpotBasis,
     /// Label included in validation errors.
     pub(crate) context: &'a str,
 }
@@ -106,6 +146,10 @@ pub(crate) fn collect_fx_forward_inputs(
             request.context
         )));
     }
+    let spot =
+        request
+            .spot_basis
+            .cash_rate(spot, domestic.as_ref(), foreign.as_ref(), request.as_of)?;
     Ok(FxForwardInputs {
         spot,
         df_domestic,
@@ -133,6 +177,10 @@ pub(crate) struct FxOptionInputRequest<'a> {
     pub(crate) quote_currency: Currency,
     /// Option expiry.
     pub(crate) expiry: Date,
+    /// Delivery date of the underlying exposure.
+    pub(crate) delivery: Date,
+    /// Value-date basis of the active spot quote.
+    pub(crate) spot_basis: FxSpotBasis,
     /// Volatility time basis.
     pub(crate) day_count: DayCount,
     /// Domestic discount curve.
@@ -183,6 +231,10 @@ pub(crate) struct FxOptionInputs {
     pub(crate) t: f64,
     /// Date-based domestic discount factor from `as_of` to expiry (`1.0` once expired).
     pub(crate) df_domestic: f64,
+    /// Date-based base-currency factor to delivery.
+    pub(crate) df_foreign: f64,
+    /// Sensitivity of valuation-date cash FX to the active spot number.
+    pub(crate) spot_conversion: f64,
 }
 
 /// Quote-per-base FX spot from the `spot_id` scalar when given, else the FX matrix.
@@ -262,8 +314,14 @@ fn collect_fx_option_inputs_no_vol_at_spot(
     let foreign_disc = request
         .market
         .get_discount(request.foreign_discount_curve_id.as_str())?;
-    let df_d = domestic_disc.df_between_dates(request.as_of, request.expiry)?;
-    let df_f = foreign_disc.df_between_dates(request.as_of, request.expiry)?;
+    let spot = request.spot_basis.cash_rate(
+        spot,
+        domestic_disc.as_ref(),
+        foreign_disc.as_ref(),
+        request.as_of,
+    )?;
+    let df_d = domestic_disc.df_between_dates(request.as_of, request.delivery)?;
+    let df_f = foreign_disc.df_between_dates(request.as_of, request.delivery)?;
     let t = request.day_count.year_fraction(
         request.as_of,
         request.expiry,
@@ -313,6 +371,8 @@ pub(crate) fn collect_fx_option_inputs_at_spot(
             sigma: 0.0,
             t: 0.0,
             df_domestic: 1.0,
+            df_foreign: 1.0,
+            spot_conversion: 1.0,
         });
     }
 
@@ -354,6 +414,8 @@ pub(crate) fn collect_fx_option_inputs_at_spot(
         sigma,
         t: no_vol.t,
         df_domestic: no_vol.df_domestic,
+        df_foreign: no_vol.df_foreign,
+        spot_conversion: no_vol.spot / spot,
     })
 }
 
@@ -679,6 +741,8 @@ mod tests {
             base_currency: Currency::EUR,
             quote_currency: Currency::USD,
             expiry,
+            delivery: expiry,
+            spot_basis: crate::shared::FxSpotBasis::Cash,
             day_count: DayCount::Act365F,
             domestic_discount_curve_id: &CurveId::new("USD-OIS"),
             foreign_discount_curve_id: &CurveId::new("EUR-OIS"),
@@ -720,6 +784,8 @@ mod tests {
             base_currency: Currency::EUR,
             quote_currency: Currency::USD,
             expiry,
+            delivery: expiry,
+            spot_basis: crate::shared::FxSpotBasis::Cash,
             day_count: DayCount::Act365F,
             domestic_discount_curve_id: &CurveId::new("USD-OIS"),
             foreign_discount_curve_id: &CurveId::new("EUR-OIS"),

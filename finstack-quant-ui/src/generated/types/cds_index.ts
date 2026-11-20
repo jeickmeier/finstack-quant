@@ -568,6 +568,11 @@ export interface D_765A4643A287F5Eb4B9D {
   convention: "isda_na" | "isda_eu" | "isda_as" | "custom";
   id: Id1;
   /**
+   * Whether scheduled premium and actual upfront payable on the valuation date
+   * are still due. A booked trade must explicitly elect this boundary.
+   */
+  include_valuation_date_cashflows: boolean;
+  /**
    * Index factor (fraction of surviving notional since series inception)
    */
   index_factor: number;

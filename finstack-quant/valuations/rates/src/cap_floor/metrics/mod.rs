@@ -56,9 +56,7 @@ pub(crate) fn register_cap_floor_metrics(
             )),
             (ImpliedVol, implied_vol::ImpliedVolCalculator),
             (ForwardPv01, ForwardPv01Calculator),
-            (BucketedDv01, UnifiedDv01Calculator::new(
-                Dv01CalculatorConfig::triangular_key_rate(),
-            )),
+            (BucketedDv01, crate::rate_bucketed_dv01::RateDv01(true)),
         ]
     }
     Ok(())

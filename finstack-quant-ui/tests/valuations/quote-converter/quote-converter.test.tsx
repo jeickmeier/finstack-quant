@@ -227,7 +227,7 @@ it("shows the native error of a failed solve as returned, and keeps the form", (
     />,
   );
   expect(screen.getByRole("alert").textContent).toBe(message);
-  expect(message).toContain("z_spread");
+  expect(message).toContain("ytw");
   expect(screen.getByRole("button", { name: "Convert" })).toBeTruthy();
 });
 it("states loading and no result", () => {

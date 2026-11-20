@@ -73,6 +73,12 @@ impl PyBasket {
         self.inner.expense_ratio
     }
 
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "Basket.expense")]
+    #[getter]
+    fn expense<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.expense)
+    }
+
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "Basket.reporting_currency")]
     #[getter]
     fn reporting_currency(&self) -> String {
@@ -131,6 +137,15 @@ impl PyBasketBuilder {
         value: f64,
     ) -> PyResult<PyRefMut<'py, Self>> {
         builder_set!(slf, |b: BasketBuilder| b.expense_ratio(value))
+    }
+
+    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "BasketBuilder.expense")]
+    fn expense<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &Bound<'py, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let value = py_to_serde(value.py(), value, "expense")?;
+        builder_set!(slf, |b: BasketBuilder| b.expense(value))
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "BasketBuilder.reporting_currency")]

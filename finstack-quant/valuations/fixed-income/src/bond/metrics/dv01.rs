@@ -1,123 +1,49 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
 use crate::bond::Bond;
-use crate::bond::metrics::effective::{option_risk_bond_and_base_price, option_risk_curve_id};
-use finstack_quant_core::market_data::bumps::BumpSpec;
-use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations_core::instruments::pricing_overrides::BondRiskBasis;
-use finstack_quant_valuations_core::metrics::sensitivities::cs01::sensitivity_central_diff;
+use finstack_quant_valuations_core::metrics::sensitivities::dv01::{
+    Dv01CalculatorConfig, UnifiedDv01Calculator,
+};
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use std::borrow::Cow;
+use std::sync::Arc;
 
-/// Calculates option-aware bond DV01.
-///
-/// Bonds with call, put, or return-floor rights and market price quotes must not
-/// reprice bumped scenarios from the fixed clean price. Convert the quote into
-/// the equivalent constant-OAS model input, then bump the tree curve and reprice.
+/// Combined direct rate DV01 on the bond's selected holder valuation basis.
 pub(crate) struct BondDv01Calculator;
 
 impl MetricCalculator for BondDv01Calculator {
     fn dependencies(&self) -> &[MetricId] {
-        &[MetricId::DurationMod, MetricId::Ytm]
+        &[MetricId::ZSpread]
     }
 
     fn dynamic_dependencies<'a>(&'a self, context: &MetricContext) -> Cow<'a, [MetricId]> {
-        let Ok(bond) = context.instrument_as::<Bond>() else {
-            return Cow::Borrowed(self.dependencies());
-        };
-        let has_options = bond.has_exercise_rights();
-        let has_price_driver = bond
-            .instrument_pricing_overrides
-            .market_quotes
-            .has_price_driver();
-        if super::bond_risk_basis(context) == BondRiskBasis::CallableOas
-            || (!has_options && !has_price_driver)
-        {
-            Cow::Borrowed(&[])
-        } else {
-            Cow::Borrowed(self.dependencies())
-        }
+        BondBucketedDv01Calculator.dynamic_dependencies(context)
     }
 
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let bond: &Bond = context.instrument_as()?;
-        let has_options = bond.has_exercise_rights();
-        let basis = super::bond_risk_basis(context);
-
-        if basis != BondRiskBasis::CallableOas {
-            if !bond
-                .instrument_pricing_overrides
-                .market_quotes
-                .has_price_driver()
-                && !has_options
-            {
-                return parallel_dv01(context);
-            }
-
-            // Default (Workout) basis: a bond with embedded exercise rights is handled by
-            // the yield-basis DV01, the dollar analogue of `DurationMod`. This
-            // keeps it consistent with `DurationMod`, `Convexity` and
-            // `YieldDv01` on this basis (they all use the quoted-yield /
-            // workout convention), and — when a market price is quoted — the
-            // workout path feeding `DurationMod` captures the embedded option.
-            //
-            // The previous behaviour cloned the bond with `call_put = None`
-            // and curve-bumped that bullet, which silently discarded the
-            // option and reported a curve sensitivity inconsistent in both
-            // methodology and units with the rest of the Workout-basis family.
-            return super::yield_dv01::YieldDv01Calculator.calculate(context);
-        }
-
-        let has_price_driver = bond
-            .instrument_pricing_overrides
-            .market_quotes
-            .has_price_driver();
-        if !has_price_driver {
-            return parallel_dv01(context);
-        }
-
-        if !has_options {
-            return super::risk_view::with_bond_risk_view(context, parallel_dv01);
-        }
-
-        let (risk_bond, _) = option_risk_bond_and_base_price(bond, context)?;
-        let curve_id = option_risk_curve_id(&risk_bond);
-
-        curve_bump_dv01(&risk_bond, context, &curve_id)
+        super::risk_view::with_bond_risk_view(context, |ctx| {
+            direct_rate_dv01(ctx, Dv01CalculatorConfig::parallel_combined())
+        })
     }
 }
 
-/// Generic parallel combined-curve DV01 of the context's instrument.
-fn parallel_dv01(context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-    use finstack_quant_valuations_core::metrics::sensitivities::dv01::{
-        Dv01CalculatorConfig, UnifiedDv01Calculator,
-    };
-    UnifiedDv01Calculator::new(Dv01CalculatorConfig::parallel_combined()).calculate(context)
-}
-
-fn curve_bump_dv01(
-    bond: &Bond,
-    context: &MetricContext,
-    curve_id: &CurveId,
+fn direct_rate_dv01(
+    context: &mut MetricContext,
+    config: Dv01CalculatorConfig,
 ) -> finstack_quant_core::Result<f64> {
-    let defaults =
-        finstack_quant_valuations_core::metrics::sensitivities::config::resolve(context)?;
-    let bump_bp = defaults.rate_bump_bp;
-    if bump_bp.abs() <= f64::EPSILON {
-        return Ok(0.0);
+    let bond = context.instrument_as::<Bond>()?;
+    let model = &bond.instrument_pricing_overrides.model_config;
+    let calculator = UnifiedDv01Calculator::new(config);
+    if model.government_curve_id.is_none() && model.asw_forward_curve_id.is_none() {
+        return calculator.calculate(context);
     }
-
-    let target = context.curves.curve_target(curve_id)?;
-    let market_up = context
-        .curves
-        .bump([target.clone().into_bump(BumpSpec::parallel_bp(bump_bp))])?;
-    let market_down = context
-        .curves
-        .bump([target.into_bump(BumpSpec::parallel_bp(-bump_bp))])?;
-
-    let pv_up = context.reprice_instrument_raw(bond, &market_up, context.as_of)?;
-    let pv_down = context.reprice_instrument_raw(bond, &market_down, context.as_of)?;
-    Ok(sensitivity_central_diff(pv_up, pv_down, bump_bp))
+    // These references belong to spread quotes. The direct rate experiment
+    // reprices the holder cashflows with the selected model's curves.
+    let mut rate_bond = bond.clone();
+    let model = &mut rate_bond.instrument_pricing_overrides.model_config;
+    model.government_curve_id = None;
+    model.asw_forward_curve_id = None;
+    context.with_instrument(Arc::new(rate_bond), |ctx| calculator.calculate(ctx))
 }
 
 /// Bucketed DV01 calculator for bonds that handles the case where a market price
@@ -150,11 +76,7 @@ impl MetricCalculator for BondBucketedDv01Calculator {
 
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         super::risk_view::with_bond_risk_view(context, |ctx| {
-            finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
-                finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate(
-                ),
-            )
-            .calculate(ctx)
+            direct_rate_dv01(ctx, Dv01CalculatorConfig::triangular_key_rate())
         })
     }
 }
@@ -167,7 +89,7 @@ mod tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
-    use finstack_quant_core::types::Rate;
+    use finstack_quant_core::types::{CurveId, Rate};
     use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::pricer::{
         InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingDispatch, PricingError,
@@ -202,7 +124,7 @@ mod tests {
     }
 
     #[test]
-    fn callable_oas_dv01_reprices_through_selected_custom_registry() {
+    fn direct_bond_dv01_reprices_through_selected_custom_registry() {
         let as_of = date!(2025 - 01 - 15);
         let curve_id = CurveId::new("USD-OIS");
         let bond = Bond::fixed(
@@ -217,7 +139,7 @@ mod tests {
         .expect("valid bond");
         let market = MarketContext::new()
             .try_insert(
-                DiscountCurve::builder(curve_id.clone())
+                DiscountCurve::builder(curve_id)
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (5.0, 0.82), (10.0, 0.67)])
                     .day_count(finstack_quant_core::dates::DayCount::Act365F)
@@ -228,14 +150,16 @@ mod tests {
             )
             .expect("insert market curve");
 
-        let native_context = MetricContext::new(
+        let mut native_context = MetricContext::new(
             Arc::new(bond.clone()),
             Arc::new(market.clone()),
             as_of,
             Money::from((1_000_i64, Currency::USD)),
             MetricContext::default_config(),
         );
-        let native_dv01 = curve_bump_dv01(&bond, &native_context, &curve_id).expect("native DV01");
+        let native_dv01 = BondDv01Calculator
+            .calculate(&mut native_context)
+            .expect("native DV01");
         assert!(
             native_dv01.abs() > 1.0e-9,
             "control path must have non-zero DV01"
@@ -249,7 +173,7 @@ mod tests {
             })
             .expect("unique custom pricer");
         let mut context = MetricContext::new(
-            Arc::new(bond.clone()),
+            Arc::new(bond),
             Arc::new(market),
             as_of,
             Money::from((777_i64, Currency::USD)),
@@ -260,13 +184,55 @@ mod tests {
             Arc::new(registry),
         ));
 
-        let selected_dv01 =
-            curve_bump_dv01(&bond, &context, &curve_id).expect("selected-model DV01");
+        let selected_dv01 = BondDv01Calculator
+            .calculate(&mut context)
+            .expect("selected-model DV01");
         assert_eq!(selected_dv01, 0.0);
         assert_eq!(
             calls.load(Ordering::SeqCst),
             2,
             "up and down legs must both use the selected pricer"
+        );
+    }
+    #[test]
+    fn quoted_bond_uses_one_direct_curve_basis_for_parallel_and_bucketed_dv01() {
+        let as_of = date!(2025 - 01 - 15);
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (5.0, 0.81), (10.0, 0.64)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .expect("discount curve");
+        let market = MarketContext::new().try_insert(curve).expect("market");
+        let mut bond = Bond::fixed(
+            "QUOTE-RISK",
+            Money::from((1_000_i64, Currency::USD)),
+            Rate::from_decimal(0.04).unwrap(),
+            date!(2020 - 01 - 15),
+            date!(2030 - 01 - 15),
+            StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .unwrap();
+        bond.instrument_pricing_overrides = bond
+            .instrument_pricing_overrides
+            .with_quoted_clean_price_pct(98.0);
+        let result = bond
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::Dv01, MetricId::BucketedDv01],
+                Default::default(),
+            )
+            .expect("quote-centered risk");
+        let parallel = result.measures["dv01"];
+        let bucketed = result.measures["bucketed_dv01"];
+        let tolerance = 2e-4 * parallel.abs();
+        assert!(
+            parallel < 0.0 && (parallel - bucketed).abs() < tolerance,
+            "{parallel} vs {bucketed}, tolerance {tolerance}"
         );
     }
 }

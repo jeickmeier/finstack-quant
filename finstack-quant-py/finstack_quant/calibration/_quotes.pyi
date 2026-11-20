@@ -350,6 +350,7 @@ class CdsQuote:
               ``"months"``, ``"years"``) or a date ``{"date": "2029-06-20"}``.
             - ``coupon_bp`` (float): Fixed running coupon in basis points per annum (``100.0``
               or ``500.0`` for the standard North American coupons).
+            - ``upfront_basis``: Required ``"clean"`` or ``"actual_cash"`` settlement quote basis.
             - ``upfront_pct`` (float): Upfront payment as a decimal fraction of notional,
               positive when the protection buyer pays (``0.023`` for 2.3 points).
             - ``recovery_rate`` (float): Assumed recovery as a decimal fraction of notional in
@@ -379,6 +380,7 @@ class CdsQuote:
         ...     "pillar": {"tenor": {"count": 5, "unit": "years"}},
         ...     "coupon_bp": 100.0,
         ...     "upfront_pct": 0.023,
+        ...     "upfront_basis": "clean",
         ...     "recovery_rate": 0.4,
         ... }).type
         'cds_upfront'

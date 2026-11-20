@@ -132,6 +132,9 @@ fn resolve_doc_clause(clause: CdsDocClause) -> CdsDocClause {
 // Note: JsonSchema derive requires finstack-quant-core types to implement JsonSchema
 // #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CreditDefaultSwap {
+    /// Whether scheduled premium and actual upfront payable on the valuation date
+    /// are still due. A booked trade must explicitly elect this boundary.
+    pub include_valuation_date_cashflows: bool,
     /// Unique instrument identifier
     pub id: InstrumentId,
     /// Notional amount
@@ -254,6 +257,7 @@ pub struct CreditDefaultSwap {
 ///     id: InstrumentId::new("CDX-IG-42"),
 ///     notional: Money::from((10_000_000_i64, Currency::USD)),
 ///     side: PayReceive::Pay,
+///     include_valuation_date_cashflows: false,
 ///     start: date!(2024 - 03 - 20),
 ///     end: date!(2029 - 06 - 20),
 ///     recovery_rate: 0.40,
@@ -266,6 +270,8 @@ pub struct CreditDefaultSwap {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CdsTradeParams {
+    /// Whether scheduled premium and actual upfront dated as of valuation are still due.
+    pub include_valuation_date_cashflows: bool,
     /// Unique instrument identifier.
     pub id: InstrumentId,
     /// Contract notional; its currency is the premium and protection currency.
@@ -290,6 +296,10 @@ pub struct CdsTradeParams {
     pub discount_curve_id: finstack_quant_core::types::CurveId,
     /// Hazard (credit) curve identifier for the protection leg.
     pub credit_curve_id: finstack_quant_core::types::CurveId,
+}
+
+pub(crate) fn cash_is_eligible(payment_date: Date, as_of: Date, include_today: bool) -> bool {
+    payment_date > as_of || (include_today && payment_date == as_of)
 }
 
 impl CreditDefaultSwap {
@@ -322,6 +332,38 @@ impl CreditDefaultSwap {
         CdsPricer::new().par_spread(self, discount.as_ref(), hazard.as_ref(), as_of)
     }
 
+    /// Accrued premium fraction for a clean quote on this CDS.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Quote valuation date. The current contractual coupon period
+    ///   accrues through this civil date, with zero at its opening or after
+    ///   final accrual.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the coupon schedule or day count cannot be resolved.
+    pub fn clean_quote_accrual(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
+        CdsPricer::new().clean_quote_accrual_fraction(self, as_of)
+    }
+
+    pub(crate) fn quote_settlement_date(&self, as_of: Date) -> finstack_quant_core::Result<Date> {
+        use finstack_quant_core::dates::{DateExt, adjust, calendar_by_id_strict};
+        use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
+        use finstack_quant_valuations_core::market::conventions::ids::CdsConventionKey;
+
+        let key = CdsConventionKey {
+            currency: self.notional.currency(),
+            doc_clause: self
+                .doc_clause
+                .unwrap_or_else(|| self.convention.as_doc_clause()),
+        };
+        let convention = ConventionRegistry::try_global()?.resolve_cds(&key)?;
+        let calendar = calendar_by_id_strict(&convention.calendar_id)?;
+        let spot = as_of.add_business_days(i32::from(convention.settlement_days), calendar)?;
+        adjust(spot, convention.business_day_convention, calendar)
+    }
+
     /// Create a canonical example CDS for testing and documentation.
     ///
     /// Returns a 5-year investment-grade CDS with standard ISDA conventions.
@@ -338,6 +380,7 @@ impl CreditDefaultSwap {
         })?;
 
         let cds = CreditDefaultSwap::builder()
+            .include_valuation_date_cashflows(false)
             .id(InstrumentId::new("CDS-CORP-5Y"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(PayReceive::Pay)
@@ -394,6 +437,7 @@ impl CreditDefaultSwap {
             id,
             notional,
             side,
+            include_valuation_date_cashflows,
             start,
             end,
             recovery_rate,
@@ -410,6 +454,7 @@ impl CreditDefaultSwap {
             id,
             notional,
             side,
+            include_valuation_date_cashflows,
             convention,
             premium_leg: PremiumLegSpec {
                 date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
@@ -473,6 +518,7 @@ impl CreditDefaultSwap {
     ///
     /// # fn main() -> finstack_quant_core::Result<()> {
     /// let cds = CreditDefaultSwap::builder()
+    ///     .include_valuation_date_cashflows(false)
     ///     .id("CDS-EXAMPLE".into())
     ///     .notional(Money::from((10_000_000_i64, Currency::USD)))
     ///     .side(PayReceive::Pay)
@@ -671,6 +717,9 @@ impl CreditDefaultSwap {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for CreditDefaultSwap {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        self.include_valuation_date_cashflows
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Cds,
         crate::CREDIT
@@ -801,6 +850,7 @@ mod tests {
                 id: InstrumentId::new("CDS-CORP-5Y"),
                 notional: Money::from((10_000_000_i64, Currency::USD)),
                 side: PayReceive::Pay,
+                include_valuation_date_cashflows: false,
                 start: date!(2025 - 03 - 20),
                 end: date!(2030 - 03 - 20),
                 recovery_rate: 0.40,
@@ -870,6 +920,7 @@ mod tests {
         protection.recovery_rate = 1.1;
 
         let error = CreditDefaultSwap::builder()
+            .include_valuation_date_cashflows(false)
             .id(cds.id)
             .notional(cds.notional)
             .side(cds.side)

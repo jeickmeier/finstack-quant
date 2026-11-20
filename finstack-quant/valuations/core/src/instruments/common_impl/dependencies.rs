@@ -268,23 +268,25 @@ impl MarketDependencies {
         ids
     }
 
-    /// Declared volatility surfaces that are actually present in `market`.
-    ///
-    /// Instruments may declare ordered fallback candidates, so missing
-    /// candidates are not errors while another is present; callers decide
-    /// what an empty result means.
+    /// Resolve every declared active volatility binding as a native grid.
     ///
     /// # Arguments
     ///
-    /// * `market` - Market context whose surfaces are probed by id.
-    pub fn present_vol_surface_ids(
+    /// * `market` - Market holding the exact typed volatility dependencies.
+    ///
+    /// # Errors
+    ///
+    /// Fails for a missing grid or when the active binding is a SABR cube or
+    /// an FX delta-quote surface, which require a different risk experiment.
+    pub fn grid_vol_surface_ids(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
-    ) -> Vec<CurveId> {
-        self.unique_vol_surface_ids()
-            .into_iter()
-            .filter(|vol_surface_id| market.get_surface(vol_surface_id.as_str()).is_ok())
-            .collect()
+    ) -> finstack_quant_core::Result<Vec<CurveId>> {
+        let ids = self.unique_vol_surface_ids();
+        for id in &ids {
+            require_volatility_grid(market, id)?;
+        }
+        Ok(ids)
     }
 
     /// Add a scalar time series identifier.
@@ -319,6 +321,27 @@ impl MarketDependencies {
 }
 
 // Deduplicate while preserving insertion order for deterministic risk reports.
+
+pub(crate) fn require_volatility_grid(
+    market: &finstack_quant_core::market_data::context::MarketContext,
+    id: &CurveId,
+) -> finstack_quant_core::Result<()> {
+    let name = id.as_str();
+    let unsupported_kind = if market.get_vol_cube(name).is_ok() {
+        Some("SABR cube")
+    } else if market.get_fx_delta_vol_surface(name).is_ok() {
+        Some("FX delta-quote surface")
+    } else {
+        None
+    };
+    if let Some(kind) = unsupported_kind {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "grid volatility risk cannot shock {kind} '{id}'"
+        )));
+    }
+    market.get_surface(name)?;
+    Ok(())
+}
 
 fn push_unique_curve(target: &mut SmallVec<[CurveId; 2]>, id: CurveId) {
     if target.contains(&id) {

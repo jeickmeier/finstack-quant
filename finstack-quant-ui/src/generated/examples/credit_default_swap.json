@@ -4,6 +4,7 @@
       "attributes": {},
       "convention": "isda_na",
       "id": "CDS-CORP-5Y",
+      "include_valuation_date_cashflows": false,
       "notional": {
         "amount": "10000000",
         "currency": "USD"

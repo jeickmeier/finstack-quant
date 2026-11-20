@@ -199,7 +199,13 @@ class QuantoOption:
         """
         ...
 
-    def delta(self, market: MarketContext | str, as_of: date | str, model: str = "default") -> float:
+    def delta(
+        self,
+        market: MarketContext | str,
+        as_of: date | str,
+        model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
+    ) -> float:
         """Compute spot delta.
 
         Parameters
@@ -210,6 +216,9 @@ class QuantoOption:
             Valuation date for the current contract and observation state.
         model : str
             Registered model to use. The default selects the instrument's canonical model.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -227,7 +236,13 @@ class QuantoOption:
         """
         ...
 
-    def gamma(self, market: MarketContext | str, as_of: date | str, model: str = "default") -> float:
+    def gamma(
+        self,
+        market: MarketContext | str,
+        as_of: date | str,
+        model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
+    ) -> float:
         """Compute spot gamma.
 
         Parameters
@@ -238,6 +253,9 @@ class QuantoOption:
             Valuation date for the current contract and observation state.
         model : str
             Registered model to use. The default selects the instrument's canonical model.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -255,7 +273,13 @@ class QuantoOption:
         """
         ...
 
-    def vega(self, market: MarketContext | str, as_of: date | str, model: str = "default") -> float:
+    def vega(
+        self,
+        market: MarketContext | str,
+        as_of: date | str,
+        model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
+    ) -> float:
         """Compute option vega.
 
         Parameters
@@ -266,6 +290,9 @@ class QuantoOption:
             Valuation date for the current contract and observation state.
         model : str
             Registered model to use. The default selects the instrument's canonical model.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -283,7 +310,13 @@ class QuantoOption:
         """
         ...
 
-    def theta(self, market: MarketContext | str, as_of: date | str, model: str = "default") -> float:
+    def theta(
+        self,
+        market: MarketContext | str,
+        as_of: date | str,
+        model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
+    ) -> float:
         """Compute option theta.
 
         Parameters
@@ -294,6 +327,9 @@ class QuantoOption:
             Valuation date for the current contract and observation state.
         model : str
             Registered model to use. The default selects the instrument's canonical model.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -311,7 +347,13 @@ class QuantoOption:
         """
         ...
 
-    def rho(self, market: MarketContext | str, as_of: date | str, model: str = "default") -> float:
+    def rho(
+        self,
+        market: MarketContext | str,
+        as_of: date | str,
+        model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
+    ) -> float:
         """Compute domestic rate rho.
 
         Parameters
@@ -322,6 +364,9 @@ class QuantoOption:
             Valuation date for the current contract and observation state.
         model : str
             Registered model to use. The default selects the instrument's canonical model.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -339,7 +384,13 @@ class QuantoOption:
         """
         ...
 
-    def foreign_rho(self, market: MarketContext | str, as_of: date | str, model: str = "default") -> float:
+    def foreign_rho(
+        self,
+        market: MarketContext | str,
+        as_of: date | str,
+        model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
+    ) -> float:
         """Compute foreign rate rho.
 
         Parameters
@@ -350,6 +401,9 @@ class QuantoOption:
             Valuation date for the current contract and observation state.
         model : str
             Registered model to use. The default selects the instrument's canonical model.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -367,7 +421,13 @@ class QuantoOption:
         """
         ...
 
-    def vanna(self, market: MarketContext | str, as_of: date | str, model: str = "default") -> float:
+    def vanna(
+        self,
+        market: MarketContext | str,
+        as_of: date | str,
+        model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
+    ) -> float:
         """Compute spot-volatility cross sensitivity.
 
         Parameters
@@ -378,6 +438,9 @@ class QuantoOption:
             Valuation date for the current contract and observation state.
         model : str
             Registered model to use. The default selects the instrument's canonical model.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -395,7 +458,13 @@ class QuantoOption:
         """
         ...
 
-    def volga(self, market: MarketContext | str, as_of: date | str, model: str = "default") -> float:
+    def volga(
+        self,
+        market: MarketContext | str,
+        as_of: date | str,
+        model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
+    ) -> float:
         """Compute option volatility curvature.
 
         Parameters
@@ -406,6 +475,9 @@ class QuantoOption:
             Valuation date for the current contract and observation state.
         model : str
             Registered model to use. The default selects the instrument's canonical model.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -423,7 +495,13 @@ class QuantoOption:
         """
         ...
 
-    def greeks(self, market: MarketContext | str, as_of: date | str, model: str = "default") -> dict[str, float]:
+    def greeks(
+        self,
+        market: MarketContext | str,
+        as_of: date | str,
+        model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
+    ) -> dict[str, float]:
         """Compute the first- and second-order price sensitivities supported by the selected model.
 
         Parameters
@@ -434,6 +512,9 @@ class QuantoOption:
             Valuation date used to determine the remaining option life and observed state.
         model : str
             Registered engine name. The default uses the instrument's standard model.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -457,6 +538,7 @@ class QuantoOption:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         metric_id: str,
         model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> float:
         """
         Compute a registered scalar metric for this quanto option.
@@ -471,6 +553,9 @@ class QuantoOption:
             Registered metric identifier (see :func:`list_standard_metrics`).
         model : str, default "default"
             Model key.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------

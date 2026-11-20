@@ -14,6 +14,7 @@ use time::Month;
 #[test]
 fn test_fx_forward_builder() {
     let forward = FxForward::builder()
+        .spot_basis(finstack_quant_valuations_fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("TEST-FWD"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
@@ -35,6 +36,7 @@ fn test_fx_forward_builder() {
 #[test]
 fn test_fx_forward_builder_with_optional_fields() {
     let forward = FxForward::builder()
+        .spot_basis(finstack_quant_valuations_fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("TEST-FWD-FULL"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
@@ -161,6 +163,7 @@ fn test_fx_forward_required_discount_curves() {
 #[test]
 fn test_fx_forward_with_forward_points_builder() {
     let forward = FxForward::builder()
+        .spot_basis(finstack_quant_valuations_fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("POINTS-TEST"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
@@ -181,6 +184,7 @@ fn test_fx_forward_with_forward_points_builder() {
 #[test]
 fn test_fx_forward_with_forward_pips() {
     let forward = FxForward::builder()
+        .spot_basis(finstack_quant_valuations_fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("PIPS-TEST"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
@@ -205,6 +209,7 @@ fn test_fx_forward_with_forward_pips() {
 #[test]
 fn test_fx_forward_with_forward_pips_jpy_pair() {
     let forward = FxForward::builder()
+        .spot_basis(finstack_quant_valuations_fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("PIPS-JPY"))
         .base_currency(Currency::USD)
         .quote_currency(Currency::JPY)

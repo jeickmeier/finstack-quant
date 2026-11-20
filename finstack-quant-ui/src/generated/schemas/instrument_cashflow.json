@@ -183,14 +183,6 @@
             "null"
           ]
         },
-        "conditional_default_prob": {
-          "description": "Interval default probability `SP(t_{i-1}) − SP(t_i)` (hazard mode only).",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
           "description": "Row currency (matters for instruments whose legs settle in several currencies)."

@@ -93,7 +93,6 @@ use crate::utils::input::js_string;
 use crate::utils::{date_to_iso, parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
-use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
@@ -278,9 +277,14 @@ pub(super) fn metric_value(
     as_of: &JsValue,
     model: Option<&JsValue>,
     metric_id: &str,
+    extras: Option<&JsValue>,
 ) -> Result<f64, JsValue> {
+    let extras: finstack_quant_valuations::pricer::PriceExtras =
+        crate::utils::input::opt_from_js_json(extras, "extras")?.unwrap_or_default();
     let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
-        instrument, None, None,
+        instrument,
+        extras.metric_pricing_overrides_json().as_deref(),
+        extras.instrument_pricing_overrides.as_ref(),
     )
     .map_err(to_js_err)?;
     let market = super::pricing::parse_market(market_json)?;
@@ -292,7 +296,7 @@ pub(super) fn metric_value(
         &as_of,
         model.as_deref().unwrap_or("default"),
         metric_id,
-        finstack_quant_calibration::recalibration::pricing_options(),
+        extras.pricing_options(finstack_quant_calibration::recalibration::pricing_options()),
     )
     .map_err(to_js_err)
 }
@@ -307,18 +311,23 @@ pub(super) fn option_greeks(
     market_json: &str,
     as_of: &str,
     model: Option<&str>,
+    extras: Option<&JsValue>,
 ) -> Js {
+    let extras: finstack_quant_valuations::pricer::PriceExtras =
+        crate::utils::input::opt_from_js_json(extras, "extras")?.unwrap_or_default();
     let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
-        instrument, None, None,
+        instrument,
+        extras.metric_pricing_overrides_json().as_deref(),
+        extras.instrument_pricing_overrides.as_ref(),
     )
     .map_err(to_js_err)?;
-    let market: MarketContext = serde_json::from_str(market_json).map_err(to_js_err)?;
+    let market = super::pricing::parse_market_text(market_json)?;
     let pairs = finstack_quant_valuations::pricer::present_standard_option_greeks(
         &instrument,
         &market,
         as_of,
         model.unwrap_or("default"),
-        finstack_quant_calibration::recalibration::pricing_options(),
+        extras.pricing_options(finstack_quant_calibration::recalibration::pricing_options()),
     )
     .map_err(to_js_err)?;
     let ordered: indexmap::IndexMap<&'static str, f64> = pairs.into_iter().collect();

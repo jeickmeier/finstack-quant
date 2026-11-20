@@ -46,8 +46,8 @@ macro_rules! instrument_pricing_methods {
             }
 
             #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".metric"))]
-            #[pyo3(signature = (market, as_of, metric_id, model="default"))]
-            #[pyo3(text_signature = "($self, market, as_of, metric_id, model='default')")]
+            #[pyo3(signature = (market, as_of, metric_id, model="default", extras=None))]
+            #[pyo3(text_signature = "($self, market, as_of, metric_id, model='default', extras=None)")]
             fn metric(
                 &self,
                 py: Python<'_>,
@@ -55,6 +55,7 @@ macro_rules! instrument_pricing_methods {
                 as_of: &Bound<'_, PyAny>,
                 metric_id: &str,
                 model: &str,
+                extras: Option<&Bound<'_, PyAny>>,
             ) -> PyResult<f64> {
                 $crate::bindings::valuations::pricing::metric_typed(
                     py,
@@ -63,6 +64,7 @@ macro_rules! instrument_pricing_methods {
                     as_of,
                     metric_id,
                     model,
+                    $crate::bindings::valuations::pricing::price_extras_from_py(py, extras)?,
                 )
             }
 
@@ -106,15 +108,16 @@ macro_rules! instrument_greek_methods {
         impl $ty {
             $(
                 #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".", stringify!($metric)))]
-                #[pyo3(signature = (market, as_of, model="default"))]
+                #[pyo3(signature = (market, as_of, model="default", extras=None))]
                 fn $metric(
                     &self,
                     py: Python<'_>,
                     market: &Bound<'_, PyAny>,
                     as_of: &Bound<'_, PyAny>,
                     model: &str,
+                    extras: Option<&Bound<'_, PyAny>>,
                 ) -> PyResult<f64> {
-                    self.metric(py, market, as_of, stringify!($metric), model)
+                    self.metric(py, market, as_of, stringify!($metric), model, extras)
                 }
             )+
         }

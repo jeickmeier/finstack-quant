@@ -1688,3 +1688,15 @@ fn recalibrated_metrics_use_the_cds_convention_family() {
         "{err}"
     );
 }
+
+#[test]
+fn rate_buckets_reconcile_with_hazard_replay() {
+    let as_of = date!(2024 - 01 - 01);
+    let instrument = create_test_cds(as_of, date!(2029 - 01 - 01));
+    let market = create_replayable_test_market(as_of);
+    crate::instruments::test_support::credit::assert_rate_bucket_reconciliation(
+        &instrument,
+        &market,
+        as_of,
+    );
+}

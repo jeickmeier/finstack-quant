@@ -48,7 +48,7 @@ fn fixed_composite_values_and_decomposes() -> Result<()> {
 
 #[test]
 fn cross_currency_values_and_dependencies_use_reporting_fx() -> Result<()> {
-    let spec = CompositeSpec::new(
+    let mut spec = CompositeSpec::new(
         "USD-EUR",
         Currency::USD,
         Money::from((100_i64, Currency::USD)),
@@ -71,12 +71,16 @@ fn cross_currency_values_and_dependencies_use_reporting_fx() -> Result<()> {
         WeightingMethod::FixedQuantity,
         RebalanceRule::Manual,
     );
+    spec.fx01_pair = Some(crate::instruments::FxPair {
+        base: Currency::EUR,
+        quote: Currency::USD,
+    });
     let composite = spec.initialize_fixed(date!(2025 - 01 - 01))?.instrument;
     let provider = Arc::new(SimpleFxProvider::new());
     provider.set_quotes(&[(Currency::EUR, Currency::USD, 1.2)])?;
     let market = MarketContext::new().insert_fx(FxMatrix::new(provider, None));
 
-    let dependencies = composite.market_dependencies()?;
+    let dependencies = composite.market_dependencies_at(&market, date!(2025 - 01 - 02))?;
     assert!(
         dependencies
             .fx_pairs
@@ -86,10 +90,21 @@ fn cross_currency_values_and_dependencies_use_reporting_fx() -> Result<()> {
     let result = composite.price_with_metrics(
         &market,
         date!(2025 - 01 - 02),
-        &[],
+        &[MetricId::Fx01, MetricId::Delta],
         PricingOptions::default(),
     )?;
     assert_eq!(result.value.amount(), 220.0);
+    let fx01 = result
+        .measures
+        .get(&MetricId::Fx01)
+        .copied()
+        .expect("whole-value FX01");
+    assert!(
+        (fx01 - 1.2).abs() < 1e-9,
+        "reporting translation contributes to FX01"
+    );
+    let eur_delta = MetricId::composite(&MetricId::Delta, &["EUR-LEG"]);
+    assert_eq!(result.measures.get(&eur_delta), Some(&1.0));
     let Some(crate::results::ValuationDetails::Composite(details)) = result.details else {
         return Err(Error::Internal(
             "cross-currency composite details are missing".to_string(),
@@ -516,6 +531,16 @@ fn composite_metric_overrides_are_leg_defaults_and_leg_settings_win() -> Result<
     let (mut composite, inherit, market) = deposit_pair_composite("1D")?;
     composite.metric_pricing_overrides.theta_period = Some(Tenor::monthly());
 
+    let error = composite
+        .price_with_metrics(
+            &market,
+            date!(2024 - 01 - 02),
+            &[MetricId::Theta],
+            PricingOptions::default(),
+        )
+        .expect_err("effective 1D and 1M theta horizons differ");
+    assert!(error.to_string().contains("incompatible aggregation bases"));
+    composite.metric_pricing_overrides.theta_period = Some(Tenor::daily());
     let result = composite.price_with_metrics(
         &market,
         date!(2024 - 01 - 02),
@@ -540,10 +565,8 @@ fn composite_metric_overrides_are_leg_defaults_and_leg_settings_win() -> Result<
         InstrumentJson::Deposit(deposit) => deposit.clone(),
         _ => return Err(Error::Internal("expected deposit leg".to_string())),
     };
-    let mut inherit_with_default = inherit.clone();
-    inherit_with_default.metric_pricing_overrides.theta_period = Some(Tenor::monthly());
     let own_expected = theta_of(&own, &market)?;
-    let inherit_expected = theta_of(&inherit_with_default, &market)?;
+    let inherit_expected = theta_of(&inherit, &market)?;
     assert_eq!(
         leg_theta(0)?,
         own_expected,
@@ -552,11 +575,7 @@ fn composite_metric_overrides_are_leg_defaults_and_leg_settings_win() -> Result<
     assert_eq!(
         leg_theta(1)?,
         inherit_expected,
-        "leg inherits the 1M default"
-    );
-    assert!(
-        (inherit_expected - theta_of(&inherit, &market)?).abs() > 1.0e-6,
-        "the 1M default must differ from the leg's unset (1D) theta"
+        "leg inherits the 1D default"
     );
 
     let total = result

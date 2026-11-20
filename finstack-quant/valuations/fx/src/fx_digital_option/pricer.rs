@@ -119,6 +119,8 @@ fn input_request<'a>(
         base_currency: inst.base_currency,
         quote_currency: inst.quote_currency,
         expiry: inst.expiry,
+        delivery: inst.expiry,
+        spot_basis: crate::shared::FxSpotBasis::Cash,
         day_count: inst.day_count,
         domestic_discount_curve_id: &inst.domestic_discount_curve_id,
         foreign_discount_curve_id: &inst.foreign_discount_curve_id,
@@ -141,10 +143,10 @@ pub(crate) struct FxDigitalOptionGreeks {
     pub(crate) gamma: f64,
     pub(crate) vega: f64,
     pub(crate) theta: f64,
-    /// PV change per 1% (100bp) parallel move of the domestic rate.
-    pub(crate) rho_domestic: f64,
-    /// PV change per 1% (100bp) parallel move of the foreign rate.
-    pub(crate) rho_foreign: f64,
+    /// Quote PV per positive domestic basis point on the option model clock.
+    pub(crate) rho_domestic_bp: f64,
+    /// Quote PV per positive foreign basis point on the option model clock.
+    pub(crate) rho_foreign_bp: f64,
 }
 
 /// Garman-Kohlhagen digital value in quote currency: `payout_amount` for
@@ -325,7 +327,7 @@ fn greeks_digital(
                 let pv = if itm { exp_rd_t * payout_amount } else { 0.0 };
                 FxDigitalOptionGreeks {
                     theta: r_d * pv / theta_days_per_year,
-                    rho_domestic: -t * pv / 100.0,
+                    rho_domestic_bp: -t * pv * 0.0001,
                     ..Default::default()
                 }
             }
@@ -335,7 +337,7 @@ fn greeks_digital(
                 FxDigitalOptionGreeks {
                     delta,
                     theta: asset_theta(pv)?,
-                    rho_foreign: -t * pv / 100.0,
+                    rho_foreign_bp: -t * pv * 0.0001,
                     ..Default::default()
                 }
             }
@@ -376,19 +378,19 @@ fn greeks_digital(
                 OptionType::Call => 1.0,
                 OptionType::Put => -1.0,
             };
-            let rho_domestic = (-t * base_pv
+            let rho_domestic_bp = (-t * base_pv
                 + rho_sign * exp_rd_t * pdf_d2 * (t / sigma_sqrt_t) * payout_amount)
-                / 100.0;
-            let rho_foreign =
-                -rho_sign * exp_rd_t * pdf_d2 * (t / sigma_sqrt_t) * payout_amount / 100.0;
+                * 0.0001;
+            let rho_foreign_bp =
+                -rho_sign * exp_rd_t * pdf_d2 * (t / sigma_sqrt_t) * payout_amount * 0.0001;
 
             FxDigitalOptionGreeks {
                 delta,
                 gamma,
                 vega,
                 theta,
-                rho_domestic,
-                rho_foreign,
+                rho_domestic_bp,
+                rho_foreign_bp,
             }
         }
         DigitalPayoutType::AssetOrNothing => {
@@ -410,19 +412,19 @@ fn greeks_digital(
             let dd1_dt = (r_d - r_f + 0.5 * sigma * sigma) / sigma_sqrt_t - d1 / (2.0 * t);
             let dv_dt = -r_f * pv_base + delta_sign * spot * exp_rf_t * pdf_d1 * dd1_dt * notional;
             let theta = -dv_dt / theta_days_per_year;
-            let rho_domestic =
-                delta_sign * spot * exp_rf_t * pdf_d1 * (t / sigma_sqrt_t) * notional / 100.0;
-            let rho_foreign = (-t * pv_base
+            let rho_domestic_bp =
+                delta_sign * spot * exp_rf_t * pdf_d1 * (t / sigma_sqrt_t) * notional * 0.0001;
+            let rho_foreign_bp = (-t * pv_base
                 - delta_sign * spot * exp_rf_t * pdf_d1 * (t / sigma_sqrt_t) * notional)
-                / 100.0;
+                * 0.0001;
 
             FxDigitalOptionGreeks {
                 delta,
                 gamma,
                 vega,
                 theta,
-                rho_domestic,
-                rho_foreign,
+                rho_domestic_bp,
+                rho_foreign_bp,
             }
         }
     })
@@ -568,8 +570,9 @@ mod tests {
                     let down = price(spot - spot_bump, r_d, 0.0, t);
                     let delta = (up - down) / (2.0 * spot_bump);
                     let gamma = (up - 2.0 * pv + down) / (spot_bump * spot_bump);
-                    let rho = (price(spot, r_d + h, 0.0, t) - price(spot, r_d - h, 0.0, t))
-                        / (2.0 * h * 100.0);
+                    let rho = (price(spot, r_d + 0.0001, 0.0, t)
+                        - price(spot, r_d - 0.0001, 0.0, t))
+                        / 2.0;
                     let vega = (price(spot, r_d, h, t) - pv) / (h * 100.0);
                     let theta = match payout_type {
                         DigitalPayoutType::CashOrNothing => {
@@ -582,7 +585,7 @@ mod tests {
                     };
                     assert!((greeks.delta - delta).abs() < 1e-4);
                     assert!((greeks.gamma - gamma).abs() < 1e-3);
-                    assert!((greeks.rho_domestic - rho).abs() < 1e-5);
+                    assert!((greeks.rho_domestic_bp - rho).abs() < 1e-5);
                     assert!((greeks.vega - vega).abs() < 1e-5);
                     assert!((greeks.theta - theta).abs() < 1e-5);
                 }

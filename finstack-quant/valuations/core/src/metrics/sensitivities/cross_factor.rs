@@ -375,22 +375,26 @@ pub fn make_credit_bumper(context: &MetricContext) -> Result<Option<Box<dyn Fact
 pub fn make_vol_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
     let deps = context.instrument.market_dependencies()?;
     let override_volatility = volatility_override(context.instrument.as_ref());
-    let vol_surface_ids = if override_volatility.is_some() {
-        Vec::new()
-    } else {
-        deps.present_vol_surface_ids(&context.curves)
-    };
+    let mut vol_surface_ids = Vec::new();
     let mut vol_scalar_ids = Vec::new();
     if override_volatility.is_none() {
-        for dependency in &deps.volatility_dependencies {
-            let id = dependency.vol_surface_id.as_str();
-            if context
-                .curves
-                .get_price(id)
-                .is_ok_and(|scalar| scalar.is_unitless())
-                && !vol_scalar_ids.iter().any(|existing| existing == id)
+        for id in deps.unique_vol_surface_ids() {
+            let name = id.as_str();
+            if context.curves.get_vol_cube(name).is_err()
+                && context.curves.get_fx_delta_vol_surface(name).is_err()
+                && context.curves.get_surface(name).is_err()
+                && context
+                    .curves
+                    .get_price(name)
+                    .is_ok_and(|scalar| scalar.is_unitless())
             {
-                vol_scalar_ids.push(id.to_string());
+                vol_scalar_ids.push(name.to_owned());
+            } else {
+                crate::instruments::common_impl::dependencies::require_volatility_grid(
+                    &context.curves,
+                    &id,
+                )?;
+                vol_surface_ids.push(id);
             }
         }
     }

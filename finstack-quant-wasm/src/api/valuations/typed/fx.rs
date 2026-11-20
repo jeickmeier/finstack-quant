@@ -47,6 +47,7 @@ macro_rules! fx_greeks_bundle {
             /// @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
             /// @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
             /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+            /// @param extras - Optional pricing configuration and overrides accepted by `price`.
             /// @returns Map of Greek name to value, with keys in the Rust
             /// `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …);
             /// only the Greeks that apply to the instrument are present.
@@ -66,6 +67,8 @@ macro_rules! fx_greeks_bundle {
                 #[wasm_bindgen(unchecked_optional_param_type = "string | null")] model: Option<
                     JsValue,
                 >,
+                            #[wasm_bindgen(unchecked_optional_param_type = "generated.valuations.PriceExtras | JsonInput | null")]
+                extras: Option<JsValue>,
             ) -> Result<JsValue, JsValue> {
                 let market_json = json_text(&market_json, "marketJson")?;
                 let as_of = js_string(&as_of, "asOf")?;
@@ -75,6 +78,7 @@ macro_rules! fx_greeks_bundle {
                     &market_json,
                     &as_of,
                     model.as_deref(),
+                    extras.as_ref(),
                 )
             }
         }
@@ -466,7 +470,7 @@ impl JsFxOption {
     ///
     /// Mirrors Rust `FxOption::european`: discount curves are `<QUOTE>-OIS`
     /// (domestic) and `<BASE>-OIS` (foreign) and the model day count is ACT/365F.
-    /// @param params - `FxOptionParams` (plain object or JSON text), every key required: `id`; `base_currency` - base (foreign) ISO code, the notional currency; `quote_currency` - quote (domestic) ISO code; `strike` - quote currency per unit of base currency; `expiry` - ISO-8601 date; `notional` - Money wire object `{ amount: "1000000", currency: "EUR" }` (decimal string amount) in `base_currency`; `vol_surface_id`; `option_type` - `"call"` or `"put"` on the base currency; `delta_convention` - `{ kind, premium_currency, venue }` with `kind` one of `"spot"`, `"forward"`, `"premium_adjusted_spot"`, `"premium_adjusted_forward"`, `premium_currency` the base or quote ISO code and `venue` a non-empty quoting-source identifier.
+    /// @param params - `FxOptionParams` (plain object or JSON text), every key required: `id`; `base_currency` - base (foreign) ISO code, the notional currency; `quote_currency` - quote (domestic) ISO code; `strike` - quote currency per unit of base currency; `expiry` - ISO-8601 date; `notional` - Money wire object `{ amount: "1000000", currency: "EUR" }` (decimal string amount) in `base_currency`; `vol_surface_id`; `option_type` - `"call"` or `"put"` on the base currency; `spot_basis` - cash spot or a booked outright value date; `delivery` - cash at expiry or a physical exchange on a fixed date with an explicit long or short position; `delta_convention` - `{ kind, premium_currency, venue }` with `kind` one of `"spot"`, `"forward"`, `"premium_adjusted_spot"`, `"premium_adjusted_forward"`, `premium_currency` the base or quote ISO code and `venue` a non-empty quoting-source identifier.
     /// @returns The validated option.
     /// @throws Error - Throws with kind `validation` if `params` is malformed, the currencies coincide, the premium currency is neither leg, the venue is blank, or the notional is not positive; kind `invalid_type` if `params` is not an object or JSON text.
     pub fn european(
@@ -533,6 +537,7 @@ mod tests {
                 "not-market-json",
                 "not-a-date",
                 Some("not-a-model"),
+                None,
             )
             .is_err()
         );
@@ -592,6 +597,9 @@ instrument_surface!(
 );
 
 getters!(JsFxForward, "FxForward", |i| {
+        /// Cash spot or an outright with a fixed spot value date.
+        /// @returns The booked election as a tagged object.
+        spot_basis as spotBasis: "generated.valuations.FxForward['spot_basis']" => json(i.spot_basis),
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"hazard_rate"` or `"black76"`.
         default_model as defaultModel: "string" => text(Instrument::default_model(i)),
@@ -654,6 +662,11 @@ builder_class!(
 );
 
 setters!(JsFxForwardBuilder, "FxForwardBuilder", {
+        /// Set the spot basis election.
+        /// @param value - Cash spot or an outright with a fixed spot value date.
+        /// @returns The builder for continued configuration.
+        /// @throws Error - Throws on a malformed election or a consumed builder.
+        spot_basis as spotBasis: "generated.valuations.FxForward['spot_basis']" => js_wire,
         /// Set the instrument identifier.
         /// @param value - Unique identifier for the FX forward.
         /// @returns The builder, for chaining.
@@ -725,6 +738,12 @@ instrument_surface!(
 );
 
 getters!(JsFxOption, "FxOption", |i| {
+        /// Cash payoff at expiry or a signed physical exchange on a booked date.
+        /// @returns The booked election as a tagged object.
+        delivery as delivery: "generated.valuations.FxOption['delivery']" => json(i.delivery),
+        /// Cash spot or an outright with a fixed spot value date.
+        /// @returns The booked election as a tagged object.
+        spot_basis as spotBasis: "generated.valuations.FxOption['spot_basis']" => json(i.spot_basis),
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"hazard_rate"` or `"black76"`.
         default_model as defaultModel: "string" => text(Instrument::default_model(i)),
@@ -787,6 +806,16 @@ builder_class!(
 );
 
 setters!(JsFxOptionBuilder, "FxOptionBuilder", {
+        /// Set the delivery election.
+        /// @param value - Cash payoff at expiry or a signed physical exchange on a booked date.
+        /// @returns The builder for continued configuration.
+        /// @throws Error - Throws on a malformed election or a consumed builder.
+        delivery as delivery: "generated.valuations.FxOption['delivery']" => js_wire,
+        /// Set the spot basis election.
+        /// @param value - Cash spot or an outright with a fixed spot value date.
+        /// @returns The builder for continued configuration.
+        /// @throws Error - Throws on a malformed election or a consumed builder.
+        spot_basis as spotBasis: "generated.valuations.FxOption['spot_basis']" => js_wire,
         /// Set the instrument identifier.
         /// @param value - Unique identifier for the FX option.
         /// @returns The builder, for chaining.

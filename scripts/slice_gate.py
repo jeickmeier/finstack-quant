@@ -27,7 +27,7 @@ GIT = "/usr/bin/git"
 
 # Run order: the stages most likely to fail on a code change come first. Each
 # value is the stage of `mise run all` it stands for; `lint` runs that stage's
-# hooks on the changed files only (scripts/tests/test_slice_gate.py keeps this
+# hooks on the changed files where possible (test_gate_parity.py keeps this
 # table equal to `all`).
 STAGES = {
     "lint": "pre-commit-run",

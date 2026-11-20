@@ -64,10 +64,10 @@ impl MetricCalculator for ConvexityCalculator {
         let super::YieldRiskBasis {
             yield_rate,
             timed,
+            compounding,
             price,
         } = super::yield_risk_basis(context, ytm)?;
         let bond: &Bond = context.instrument_as()?;
-        let comp = crate::bond::pricing::quote_conversions::YieldCompounding::Street;
         let frequency = bond.cashflow_spec.frequency();
         if price.abs() < ZERO_TOLERANCE {
             return Ok(0.0);
@@ -83,11 +83,23 @@ impl MetricCalculator for ConvexityCalculator {
                 continue;
             }
             let df = crate::bond::pricing::quote_conversions::df_from_yield(
-                yield_rate, t, comp, frequency,
+                yield_rate,
+                t,
+                compounding,
+                frequency,
             )?;
-            let c = m * t;
-            let denom = m + yield_rate;
-            d2_price.add(amount.amount() * c * (c + 1.0) / (denom * denom) * df)?;
+            let normalized_curvature = if matches!(
+                compounding,
+                crate::bond::pricing::quote_conversions::YieldCompounding::Rate(
+                    finstack_quant_core::math::Compounding::Simple,
+                )
+            ) {
+                2.0 * (t * df).powi(2)
+            } else {
+                let c = m * t;
+                c * (c + 1.0) / (m + yield_rate).powi(2)
+            };
+            d2_price.add(amount.amount() * df * normalized_curvature)?;
         }
 
         Ok(d2_price.get_total()? / price / 100.0)

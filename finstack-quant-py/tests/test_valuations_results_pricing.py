@@ -339,13 +339,29 @@ def test_market_history_typed_twin() -> None:
         {
             "date": "2024-01-12",
             "shifts": [
-                {"factor": {"type": "discount_rate", "curve_id": "USD-OIS", "tenor_years": 5.0}, "shift": 0.001}
+                {
+                    "factor": {
+                        "type": "discount_rate",
+                        "curve_id": "USD-OIS",
+                        "tenor_years": 5.0,
+                        "grid_years": [3.0, 5.0, 7.0],
+                    },
+                    "shift": 0.001,
+                }
             ],
         },
         {
             "date": "2024-01-11",
             "shifts": [
-                {"factor": {"type": "discount_rate", "curve_id": "USD-OIS", "tenor_years": 5.0}, "shift": -0.0005}
+                {
+                    "factor": {
+                        "type": "discount_rate",
+                        "curve_id": "USD-OIS",
+                        "tenor_years": 5.0,
+                        "grid_years": [3.0, 5.0, 7.0],
+                    },
+                    "shift": -0.0005,
+                }
             ],
         },
     ]
@@ -583,7 +599,15 @@ def test_pricing_entry_points_reject_retired_pricing_options_keyword() -> None:
 
 def _rate_history() -> MarketHistory:
     shift = lambda s: [  # noqa: E731
-        {"factor": {"type": "discount_rate", "curve_id": "USD-OIS", "tenor_years": 5.0}, "shift": s}
+        {
+            "factor": {
+                "type": "discount_rate",
+                "curve_id": "USD-OIS",
+                "tenor_years": 5.0,
+                "grid_years": [3.0, 5.0, 7.0],
+            },
+            "shift": s,
+        }
     ]
     return MarketHistory(
         AS_OF,
@@ -614,8 +638,24 @@ def test_calculate_var_single_instrument_matches_hvar_metric() -> None:
 
 def test_calculate_var_diversifies_offsetting_positions() -> None:
     shift = lambda s: [  # noqa: E731
-        {"factor": {"type": "discount_rate", "curve_id": "USD-OIS", "tenor_years": 5.0}, "shift": s},
-        {"factor": {"type": "forward_rate", "curve_id": "USD-SOFR-3M", "tenor_years": 5.0}, "shift": s},
+        {
+            "factor": {
+                "type": "discount_rate",
+                "curve_id": "USD-OIS",
+                "tenor_years": 5.0,
+                "grid_years": [3.0, 5.0, 7.0],
+            },
+            "shift": s,
+        },
+        {
+            "factor": {
+                "type": "forward_rate",
+                "curve_id": "USD-SOFR-3M",
+                "tenor_years": 5.0,
+                "grid_years": [3.0, 5.0, 7.0],
+            },
+            "shift": s,
+        },
     ]
     history = MarketHistory(
         AS_OF,

@@ -55,6 +55,8 @@
 //! - [`crate::fx_spot::FxSpot`] for spot FX positions
 //! - [`crate::fx_option::FxOption`] for FX options
 
+pub use crate::shared::FxSpotBasis;
+
 mod types;
 
 pub use types::{FxForward, FxForwardBuilder, FxForwardTradeDateParams};

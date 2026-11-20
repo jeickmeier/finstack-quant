@@ -164,8 +164,12 @@ it(
       const result = await query.fetchQuery(
         calibrationOptions(client, 1, "calibrate", inputs[0]!),
       );
+      const instrument = JSON.parse(bond.request.instrumentJson);
+      instrument.instrument.spec.maturity = "2030-01-01";
       const request = {
         ...bond.request,
+        instrumentJson: JSON.stringify(instrument),
+        asOf: base.plan.steps[0].base_date,
         marketJson: serializeHost(result.result.final_market),
       };
       const actual = unwrap(await worker.proxy.price(request));

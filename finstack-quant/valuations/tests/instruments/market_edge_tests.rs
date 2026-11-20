@@ -110,10 +110,12 @@ mod cds_market_edge {
 
         // Add same upfront
         let upfront = 500_000.0;
+        buyer.include_valuation_date_cashflows = true;
         buyer.upfront = Some((
             as_of,
             Money::new(upfront, Currency::USD).expect("valid money fixture"),
         ));
+        seller.include_valuation_date_cashflows = true;
         seller.upfront = Some((
             as_of,
             Money::new(upfront, Currency::USD).expect("valid money fixture"),

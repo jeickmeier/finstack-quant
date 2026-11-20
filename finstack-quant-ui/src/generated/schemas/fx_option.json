@@ -9,6 +9,9 @@
           "attributes": {},
           "base_currency": "EUR",
           "day_count": "act_365f",
+          "delivery": {
+            "type": "cash_at_expiry"
+          },
           "delta_convention": {
             "kind": "forward",
             "premium_currency": "USD",
@@ -24,6 +27,9 @@
           },
           "option_type": "call",
           "quote_currency": "USD",
+          "spot_basis": {
+            "type": "cash"
+          },
           "strike": 1.12,
           "vol_surface_id": "EURUSD-VOL"
         },
@@ -1131,6 +1137,56 @@
         }
       ]
     },
+    "d_78102f94ceb92cc3f3ca": {
+      "description": "Settlement profile of the FX option.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Cash-settled benchmark option whose intrinsic payoff is due at expiry.",
+          "properties": {
+            "type": {
+              "const": "cash_at_expiry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Deliverable option with a fixed native cash exchange on exercise.",
+          "properties": {
+            "date": {
+              "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+              "description": "Booked value date of both currency legs, on or after expiry."
+            },
+            "exercised": {
+              "description": "Confirmed expiry outcome. The live option has no known outcome.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "position": {
+              "$ref": "#/$defs/d_8262d0a7fe31a173e8ec",
+              "description": "Signed holder position with positive base notional."
+            },
+            "type": {
+              "const": "physical",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "date",
+            "position"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "d_7dd9bdea4c4382f447f9": {
       "additionalProperties": false,
       "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_quant_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months).expect(\"valid tenor fixture\");\nassert_eq!(tenor.count(), 3);\nassert_eq!(tenor.unit(), TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count(), 6);\nassert_eq!(parsed.unit(), TenorUnit::Months);\n# Ok(())\n# }\n```",
@@ -1204,6 +1260,21 @@
         {
           "const": "toggle",
           "description": "Deferred to the [`ToggleExerciseModel`] on the config.\nFalls back to `Cash` if no toggle model is set.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_8262d0a7fe31a173e8ec": {
+      "description": "Holder direction of a physically delivered FX option.",
+      "oneOf": [
+        {
+          "const": "long",
+          "description": "Holder receives the exercised option exchange.",
+          "type": "string"
+        },
+        {
+          "const": "short",
+          "description": "Writer owes the opposite exchange when exercised.",
           "type": "string"
         }
       ]
@@ -2171,6 +2242,44 @@
       ],
       "title": "Id",
       "type": "string"
+    },
+    "d_a813281b23253f1d49c3": {
+      "description": "Value-date basis of the selected ordered FX quote.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "The selected quote is cash FX at the valuation date.",
+          "properties": {
+            "type": {
+              "const": "cash",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The selected outright is quoted for a stated value date.",
+          "properties": {
+            "date": {
+              "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+              "description": "Fixed value date of the spot quote."
+            },
+            "type": {
+              "const": "value_date",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "date"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "d_ae5d75ed4e313ae3bc25": {
       "description": "Which valuation parameter to solve the breakeven for.\n\n# Result units\n\nThe breakeven metric is a bare `f64` whose unit depends on the target. Read\nthe per-variant docs before interpreting a value:\n\n| Target             | Sensitivity     | Result unit          |\n|--------------------|-----------------|----------------------|\n| `ZSpread`          | CS01            | basis points         |\n| `Ytm`              | DV01            | basis points         |\n| `Oas`              | CS01            | basis points         |\n| `ImpliedVol`       | Vega            | vol points (1 = 1%)  |\n| `BaseCorrelation`  | Correlation01   | correlation points   |",
@@ -4506,7 +4615,7 @@
     },
     "d_f2834e0dc8039c010dc1": {
       "additionalProperties": false,
-      "description": "European FX option with same-day cash settlement at expiry.\n\nPhysical delivery is intentionally not represented: exercised payoff is a\nquote-currency cash amount on `expiry`.",
+      "description": "European FX option with an explicit cash or physical settlement profile.",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
@@ -4520,6 +4629,10 @@
           "$ref": "#/$defs/d_c0401254ec268b317b65",
           "default": "act_365f",
           "description": "Day count convention"
+        },
+        "delivery": {
+          "$ref": "#/$defs/d_78102f94ceb92cc3f3ca",
+          "description": "Booked payoff and settlement profile."
         },
         "delta_convention": {
           "$ref": "#/$defs/d_ee1801801f5abe1ae6a6",
@@ -4565,6 +4678,10 @@
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "description": "Scenario-only pricing adjustments."
         },
+        "spot_basis": {
+          "$ref": "#/$defs/d_a813281b23253f1d49c3",
+          "description": "Selected spot quote's fixed value-date basis."
+        },
         "strike": {
           "description": "Strike exchange rate (quote per base).\n\n**Note on ATM convention**: Professional FX markets define ATM as the\nDelta-Neutral Straddle (DNS) strike, not the forward rate. See module\ndocumentation for details. If constructing an \"ATM\" option, compute\nthe forward rate or DNS strike externally.",
           "format": "double",
@@ -4576,6 +4693,8 @@
         }
       },
       "required": [
+        "spot_basis",
+        "delivery",
         "id",
         "base_currency",
         "quote_currency",

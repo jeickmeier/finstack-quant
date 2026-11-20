@@ -42,8 +42,9 @@ fn load_option(fixture: &Value) -> CdsOption {
         .expect("parse cds option spec")
 }
 
-/// Library NPV on the supplied curve. Bloomberg CDSO shows 118,781.76: an open
-/// reconciliation of 431.15 (0.36%), not a tolerance.
+/// Library NPV on the supplied curve with the clean CDS quote converted to
+/// dated accrued cash at settlement. Bloomberg CDSO shows 118,781.76, leaving
+/// an open difference of 411.79 (0.35%).
 ///
 /// What is established (see `docs/audits/2026-09-09-cdso-reconciliation.md`,
 /// 2026-10-08 section): CDSO prices the index on a flat curve at the index
@@ -54,7 +55,7 @@ fn load_option(fixture: &Value) -> CdsOption {
 /// protection) reproduces NPV, forward, delta, vega and theta together.
 /// Closing the rest needs payer and receiver CDSO prices at a strike equal to
 /// the coupon and at two other strikes, plus the CDSO curve tab.
-const LIBRARY_NPV: f64 = 118_350.607_245_74;
+const LIBRARY_NPV: f64 = 118_369.972_159_346_52;
 
 /// Pins the library value so an unintended pricing change is caught, and pins
 /// the size of the open Bloomberg difference so closing it is a deliberate,
@@ -75,7 +76,7 @@ fn cdx_ig_46_npv_is_pinned_with_the_open_bloomberg_difference() {
     );
     let open_difference = BBG_NPV - supplied_pv;
     assert!(
-        (open_difference - 431.15).abs() < 0.01,
+        (open_difference - 411.79).abs() < 0.01,
         "open Bloomberg difference changed: {open_difference} (target {BBG_NPV})",
     );
 }

@@ -63,6 +63,7 @@ fn cds_quote_id_and_bump_semantics() {
         pillar: Pillar::Tenor("5Y".parse().unwrap()),
         coupon_bp: 500.0,
         upfront_pct: 0.02,
+        upfront_basis: finstack_quant_calibration::quotes::CdsUpfrontBasis::Clean,
         recovery_rate: 0.40,
     };
     // The upfront coupon is contractual (25/100/500/1000bp): bumping it would

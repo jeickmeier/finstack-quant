@@ -74,3 +74,41 @@ fn money_market_maturity_separates_principal_from_interest_income() {
         }
     }
 }
+
+#[test]
+fn dated_curve_carry_plus_funding_matches_theta_on_sloped_curve() {
+    use finstack_quant_core::dates::{DayCount, Tenor};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::math::interp::InterpStyle;
+    use finstack_quant_valuations::instruments::Instrument;
+    use finstack_quant_valuations::metrics::MetricId;
+
+    let as_of = date!(2024 - 02 - 01);
+    let mut deposit = Deposit::example().expect("deposit");
+    deposit.metric_pricing_overrides.theta_period = Some(Tenor::parse("1M").expect("horizon"));
+    let curve = DiscountCurve::builder(deposit.discount_curve_id.clone())
+        .base_date(as_of)
+        .day_count(DayCount::Act365F)
+        .knots([(0.0, 1.0), (0.1, 0.997), (0.5, 0.975), (1.0, 0.938)])
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+        .build()
+        .expect("sloped discount curve");
+    let market = MarketContext::new().try_insert(curve).expect("market");
+    let result = deposit
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::CarryTotal, MetricId::FundingCost, MetricId::Theta],
+            Default::default(),
+        )
+        .expect("carry and theta");
+    let carry_before_funding = result.measures["carry_total"] + result.measures["funding_cost"];
+    let theta = result.measures["theta"];
+    assert!(theta.abs() > 1.0, "fixture must have a nonzero roll");
+    assert!(
+        (carry_before_funding - theta).abs() < 1e-8,
+        "carry before funding {carry_before_funding} versus theta {theta}"
+    );
+}

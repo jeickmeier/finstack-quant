@@ -762,6 +762,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             settlement_delay: convention.get_spec().expect("CDS registry").settlement_days,
         };
         let cds = CreditDefaultSwap {
+            include_valuation_date_cashflows: false,
             id: cds_id.clone().into(),
             notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             side: if i % 2 == 0 {
@@ -933,6 +934,8 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     for i in 0..positions_per_derivative.min(2) {
         let fx_option_id = format!("FXOPTION_{}", i);
         let fx_option = FxOption::builder()
+            .spot_basis(finstack_quant_valuations::instruments::fx::fx_option::FxSpotBasis::Cash)
+            .delivery(finstack_quant_valuations::instruments::fx::fx_option::FxOptionDelivery::CashAtExpiry)
             .id(fx_option_id.clone().into())
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)

@@ -62,6 +62,7 @@ use super::pricing_options::PricingOptions;
 /// }
 ///
 /// impl Instrument for ZeroNote {
+///     fn includes_valuation_date_cashflows(&self) -> bool { true }
 ///     fn id(&self) -> &str { &self.id }
 ///     fn key(&self) -> InstrumentType { InstrumentType::Bond }
 ///     fn as_any(&self) -> &dyn Any { self }
@@ -703,6 +704,21 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// no market data (see the `no_market_dependencies` coverage-manifest flag).
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies>;
 
+    /// Resolve market dependencies that depend on the live valuation state.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Frozen market supplying instrument inputs at valuation.
+    /// * `as_of` - Date at which the product's live value and currencies apply.
+    fn market_dependencies_at(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<MarketDependencies> {
+        let _ = (market, as_of);
+        self.market_dependencies()
+    }
+
     /// FX exposure for this instrument.
     ///
     /// Returns the currency pair if this instrument has FX exposure.
@@ -733,13 +749,10 @@ pub trait Instrument: CashflowProvider + Send + Sync {
 
     /// Whether valuation includes cash payable on the valuation date.
     ///
-    /// The default is start-of-day valuation (`date >= as_of`). Instruments
-    /// whose pricers exclude already-settled same-day payments override this
-    /// to return `false` (`date > as_of`). Period-cash metrics use this policy
-    /// to avoid dropping or double-counting payments at either endpoint.
-    fn includes_valuation_date_cashflows(&self) -> bool {
-        true
-    }
+    /// Return `true` when a scheduled payment dated on the valuation date
+    /// remains in holder PV. Return `false` when that payment is settled.
+    /// Period-cash metrics use this election at both horizon endpoints.
+    fn includes_valuation_date_cashflows(&self) -> bool;
 
     /// Copy of this instrument whose observation state covers a theta roll.
     ///

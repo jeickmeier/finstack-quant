@@ -158,9 +158,6 @@ impl MetricId {
     /// Number of constituents in the basket
     pub const ConstituentCount: Self = Self(Cow::Borrowed("constituent_count"));
 
-    /// Expense ratio as percentage
-    pub const ExpenseRatio: Self = Self(Cow::Borrowed("expense_ratio"));
-
     // Inflation-Linked Bond Metrics
 
     /// Real yield (inflation-adjusted)

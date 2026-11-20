@@ -621,6 +621,10 @@ export type Currency1 =
   | "ZWG"
   | "ZWL";
 /**
+ * Fixed value date of the spot quote.
+ */
+export type Date1 = string;
+/**
  * Canonical schema marker for persisted instrument envelopes.
  */
 export type D_605C3B0B209Df681Efb9 = "finstack_quant.instrument/1";
@@ -667,6 +671,7 @@ export interface D_644Fac7163A2Fe78B985 {
  * use time::Month;
  *
  * let forward = FxForward::builder()
+ *     .spot_basis(finstack_quant_valuations_fx::FxSpotBasis::Cash)
  *     .id(InstrumentId::new("EURUSD-FWD-6M"))
  *     .base_currency(Currency::EUR)
  *     .quote_currency(Currency::USD)
@@ -706,6 +711,17 @@ export interface D_5F15F4Bd684Bc813Ff88 {
    */
   quoted_spot?: number | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
+  /**
+   * Basis of the selected spot quote, held fixed across reprices.
+   */
+  spot_basis:
+    | {
+        type: "cash";
+      }
+    | {
+        date: Date1;
+        type: "value_date";
+      };
 }
 /**
  * Attributes for scenario selection and tagging

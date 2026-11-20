@@ -38,10 +38,10 @@ function ladderCase(spec) {
   const metric = (id) =>
     native.priceInstrument(instrumentJson, marketJson, asOf, "default", [id])
       .measures[id];
-  // The metric rejects a workout on the quote date, which has no par horizon.
-  const iSpread = () => {
+  // The immediate workout has no finite yield or par horizon.
+  const metricOrError = (id) => {
     try {
-      return metric("i_spread");
+      return metric(id);
     } catch (error) {
       return { error: error.message };
     }
@@ -50,9 +50,8 @@ function ladderCase(spec) {
     return {
       request: { instrumentJson, marketJson, asOf },
       ladder: native.bondWorkoutLadder(bond, marketJson, asOf),
-      // JSON has no infinity: a null here is the metric's negative infinity.
-      ytw: metric("ytw"),
-      iSpread: iSpread(),
+      ytw: metricOrError("ytw"),
+      iSpread: metricOrError("i_spread"),
     };
   } finally {
     bond.free();

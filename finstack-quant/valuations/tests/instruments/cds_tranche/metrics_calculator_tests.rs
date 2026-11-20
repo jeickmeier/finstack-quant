@@ -884,3 +884,15 @@ mod production_credit_audit {
         }
     }
 }
+
+#[test]
+fn rate_buckets_reconcile_with_hazard_replay() {
+    let as_of = base_date();
+    let instrument = mezzanine_tranche();
+    let market = replayable_market_context();
+    crate::instruments::test_support::credit::assert_rate_bucket_reconciliation(
+        &instrument,
+        &market,
+        as_of,
+    );
+}

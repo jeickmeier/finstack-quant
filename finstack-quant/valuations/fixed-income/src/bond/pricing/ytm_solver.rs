@@ -182,8 +182,19 @@ pub(crate) fn solve_bond_ytm(
     target_price: Money,
     spec: YtmPricingSpec,
 ) -> Result<f64> {
-    let timed = bond_flow_times(bond, cashflows, as_of)?;
-    solve_ytm_timed(&timed, target_price, spec)
+    let (timed, compounding) = if matches!(spec.compounding, YieldCompounding::Street) {
+        super::quote_conversions::street_flow_times(bond, cashflows, as_of)?
+    } else {
+        (bond_flow_times(bond, cashflows, as_of)?, spec.compounding)
+    };
+    solve_ytm_timed(
+        &timed,
+        target_price,
+        YtmPricingSpec {
+            compounding,
+            ..spec
+        },
+    )
 }
 
 #[cfg(test)]

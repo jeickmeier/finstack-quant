@@ -27,8 +27,8 @@ pub(crate) fn register_basis_swap_metrics(
             // Leg-specific metrics with primary/reference constructors.
             (AnnuityPrimary, AnnuityCalculator::primary()),
             (AnnuityReference, AnnuityCalculator::reference()),
-            (PvPrimary, PvCalculator::primary()),
-            (PvReference, PvCalculator::reference()),
+            (PvPrimary, PvCalculator::primary(), NativeMoney),
+            (PvReference, PvCalculator::reference(), NativeMoney),
             // DV01 in per-curve mode bumps each curve individually (discount,
             // primary forward, reference forward).
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_per_curve())),

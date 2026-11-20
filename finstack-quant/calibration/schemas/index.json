@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
-      "bytes": 223055,
+      "bytes": 223781,
       "kind": "input",
       "path": "schemas/calibration/1/calibration.schema.json",
       "summary": "Build a market from quotes: a calibration plan, flat market data, and any pre-built curves or surfaces.",
@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/step_with_quotes.schema.json",
-      "bytes": 127581,
+      "bytes": 128307,
       "kind": "input",
       "path": "schemas/calibration/1/step_with_quotes.schema.json",
       "summary": "One typed calibration step with inline observations.",
@@ -83,7 +83,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/market/1/cds_quote.schema.json",
-      "bytes": 9180,
+      "bytes": 9866,
       "kind": "component",
       "path": "schemas/market/1/cds_quote.schema.json",
       "summary": "Single-name CDS par-spread or upfront quote.",
@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/market/1/market_quote.schema.json",
-      "bytes": 30580,
+      "bytes": 31286,
       "kind": "component",
       "path": "schemas/market/1/market_quote.schema.json",
       "summary": "One market observation, tagged by asset class.",

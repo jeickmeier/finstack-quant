@@ -386,9 +386,9 @@ fn test_callable_quoted_bond_can_request_callable_oas_risk_basis() {
             > 1e-4,
         "callable_oas basis should use option-aware duration"
     );
-    assert!(
-        (callable_result.measures["dv01"] - bullet_result.measures["dv01"]).abs() > 1e-2,
-        "callable_oas basis should use option-aware DV01"
+    assert_eq!(
+        callable_result.measures["dv01"],
+        bullet_result.measures["dv01"]
     );
 }
 
@@ -428,10 +428,6 @@ fn test_floor_only_bond_uses_workout_schedule_and_option_aware_risk() {
         "floor-only duration must use the floor-generated workout yield"
     );
     assert!(
-        (workout.measures["dv01"] - workout.measures["yield_dv01"]).abs() < 1.0e-8,
-        "floor-only Workout DV01 must use the option-aware yield basis"
-    );
-    assert!(
         workout.measures["embedded_option_value"].abs() > 1.0e-6,
         "floor-only EOV must not collapse to zero"
     );
@@ -448,6 +444,7 @@ fn test_floor_only_bond_uses_workout_schedule_and_option_aware_risk() {
             finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .expect("floor-only callable-OAS risk metrics should compute");
+    assert_eq!(workout.measures["dv01"], option_aware.measures["dv01"]);
     assert!(
         (option_aware.measures["duration_mod"] - workout.measures["duration_mod"]).abs() > 1.0e-4,
         "CallableOas duration must use floor optionality"
@@ -458,17 +455,9 @@ fn test_floor_only_bond_uses_workout_schedule_and_option_aware_risk() {
     );
 }
 
-/// Item 3a regression: a callable bond on the default (`BulletDiscountable` /
-/// Workout) risk basis with **no market price quote** must not report a
-/// straight-bullet curve-bump DV01 that silently discards the embedded option.
-///
-/// On the Workout basis `DurationMod`, `Convexity` and `YieldDv01` are all
-/// yield-basis measures (and pick up the call via the workout path when a
-/// price is quoted). `Dv01` must be consistent with that family — the dollar
-/// analogue of modified duration — rather than a curve-bump of a structurally
-/// mutated `call_put = None` clone. So on this basis `Dv01 == YieldDv01`.
+/// A callable bond's unquoted model PV retains the option in both rate shocks.
 #[test]
-fn test_callable_no_quote_default_basis_dv01_is_yield_basis() {
+fn test_callable_no_quote_dv01_uses_selected_model() {
     let as_of = date!(2025 - 01 - 01);
 
     let mut callable = Bond::fixed(
@@ -506,21 +495,25 @@ fn test_callable_no_quote_default_basis_dv01_is_yield_basis() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::Dv01, MetricId::YieldDv01],
+            &[MetricId::Dv01],
             finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
-        .expect("callable no-quote default-basis risk metrics should compute");
+        .expect("callable direct risk");
 
     let dv01 = result.measures["dv01"];
-    let yield_dv01 = result.measures["yield_dv01"];
-
-    assert!(
-        (dv01 - yield_dv01).abs() < 1e-8,
-        "default-basis callable DV01 must equal the yield-basis DV01 (no \
-         straight-bullet curve-bump): dv01={dv01}, yield_dv01={yield_dv01}"
-    );
-    // Sanity: both are negative for a long bond.
-    assert!(dv01 < 0.0, "long-bond DV01 should be negative, got {dv01}");
+    use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+    let reprice = |bp| {
+        let bumped = market
+            .bump([MarketBump::DiscountCurve {
+                id: callable.discount_curve_id.clone(),
+                spec: BumpSpec::parallel_bp(bp),
+            }])
+            .expect("rate bump");
+        callable.value_raw(&bumped, as_of).expect("option-aware PV")
+    };
+    let expected = (reprice(1.0) - reprice(-1.0)) / 2.0;
+    assert!(expected < 0.0);
+    assert!((dv01 - expected).abs() < 1e-8, "{dv01} vs {expected}");
 }
 
 #[test]

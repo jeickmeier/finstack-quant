@@ -276,6 +276,7 @@ class InterestRateSwap:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         metric_id: str,
         model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> float:
         """
         Compute one scalar metric for this swap (e.g. ``"dv01"``).
@@ -290,6 +291,9 @@ class InterestRateSwap:
             Registered metric identifier (see :func:`list_standard_metrics`).
         model : str, default "default"
             Model key.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -1089,6 +1093,7 @@ class Swaption:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         metric_id: str,
         model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> float:
         """
         Compute one scalar metric for this swaption (e.g. ``"vega"``).
@@ -1103,6 +1108,9 @@ class Swaption:
             Registered metric identifier (see :func:`list_standard_metrics`).
         model : str, default "default"
             Model key.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -2061,6 +2069,7 @@ class CapFloor:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         metric_id: str,
         model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> float:
         """
         Compute one scalar metric for this cap/floor (e.g. ``"vega"``).
@@ -2075,6 +2084,9 @@ class CapFloor:
             Registered metric identifier (see :func:`list_standard_metrics`).
         model : str, default "default"
             Model key.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------

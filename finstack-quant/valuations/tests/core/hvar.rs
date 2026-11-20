@@ -61,6 +61,7 @@ fn usd_ois_rate_scenario(date: Date, shift: f64) -> MarketScenario {
             factor: RiskFactorType::DiscountRate {
                 curve_id: CurveId::from("USD-OIS"),
                 tenor_years: 5.0,
+                grid_years: finstack_quant_valuations::metrics::STANDARD_BUCKETS_YEARS.to_vec(),
             },
             shift,
         }],
@@ -217,5 +218,41 @@ fn request_config_applies_to_both_historical_risk_metrics_in_either_order() -> R
             (result.measures["expected_shortfall"] - expected.expected_shortfall).abs() < 1e-10
         );
     }
+    Ok(())
+}
+
+#[test]
+fn historical_discount_shock_requires_a_policy_for_unchanged_credit_quotes() -> Result<()> {
+    use finstack_quant_valuations::metrics::risk::UnshiftedHazardPolicy;
+    let as_of = sample_as_of();
+    let market = usd_ois_market(as_of)?;
+    let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
+        &market, as_of, "CREDIT", "ENTITY", "USD-OIS",
+    )?;
+    let market = market.try_insert(hazard)?;
+    let options = finstack_quant_calibration::recalibration::pricing_options();
+    let provider = options.recalibration_provider.as_deref();
+    let mut scenario = usd_ois_rate_scenario(as_of, 0.01);
+
+    let error = scenario
+        .apply(&market, provider)
+        .expect_err("missing replay policy");
+    assert!(error.to_string().contains("explicit hazard replay policy"));
+    scenario
+        .unshifted_hazard_policies
+        .insert("CREDIT".into(), UnshiftedHazardPolicy::FrozenIntensity);
+    let frozen = scenario.apply(&market, provider)?;
+    assert_eq!(
+        frozen.get_hazard("CREDIT")?.hazard_rates(),
+        market.get_hazard("CREDIT")?.hazard_rates()
+    );
+    scenario
+        .unshifted_hazard_policies
+        .insert("CREDIT".into(), UnshiftedHazardPolicy::RefitOriginalQuotes);
+    let refit = scenario.apply(&market, provider)?;
+    assert_ne!(
+        refit.get_hazard("CREDIT")?.hazard_rates(),
+        market.get_hazard("CREDIT")?.hazard_rates()
+    );
     Ok(())
 }

@@ -33,7 +33,6 @@ const diagnostics = [
 ] as const;
 const extraDiagnostics = [
   ["survival_probability", "Survival"],
-  ["conditional_default_prob", "Interval default probability"],
   ["inflation_index_ratio", "Inflation ratio"],
   ["prepayment_smm", "Prepayment SMM"],
 ] as const;

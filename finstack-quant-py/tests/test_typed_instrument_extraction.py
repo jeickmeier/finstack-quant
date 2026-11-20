@@ -201,7 +201,15 @@ def test_metric_pricing_overrides_merge_identically() -> None:
 
 def test_calculate_var_typed_equal_envelope() -> None:
     shift = lambda s: [  # noqa: E731
-        {"factor": {"type": "discount_rate", "curve_id": "USD-OIS", "tenor_years": 5.0}, "shift": s}
+        {
+            "factor": {
+                "type": "discount_rate",
+                "curve_id": "USD-OIS",
+                "tenor_years": 5.0,
+                "grid_years": [3.0, 5.0, 7.0],
+            },
+            "shift": s,
+        }
     ]
     history = MarketHistory(
         AS_OF,

@@ -163,6 +163,9 @@ impl MetricSeed for SimulationMetricSeed {
 }
 
 impl Instrument for StructuredCredit {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::StructuredCredit,
         crate::STRUCTURED_CREDIT

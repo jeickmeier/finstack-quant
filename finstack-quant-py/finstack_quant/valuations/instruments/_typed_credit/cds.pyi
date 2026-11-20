@@ -182,6 +182,7 @@ class CreditDefaultSwap:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         metric_id: str,
         model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> float:
         """
         Compute one scalar metric for this instrument (e.g. ``"cs01"`` or ``"par_spread"``).
@@ -196,6 +197,9 @@ class CreditDefaultSwap:
             Registered metric identifier (see :func:`list_standard_metrics`).
         model : str, default "default"
             Model key.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -472,6 +476,19 @@ class CreditDefaultSwap:
         This accessor does not raise; it returns the stored value.
         """
         ...
+    @property
+    def include_valuation_date_cashflows(self) -> bool:
+        """Whether coupons and actual upfront due on the valuation date enter PV.
+
+        Returns:
+            True when same-day payments are still owed and False when they have settled.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
     @property
     def upfront(self) -> tuple[datetime.date, Money] | None:
         """
@@ -800,6 +817,20 @@ class CreditDefaultSwapBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized convention.
         """
         ...
+    def include_valuation_date_cashflows(self, value: bool) -> CreditDefaultSwapBuilder:
+        """Elect how valuation-date premiums and actual upfront cash enter PV.
+
+        Args:
+            value: True for cash still owed on the valuation date. False for already-settled cash.
+
+        Returns:
+            This builder for chaining.
+
+        Raises:
+            ValueError: If the builder has already been consumed by build().
+        """
+        ...
+
     def upfront(
         self, value: tuple[datetime.date | datetime.datetime | pd.Timestamp | str, Money]
     ) -> CreditDefaultSwapBuilder:

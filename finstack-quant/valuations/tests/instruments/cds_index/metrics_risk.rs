@@ -838,3 +838,20 @@ fn parallel_cs01_uses_the_configured_credit_spread_bump() {
     let expected = (pv_at(bump_bp) - pv_at(-bump_bp)) / (2.0 * bump_bp);
     relative_eq(cs01, expected, 1e-9, "parallel CS01 at the configured bump");
 }
+
+#[test]
+fn rate_buckets_reconcile_with_hazard_replay() {
+    let as_of = date!(2025 - 01 - 01);
+    let instrument = standard_single_curve_index(
+        "CDX-DV01-BUCKETS",
+        as_of,
+        date!(2030 - 01 - 01),
+        10_000_000.0,
+    );
+    let market = replayable_standard_market_context(as_of);
+    crate::instruments::test_support::credit::assert_rate_bucket_reconciliation(
+        &instrument,
+        &market,
+        as_of,
+    );
+}

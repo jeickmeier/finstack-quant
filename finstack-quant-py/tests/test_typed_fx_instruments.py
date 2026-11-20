@@ -33,6 +33,7 @@ class TestFxForwardTyped:
             (
                 FxForward
                 .builder()
+                .spot_basis({"type": "cash"})
                 .id("BAD")
                 .base_currency(Currency("USD"))
                 .quote_currency(Currency("USD"))
@@ -67,6 +68,7 @@ class TestFxForwardTyped:
         forward = (
             FxForward
             .builder()
+            .spot_basis({"type": "cash"})
             .id(spec["id"])
             .base_currency(Currency(spec["base_currency"]))
             .quote_currency(Currency(spec["quote_currency"]))
@@ -90,6 +92,8 @@ class TestFxOptionTyped:
         option = (
             FxOption
             .builder()
+            .spot_basis({"type": "cash"})
+            .delivery({"type": "cash_at_expiry"})
             .id("EURUSD-CALL-1Y")
             .base_currency(Currency("EUR"))
             .quote_currency(Currency("USD"))
@@ -134,6 +138,8 @@ class TestFxOptionTyped:
         option = (
             FxOption
             .builder()
+            .spot_basis({"type": "cash"})
+            .delivery({"type": "cash_at_expiry"})
             .id("EURUSD-DELTA")
             .base_currency(Currency("EUR"))
             .quote_currency(Currency("USD"))

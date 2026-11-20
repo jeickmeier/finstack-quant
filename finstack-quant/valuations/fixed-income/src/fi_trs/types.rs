@@ -313,6 +313,9 @@ impl FiIndexTotalReturnSwap {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for FiIndexTotalReturnSwap {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::FiIndexTotalReturnSwap,
         crate::FIXED_INCOME

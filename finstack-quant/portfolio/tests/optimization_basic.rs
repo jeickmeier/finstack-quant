@@ -48,6 +48,9 @@ impl FixedValueInstrument {
 }
 
 impl Instrument for FixedValueInstrument {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     /// Test mock: reads no market data.
     fn market_dependencies(
         &self,

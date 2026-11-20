@@ -3,7 +3,7 @@
   "sources": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "0b2dadbea985c1db3b433ecfdf8c26213cedda7ff60f7571cbb8e57b438cbd16"
+      "sha256": "1b1c97c1e978f6ddf018b5f38e16b7b0c407aac254f7443f76908d9c27a07162"
     }
   ],
   "base": {
@@ -87,9 +87,9 @@
           "currency": "USD"
         },
         "measures": {
-          "ytm": 0.04703884277654928,
+          "ytm": 0.047169283615153525,
           "dv01": -98.76957239897456,
-          "duration_mod": 0.9667764980918271,
+          "duration_mod": 0.9640730467995994,
           "bucketed_dv01": -98.76957239757758,
           "bucketed_dv01::USD-OIS::10y": 0,
           "bucketed_dv01::USD-OIS::15y": 0,
@@ -477,9 +477,9 @@
           "currency": "USD"
         },
         "measures": {
-          "ytm": 0.04436447500613873,
+          "ytm": 0.044499934900579796,
           "dv01": -90.36448919400573,
-          "duration_mod": 0.8788724314855275,
+          "duration_mod": 0.87616873063265,
           "bucketed_dv01": -90.36448913993081,
           "bucketed_dv01::USD-OIS::10y": 0,
           "bucketed_dv01::USD-OIS::15y": 0,
@@ -821,9 +821,9 @@
           "currency": "USD"
         },
         "measures": {
-          "ytm": 0.04192805926047875,
+          "ytm": 0.04204418562619366,
           "dv01": -99.2633986165165,
-          "duration_mod": 0.9692215091091336,
+          "duration_mod": 0.9665177009654405,
           "bucketed_dv01": -99.26339861511951,
           "bucketed_dv01::USD-OIS::10y": 0,
           "bucketed_dv01::USD-OIS::15y": 0,

@@ -21,6 +21,43 @@ thread_local! {
 
 pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -> Result<Money> {
     inst.validate()?;
+    let signed_notional = inst.notional.amount() * inst.delivery.position_sign();
+    if let crate::fx_option::FxOptionDelivery::Physical {
+        date, exercised, ..
+    } = inst.delivery
+        && as_of >= inst.expiry
+    {
+        if as_of > date || exercised == Some(false) {
+            return Ok(Money::from((0_i64, inst.quote_currency)));
+        }
+        if exercised != Some(true) {
+            return Err(finstack_quant_core::Error::Validation(
+                "deliverable FX option requires a confirmed exercise outcome at expiry".into(),
+            ));
+        }
+        let settlement =
+            crate::shared::collect_fx_forward_inputs(crate::shared::FxForwardRateRequest {
+                market: curves,
+                as_of,
+                maturity: date,
+                base_currency: inst.base_currency,
+                quote_currency: inst.quote_currency,
+                domestic_discount_curve_id: &inst.domestic_discount_curve_id,
+                foreign_discount_curve_id: &inst.foreign_discount_curve_id,
+                quoted_spot: None,
+                spot_basis: inst.spot_basis,
+                context: "FxOption physical exercise",
+            })?;
+        let sign = if inst.option_type == OptionType::Call {
+            1.0
+        } else {
+            -1.0
+        };
+        let amount = sign
+            * signed_notional
+            * (settlement.spot * settlement.df_foreign - inst.strike * settlement.df_domestic);
+        return Money::from_model_value(amount, inst.quote_currency);
+    }
     if crate::shared::event_has_occurred(inst.expiry, as_of) {
         return Ok(Money::from((0_i64, inst.quote_currency)));
     }
@@ -30,15 +67,19 @@ pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -
         r_foreign: r_f,
         sigma,
         t,
+        df_domestic,
+        df_foreign,
         ..
     } = collect_fx_option_inputs(input_request(inst, curves, as_of))?;
 
     if t <= 0.0 {
-        let intrinsic = match inst.option_type {
-            OptionType::Call => (spot - inst.strike).max(0.0),
-            OptionType::Put => (inst.strike - spot).max(0.0),
-        };
-        return Money::new(intrinsic * inst.notional.amount(), inst.quote_currency);
+        let intrinsic = inst
+            .option_type
+            .intrinsic(spot * df_foreign / df_domestic, inst.strike);
+        return Money::new(
+            intrinsic * df_domestic * signed_notional,
+            inst.quote_currency,
+        );
     }
 
     if inst.strike.abs() < STRIKE_ZERO_TOL {
@@ -46,11 +87,11 @@ pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -
             OptionType::Call => spot * (-r_f * t).exp(),
             OptionType::Put => 0.0,
         };
-        return Money::new(unit_price * inst.notional.amount(), inst.quote_currency);
+        return Money::new(unit_price * signed_notional, inst.quote_currency);
     }
 
     let price = bs_price_unchecked(spot, inst.strike, r_d, r_f, sigma, t, inst.option_type);
-    Money::new(price * inst.notional.amount(), inst.quote_currency)
+    Money::new(price * signed_notional, inst.quote_currency)
 }
 
 pub(crate) fn input_request<'a>(
@@ -64,6 +105,8 @@ pub(crate) fn input_request<'a>(
         base_currency: inst.base_currency,
         quote_currency: inst.quote_currency,
         expiry: inst.expiry,
+        delivery: inst.delivery.value_date(inst.expiry),
+        spot_basis: inst.spot_basis,
         day_count: inst.day_count,
         domestic_discount_curve_id: &inst.domestic_discount_curve_id,
         foreign_discount_curve_id: &inst.foreign_discount_curve_id,
@@ -100,7 +143,7 @@ pub(crate) fn implied_vol(
         )));
     }
 
-    let target_unit = target_price / inst.notional.amount();
+    let target_unit = target_price / (inst.notional.amount() * inst.delivery.position_sign());
 
     finstack_quant_models::closed_form::bs_implied_vol(
         spot,
@@ -130,6 +173,7 @@ pub(crate) fn compute_greeks(
         r_foreign: r_f,
         sigma,
         t,
+        spot_conversion,
         ..
     } = collect_fx_option_inputs(input_request(inst, curves, as_of))?;
     if t <= 0.0 || inst.strike.abs() < STRIKE_ZERO_TOL {
@@ -152,14 +196,14 @@ pub(crate) fn compute_greeks(
         let delta = foreign_df * signed_probability;
         let forward = spot * foreign_df / domestic_df;
         let premium_in_base = inst.delta_convention.premium_currency == inst.base_currency;
-        let scale = inst.notional.amount();
+        let scale = inst.notional.amount() * inst.delivery.position_sign();
         let pv = if t > 0.0 {
             scale * spot * foreign_df * signed_probability
         } else {
             0.0
         };
         return Ok(FxOptionGreeks {
-            delta: delta * scale,
+            delta: delta * scale * spot_conversion,
             delta_forward: signed_probability * scale,
             delta_premium_adjusted_spot: if premium_in_base {
                 inst.strike / spot * domestic_df * signed_probability * scale
@@ -171,7 +215,7 @@ pub(crate) fn compute_greeks(
             } else {
                 signed_probability * scale
             },
-            rho_foreign: -t * pv * 0.01,
+            rho_foreign_bp: -t * pv * 0.0001,
             theta: r_f * pv / inst.metric_pricing_overrides.theta_days_per_year(),
             ..Default::default()
         });
@@ -214,17 +258,30 @@ pub(crate) fn compute_greeks(
         delta_forward_unit
     };
 
-    let scale = inst.notional.amount();
+    let scale = inst.notional.amount() * inst.delivery.position_sign();
+    let day_count = inst.day_count;
+    let delivery_scale = day_count.year_fraction(
+        as_of,
+        inst.delivery.value_date(inst.expiry),
+        Default::default(),
+    )? / t;
+    let spot_time = match inst.spot_basis {
+        crate::FxSpotBasis::Cash => 0.0,
+        crate::FxSpotBasis::ValueDate { date } => {
+            day_count.year_fraction(as_of, date, Default::default())?
+        }
+    };
+    let bridge_rho = spot_time * spot * greeks_unit.delta * scale * 0.0001;
     Ok(FxOptionGreeks {
-        delta: greeks_unit.delta * scale,
+        delta: greeks_unit.delta * scale * spot_conversion,
         delta_forward: delta_forward_unit * scale,
         delta_premium_adjusted_spot: delta_premium_adjusted_spot_unit * scale,
         delta_premium_adjusted_forward: delta_premium_adjusted_forward_unit * scale,
-        gamma: greeks_unit.gamma * scale,
+        gamma: greeks_unit.gamma * scale * spot_conversion * spot_conversion,
         vega: greeks_unit.vega * scale,
         theta: greeks_unit.theta * scale,
-        rho_domestic: greeks_unit.rho_r * scale,
-        rho_foreign: greeks_unit.rho_q * scale,
+        rho_domestic_bp: greeks_unit.rho_r * scale * delivery_scale / 100.0 - bridge_rho,
+        rho_foreign_bp: greeks_unit.rho_q * scale * delivery_scale / 100.0 + bridge_rho,
     })
 }
 
@@ -244,8 +301,10 @@ pub(crate) struct FxOptionGreeks {
     pub(crate) gamma: f64,
     pub(crate) vega: f64,
     pub(crate) theta: f64,
-    pub(crate) rho_domestic: f64,
-    pub(crate) rho_foreign: f64,
+    /// Quote PV per positive domestic basis point on the option model clock.
+    pub(crate) rho_domestic_bp: f64,
+    /// Quote PV per positive foreign basis point on the option model clock.
+    pub(crate) rho_foreign_bp: f64,
 }
 
 #[cfg(test)]
@@ -311,6 +370,8 @@ mod delegation_tests {
 
     fn build_option(expiry: Date) -> FxOption {
         FxOption::builder()
+            .spot_basis(crate::fx_option::FxSpotBasis::Cash)
+            .delivery(crate::fx_option::FxOptionDelivery::CashAtExpiry)
             .id(InstrumentId::new("FX-OPTION-TEST"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
@@ -403,6 +464,87 @@ mod delegation_tests {
     }
 
     #[test]
+    fn deliverable_put_call_parity_and_local_rho_use_booked_dates() {
+        use crate::fx_option::{FxOptionDelivery, FxOptionPosition, FxSpotBasis};
+        use finstack_quant_core::market_data::bumps::BumpSpec;
+        use finstack_quant_core::market_data::traits::Discounting;
+
+        let as_of = date!(2025 - 01 - 02);
+        let spot_date = date!(2025 - 01 - 06);
+        let expiry = date!(2025 - 07 - 02);
+        let delivery = date!(2025 - 07 - 07);
+        let mut market = build_market(as_of);
+        for (id, knots) in [
+            ("USD-OIS", [(0.0, 1.0), (0.25, 0.98), (1.0, 0.94)]),
+            ("EUR-OIS", [(0.0, 1.0), (0.25, 0.995), (1.0, 0.97)]),
+        ] {
+            let curve = DiscountCurve::builder(id)
+                .base_date(as_of)
+                .day_count(DayCount::Act365F)
+                .knots(knots)
+                .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("sloped curve");
+            market.try_insert_mut(curve).expect("curve");
+        }
+        let mut call = build_option(expiry);
+        call.spot_basis = FxSpotBasis::ValueDate { date: spot_date };
+        call.delivery = FxOptionDelivery::Physical {
+            date: delivery,
+            position: FxOptionPosition::Long,
+            exercised: None,
+        };
+        let mut put = call.clone();
+        put.option_type = OptionType::Put;
+        let pv = |option: &FxOption, market: &MarketContext| {
+            compute_pv(option, market, as_of)
+                .expect("option PV")
+                .amount()
+        };
+
+        let domestic = market.get_discount("USD-OIS").expect("discount curve");
+        let foreign = market.get_discount("EUR-OIS").expect("base curve");
+        let cash_spot = 1.2 * domestic.df_between_dates(as_of, spot_date).unwrap()
+            / foreign.df_between_dates(as_of, spot_date).unwrap();
+        let parity = call.notional.amount()
+            * (cash_spot * foreign.df_between_dates(as_of, delivery).unwrap()
+                - call.strike * domestic.df_between_dates(as_of, delivery).unwrap());
+        assert!((pv(&call, &market) - pv(&put, &market) - parity).abs() < 1e-7);
+
+        let mut sold = call.clone();
+        sold.delivery = FxOptionDelivery::Physical {
+            date: delivery,
+            position: FxOptionPosition::Short,
+            exercised: None,
+        };
+        assert_eq!(pv(&call, &market), -pv(&sold, &market));
+
+        let greeks = compute_greeks(&call, &market, as_of).expect("option Greeks");
+        let sold_greeks = compute_greeks(&sold, &market, as_of).expect("short option Greeks");
+        assert_eq!(greeks.delta, -sold_greeks.delta);
+        assert_eq!(greeks.rho_domestic_bp, -sold_greeks.rho_domestic_bp);
+
+        for (curve, analytic) in [
+            (&call.domestic_discount_curve_id, greeks.rho_domestic_bp),
+            (&call.foreign_discount_curve_id, greeks.rho_foreign_bp),
+        ] {
+            let shocked_pv = |bp| {
+                let mut shocked = market.clone();
+                shocked
+                    .apply_curve_bump_in_place(curve, BumpSpec::parallel_bp(bp))
+                    .expect("rate bump");
+                pv(&call, &shocked)
+            };
+            let central = (shocked_pv(1.0) - shocked_pv(-1.0)) / 2.0;
+            assert!(
+                (analytic - central).abs() < 1e-4,
+                "{curve}: {analytic} versus {central}"
+            );
+        }
+    }
+
+    #[test]
     fn post_expiry_value_is_zero_without_live_spot_or_curves() {
         let expiry = date!(2025 - 01 - 01);
         let option = build_option(expiry);
@@ -430,11 +572,11 @@ mod delegation_tests {
         assert_eq!(g.delta_forward, 1_000_000.0);
         assert_eq!(g.delta_premium_adjusted_forward, 0.0);
         assert_eq!(g.delta_premium_adjusted_spot, 0.0);
-        assert!((g.rho_foreign + pv * 0.01).abs() < 1e-8);
+        assert!((g.rho_foreign_bp + pv * 0.0001).abs() < 1e-8);
         option.option_type = OptionType::Put;
         let g = compute_greeks(&option, &market, as_of).unwrap();
         assert_eq!(g.delta_forward, 0.0);
-        assert_eq!(g.rho_foreign, 0.0);
+        assert_eq!(g.rho_foreign_bp, 0.0);
     }
 
     #[test]

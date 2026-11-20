@@ -31,9 +31,9 @@ crate::bindings::macros::wire_methods!(
 impl PyCoverageRules {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.coverage_rules", "CoverageRules.__init__")]
     #[new]
-    #[pyo3(signature = (rating_haircuts=None, defaulted_valuation=None, ccc_bucket=None, discount_obligation=None))]
+    #[pyo3(signature = (rating_haircuts=None, defaulted_valuation=None, ccc_bucket=None, discount_obligation=None, borrowing_base=None))]
     #[pyo3(
-        text_signature = "(rating_haircuts=None, defaulted_valuation=None, ccc_bucket=None, discount_obligation=None)"
+        text_signature = "(rating_haircuts=None, defaulted_valuation=None, ccc_bucket=None, discount_obligation=None, borrowing_base=None)"
     )]
     fn new(
         py: Python<'_>,
@@ -41,6 +41,7 @@ impl PyCoverageRules {
         defaulted_valuation: Option<&Bound<'_, PyAny>>,
         ccc_bucket: Option<&Bound<'_, PyAny>>,
         discount_obligation: Option<&Bound<'_, PyAny>>,
+        borrowing_base: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
         let mut inner = CoverageRules::default();
         if let Some(value) = rating_haircuts {
@@ -63,6 +64,13 @@ impl PyCoverageRules {
                 py,
                 value,
                 "discount_obligation",
+            )?);
+        }
+        if let Some(value) = borrowing_base {
+            inner.borrowing_base = Some(crate::bindings::module_utils::py_to_serde(
+                py,
+                value,
+                "borrowing_base",
             )?);
         }
         inner.validate().map_err(core_to_py)?;
@@ -105,6 +113,16 @@ impl PyCoverageRules {
     fn discount_obligation<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
             .discount_obligation
+            .as_ref()
+            .map(|rule| serde_to_py(py, rule))
+            .transpose()
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.coverage_rules", "CoverageRules.borrowing_base")]
+    #[getter]
+    fn borrowing_base<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .borrowing_base
             .as_ref()
             .map(|rule| serde_to_py(py, rule))
             .transpose()

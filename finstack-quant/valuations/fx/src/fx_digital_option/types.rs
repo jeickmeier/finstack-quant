@@ -227,6 +227,9 @@ impl FxDigitalOption {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for FxDigitalOption {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::FxDigitalOption,
         crate::FX
@@ -296,8 +299,8 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxDig
                     vega: Some(greeks.vega),
                     theta: Some(greeks.theta),
                     // Rho domestic and foreign per 1bp.
-                    rho_bp: Some(greeks.rho_domestic / 100.0),
-                    foreign_rho_bp: Some(greeks.rho_foreign / 100.0),
+                    rho_bp: Some(greeks.rho_domestic_bp),
+                    foreign_rho_bp: Some(greeks.rho_foreign_bp),
                     ..OptionGreeks::default()
                 })
             }

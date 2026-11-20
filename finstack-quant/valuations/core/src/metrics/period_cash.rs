@@ -175,6 +175,7 @@ fn is_period_economic_cash(kind: CFKind) -> bool {
                 | CFKind::RevolvingRepayment
                 | CFKind::Recovery
                 | CFKind::ProtectionPayment
+                | CFKind::DerivativeSettlement
         )
 }
 

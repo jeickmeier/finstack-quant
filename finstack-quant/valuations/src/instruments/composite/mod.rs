@@ -54,7 +54,7 @@
 //! - Value, additive risk, cashflows, P&L, and capital are reported in
 //!   `reporting_currency`; FX conversion uses the market's required FX matrix
 //!   on the valuation or cashflow date.
-//! - Primitive exposure reports accept only [additive metrics](crate::metrics::is_additive_metric).
+//! - Primitive exposure reports accept only metrics declared linear and compatible by the producing owners.
 //!   Yield, duration, implied volatility, and other non-linear measures are
 //!   rejected at the aggregate surface.
 //! - Composite instruments do not emit their own contractual cashflows; history

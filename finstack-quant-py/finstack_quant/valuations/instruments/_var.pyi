@@ -83,7 +83,17 @@ def calculate_var(
     ...     return Bond.fixed(
     ...         id, Money(1e6, Currency("USD")), Rate(0.05), as_of, datetime.date(2029, 1, 2), StubKind.NONE, "USD-OIS"
     ...     )
-    >>> shift = lambda s: [{"factor": {"type": "discount_rate", "curve_id": "USD-OIS", "tenor_years": 5.0}, "shift": s}]
+    >>> shift = lambda s: [
+    ...     {
+    ...         "factor": {
+    ...             "type": "discount_rate",
+    ...             "curve_id": "USD-OIS",
+    ...             "tenor_years": 5.0,
+    ...             "grid_years": [3.0, 5.0, 7.0],
+    ...         },
+    ...         "shift": s,
+    ...     }
+    ... ]
     >>> history = MarketHistory(
     ...     as_of,
     ...     2,

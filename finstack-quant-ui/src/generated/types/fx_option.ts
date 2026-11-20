@@ -185,6 +185,10 @@ export type DayCount =
   | "act_act_afb"
   | "bus_252";
 /**
+ * Booked value date of both currency legs, on or after expiry.
+ */
+export type Date = string;
+/**
  * Currency in which the option premium is paid.
  */
 export type Currency1 =
@@ -356,7 +360,7 @@ export type Id = string;
 /**
  * Option expiry date
  */
-export type Date = string;
+export type Date1 = string;
 /**
  * Foreign currency discount curve ID
  */
@@ -800,6 +804,10 @@ export type Currency2 =
   | "ZWG"
   | "ZWL";
 /**
+ * Fixed value date of the spot quote.
+ */
+export type Date2 = string;
+/**
  * FX volatility surface ID
  */
 export type Id3 = string;
@@ -820,18 +828,34 @@ export interface D_4F1Dc84580630864F146 {
   type: "fx_option";
 }
 /**
- * European FX option with same-day cash settlement at expiry.
- *
- * Physical delivery is intentionally not represented: exercised payoff is a
- * quote-currency cash amount on `expiry`.
+ * European FX option with an explicit cash or physical settlement profile.
  */
 export interface DF2834E0Dc8039C010Dc1 {
   attributes: Attributes;
   base_currency: Currency;
   day_count?: DayCount;
+  /**
+   * Booked payoff and settlement profile.
+   */
+  delivery:
+    | {
+        type: "cash_at_expiry";
+      }
+    | {
+        date: Date;
+        /**
+         * Confirmed expiry outcome. The live option has no known outcome.
+         */
+        exercised?: boolean | null;
+        /**
+         * Signed holder position with positive base notional.
+         */
+        position: "long" | "short";
+        type: "physical";
+      };
   delta_convention: DEe1801801F5Abe1Ae6A6;
   domestic_discount_curve_id: Id;
-  expiry: Date;
+  expiry: Date1;
   foreign_discount_curve_id: Id1;
   id: Id2;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
@@ -843,6 +867,17 @@ export interface DF2834E0Dc8039C010Dc1 {
   option_type: "call" | "put";
   quote_currency: Currency2;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
+  /**
+   * Selected spot quote's fixed value-date basis.
+   */
+  spot_basis:
+    | {
+        type: "cash";
+      }
+    | {
+        date: Date2;
+        type: "value_date";
+      };
   /**
    * Strike exchange rate (quote per base).
    *

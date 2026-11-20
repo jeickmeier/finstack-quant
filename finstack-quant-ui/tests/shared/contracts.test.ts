@@ -15,6 +15,39 @@ import {
 
 const repo = resolve(import.meta.dirname, "../../..");
 
+it("retains local definitions on a closed discriminated union", () => {
+  const validator = z.fromJSONSchema(
+    converterSchema({
+      type: "object",
+      $defs: { Amount: { type: "number" } },
+      oneOf: [
+        {
+          type: "object",
+          properties: {
+            kind: { const: "amount", type: "string" },
+            value: { $ref: "#/$defs/Amount" },
+          },
+          required: ["kind", "value"],
+        },
+        {
+          type: "object",
+          properties: { kind: { const: "empty", type: "string" } },
+          required: ["kind"],
+        },
+      ],
+      unevaluatedProperties: false,
+    }),
+  );
+  expect(validator.parse({ kind: "amount", value: 1 })).toEqual({
+    kind: "amount",
+    value: 1,
+  });
+  expect(validator.safeParse({ kind: "amount", value: "1" }).success).toBe(
+    false,
+  );
+  expect(validator.safeParse({ kind: "empty", value: 1 }).success).toBe(false);
+});
+
 describe("discovered canonical fixtures", () => {
   for (const entry of instruments) {
     it(`${entry.type}: lazy module is cached and accepts its complete wire example unchanged`, async () => {
@@ -52,18 +85,21 @@ describe("discovered canonical fixtures", () => {
       ]);
   });
   it("validates calibration inputs separately from any returned final_market", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    const shared = JSON.parse(
+      await readFile(resolve(generated, "defs/shared.json"), "utf8"),
+    );
     const validators = new Map();
     for (const fixture of fixtures.filter(
       (fixture) => fixture.kind !== "instrument",
     )) {
       if (!validators.has(fixture.schema)) {
         const root = roots.find((root) => root.uri === fixture.schema)!;
-        const schema = JSON.parse(
-          await readFile(
-            resolve(repo, "finstack-quant-ui/src/generated", root.schema),
-            "utf8",
-          ),
-        );
+        const text = await readFile(resolve(generated, root.schema), "utf8");
+        const bundle = JSON.parse(text);
+        const schema = text.includes(sharedDefsId)
+          ? linkSchema(bundle, shared)
+          : bundle;
         validators.set(
           fixture.schema,
           z.fromJSONSchema(converterSchema(schema)),

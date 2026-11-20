@@ -11,6 +11,7 @@
           "amount": "1000",
           "currency": "USD"
         },
+        "include_valuation_date_cashflows": false,
         "premium_leg": {
           "business_day_convention": "modified_following",
           "calendar_id": null,

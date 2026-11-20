@@ -322,6 +322,9 @@ impl FxSwap {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for FxSwap {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     fn cashflow_export_terms(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,

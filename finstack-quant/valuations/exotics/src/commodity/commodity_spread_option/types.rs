@@ -252,6 +252,9 @@ impl CommoditySpreadOption {
 }
 
 impl Instrument for CommoditySpreadOption {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CommoditySpreadOption,
         crate::EXOTICS

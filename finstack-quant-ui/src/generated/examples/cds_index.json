@@ -5,6 +5,7 @@
       "constituents": [],
       "convention": "isda_na",
       "id": "CDX-IG-42",
+      "include_valuation_date_cashflows": false,
       "index_factor": 1.0,
       "index_name": "CDX.NA.IG",
       "notional": {

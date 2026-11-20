@@ -123,6 +123,7 @@ test('cdsQuoteUpfront builds the Python CdsQuote.upfront object', () => {
         pillar: { tenor: { count: 5, unit: 'years' } },
         coupon_bp: 100.0,
         upfront_pct: 0.01,
+        upfront_basis: 'clean',
         recovery_rate: 0.4,
       })
     ),

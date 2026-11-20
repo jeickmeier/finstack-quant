@@ -211,13 +211,14 @@ fn bump_market_for_target(
         BreakevenTarget::ImpliedVol => {
             let vol_surface_ids = context
                 .instrument
-                .market_dependencies()
-                .ok()
-                .map(|dependencies| dependencies.present_vol_surface_ids(&context.curves))
-                .filter(|vol_surface_ids| !vol_surface_ids.is_empty())
-                .ok_or_else(|| finstack_quant_core::InputError::NotFound {
+                .market_dependencies()?
+                .grid_vol_surface_ids(&context.curves)?;
+            if vol_surface_ids.is_empty() {
+                return Err(finstack_quant_core::InputError::NotFound {
                     id: "iterative_breakeven: no vol surface found for instrument".into(),
-                })?;
+                }
+                .into());
+            }
             // `delta` is the breakeven expressed in **vol points** (consistent
             // with `initial_guess = -carry / Vega_per_vol_point` and the Linear
             // mode output). One vol point = 0.01 absolute vol, so convert vol

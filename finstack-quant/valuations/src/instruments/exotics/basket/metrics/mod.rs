@@ -6,11 +6,11 @@
 //!
 //! Exposed metrics:
 //! - Constituent count
-//! - Expense ratio (percentage)
+//! - One-percent relative mark shock
 //!
 //! Note: Present value is handled by the instrument's built-in value() method.
 
-mod constituent_delta;
+mod basket_mark_shock;
 mod weight_risk;
 
 use crate::metrics::MetricRegistry;
@@ -18,7 +18,7 @@ use crate::metrics::MetricRegistry;
 use crate::instruments::exotics::basket::types::Basket;
 use crate::metrics::MetricCalculator;
 use crate::metrics::MetricContext;
-pub(crate) use constituent_delta::ConstituentDeltaCalculator;
+use basket_mark_shock::BasketMarkShockCalculator;
 use finstack_quant_core::Result;
 pub(crate) use weight_risk::WeightRiskCalculator;
 
@@ -33,9 +33,8 @@ pub(crate) fn register_basket_metrics(
         instrument: InstrumentType::Basket,
         metrics: [
             (ConstituentCount, ConstituentCountCalculator),
-            (ExpenseRatio, ExpenseRatioCalculator),
             // Custom metrics for basket-specific risks
-            (ConstituentDelta, ConstituentDeltaCalculator),
+            (BasketMarkShock, BasketMarkShockCalculator),
             (WeightRisk, WeightRiskCalculator),
         ]
     };
@@ -51,17 +50,5 @@ impl MetricCalculator for ConstituentCountCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let basket = context.instrument_as::<Basket>()?;
         Ok(basket.constituent_count() as f64)
-    }
-}
-
-/// Calculate expense ratio as percentage
-///
-/// Returns the configured expense ratio as a percentage.
-pub(super) struct ExpenseRatioCalculator;
-
-impl MetricCalculator for ExpenseRatioCalculator {
-    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let basket = context.instrument_as::<Basket>()?;
-        Ok(basket.expense_ratio * 100.0)
     }
 }

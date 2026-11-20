@@ -275,6 +275,7 @@ test('credit instruments match Python', () => {
   close(cds.parSpread(credit.market, '2024-06-20'), credit.cds_par_spread, LOOSE, 'par spread');
 
   const index = instruments.CdsIndex.fromPreset(instruments.cdsIndexParamsCdxNaIg(42, 1, 100), {
+    include_valuation_date_cashflows: false,
     id: 'CDX-IG-42',
     notional: { amount: '10000000', currency: 'USD' },
     side: 'pay',

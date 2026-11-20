@@ -349,6 +349,7 @@
         },
         "side": "pay",
         "convention": "isda_na",
+        "include_valuation_date_cashflows": false,
         "premium_leg": {
           "start": "2026-04-30",
           "end": "2031-06-20",

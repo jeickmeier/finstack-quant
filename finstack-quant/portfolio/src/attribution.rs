@@ -1226,6 +1226,9 @@ mod tests {
     );
 
     impl Instrument for ConfigRequiredInstrument {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
         /// Test mock: reads no market data.
         fn market_dependencies(
             &self,
@@ -1310,6 +1313,9 @@ mod tests {
     }
 
     impl Instrument for EndpointFailingInstrument {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
         /// Test mock: reads no market data.
         fn market_dependencies(
             &self,

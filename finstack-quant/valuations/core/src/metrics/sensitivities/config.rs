@@ -288,9 +288,11 @@ mod tests {
         assert_eq!(format_bucket_label(0.25), "3m");
         assert_eq!(format_bucket_label(10.0), "10y");
         assert_eq!(format_bucket_label(0.75), "9m");
-        assert_eq!(format_bucket_label(1.4), "1y");
+        assert_eq!(format_bucket_label(1.4), "17m");
         assert_eq!(format_bucket_label(5.0), std::borrow::Cow::Borrowed("5y"));
-        assert_eq!(format_bucket_label(1.25).into_owned(), "1y");
+        assert_eq!(format_bucket_label(1.25).into_owned(), "15m");
+        assert_eq!(format_bucket_label(1.5), "18m");
+        assert_eq!(format_bucket_label(2.0), "2y");
     }
 
     #[test]

@@ -53,6 +53,7 @@ fn test_jump_to_default_negative_for_protection_seller() {
             id: finstack_quant_core::types::InstrumentId::new("CDX-JTD-SELL"),
             notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Receive,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: STANDARD_RECOVERY_SENIOR,

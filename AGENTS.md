@@ -35,11 +35,11 @@
   - `mise run rust-test-filter -- <package> <filter>` — tests matching a name
   - `mise run rust-bench-crate -- <package> <bench>` — one Criterion target
   - Path → package mapping lives in `.agents/rules/selective-test-running.mdc`
-- **The slice gate (after each slice, before its commit):** `mise run slice-gate` runs only the stages of `mise run all` the uncommitted diff can affect, cheapest first, stops at the first failure and prints each stage's time; logs are in `target/slice-gate/`. After fixing a failure, resume with `mise run slice-gate --from <stage>`. `--dry-run` prints the selection, `--base <ref>` widens the diff. It never regenerates: run `mise run gen-write` first when a wire type, generator, binding or facade changed. Do not write ad hoc gate scripts or run the full gate per slice.
-- **The gate (plan end / pre-PR):** `mise run all` runs exactly what CI's `checks.yml` runs; `mise run all --full` adds the nightly tier (docs, doctests, slow suites). After touching a generator, a wire type, a binding or the WASM facade, run `mise run gen-write` first. Use `mise run all-build` when an explicit build pass is needed. Every checker, the convention it enforces and the stage that runs it is listed in `scripts/README.md`.
+- **The slice gate (before committing a slice):** `mise run slice-gate` runs only the stages of `mise run all` the uncommitted diff can affect, cheapest first, stops at the first failure and prints each stage's time; logs are in `target/slice-gate/`. After fixing a failure, resume with `mise run slice-gate --from <stage>`. `--dry-run` prints the selection, `--base <ref>` widens the diff. It never regenerates: run `mise run gen-write` first when a wire type, generator, binding or facade changed. Do not write ad hoc gate scripts or run the full gate per slice.
+- **The gate (plan end / pre-PR):** `mise run all` runs exactly what CI's `checks.yml` runs; `mise run all --full` adds the nightly tier (docs, doctests, slow suites). For an uncommitted batch, use scoped checks during implementation and go directly to `mise run all` at the end. Use `mise run all --from <stage>` after a failure when earlier checks and build outputs still apply. Run `mise run gen-write` first after touching a generator, wire type, binding or WASM facade. Use `mise run all-build` when an explicit build pass is needed. Every checker, its convention and its stage are listed in `scripts/README.md`.
 - Full Python test tasks rebuild the extension with the fast dev profile before running pytest. For repeated focused tests after one explicit `mise run python-build`, use `mise run python-test-file -- <file-or-node-id>`; it does not rebuild. Use `mise run python-build -- --release` only for release validation, performance-sensitive runs, or when explicitly requested. Use `mise run python-sync` first (or whenever Python deps change) to refresh the `uv` virtualenv.
 - After `mise run wasm-test` or `mise run wasm-pkg`, use `mise run wasm-test-built` to rerun Node facade tests without rebuilding the WASM package. Run `mise run wasm-test` after binding changes for the complete Rust, web, and Node validation gate, and `mise run wasm-test --doctest` to execute the documented examples.
-- Pre-commit runs the formatters and linters through the `*-fmt` and `*-lint` mise tasks (clippy is `mise run rust-lint`)
+- Pre-commit checks formatting and lint through the `*-lint` mise tasks (clippy is `mise run rust-lint`). Use `mise run all-fmt` to apply formatting fixes.
 - `mise run all-audit` runs `cargo deny check` (advisories, licenses, bans) and OSV-Scanner across `Cargo.lock`, `uv.lock`, and `package-lock.json`
 - Clippy runs with `-D warnings`; all warnings are treated as errors
 - Do not run `cargo test` or `cargo clippy` directly during agent work; use the scoped `mise run rust-*` tasks
@@ -128,7 +128,7 @@
   - `rolling_var_forecasts_with_fn(..., fn)` — specialized closure variant (Rust-internal)
 - **Descriptive suffixes for specialized variants:** use `_from_<input>` (alternate input shape), `_with_<thing>` (alternate dispatch mechanism), `_unchecked` (invariant-skipping). Suffixes are only for the non-canonical variants; the short base name belongs to the one exposed through bindings.
 - **Accessors still use `get_*`** (see above) — naming-strategy shortening does not override the `get_*` convention.
-- **When renaming, propagate everywhere in one slice:** Rust source + Rust tests + re-exports → PyO3 `#[pyfunction]` + `__all__` + `.pyi` + `__init__.py` → WASM `#[wasm_bindgen(js_name=...)]` + `exports/*.js` (then `mise run gen-write` for `index.d.ts`) → `finstack-quant-py/parity_contract.toml` + benchmarks + notebooks. Verify with `mise run all-fmt && mise run all`.
+- **When renaming, propagate everywhere in one slice:** Rust source + Rust tests + re-exports → PyO3 `#[pyfunction]` + `__all__` + `.pyi` + `__init__.py` → WASM `#[wasm_bindgen(js_name=...)]` + `exports/*.js` (then `mise run gen-write` for `index.d.ts`) → `finstack-quant-py/parity_contract.toml` + benchmarks + notebooks. Verify with `mise run all` at the end of the batch.
 
 ## Workflow Preferences
 
@@ -138,6 +138,6 @@
 - During a plan, validate each completed batch with scoped checks for the crate(s) touched:
   - `mise run rust-lint-crate -- <package>` and `mise run rust-test-crate` / `rust-test-integration` / `rust-test-filter`
   - Before committing a slice, run `mise run slice-gate`; it selects the cross-language stages the diff needs
-  - Run `mise run all` (full workspace) only once at the very end, after the slice gates are clean
+  - Run `mise run all` once at the very end. An uncommitted batch needs only this gate after its scoped checks.
 - User reports issues by pasting terminal output (clippy, cargo deny, test failures) rather than describing them
 - When moving files, use `mv` in terminal and update all import references; then lint and format

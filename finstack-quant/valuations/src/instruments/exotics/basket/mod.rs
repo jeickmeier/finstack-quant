@@ -18,19 +18,16 @@
 //! contribution_i = Price_i × Units_i   (unit-held constituent)
 //! contribution_i = Price_i × w_i       (weight-held constituent)
 //! NAV            = Σᵢ contribution_i − drag
-//! drag           = Σᵢ contribution_i × Expense_ratio / days_in_year
+//! drag           = elected cash expense per basket unit
 //! ```
 //!
-//! The drag is a single day of fees on the day basis in
-//! [`BasketPricingConfig`](crate::instruments::exotics::basket::BasketPricingConfig) (365.25 by default). The basket PV is the NAV
-//! scaled by the notional amount.
+//! The basket PV is the NAV scaled by the position amount.
 //!
 //! # Metrics
 //!
 //! - **Constituent count**: number of holdings
-//! - **Expense ratio**: the configured ratio, in percent
-//! - **Constituent delta**: basket PV change for a +1% move in each
-//!   constituent price
+//! - **Basket mark shock**: basket PV change from a 1% relative shock, grouped
+//!   by direct price ID or embedded instrument constituent ID
 //! - **Weight risk**: basket PV change for a 1bp weight reallocation into each
 //!   constituent, funded pro rata from the others
 //!
@@ -50,6 +47,6 @@ pub(crate) mod types;
 
 // Builder is generated via derive on `Basket`.
 pub use types::{
-    Basket, BasketAssetType, BasketBuilder, BasketConstituent, BasketPricingConfig,
+    Basket, BasketAssetType, BasketBuilder, BasketConstituent, BasketExpense, BasketPricingConfig,
     ConstituentReference,
 };

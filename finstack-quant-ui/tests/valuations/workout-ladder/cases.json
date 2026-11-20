@@ -94,8 +94,8 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.03055780295883031,
-            "i_spread": 0.00016984424469373288,
+            "yield_rate": 0.030559906982694708,
+            "i_spread": 0.00017194826855813222,
             "is_worst": false
           },
           {
@@ -107,8 +107,8 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.034999945164519194,
-            "i_spread": 0.004631880049576133,
+            "yield_rate": 0.03501893696573791,
+            "i_spread": 0.004650871850794845,
             "is_worst": false
           }
         ]
@@ -167,8 +167,8 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.06438294380873158,
-            "i_spread": 0.033994985094595004,
+            "yield_rate": 0.06438760947332817,
+            "i_spread": 0.03399965075919159,
             "is_worst": false
           },
           {
@@ -180,14 +180,14 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.056203271843392036,
-            "i_spread": 0.025835206728448974,
+            "yield_rate": 0.05623382845359469,
+            "i_spread": 0.025865763338651628,
             "is_worst": true
           }
         ]
       },
-      "ytw": 0.056203271843392036,
-      "iSpread": 0.025835206728448974
+      "ytw": 0.05623382845359469,
+      "iSpread": 0.025865763338651628
     },
     "putable": {
       "request": {
@@ -227,8 +227,8 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.032617973947617326,
-            "i_spread": 0.0022499088326742647,
+            "yield_rate": 0.03263566913304168,
+            "i_spread": 0.0022676040180986193,
             "is_worst": false
           }
         ]
@@ -274,14 +274,14 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.038674050402662835,
-            "i_spread": 0.008305985287719773,
+            "yield_rate": 0.03869504325584757,
+            "i_spread": 0.008326978140904509,
             "is_worst": true
           }
         ]
       },
-      "ytw": 0.038674050402662835,
-      "iSpread": 0.008305985287719773
+      "ytw": 0.03869504325584757,
+      "iSpread": 0.008326978140904509
     },
     "bullet": {
       "request": {
@@ -308,14 +308,14 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.03036862933411249,
-            "i_spread": 5.86477065491614e-7,
+            "yield_rate": 0.03038510060975678,
+            "i_spread": 0.00001705775270978427,
             "is_worst": true
           }
         ]
       },
-      "ytw": 0.03036862933411249,
-      "iSpread": 5.86477065491614e-7
+      "ytw": 0.03038510060975678,
+      "iSpread": 0.00001705775270978427
     },
     "quoteDateCall": {
       "request": {
@@ -355,13 +355,15 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.04247677938739128,
-            "i_spread": 0.012108714272448216,
+            "yield_rate": 0.04249984467505206,
+            "i_spread": 0.012131779560108996,
             "is_worst": false
           }
         ]
       },
-      "ytw": null,
+      "ytw": {
+        "error": "Validation error: Metric 'ytw' calculation failed: Validation error: metric output must be finite, got -inf [instrument=US912828XG33, type=Bond, model=Tree]"
+      },
       "iSpread": {
         "error": "Validation error: Metric 'i_spread' calculation failed: Invalid date range: start must be before end [instrument=US912828XG33, type=Bond, model=Tree]"
       }

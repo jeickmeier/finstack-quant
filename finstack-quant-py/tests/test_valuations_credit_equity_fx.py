@@ -167,6 +167,7 @@ class TestCreditDefaultSwap:
         cds = (
             CreditDefaultSwap
             .builder()
+            .include_valuation_date_cashflows(False)
             .id("CDS-UPF")
             .notional(Money(10_000_000.0, USD))
             .side("pay")
@@ -217,6 +218,7 @@ class TestCreditDefaultSwap:
         cds = (
             CreditDefaultSwap
             .builder()
+            .include_valuation_date_cashflows(False)
             .id("CDS-ISO")
             .notional(Money(1_000_000.0, USD))
             .side("receive")
@@ -250,6 +252,7 @@ class TestCdsIndex:
                 "end": "2029-06-20",
                 "recovery_rate": 0.4,
                 "discount_curve_id": "USD-OIS",
+                "include_valuation_date_cashflows": False,
                 "credit_curve_id": "CDX.NA.IG.HAZARD",
             },
         )
@@ -284,6 +287,7 @@ class TestCdsIndex:
             return (
                 CdsIndex
                 .builder()
+                .include_valuation_date_cashflows(False)
                 .id("CDX-CONS")
                 .index_name("CDX.NA.IG")
                 .series(42)
@@ -539,6 +543,27 @@ class TestEquityOption:
         implied = option.implied_vol(market, "2024-01-15", result.price)
         assert implied == pytest.approx(0.2, abs=2e-3)
 
+    def test_typed_pricing_routes_share_extras(self) -> None:
+        from finstack_quant.core.config import FinstackConfig
+        from finstack_quant.valuations.instruments import MetricPricingOverrides, PriceExtras
+
+        option = EquityOption.example()
+        market = _equity_market()
+        config = FinstackConfig(rounding_mode="floor")
+        config.set_output_scale("USD", 0)
+        extras = PriceExtras(
+            config=config,
+            metric_pricing_overrides=MetricPricingOverrides(theta_period="1M"),
+        )
+        assert extras.config.output_scale("USD") == 0
+
+        value = option.price(market, "2024-01-15", metrics=["theta"], extras=extras)
+        theta = option.metric(market, "2024-01-15", "theta", extras=extras)
+        greeks = option.greeks(market, "2024-01-15", extras=extras)
+        assert theta == pytest.approx(value["theta"])
+        assert theta == pytest.approx(greeks["theta"])
+        assert theta != pytest.approx(option.metric(market, "2024-01-15", "theta"))
+
     @pytest.mark.parametrize("style", ["european", "american", "bermudan"])
     def test_equity_iv_uses_active_exercise_and_day_count(self, style: str) -> None:
         option = (
@@ -684,6 +709,8 @@ class TestFxOption:
             "notional": Money(1_000_000.0, "EUR"),
             "vol_surface_id": "EURUSD-VOL",
             "option_type": "call",
+            "spot_basis": {"type": "cash"},
+            "delivery": {"type": "cash_at_expiry"},
             "delta_convention": {"kind": "spot", "premium_currency": "USD", "venue": "desk"},
         })
         assert opt.domestic_discount_curve_id == "USD-OIS"
@@ -700,6 +727,8 @@ class TestFxOption:
         opt = (
             FxOption
             .builder()
+            .spot_basis({"type": "cash"})
+            .delivery({"type": "cash_at_expiry"})
             .id("FXO-B")
             .base_currency("EUR")
             .quote_currency(USD)
@@ -726,6 +755,8 @@ class TestFxOption:
             return (
                 FxOption
                 .builder()
+                .spot_basis({"type": "cash"})
+                .delivery({"type": "cash_at_expiry"})
                 .id("FXO-A")
                 .base_currency("EUR")
                 .quote_currency(USD)

@@ -19,7 +19,7 @@
 use std::marker::PhantomData;
 
 use crate::instruments::Instrument;
-use crate::instruments::{MarketDependencies, VolatilityDependency};
+use crate::instruments::MarketDependencies;
 use crate::metrics::finite_difference::{
     bumped_volatility_override, revert_scratch_bumps, scalar_numeric_value, volatility_override,
 };
@@ -96,85 +96,26 @@ fn effective_spot_bump(spot: f64, bump_pct: f64) -> SpotBump {
     }
 }
 
-/// Smallest implied vol on a surface that is *relevant* to a single-strike
-/// option, used to decide whether a `±h` vol bump would clamp at zero on
-/// any cell the option's pricing actually touches.
-///
-/// When the instrument supplies a `reference_strike`, only the stored vols
-/// at the two strike-grid columns bracketing the reference (or just the
-/// adjacent column when the reference sits outside the strike axis) are
-/// inspected, across every expiry. Bilinear interpolation cannot draw vol
-/// from outside that footprint, so a low-σ corner of the surface that the
-/// option never samples no longer forces the vega calculator into a
-/// one-sided (O(h)) difference.
-///
-/// Without a reference strike (e.g. basket payoffs, autocallables where
-/// pricing samples the surface along a path), this conservatively falls
-/// back to [`min_grid_vol`] — the previous global-min behaviour.
-///
-/// Returns `None` when the surface has no usable strike grid.
-fn min_relevant_surface_vol(
-    surface: &finstack_quant_core::market_data::surfaces::VolSurface,
-    reference_strike: Option<f64>,
-) -> Option<f64> {
-    let Some(strike) = reference_strike else {
-        return min_grid_vol(surface);
-    };
-    let strikes = surface.secondary_values();
-    if strikes.is_empty() {
-        return None;
+fn active_minimum_vol(
+    instrument: &dyn Instrument,
+    market: &MarketContext,
+    volatility_surface_ids: &[CurveId],
+) -> Result<Option<f64>> {
+    if let Some(volatility) = volatility_override(instrument) {
+        return Ok(Some(volatility));
     }
-    // Find the bracketing strike columns. Bilinear interpolation only
-    // mixes the two columns immediately adjacent to the query strike.
-    let lo_idx = strikes.iter().rposition(|&s| s <= strike).unwrap_or(0);
-    let hi_idx = strikes
-        .iter()
-        .position(|&s| s >= strike)
-        .unwrap_or(strikes.len() - 1);
-    let relevant_strikes: &[f64] = if lo_idx == hi_idx {
-        &strikes[lo_idx..=lo_idx]
-    } else {
-        &strikes[lo_idx..=hi_idx]
-    };
-
-    let mut min_vol: Option<f64> = None;
-    for &expiry in surface.expiries() {
-        for &col_strike in relevant_strikes {
-            if let Ok(vol) =
-                finstack_quant_models::volatility::get_surface_vol(surface, expiry, col_strike)
-            {
-                min_vol = Some(min_vol.map_or(vol, |m: f64| m.min(vol)));
-            }
-        }
+    let mut minimum: Option<f64> = None;
+    for id in volatility_surface_ids {
+        let surface = market.get_surface(id.as_str())?;
+        let vol = min_grid_vol(&surface).ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!("volatility grid '{id}' has no values"))
+        })?;
+        minimum = Some(minimum.map_or(vol, |current| current.min(vol)));
     }
-    min_vol
+    Ok(minimum)
 }
 
-fn min_dependency_surface_vol(
-    surface: &finstack_quant_core::market_data::surfaces::VolSurface,
-    vol_surface_id: &CurveId,
-    dependencies: &[VolatilityDependency],
-) -> Option<f64> {
-    let matching = dependencies
-        .iter()
-        .filter(|dependency| dependency.vol_surface_id == *vol_surface_id);
-    if matching
-        .clone()
-        .any(|dependency| dependency.reference_strike.is_none())
-    {
-        return min_grid_vol(surface);
-    }
-    matching
-        .filter_map(|dependency| min_relevant_surface_vol(surface, dependency.reference_strike))
-        .reduce(f64::min)
-}
-
-/// Resolve every distinct declared volatility surface that is actually present.
-///
-/// A quoted implied-vol override replaces the surfaces, so none is bumped then.
-/// Some instruments declare ordered fallback candidates. Missing candidates are
-/// therefore not errors when another candidate is present, but an empty resolved
-/// set is an actionable missing-market-data error.
+/// Resolve the active grids when the instrument has no scalar override.
 fn bumped_vol_surface_ids(
     instrument: &dyn Instrument,
     dependencies: &MarketDependencies,
@@ -190,22 +131,7 @@ fn bumped_vol_surface_ids(
         )));
     }
 
-    let declared = dependencies.unique_vol_surface_ids();
-    let present = dependencies.present_vol_surface_ids(market);
-    if present.is_empty() {
-        return Err(finstack_quant_core::InputError::NotFound {
-            id: format!(
-                "vol_surface:{}",
-                declared
-                    .iter()
-                    .map(|id| id.as_str())
-                    .collect::<Vec<_>>()
-                    .join("|")
-            ),
-        }
-        .into());
-    }
-    Ok(present)
+    dependencies.grid_vol_surface_ids(market)
 }
 
 // First market scalar of the instrument: the spot the spot-bumped greeks move.
@@ -238,19 +164,10 @@ fn is_expired(instrument: &dyn Instrument, as_of: Date) -> Result<bool> {
 fn symmetric_volatility_step(
     instrument: &dyn Instrument,
     market: &MarketContext,
-    dependencies: &MarketDependencies,
     volatility_surface_ids: &[CurveId],
     requested: f64,
 ) -> Result<f64> {
-    let minimum = volatility_override(instrument).or_else(|| {
-        volatility_surface_ids
-            .iter()
-            .filter_map(|id| {
-                let surface = market.get_surface(id.as_str()).ok()?;
-                min_dependency_surface_vol(&surface, id, &dependencies.volatility_dependencies)
-            })
-            .reduce(f64::min)
-    });
+    let minimum = active_minimum_vol(instrument, market, volatility_surface_ids)?;
     match minimum {
         Some(volatility) if volatility.is_finite() && volatility > 0.0 => {
             Ok(requested.min(volatility * 0.5))
@@ -304,10 +221,9 @@ where
     seeded
 }
 
-fn apply_dependency_surface_bumps_in_place(
+fn apply_surface_bumps_in_place(
     context: &mut MarketContext,
     vol_surface_ids: &[CurveId],
-    dependencies: &[VolatilityDependency],
     bump_abs: f64,
 ) -> Result<Vec<finstack_quant_core::market_data::context::ContextScratchBump>> {
     use finstack_quant_core::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits};
@@ -320,78 +236,11 @@ fn apply_dependency_surface_bumps_in_place(
     };
     let mut tokens = Vec::with_capacity(vol_surface_ids.len());
     for vol_surface_id in vol_surface_ids {
-        let footprint_only = if bump_abs < 0.0 {
-            if let Ok(surface) = context.get_surface(vol_surface_id.as_str()) {
-                if min_grid_vol(&surface).is_some_and(|m| m + bump_abs < 0.0) {
-                    let matching: Vec<_> = dependencies
-                        .iter()
-                        .filter(|dep| dep.vol_surface_id == *vol_surface_id)
-                        .collect();
-                    let strikes = surface.secondary_values();
-                    if !matching.is_empty()
-                        && !strikes.is_empty()
-                        && matching.iter().all(|dep| dep.reference_strike.is_some())
-                    {
-                        let mut col_indices = Vec::new();
-                        for dep in matching {
-                            if let Some(strike) = dep.reference_strike {
-                                let lo_idx =
-                                    strikes.iter().rposition(|&s| s <= strike).unwrap_or(0);
-                                let hi_idx = strikes
-                                    .iter()
-                                    .position(|&s| s >= strike)
-                                    .unwrap_or(strikes.len() - 1);
-                                for idx in lo_idx..=hi_idx {
-                                    col_indices.push(idx);
-                                }
-                            }
-                        }
-                        col_indices.sort_unstable();
-                        col_indices.dedup();
-                        Some((
-                            surface.expiries().to_vec(),
-                            col_indices
-                                .into_iter()
-                                .map(|idx| strikes[idx])
-                                .collect::<Vec<_>>(),
-                        ))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        if let Some((expiries, footprint_strikes)) = footprint_only {
-            for expiry in expiries {
-                for &col_strike in &footprint_strikes {
-                    match context.apply_surface_point_absolute_bump_in_place(
-                        vol_surface_id.as_str(),
-                        expiry,
-                        col_strike,
-                        bump_abs,
-                    ) {
-                        Ok(token) => tokens.push(token),
-                        Err(error) => {
-                            revert_scratch_bumps(context, tokens)?;
-                            return Err(error);
-                        }
-                    }
-                }
-            }
-        } else {
-            match context.apply_surface_bump_in_place(vol_surface_id.as_str(), spec) {
-                Ok(token) => tokens.push(token),
-                Err(error) => {
-                    revert_scratch_bumps(context, tokens)?;
-                    return Err(error);
-                }
+        match context.apply_surface_bump_in_place(vol_surface_id.as_str(), spec) {
+            Ok(token) => tokens.push(token),
+            Err(error) => {
+                revert_scratch_bumps(context, tokens)?;
+                return Err(error);
             }
         }
     }
@@ -404,13 +253,13 @@ fn eval_raw_with_scratch_bumps<I>(
     instrument: &I,
     as_of: Date,
     spot_bump: Option<(&str, f64)>,
-    vol_bump: Option<(&[CurveId], &[VolatilityDependency], f64)>,
+    vol_bump: Option<(&[CurveId], f64)>,
 ) -> Result<f64>
 where
     I: Instrument + Clone,
 {
     let bumped_instrument = match vol_bump {
-        Some((_, _, bump_abs)) => bumped_volatility_override(instrument, bump_abs)?,
+        Some((_, bump_abs)) => bumped_volatility_override(instrument, bump_abs)?,
         None => None,
     };
     let price_token = if let Some((spot_id, bump_pct)) = spot_bump {
@@ -420,13 +269,8 @@ where
     };
 
     let surface_tokens = match vol_bump.filter(|_| bumped_instrument.is_none()) {
-        Some((vol_surface_ids, vol_dependencies, bump_abs)) => {
-            match apply_dependency_surface_bumps_in_place(
-                scratch,
-                vol_surface_ids,
-                vol_dependencies,
-                bump_abs,
-            ) {
+        Some((vol_surface_ids, bump_abs)) => {
+            match apply_surface_bumps_in_place(scratch, vol_surface_ids, bump_abs) {
                 Ok(tokens) => Some(tokens),
                 Err(err) => {
                     if let Some(token) = price_token {
@@ -650,23 +494,7 @@ where
         // surface does NOT represent a uniform `-h` move, so a central
         // difference divided by the full `2h` is asymmetric and biased.
         //
-        // Restrict the clamp check on each surface to every strike footprint
-        // declared for that surface. A descriptor without a strike means the
-        // instrument may sample the whole surface and therefore retains the
-        // conservative global-minimum check.
-        let min_vol = volatility_override(instrument).or_else(|| {
-            vol_surface_ids
-                .iter()
-                .filter_map(|vol_surface_id| {
-                    let surface = context.curves.get_surface(vol_surface_id.as_str()).ok()?;
-                    min_dependency_surface_vol(
-                        &surface,
-                        vol_surface_id,
-                        &dependencies.volatility_dependencies,
-                    )
-                })
-                .reduce(f64::min)
-        });
+        let min_vol = active_minimum_vol(instrument, &context.curves, &vol_surface_ids)?;
         let clamp_active = min_vol.map(|m| m <= bump_abs).unwrap_or(false);
 
         let vega = if clamp_active {
@@ -684,11 +512,7 @@ where
                     &seeded_instrument,
                     as_of,
                     None,
-                    Some((
-                        &vol_surface_ids,
-                        &dependencies.volatility_dependencies,
-                        bump_abs,
-                    )),
+                    Some((&vol_surface_ids, bump_abs)),
                 )?;
                 let pv_base = context.reprice_instrument_raw(&seeded_instrument, scratch, as_of)?;
                 // Forward difference: (PV(σ+h) - PV(σ)) / h.
@@ -706,11 +530,7 @@ where
                     &seeded_instrument,
                     as_of,
                     None,
-                    Some((
-                        &vol_surface_ids,
-                        &dependencies.volatility_dependencies,
-                        bump_abs,
-                    )),
+                    Some((&vol_surface_ids, bump_abs)),
                 )?;
                 let pv_down = eval_raw_with_scratch_bumps(
                     context,
@@ -718,11 +538,7 @@ where
                     &seeded_instrument,
                     as_of,
                     None,
-                    Some((
-                        &vol_surface_ids,
-                        &dependencies.volatility_dependencies,
-                        -bump_abs,
-                    )),
+                    Some((&vol_surface_ids, -bump_abs)),
                 )?;
                 // Central difference: (PV(σ+h) - PV(σ-h)) / 2h.
                 crate::metrics::finite_difference::central_diff_by_width(
@@ -778,7 +594,6 @@ where
         let bump_abs = symmetric_volatility_step(
             instrument,
             &context.curves,
-            &dependencies,
             &vol_surface_ids,
             defaults.vol_bump_decimal,
         )?;
@@ -791,11 +606,7 @@ where
                 &seeded_instrument,
                 as_of,
                 None,
-                Some((
-                    &vol_surface_ids,
-                    &dependencies.volatility_dependencies,
-                    bump_abs,
-                )),
+                Some((&vol_surface_ids, bump_abs)),
             )?;
             let pv_down = eval_raw_with_scratch_bumps(
                 context,
@@ -803,11 +614,7 @@ where
                 &seeded_instrument,
                 as_of,
                 None,
-                Some((
-                    &vol_surface_ids,
-                    &dependencies.volatility_dependencies,
-                    -bump_abs,
-                )),
+                Some((&vol_surface_ids, -bump_abs)),
             )?;
             Ok((base_pv, pv_up, pv_down))
         })?;
@@ -866,13 +673,8 @@ where
 
         let spot_bump = effective_spot_bump(current_spot, spot_bump_decimal);
         let h_abs = spot_bump.absolute; // absolute spot change
-        let k_abs = symmetric_volatility_step(
-            instrument,
-            &context.curves,
-            &dependencies,
-            &vol_surface_ids,
-            vol_bump_abs,
-        )?;
+        let k_abs =
+            symmetric_volatility_step(instrument, &context.curves, &vol_surface_ids, vol_bump_abs)?;
 
         let seeded_instrument = clone_with_crn_seed(instrument)?;
 
@@ -883,11 +685,7 @@ where
                 &seeded_instrument,
                 as_of,
                 Some((spot_id, spot_bump.relative)),
-                Some((
-                    &vol_surface_ids,
-                    &dependencies.volatility_dependencies,
-                    k_abs,
-                )),
+                Some((&vol_surface_ids, k_abs)),
             )?;
             let v_pm = eval_raw_with_scratch_bumps(
                 context,
@@ -895,11 +693,7 @@ where
                 &seeded_instrument,
                 as_of,
                 Some((spot_id, spot_bump.relative)),
-                Some((
-                    &vol_surface_ids,
-                    &dependencies.volatility_dependencies,
-                    -k_abs,
-                )),
+                Some((&vol_surface_ids, -k_abs)),
             )?;
             let v_mp = eval_raw_with_scratch_bumps(
                 context,
@@ -907,11 +701,7 @@ where
                 &seeded_instrument,
                 as_of,
                 Some((spot_id, -spot_bump.relative)),
-                Some((
-                    &vol_surface_ids,
-                    &dependencies.volatility_dependencies,
-                    k_abs,
-                )),
+                Some((&vol_surface_ids, k_abs)),
             )?;
             let v_mm = eval_raw_with_scratch_bumps(
                 context,
@@ -919,11 +709,7 @@ where
                 &seeded_instrument,
                 as_of,
                 Some((spot_id, -spot_bump.relative)),
-                Some((
-                    &vol_surface_ids,
-                    &dependencies.volatility_dependencies,
-                    -k_abs,
-                )),
+                Some((&vol_surface_ids, -k_abs)),
             )?;
             Ok((v_pp, v_pm, v_mp, v_mm))
         })?;
@@ -1023,6 +809,9 @@ mod tests {
     }
 
     impl crate::instruments::Instrument for TestFdInstrument {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
         fn expiry(&self) -> Option<Date> {
             Some(self.expiry)
         }
@@ -1124,6 +913,9 @@ mod tests {
     }
 
     impl crate::instruments::Instrument for RoundingSensitiveInstrument {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
         fn expiry(&self) -> Option<Date> {
             Some(self.expiry)
         }
@@ -1593,6 +1385,9 @@ mod tests {
     }
 
     impl crate::instruments::Instrument for VolLinearInstrument {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
         fn expiry(&self) -> Option<Date> {
             Some(self.expiry)
         }
@@ -1767,84 +1562,6 @@ mod tests {
         assert!(
             (vega - slope * 0.0075).abs() > 1.0,
             "vega must not equal the contaminated central-difference value"
-        );
-    }
-
-    #[test]
-    fn min_relevant_surface_vol_falls_back_to_global_without_strike() {
-        // Surface: ATM (strike=100) has σ=0.20; wings (90, 110) have σ=0.005.
-        let surface = finstack_quant_core::market_data::surfaces::VolSurface::builder("SMILE")
-            .expiries(&[0.5, 1.0])
-            .secondary_values(&[90.0, 100.0, 110.0])
-            .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
-            .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
-            .interpolation_mode(
-                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
-            )
-            .row(&[0.005, 0.20, 0.005])
-            .row(&[0.005, 0.20, 0.005])
-            .build()
-            .expect("smile surface");
-        // No reference strike: must keep the legacy global-min behaviour so
-        // instruments that genuinely sample wing strikes (basket payoffs,
-        // path-dependent autocallables) still get the conservative clamp
-        // detection.
-        let min = super::min_relevant_surface_vol(&surface, None).expect("non-empty");
-        assert!(
-            (min - 0.005).abs() < 1e-12,
-            "global min should be 0.005, got {min}"
-        );
-    }
-
-    #[test]
-    fn min_relevant_surface_vol_uses_only_bracketing_columns_when_strike_present() {
-        // Same smile surface: ATM high-vol, wings low-vol.
-        let surface = finstack_quant_core::market_data::surfaces::VolSurface::builder("SMILE2")
-            .expiries(&[0.5, 1.0])
-            .secondary_values(&[90.0, 100.0, 110.0])
-            .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
-            .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
-            .interpolation_mode(
-                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
-            )
-            .row(&[0.005, 0.20, 0.005])
-            .row(&[0.005, 0.20, 0.005])
-            .build()
-            .expect("smile surface");
-
-        // Reference strike exactly on the ATM column: only column [100] is
-        // relevant ⇒ min is the ATM vol, NOT the wing vol. This is the fix
-        // for audit P2a — a single low-vol corner that the option's pricing
-        // never samples must not force a one-sided vega.
-        let atm = super::min_relevant_surface_vol(&surface, Some(100.0)).expect("non-empty");
-        assert!(
-            (atm - 0.20).abs() < 1e-12,
-            "strike=100 (ATM) should bracket to {{[100]}} only, expected min=0.20, got {atm}"
-        );
-
-        // Reference strike between two columns: bracketing is {[100, 110]}.
-        // 110 column is low-vol, so the min reflects that. Strikes between
-        // grid columns mix both via bilinear interpolation, so both must be
-        // considered.
-        let mid = super::min_relevant_surface_vol(&surface, Some(105.0)).expect("non-empty");
-        assert!(
-            (mid - 0.005).abs() < 1e-12,
-            "strike=105 should bracket to {{[100, 110]}}, expected min=0.005, got {mid}"
-        );
-
-        // Strike outside the right axis: clamps to the rightmost column.
-        let beyond_right =
-            super::min_relevant_surface_vol(&surface, Some(150.0)).expect("non-empty");
-        assert!(
-            (beyond_right - 0.005).abs() < 1e-12,
-            "strike beyond right axis should use the rightmost column"
-        );
-
-        // Strike outside the left axis: clamps to the leftmost column.
-        let beyond_left = super::min_relevant_surface_vol(&surface, Some(50.0)).expect("non-empty");
-        assert!(
-            (beyond_left - 0.005).abs() < 1e-12,
-            "strike beyond left axis should use the leftmost column"
         );
     }
 

@@ -10,27 +10,6 @@ use finstack_quant_core::math::units::{BASIS_POINTS_PER_UNIT, ONE_BASIS_POINT};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::constants::{credit, numerical};
 use finstack_quant_valuations_core::instruments::CdsDateRegime;
-use rust_decimal::prelude::ToPrimitive;
-
-/// Day-count policy applied when measuring premium accrual from the most
-/// recent coupon date to `as_of`.
-///
-/// The two variants share the same schedule walk but differ on `Act/360`
-/// in-period accrual:
-///
-/// - [`Self::CdswInclusive`]: Bloomberg CDSW clean-settlement convention,
-///   `Act/360` accrual is inclusive of the upper boundary (one extra day).
-///   Other day-counts use plain `year_fraction`.
-/// - [`Self::IsdaStandard`]: plain `year_fraction` in every day-count;
-///   matches the ISDA default-payment convention used for jump-to-default.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum AccrualDayCountPolicy {
-    /// Bloomberg CDSW: `Act/360` inclusive of the last day; other day-counts
-    /// use plain `year_fraction`.
-    CdswInclusive,
-    /// Standard ISDA: plain `year_fraction` in every day-count.
-    IsdaStandard,
-}
 
 impl CdsPricer {
     /// Generate contractual accrual and payment dates from the premium terms.
@@ -179,52 +158,53 @@ impl CdsPricer {
             .collect()
     }
 
-    /// Year fraction of premium accrued from the most recent coupon date to
-    /// `as_of`, expressed in the instrument's premium-leg day-count.
-    ///
-    /// CDS desks use two slightly different conventions for the in-period
-    /// accrual:
-    ///
-    /// - [`AccrualDayCountPolicy::CdswInclusive`] — Bloomberg CDSW clean
-    ///   settlement adds one extra calendar day for `Act/360` (so 2026-03-20
-    ///   to 2026-05-02 reads as 44 days). Other day-counts use plain
-    ///   `year_fraction`.
-    /// - [`AccrualDayCountPolicy::IsdaStandard`] — plain `year_fraction` in
-    ///   every day-count. Used for the jump-to-default accrued-premium
-    ///   calculation.
-    ///
-    /// Returns `0.0` when `as_of` is at or outside the premium-leg window
-    /// (`<= start` or `>= end`).
-    pub(crate) fn coupon_accrued_fraction(
+    /// Premium accrued up to the default date, using the jump-to-default
+    /// convention's exclusive cutoff and rolled payment dates.
+    pub(crate) fn default_accrued_fraction(
         &self,
         cds: &CreditDefaultSwap,
         as_of: Date,
-        policy: AccrualDayCountPolicy,
     ) -> Result<f64> {
         if as_of <= cds.premium_leg.start || as_of >= cds.premium_leg.end {
             return Ok(0.0);
         }
-
         let schedule = self.generate_isda_schedule(cds)?;
-        let mut last_coupon = cds.premium_leg.start;
-        for &coupon_date in &schedule {
-            if coupon_date <= as_of {
-                last_coupon = coupon_date;
-            } else {
-                break;
-            }
-        }
-
-        if matches!(policy, AccrualDayCountPolicy::CdswInclusive)
-            && cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360
-        {
-            let days = (as_of - last_coupon).whole_days() + 1;
-            return Ok((days.max(0) as f64) / 360.0);
-        }
-
+        let last_coupon = schedule
+            .into_iter()
+            .take_while(|&coupon_date| coupon_date <= as_of)
+            .last()
+            .unwrap_or(cds.premium_leg.start);
         cds.premium_leg
             .day_count
             .year_fraction(last_coupon, as_of, DayCountContext::default())
+    }
+
+    pub(crate) fn clean_quote_accrual_fraction(
+        &self,
+        cds: &CreditDefaultSwap,
+        as_of: Date,
+    ) -> Result<f64> {
+        if as_of <= cds.premium_leg.start || as_of >= cds.premium_leg.end {
+            return Ok(0.0);
+        }
+        let periods = self.coupon_periods(cds, as_of)?;
+        let Some(period) = periods
+            .iter()
+            .find(|period| period.accrual_start <= as_of && as_of < period.accrual_end)
+        else {
+            return Ok(0.0);
+        };
+        if period.accrual_start == as_of {
+            return Ok(0.0);
+        }
+        let close = as_of.next_day().ok_or_else(|| {
+            Error::Validation("CDS quote valuation close is outside the date range".into())
+        })?;
+        cds.premium_leg.day_count.year_fraction(
+            period.accrual_start,
+            close,
+            DayCountContext::default(),
+        )
     }
 
     fn clean_par_spread_denominator(
@@ -235,9 +215,10 @@ impl CdsPricer {
         as_of: Date,
     ) -> Result<f64> {
         let full_premium_per_bp = self.premium_leg_pv_per_bp(cds, disc, surv, as_of)?;
-        let accrued_per_unit_spread =
-            self.coupon_accrued_fraction(cds, as_of, AccrualDayCountPolicy::CdswInclusive)?;
-        Ok(full_premium_per_bp / ONE_BASIS_POINT - accrued_per_unit_spread)
+        let accrued_per_unit_spread = self.clean_quote_accrual_fraction(cds, as_of)?;
+        let settlement = cds.quote_settlement_date(as_of)?;
+        let settlement_df = disc.df_between_dates(as_of, settlement)?;
+        Ok(full_premium_per_bp / ONE_BASIS_POINT - settlement_df * accrued_per_unit_spread)
     }
 
     /// Calculate par spread (bp) that sets NPV to zero.
@@ -251,9 +232,8 @@ impl CdsPricer {
     /// The denominator is selected by the instrument's `valuation_convention`
     /// (see [`Self::par_spread_denominator`]). The default,
     /// `BloombergCdswClean`, uses the premium-leg annuity **including**
-    /// accrual-on-default minus the accrued fraction. Only `IsdaDirty` uses the
-    /// scheduled risky annuity `Σ DF(t) * SP(t) * YearFrac`, which excludes
-    /// accrual-on-default. Accrual-on-default matters most for distressed
+    /// accrual-on-default minus the accrued fraction discounted from quote settlement.
+    /// The dirty quote uses the full premium-leg annuity. Accrual-on-default matters most for distressed
     /// credits (typically 2-5 bp for hazard > 3%).
     ///
     /// # Returns
@@ -269,8 +249,7 @@ impl CdsPricer {
     /// * `cds.uses_clean_price()` → clean-price denominator (premium leg per unit
     ///   spread including accrual-on-default, minus the accrued fraction;
     ///   `BloombergCdswClean`, the default).
-    /// * Otherwise (`IsdaDirty`) → scheduled risky annuity (`Σ DF·SP·τ`), which
-    ///   excludes accrual-on-default.
+    /// * Otherwise (`IsdaDirty`) → full premium-leg annuity.
     ///
     /// All branches return values in the same units (per unit notional, per
     /// unit spread), so callers can reuse the result for index aggregation
@@ -288,7 +267,7 @@ impl CdsPricer {
         } else if cds.uses_clean_price() {
             self.clean_par_spread_denominator(cds, disc, surv, as_of)
         } else {
-            self.risky_annuity(cds, disc, surv, as_of)
+            self.premium_leg_annuity(cds, disc, surv, as_of, 1.0, true)
         }
     }
 
@@ -400,8 +379,11 @@ impl CdsPricer {
             let end_date = period.accrual_end;
             let payment_date = period.payment_date;
 
-            // Payments on as_of are treated as settled.
-            if payment_date <= as_of {
+            if !crate::cds::cash_is_eligible(
+                payment_date,
+                as_of,
+                cds.include_valuation_date_cashflows,
+            ) {
                 continue;
             }
 
@@ -484,21 +466,8 @@ impl CdsPricer {
         Ok(annuity * cds.notional.amount() / BASIS_POINTS_PER_UNIT)
     }
 
-    /// Canonical CDS instrument NPV from the perspective of the `PayReceive`
-    /// side, including both upfront-payment forms and the clean-price accrued
-    /// add-back.
-    ///
-    /// Layered components (raw `f64`):
-    ///
-    /// 1. **Leg PV with sign:** Protection PV − Premium PV (for `Pay`),
-    ///    Premium PV − Protection PV (for `Receive`).
-    /// 2. **Dated upfront** (`cds.upfront: Option<(Date, Money)>`): a specific
-    ///    payment on a specific date, discounted from `as_of`. Positive
-    ///    amount = paid by Buyer (reduces Buyer NPV).
-    /// 3. **Clean-price accrued add-back**: when [`CreditDefaultSwap::uses_clean_price`]
-    ///    is `true`, add (Buyer view) or subtract (Seller view) the
-    ///    Bloomberg CDSW-style accrued premium so the reported NPV matches the
-    ///    "Principal" line. Cash settlement is `Principal + Accrued`.
+    /// Economic CDS value from the holder's side, including eligible dated
+    /// upfront cash at its discount factor.
     pub(crate) fn npv_full(
         &self,
         cds: &CreditDefaultSwap,
@@ -509,31 +478,25 @@ impl CdsPricer {
         let protection_pv = self.pv_protection_leg_raw(cds, disc, surv, as_of)?;
         let premium_pv = self.pv_premium_leg_raw(cds, disc, surv, as_of)?;
 
-        // Dated upfront PV: positive = paid by Buyer. Past upfronts (dt < as_of)
-        // are dropped — they are not part of the forward-looking NPV.
+        // Positive upfront is paid by the buyer. The coupon cash boundary also applies here.
         let upfront_pv = match cds.upfront {
-            Some((dt, amount)) if dt >= as_of => {
+            Some((dt, amount))
+                if crate::cds::cash_is_eligible(
+                    dt,
+                    as_of,
+                    cds.include_valuation_date_cashflows,
+                ) =>
+            {
                 amount.amount() * disc.df_between_dates(as_of, dt)?
             }
             _ => 0.0,
         };
 
-        let clean_accrued = if cds.uses_clean_price() {
-            let accrual_fraction =
-                self.coupon_accrued_fraction(cds, as_of, AccrualDayCountPolicy::CdswInclusive)?;
-            let spread = cds.premium_leg.coupon_bp.to_f64().ok_or_else(|| {
-                Error::Validation("premium.coupon_bp cannot be represented as f64".into())
-            })? / BASIS_POINTS_PER_UNIT;
-            cds.notional.amount() * spread * accrual_fraction
-        } else {
-            0.0
-        };
         Ok(super::engine::signed_npv(
             cds,
             protection_pv,
             premium_pv,
             upfront_pv,
-            clean_accrued,
         ))
     }
 }

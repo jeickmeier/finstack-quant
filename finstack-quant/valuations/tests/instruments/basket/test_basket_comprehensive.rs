@@ -17,7 +17,8 @@ use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::types::Attributes;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::exotics::basket::{
-    Basket, BasketAssetType, BasketConstituent, BasketPricingConfig, ConstituentReference,
+    Basket, BasketAssetType, BasketConstituent, BasketExpense, BasketPricingConfig,
+    ConstituentReference,
 };
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::metrics::{MetricContext, MetricId};
@@ -146,6 +147,7 @@ fn simple_equity_basket() -> Basket {
             },
         ])
         .expense_ratio(0.001)
+        .expense(BasketExpense::None)
         .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
@@ -176,6 +178,7 @@ fn test_basket_creation_with_minimal_fields() {
             ticker: None,
         }])
         .expense_ratio(0.0)
+        .expense(BasketExpense::None)
         .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
@@ -203,6 +206,7 @@ fn test_basket_builder_pattern() {
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .expense_ratio(0.0025)
+        .expense(BasketExpense::None)
         .pricing_config(BasketPricingConfig::default())
         .constituents(vec![BasketConstituent {
             id: "TEST".to_string(),
@@ -261,6 +265,7 @@ fn test_basket_validation_empty_constituents() {
         .id("EMPTY_BASKET".into())
         .constituents(vec![])
         .expense_ratio(0.001)
+        .expense(BasketExpense::None)
         .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
@@ -298,7 +303,6 @@ fn test_default_pricing_config() {
     let config = BasketPricingConfig::default();
 
     // Assert
-    assert_eq!(config.days_in_year, 365.25);
     assert!(matches!(config.fx_policy, FxConversionPolicy::CashflowDate));
 }
 
@@ -306,7 +310,6 @@ fn test_default_pricing_config() {
 fn test_custom_pricing_config() {
     // Arrange
     let config = BasketPricingConfig {
-        days_in_year: 360.0,
         fx_policy: FxConversionPolicy::PeriodEnd,
     };
 
@@ -317,6 +320,7 @@ fn test_custom_pricing_config() {
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .expense_ratio(0.001)
+        .expense(BasketExpense::None)
         .pricing_config(config)
         .constituents(vec![BasketConstituent {
             id: "TEST".to_string(),
@@ -331,8 +335,10 @@ fn test_custom_pricing_config() {
         .build()
         .unwrap();
 
-    // Assert
-    assert_eq!(basket.pricing_config.days_in_year, 360.0);
+    assert!(matches!(
+        basket.pricing_config.fx_policy,
+        FxConversionPolicy::PeriodEnd
+    ));
 }
 
 // Units-Based Pricing Tests
@@ -365,6 +371,7 @@ fn test_pricing_with_explicit_units() {
             },
         ])
         .expense_ratio(0.0)
+        .expense(BasketExpense::None)
         .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
@@ -391,62 +398,24 @@ fn test_pricing_with_explicit_units() {
 
 // Weight-Based Pricing Tests
 
-// Expense Ratio Tests
-
 #[test]
-fn test_expense_ratio_zero_has_no_impact() {
-    // Arrange
+fn basket_deducts_elected_accrued_expense_once() {
     let mut basket = simple_equity_basket();
-    basket.expense_ratio = 0.0;
-    let context = equity_market_context();
+    basket.expense_ratio = 0.02;
+    let market = equity_market_context();
     let as_of = date(2025, 1, 1);
+    assert_eq!(unit_value(&basket, &market, as_of).unwrap().amount(), 210.0);
 
-    // Act
-    let basket_value = unit_value(&basket, &context, as_of).unwrap();
-
-    // Assert
-    // Unit NAV before fees: 0.6 × $150 + 0.4 × $300 = $210; one day of fees is
-    // deducted as value × expense_ratio / days_in_year.
-    assert!((basket_value.amount() - 210.0).abs() < 1e-9);
-}
-
-#[test]
-fn test_expense_ratio_reduces_basket_value() {
-    // Arrange
-    let mut basket = simple_equity_basket();
-    basket.expense_ratio = 0.365; // Large ratio for clear test signal
-    let context = equity_market_context();
-    let as_of = date(2025, 1, 1);
-
-    // Act
-    let basket_value = unit_value(&basket, &context, as_of).unwrap();
-
-    // Assert
-    // Unit NAV before fees: 0.6 × $150 + 0.4 × $300 = $210; one day of fees is
-    // deducted as value × expense_ratio / days_in_year.
-    assert!((basket_value.amount() - (210.0 - 210.0 * (0.365 / 365.25))).abs() < 1e-9);
-}
-
-#[test]
-fn test_expense_ratio_with_custom_days_in_year() {
-    // Arrange
-    let config = BasketPricingConfig {
-        days_in_year: 360.0,
-        fx_policy: FxConversionPolicy::CashflowDate,
-    };
-    let mut basket = simple_equity_basket();
-    basket.pricing_config = config;
-    basket.expense_ratio = 0.36; // 0.1% daily with 360 day basis
-    let context = equity_market_context();
-    let as_of = date(2025, 1, 1);
-
-    // Act
-    let basket_value = unit_value(&basket, &context, as_of).unwrap();
-
-    // Assert
-    // Unit NAV before fees: 0.6 × $150 + 0.4 × $300 = $210; one day of fees is
-    // deducted as value × expense_ratio / days_in_year.
-    assert!((basket_value.amount() - (210.0 - 210.0 * (0.36 / 360.0))).abs() < 1e-9);
+    basket.expense = BasketExpense::Accrued { amount: usd(0.75) };
+    assert_eq!(
+        unit_value(&basket, &market, as_of).unwrap().amount(),
+        209.25
+    );
+    basket.expense = BasketExpense::Accrued { amount: usd(-0.75) };
+    assert!(basket.validate().is_err());
+    basket.expense = BasketExpense::None;
+    basket.expense_ratio = -0.01;
+    assert!(basket.validate().is_err());
 }
 
 // Multi-Currency and FX Conversion Tests
@@ -467,6 +436,7 @@ fn test_fx_conversion_eur_to_usd() {
             ticker: None,
         }])
         .expense_ratio(0.0)
+        .expense(BasketExpense::None)
         .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
@@ -529,6 +499,7 @@ fn test_fx_conversion_multiple_currencies() {
             },
         ])
         .expense_ratio(0.0)
+        .expense(BasketExpense::None)
         .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
@@ -569,6 +540,7 @@ fn test_fx_conversion_error_without_fx_provider() {
             ticker: None,
         }])
         .expense_ratio(0.0)
+        .expense(BasketExpense::None)
         .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
@@ -624,6 +596,7 @@ fn test_mixed_units_and_weights() {
             },
         ])
         .expense_ratio(0.0)
+        .expense(BasketExpense::None)
         .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
@@ -677,6 +650,7 @@ fn test_constituent_reference_with_bond_instrument() {
             ticker: None,
         }])
         .expense_ratio(0.0)
+        .expense(BasketExpense::None)
         .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
@@ -741,6 +715,7 @@ fn test_basket_with_multiple_asset_types() {
             },
         ])
         .expense_ratio(0.0)
+        .expense(BasketExpense::None)
         .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
@@ -780,30 +755,6 @@ fn test_constituent_count_metric() {
 
     // Assert
     assert_eq!(results[&MetricId::ConstituentCount], 2.0);
-}
-
-#[test]
-fn test_expense_ratio_metric() {
-    // Arrange
-    let basket = simple_equity_basket();
-    let context = equity_market_context();
-    let instrument: Arc<dyn Instrument> = Arc::new(basket);
-    let mut metric_context = MetricContext::new(
-        instrument,
-        Arc::new(context),
-        date(2025, 1, 1),
-        usd(0.0),
-        MetricContext::default_config(),
-    );
-    // Act
-    let results = finstack_quant_valuations::pricer::STANDARD
-        .metrics()
-        .compute(&[MetricId::ExpenseRatio], &mut metric_context)
-        .unwrap();
-
-    // Assert
-    // Expense ratio is stored as decimal (0.001), returned as percentage (0.1)
-    assert!((results[&MetricId::ExpenseRatio] - 0.1).abs() < 0.001);
 }
 
 // Instrument Trait Implementation Tests
@@ -846,39 +797,6 @@ fn test_missing_price_data_error() {
 }
 
 #[test]
-fn test_very_small_expense_ratio() {
-    // Arrange
-    let mut basket = simple_equity_basket();
-    basket.expense_ratio = 0.000001; // 0.0001 bp
-    let context = equity_market_context();
-    let as_of = date(2025, 1, 1);
-
-    // Act
-    let basket_value = unit_value(&basket, &context, as_of).unwrap();
-
-    // Assert
-    // Unit NAV before fees: 0.6 × $150 + 0.4 × $300 = $210; one day of fees is
-    // deducted as value × expense_ratio / days_in_year.
-    assert!((basket_value.amount() - 210.0).abs() < 1e-3);
-}
-
-#[test]
-fn test_very_large_expense_ratio() {
-    // Arrange
-    let mut basket = simple_equity_basket();
-    basket.expense_ratio = 10.0; // 1000% - unrealistic but tests math
-    let context = equity_market_context();
-    let as_of = date(2025, 1, 1);
-
-    // Act
-    let basket_value = unit_value(&basket, &context, as_of).unwrap();
-
-    // Assert
-    // Should handle large expense ratios without panic
-    assert!(basket_value.amount() >= 0.0);
-}
-
-#[test]
 fn test_single_constituent_basket() {
     // Arrange
     let basket = Basket::builder()
@@ -894,6 +812,7 @@ fn test_single_constituent_basket() {
             ticker: None,
         }])
         .expense_ratio(0.0)
+        .expense(BasketExpense::None)
         .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
@@ -926,6 +845,7 @@ fn test_unitless_scalar_defaults_to_basket_currency() {
             ticker: None,
         }])
         .expense_ratio(0.0)
+        .expense(BasketExpense::None)
         .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
@@ -1028,6 +948,7 @@ fn test_basket_with_mixed_constituents_serialization() {
             },
         ])
         .expense_ratio(0.001)
+        .expense(BasketExpense::None)
         .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
@@ -1150,6 +1071,7 @@ fn test_basket_envelope_roundtrip_with_instruments() {
             ticker: None,
         }])
         .expense_ratio(0.001)
+        .expense(BasketExpense::None)
         .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
@@ -1214,8 +1136,8 @@ fn test_full_pricing_workflow_units_based() {
             },
         ])
         .expense_ratio(0.01)
-        .// 1% annual
-        reporting_currency(Currency::USD)
+        .expense(BasketExpense::None)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -1235,9 +1157,7 @@ fn test_full_pricing_workflow_units_based() {
     // AAPL: 50 × $150 = $7,500
     // MSFT: 30 × $300 = $9,000
     // Total: $16,500
-    // Expense: $16,500 × (0.01 / 365.25) ≈ $0.45
-    // After fees: $16,499.55
-    assert!((nav.amount() - (16_500.0 - 16_500.0 * (0.01 / 365.25))).abs() < 1e-9);
+    assert!((nav.amount() - 16_500.0).abs() < 1e-9);
 }
 
 #[test]
@@ -1298,8 +1218,8 @@ fn test_real_world_etf_scenario() {
             },
         ])
         .expense_ratio(0.0009)
-        .// 9 bp (typical for equity ETF)
-        reporting_currency(Currency::USD)
+        .expense(BasketExpense::None)
+        .reporting_currency(Currency::USD)
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(Default::default())
@@ -1319,7 +1239,7 @@ fn test_real_world_etf_scenario() {
     // Assert
     // Unit NAV before fees: 0.25 × (150 + 300 + 2800) + 0.20 × 3200 + 0.05 × 1 = $1,452.55
     assert_eq!(nav.currency(), Currency::USD);
-    assert!((nav.amount() - (1452.55 - 1452.55 * (0.0009 / 365.25))).abs() < 1e-9);
+    assert!((nav.amount() - 1452.55).abs() < 1e-9);
 }
 
 #[test]
@@ -1358,7 +1278,7 @@ fn production_risk_basket_weights_are_currency_per_bp() {
     assert!((rows[1].1 - 1.5).abs() < 1e-9);
 }
 
-/// `constituent_delta` is the basket PV change for a +1% relative move in
+/// `basket_mark_shock` is the basket PV change for a +1% relative move in
 /// each constituent price.
 ///
 /// Reference: with explicit units, no expense ratio and a unit notional the
@@ -1367,7 +1287,7 @@ fn production_risk_basket_weights_are_currency_per_bp() {
 /// (AAPL: 0.01 × 10 × 150 = 15; MSFT: 0.01 × 5 × 300 = 15). Only floating-point
 /// residuals remain, hence 1e-9.
 #[test]
-fn constituent_delta_is_pv_change_per_one_percent_move() {
+fn basket_mark_shock_is_pv_change_per_one_percent_move() {
     let basket = Basket::builder()
         .id("DELTA_BASKET".into())
         .constituents(vec![
@@ -1393,6 +1313,7 @@ fn constituent_delta_is_pv_change_per_one_percent_move() {
             },
         ])
         .expense_ratio(0.0)
+        .expense(BasketExpense::None)
         .reporting_currency(Currency::USD)
         .notional(usd(1.0))
         .discount_curve_id("USD-OIS".into())
@@ -1403,6 +1324,11 @@ fn constituent_delta_is_pv_change_per_one_percent_move() {
         .pricing_config(BasketPricingConfig::default())
         .build()
         .unwrap();
+    let mut basket = basket;
+    let mut shared_quote = basket.constituents[0].clone();
+    shared_quote.id = "AAPL-second-lot".into();
+    basket.constituents.push(shared_quote);
+    basket.expense = BasketExpense::Accrued { amount: usd(2.0) };
     let market = equity_market_context();
     let as_of = date(2025, 1, 1);
 
@@ -1410,18 +1336,21 @@ fn constituent_delta_is_pv_change_per_one_percent_move() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::ConstituentDelta],
+            &[MetricId::BasketMarkShock],
             finstack_quant_valuations::instruments::PricingOptions::default(),
         )
         .unwrap();
 
-    let total = *result.measures.get("constituent_delta").unwrap();
+    let total = *result.measures.get("basket_mark_shock").unwrap();
     assert!(
-        (total - 30.0).abs() < 1e-9,
-        "total constituent delta {total}"
+        (total - 45.0).abs() < 1e-9,
+        "total basket mark shock {total}"
     );
-    let aapl = *result.measures.get("constituent_delta::AAPL").unwrap();
-    assert!((aapl - 15.0).abs() < 1e-9, "AAPL constituent delta {aapl}");
+    let aapl = *result
+        .measures
+        .get("basket_mark_shock::price::AAPL")
+        .unwrap();
+    assert!((aapl - 30.0).abs() < 1e-9, "AAPL mark shock {aapl}");
 }
 
 #[test]

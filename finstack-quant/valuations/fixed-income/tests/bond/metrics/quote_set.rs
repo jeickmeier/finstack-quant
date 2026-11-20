@@ -427,18 +427,15 @@ fn a_non_finite_or_non_positive_input_is_an_error() {
     assert!(message.contains("must be positive"), "{message}");
 }
 
-/// `ytw` alone is negative infinity here and the `i_spread` metric fails with
-/// "Invalid date range". The set runs `z_spread` first, which has no spread that
-/// matches same-day cash, so its error is the one the whole set returns.
+/// The quote set propagates the missing finite yield of the limiting workout.
 #[test]
-fn a_call_on_the_quote_date_below_the_price_fails_the_whole_set_at_z_spread() {
+fn a_call_on_the_quote_date_below_the_price_fails_the_whole_set_at_ytw() {
     let bond = with_calls(vec![call(AS_OF, 99.0)]);
-    assert_eq!(metric(&bond, 100.0, &MetricId::Ytw), f64::NEG_INFINITY);
     let message = quotes(&bond, BondQuoteInput::CleanPricePct(100.0))
         .expect_err("rejected")
         .to_string();
     assert!(
-        message.contains("bond quote metric 'z_spread'") && message.contains(bond.id.as_str()),
+        message.contains("bond quote metric 'ytw'") && message.contains(bond.id.as_str()),
         "{message}"
     );
 }

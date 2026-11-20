@@ -64,6 +64,9 @@ pub struct CompositeSpec {
     pub weighting_method: WeightingMethod,
     /// Dates on which explicit dynamic resolution becomes eligible.
     pub rebalance_rule: RebalanceRule,
+    /// Ordered market FX direction for whole-composite FX01.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fx01_pair: Option<crate::instruments::FxPair>,
     /// Scenario-selection and reporting metadata.
     pub attributes: Attributes,
 }
@@ -104,6 +107,7 @@ impl CompositeSpec {
             legs,
             weighting_method,
             rebalance_rule,
+            fx01_pair: None,
             attributes: Attributes::new(),
         }
     }
@@ -146,6 +150,13 @@ impl CompositeSpec {
                 "composite '{}' capital must be positive and denominated in {}",
                 self.id, self.reporting_currency
             )));
+        }
+        if let Some(pair) = self.fx01_pair
+            && pair.base == pair.quote
+        {
+            return Err(Error::Validation(
+                "composite FX01 requires distinct currencies".into(),
+            ));
         }
         self.rebalance_rule.validate()?;
         let mut local_ids = BTreeMap::<String, ()>::new();

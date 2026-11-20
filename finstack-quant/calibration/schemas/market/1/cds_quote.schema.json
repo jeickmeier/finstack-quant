@@ -73,6 +73,21 @@
         }
       ]
     },
+    "CdsUpfrontBasis": {
+      "description": "Representation of a single-name CDS upfront quote.",
+      "oneOf": [
+        {
+          "const": "clean",
+          "description": "Clean fraction of notional, before deducting the accrued premium rebate.",
+          "type": "string"
+        },
+        {
+          "const": "actual_cash",
+          "description": "Actual signed cash as a fraction of notional, including the rebate.",
+          "type": "string"
+        }
+      ]
+    },
     "Pillar": {
       "description": "The maturity pillar of a quote.\n\nThe pillar represents the maturity of the instrument referenced by the quote. OTC instruments\n(swaps, deposits) typically use `Tenor` (e.g., \"5Y\") to allow rolling headers that automatically\nadjust as the valuation date changes. Futures or bespoke runs may use `Date` to pin a specific\nmaturity date.\n\nThe JSON wire form is externally tagged: `{\"tenor\": {\"count\": 5, \"unit\": \"years\"}}`\nor `{\"date\": \"2029-06-20\"}`. A bare string such as `\"5Y\"` is rejected.\n\n# Examples\n\nUsing a tenor pillar:\n```rust\nuse finstack_quant_calibration::quotes::Pillar;\n\n# fn example() -> finstack_quant_core::Result<()> {\nlet pillar = Pillar::Tenor(\"5Y\".parse()?);\n# Ok(())\n# }\n```\n\nUsing a date pillar:\n```rust\nuse finstack_quant_calibration::quotes::Pillar;\nuse finstack_quant_core::dates::Date;\n\nlet pillar = Pillar::Date(Date::from_calendar_date(2029, time::Month::June, 20).unwrap());\n```",
       "oneOf": [
@@ -214,8 +229,12 @@
           "const": "cds_upfront",
           "type": "string"
         },
+        "upfront_basis": {
+          "$ref": "#/$defs/CdsUpfrontBasis",
+          "description": "Whether the fraction is a clean quote or actual buyer cash at settlement."
+        },
         "upfront_pct": {
-          "description": "Upfront payment percentage of notional (e.g. 0.01 for 1%).",
+          "description": "Signed upfront fraction of notional (0.01 is 1%).",
           "format": "double",
           "type": "number"
         }
@@ -228,6 +247,7 @@
         "pillar",
         "coupon_bp",
         "upfront_pct",
+        "upfront_basis",
         "recovery_rate"
       ],
       "type": "object"

@@ -81,6 +81,12 @@ impl PyCreditDefaultSwap {
         self.inner.par_spread(&market, as_of).map_err(core_to_py)
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap.include_valuation_date_cashflows")]
+    #[getter]
+    fn include_valuation_date_cashflows(&self) -> bool {
+        self.inner.include_valuation_date_cashflows
+    }
+
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwap.upfront")]
     #[getter]
     fn upfront<'py>(&self, py: Python<'py>) -> PyResult<Option<(Bound<'py, PyAny>, PyMoney)>> {
@@ -277,6 +283,20 @@ impl PyCreditDefaultSwapBuilder {
             valuation_convention,
             format!("{value:?}"),
             |b: CreditDefaultSwapBuilder| b.valuation_convention(convention)
+        )
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds", "CreditDefaultSwapBuilder.include_valuation_date_cashflows")]
+    #[pyo3(text_signature = "($self, value)")]
+    fn include_valuation_date_cashflows<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: bool,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        builder_set!(
+            slf,
+            include_valuation_date_cashflows,
+            value.to_string(),
+            |b: CreditDefaultSwapBuilder| b.include_valuation_date_cashflows(value)
         )
     }
 

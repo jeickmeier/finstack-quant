@@ -170,6 +170,9 @@ impl LeveredRealEstateEquity {
 }
 
 impl Instrument for LeveredRealEstateEquity {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     impl_instrument_base!(
         InstrumentType::LeveredRealEstateEquity,
         crate::pricer::STANDARD

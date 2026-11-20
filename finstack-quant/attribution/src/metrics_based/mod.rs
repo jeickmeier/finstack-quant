@@ -366,6 +366,18 @@ pub(crate) fn attribute_request(request: &crate::AttributionRequest<'_>) -> Resu
         .cloned()
         .unwrap_or_else(finstack_quant_calibration::recalibration::pricing_options)
         .with_config(config);
+    use finstack_quant_valuations::pricer::{InstrumentType, ModelKey};
+    let model = pricing_options
+        .model
+        .unwrap_or_else(|| metrics_instrument.default_model());
+    if request.metrics.is_none()
+        && metrics_instrument.key() == InstrumentType::Bond
+        && !matches!(model, ModelKey::HazardRate | ModelKey::RatesCredit)
+    {
+        // A rates-only bond has a parallel Z-spread metric. Only a
+        // credit-consuming model exposes hazard-quote buckets.
+        metrics.retain(|metric| *metric != MetricId::BucketedCs01);
+    }
     let mut menu_note = None;
     let curves = if request.metrics.is_none() {
         unreplayable_hazard_curves(metrics_instrument.as_ref(), market_t0)?

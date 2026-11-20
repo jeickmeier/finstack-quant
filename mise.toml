@@ -75,6 +75,7 @@ description = "The pre-PR gate: exactly what CI runs on a pull request (--full a
 usage = '''
 flag "--full" help="Also run the nightly tier: docs, doctests and the slow suites"
 flag "--release" help="Also run the nightly tier and the release gates (publish checks, semver)"
+flag "--from <stage>" help="Resume at a PR stage when earlier results and build products still apply"
 '''
 # One stage per job of .github/workflows/checks.yml, which runs the same tasks
 # split across runners (scripts/tests/test_gate_parity.py keeps the two equal);
@@ -82,9 +83,8 @@ flag "--release" help="Also run the nightly tier and the release gates (publish 
 # time cap (NEXTEST_PROFILE=ci). The slow suites (`--slow`) run under nextest's
 # `slow` profile, a 10-minute per-test cap instead of the 60 s one.
 #
-# The Lint stage may format (pre-commit runs the *-fmt tasks); nothing here
-# regenerates. After touching a generator or a wire type, run
-# `mise run gen-write` first.
+# The Lint stage checks formatting. Use all-fmt to apply fixes and gen-write
+# after touching a generator or a wire type.
 #
 # wasm-test runs first: it builds the dev web and Node packages ui-check
 # imports, and it rewrites them, so it cannot overlap ui-check. rust-build-tests
@@ -92,14 +92,31 @@ flag "--release" help="Also run the nightly tier and the release gates (publish 
 # run them. ui-check (the longest stage) overlaps only gen-check and
 # all-audit, which are light: beside the core-saturating rust-test or
 # python-test its tests outrun their time budgets. Those two run alone after.
-run = [
-  { task = "pre-commit-run" },
-  { task = "wasm-test" },
-  { task = "rust-build-tests" },
-  { tasks = ["gen-check", "ui-check", "all-audit"] },
-  { task = "rust-test" },
-  { task = "python-test" },
-  '''
+run = '''
+  set -eu
+  resume_from=${usage_from:-}
+  run_stage() {
+    if [ -n "$resume_from" ]; then
+      while [ "$#" -gt 0 ] && [ "$1" != "$resume_from" ]; do
+        shift
+      done
+      [ "$#" -gt 0 ] || return 0
+      resume_from=
+    fi
+    mise run "$@"
+  }
+
+  run_stage pre-commit-run
+  run_stage wasm-test
+  run_stage rust-build-tests
+  run_stage gen-check ::: ui-check ::: all-audit
+  run_stage rust-test
+  run_stage python-test
+  if [ -n "$resume_from" ]; then
+    printf 'Unknown PR gate stage: %s\n' "$resume_from" >&2
+    exit 2
+  fi
+
   if [ "${usage_full:-false}" = "true" ] || [ "${usage_release:-false}" = "true" ]; then
     mise run all-doc
     mise run rust-test --doctest
@@ -118,14 +135,13 @@ run = [
       -p finstack-quant-portfolio \
       --baseline-rev "$baseline"
   fi
-  ''',
-]
+'''
 
 [tasks.slice-gate]
 # The per-slice gate: scripts/slice_gate.py picks the stages of `all` the diff
 # can affect, runs them cheapest first as the same tasks, stops at the first
 # failure and prints each stage's time. It never regenerates. `all` stays the
-# pre-PR gate; scripts/tests/test_slice_gate.py keeps the stage lists equal.
+# pre-PR gate; scripts/tests/test_gate_parity.py keeps the stage lists equal.
 description = "Run the stages of `all` the diff can affect, stopping at the first failure (--base REF widens the diff, --from STAGE resumes)"
 usage = '''
 flag "--base <ref>" default="HEAD" help="Diff base; HEAD checks only uncommitted work"
@@ -144,8 +160,13 @@ description = "Build the Rust workspace, Python bindings and WASM package"
 depends = ["rust-build", "python-build", "wasm-build"]
 
 [tasks.all-fmt]
-description = "Format Rust, Python and WASM; auto-fix Python and WASM"
+description = "Format Rust, Python and WASM and fix text and Markdown formatting"
 depends = ["rust-fmt", "python-fmt", "wasm-fmt"]
+# Pre-commit reports a change as a failure even when the fix worked.
+run = '''
+uv run --no-sync pre-commit run --all-files --hook-stage manual ||
+  uv run --no-sync pre-commit run --all-files --hook-stage manual
+'''
 
 [tasks.all-doc]
 # The nightly docs stage of `mise run all --full`. Doc examples run through
@@ -861,5 +882,5 @@ description = "Build release wheels for every locally available Python"
 run = "uv run maturin build --release --find-interpreter -o target/wheels"
 
 [tasks.pre-commit-run]
-description = "Run every pre-commit hook on the full tree (the CI Lint job)"
-run = "uv run --no-sync pre-commit run --all-files"
+description = "Run the check-stage pre-commit hooks on the full tree (the CI Lint job)"
+run = "uv run --no-sync pre-commit run --all-files --hook-stage pre-commit"

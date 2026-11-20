@@ -142,8 +142,8 @@ export default [
       "frequency": null
     },
     "description": "Owned, canonicalized day-count context parameters.",
-    "ref": "#/$defs/DayCountContextState",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DayCountContextState"
+    "ref": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DayCountContextState",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DayCountContextState"
   },
   {
     "path": "#/$defs/d_04fbc100264b0ba64e0f/properties/day_count",
@@ -579,8 +579,8 @@ export default [
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/2/properties/cds_valuation_convention/anyOf/0",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/2/properties/cds_valuation_convention/anyOf/0",
-    "ref": "#/$defs/CdsValuationConvention",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsValuationConvention"
+    "ref": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsValuationConvention",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsValuationConvention"
   },
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/2/properties/cds_valuation_convention/anyOf/1",
@@ -1035,8 +1035,8 @@ export default [
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/6/properties/date_regime",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/6/properties/date_regime",
     "description": "Contractual date regime of the synthetic tranches (record\nCALIBRATION-FRAMEWORK-007, O7): `standard` CDS roll dates (20th of\nMar/Jun/Sep/Dec) or `bespoke` for a schedule from the convention\nfrequency and stub. Required; there is no default regime.",
-    "ref": "#/$defs/CdsDateRegime",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsDateRegime"
+    "ref": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsDateRegime",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsDateRegime"
   },
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/6/properties/day_count",
@@ -1372,23 +1372,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_0d11ec5d3bb569cc9141",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/OptionType",
-    "description": "Option payoff direction used by analytical and numerical model engines."
-  },
-  {
-    "path": "#/$defs/d_0d11ec5d3bb569cc9141/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/OptionType/oneOf/0",
-    "const": "call",
-    "description": "Call option."
-  },
-  {
-    "path": "#/$defs/d_0d11ec5d3bb569cc9141/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/OptionType/oneOf/1",
-    "const": "put",
-    "description": "Put option."
-  },
-  {
     "path": "#/$defs/d_149952dfbecf32b456eb",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsConventionKey",
     "description": "Key to look up CDS conventions (Currency + DocClause).\n\nCDS conventions are identified by both currency and documentation clause, as different\nclauses have different market conventions. Used to look up [`CdsConventionSpec`](crate::market::conventions::CdsConventionSpec)\nfrom the convention registry.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};\nuse finstack_quant_core::currency::Currency;\n\nlet key = CdsConventionKey {\n    currency: Currency::USD,\n    doc_clause: CdsDocClause::Cr14,\n};\n```"
@@ -1404,8 +1387,8 @@ export default [
     "path": "#/$defs/d_149952dfbecf32b456eb/properties/doc_clause",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsConventionKey/properties/doc_clause",
     "description": "The documentation clause (e.g. CR14, MM14).",
-    "ref": "#/$defs/CdsDocClause",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsDocClause"
+    "ref": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsDocClause",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsDocClause"
   },
   {
     "path": "#/$defs/d_1592bbe0910207d35680",
@@ -1594,23 +1577,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketScalar/oneOf/1/properties/price",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_33b593cc329bf757aee1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsDateRegime",
-    "description": "Named contractual date regime of a CDS product (record\nCALIBRATION-FRAMEWORK-007, O7).\n\nThe regime owns how the premium grid, its stub and its endpoints are\nderived; no regime is inferred and none is a default."
-  },
-  {
-    "path": "#/$defs/d_33b593cc329bf757aee1/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsDateRegime/oneOf/0",
-    "const": "standard",
-    "description": "Standard quarterly CDS roll dates (20 March, June, September and\nDecember): the premium grid runs quarterly from an accrual start on a\nroll date, with a short final period when the maturity is off the\ngrid. The leg's `frequency` must be quarterly; its `stub` is not used."
-  },
-  {
-    "path": "#/$defs/d_33b593cc329bf757aee1/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsDateRegime/oneOf/1",
-    "const": "bespoke",
-    "description": "A bespoke schedule from the leg's own `frequency`, `stub` and\nboundaries."
   },
   {
     "path": "#/$defs/d_344d3d76fad0c4b3fff9",
@@ -1854,35 +1820,6 @@ export default [
     "path": "#/$defs/d_3ae1d648491d93be37b3/oneOf/1/properties/global_solve/properties/use_analytical_jacobian",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationMethod/oneOf/1/properties/global_solve/properties/use_analytical_jacobian",
     "description": "Use analytical Jacobian if available (otherwise finite-difference)."
-  },
-  {
-    "path": "#/$defs/d_3d7928f8797773779aed",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsValuationConvention",
-    "description": "Valuation presentation and pricing policy for CDS marks.\n\nEach variant bundles a coherent set of choices (premium-leg accrual schedule,\nAct/360 accrual day counting, accrual-on-default bias, clean/dirty NPV,\npar-spread denominator). Mixing those choices via separate boolean\noverrides is intentionally not supported — the variants here are the only\nconventions traded in practice."
-  },
-  {
-    "path": "#/$defs/d_3d7928f8797773779aed/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsValuationConvention/oneOf/0",
-    "const": "isda_dirty",
-    "description": "ISDA-style dirty model PV.\n\nPremium-leg cashflows accrue between unadjusted IMM dates, the final\ncoupon excludes the maturity day, and the reported NPV is the dirty\nmodel PV (no add-back of accrued premium). Par spread uses the risky\nannuity denominator. Use only for direct reproduction of academic ISDA\nStandard Model literature."
-  },
-  {
-    "path": "#/$defs/d_3d7928f8797773779aed/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsValuationConvention/oneOf/1",
-    "const": "bloomberg_cdsw_clean",
-    "description": "Bloomberg CDSW clean principal presentation and premium-leg policy.\n\nThis is the industry-standard convention used by Bloomberg CDSW and\nthe ISDA Standard Upfront Model. It is the default for new\n`CreditDefaultSwap` instances:\n\n- Intermediate premium cashflows accrue between business-day-adjusted\n  dates. Final accrual ends on unadjusted maturity; the final payment\n  follows the business-day convention independently.\n- The final coupon period is inclusive of the maturity date (extra\n  day) per CDSW convention.\n- The reported NPV is the clean principal value (Bloomberg\n  \"Principal\" line). Cash settlement is `Principal + Accrued`.\n- Par spread uses the risky annuity denominator (matches the CDSW\n  screen for investment-grade credits).\n- Hazard rebootstrap inside risk metrics (CS01, recovery01, etc.)\n  inherits the same CDSW pricer convention so sensitivities are\n  self-consistent with the base PV."
-  },
-  {
-    "path": "#/$defs/d_3d7928f8797773779aed/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsValuationConvention/oneOf/2",
-    "const": "bloomberg_cdsw_clean_full_premium",
-    "description": "Bloomberg CDSW clean principal with full premium leg in the par-spread\ndenominator (distressed-credit variant).\n\nIdentical to [`Self::BloombergCdswClean`] except the par spread\ndenominator includes accrual-on-default. The difference vs. risky\nannuity is typically < 1bp for investment grade and 2-5bps for\ndistressed credits (hazard rate > 3%)."
-  },
-  {
-    "path": "#/$defs/d_3d7928f8797773779aed/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsValuationConvention/oneOf/3",
-    "const": "quant_lib_isda_parity",
-    "description": "QuantLib `IsdaCdsEngine` parity convention.\n\nReproduces QuantLib's CDS output: dirty PV (no clean add-back),\nbusiness-day-adjusted premium accrual periods, full premium leg in\nthe par-spread denominator, QuantLib `Actual360(true)` accrual (every\nAct/360 premium period includes its end date) and the `IsdaCdsEngine`\n`HalfDayBias` accrual-on-default adjustment."
   },
   {
     "path": "#/$defs/d_41166743d7ec9326bdd4",
@@ -2178,8 +2115,8 @@ export default [
   {
     "path": "#/$defs/d_5f0b38036294b8235c6a/properties/ois_compounding/anyOf/0",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RatesStepConventions/properties/ois_compounding/anyOf/0",
-    "ref": "#/$defs/FloatingLegCompounding",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FloatingLegCompounding"
+    "ref": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding"
   },
   {
     "path": "#/$defs/d_5f0b38036294b8235c6a/properties/ois_compounding/anyOf/1",
@@ -2219,23 +2156,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ResidualWeightingScheme/oneOf/3",
     "const": "inverse_duration",
     "description": "Weight by inverse duration (1/DV01 approximation)."
-  },
-  {
-    "path": "#/$defs/d_628e8bb89f248ce0647b",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SeriesInterpolation",
-    "description": "Interpolation strategy for [`ScalarTimeSeries`].\n\n# Examples\n```rust\nuse finstack_quant_core::market_data::scalars::{\n    ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,\n};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"TS\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\"), 100.0),\n        (Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\"), 105.0),\n    ],\n    None,\n    SeriesInterpolation::Step,\n    SeriesExtrapolation::Error,\n)\n.expect(\"Series creation should succeed\");\nlet mid_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nassert_eq!(series.get_value(mid_date).expect(\"Value lookup should succeed\"), 100.0);\n```"
-  },
-  {
-    "path": "#/$defs/d_628e8bb89f248ce0647b/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SeriesInterpolation/oneOf/0",
-    "const": "step",
-    "description": "Last observation carried forward"
-  },
-  {
-    "path": "#/$defs/d_628e8bb89f248ce0647b/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SeriesInterpolation/oneOf/1",
-    "const": "linear",
-    "description": "Linear interpolation between observed points"
   },
   {
     "path": "#/$defs/d_62f16222adf57cd5e917",
@@ -2979,9 +2899,16 @@ export default [
     "const": "cds_upfront"
   },
   {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/1/oneOf/1/properties/upfront_basis",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/1/oneOf/1/properties/upfront_basis",
+    "description": "Whether the fraction is a clean quote or actual buyer cash at settlement.",
+    "ref": "#/$defs/CdsUpfrontBasis",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsUpfrontBasis"
+  },
+  {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/1/oneOf/1/properties/upfront_pct",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/1/oneOf/1/properties/upfront_pct",
-    "description": "Upfront payment percentage of notional (e.g. 0.01 for 1%).",
+    "description": "Signed upfront fraction of notional (0.01 is 1%).",
     "format": "double"
   },
   {
@@ -3522,8 +3449,8 @@ export default [
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/4/oneOf/0/properties/option_vol/properties/option_type",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/4/oneOf/0/properties/option_vol/properties/option_type",
     "description": "Option type (Call or Put).",
-    "ref": "#/$defs/OptionType",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/OptionType"
+    "ref": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OptionType",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OptionType"
   },
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/4/oneOf/0/properties/option_vol/properties/strike",
@@ -3830,8 +3757,8 @@ export default [
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/9/properties/interpolation",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/9/properties/interpolation",
     "description": "Interpolation method",
-    "ref": "#/$defs/SeriesInterpolation",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SeriesInterpolation"
+    "ref": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SeriesInterpolation",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SeriesInterpolation"
   },
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/9/properties/kind",
@@ -4028,71 +3955,6 @@ export default [
     "description": "Number of business days in the rate-cutoff window.",
     "format": "uint32",
     "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_973d7a036900fe27e69d",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsDocClause",
-    "description": "CDS market standard documentation clauses.\n\nRepresents the ISDA documentation clause used for CDS contracts. Different clauses\ndefine different restructuring events and settlement procedures. Used as part of\n[`CdsConventionKey`] to look up CDS conventions.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;\n\nlet clause = CdsDocClause::Cr14; // Cum-Restructuring 2014\n```"
-  },
-  {
-    "path": "#/$defs/d_973d7a036900fe27e69d/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsDocClause/oneOf/0",
-    "const": "cr14",
-    "description": "Cum-Restructuring 2014 (CR14)"
-  },
-  {
-    "path": "#/$defs/d_973d7a036900fe27e69d/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsDocClause/oneOf/1",
-    "const": "mr14",
-    "description": "Modified-Restructuring 2014 (MR14)"
-  },
-  {
-    "path": "#/$defs/d_973d7a036900fe27e69d/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsDocClause/oneOf/2",
-    "const": "mm14",
-    "description": "Modified-Modified-Restructuring 2014 (MM14)"
-  },
-  {
-    "path": "#/$defs/d_973d7a036900fe27e69d/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsDocClause/oneOf/3",
-    "const": "xr14",
-    "description": "No-Restructuring 2014 (XR14)"
-  },
-  {
-    "path": "#/$defs/d_973d7a036900fe27e69d/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsDocClause/oneOf/4",
-    "const": "isda_na",
-    "description": "ISDA North American Corporate (IsdaNa)"
-  },
-  {
-    "path": "#/$defs/d_973d7a036900fe27e69d/oneOf/5",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsDocClause/oneOf/5",
-    "const": "isda_eu",
-    "description": "ISDA European Corporate (IsdaEu)"
-  },
-  {
-    "path": "#/$defs/d_973d7a036900fe27e69d/oneOf/6",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsDocClause/oneOf/6",
-    "const": "isda_as",
-    "description": "ISDA Asia Corporate (IsdaAs)"
-  },
-  {
-    "path": "#/$defs/d_973d7a036900fe27e69d/oneOf/7",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsDocClause/oneOf/7",
-    "const": "isda_au",
-    "description": "ISDA Australia Corporate (IsdaAu)"
-  },
-  {
-    "path": "#/$defs/d_973d7a036900fe27e69d/oneOf/8",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsDocClause/oneOf/8",
-    "const": "isda_nz",
-    "description": "ISDA New Zealand Corporate (IsdaNz)"
-  },
-  {
-    "path": "#/$defs/d_973d7a036900fe27e69d/oneOf/9",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsDocClause/oneOf/9",
-    "const": "custom",
-    "description": "Custom / Other"
   },
   {
     "path": "#/$defs/d_98cf8b7ac32c57498b10",
@@ -5103,74 +4965,6 @@ export default [
     "title": "Id"
   },
   {
-    "path": "#/$defs/d_9f40e937966e31f97b30",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FloatingLegCompounding",
-    "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```"
-  },
-  {
-    "path": "#/$defs/d_9f40e937966e31f97b30/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FloatingLegCompounding/oneOf/0",
-    "const": "simple",
-    "description": "Simple term-rate projection: one fixing or forward over the period.\n\n`Coupon = Notional × (Forward_Rate + Spread) × DCF`. This is the\ndefault; a registered overnight RFR index rejects it."
-  },
-  {
-    "path": "#/$defs/d_9f40e937966e31f97b30/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FloatingLegCompounding/oneOf/1",
-    "const": "simple_average",
-    "description": "Arithmetic average of daily overnight fixings weighted by accrual days,\n`Rate = (Σ rᵢ·dᵢ) / D`, for instruments that contractually specify a\nsimple-average overnight index."
-  },
-  {
-    "path": "#/$defs/d_9f40e937966e31f97b30/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FloatingLegCompounding/oneOf/2",
-    "description": "Compounded in arrears (overnight RFR rates).\n\n`Coupon = Notional × [∏(1 + rᵢ·dᵢ/B) − 1]` over the daily observations\nof the accrual period."
-  },
-  {
-    "path": "#/$defs/d_9f40e937966e31f97b30/oneOf/2/properties/compounded_in_arrears",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_in_arrears"
-  },
-  {
-    "path": "#/$defs/d_9f40e937966e31f97b30/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FloatingLegCompounding/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
-    "description": "Business days by which observation dates move backward while the\nday-count weights stay on the original accrual dates (\"lookback\nwithout observation shift\", ISDA 2021 / ARRC). `0` is plain\nin-arrears, the cleared-OIS convention.",
-    "format": "uint32",
-    "maximum": 31,
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_9f40e937966e31f97b30/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FloatingLegCompounding/oneOf/3",
-    "description": "Compounded in arrears with ISDA 2021 observation shift: both the\nobservation dates and their day-count weights move back\n(ISDA 2021 Definitions Section 4.5(c))."
-  },
-  {
-    "path": "#/$defs/d_9f40e937966e31f97b30/oneOf/3/properties/compounded_with_observation_shift",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_observation_shift"
-  },
-  {
-    "path": "#/$defs/d_9f40e937966e31f97b30/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FloatingLegCompounding/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
-    "description": "Business days to shift both observation dates and weights.",
-    "format": "uint32",
-    "maximum": 31,
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_9f40e937966e31f97b30/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FloatingLegCompounding/oneOf/4",
-    "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThe last `cutoff_days` business-day observations are frozen at the\nfixing immediately preceding them: for fixings `b_1..b_n` the source is\n`b_{n-cutoff}`, so a positive cut-off must leave a preceding fixing.\nReference: ARRC, December 3, 2021 Statement, Appendix A (\"Lockout\")."
-  },
-  {
-    "path": "#/$defs/d_9f40e937966e31f97b30/oneOf/4/properties/compounded_with_rate_cutoff",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FloatingLegCompounding/oneOf/4/properties/compounded_with_rate_cutoff"
-  },
-  {
-    "path": "#/$defs/d_9f40e937966e31f97b30/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FloatingLegCompounding/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
-    "description": "Business days before period end over which the rate is frozen.",
-    "format": "uint32",
-    "maximum": 31,
-    "minimum": 0
-  },
-  {
     "path": "#/$defs/d_9ffaa1e088ad89c67a16",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateBoundsPolicy",
     "description": "How `CalibrationConfig` obtains rate bounds.\n\nMarket-standard bounds depend on currency/market regime. `AutoCurrency` makes this choice\nexplicit and avoids relying on `RateBounds::default()` as an implicit assumption."
@@ -5249,6 +5043,23 @@ export default [
     "description": "Weighting scheme for global solve residuals.",
     "ref": "#/$defs/ResidualWeightingScheme",
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ResidualWeightingScheme"
+  },
+  {
+    "path": "#/$defs/d_ab1e87184ae9a3b1d069",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsUpfrontBasis",
+    "description": "Representation of a single-name CDS upfront quote."
+  },
+  {
+    "path": "#/$defs/d_ab1e87184ae9a3b1d069/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsUpfrontBasis/oneOf/0",
+    "const": "clean",
+    "description": "Clean fraction of notional, before deducting the accrued premium rebate."
+  },
+  {
+    "path": "#/$defs/d_ab1e87184ae9a3b1d069/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsUpfrontBasis/oneOf/1",
+    "const": "actual_cash",
+    "description": "Actual signed cash as a fraction of notional, including the rebate."
   },
   {
     "path": "#/$defs/d_af96800aab5249199d14",
@@ -6369,63 +6180,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/9",
     "const": "nl_365",
     "description": "NL/365 (Actual/365 No Leap) day count convention.\n\nYear fraction = (actual days excluding any February 29) / 365\n\n# Standards Reference\n\n- **Also known as**: Act/365 No Leap, NL365, Actual/365NL"
-  },
-  {
-    "path": "#/$defs/d_cd1309ede7abd3f53244",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DayCountContextState",
-    "description": "Serializable snapshot of [`DayCountContext`] state for persistence and interchange.\n\nThis struct captures the optional context parameters (calendar, frequency, business-day basis)\nneeded to reconstruct a [`DayCountContext`] at runtime using the built-in calendar lookup.\n`Default` is the empty context (no calendar, frequency, basis, coupon\nperiod or termination status), the snapshot of\n[`DayCountContext::default`]."
-  },
-  {
-    "path": "#/$defs/d_cd1309ede7abd3f53244/properties/bus_basis",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DayCountContextState/properties/bus_basis",
-    "description": "Optional custom business-day divisor (defaults to 252 when `None`).",
-    "format": "uint16",
-    "maximum": 65535,
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_cd1309ede7abd3f53244/properties/calendar_id",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DayCountContextState/properties/calendar_id",
-    "description": "Optional calendar code (e.g. \"target2\")."
-  },
-  {
-    "path": "#/$defs/d_cd1309ede7abd3f53244/properties/coupon_period",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DayCountContextState/properties/coupon_period",
-    "default": null,
-    "description": "Optional unadjusted regular ICMA reference period or ACT/365L enclosing\ncoupon `(start, end)`, serialized as two ISO dates.\n\nRequired for exact ICMA accrual on round-trip. `None` selects the\nfrequency-only ICMA calculation path; ACT/365L requires these dates."
-  },
-  {
-    "path": "#/$defs/d_cd1309ede7abd3f53244/properties/coupon_period/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DayCountContextState/properties/coupon_period/prefixItems/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_cd1309ede7abd3f53244/properties/coupon_period/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DayCountContextState/properties/coupon_period/prefixItems/1",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_cd1309ede7abd3f53244/properties/end_is_termination_date",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DayCountContextState/properties/end_is_termination_date",
-    "default": null,
-    "description": "Whether the later accrual endpoint is the contractual termination\ndate; `None` (omitted or `null` on the wire) means unspecified, which\n30E/360 ISDA rejects."
-  },
-  {
-    "path": "#/$defs/d_cd1309ede7abd3f53244/properties/frequency",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DayCountContextState/properties/frequency",
-    "description": "Optional coupon frequency, required for ACT/ACT ISMA."
-  },
-  {
-    "path": "#/$defs/d_cd1309ede7abd3f53244/properties/frequency/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DayCountContextState/properties/frequency/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_cd1309ede7abd3f53244/properties/frequency/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DayCountContextState/properties/frequency/anyOf/1"
   },
   {
     "path": "#/$defs/d_cebddb4a91c1c968bece",

@@ -78,6 +78,7 @@ QUOTES = {
         "pillar": {"tenor": {"count": 5, "unit": "years"}},
         "coupon_bp": 100.0,
         "upfront_pct": 0.01,
+        "upfront_basis": "clean",
         "recovery_rate": 0.4,
     }),
     "option_vol": lambda: VolQuote.option_vol("O", "AAPL", "2027-05-08", 155.0, 0.28),

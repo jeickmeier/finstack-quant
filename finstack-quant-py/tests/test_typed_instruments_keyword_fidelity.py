@@ -154,6 +154,7 @@ def test_fx_forward_builder_setters_accept_keyword_value() -> None:
         .contract_rate(value=1.10)
         .domestic_discount_curve_id(value="USD-OIS")
         .foreign_discount_curve_id(value="EUR-OIS")
+        .spot_basis(value={"type": "cash"})
         .quoted_spot(value=1.09)
         .base_calendar_id(value="target")
         .quote_calendar_id(value="nyse")
@@ -179,6 +180,8 @@ def test_fx_option_builder_setters_accept_keyword_value() -> None:
         .domestic_discount_curve_id(value="USD-OIS")
         .foreign_discount_curve_id(value="EUR-OIS")
         .vol_surface_id(value="EURUSD-VOL")
+        .spot_basis(value={"type": "cash"})
+        .delivery(value={"type": "cash_at_expiry"})
         .build()
     )
     assert opt.id == "FXOPT-KW"

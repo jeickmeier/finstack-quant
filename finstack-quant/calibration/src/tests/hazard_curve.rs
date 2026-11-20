@@ -285,6 +285,7 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
         pillar,
         coupon_bp: 100.0,
         upfront_pct: 2.0,
+        upfront_basis: crate::quotes::CdsUpfrontBasis::Clean,
         recovery_rate,
         convention,
     })
@@ -569,6 +570,7 @@ fn hazard_calibration_rejects_non_standard_upfront_running_coupon() {
         pillar: Pillar::Date(Date::from_calendar_date(2028, Month::March, 20).unwrap()),
         coupon_bp: 250.0,
         upfront_pct: 0.02,
+        upfront_basis: crate::quotes::CdsUpfrontBasis::Clean,
         recovery_rate: 0.40,
         convention: CdsConventionKey {
             currency,
@@ -624,6 +626,110 @@ fn hazard_calibration_rejects_non_standard_upfront_running_coupon() {
             | finstack_quant_core::Error::Input(_)
             | finstack_quant_core::Error::Calibration { .. }
     ));
+}
+
+#[test]
+fn hazard_calibration_upfront_reprices_to_zero_dirty_pv() {
+    let base = Date::from_calendar_date(2025, Month::April, 21).unwrap();
+    let currency = Currency::USD;
+
+    let disc = create_test_discount_curve(base);
+    let source_market = MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve");
+
+    let quotes = vec![MarketQuote::Cds(CdsQuote::CdsUpfront {
+        id: QuoteId::new("CDS-UPFRONT-100BP"),
+        entity: "UPFRONT".to_string(),
+        pillar: Pillar::Date(Date::from_calendar_date(2028, Month::March, 20).unwrap()),
+        coupon_bp: 100.0,
+        upfront_pct: 0.02,
+        upfront_basis: crate::quotes::CdsUpfrontBasis::Clean,
+        recovery_rate: 0.40,
+        convention: CdsConventionKey {
+            currency,
+            doc_clause: CdsDocClause::IsdaNa,
+        },
+    })];
+
+    let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
+    cal_utils::extend_market_data(&mut market_data, &quotes);
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
+    quote_sets.insert("credit".to_string(), cal_utils::quote_set_ids(&quotes));
+
+    let plan = CalibrationPlan {
+        id: "plan".to_string(),
+        description: None,
+        quote_sets: quote_sets.into_iter().collect(),
+        settings: Default::default(),
+        steps: vec![CalibrationStep {
+            id: "haz".to_string(),
+            quote_set: "credit".to_string(),
+            params: StepParams::Hazard(HazardCurveParams {
+                curve_id: "UPFRONT-SENIOR".into(),
+                entity: "UPFRONT".to_string(),
+                seniority: Seniority::Senior,
+                currency,
+                base_date: base,
+                discount_curve_id: "TEST-DISC".into(),
+                recovery_rate: 0.40,
+                notional: fixtures::STANDARD_NOTIONAL,
+                method: CalibrationMethod::Bootstrap,
+
+                doc_clause: None,
+                cds_valuation_convention: None,
+            }),
+        }],
+    };
+
+    let envelope = CalibrationEnvelope {
+        schema_url: None,
+
+        schema: crate::api::schema::CalibrationSchema::CURRENT,
+        plan,
+        market_data,
+        prior_market: prior,
+    };
+
+    use finstack_quant_core::market_data::traits::Discounting;
+    use finstack_quant_valuations_core::metrics::MetricId;
+
+    let calibrated = engine::calibrate(&envelope).expect("upfront hazard calibration");
+    let market =
+        MarketContext::try_from(calibrated.result.final_market).expect("calibrated market");
+    let build = BuildCtx::new(
+        base,
+        fixtures::STANDARD_NOTIONAL,
+        [
+            ("discount".to_string(), "TEST-DISC".to_string()),
+            ("credit".to_string(), "UPFRONT-SENIOR".to_string()),
+        ]
+        .into_iter()
+        .collect(),
+    );
+    let MarketQuote::Cds(quote) = &quotes[0] else {
+        panic!("expected CDS quote");
+    };
+    let cds = build_cds_instrument(quote, &build).expect("book the upfront cash");
+    let legs = cds
+        .price_with_metrics(
+            &market,
+            base,
+            &[MetricId::ProtectionLegPv, MetricId::PremiumLegPv],
+            Default::default(),
+        )
+        .expect("credit legs");
+    let (payment, cash) = cds.upfront.expect("booked upfront cash");
+    let settlement_df = market
+        .get_discount("TEST-DISC")
+        .unwrap()
+        .df_between_dates(base, payment)
+        .unwrap();
+    assert!(payment > base);
+    let dirty_pv = legs.measures["protection_leg_pv"]
+        - legs.measures["premium_leg_pv"]
+        - settlement_df * cash.amount();
+    assert!(dirty_pv.abs() < 1.0e-4, "dirty PV = {dirty_pv:.8}");
 }
 
 #[test]

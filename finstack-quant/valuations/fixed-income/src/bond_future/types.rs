@@ -1178,6 +1178,9 @@ mod tests {
 
 // Implement Instrument trait for BondFuture
 impl finstack_quant_valuations_core::instruments::Instrument for BondFuture {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::BondFuture,
         crate::FIXED_INCOME

@@ -274,19 +274,19 @@ pub fn compute_quotes(
             })?;
     }
 
-    // Read back the metrics we care about. A metric with no finite value, such
-    // as `ytw` on a workout at the quote date, is `None`: JSON has no infinity.
-    let finite = |id: &MetricId| ctx.computed.get(id).copied().filter(|v| v.is_finite());
-    let ytm = finite(&MetricId::Ytm);
-    let ytw = finite(&MetricId::Ytw);
-    let z_spread = finite(&MetricId::ZSpread);
-    let discount_margin = finite(&MetricId::DiscountMargin);
-    let oas = finite(&MetricId::Oas);
-    let asw_par = finite(&MetricId::ASWPar);
-    let asw_market = finite(&MetricId::ASWMarket);
-    let i_spread = finite(&MetricId::ISpread);
-    let japanese_simple_yield = finite(&MetricId::JapaneseSimpleYield);
-    let moosmuller_ytm = finite(&MetricId::MoosmullerYtm);
+    // The registry validates calculated measures. Optional quote fields are
+    // absent when their calculation does not apply to this bond.
+    let measure = |id: &MetricId| ctx.computed.get(id).copied();
+    let ytm = measure(&MetricId::Ytm);
+    let ytw = measure(&MetricId::Ytw);
+    let z_spread = measure(&MetricId::ZSpread);
+    let discount_margin = measure(&MetricId::DiscountMargin);
+    let oas = measure(&MetricId::Oas);
+    let asw_par = measure(&MetricId::ASWPar);
+    let asw_market = measure(&MetricId::ASWMarket);
+    let i_spread = measure(&MetricId::ISpread);
+    let japanese_simple_yield = measure(&MetricId::JapaneseSimpleYield);
+    let moosmuller_ytm = measure(&MetricId::MoosmullerYtm);
 
     Ok(BondQuoteSet {
         clean_price_currency,

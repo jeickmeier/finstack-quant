@@ -1413,6 +1413,21 @@
         }
       ]
     },
+    "CdsUpfrontBasis": {
+      "description": "Representation of a single-name CDS upfront quote.",
+      "oneOf": [
+        {
+          "const": "clean",
+          "description": "Clean fraction of notional, before deducting the accrued premium rebate.",
+          "type": "string"
+        },
+        {
+          "const": "actual_cash",
+          "description": "Actual signed cash as a fraction of notional, including the rebate.",
+          "type": "string"
+        }
+      ]
+    },
     "CdsValuationConvention": {
       "description": "Valuation presentation and pricing policy for CDS marks.\n\nEach variant bundles a coherent set of choices (premium-leg accrual schedule,\nAct/360 accrual day counting, accrual-on-default bias, clean/dirty NPV,\npar-spread denominator). Mixing those choices via separate boolean\noverrides is intentionally not supported — the variants here are the only\nconventions traded in practice.",
       "oneOf": [
@@ -2716,8 +2731,12 @@
                   "const": "cds_upfront",
                   "type": "string"
                 },
+                "upfront_basis": {
+                  "$ref": "#/$defs/CdsUpfrontBasis",
+                  "description": "Whether the fraction is a clean quote or actual buyer cash at settlement."
+                },
                 "upfront_pct": {
-                  "description": "Upfront payment percentage of notional (e.g. 0.01 for 1%).",
+                  "description": "Signed upfront fraction of notional (0.01 is 1%).",
                   "format": "double",
                   "type": "number"
                 }
@@ -2730,6 +2749,7 @@
                 "pillar",
                 "coupon_bp",
                 "upfront_pct",
+                "upfront_basis",
                 "recovery_rate"
               ],
               "type": "object"

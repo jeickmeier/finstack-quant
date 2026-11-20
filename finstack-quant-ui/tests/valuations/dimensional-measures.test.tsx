@@ -184,19 +184,17 @@ it("selects a native three-axis slice and retains one-axis qualified measures", 
     "surface::front::A::2y": 6,
     "surface::back::A::1y": 7,
     "surface::back::A::2y": 8,
-    "constituent_delta::AAPL": 12,
+    "delta::AAPL": 12,
   };
   const metadata = [
     ...Object.keys(measures)
       .filter((key) => key.startsWith("surface::"))
       .map((key) => descriptor(key, "surface", key.split("::").slice(1))),
-    descriptor("constituent_delta::AAPL", "constituent_delta", ["AAPL"]),
+    descriptor("delta::AAPL", "delta", ["AAPL"]),
   ];
   render(<DimensionalMeasures result={{ measures }} metadata={metadata} />);
   expect(dimensionalMeasureCount({ result: { measures }, metadata })).toBe(5);
-  expect(
-    screen.getByRole("heading", { name: "Constituent delta" }),
-  ).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Delta" })).toBeTruthy();
   const slice = screen.getByRole("combobox", {
     name: "First returned coordinate",
   });

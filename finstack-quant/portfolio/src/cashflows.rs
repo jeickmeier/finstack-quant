@@ -558,6 +558,10 @@ mod tests {
     }
 
     impl InternalInstrument for UnsupportedInstrument {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            false
+        }
+
         /// Test mock: reads no market data.
         fn market_dependencies(
             &self,

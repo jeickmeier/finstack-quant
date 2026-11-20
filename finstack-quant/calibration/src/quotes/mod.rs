@@ -54,7 +54,7 @@ mod vol;
 /// Cross-currency swap quotes.
 mod xccy;
 
-pub use cds::CdsQuote;
+pub use cds::{CdsQuote, CdsUpfrontBasis};
 pub use cds_tranche::CdsTrancheQuote;
 pub use ids::{Pillar, QuoteId};
 pub use inflation::InflationQuote;

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use super::{
     ids::MetricId,
-    registry::{MetricRegistry, MetricRegistryError},
+    registry::{MetricAggregation, MetricRegistry, MetricRegistryError},
     traits::{MetricCalculator, MetricContext},
 };
 use crate::metrics::risk::{GenericExpectedShortfall, GenericHVar};
@@ -94,7 +94,12 @@ impl MetricCalculator for PricerPublishedMetric {
 pub fn register_universal_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), MetricRegistryError> {
-    registry.register_metric(MetricId::Theta, Arc::new(GenericThetaAny), &[])?;
+    registry.register_aggregate_metric(
+        MetricId::Theta,
+        Arc::new(GenericThetaAny),
+        &[],
+        MetricAggregation::ThetaPeriodMoney,
+    )?;
     registry.register_metric(
         MetricId::ThetaCarry,
         Arc::new(ComputedMetricLookup::new(

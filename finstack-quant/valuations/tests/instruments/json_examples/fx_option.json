@@ -4,6 +4,9 @@
       "attributes": {},
       "base_currency": "EUR",
       "day_count": "act_365f",
+      "delivery": {
+        "type": "cash_at_expiry"
+      },
       "delta_convention": {
         "kind": "forward",
         "premium_currency": "USD",
@@ -19,6 +22,9 @@
       },
       "option_type": "call",
       "quote_currency": "USD",
+      "spot_basis": {
+        "type": "cash"
+      },
       "strike": 1.12,
       "vol_surface_id": "EURUSD-VOL"
     },

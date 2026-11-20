@@ -133,7 +133,7 @@
         },
         {
           "date": "2034-01-16",
-          "i_spread": 0.00333392217282,
+          "i_spread": 0.00334585960759,
           "is_worst": false,
           "kind": "maturity",
           "make_whole": false,
@@ -142,7 +142,7 @@
             "currency": "USD"
           },
           "redemption_price_pct": 100.0,
-          "yield_rate": 0.0393402526508
+          "yield_rate": 0.0393521900856
         }
       ]
     }

@@ -69,11 +69,21 @@ impl MetricCalculator for ModifiedDurationCalculator {
             ytm
         };
 
-        let m = bond.cashflow_spec.frequency().payments_per_year()?.max(1.0);
-        let denom = 1.0 + denominator_yield / m;
-        if denom.abs() < 1e-12 {
+        let frequency = bond.cashflow_spec.frequency().payments_per_year()?.max(1.0);
+        let compounding = super::yield_risk_basis(context, ytm)?.compounding;
+        let denom = if matches!(
+            compounding,
+            crate::bond::pricing::quote_conversions::YieldCompounding::Rate(
+                finstack_quant_core::math::Compounding::Simple,
+            )
+        ) {
+            1.0 + denominator_yield * d_mac
+        } else {
+            1.0 + denominator_yield / frequency
+        };
+        if denom <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(
-                "Modified duration undefined when 1 + ytm/m is near zero".to_string(),
+                "Modified duration requires a positive yield denominator".to_string(),
             ));
         }
         Ok(d_mac / denom)

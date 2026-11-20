@@ -52,15 +52,23 @@ super::typed_macros::instrument_greek_methods!(
 #[pymethods]
 impl PyFxBarrierOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.greeks")]
-    #[pyo3(signature = (market, as_of, model="default"))]
+    #[pyo3(signature = (market, as_of, model="default", extras=None))]
     fn greeks<'py>(
         &self,
         py: Python<'py>,
         market: &Bound<'py, PyAny>,
         as_of: &Bound<'py, PyAny>,
         model: &str,
+        extras: Option<&Bound<'py, PyAny>>,
     ) -> PyResult<Bound<'py, PyDict>> {
-        super::pricing::typed_option_greeks(py, Box::new(self.inner.clone()), market, as_of, model)
+        super::pricing::typed_option_greeks(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            model,
+            super::pricing::price_extras_from_py(py, extras)?,
+        )
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.to_builder")]

@@ -65,7 +65,7 @@ shared `mise.toml`-derived key. The other jobs then run in parallel, and each
 fails the run on its own:
 
 - **Supply-chain Security** (`all-audit`) gates nothing else.
-- **Lint** (`pre-commit-run`) runs every hook, as locally.
+- **Lint** (`pre-commit-run`) runs the check-stage hooks, including formatting checks.
 - **Generated artifacts** (`gen-check`) builds the `gen_*` binaries and the
   `generate_contracts` example rather than the test profile.
 - **Test Rust** (`rust-test`) runs under `NEXTEST_PROFILE=ci`. **Test Rust**,

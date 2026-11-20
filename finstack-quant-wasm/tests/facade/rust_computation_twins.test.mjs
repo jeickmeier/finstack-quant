@@ -361,6 +361,8 @@ test('FxOption.european and impliedVol recover the surface vol', () => {
     notional: { amount: '1000000', currency: 'EUR' },
     vol_surface_id: 'EURUSD-VOL',
     option_type: 'call',
+    spot_basis: { type: 'cash' },
+    delivery: { type: 'cash_at_expiry' },
     delta_convention: { kind: 'spot', premium_currency: 'USD', venue: 'desk' },
   };
   const option = FxOption.european(optionParams);
@@ -372,6 +374,8 @@ test('FxOption.european and impliedVol recover the surface vol', () => {
     () =>
       FxOption.european({
         ...optionParams,
+        spot_basis: { type: 'cash' },
+        delivery: { type: 'cash_at_expiry' },
         delta_convention: { kind: 'sideways', premium_currency: 'USD', venue: 'desk' },
       }),
     (e) => e.kind === 'validation'

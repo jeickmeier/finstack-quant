@@ -1,7 +1,7 @@
 """`mise run slice-gate` selects stages of `mise run all` from a diff.
 
-The selector must never skip a stage a change can break, and its stage table
-must stay equal to `all`, so the two gates cannot drift apart.
+The selector must never skip a stage a change can break.
+`test_gate_parity.py` checks that its stage table stays equal to `all`.
 """
 
 from __future__ import annotations
@@ -17,21 +17,6 @@ ROOT = Path(__file__).resolve().parents[2]
 TASKS = tomllib.loads((ROOT / "mise.toml").read_text(encoding="utf-8"))["tasks"]
 ALL = tuple(slice_gate.STAGES)
 RUST_LIBRARY = ["lint", "rust-test", "gen-check", "python-test", "wasm-test", "ui-check"]
-
-
-def _all_stage_tasks() -> set[str]:
-    """Task names `mise run all` runs as `{ task = ... }` / `{ tasks = [...] }` steps."""
-    names: set[str] = set()
-    for step in TASKS["all"]["run"]:
-        if isinstance(step, dict):
-            names |= {step["task"]} if "task" in step else set(step["tasks"])
-    return names
-
-
-def test_stages_are_exactly_the_stages_of_all() -> None:
-    """Every check stage of `all` is a slice-gate stage, and nothing else is."""
-    # rust-build-tests only compiles what rust-test and gen-check then run.
-    assert set(slice_gate.STAGES.values()) == _all_stage_tasks() - {"rust-build-tests"}
 
 
 def test_every_stage_task_exists() -> None:

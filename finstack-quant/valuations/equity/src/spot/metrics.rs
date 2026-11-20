@@ -95,7 +95,7 @@ pub(crate) fn register_equity_metrics(
             (EquityShares, SharesCalculator),
             (EquityDividendYield, DividendYieldCalculator),
             (EquityForwardPrice, ForwardPricePerShareCalculator),
-            (Delta, DeltaCalculator),
+            (Delta, DeltaCalculator, FactorQuantity),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
         ]

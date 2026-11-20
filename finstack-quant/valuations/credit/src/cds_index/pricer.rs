@@ -115,7 +115,9 @@ impl CdsIndex {
                 cds.notional.currency(),
             )
         })?;
-        if let Some((date, amount)) = index.upfront.filter(|(date, _)| *date >= as_of) {
+        if let Some((date, amount)) = index.upfront.filter(|(date, _)| {
+            crate::cds::cash_is_eligible(*date, as_of, index.include_valuation_date_cashflows)
+        }) {
             let df = curves
                 .get_discount(index.premium_leg.discount_curve_id.as_str())?
                 .df_between_dates(as_of, date)?;
@@ -315,7 +317,9 @@ impl CdsIndex {
         };
         // The synthetic CDS carries no upfront, so the index upfront is added
         // and signed only here, with the same side convention as `npv`.
-        if let Some((dt, amount)) = index.upfront.filter(|(dt, _)| *dt >= as_of) {
+        if let Some((dt, amount)) = index.upfront.filter(|(dt, _)| {
+            crate::cds::cash_is_eligible(*dt, as_of, index.include_valuation_date_cashflows)
+        }) {
             schedule.push_flow(
                 CashFlowParams::new(
                     dt,
@@ -395,16 +399,22 @@ fn visit_positions(
     mut visit: impl FnMut(&CdsPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve) -> Result<()>,
 ) -> Result<()> {
     index.validate()?;
-    // A matured index has no live positions; only a pending upfront
-    // (applied in `npv`) can remain.
-    if as_of >= index.premium_leg.end {
-        return Ok(());
-    }
     let pricer = CdsPricer::new();
     // `to_synthetic_cds()` already applies `index_factor` to notional and
     // leaves the synthetic CDS without an upfront: the index applies its
     // own upfront once at the aggregate level in `npv`.
     let mut cds = index.to_synthetic_cds()?;
+    if as_of >= index.premium_leg.end
+        && !pricer.coupon_periods(&cds, as_of)?.iter().any(|period| {
+            crate::cds::cash_is_eligible(
+                period.payment_date,
+                as_of,
+                index.include_valuation_date_cashflows,
+            )
+        })
+    {
+        return Ok(());
+    }
     let disc = curves.get_discount(&cds.premium_leg.discount_curve_id)?;
     match index.pricing {
         IndexPricing::SingleCurve => {
@@ -613,7 +623,9 @@ fn project_cds_flows(
     let protection_sign = -premium_sign;
     let loss_given_default = 1.0 - cds.protection_leg.recovery_rate;
 
-    schedule.retain_flows(|flow| flow.get_date() >= as_of);
+    schedule.retain_flows(|flow| {
+        crate::cds::cash_is_eligible(flow.get_date(), as_of, cds.include_valuation_date_cashflows)
+    });
     let mut prev_survival = if as_of <= survival.base_date() {
         1.0
     } else {
@@ -792,6 +804,7 @@ mod tests {
 
         // Paid on the valuation date, so the discount factor is exactly 1.
         let mut pay = CdsIndex::example().expect("example");
+        pay.include_valuation_date_cashflows = true;
         pay.upfront = Some((as_of, upfront));
         let pay_base = CdsIndex::example()
             .expect("example")
@@ -802,6 +815,7 @@ mod tests {
         let mut receive = CdsIndex::example().expect("example");
         receive.side = finstack_quant_valuations_core::instruments::PayReceive::Receive;
         let mut receive_with_upfront = receive.clone();
+        receive_with_upfront.include_valuation_date_cashflows = true;
         receive_with_upfront.upfront = Some((as_of, upfront));
         let receive_base = receive.npv(&market, as_of).expect("base receive npv");
         let receive_total = receive_with_upfront

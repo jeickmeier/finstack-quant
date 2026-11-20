@@ -252,46 +252,23 @@ impl MetricCalculator for BondCs01Calculator {
     }
 }
 
-/// Bond bucketed CS01 with z-spread fallback.
-///
-/// Delegates to `GenericBucketedCs01` when the active model consumes a credit
-/// curve; otherwise returns the parallel OAS or z-spread CS01 keyed by
-/// instrument ID.
+/// Bucketed sensitivity to exact par-spread quotes on the active credit model.
 pub(crate) struct BondBucketedCs01Calculator;
 
 impl MetricCalculator for BondBucketedCs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let uses_credit = {
-            let bond: &Bond = context.instrument_as()?;
-            active_model_consumes_credit(context, bond)
-        };
-
-        if uses_credit {
-            require_credit_curve_replay(context, "quote-space bucketed CS01")?;
-            return with_bond_risk_view(context, |ctx| {
-                finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericBucketedCs01
-                    .calculate(ctx)
+        let bond: &Bond = context.instrument_as()?;
+        if !active_model_consumes_credit(context, bond) {
+            return Err(finstack_quant_core::Error::MetricNotApplicable {
+                metric_id: MetricId::BucketedCs01.as_str().to_owned(),
+                instrument_type: bond.key().to_string(),
             });
         }
-
-        let cs01 = context.computed_metric(&MetricId::Cs01)?;
-
-        Ok(cs01)
-    }
-
-    fn dependencies(&self) -> &[MetricId] {
-        &[MetricId::Cs01]
-    }
-
-    fn dynamic_dependencies<'a>(&'a self, context: &MetricContext) -> Cow<'a, [MetricId]> {
-        let Ok(bond) = context.instrument_as::<Bond>() else {
-            return Cow::Borrowed(self.dependencies());
-        };
-        if active_model_consumes_credit(context, bond) {
-            Cow::Borrowed(&[])
-        } else {
-            Cow::Borrowed(self.dependencies())
-        }
+        require_credit_curve_replay(context, "quote-space bucketed CS01")?;
+        with_bond_risk_view(context, |ctx| {
+            finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericBucketedCs01
+                .calculate(ctx)
+        })
     }
 }
 
@@ -640,5 +617,31 @@ mod tests {
             );
             assert_eq!(pricer_calls.load(Ordering::SeqCst), 1, "{operation}");
         }
+    }
+    #[test]
+    fn uncalibrated_z_spread_is_not_a_bucketed_cs01() {
+        let bond = Bond::example().expect("bond example");
+        let as_of = bond.issue_date;
+        let curve = finstack_quant_core::market_data::term_structures::DiscountCurve::builder(
+            bond.discount_curve_id.clone(),
+        )
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (10.0, 0.64)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+        .build()
+        .unwrap();
+        let market = MarketContext::new().try_insert(curve).unwrap();
+        let error = bond
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::BucketedCs01],
+                PricingOptions::default(),
+            )
+            .expect_err("a single Z-spread does not form a bucketed measure")
+            .to_string();
+        assert!(error.contains("bucketed_cs01"), "{error}");
     }
 }

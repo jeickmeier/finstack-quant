@@ -83,6 +83,7 @@ impl FxBarrierOptionMcPricer {
             sigma,
             t,
             df_domestic: discount_factor,
+            ..
         } = match barrier_state(inst, curves, as_of)? {
             BarrierState::Fixed(per_unit) => {
                 return Ok(FxBarrierPricingOutcome::deterministic(notional_value(
@@ -325,6 +326,8 @@ fn input_request<'a>(
         base_currency: inst.base_currency,
         quote_currency: inst.quote_currency,
         expiry: inst.expiry,
+        delivery: inst.expiry,
+        spot_basis: crate::shared::FxSpotBasis::Cash,
         day_count: inst.day_count,
         domestic_discount_curve_id: &inst.domestic_discount_curve_id,
         foreign_discount_curve_id: &inst.foreign_discount_curve_id,

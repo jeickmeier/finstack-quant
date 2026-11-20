@@ -361,6 +361,9 @@ impl CdsTranche {
 // Attributable is provided via blanket impl for all Instrument types
 
 impl Instrument for CdsTranche {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CdsTranche,
         crate::CREDIT

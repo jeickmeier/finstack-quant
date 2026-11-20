@@ -106,6 +106,7 @@ pub mod ndf;
 /// Quanto option module - Cross-currency quanto options.
 pub mod quanto_option;
 pub(crate) mod shared;
+pub use shared::FxSpotBasis;
 
 mod family;
 pub use family::FX;

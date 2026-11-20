@@ -389,6 +389,9 @@ impl CommoditySwap {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for CommoditySwap {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CommoditySwap,
         crate::EXOTICS

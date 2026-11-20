@@ -15,6 +15,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period;
 use rust_decimal::prelude::ToPrimitive;
 
+/// Actual payment date, yield time in years and native-currency payment.
+pub(crate) type TimedCashflows = Vec<(Date, f64, Money)>;
+
 /// Discount factor from yield.
 ///
 /// Computes the discount factor for a given yield, time, and compounding convention.
@@ -126,7 +129,7 @@ pub(crate) fn flow_times(
     frequency: finstack_quant_core::dates::Tenor,
     flows: &[(Date, Money)],
     as_of: Date,
-) -> finstack_quant_core::Result<Vec<(Date, f64, Money)>> {
+) -> finstack_quant_core::Result<TimedCashflows> {
     let ref_period = icma_reference_period(
         day_count,
         frequency,
@@ -173,17 +176,195 @@ pub(crate) fn bond_flow_times(
     bond: &Bond,
     flows: &[(Date, Money)],
     as_of: Date,
-) -> finstack_quant_core::Result<Vec<(Date, f64, Money)>> {
-    if bond.cashflow_spec.day_count() != finstack_quant_core::dates::DayCount::Act365L {
-        return flow_times(
-            bond.cashflow_spec.day_count(),
-            bond.cashflow_spec.frequency(),
-            flows,
-            as_of,
-        );
+) -> finstack_quant_core::Result<TimedCashflows> {
+    use finstack_quant_core::dates::DayCount;
+
+    let day_count = bond.cashflow_spec.day_count();
+    let frequency = bond.cashflow_spec.frequency();
+    match day_count {
+        DayCount::Act365L => {
+            let coupons = crate::bond::pricing::time_basis::bond_coupon_dates(bond)?;
+            act365l_flow_times(&coupons, flows, as_of)
+        }
+        DayCount::ActActIsma => icma_bond_flow_times(bond, flows, as_of),
+        _ => flow_times(day_count, frequency, flows, as_of),
     }
-    let coupons = crate::bond::pricing::time_basis::bond_coupon_dates(bond)?;
-    act365l_flow_times(&coupons, flows, as_of)
+}
+
+fn icma_bond_flow_times(
+    bond: &Bond,
+    flows: &[(Date, Money)],
+    as_of: Date,
+) -> finstack_quant_core::Result<TimedCashflows> {
+    use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods, period_accrual};
+
+    if bond.custom_cashflows.is_some() {
+        return Err(finstack_quant_core::Error::Validation(
+            "ICMA quoted yield requires a qualified contractual coupon grid".into(),
+        ));
+    }
+    let mut params = BuildPeriodsParams::from_schedule(
+        bond.cashflow_spec.schedule(),
+        bond.issue_date,
+        bond.maturity,
+        None,
+    );
+    let mut periods = build_periods(params)?;
+    params.adjust_accrual_dates = false;
+    for period in &mut periods {
+        period.accrual_start = period.unadjusted_start;
+        period.accrual_end = period.unadjusted_end;
+    }
+    flows
+        .iter()
+        .map(|&(date, amount)| {
+            if date <= as_of {
+                return Ok((date, 0.0, amount));
+            }
+            let mut matching_periods = periods.iter().filter(|period| period.payment_date == date);
+            let contractual_date = matching_periods
+                .next()
+                .map_or(date, |period| period.unadjusted_end);
+            if matching_periods.any(|period| period.unadjusted_end != contractual_date)
+                || contractual_date <= as_of
+                || contractual_date > bond.maturity
+                || as_of < bond.issue_date
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "ICMA quoted yield cannot resolve a contractual time for cash on {date}"
+                )));
+            }
+            let mut years = NeumaierAccumulator::new();
+            for period in &periods {
+                let start = as_of.max(period.unadjusted_start);
+                let end = contractual_date.min(period.unadjusted_end);
+                if start < end {
+                    years.add(period_accrual(period, start, end, &params)?)?;
+                }
+            }
+            Ok((date, years.get_total()?, amount))
+        })
+        .collect()
+}
+
+/// Prepare Street yield cash on the regular fixed-coupon bullet grid.
+///
+/// # Arguments
+///
+/// * `bond` - Bond supplying the contractual coupon intervals and payment dates.
+/// * `flows` - Entitled native-currency cash by actual payment date.
+/// * `as_of` - Buyer settlement date used for the broken coupon fraction.
+pub(crate) fn street_flow_times(
+    bond: &Bond,
+    flows: &[(Date, Money)],
+    as_of: Date,
+) -> finstack_quant_core::Result<(TimedCashflows, YieldCompounding)> {
+    use finstack_quant_cashflows::builder::{
+        BuildPeriodsParams, CouponType, RollRule, build_periods, period_accrual,
+    };
+    use finstack_quant_core::dates::{DateExt, DayCount};
+
+    let other_profile = || {
+        Ok((
+            bond_flow_times(bond, flows, as_of)?,
+            YieldCompounding::Street,
+        ))
+    };
+    let crate::bond::CashflowSpec::Fixed(spec) = &bond.cashflow_spec else {
+        return other_profile();
+    };
+    let schedule = &spec.schedule;
+    if spec.coupon_type != CouponType::Cash
+        || !matches!(
+            schedule.day_count,
+            DayCount::Thirty360 | DayCount::ActActIsma
+        )
+        || !matches!(schedule.roll_rule, RollRule::None)
+        || bond.custom_cashflows.is_some()
+        || as_of < bond.issue_date
+        || bond.maturity <= as_of
+    {
+        return other_profile();
+    }
+    let Some(months) = schedule
+        .frequency
+        .months()
+        .and_then(|months| i32::try_from(months).ok())
+    else {
+        return other_profile();
+    };
+    if months == 0 || 12 % months != 0 {
+        return other_profile();
+    }
+
+    let mut params =
+        BuildPeriodsParams::from_schedule(schedule, bond.issue_date, bond.maturity, None);
+    let periods = build_periods(params)?;
+    if bond.has_exercise_rights()
+        && !periods
+            .last()
+            .is_some_and(|terminal| flows.iter().any(|(date, _)| *date == terminal.payment_date))
+    {
+        // An exercise path has a different contractual endpoint.
+        return other_profile();
+    }
+    for period in &periods {
+        let regular_start = period.unadjusted_end.add_months(-months)?;
+        let regular_start = if schedule.end_of_month {
+            regular_start.end_of_month()
+        } else {
+            regular_start
+        };
+        if period.unadjusted_start != regular_start {
+            return other_profile();
+        }
+    }
+    let first = periods.partition_point(|period| period.unadjusted_end <= as_of);
+    let mut broken = *periods.get(first).ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "Street yield requires a remaining contractual coupon interval".into(),
+        )
+    })?;
+    params.adjust_accrual_dates = false;
+    broken.accrual_start = broken.unadjusted_start;
+    broken.accrual_end = broken.unadjusted_end;
+    let full = period_accrual(&broken, broken.accrual_start, broken.accrual_end, &params)?;
+    let remaining = period_accrual(&broken, as_of, broken.accrual_end, &params)?;
+    if !(full.is_finite() && remaining.is_finite() && remaining > 0.0 && remaining <= full) {
+        return Err(finstack_quant_core::Error::Validation(
+            "Street yield requires a positive broken coupon fraction on the contractual grid"
+                .into(),
+        ));
+    }
+    let fraction = remaining / full;
+    let frequency = f64::from(12 / months);
+    let timed = flows
+        .iter()
+        .map(|&(date, amount)| {
+            if date <= as_of {
+                return Ok((date, 0.0, amount));
+            }
+            let mut slots = periods
+                .iter()
+                .enumerate()
+                .filter(|(_, period)| period.payment_date == date);
+            let slot = slots.next().map(|(slot, _)| slot);
+            match slot {
+                Some(slot) if slot >= first && slots.next().is_none() => {
+                    Ok((date, (fraction + (slot - first) as f64) / frequency, amount))
+                }
+                _ => Err(finstack_quant_core::Error::Validation(format!(
+                    "Street yield cannot resolve the contractual coupon slot for cash on {date}"
+                ))),
+            }
+        })
+        .collect::<finstack_quant_core::Result<Vec<_>>>()?;
+    let compounding = if first + 1 == periods.len() {
+        YieldCompounding::Rate(finstack_quant_core::math::Compounding::Simple)
+    } else {
+        YieldCompounding::Street
+    };
+    Ok((timed, compounding))
 }
 
 /// Measure ACT/365L quoted flows using explicit contractual coupon metadata.
@@ -201,7 +382,7 @@ pub(crate) fn act365l_flow_times(
     coupons: &[(Date, Date, Date)],
     flows: &[(Date, Money)],
     as_of: Date,
-) -> finstack_quant_core::Result<Vec<(Date, f64, Money)>> {
+) -> finstack_quant_core::Result<TimedCashflows> {
     use crate::bond::pricing::time_basis::act365l_year_fraction;
     let mut periods: Vec<_> = coupons
         .iter()
@@ -371,13 +552,8 @@ pub fn price_from_ytm(
     as_of: Date,
     ytm: f64,
 ) -> finstack_quant_core::Result<f64> {
-    let timed = bond_flow_times(bond, flows, as_of)?;
-    price_from_ytm_timed(
-        &timed,
-        bond.cashflow_spec.frequency(),
-        ytm,
-        YieldCompounding::Street,
-    )
+    let (timed, compounding) = street_flow_times(bond, flows, as_of)?;
+    price_from_ytm_timed(&timed, bond.cashflow_spec.frequency(), ytm, compounding)
 }
 
 /// JSDA inputs of a Japanese simple yield (単利): annual coupon rate and
@@ -1128,6 +1304,75 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::types::Rate;
     use time::macros::date;
+
+    #[test]
+    fn icma_ytm_is_invariant_to_weekend_payment_roll() {
+        use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind};
+        let as_of = date!(2025 - 04 - 01);
+        let mut rolled = Bond::fixed(
+            "WEEKEND",
+            Money::from((100_i64, Currency::USD)),
+            Rate::from_decimal(0.05).unwrap(),
+            date!(2024 - 12 - 15),
+            date!(2026 - 12 - 15),
+            StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .unwrap();
+        if let crate::bond::CashflowSpec::Fixed(spec) = &mut rolled.cashflow_spec {
+            spec.schedule.day_count = DayCount::ActActIsma;
+        }
+        let mut unadjusted = rolled.clone();
+        if let crate::bond::CashflowSpec::Fixed(spec) = &mut unadjusted.cashflow_spec {
+            spec.schedule.business_day_convention = BusinessDayConvention::Unadjusted;
+        }
+        let market = MarketContext::new();
+        let rolled_flows = rolled.pricing_dated_cashflows(&market, as_of).unwrap();
+        let unadjusted_flows = unadjusted.pricing_dated_cashflows(&market, as_of).unwrap();
+        assert_ne!(rolled_flows[0].0, unadjusted_flows[0].0);
+        let price = price_from_ytm(&unadjusted, &unadjusted_flows, as_of, 0.04).unwrap();
+        let rolled_yield = solve_bond_ytm(
+            &rolled,
+            &rolled_flows,
+            as_of,
+            Money::new(price, Currency::USD).unwrap(),
+            YtmPricingSpec {
+                day_count: DayCount::ActActIsma,
+                notional: rolled.notional,
+                coupon_rate: 0.05,
+                compounding: YieldCompounding::Street,
+                frequency: rolled.cashflow_spec.frequency(),
+            },
+        )
+        .unwrap();
+        assert!((rolled_yield - 0.04).abs() < 1e-10, "{rolled_yield}");
+    }
+
+    #[test]
+    fn street_yield_uses_simple_discounting_in_the_final_contractual_period() {
+        let as_of = date!(2025 - 11 - 15);
+        let bond = Bond::fixed(
+            "STREET-FINAL",
+            Money::from((100_i64, Currency::USD)),
+            Rate::from_decimal(0.05).unwrap(),
+            date!(2024 - 01 - 15),
+            date!(2026 - 01 - 15),
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .unwrap();
+        let flows = bond
+            .pricing_dated_cashflows(&MarketContext::new(), as_of)
+            .unwrap();
+        let terminal = flows
+            .iter()
+            .filter(|&&(date, _)| date > as_of)
+            .map(|(_, amount)| amount.amount())
+            .sum::<f64>();
+        let expected = terminal / (1.0 + 0.12 * 60.0 / 360.0);
+        let actual = price_from_ytm(&bond, &flows, as_of, 0.12).unwrap();
+        assert!((actual - expected).abs() < 1e-10, "{actual} != {expected}");
+    }
 
     #[test]
     fn time_based_moosmuller_counts_whole_periods_after_the_first() {

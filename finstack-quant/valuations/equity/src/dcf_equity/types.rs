@@ -832,6 +832,9 @@ impl DiscountedCashFlow {
 }
 
 impl Instrument for DiscountedCashFlow {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     impl_instrument_base!(InstrumentType::Dcf, crate::EQUITY);
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {

@@ -1,72 +1,31 @@
-//! CDS-Option-specific DV01 calculator.
-//!
-//! CDS-option IR DV01 is a swap-curve quote sensitivity: when the discount
-//! curve stores its swap-curve calibration quotes, bump those quotes, rebuild
-//! the curve, and reprice (Bloomberg CDSO convention). When the curve carries
-//! no calibration metadata (e.g. a directly-specified discount curve), fall
-//! back to a parallel bump of the discount factors — identical to the sibling
-//! [`CdsDv01Calculator`](crate::cds::metrics)
-//! so CDS and CDS-option IR DV01 share a single unit and sign convention and
-//! can be aggregated across a portfolio regardless of how the curve was built.
+//! CDS option discount risk with replay of calibrated underlying hazards.
 
-use crate::cds::metrics::dv01::discount_bumped_market;
+use crate::cds::metrics::dv01::{
+    DiscountShock, HazardReplay, calculate_credit_dv01, rate_bumped_market_with_hazard_replay,
+};
 use crate::cds_option::CdsOption;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
-use finstack_quant_valuations_core::metrics::sensitivities::cs01::sensitivity_central_diff;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
+use std::sync::Arc;
 
-const MIN_BUMP_BP: f64 = 1e-10;
-
-/// CDS option DV01 calculator: swap-curve quote bump when calibration metadata
-/// is present, parallel discount-factor bump otherwise (Bloomberg CDSO
-/// convention, hazard curve held fixed).
-pub(crate) struct CdsOptionDv01Calculator;
-
-impl CdsOptionDv01Calculator {
-    fn price_at_rate_bump(
-        option: &CdsOption,
-        context: &MetricContext,
-        bump_bp: f64,
-    ) -> Result<f64> {
-        // Prefer the market-standard swap-quote bump when the curve records its
-        // calibration; otherwise bump the discount factors directly so a
-        // directly-specified curve still yields a well-defined IR DV01 (matches
-        // `CdsDv01Calculator`).
-        let bumped_market = discount_bumped_market(context, &option.discount_curve_id, bump_bp)?;
-        context.reprice_raw(&bumped_market, context.as_of)
-    }
-}
+pub(crate) struct CdsOptionDv01Calculator(pub(crate) bool);
 
 impl MetricCalculator for CdsOptionDv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let option: &CdsOption = context.instrument_as()?;
-        let defaults = sens_config::resolve(context)?;
-        let bump_bp = defaults.rate_bump_bp;
-        if bump_bp.abs() <= MIN_BUMP_BP {
-            return Ok(0.0);
-        }
-
-        // CDS-option IR DV01 is a swap-curve quote sensitivity with the
-        // hazard curve held fixed. To allow portfolio aggregation against the
-        // CDS IR DV01, this MUST use the identical unit and sign convention:
-        // the half-width central-difference slope `(pv_up - pv_down) /
-        // (2 × bump_bp)`, i.e. PV change per +1bp parallel rate move, with no
-        // bond-convention sign flip. (The legacy `-(pv_up - pv_down)/bump_bp`
-        // form was both 2× scaled and sign-flipped relative to CDS DV01.)
-        let pv_up = Self::price_at_rate_bump(option, context, bump_bp)?;
-        let pv_down = Self::price_at_rate_bump(option, context, -bump_bp)?;
-
-        Ok(sensitivity_central_diff(pv_up, pv_down, bump_bp))
+        let option = context.instrument_as::<CdsOption>()?;
+        let discount_id = option.discount_curve_id.clone();
+        let hazard = context.curves.get_hazard(&option.credit_curve_id)?;
+        let reprice = |context: &MetricContext, shock: DiscountShock| -> Result<f64> {
+            let replay = HazardReplay {
+                hazard: Arc::clone(&hazard),
+                doc_clause: None,
+                cds_valuation_convention: None,
+                deal_quote_override: None,
+            };
+            let (market, _) =
+                rate_bumped_market_with_hazard_replay(context, &discount_id, shock, [replay])?;
+            context.reprice_raw(&market, context.as_of)
+        };
+        calculate_credit_dv01(context, &discount_id, self.0, reprice)
     }
 }
-
-// W-18 unit-and-sign reconciliation between CDS-option IR DV01 and CDS IR
-// DV01 is exercised at the integration level by
-// `tests/instruments/cds_option/test_metrics_registry.rs::
-// test_cds_option_dv01_bumps_swap_curve_quotes_and_matches_cds_convention`,
-// which prices a CDS option and a CDS on a shared discount curve, bumps
-// the swap-curve quotes, and asserts both metrics report the same sign
-// and unit. A purely-numeric unit test that calls `sensitivity_central_diff`
-// twice with identical inputs adds no coverage on top of that, so it was
-// removed.

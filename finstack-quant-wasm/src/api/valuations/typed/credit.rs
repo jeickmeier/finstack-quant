@@ -50,6 +50,9 @@ instrument_surface!(
 );
 
 getters!(JsCreditDefaultSwap, "CreditDefaultSwap", |i| {
+        /// Same-day premium and actual upfront cash election.
+        /// @returns True when payments dated on the valuation date are still owed.
+        include_valuation_date_cashflows as includeValuationDateCashflows: "boolean" => json(i.include_valuation_date_cashflows),
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"hazard_rate"` or `"black76"`.
         default_model as defaultModel: "string" => text(Instrument::default_model(i)),
@@ -134,6 +137,11 @@ builder_class!(
 );
 
 setters!(JsCreditDefaultSwapBuilder, "CreditDefaultSwapBuilder", {
+        /// Elect whether to include payments due on the valuation date.
+        /// @param value - True when same-day premium and actual upfront are still owed.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` for non-boolean inputs or `validation` once the builder is consumed.
+        include_valuation_date_cashflows as includeValuationDateCashflows: "boolean" => js_bool,
         /// Set the instrument identifier.
         /// @param value - Unique identifier for the CDS.
         /// @returns The builder, for chaining.
@@ -215,6 +223,9 @@ instrument_surface!(
 );
 
 getters!(JsCdsIndex, "CdsIndex", |i| {
+        /// Same-day premium and actual upfront cash election.
+        /// @returns True when payments dated on the valuation date are still owed.
+        include_valuation_date_cashflows as includeValuationDateCashflows: "boolean" => json(i.include_valuation_date_cashflows),
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"hazard_rate"` or `"black76"`.
         default_model as defaultModel: "string" => text(Instrument::default_model(i)),
@@ -311,6 +322,11 @@ builder_class!(
 );
 
 setters!(JsCdsIndexBuilder, "CdsIndexBuilder", {
+        /// Elect whether to include payments due on the valuation date.
+        /// @param value - True when same-day premium and actual upfront are still owed.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` for non-boolean inputs or `validation` once the builder is consumed.
+        include_valuation_date_cashflows as includeValuationDateCashflows: "boolean" => js_bool,
         /// Set the instrument identifier.
         /// @param value - Unique identifier for the index trade.
         /// @returns The builder, for chaining.

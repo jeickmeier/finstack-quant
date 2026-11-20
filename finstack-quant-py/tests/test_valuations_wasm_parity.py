@@ -338,6 +338,7 @@ def build_cases() -> dict[str, Any]:
             "end": "2029-06-20",
             "recovery_rate": 0.4,
             "discount_curve_id": "USD-OIS",
+            "include_valuation_date_cashflows": False,
             "credit_curve_id": "CDX.NA.IG.HAZARD",
         },
     )

@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/cds_trade_params.schema.json",
-      "bytes": 3026,
+      "bytes": 3294,
       "kind": "input",
       "path": "schemas/common/1/cds_trade_params.schema.json",
       "summary": "Trade terms (id, notional, side, dates, recovery, curves) of a standard-convention CDS index trade.",
@@ -164,7 +164,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/fx_option_params.schema.json",
-      "bytes": 4399,
+      "bytes": 7876,
       "kind": "input",
       "path": "schemas/common/1/fx_option_params.schema.json",
       "summary": "Pair, strike, expiry, notional, volatility surface, call/put and delta convention of a European FX option.",
@@ -200,7 +200,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
-      "bytes": 1020457,
+      "bytes": 1026494,
       "kind": "component",
       "path": "schemas/common/1/instrument_json.schema.json",
       "summary": "The instrument union embedded by portfolio positions and candidates; the same branches as the instrument envelope's `instrument` field.",
@@ -227,7 +227,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/market_history.schema.json",
-      "bytes": 8353,
+      "bytes": 10648,
       "kind": "component",
       "path": "schemas/common/1/market_history.schema.json",
       "summary": "Historical market scenarios for historical VaR and expected shortfall.",
@@ -281,7 +281,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/price_extras.schema.json",
-      "bytes": 10785,
+      "bytes": 13344,
       "kind": "input",
       "path": "schemas/common/1/price_extras.schema.json",
       "summary": "Metric-pricing override patch, market history and step-trace flag of one price call.",
@@ -434,7 +434,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1028376,
+      "bytes": 1034413,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -443,7 +443,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json",
-      "bytes": 45232,
+      "bytes": 45585,
       "kind": "input",
       "path": "schemas/instruments/1/credit_derivatives/cds_index.schema.json",
       "summary": "Standardised CDS index such as CDX or iTraxx.",
@@ -470,7 +470,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json",
-      "bytes": 49013,
+      "bytes": 49366,
       "kind": "input",
       "path": "schemas/instruments/1/credit_derivatives/credit_default_swap.schema.json",
       "summary": "Single-name CDS priced on the ISDA standard model.",
@@ -632,7 +632,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1027353,
+      "bytes": 1033417,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -830,7 +830,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json",
-      "bytes": 6921,
+      "bytes": 8313,
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_forward.schema.json",
       "summary": "Outright FX forward.",
@@ -857,7 +857,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json",
-      "bytes": 7596,
+      "bytes": 11028,
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_option.schema.json",
       "summary": "Vanilla European FX option.",
@@ -920,7 +920,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1124784,
+      "bytes": 1131160,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -1127,7 +1127,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
-      "bytes": 1029984,
+      "bytes": 1036021,
       "kind": "output",
       "path": "schemas/results/1/composite_rebalance_result.schema.json",
       "summary": "Result of resolving a new composite holdings state.",
@@ -1199,7 +1199,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
-      "bytes": 21784,
+      "bytes": 21529,
       "kind": "output",
       "path": "schemas/results/1/instrument_cashflow.schema.json",
       "summary": "Native cashflow rows, reporting-currency PV and reconciliation status.",

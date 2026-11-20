@@ -316,6 +316,9 @@ impl CmsSpreadOption {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for CmsSpreadOption {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CmsSpreadOption,
         crate::RATES

@@ -42,10 +42,10 @@ pub fn format_bucket_label(years: f64) -> std::borrow::Cow<'static, str> {
         }
     }
 
-    let s = if years < 1.0 {
-        format!("{:.0}m", (years * 12.0).round())
-    } else {
+    let s = if years >= 1.0 && years.fract() == 0.0 {
         format!("{:.0}y", years)
+    } else {
+        format!("{:.0}m", (years * 12.0).round())
     };
     std::borrow::Cow::Owned(s)
 }

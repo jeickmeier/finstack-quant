@@ -283,6 +283,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique instrument identifier"
         },
+        "include_valuation_date_cashflows": {
+          "description": "Whether scheduled premium and actual upfront payable on the valuation date\nare still due. A booked trade must explicitly elect this boundary.",
+          "type": "boolean"
+        },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "description": "Instrument-owned pricing inputs."
@@ -357,6 +361,7 @@
         }
       },
       "required": [
+        "include_valuation_date_cashflows",
         "id",
         "notional",
         "side",
@@ -963,6 +968,7 @@
           "attributes": {},
           "convention": "isda_na",
           "id": "CDS-CORP-5Y",
+          "include_valuation_date_cashflows": false,
           "notional": {
             "amount": "10000000",
             "currency": "USD"

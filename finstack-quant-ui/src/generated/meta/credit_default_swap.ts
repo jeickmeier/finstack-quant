@@ -11,6 +11,7 @@ export default [
             "attributes": {},
             "convention": "isda_na",
             "id": "CDS-CORP-5Y",
+            "include_valuation_date_cashflows": false,
             "notional": {
               "amount": "10000000",
               "currency": "USD"
@@ -1775,6 +1776,11 @@ export default [
     "description": "Unique instrument identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_8af4c7b7cd300c5c83f1/properties/include_valuation_date_cashflows",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/CreditDefaultSwap/properties/include_valuation_date_cashflows",
+    "description": "Whether scheduled premium and actual upfront payable on the valuation date\nare still due. A booked trade must explicitly elect this boundary."
   },
   {
     "path": "#/$defs/d_8af4c7b7cd300c5c83f1/properties/instrument_pricing_overrides",

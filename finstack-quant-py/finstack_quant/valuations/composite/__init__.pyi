@@ -717,6 +717,8 @@ class CompositeSpec:
         legs: list[CompositeLegSpec],
         weighting_method: WeightingMethod,
         rebalance_rule: RebalanceRule,
+        *,
+        fx01_pair: dict[str, str] | str | None = None,
     ) -> None:
         """
         Construct and validate a self-contained composite specification.
@@ -736,6 +738,9 @@ class CompositeSpec:
             Policy used only during initialization or explicit rebalance.
         rebalance_rule : RebalanceRule
             Manual or scheduled rule controlling state transitions.
+        fx01_pair : dict[str, str] or str or None
+            Ordered shock pair, as ``{"base": "EUR", "quote": "USD"}``
+            or equivalent JSON text. Without a pair, FX01 is unavailable.
 
         Raises
         ------
@@ -743,6 +748,19 @@ class CompositeSpec:
             If a currency code, specification invariant, or embedded definition is invalid.
         TypeError
             If the reporting currency is neither a handle nor a string.
+        """
+        ...
+
+    @property
+    def fx01_pair(self) -> dict[str, str] | None:
+        """Return the ordered quote shocked by whole-composite FX01.
+
+        Returns
+        -------
+        dict[str, str] or None
+            ISO currency codes under ``base`` and ``quote``, or None when FX01 is unavailable.
+
+        This property does not raise.
         """
         ...
 

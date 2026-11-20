@@ -315,7 +315,7 @@ fn an_exit_on_the_quote_date_has_no_yield() {
         Some(measure(&bond, MetricId::Ytw, "ytw"))
     );
 
-    // Callable today below the price: the limiting worst path, also the metric's.
+    // The ladder shows the limiting worst path without a numeric yield.
     let mut below = bullet("LADDER-TODAY-BELOW");
     below.call_put = Some(CallPutSchedule {
         calls: vec![call(AS_OF, 95.0)],
@@ -326,7 +326,19 @@ fn an_exit_on_the_quote_date_has_no_yield() {
     let today = worst(&ladder);
     assert_eq!(today.date, AS_OF);
     assert_eq!(today.yield_rate, None);
-    assert_eq!(measure(&below, MetricId::Ytw, "ytw"), f64::NEG_INFINITY);
+    let error = below
+        .price_with_metrics(
+            &market(),
+            AS_OF,
+            &[MetricId::Ytw],
+            PricingOptions::default(),
+        )
+        .expect_err("same-day workout has no finite yield")
+        .to_string();
+    assert!(
+        error.contains("ytw") && error.contains("must be finite"),
+        "{error}"
+    );
 }
 
 #[test]

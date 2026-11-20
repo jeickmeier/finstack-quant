@@ -15,9 +15,9 @@
       "currency": "USD"
     },
     "measures": {
-      "ytm": 0.04192805926047875,
+      "ytm": 0.04204418562619366,
       "dv01": -99.2633986165165,
-      "duration_mod": 0.9692215091091336,
+      "duration_mod": 0.9665177009654405,
       "bucketed_dv01": -99.26339861511951,
       "bucketed_dv01::USD-OIS::10y": 0,
       "bucketed_dv01::USD-OIS::15y": 0,

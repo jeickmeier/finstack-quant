@@ -36,7 +36,7 @@ pub(crate) fn register_fra_metrics(
             (Pv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_forward_only())),
             (ForwardPv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_forward_only())),
             (ParRate, FraParRateCalculator),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, crate::rate_bucketed_dv01::RateDv01(true)),
         ]
     }
     Ok(())
@@ -121,7 +121,7 @@ fn generic_fallback(context: &mut MetricContext) -> Result<f64> {
     .calculate(context)
 }
 
-fn uses_basis_quotes(calibration: &RateCalibrationRecipe) -> bool {
+pub(crate) fn uses_basis_quotes(calibration: &RateCalibrationRecipe) -> bool {
     calibration
         .quotes
         .iter()

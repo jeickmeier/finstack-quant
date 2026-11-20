@@ -17,10 +17,12 @@ use crate::utils::wire::{js_date, js_opt_date, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndexParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
-use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AmortizationEvent;
+use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::{
+    AmortizationEvent, FacilityProjection,
+};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, CoverageRules, CoverageTestSpec, PenaltyStep, PoolAsset, PrepaymentPenalty, Tranche,
-    TrancheCashflows, TrancheStructure, Waterfall,
+    AssetPool, CoverageRules, CoverageTestSpec, LiquidationSpec, PenaltyStep, PoolAsset,
+    PrepaymentPenalty, Tranche, TrancheCashflows, TrancheStructure, Waterfall,
 };
 use finstack_quant_valuations::instruments::{MertonMcConfig, PikSchedule};
 use wasm_bindgen::prelude::*;
@@ -296,6 +298,77 @@ pub fn tranche_structure_from_balances(
 ) -> Result<JsValue, JsValue> {
     let tranches: Vec<Tranche> = from_js_json(&tranches, "tranches")?;
     to_js_value(&TrancheStructure::from_balances(tranches).map_err(to_js_err)?)
+}
+
+/// Sum the tranche balances on the structure's native currency basis.
+/// @param structure - Tranche structure object or JSON text.
+/// @returns Total tranche balance as a Money wire value.
+/// @throws Error - Throws if the structure is malformed, currencies differ, or the amount overflows.
+#[wasm_bindgen(js_name = trancheStructureTotalSize, unchecked_return_type = "MoneyValue")]
+pub fn tranche_structure_total_size(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.TrancheStructure | string")]
+    structure: JsValue,
+) -> Result<JsValue, JsValue> {
+    let structure: TrancheStructure = from_js_json(&structure, "structure")?;
+    to_js_value(&structure.total_size().map_err(to_js_err)?)
+}
+
+/// Resolve whether the tranche's interest must be paid without deferral.
+/// @param tranche - Tranche object or JSON text, including any explicit non-deferrable election.
+/// @returns The resolved interest treatment, using the tranche rules when the flag is absent.
+/// @throws Error - Throws if the input does not match the tranche schema.
+#[wasm_bindgen(js_name = trancheIsNonDeferrable)]
+pub fn tranche_is_non_deferrable(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.Tranche | string")]
+    tranche: JsValue,
+) -> Result<bool, JsValue> {
+    let tranche: Tranche = from_js_json(&tranche, "tranche")?;
+    Ok(tranche.is_non_deferrable())
+}
+
+/// Read the tranche's waterfall payment priority.
+/// @param tranche - Tranche object or JSON text, including its optional authored priority.
+/// @returns The nonnegative integer priority used to order tranche payments.
+/// @throws Error - Throws if the input does not match the tranche schema.
+#[wasm_bindgen(js_name = tranchePaymentPriority)]
+pub fn tranche_payment_priority(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.Tranche | string")]
+    tranche: JsValue,
+) -> Result<u32, JsValue> {
+    let tranche: Tranche = from_js_json(&tranche, "tranche")?;
+    Ok(tranche.payment_priority)
+}
+
+/// Resolve liquidation proceeds after modeled costs.
+/// @param spec - Liquidation specification object or JSON text, with recovery and cost terms.
+/// @returns Net proceeds as a decimal fraction of the liquidated balance.
+/// @throws Error - Throws if the input does not match the liquidation specification.
+#[wasm_bindgen(js_name = liquidationSpecNetProceedsFraction)]
+pub fn liquidation_spec_net_proceeds_fraction(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.LiquidationSpec | string")]
+    spec: JsValue,
+) -> Result<f64, JsValue> {
+    let spec: LiquidationSpec = from_js_json(&spec, "spec")?;
+    Ok(spec.net_proceeds_fraction())
+}
+
+/// Compute lender cashflows of an asset-backed facility projection.
+/// @param projection - Facility projection object or JSON text containing the projected payments, fees and draws.
+/// @returns Dated signed lender cashflows as ISO date and Money wire value pairs.
+/// @throws Error - Throws for malformed projection data or when the signed cashflows cannot be combined.
+#[wasm_bindgen(js_name = facilityProjectionLenderCashflows, unchecked_return_type = "[string, MoneyValue][]")]
+pub fn facility_projection_lender_cashflows(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.FacilityProjection | string")]
+    projection: JsValue,
+) -> Result<JsValue, JsValue> {
+    let projection: FacilityProjection = from_js_json(&projection, "projection")?;
+    let cashflows: Vec<_> = projection
+        .lender_cashflows()
+        .map_err(to_js_err)?
+        .into_iter()
+        .map(|(date, money)| (date.to_string(), money))
+        .collect();
+    to_js_value(&cashflows)
 }
 
 /// Create a fixed-rate bond pool asset (mirrors Rust `PoolAsset::fixed_rate_bond`).

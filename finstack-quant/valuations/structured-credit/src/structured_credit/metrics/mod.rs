@@ -155,7 +155,7 @@ fn register_scope_metrics(
         instrument: instrument,
         metrics: [
             // Standard cashflow-based metrics
-            (Accrued, pricing::AccruedCalculator),
+            (Accrued, pricing::AccruedCalculator, NativeMoney),
             (DirtyPrice, pricing::DirtyPriceCalculator),
             (CleanPrice, pricing::CleanPriceCalculator),
             (WAL, pricing::WalCalculator),

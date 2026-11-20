@@ -331,6 +331,7 @@ fn cds_upfront_quote_rejects_running_spread_bp() {
         pillar: Pillar::Tenor("5Y".parse().expect("tenor")),
         coupon_bp: 500.0,
         upfront_pct: 0.02,
+        upfront_basis: finstack_quant_calibration::quotes::CdsUpfrontBasis::Clean,
         recovery_rate: 0.40,
     };
     let mut json = serde_json::to_value(&quote).expect("serialize");

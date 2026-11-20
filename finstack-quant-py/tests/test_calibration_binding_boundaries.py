@@ -372,6 +372,7 @@ def test_calibration_currency_conversion_uses_the_core_contract() -> None:
             "pillar": {"tenor": {"count": 5, "unit": "years"}},
             "coupon_bp": 100.0,
             "upfront_pct": 0.01,
+            "upfront_basis": "clean",
             "recovery_rate": 0.4,
         }),
         lambda currency: CdsTrancheQuote({

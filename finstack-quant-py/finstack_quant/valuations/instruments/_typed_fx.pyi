@@ -37,6 +37,19 @@ class FxForward:
     ('EUR', 'USD', 1.12)
     """
 
+    @property
+    def spot_basis(self) -> dict[str, Any]:
+        """Cash spot or an outright with a fixed spot value date.
+
+        Returns
+        -------
+        dict[str, Any]
+            ``{"type": "cash"}`` or ``{"type": "value_date", "date": "YYYY-MM-DD"}``.
+
+        This property does not raise.
+        """
+        ...
+
     @staticmethod
     def builder() -> FxForwardBuilder:
         """
@@ -179,6 +192,7 @@ class FxForward:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         metric_id: str,
         model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> float:
         """
         Compute one scalar metric for this instrument (e.g. ``"dv01"`` or ``"fx01"``).
@@ -193,6 +207,9 @@ class FxForward:
             Registered metric identifier (see :func:`list_standard_metrics`).
         model : str, default "default"
             Model key.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -710,7 +727,7 @@ class FxForwardBuilder:
 
     Builders are consumed by ``build()``; create a new builder per
     instrument. Required fields: ``id``, ``base_currency``,
-    ``quote_currency``, ``maturity``, ``notional``,
+    ``quote_currency``, ``maturity``, ``notional``, ``spot_basis``,
     ``domestic_discount_curve_id``, ``foreign_discount_curve_id``.
 
     Examples
@@ -721,6 +738,7 @@ class FxForwardBuilder:
     >>> fwd = (
     ...     FxForward
     ...     .builder()
+    ...     .spot_basis({"type": "cash"})
     ...     .id("EURUSD-FWD")
     ...     .base_currency("EUR")
     ...     .quote_currency(Currency("USD"))
@@ -734,6 +752,26 @@ class FxForwardBuilder:
     >>> fwd.contract_rate
     1.12
     """
+
+    def spot_basis(self, value: dict[str, Any] | str) -> FxForwardBuilder:
+        """Set the spot basis election.
+
+        Parameters
+        ----------
+        value : dict[str, Any] or str
+            Wire dict or JSON text containing ``{"type": "cash"}`` or ``{"type": "value_date", "date": "YYYY-MM-DD"}``.
+
+        Returns
+        -------
+        FxForwardBuilder
+            This builder for continued configuration.
+
+        Raises
+        ------
+        ValueError
+            If the election is malformed or the builder has already been consumed.
+        """
+        ...
 
     def id(self, value: str) -> FxForwardBuilder:
         """
@@ -1108,6 +1146,32 @@ class FxOption:
     ('call', 1.12, 'forward')
     """
 
+    @property
+    def delivery(self) -> dict[str, Any]:
+        """Cash payoff at expiry or a physical exchange on a booked date.
+
+        Returns
+        -------
+        dict[str, Any]
+            ``{"type": "cash_at_expiry"}`` or ``{"type": "physical", "date": "YYYY-MM-DD", "position": "long", "exercised": None}``. The position can be ``"long"`` or ``"short"``. Use a bool for a confirmed expiry outcome.
+
+        This property does not raise.
+        """
+        ...
+
+    @property
+    def spot_basis(self) -> dict[str, Any]:
+        """Cash spot or an outright with a fixed spot value date.
+
+        Returns
+        -------
+        dict[str, Any]
+            ``{"type": "cash"}`` or ``{"type": "value_date", "date": "YYYY-MM-DD"}``.
+
+        This property does not raise.
+        """
+        ...
+
     @staticmethod
     def builder() -> FxOptionBuilder:
         """
@@ -1250,6 +1314,7 @@ class FxOption:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         metric_id: str,
         model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> float:
         """
         Compute one scalar metric for this instrument (e.g. ``"delta"`` or ``"vega"``).
@@ -1264,6 +1329,9 @@ class FxOption:
             Registered metric identifier (see :func:`list_standard_metrics`).
         model : str, default "default"
             Model key.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -1437,11 +1505,13 @@ class FxOption:
             - ``base_currency`` / ``quote_currency`` (Currency | str): base
               (foreign, notional) and quote (domestic) ISO-4217 codes.
             - ``strike`` (float): quote currency per unit of base currency.
-            - ``expiry`` (datetime.date | str): ISO 8601 date; the cash payoff settles on it.
+            - ``expiry`` (datetime.date | str): ISO 8601 date when the exercise outcome is determined.
             - ``notional`` (Money | dict): notional in ``base_currency``, a
               ``Money`` or its wire dict ``{"amount": "1000000", "currency": "USD"}``.
             - ``vol_surface_id`` (str): FX volatility surface identifier.
             - ``option_type`` (str): ``"call"`` or ``"put"`` on the base currency.
+            - ``spot_basis`` (dict): cash spot or outright with a booked spot value date.
+            - ``delivery`` (dict): cash at expiry or physical exchange on a fixed date.
             - ``delta_convention`` (dict): ``{"kind", "premium_currency",
               "venue"}`` with ``kind`` one of ``"spot"``, ``"forward"``,
               ``"premium_adjusted_spot"``, ``"premium_adjusted_forward"``,
@@ -1473,6 +1543,8 @@ class FxOption:
         ...     "notional": Money(1_000_000.0, "EUR"),
         ...     "vol_surface_id": "EURUSD-VOL",
         ...     "option_type": "call",
+        ...     "spot_basis": {"type": "cash"},
+        ...     "delivery": {"type": "cash_at_expiry"},
         ...     "delta_convention": {"kind": "spot", "premium_currency": "USD", "venue": "desk"},
         ... })
         >>> (opt.domestic_discount_curve_id, opt.foreign_discount_curve_id)
@@ -1517,6 +1589,7 @@ class FxOption:
         market: MarketContext | str,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> dict[str, float]:
         """
         Compute the standard option Greek set as a dict (mirrors the WASM
@@ -1531,6 +1604,9 @@ class FxOption:
             Valuation date.
         model : str, default "default"
             Model key.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -1761,6 +1837,8 @@ class FxOptionBuilder:
     >>> opt = (
     ...     FxOption
     ...     .builder()
+    ...     .spot_basis({"type": "cash"})
+    ...     .delivery({"type": "cash_at_expiry"})
     ...     .id("EURUSD-CALL")
     ...     .base_currency("EUR")
     ...     .quote_currency("USD")
@@ -1777,6 +1855,46 @@ class FxOptionBuilder:
     >>> opt.delta_convention["venue"]
     'desk'
     """
+
+    def delivery(self, value: dict[str, Any] | str) -> FxOptionBuilder:
+        """Set the delivery election.
+
+        Parameters
+        ----------
+        value : dict[str, Any] or str
+            Wire dict or JSON text containing ``{"type": "cash_at_expiry"}`` or ``{"type": "physical", "date": "YYYY-MM-DD", "position": "long", "exercised": None}``. The position can be ``"long"`` or ``"short"``. Use a bool for a confirmed expiry outcome.
+
+        Returns
+        -------
+        FxOptionBuilder
+            This builder for continued configuration.
+
+        Raises
+        ------
+        ValueError
+            If the election is malformed or the builder has already been consumed.
+        """
+        ...
+
+    def spot_basis(self, value: dict[str, Any] | str) -> FxOptionBuilder:
+        """Set the spot basis election.
+
+        Parameters
+        ----------
+        value : dict[str, Any] or str
+            Wire dict or JSON text containing ``{"type": "cash"}`` or ``{"type": "value_date", "date": "YYYY-MM-DD"}``.
+
+        Returns
+        -------
+        FxOptionBuilder
+            This builder for continued configuration.
+
+        Raises
+        ------
+        ValueError
+            If the election is malformed or the builder has already been consumed.
+        """
+        ...
 
     def id(self, value: str) -> FxOptionBuilder:
         """

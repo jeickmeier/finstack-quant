@@ -207,14 +207,6 @@
             "null"
           ]
         },
-        "conditional_default_prob": {
-          "description": "Interval default probability `SP(t_{i-1}) − SP(t_i)` (hazard mode only).",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Row currency (matters for instruments whose legs settle in several currencies)."

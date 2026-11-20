@@ -5,6 +5,7 @@
 //! (historical scenarios for `hvar` / `expected_shortfall`).
 
 use super::PyValuationResult;
+use crate::bindings::core::config::PyFinstackConfig;
 use crate::bindings::extract::{extract_instrument, extract_market};
 use crate::bindings::module_utils::{
     opt_spec_from_py, py_to_json_string, py_to_serde, spec_from_py,
@@ -369,13 +370,14 @@ struct PyPriceExtras {
 impl PyPriceExtras {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "PriceExtras.__init__")]
     #[new]
-    #[pyo3(signature = (*, metric_pricing_overrides=None, instrument_pricing_overrides=None, market_history=None, explain=false))]
+    #[pyo3(signature = (*, metric_pricing_overrides=None, instrument_pricing_overrides=None, market_history=None, explain=false, config=None))]
     fn new(
         py: Python<'_>,
         metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
         instrument_pricing_overrides: Option<&Bound<'_, PyDict>>,
         market_history: Option<&PyMarketHistory>,
         explain: bool,
+        config: Option<PyRef<'_, PyFinstackConfig>>,
     ) -> PyResult<Self> {
         let metric_pricing_overrides = metric_pricing_overrides
             .map(|value| {
@@ -396,8 +398,18 @@ impl PyPriceExtras {
                 instrument_pricing_overrides,
                 market_history: market_history.map(|history| history.inner.clone()),
                 explain,
+                config: config.map(|config| config.inner.clone()),
             },
         })
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "PriceExtras.config")]
+    #[getter]
+    fn config(&self) -> Option<PyFinstackConfig> {
+        self.inner
+            .config
+            .clone()
+            .map(|inner| PyFinstackConfig { inner })
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "PriceExtras.explain")]
@@ -670,7 +682,6 @@ const CASHFLOW_ROW_COLUMNS: &[(&str, &str)] = &[
     ("discount_factor", "float64"),
     ("discount_curve_id", "str"),
     ("survival_probability", "float64"),
-    ("conditional_default_prob", "float64"),
     ("inflation_index_ratio", "float64"),
     ("prepayment_smm", "float64"),
     ("beginning_balance", "float64"),
@@ -879,17 +890,6 @@ pub(crate) fn price_typed(
     })?;
     price_prepared(py, instrument, market, as_of, model, metrics, extras)
 }
-/// Pricing options shared by the host entry points: the recalibration
-/// provider, plus a step trace on the result when `explain` is set.
-fn pricing_options(explain: bool) -> finstack_quant_valuations::instruments::PricingOptions {
-    let options = finstack_quant_calibration::recalibration::pricing_options();
-    if explain {
-        options.with_explain(finstack_quant_core::explain::ExplainOpts::enabled())
-    } else {
-        options
-    }
-}
-
 /// Price a prepared instrument after host market/date conversion.
 ///
 /// `extras` supplies the market history and the `explain` flag; its
@@ -915,8 +915,9 @@ pub(crate) fn price_prepared(
                 &as_of,
                 &model,
                 &metrics,
-                extras.market_history.as_ref(),
-                pricing_options(extras.explain),
+                None,
+                extras
+                    .pricing_options(finstack_quant_calibration::recalibration::pricing_options()),
             )
         })
         .map_err(core_to_py)?;
@@ -931,6 +932,7 @@ pub(crate) fn metric_typed(
     as_of: &Bound<'_, PyAny>,
     metric_id: &str,
     model: &str,
+    extras: PriceExtras,
 ) -> PyResult<f64> {
     let market = extract_market(py, market)?;
     let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
@@ -938,7 +940,9 @@ pub(crate) fn metric_typed(
     let metric_id = metric_id.to_owned();
     py.detach(move || {
         let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
-            instrument, None, None,
+            instrument,
+            extras.metric_pricing_overrides_json().as_deref(),
+            extras.instrument_pricing_overrides.as_ref(),
         )?;
         finstack_quant_valuations::pricer::metric_value(
             &instrument,
@@ -946,7 +950,7 @@ pub(crate) fn metric_typed(
             &as_of,
             &model,
             &metric_id,
-            finstack_quant_calibration::recalibration::pricing_options(),
+            extras.pricing_options(finstack_quant_calibration::recalibration::pricing_options()),
         )
     })
     .map_err(core_to_py)
@@ -971,6 +975,7 @@ pub(crate) fn typed_option_greeks<'py>(
     market: &Bound<'py, PyAny>,
     as_of: &Bound<'py, PyAny>,
     model: &str,
+    extras: PriceExtras,
 ) -> PyResult<Bound<'py, PyDict>> {
     let market = extract_market(py, market)?;
     let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
@@ -978,14 +983,17 @@ pub(crate) fn typed_option_greeks<'py>(
     let pairs = py
         .detach(move || {
             let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
-                instrument, None, None,
+                instrument,
+                extras.metric_pricing_overrides_json().as_deref(),
+                extras.instrument_pricing_overrides.as_ref(),
             )?;
             finstack_quant_valuations::pricer::present_standard_option_greeks(
                 &instrument,
                 &market,
                 &as_of,
                 &model,
-                finstack_quant_calibration::recalibration::pricing_options(),
+                extras
+                    .pricing_options(finstack_quant_calibration::recalibration::pricing_options()),
             )
         })
         .map_err(core_to_py)?;

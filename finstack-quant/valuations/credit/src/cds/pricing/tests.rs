@@ -34,6 +34,7 @@ fn create_test_cds(
             id: finstack_quant_core::types::InstrumentId::new(id),
             notional: Money::from((10000000_i64, Currency::USD)),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start: start_date,
             end: end_date,
             recovery_rate,
@@ -168,7 +169,7 @@ fn test_par_spread_calculation() {
 }
 
 #[test]
-fn risky_pv01_reconciles_clean_npv_to_par_spread() {
+fn risky_pv01_reconciles_discounted_clean_mark_to_par_spread() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
     // Seasoned: 42 days of accrued premium separate the clean and dirty annuities.
@@ -188,21 +189,22 @@ fn risky_pv01_reconciles_clean_npv_to_par_spread() {
     let risky_pv01 = pricer
         .risky_pv01(&cds, &disc, &credit, as_of)
         .expect("risky pv01");
-    let npv = pricer.npv_full(&cds, &disc, &credit, as_of).expect("npv");
+    use finstack_quant_core::market_data::traits::Discounting;
+
+    let dirty_pv = pricer
+        .npv_full(&cds, &disc, &credit, as_of)
+        .expect("economic PV");
+    let settlement = cds.quote_settlement_date(as_of).expect("quote settlement");
+    let settlement_df = disc
+        .df_between_dates(as_of, settlement)
+        .expect("settlement DF");
+    let accrual = cds.clean_quote_accrual(as_of).expect("quote accrual");
+    let accrued_cash = cds.notional.amount() * 0.01 * accrual;
+    assert!(settlement > as_of && accrual > 0.0 && settlement_df < 1.0);
+    let clean_mark = dirty_pv + settlement_df * accrued_cash;
     let implied = (par_spread - 100.0) * risky_pv01;
-    assert!(
-        (npv - implied).abs() < 1e-6 * npv.abs().max(1.0),
-        "clean npv {npv} should equal (par - coupon) x risky_pv01 = {implied}"
-    );
-    let dirty_annuity_pv01 = pricer
-        .risky_annuity(&cds, &disc, &credit, as_of)
-        .expect("risky annuity")
-        * cds.notional.amount()
-        * ONE_BASIS_POINT;
-    assert!(
-        risky_pv01 < dirty_annuity_pv01,
-        "clean risky pv01 {risky_pv01} excludes accrued premium in {dirty_annuity_pv01}"
-    );
+    assert!((clean_mark - implied).abs() < 1e-7);
+    assert!((dirty_pv + accrued_cash - implied).abs() > 1e-4);
 }
 
 #[test]
@@ -428,6 +430,7 @@ fn test_doc_clause_default_when_omitted() {
 
     // Builder pattern should also work without doc_clause
     let cds_built = CreditDefaultSwap::builder()
+        .include_valuation_date_cashflows(false)
         .id(finstack_quant_core::types::InstrumentId::new("CDS-BUILDER"))
         .notional(Money::from((10_000_000_i64, Currency::USD)))
         .side(PayReceive::Pay)
@@ -554,7 +557,7 @@ fn test_premium_leg_per_bp_matches_risky_annuity_without_accrual_on_default() {
 }
 
 #[test]
-fn test_full_premium_par_spread_is_below_risky_annuity_par_spread() {
+fn dirty_par_spread_uses_the_full_premium_annuity() {
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
@@ -580,9 +583,6 @@ fn test_full_premium_par_spread_is_below_risky_annuity_par_spread() {
     );
     cds.valuation_convention = CdsValuationConvention::IsdaDirty;
 
-    // Same trade and conventions; only the par-spread denominator differs:
-    // the risky annuity (ISDA) versus the full premium leg per unit spread
-    // including accrual-on-default (the full-premium denominator).
     let pricer = CdsPricer::new();
     let isda_spread = pricer
         .par_spread(&cds, &disc, &credit, as_of)
@@ -595,11 +595,12 @@ fn test_full_premium_par_spread_is_below_risky_annuity_par_spread() {
         .expect("full-premium denominator");
     let full_spread = protection / (full_denominator * cds.notional.amount()) * 10_000.0;
 
-    assert!(isda_spread.is_finite() && full_spread.is_finite());
-    assert!(
-        full_spread < isda_spread,
-        "including AoD in the denominator should reduce the par spread"
-    );
+    let scheduled_annuity = pricer
+        .risky_annuity(&cds, &disc, &credit, as_of)
+        .expect("scheduled annuity");
+    let scheduled_only_spread = protection / (scheduled_annuity * cds.notional.amount()) * 10_000.0;
+    assert!((isda_spread - full_spread).abs() < 1e-10);
+    assert!(isda_spread < scheduled_only_spread);
 }
 
 #[test]
@@ -947,8 +948,7 @@ fn production_cds_option_audit_premium_frequency_and_stub_are_effective() {
 }
 
 #[test]
-fn cdsw_accrued_counts_the_step_in_day_on_an_imm_coupon_date() {
-    use super::metrics::AccrualDayCountPolicy;
+fn clean_quote_accrual_is_zero_at_coupon_opening_and_includes_valuation_close() {
     let cds = create_test_cds(
         "IMM-ACCRUED",
         date!(2024 - 03 - 20),
@@ -957,25 +957,17 @@ fn cdsw_accrued_counts_the_step_in_day_on_an_imm_coupon_date() {
         0.4,
     );
     let pricer = CdsPricer::new();
-    let accrued = |as_of, policy| {
-        pricer
-            .coupon_accrued_fraction(&cds, as_of, policy)
-            .expect("accrued")
-    };
     let coupon_date = date!(2024 - 06 - 20);
+    assert_eq!(cds.clean_quote_accrual(coupon_date).expect("opening"), 0.0);
     assert_eq!(
-        accrued(coupon_date, AccrualDayCountPolicy::CdswInclusive),
-        1.0 / 360.0
-    );
-    assert_eq!(
-        accrued(
-            coupon_date + Duration::days(1),
-            AccrualDayCountPolicy::CdswInclusive
-        ),
+        cds.clean_quote_accrual(coupon_date + Duration::days(1))
+            .expect("valuation close"),
         2.0 / 360.0
     );
     assert_eq!(
-        accrued(coupon_date, AccrualDayCountPolicy::IsdaStandard),
-        0.0
+        pricer
+            .default_accrued_fraction(&cds, coupon_date + Duration::days(1))
+            .expect("default cutoff"),
+        1.0 / 360.0
     );
 }

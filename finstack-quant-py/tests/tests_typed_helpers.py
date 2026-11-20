@@ -220,6 +220,7 @@ def build_cds() -> CreditDefaultSwap:
     return (
         CreditDefaultSwap
         .builder()
+        .include_valuation_date_cashflows(False)
         .id("CDS-1")
         .notional(Money(10_000_000.0, Currency("USD")))
         .side("pay")
@@ -235,6 +236,7 @@ def build_cds_index() -> CdsIndex:
     return (
         CdsIndex
         .builder()
+        .include_valuation_date_cashflows(False)
         .id("CDX-IG-42")
         .index_name("CDX.NA.IG")
         .series(42)
@@ -255,6 +257,7 @@ def build_fx_forward() -> FxForward:
     return (
         FxForward
         .builder()
+        .spot_basis({"type": "cash"})
         .id("EURUSD-FWD-6M")
         .base_currency(Currency("EUR"))
         .quote_currency(Currency("USD"))
@@ -271,6 +274,8 @@ def build_fx_option() -> FxOption:
     return (
         FxOption
         .builder()
+        .spot_basis({"type": "cash"})
+        .delivery({"type": "cash_at_expiry"})
         .id("EURUSD-CALL-1Y")
         .base_currency(Currency("EUR"))
         .quote_currency(Currency("USD"))

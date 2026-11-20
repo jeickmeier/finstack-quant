@@ -630,6 +630,11 @@ export interface D_8Af4C7B7Cd300C5C83F1 {
    */
   doc_clause?: D_9F2015Dceb8C80D6E4D1 | null;
   id: Id;
+  /**
+   * Whether scheduled premium and actual upfront payable on the valuation date
+   * are still due. A booked trade must explicitly elect this boundary.
+   */
+  include_valuation_date_cashflows: boolean;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
    * Optional OTC margin specification for VM/IM.

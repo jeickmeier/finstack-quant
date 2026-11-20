@@ -110,11 +110,24 @@ pub enum CdsQuote {
         pillar: Pillar,
         /// Contractual running coupon in basis points (25.0, 100.0, 500.0 or 1000.0).
         coupon_bp: f64,
-        /// Upfront payment percentage of notional (e.g. 0.01 for 1%).
+        /// Signed upfront fraction of notional (0.01 is 1%).
         upfront_pct: f64,
+        /// Whether the fraction is a clean quote or actual buyer cash at settlement.
+        upfront_basis: CdsUpfrontBasis,
         /// Recovery rate assumption.
         recovery_rate: f64,
     },
+}
+
+/// Representation of a single-name CDS upfront quote.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum CdsUpfrontBasis {
+    /// Clean fraction of notional, before deducting the accrued premium rebate.
+    Clean,
+    /// Actual signed cash as a fraction of notional, including the rebate.
+    ActualCash,
 }
 
 impl CdsQuote {

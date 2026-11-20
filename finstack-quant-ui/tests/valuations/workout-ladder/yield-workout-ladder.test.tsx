@@ -52,8 +52,9 @@ it.each(Object.entries(cases))(
   (_name, entry) => {
     const marked = ladderOf(entry).rows.filter((row) => row.is_worst);
     expect(marked).toHaveLength(1);
-    // A null metric is negative infinity through JSON: no finite yield either way.
-    expect(marked[0].yield_rate ?? null).toBe(entry.ytw);
+    expect(marked[0].yield_rate ?? null).toBe(
+      typeof entry.ytw === "number" ? entry.ytw : null,
+    );
     // The rolled bullet is the case whose par rate runs to contractual maturity, not
     // the row's date. Where the metric rejects a quote-date workout the row has none.
     expect(marked[0].i_spread ?? null).toBe(
@@ -78,6 +79,11 @@ it("only a workout on the quote date has no i_spread metric", () => {
       typeof entry.iSpread === "number" ? [] : [name],
     ),
   ).toEqual(["quoteDateCall"]);
+});
+it("the quote-date workout rejects a non-finite ytw", () => {
+  expect(cases.quoteDateCall.ytw).toEqual({
+    error: expect.stringContaining("metric output must be finite"),
+  });
 });
 it("the bullet case rolls, so its spread pins the contractual-maturity horizon", () => {
   const bond = JSON.parse(cases.bullet.request.instrumentJson);

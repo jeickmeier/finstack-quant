@@ -390,7 +390,7 @@ def expected_metrics(stage: str = "base") -> dict[str, tuple[str, ...]]:
     False
     """
     families = {
-        "bond": ("dv01", "bucketed_dv01", "cs01", "bucketed_cs01", "vega", "theta"),
+        "bond": ("dv01", "bucketed_dv01", "cs01", "vega", "theta"),
         "deposit": ("dv01", "bucketed_dv01", "theta"),
         "interest_rate_swap": ("dv01", "bucketed_dv01", "pv01", "theta"),
         "equity_option": ("dv01", "bucketed_dv01", "delta", "gamma", "vega", "rho", "theta"),

@@ -19,7 +19,7 @@
 //! accrual_notional, index_rate, principal_delta, principal_date,
 //! year_fraction, rate,
 //! reset_date, discount_factor, survival_probability,
-//! conditional_default_prob, inflation_index_ratio, prepayment_smm,
+//! inflation_index_ratio, prepayment_smm,
 //! beginning_balance, ending_balance, native_pv, fx_rate, pv`.
 //!
 //! The accrual columns carry the inputs of each coupon, so a row can be
@@ -238,9 +238,6 @@ pub struct CashflowRow {
     /// Cumulative survival probability (hazard mode only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub survival_probability: Option<f64>,
-    /// Interval default probability `SP(t_{i-1}) − SP(t_i)` (hazard mode only).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub conditional_default_prob: Option<f64>,
     /// Inflation index ratio (populated for index-linked flows).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inflation_index_ratio: Option<f64>,
@@ -555,7 +552,6 @@ fn envelope_for_priced(
 
     let mut rows = Vec::with_capacity(schedule.get_flows().len());
     let mut envelope_currency = reporting_currency;
-    let mut prev_sp = 1.0_f64;
     let row_discounts: Vec<_> = schedule
         .get_flows()
         .iter()
@@ -621,14 +617,13 @@ fn envelope_for_priced(
         // T+0 instruments like a deposit valued on its effective date, whose
         // initial notional exchange settles on `as_of`.
         let settled = flow.get_date() <= as_of_date;
-        let (discount_factor, survival_probability, conditional_default_prob) = if settled {
+        let (discount_factor, survival_probability) = if settled {
             let sp = if hazard_arc.is_some() {
                 Some(1.0)
             } else {
                 None
             };
-            let cond_pd = sp.map(|_| 0.0);
-            (1.0, sp, cond_pd)
+            (1.0, sp)
         } else {
             // Date-based discounting: `DiscountCurve::df` expects time from
             // the curve's own `base_date`, not from `as_of`. For a seasoned
@@ -637,18 +632,15 @@ fn envelope_for_priced(
             // breaks reconciliation with `Instrument::value`, which uses
             // `df_between_dates`. Use the same date-based helper here.
             let df = discount_factors[row_index];
-            let (sp, cond_pd) = match (hazard_arc.as_ref(), survival_at_as_of) {
+            let sp = match (hazard_arc.as_ref(), survival_at_as_of) {
                 (Some(h), Some(s0)) => {
                     // Conditional survival Q(as_of, T) = S(T) / S(as_of).
                     let s_t = h.sp_on_date(flow.get_date())?;
-                    let sp = (s_t / s0).clamp(0.0, 1.0);
-                    let cond_pd = (prev_sp - sp).max(0.0);
-                    prev_sp = sp;
-                    (Some(sp), Some(cond_pd))
+                    Some((s_t / s0).clamp(0.0, 1.0))
                 }
-                _ => (None, None),
+                _ => None,
             };
-            (df, sp, cond_pd)
+            (df, sp)
         };
 
         let native_pv = native_pvs[row_index];
@@ -735,7 +727,6 @@ fn envelope_for_priced(
             discount_factor,
             discount_curve_id: row_discount_curve_id.clone(),
             survival_probability,
-            conditional_default_prob,
             inflation_index_ratio,
             prepayment_smm: mbs_row.map(|s| s.smm),
             beginning_balance: mbs_row

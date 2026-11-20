@@ -193,15 +193,9 @@ impl MetricId {
     /// Units: currency per 1 vol point.
     pub const DeltaVol: Self = Self(Cow::Borrowed("delta_vol"));
 
-    /// Per-constituent delta for basket instruments.
-    ///
-    /// Decomposes basket delta by individual constituent, providing
-    /// per-name or per-asset sensitivity attribution. Each bucket
-    /// (`constituent_delta::<label>`) is the basket PV change for a +1%
-    /// relative move in that constituent's price; the total is their sum.
-    ///
-    /// Units: currency per 1% constituent price move.
-    pub const ConstituentDelta: Self = Self(Cow::Borrowed("constituent_delta"));
+    /// Signed basket PV change from a +1% relative shock to prepared marks.
+    /// Grouped by exact price identifier or embedded constituent identifier.
+    pub const BasketMarkShock: Self = Self(Cow::Borrowed("basket_mark_shock"));
 
     /// Convexity adjustment risk (CMS options)
     pub const ConvexityAdjustmentRisk: Self = Self(Cow::Borrowed("convexity_adjustment_risk"));

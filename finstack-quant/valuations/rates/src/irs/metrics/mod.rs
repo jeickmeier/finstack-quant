@@ -73,10 +73,10 @@ pub(crate) fn register_irs_metrics(
             (Pv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_per_curve()
                 .with_series_id(finstack_quant_valuations_core::metrics::MetricId::Pv01))),
 
-            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, crate::rate_bucketed_dv01::RateDv01(true)),
 
-            (PvFixed, FixedLegPvCalculator),
-            (PvFloat, FloatLegPvCalculator),
+            (PvFixed, FixedLegPvCalculator, NativeMoney),
+            (PvFloat, FloatLegPvCalculator, NativeMoney),
             (IrConvexity, ir_convexity::IrConvexityCalculator),
             (IrCrossGamma, ir_convexity::CrossGammaCalculator),
         ]

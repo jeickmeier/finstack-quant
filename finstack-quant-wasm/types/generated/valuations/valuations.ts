@@ -2860,6 +2860,20 @@ export type EquityPriceSeriesPolicy = "adjusted" | "raw";
  */
 export type RealizedVarMethod = "close_to_close" | "parkinson" | "garman_klass" | "rogers_satchell" | "yang_zhang";
 /**
+ * Value-date basis of the selected ordered FX quote.
+ */
+export type FxSpotBasis =
+  | {
+      type: "cash";
+    }
+  | {
+      /**
+       * Fixed value date of the spot quote.
+       */
+      date: DateWire;
+      type: "value_date";
+    };
+/**
  * Official NDF fixing source/benchmark.
  *
  * NDF settlements reference official fixing rates published by central banks
@@ -2914,6 +2928,32 @@ export type NdfFixingSource =
  * other FX instruments that quote in this direction.
  */
 export type NdfQuoteConvention = "base_per_settlement" | "settlement_per_base";
+/**
+ * Settlement profile of the FX option.
+ */
+export type FxOptionDelivery =
+  | {
+      type: "cash_at_expiry";
+    }
+  | {
+      /**
+       * Booked value date of both currency legs, on or after expiry.
+       */
+      date: DateWire;
+      /**
+       * Confirmed expiry outcome. The live option has no known outcome.
+       */
+      exercised?: boolean | null;
+      /**
+       * Signed holder position with positive base notional.
+       */
+      position: FxOptionPosition;
+      type: "physical";
+    };
+/**
+ * Holder direction of a physically delivered FX option.
+ */
+export type FxOptionPosition = "long" | "short";
 /**
  * Pair/venue FX delta quoting convention selected by the contract.
  */
@@ -3784,6 +3824,20 @@ export type UnaryOp = "neg" | "not";
  */
 export type BasketAssetType = "equity" | "bond" | "etf" | "cash" | "commodity" | "derivative";
 /**
+ * Operating expense accrued at the basket's valuation cut.
+ */
+export type BasketExpense =
+  | {
+      type: "none";
+    }
+  | {
+      /**
+       * Nonnegative accrued cash per basket unit in the reporting currency.
+       */
+      amount: Money;
+      type: "accrued";
+    };
+/**
  * Provider-selection purpose of a point-date FX query (record
  * CORE-CONVENTIONS-013 #1/#2).
  *
@@ -4170,8 +4224,7 @@ export type ListedProductKind = "future" | "option_on_future" | "option";
  * Risk factor categories for VaR calculation.
  *
  * Each risk factor represents a market variable that can shift and impact
- * portfolio valuations. Risk factors are bucketed at standard tenors/strikes
- * to enable historical simulation.
+ * portfolio valuations. Rate changes carry exact source-year coordinates.
  */
 export type RiskFactorType =
   | {
@@ -4180,11 +4233,14 @@ export type RiskFactorType =
        */
       curve_id: Id;
       /**
+       * Strictly increasing positive source-year grid containing this center exactly.
+       */
+      grid_years: number[];
+      /**
        * Tenor in years (e.g., 1.0, 5.0, 10.0)
        */
       tenor_years: number;
       type: "discount_rate";
-      [k: string]: unknown;
     }
   | {
       /**
@@ -4192,11 +4248,14 @@ export type RiskFactorType =
        */
       curve_id: Id;
       /**
+       * Strictly increasing positive source-year grid containing this center exactly.
+       */
+      grid_years: number[];
+      /**
        * Tenor in years
        */
       tenor_years: number;
       type: "forward_rate";
-      [k: string]: unknown;
     }
   | {
       /**
@@ -4208,7 +4267,6 @@ export type RiskFactorType =
        */
       tenor_years: number;
       type: "credit_spread";
-      [k: string]: unknown;
     }
   | {
       /**
@@ -4216,7 +4274,6 @@ export type RiskFactorType =
        */
       ticker: string;
       type: "equity_spot";
-      [k: string]: unknown;
     }
   | {
       /**
@@ -4228,7 +4285,6 @@ export type RiskFactorType =
        */
       quote: Currency;
       type: "fx_spot";
-      [k: string]: unknown;
     }
   | {
       /**
@@ -4244,8 +4300,11 @@ export type RiskFactorType =
        * Volatility surface identifier
        */
       vol_surface_id: Id;
-      [k: string]: unknown;
     };
+/**
+ * Treatment of a hazard source whose calibration discount curve moves.
+ */
+export type UnshiftedHazardPolicy = "frozen_intensity" | "refit_original_quotes";
 /**
  * Unit family of a metric value.
  *
@@ -9005,8 +9064,11 @@ export interface Basket {
    */
   discount_curve_id: Id;
   /**
-   * Total expense ratio (as decimal, e.g., 0.0025 = 0.25%)
-   * This affects pricing through expense drag calculations
+   * Explicit accrued expense election at the valuation cut.
+   */
+  expense: BasketExpense;
+  /**
+   * Annual expense-ratio disclosure in decimal units (0.0025 is 0.25%).
    */
   expense_ratio: number;
   /**
@@ -11716,6 +11778,11 @@ export interface CreditDefaultSwap {
    */
   id: Id;
   /**
+   * Whether scheduled premium and actual upfront payable on the valuation date
+   * are still due. A booked trade must explicitly elect this boundary.
+   */
+  include_valuation_date_cashflows: boolean;
+  /**
    * Instrument-owned pricing inputs.
    */
   instrument_pricing_overrides?: InstrumentPricingOverrides;
@@ -11869,6 +11936,11 @@ export interface CdsIndex {
    * Unique instrument identifier
    */
   id: Id;
+  /**
+   * Whether scheduled premium and actual upfront payable on the valuation date
+   * are still due. A booked trade must explicitly elect this boundary.
+   */
+  include_valuation_date_cashflows: boolean;
   /**
    * Index factor (fraction of surviving notional since series inception)
    */
@@ -13098,6 +13170,10 @@ export interface FxForward {
    * Scenario-only pricing adjustments.
    */
   scenario_pricing_overrides?: ScenarioPricingOverrides;
+  /**
+   * Basis of the selected spot quote, held fixed across reprices.
+   */
+  spot_basis: FxSpotBasis;
 }
 /**
  * Non-Deliverable Forward (NDF) instrument.
@@ -13235,10 +13311,7 @@ export interface Ndf {
   settlement_currency: Currency;
 }
 /**
- * European FX option with same-day cash settlement at expiry.
- *
- * Physical delivery is intentionally not represented: exercised payoff is a
- * quote-currency cash amount on `expiry`.
+ * European FX option with an explicit cash or physical settlement profile.
  */
 export interface FxOption {
   /**
@@ -13253,6 +13326,10 @@ export interface FxOption {
    * Day count convention
    */
   day_count?: DayCount;
+  /**
+   * Booked payoff and settlement profile.
+   */
+  delivery: FxOptionDelivery;
   /**
    * Pair/venue delta convention and premium currency.
    */
@@ -13297,6 +13374,10 @@ export interface FxOption {
    * Scenario-only pricing adjustments.
    */
   scenario_pricing_overrides?: ScenarioPricingOverrides;
+  /**
+   * Selected spot quote's fixed value-date basis.
+   */
+  spot_basis: FxSpotBasis;
   /**
    * Strike exchange rate (quote per base).
    *
@@ -17733,6 +17814,10 @@ export interface CompositeSpec {
    */
   capital: Money;
   /**
+   * Ordered market FX direction for whole-composite FX01.
+   */
+  fx01_pair?: FxPair | null;
+  /**
    * Stable composite instrument identifier.
    */
   id: Id;
@@ -17752,6 +17837,19 @@ export interface CompositeSpec {
    * Rule used to resolve quantities at initialization and rebalance.
    */
   weighting_method: WeightingMethod;
+}
+/**
+ * FX pair identifier using base/quote currency ordering.
+ */
+export interface FxPair {
+  /**
+   * Base currency (numerator).
+   */
+  base: Currency;
+  /**
+   * Quote currency (denominator).
+   */
+  quote: Currency;
 }
 /**
  * One self-contained leg in a composite specification.
@@ -17820,10 +17918,6 @@ export interface ResolvedCompositeLeg {
  * Configuration for basket pricing behaviour.
  */
 export interface BasketPricingConfig {
-  /**
-   * Day basis used for fee accrual (e.g., 365.0 or 365.25). Avoid hardcoding in logic.
-   */
-  days_in_year: number;
   /**
    * FX policy hint for conversions when constituent currency != basket currency.
    */
@@ -18203,10 +18297,6 @@ export interface CashflowRow {
    */
   beginning_balance?: number | null;
   /**
-   * Interval default probability `SP(t_{i-1}) − SP(t_i)` (hazard mode only).
-   */
-  conditional_default_prob?: number | null;
-  /**
    * Row currency (matters for instruments whose legs settle in several currencies).
    */
   currency: Currency;
@@ -18381,6 +18471,10 @@ export interface CdsTradeParams {
    * Unique instrument identifier.
    */
   id: Id;
+  /**
+   * Whether scheduled premium and actual upfront dated as of valuation are still due.
+   */
+  include_valuation_date_cashflows: boolean;
   /**
    * Contract notional; its currency is the premium and protection currency.
    */
@@ -19354,19 +19448,6 @@ export interface InstrumentCurves {
    * Inflation curves or published inflation indices used by the instrument.
    */
   inflation_curves: Id[];
-}
-/**
- * FX pair identifier using base/quote currency ordering.
- */
-export interface FxPair {
-  /**
-   * Base currency (numerator).
-   */
-  base: Currency;
-  /**
-   * Quote currency (denominator).
-   */
-  quote: Currency;
 }
 /**
  * A volatility-surface dependency with the context needed for diagnostics.
@@ -20753,11 +20834,15 @@ export interface FxOptionParams {
    */
   base_currency: Currency;
   /**
+   * Booked payoff and settlement profile.
+   */
+  delivery: FxOptionDelivery;
+  /**
    * Delta quoting convention: kind, premium currency (base or quote) and venue.
    */
   delta_convention: FxDeltaConvention;
   /**
-   * Expiry date; the cash payoff settles on this date.
+   * Date anchoring expiry and the option volatility clock.
    */
   expiry: DateWire;
   /**
@@ -20776,6 +20861,10 @@ export interface FxOptionParams {
    * Quote (domestic) currency: the strike and PV currency.
    */
   quote_currency: Currency;
+  /**
+   * Selected spot quote's fixed value-date basis.
+   */
+  spot_basis: FxSpotBasis;
   /**
    * Strike exchange rate, quote currency per unit of base currency.
    */
@@ -21054,6 +21143,12 @@ export interface MarketScenario {
    * All risk factor shifts on this date (relative to base date)
    */
   shifts: RiskFactorShift[];
+  /**
+   * Required treatments for unshifted calibrated hazards whose discount dependencies move.
+   */
+  unshifted_hazard_policies?: {
+    [k: string]: UnshiftedHazardPolicy;
+  };
 }
 /**
  * Historical shift for a single risk factor on a single date.
@@ -21520,6 +21615,12 @@ export interface PoolReportFieldUnits {
  * Metric-pricing override patch, market history and step-trace flag of one price call.
  */
 export interface PriceExtras {
+  /**
+   * Per-request configuration for metric settings and monetary conventions.
+   */
+  config?: {
+    [k: string]: unknown;
+  } | null;
   /**
    * When `true`, attaches a step trace to the result as `explanation`.
    * Defaults to `false` (no trace).

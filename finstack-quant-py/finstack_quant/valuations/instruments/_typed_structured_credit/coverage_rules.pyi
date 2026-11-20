@@ -27,6 +27,7 @@ class CoverageRules:
         defaulted_valuation: dict[str, Any] | str | None = None,
         ccc_bucket: dict[str, Any] | str | None = None,
         discount_obligation: dict[str, Any] | str | None = None,
+        borrowing_base: dict[str, Any] | str | None = None,
     ) -> None:
         """
         Construct rules from their serde parts (every part optional).
@@ -41,11 +42,14 @@ class CoverageRules:
             ``DefaultedValuation`` serde value: ``"recovery"`` (modeled recovery,
             the default) or ``{"market_value": {"pct": 60.0}}``.
         ccc_bucket : dict[str, Any] | str, optional
-            ``CccBucketRule`` (``threshold_pct``, ``treatment``); ``None``
+            ``CccBucketRule`` (``threshold_pct`` in percent points, ``carry_at_market_value`` boolean); ``None``
             disables the bucket.
         discount_obligation : dict[str, Any] | str, optional
             ``DiscountObligationRule`` (``price_threshold_pct``); ``None``
             disables it.
+        borrowing_base : dict[str, Any] | str, optional
+            Borrowing base rules with decimal advance rates, asset eligibility
+            and concentration limits. None disables the borrowing base test.
 
         Raises
         ------
@@ -209,6 +213,23 @@ class CoverageRules:
         ------
         ValueError
             If the value cannot be serialized.
+        """
+        ...
+
+    @property
+    def borrowing_base(self) -> dict[str, Any] | None:
+        """Read the borrowing base rules selected for collateral coverage.
+
+        Returns
+        -------
+        dict[str, Any] or None
+            Wire-form advance rates, eligibility and concentration rules, or
+            None when the borrowing base is disabled.
+
+        Raises
+        ------
+        ValueError
+            If the configured rules cannot be serialized.
         """
         ...
 

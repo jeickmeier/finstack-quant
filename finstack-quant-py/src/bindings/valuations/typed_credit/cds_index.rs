@@ -329,6 +329,12 @@ impl PyCdsIndex {
             .collect()
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.include_valuation_date_cashflows")]
+    #[getter]
+    fn include_valuation_date_cashflows(&self) -> bool {
+        self.inner.include_valuation_date_cashflows
+    }
+
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.upfront")]
     #[getter]
     fn upfront<'py>(&self, py: Python<'py>) -> PyResult<Option<(Bound<'py, PyAny>, PyMoney)>> {
@@ -566,6 +572,20 @@ impl PyCdsIndexBuilder {
             num_constituents,
             value.to_string(),
             |b: CdsIndexBuilder| b.num_constituents(value)
+        )
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.include_valuation_date_cashflows")]
+    #[pyo3(text_signature = "($self, value)")]
+    fn include_valuation_date_cashflows<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: bool,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        builder_set!(
+            slf,
+            include_valuation_date_cashflows,
+            value.to_string(),
+            |b: CdsIndexBuilder| b.include_valuation_date_cashflows(value)
         )
     }
 

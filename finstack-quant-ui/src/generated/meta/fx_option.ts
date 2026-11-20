@@ -11,6 +11,9 @@ export default [
             "attributes": {},
             "base_currency": "EUR",
             "day_count": "act_365f",
+            "delivery": {
+              "type": "cash_at_expiry"
+            },
             "delta_convention": {
               "kind": "forward",
               "premium_currency": "USD",
@@ -26,6 +29,9 @@ export default [
             },
             "option_type": "call",
             "quote_currency": "USD",
+            "spot_basis": {
+              "type": "cash"
+            },
             "strike": 1.12,
             "vol_surface_id": "EURUSD-VOL"
           },
@@ -1079,6 +1085,50 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_78102f94ceb92cc3f3ca",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxOptionDelivery",
+    "description": "Settlement profile of the FX option."
+  },
+  {
+    "path": "#/$defs/d_78102f94ceb92cc3f3ca/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxOptionDelivery/oneOf/0",
+    "description": "Cash-settled benchmark option whose intrinsic payoff is due at expiry."
+  },
+  {
+    "path": "#/$defs/d_78102f94ceb92cc3f3ca/oneOf/0/properties/type",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxOptionDelivery/oneOf/0/properties/type",
+    "const": "cash_at_expiry"
+  },
+  {
+    "path": "#/$defs/d_78102f94ceb92cc3f3ca/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxOptionDelivery/oneOf/1",
+    "description": "Deliverable option with a fixed native cash exchange on exercise."
+  },
+  {
+    "path": "#/$defs/d_78102f94ceb92cc3f3ca/oneOf/1/properties/date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxOptionDelivery/oneOf/1/properties/date",
+    "description": "Booked value date of both currency legs, on or after expiry.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_78102f94ceb92cc3f3ca/oneOf/1/properties/exercised",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxOptionDelivery/oneOf/1/properties/exercised",
+    "description": "Confirmed expiry outcome. The live option has no known outcome."
+  },
+  {
+    "path": "#/$defs/d_78102f94ceb92cc3f3ca/oneOf/1/properties/position",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxOptionDelivery/oneOf/1/properties/position",
+    "description": "Signed holder position with positive base notional.",
+    "ref": "#/$defs/FxOptionPosition",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxOptionPosition"
+  },
+  {
+    "path": "#/$defs/d_78102f94ceb92cc3f3ca/oneOf/1/properties/type",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxOptionDelivery/oneOf/1/properties/type",
+    "const": "physical"
+  },
+  {
     "path": "#/$defs/d_7dd9bdea4c4382f447f9",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/Tenor",
     "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_quant_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months).expect(\"valid tenor fixture\");\nassert_eq!(tenor.count(), 3);\nassert_eq!(tenor.unit(), TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count(), 6);\nassert_eq!(parsed.unit(), TenorUnit::Months);\n# Ok(())\n# }\n```"
@@ -1148,6 +1198,23 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PikMode/oneOf/3",
     "const": "toggle",
     "description": "Deferred to the [`ToggleExerciseModel`] on the config.\nFalls back to `Cash` if no toggle model is set."
+  },
+  {
+    "path": "#/$defs/d_8262d0a7fe31a173e8ec",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxOptionPosition",
+    "description": "Holder direction of a physically delivered FX option."
+  },
+  {
+    "path": "#/$defs/d_8262d0a7fe31a173e8ec/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxOptionPosition/oneOf/0",
+    "const": "long",
+    "description": "Holder receives the exercised option exchange."
+  },
+  {
+    "path": "#/$defs/d_8262d0a7fe31a173e8ec/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxOptionPosition/oneOf/1",
+    "const": "short",
+    "description": "Writer owes the opposite exchange when exercised."
   },
   {
     "path": "#/$defs/d_8a837e6f142b34e8cfd4",
@@ -2251,6 +2318,38 @@ export default [
       "US912828XG33"
     ],
     "title": "Id"
+  },
+  {
+    "path": "#/$defs/d_a813281b23253f1d49c3",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxSpotBasis",
+    "description": "Value-date basis of the selected ordered FX quote."
+  },
+  {
+    "path": "#/$defs/d_a813281b23253f1d49c3/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxSpotBasis/oneOf/0",
+    "description": "The selected quote is cash FX at the valuation date."
+  },
+  {
+    "path": "#/$defs/d_a813281b23253f1d49c3/oneOf/0/properties/type",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxSpotBasis/oneOf/0/properties/type",
+    "const": "cash"
+  },
+  {
+    "path": "#/$defs/d_a813281b23253f1d49c3/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxSpotBasis/oneOf/1",
+    "description": "The selected outright is quoted for a stated value date."
+  },
+  {
+    "path": "#/$defs/d_a813281b23253f1d49c3/oneOf/1/properties/date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxSpotBasis/oneOf/1/properties/date",
+    "description": "Fixed value date of the spot quote.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_a813281b23253f1d49c3/oneOf/1/properties/type",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxSpotBasis/oneOf/1/properties/type",
+    "const": "value_date"
   },
   {
     "path": "#/$defs/d_ae5d75ed4e313ae3bc25",
@@ -4896,7 +4995,7 @@ export default [
   {
     "path": "#/$defs/d_f2834e0dc8039c010dc1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxOption",
-    "description": "European FX option with same-day cash settlement at expiry.\n\nPhysical delivery is intentionally not represented: exercised payoff is a\nquote-currency cash amount on `expiry`."
+    "description": "European FX option with an explicit cash or physical settlement profile."
   },
   {
     "path": "#/$defs/d_f2834e0dc8039c010dc1/properties/attributes",
@@ -4919,6 +5018,13 @@ export default [
     "description": "Day count convention",
     "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_f2834e0dc8039c010dc1/properties/delivery",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxOption/properties/delivery",
+    "description": "Booked payoff and settlement profile.",
+    "ref": "#/$defs/FxOptionDelivery",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxOptionDelivery"
   },
   {
     "path": "#/$defs/d_f2834e0dc8039c010dc1/properties/delta_convention",
@@ -4996,6 +5102,13 @@ export default [
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_f2834e0dc8039c010dc1/properties/spot_basis",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxOption/properties/spot_basis",
+    "description": "Selected spot quote's fixed value-date basis.",
+    "ref": "#/$defs/FxSpotBasis",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json#/$defs/FxSpotBasis"
   },
   {
     "path": "#/$defs/d_f2834e0dc8039c010dc1/properties/strike",

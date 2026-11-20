@@ -9,6 +9,7 @@
           "attributes": {},
           "convention": "isda_na",
           "id": "CDS-CORP-5Y",
+          "include_valuation_date_cashflows": false,
           "notional": {
             "amount": "10000000",
             "currency": "USD"
@@ -1782,6 +1783,10 @@
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Unique instrument identifier"
         },
+        "include_valuation_date_cashflows": {
+          "description": "Whether scheduled premium and actual upfront payable on the valuation date\nare still due. A booked trade must explicitly elect this boundary.",
+          "type": "boolean"
+        },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "description": "Instrument-owned pricing inputs."
@@ -1856,6 +1861,7 @@
         }
       },
       "required": [
+        "include_valuation_date_cashflows",
         "id",
         "notional",
         "side",

@@ -20,7 +20,7 @@ macro_rules! register_metrics {
         registry: $registry:expr_2021,
         instrument: $instrument:expr_2021,
         metrics: [
-            $(($metric_id:ident, $calculator:expr_2021)),* $(,)?
+            $(($metric_id:ident, $calculator:expr_2021 $(, $aggregation:ident)?)),* $(,)?
         ]
         $(, custom: [
             $(($custom_id:literal, $custom_calculator:expr_2021)),* $(,)?
@@ -31,11 +31,8 @@ macro_rules! register_metrics {
         use std::sync::Arc;
 
         $(
-            $registry.register_metric(
-                MetricId::$metric_id,
-                Arc::new($calculator),
-                &[$instrument],
-            )?;
+            $crate::register_metrics!(@register $registry, MetricId::$metric_id,
+                Arc::new($calculator), &[$instrument] $(, $aggregation)?);
         )*
         $($(
             $registry.register_metric(
@@ -45,6 +42,15 @@ macro_rules! register_metrics {
             )?;
         )*)?
     }};
+    (@register $registry:expr_2021, $id:expr_2021, $calculator:expr_2021, $instruments:expr_2021) => {
+        $registry.register_metric($id, $calculator, $instruments)?
+    };
+    (@register $registry:expr_2021, $id:expr_2021, $calculator:expr_2021, $instruments:expr_2021,
+        $aggregation:ident) => {
+        $registry.register_aggregate_metric(
+            $id, $calculator, $instruments, $crate::metrics::MetricAggregation::$aggregation,
+        )?
+    };
 }
 
 #[cfg(test)]
@@ -93,7 +99,7 @@ mod tests {
             registry: registry,
             instrument: InstrumentType::Bond,
             metrics: [
-                (Accrued, DummyCalculator),
+                (Accrued, DummyCalculator, NativeMoney),
                 (Ytm, DummyCalculator),
             ],
             custom: [("custom_metric", DummyCalculator)]

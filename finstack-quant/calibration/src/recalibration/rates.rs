@@ -73,6 +73,12 @@ struct DiscountRateRecalibrationKey {
 enum RateBumpKey {
     Parallel(u64),
     Tenors(Vec<(u64, u64)>),
+    Exact {
+        curve_id: CurveId,
+        quote_id: String,
+        pillar_date: Date,
+        bp: u64,
+    },
 }
 
 impl From<&QuoteBump> for RateBumpKey {
@@ -85,6 +91,17 @@ impl From<&QuoteBump> for RateBumpKey {
                     .map(|(tenor, bp)| (tenor.to_bits(), bp.to_bits()))
                     .collect(),
             ),
+            QuoteBump::RateQuoteBp {
+                curve_id,
+                quote_id,
+                pillar_date,
+                bp,
+            } => Self::Exact {
+                curve_id: curve_id.clone(),
+                quote_id: quote_id.clone(),
+                pillar_date: *pillar_date,
+                bp: bp.to_bits(),
+            },
         }
     }
 }
@@ -146,20 +163,44 @@ enum RateQuoteShock<'a> {
 impl RateQuoteShock<'_> {
     fn apply(
         self,
+        curve_id: &CurveId,
         quotes: Vec<RateQuote>,
         bindings: &[RateQuoteBinding],
     ) -> finstack_quant_core::Result<Vec<RateQuote>> {
-        let (target, bp) = match self {
-            Self::Bucket(bump) => return Ok(apply_bump_to_rate_quotes(quotes, bump, bindings)),
-            Self::Exact { target, bp } => (target, bp),
-        };
+        match self {
+            Self::Bucket(QuoteBump::RateQuoteBp {
+                curve_id: target,
+                quote_id,
+                pillar_date,
+                bp,
+            }) => {
+                if target == curve_id {
+                    Self::apply_exact(quotes, bindings, quote_id, *pillar_date, *bp)
+                } else {
+                    Ok(quotes)
+                }
+            }
+            Self::Bucket(bump) => apply_bump_to_rate_quotes(quotes, bump, bindings),
+            Self::Exact { target, bp } => {
+                Self::apply_exact(quotes, bindings, &target.quote_id, target.pillar_date, bp)
+            }
+        }
+    }
+
+    fn apply_exact(
+        quotes: Vec<RateQuote>,
+        bindings: &[RateQuoteBinding],
+        quote_id: &str,
+        pillar_date: Date,
+        bp: f64,
+    ) -> finstack_quant_core::Result<Vec<RateQuote>> {
         let invalid = |detail: &str| {
             finstack_quant_core::Error::Validation(format!(
                 "Exact rate quote '{}' at {}: {detail}",
-                target.quote_id, target.pillar_date
+                quote_id, pillar_date
             ))
         };
-        if target.quote_id.trim().is_empty() || !bp.is_finite() {
+        if quote_id.trim().is_empty() || !bp.is_finite() {
             return Err(invalid(
                 "requires a nonempty quote ID and a finite basis-point shock",
             ));
@@ -167,17 +208,17 @@ impl RateQuoteShock<'_> {
         let mut positions = bindings
             .iter()
             .enumerate()
-            .filter(|(_, binding)| binding.quote_id == target.quote_id);
+            .filter(|(_, binding)| binding.quote_id == quote_id);
         let (index, binding) = positions
             .next()
             .ok_or_else(|| invalid("missing executed binding"))?;
-        if positions.next().is_some() || binding.pillar_date != target.pillar_date {
+        if positions.next().is_some() || binding.pillar_date != pillar_date {
             return Err(invalid("ambiguous quote ID or a different resolved pillar"));
         }
         let mut quotes = quotes;
         let quote = quotes
             .get_mut(index)
-            .filter(|quote| quote.id().as_str() == target.quote_id)
+            .filter(|quote| quote.id().as_str() == quote_id)
             .ok_or_else(|| invalid("quote and executed binding orders differ"))?;
         *quote = quote.bump_rate_bp(bp);
         quote.validate()?;
@@ -202,6 +243,14 @@ pub fn bump_discount_curve_from_rate_calibration(
     context: &MarketContext,
     bump: &QuoteBump,
 ) -> finstack_quant_core::Result<DiscountCurve> {
+    if let QuoteBump::RateQuoteBp { curve_id, .. } = bump
+        && curve_id != curve.id()
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "rate quote bump targets {curve_id}, but this replay owns {}",
+            curve.id()
+        )));
+    }
     bump.validate()?;
     bump_discount_curve_from_rate_calibration_with_projection(
         curve,
@@ -304,7 +353,11 @@ fn bump_discount_curve_from_rate_calibration_with_projection(
             cfg.discount_curve.validation_tolerance,
         )?;
     }
-    let quotes = bump.apply(quotes, &original_execution(calibration)?.bindings)?;
+    let quotes = bump.apply(
+        curve.id(),
+        quotes,
+        &original_execution(calibration)?.bindings,
+    )?;
     let bumped = solve_discount_curve(&quotes, &params, context, &cfg)?;
     let mut recipe = required_discount_rate_calibration(&bumped)?.clone();
     recipe.role = calibration.role.clone();
@@ -480,7 +533,11 @@ fn bump_forward_curve_with_shock(
             tolerance,
         )?;
     }
-    let quotes = bump.apply(quotes, &original_execution(calibration)?.bindings)?;
+    let quotes = bump.apply(
+        curve.id(),
+        quotes,
+        &original_execution(calibration)?.bindings,
+    )?;
     let bumped = rebootstrap_forward_curve(quotes, &params, target_context, &cfg)?;
     if let Some(policy) = curve.fx_policy() {
         return bumped
@@ -721,6 +778,14 @@ pub(crate) fn bump_market_via_rate_quote_shock(
         discount_curve_id,
         forward_curve_id,
     )?;
+    if let QuoteBump::RateQuoteBp { curve_id, .. } = bump
+        && curve_id != discount_curve_id
+        && (linked_single_curve || curve_id != forward_curve_id)
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "rate quote bump targets {curve_id}, which is not an independent source of this replay"
+        )));
+    }
     let discount_cal = required_discount_rate_calibration(discount.as_ref())?;
     let forward_cal = required_forward_rate_calibration(forward.as_ref())?;
 
@@ -733,6 +798,9 @@ pub(crate) fn bump_market_via_rate_quote_shock(
             RateQuoteShock::Bucket(bump),
             Some(discount_curve_id.clone()),
         )?
+    } else if matches!(bump, QuoteBump::RateQuoteBp { curve_id, .. } if curve_id == forward_curve_id)
+    {
+        discount.as_ref().clone()
     } else {
         bump_discount_curve_from_rate_calibration(discount.as_ref(), discount_cal, market, bump)?
     };
@@ -853,6 +921,15 @@ pub(crate) fn bump_single_ois_market_via_rate_quote_shock(
     bump: &QuoteBump,
 ) -> finstack_quant_core::Result<MarketContext> {
     bump.validate()?;
+    if let QuoteBump::RateQuoteBp {
+        curve_id: target, ..
+    } = bump
+        && target != curve_id
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "rate quote bump targets {target}, but this replay owns {curve_id}"
+        )));
+    }
     let discount = market.get_discount(curve_id.as_str())?;
     let discount_cal = required_discount_rate_calibration(discount.as_ref())?;
 
@@ -943,29 +1020,43 @@ fn fixing_seed(
     )
 }
 
-/// Apply shocks to the quote whose executed pillar is nearest each requested curve time.
+/// Apply a parallel quote move or exact, nonambiguous pillar moves.
 fn apply_bump_to_rate_quotes(
     mut quotes: Vec<RateQuote>,
     bump: &QuoteBump,
     bindings: &[RateQuoteBinding],
-) -> Vec<RateQuote> {
+) -> finstack_quant_core::Result<Vec<RateQuote>> {
     match bump {
-        QuoteBump::ParallelBp(bp) => quotes
+        QuoteBump::ParallelBp(bp) => Ok(quotes
             .into_iter()
             .map(|quote| quote.bump_rate_bp(*bp))
-            .collect(),
+            .collect()),
         QuoteBump::TenorsBp(targets) => {
-            for (time, bp) in targets {
-                if let Some((i, _)) = bindings.iter().enumerate().min_by(|(_, a), (_, b)| {
-                    (a.pillar_time - time)
-                        .abs()
-                        .total_cmp(&(b.pillar_time - time).abs())
-                }) {
-                    quotes[i] = quotes[i].bump_rate_bp(*bp);
-                }
+            for &(time, bp) in targets {
+                let mut matches = bindings
+                    .iter()
+                    .filter(|binding| binding.pillar_time.to_bits() == time.to_bits());
+                let target = matches
+                    .next()
+                    .filter(|_| matches.next().is_none())
+                    .ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(format!(
+                            "rate quote bump pillar {time} requires one exact executed binding"
+                        ))
+                    })?;
+                quotes = RateQuoteShock::apply_exact(
+                    quotes,
+                    bindings,
+                    &target.quote_id,
+                    target.pillar_date,
+                    bp,
+                )?;
             }
-            quotes
+            Ok(quotes)
         }
+        QuoteBump::RateQuoteBp { .. } => Err(finstack_quant_core::Error::Internal(
+            "rate quote shock requires the owning curve identity".into(),
+        )),
     }
 }
 
@@ -1894,7 +1985,8 @@ mod tests {
         };
         let base_rates: Vec<f64> = quotes.iter().map(implied_rate).collect();
 
-        let bumped = apply_bump_to_rate_quotes(quotes, &QuoteBump::ParallelBp(1.0), &[]);
+        let bumped = apply_bump_to_rate_quotes(quotes, &QuoteBump::ParallelBp(1.0), &[])
+            .expect("parallel bump");
 
         for (q, base) in bumped.iter().zip(base_rates.iter()) {
             let moved = implied_rate(q) - base;

@@ -361,7 +361,17 @@ const RATE_HISTORY = {
   window_days: 3,
   scenarios: [0.001, -0.0005, 0.002].map((shift, index) => ({
     date: `2024-01-1${2 - index}`,
-    shifts: [{ factor: { type: 'discount_rate', curve_id: 'USD-OIS', tenor_years: 5.0 }, shift }],
+    shifts: [
+      {
+        factor: {
+          type: 'discount_rate',
+          curve_id: 'USD-OIS',
+          tenor_years: 5.0,
+          grid_years: [3, 5, 7],
+        },
+        shift,
+      },
+    ],
   })),
 };
 

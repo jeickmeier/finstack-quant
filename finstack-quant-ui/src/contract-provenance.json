@@ -68,14 +68,14 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "9ce7eaada4aa30cea36368e936d137f62444b2c1e92814af6c36b6b5f4e2ad95",
+          "sha256": "1a306e102795013a0f3abbf82404386a33d5fc9198764f03224535f86bb8f1f9",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/credit_derivatives/cds_index.schema.json",
-          "sha256": "99ad29b4dac977b1a42ff05f9fe461a07965ee38d1bab179e36d31768d1cd678",
+          "sha256": "62218c97f3aaff2a89fff7c6c7158068186d7645bd96f1785e3604402b036aed",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -96,7 +96,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/credit_derivatives/credit_default_swap.schema.json",
-          "sha256": "afd81897ac6654468367a08ebf3cc5754f03333f3988f25dda30d615de4c2672",
+          "sha256": "bdda80067e1693041a59a851b313a392e3d5259b46adc7085ca6f49b01187a5f",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "12061ff9da59a8c9c531dbd96f630d926c238ac574f9ef504bf135dc3b08c6d3",
+          "sha256": "a9a26548ec292d6dc712ef1e0034ae2d3c2432ac9e4d1584d28188aee1f6a62c",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -376,7 +376,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_forward.schema.json",
-          "sha256": "b45a19e99ac62782b8573feb35dd18e7c7cd18a290167122cff242d5ee2fba2f",
+          "sha256": "83795fb0f0c48ae717f31055dd11680aa5f9e799b51ca6adba219548984557bd",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -397,7 +397,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_option.schema.json",
-          "sha256": "ac86b9cf073554f59d332c17dd7e8d5f0e3fb0cb78b0a50b5cde40831ce63993",
+          "sha256": "6fc13a389dedbf6bd3fcd8d1178b164658fda3ac7a0d642835cec660934fc03b",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -586,7 +586,7 @@
           "uri": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
           "pointer": "#",
           "source": "finstack-quant/calibration/schemas/calibration/1/calibration.schema.json",
-          "sha256": "3e4a152b3705f0a1fc1d2f57537725ca6e4122b5060c806869168b1715d35a0c",
+          "sha256": "b7c0208bb7c42f3fdc35f69de64339aba0e322dec1c1f896d416a504bcca0a3e",
           "description": "Canonical typed calibration request and result envelope."
         }
       ]
@@ -1035,7 +1035,7 @@
           "uri": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/results/1/instrument_cashflow.schema.json",
-          "sha256": "446531a56668935824ba22ce8707a7dcfc9f53d1b068a53bd5a8f06fcadfc853",
+          "sha256": "cc908d2734d3049bbb3980d12401c724e659d0b1f9469942e51f067949130db3",
           "description": "Native cashflow rows, reporting-currency PV and reconciliation status."
         }
       ]

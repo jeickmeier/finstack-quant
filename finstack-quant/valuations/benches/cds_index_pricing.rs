@@ -43,6 +43,7 @@ fn create_cds_index_single_curve(tenor_years: i32) -> CdsIndex {
             id: format!("CDX-{}Y", tenor_years).into(),
             notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: 0.40,

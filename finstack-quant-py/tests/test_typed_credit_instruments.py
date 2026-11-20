@@ -88,6 +88,7 @@ def _cds_hand_written_json() -> str:
             "type": "credit_default_swap",
             "spec": {
                 "id": "CDS-1",
+                "include_valuation_date_cashflows": False,
                 "notional": {"amount": "10000000", "currency": "USD"},
                 "side": "pay",
                 "convention": "isda_na",
@@ -159,6 +160,7 @@ class TestCreditDefaultSwapTyped:
         cds = (
             CreditDefaultSwap
             .builder()
+            .include_valuation_date_cashflows(False)
             .id("CDS-SIDE")
             .notional(Money(1_000_000.0, Currency("USD")))
             .side(value)
@@ -175,6 +177,7 @@ class TestCreditDefaultSwapTyped:
         cds = (
             CreditDefaultSwap
             .builder()
+            .include_valuation_date_cashflows(False)
             .id("CDS-CONV")
             .notional(Money(1_000_000.0, Currency("USD")))
             .side("pay")
@@ -194,6 +197,7 @@ class TestCreditDefaultSwapTyped:
         cds = (
             CreditDefaultSwap
             .builder()
+            .include_valuation_date_cashflows(False)
             .id("CDS-DOC")
             .notional(Money(1_000_000.0, Currency("USD")))
             .side("pay")
@@ -223,6 +227,7 @@ class TestCreditDefaultSwapTyped:
         cds = (
             CreditDefaultSwap
             .builder()
+            .include_valuation_date_cashflows(False)
             .id("CDS-FWD")
             .notional(Money(1_000_000.0, Currency("USD")))
             .side("pay")
@@ -241,6 +246,7 @@ class TestCreditDefaultSwapTyped:
         cds = (
             CreditDefaultSwap
             .builder()
+            .include_valuation_date_cashflows(False)
             .id(value="CDS-KW")
             .notional(value=Money(1_000_000.0, Currency("USD")))
             .side(value="pay")
@@ -288,6 +294,7 @@ class TestCdsIndexTyped:
         index = (
             CdsIndex
             .builder()
+            .include_valuation_date_cashflows(False)
             .id("CDX-IG-42")
             .index_name("CDX.NA.IG")
             .series(42)
@@ -312,6 +319,7 @@ class TestCdsIndexTyped:
         index = (
             CdsIndex
             .builder()
+            .include_valuation_date_cashflows(False)
             .id("CDX-CONV")
             .index_name("CDX.NA.IG")
             .series(42)
@@ -334,6 +342,7 @@ class TestCdsIndexTyped:
         builder = (
             CdsIndex
             .builder()
+            .include_valuation_date_cashflows(False)
             .id("CDX-PRICING")
             .index_name("CDX.NA.IG")
             .series(42)
@@ -386,6 +395,7 @@ class TestCdsIndexTyped:
         index = (
             CdsIndex
             .builder()
+            .include_valuation_date_cashflows(False)
             .id(value="CDX-KW")
             .index_name(value="CDX.NA.IG")
             .series(value=42)

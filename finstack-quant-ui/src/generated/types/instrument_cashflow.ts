@@ -460,10 +460,6 @@ export interface D_674830A94Dacf97E7Ac8 {
    * instruments and for a schedule with no issue date.
    */
   beginning_balance?: number | null;
-  /**
-   * Interval default probability `SP(t_{i-1}) − SP(t_i)` (hazard mode only).
-   */
-  conditional_default_prob?: number | null;
   currency: Currency1;
   date: Date2;
   discount_curve_id: Id2;

@@ -60,22 +60,24 @@ fn test_matured_position() {
 }
 
 #[test]
-fn test_at_maturity() {
-    // Edge Case: Pricing exactly at maturity date
+fn test_at_maturity_with_an_unpaid_rolled_coupon() {
     let start = date!(2025 - 01 - 01);
+    // New Year's Day is a scheduled termination date. Its final coupon
+    // follows to the next business day and remains payable at termination.
     let end = date!(2030 - 01 - 01);
-    let as_of = end; // Exactly at maturity
-
     let idx = standard_single_curve_index("CDX-AT-MAT", start, end, 10_000_000.0);
-    let ctx = standard_market_context(as_of);
+    let ctx = standard_market_context(end);
 
-    let npv = idx
-        .value(&ctx, as_of)
-        .expect("pricing at maturity should collapse to zero residual value");
-    assert!(
-        npv.amount().abs() < 1_000.0,
-        "Pricing at maturity should have ~zero residual value"
-    );
+    let principal = idx
+        .pv_protection_leg(&ctx, end)
+        .expect("expired protection");
+    assert_eq!(principal.amount(), 0.0);
+    let premium = idx.pv_premium_leg(&ctx, end).expect("pending final coupon");
+    assert!(premium.amount() > 0.0);
+    let npv = idx.value(&ctx, end).expect("rolled final coupon");
+    assert_eq!(npv.amount(), -premium.amount());
+    let payment = end.next_day().expect("payment date");
+    assert_eq!(idx.value(&ctx, payment).expect("settled").amount(), 0.0);
 }
 
 #[test]
@@ -159,6 +161,7 @@ fn test_constituents_weights_dont_sum_to_one() {
             id: finstack_quant_core::types::InstrumentId::new("CDX-BAD-WEIGHTS"),
             notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: TEST_RECOVERY,
@@ -194,6 +197,7 @@ fn test_negative_weights() {
             id: finstack_quant_core::types::InstrumentId::new("CDX-NEG-WEIGHTS"),
             notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: TEST_RECOVERY,
@@ -223,6 +227,7 @@ fn test_recovery_rate_zero() {
             id: finstack_quant_core::types::InstrumentId::new("CDX-ZERO-REC"),
             notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: 0.0,
@@ -262,6 +267,7 @@ fn test_recovery_rate_one() {
             id: finstack_quant_core::types::InstrumentId::new("CDX-FULL-REC"),
             notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: 1.0,
@@ -301,6 +307,7 @@ fn test_index_factor_zero() {
             id: finstack_quant_core::types::InstrumentId::new("CDX-ZERO-FACTOR"),
             notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: TEST_RECOVERY,
@@ -336,6 +343,7 @@ fn test_index_factor_greater_than_one() {
             id: finstack_quant_core::types::InstrumentId::new("CDX-BIG-FACTOR"),
             notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: TEST_RECOVERY,
@@ -369,6 +377,7 @@ fn test_par_spread_rejects_invalid_index_factor() {
             id: finstack_quant_core::types::InstrumentId::new("CDX-PAR-BAD-FACTOR"),
             notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: TEST_RECOVERY,
@@ -401,6 +410,7 @@ fn test_empty_constituents_list() {
             id: finstack_quant_core::types::InstrumentId::new("CDX-EMPTY"),
             notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: TEST_RECOVERY,
@@ -433,6 +443,7 @@ fn test_missing_constituent_hazard_curve() {
             id: finstack_quant_core::types::InstrumentId::new("CDX-MISSING-CONST"),
             notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: TEST_RECOVERY,

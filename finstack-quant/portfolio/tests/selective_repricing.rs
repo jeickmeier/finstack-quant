@@ -487,6 +487,9 @@ impl UnresolvableInstrument {
 }
 
 impl Instrument for UnresolvableInstrument {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     fn id(&self) -> &str {
         "UNRESOLVABLE"
     }
@@ -641,6 +644,9 @@ finstack_quant_valuations::impl_empty_cashflow_provider!(
 );
 
 impl Instrument for DependencyProbeInstrument {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     fn id(&self) -> &str {
         &self.id
     }

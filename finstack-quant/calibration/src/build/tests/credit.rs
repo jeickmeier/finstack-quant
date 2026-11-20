@@ -77,7 +77,8 @@ fn test_build_cds_upfront() {
         convention: key,
         pillar: Pillar::Tenor(Tenor::parse("5Y").unwrap()),
         coupon_bp: 100.0,
-        upfront_pct: 0.02, // 2% upfront
+        upfront_pct: 0.02,
+        upfront_basis: crate::quotes::CdsUpfrontBasis::ActualCash,
         recovery_rate: 0.40,
     };
 
@@ -129,6 +130,7 @@ fn credit_coupon_anchors_follow_trade_date_across_all_quarterly_rolls() {
                 pillar: Pillar::Tenor(Tenor::parse("5Y").unwrap()),
                 coupon_bp: 100.0,
                 upfront_pct: 0.02,
+                upfront_basis: crate::quotes::CdsUpfrontBasis::Clean,
                 recovery_rate: 0.40,
             };
             let cds_instrument = build_cds_instrument(&cds_quote, &ctx).unwrap();
@@ -190,6 +192,7 @@ fn cds_coupon_anchor_cash_settlement_and_protection_step_in_remain_distinct() {
         pillar: Pillar::Tenor(Tenor::parse("5Y").unwrap()),
         coupon_bp: 100.0,
         upfront_pct: 0.02,
+        upfront_basis: crate::quotes::CdsUpfrontBasis::Clean,
         recovery_rate: 0.40,
     };
     for (convention, expected_step_in) in [

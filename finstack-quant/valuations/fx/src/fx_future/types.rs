@@ -173,6 +173,7 @@ impl FxFuture {
             domestic_discount_curve_id: &self.domestic_discount_curve_id,
             foreign_discount_curve_id: &self.foreign_discount_curve_id,
             quoted_spot: self.quoted_spot,
+            spot_basis: crate::shared::FxSpotBasis::Cash,
             context: "FxFuture",
         })
     }
@@ -210,6 +211,9 @@ impl FxFuture {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for FxFuture {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::FxFuture,
         crate::FX

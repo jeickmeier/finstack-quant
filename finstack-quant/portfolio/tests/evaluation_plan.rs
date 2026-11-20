@@ -53,6 +53,9 @@ finstack_quant_valuations::impl_empty_cashflow_provider!(
 );
 
 impl Instrument for ProbedInstrument {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     /// Test mock: reads no market data.
     fn market_dependencies(
         &self,

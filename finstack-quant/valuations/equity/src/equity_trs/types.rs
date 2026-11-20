@@ -413,6 +413,9 @@ impl EquityTotalReturnSwap {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for EquityTotalReturnSwap {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::EquityTotalReturnSwap,
         crate::EQUITY

@@ -38,18 +38,25 @@ pub(crate) fn compute_pv(
             } = collect_inputs(inst, curves, as_of)?;
             bs_price_unchecked(spot, inst.strike, r, q, sigma, t, inst.option_type)
         }
-        ExerciseStyle::American => {
-            let tree = leisen_reimer_tree(inst);
+        ExerciseStyle::American | ExerciseStyle::Bermudan => {
+            let schedule = if inst.exercise_style == ExerciseStyle::Bermudan {
+                Some(bermudan_schedule(inst)?)
+            } else {
+                None
+            };
             let (params, dividends) = early_exercise_market_params(inst, curves, as_of)?;
-            tree.price_american(&params, &dividends)?
-        }
-        ExerciseStyle::Bermudan => {
-            let schedule = bermudan_schedule(inst)?;
-            let tree = leisen_reimer_tree(inst);
-            let (params, dividends) = early_exercise_market_params(inst, curves, as_of)?;
-            let exercise_times =
-                bermudan_exercise_times(inst, schedule, as_of, params.time_to_expiry)?;
-            tree.price_bermudan(&params, &exercise_times, &dividends)?
+            if params.time_to_expiry == 0.0 {
+                params.option_type.intrinsic(params.spot, params.strike)
+            } else {
+                let tree = leisen_reimer_tree(inst);
+                if let Some(schedule) = schedule {
+                    let exercise_times =
+                        bermudan_exercise_times(inst, schedule, as_of, params.time_to_expiry)?;
+                    tree.price_bermudan(&params, &exercise_times, &dividends)?
+                } else {
+                    tree.price_american(&params, &dividends)?
+                }
+            }
         }
     };
 
@@ -73,7 +80,7 @@ pub(crate) struct EquityOptionGreeks {
     /// theta holds each remaining cashflow's zero yield fixed and excludes
     /// the discontinuous spot change on an ex-dividend date.
     pub theta: f64,
-    /// Rho: PV change per 1bp (0.0001) move in the risk-free rate, in currency
+    /// Rho: currency PV per positive basis point on the option model clock.
     pub rho: f64,
 }
 

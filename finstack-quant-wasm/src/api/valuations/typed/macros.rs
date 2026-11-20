@@ -153,6 +153,7 @@ macro_rules! instrument_pricing {
             /// @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
             /// @param metricId - Fully qualified metric identifier, e.g. `"dv01"` or `"par_rate"`.
             /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+            /// @param extras - Optional pricing configuration, history and overrides accepted by `price`.
             /// @returns The metric value in the metric's documented unit.
             /// @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
             pub fn metric(
@@ -162,6 +163,8 @@ macro_rules! instrument_pricing {
                 #[wasm_bindgen(js_name = "metricId", unchecked_param_type = "string")] metric_id: JsValue,
                 #[wasm_bindgen(unchecked_optional_param_type = "string | null")]
                 model: Option<JsValue>,
+                #[wasm_bindgen(unchecked_optional_param_type = "generated.valuations.PriceExtras | JsonInput | null")]
+                extras: Option<JsValue>,
             ) -> Result<f64, JsValue> {
                 let metric_id = crate::utils::input::js_string(&metric_id, "metricId")?;
                 $crate::api::valuations::typed::metric_value(
@@ -170,6 +173,7 @@ macro_rules! instrument_pricing {
                     &as_of,
                     model.as_ref(),
                     &metric_id,
+                    extras.as_ref(),
                 )
             }
         }
@@ -277,12 +281,15 @@ macro_rules! greek_methods {
         impl $ty {
             $(
                 $(#[$doc])*
+                /// @param extras - Optional pricing configuration and overrides accepted by `price`.
                 #[wasm_bindgen(js_name = $js_name)]
                 pub fn $name(
                     &self,
                     #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")] market_json: JsValue,
                     #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
                     #[wasm_bindgen(unchecked_optional_param_type = "string | null")] model: Option<JsValue>,
+                    #[wasm_bindgen(unchecked_optional_param_type = "generated.valuations.PriceExtras | JsonInput | null")]
+                extras: Option<JsValue>,
                 ) -> Result<f64, JsValue> {
                     $crate::api::valuations::typed::metric_value(
                         Box::new(self.inner.clone()),
@@ -290,6 +297,7 @@ macro_rules! greek_methods {
                         &as_of,
                         model.as_ref(),
                         $metric,
+                        extras.as_ref(),
                     )
                 }
             )*

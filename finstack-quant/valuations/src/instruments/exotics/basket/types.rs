@@ -82,8 +82,6 @@ pub struct BasketConstituent {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct BasketPricingConfig {
-    /// Day basis used for fee accrual (e.g., 365.0 or 365.25). Avoid hardcoding in logic.
-    pub days_in_year: f64,
     /// FX policy hint for conversions when constituent currency != basket currency.
     pub fx_policy: FxConversionPolicy,
 }
@@ -91,10 +89,23 @@ pub struct BasketPricingConfig {
 impl Default for BasketPricingConfig {
     fn default() -> Self {
         Self {
-            days_in_year: 365.25,
             fx_policy: FxConversionPolicy::CashflowDate,
         }
     }
+}
+
+/// Operating expense accrued at the basket's valuation cut.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+pub enum BasketExpense {
+    /// Explicitly elect no accrued expense at this cut.
+    None,
+    /// Deduct the qualified accrued expense once for each basket unit.
+    Accrued {
+        /// Nonnegative accrued cash per basket unit in the reporting currency.
+        amount: Money,
+    },
 }
 
 /// Simplified basket instrument focused on pricing essentials.
@@ -116,9 +127,10 @@ pub struct Basket {
     pub id: InstrumentId,
     /// Basket constituents (the actual holdings)
     pub constituents: Vec<BasketConstituent>,
-    /// Total expense ratio (as decimal, e.g., 0.0025 = 0.25%)
-    /// This affects pricing through expense drag calculations
+    /// Annual expense-ratio disclosure in decimal units (0.0025 is 0.25%).
     pub expense_ratio: f64,
+    /// Explicit accrued expense election at the valuation cut.
+    pub expense: BasketExpense,
     /// Reporting currency of the basket: NAV and PV are stated in it and every
     /// constituent in another currency is FX-converted into it.
     pub reporting_currency: Currency,
@@ -161,6 +173,7 @@ impl Basket {
             .id(self.id.clone())
             .constituents(self.constituents.clone())
             .expense_ratio(self.expense_ratio)
+            .expense(self.expense)
             .reporting_currency(self.reporting_currency)
             .notional(self.notional)
             .discount_curve_id(self.discount_curve_id.clone())
@@ -200,6 +213,7 @@ impl Basket {
             .id(InstrumentId::new("BASKET-60-40"))
             .constituents(constituents)
             .expense_ratio(0.0025)
+            .expense(BasketExpense::None)
             .reporting_currency(Currency::USD)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
@@ -248,13 +262,20 @@ impl Basket {
             || "basket constituent weights and units must be finite".to_string(),
         )?;
         validation::require_with(
-            self.pricing_config.days_in_year.is_finite() && self.pricing_config.days_in_year > 0.0,
-            || "basket pricing days_in_year must be finite and positive".to_string(),
+            self.expense_ratio.is_finite() && self.expense_ratio >= 0.0,
+            || "basket expense_ratio must be finite and nonnegative".to_string(),
         )?;
 
         validation::require_with(self.notional.currency() == self.reporting_currency, || {
             "basket notional currency must match basket reporting_currency".to_string()
         })?;
+
+        if let BasketExpense::Accrued { amount } = self.expense {
+            validation::require_with(
+                amount.currency() == self.reporting_currency && amount.amount() >= 0.0,
+                || "accrued basket expense must be nonnegative in reporting currency".to_string(),
+            )?;
+        }
 
         Ok(())
     }
@@ -262,6 +283,9 @@ impl Basket {
 
 // Implement traits manually to handle InstrumentId properly
 impl Instrument for Basket {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
     impl_instrument_base!(
         crate::pricer::InstrumentType::Basket,
         crate::pricer::STANDARD
@@ -292,7 +316,7 @@ impl Instrument for Basket {
     fn base_value(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
         self.validate()?;
         // Scale NAV-per-unit by explicit basket notional for portfolio PV.
-        let nav_per_unit = super::pricer::nav(self, curves, as_of, 1.0)?;
+        let nav_per_unit = super::pricer::nav(self, curves, as_of)?;
         let scaled = nav_per_unit.amount() * self.notional.amount();
         Money::from_model_value(scaled, self.notional.currency())
     }
@@ -315,6 +339,7 @@ mod tests {
             id: InstrumentId::new("TEST_BASKET"),
             constituents: vec![],
             expense_ratio: 0.001,
+            expense: BasketExpense::None,
             reporting_currency: Currency::USD,
             notional: Money::from((1_000_000_i64, Currency::USD)),
             discount_curve_id: "USD-OIS".into(),
@@ -356,6 +381,7 @@ mod tests {
                 },
             ],
             expense_ratio: 0.001,
+            expense: BasketExpense::None,
             reporting_currency: Currency::USD,
             notional: Money::from((1_000_000_i64, Currency::USD)),
             discount_curve_id: "USD-OIS".into(),

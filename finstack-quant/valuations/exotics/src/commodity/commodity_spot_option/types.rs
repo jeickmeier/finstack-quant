@@ -653,6 +653,9 @@ fn implied_carry(spot: f64, forward: f64, r: f64, t: f64) -> f64 {
 }
 
 impl Instrument for CommoditySpotOption {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CommoditySpotOption,
         crate::EXOTICS

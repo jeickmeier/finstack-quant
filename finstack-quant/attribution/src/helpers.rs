@@ -923,6 +923,9 @@ mod tests {
     );
 
     impl Instrument for CountingInstrument {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
         fn id(&self) -> &str {
             "COUNTED-CARRY"
         }

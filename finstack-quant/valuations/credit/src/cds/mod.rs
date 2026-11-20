@@ -144,3 +144,4 @@ mod types;
 pub use types::CdsTradeParams;
 pub use types::CreditDefaultSwap;
 pub use types::CreditDefaultSwapBuilder;
+pub(crate) use types::cash_is_eligible;

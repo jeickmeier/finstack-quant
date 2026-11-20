@@ -41,8 +41,11 @@ getters!(JsBasket, "Basket", |i| {
     /// @returns Basket constituents (the actual holdings)
     constituents as constituents: "generated.valuations.Basket['constituents']" => json(i.constituents),
     /// Read the contract's expense ratio.
-    /// @returns Total expense ratio (as decimal, e.g., 0.0025 = 0.25%) This affects pricing through expense drag calculations
+    /// @returns Total expense ratio (as decimal, e.g., 0.0025 = 0.25%) The explicit expense election supplies accrued cash.
     expense_ratio as expenseRatio: "number" => json(i.expense_ratio),
+    /// Read the accrued operating expense election.
+    /// @returns The no-expense election or reporting-currency accrued cash per basket unit.
+    expense as expense: "generated.valuations.Basket['expense']" => json(i.expense),
     /// Read the contract's reporting currency.
     /// @returns Reporting currency of the basket: NAV and PV are stated in it and every constituent in another currency is FX-converted into it.
     reporting_currency as reportingCurrency: "string" => text(i.reporting_currency),
@@ -99,10 +102,16 @@ setters!(JsBasketBuilder, "BasketBuilder", {
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
     constituents as constituents: "generated.valuations.Basket['constituents']" => js_wire,
     /// Set the contract's expense ratio.
-    /// @param value - Total expense ratio (as decimal, e.g., 0.0025 = 0.25%) This affects pricing through expense drag calculations
+    /// @param value - Total expense ratio (as decimal, e.g., 0.0025 = 0.25%) The explicit expense election supplies accrued cash.
     /// @returns The active builder.
     /// @throws FinstackError when the value cannot be converted or the builder has already been consumed.
     expense_ratio as expenseRatio: "number" => js_wire,
+    /// Set the basket's accrued expense election.
+    /// @param value - No expense or nonnegative reporting-currency cash per basket unit.
+    /// @returns This builder for chaining.
+    /// @throws Error - Throws for malformed inputs or a consumed builder.
+    expense as expense: "generated.valuations.Basket['expense']" => js_wire,
+
     /// Set the contract's reporting currency.
     /// @param value - Reporting currency of the basket: NAV and PV are stated in it and every constituent in another currency is FX-converted into it.
     /// @returns The active builder.

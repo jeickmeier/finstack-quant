@@ -2,8 +2,8 @@
 
 use crate::build::BuildCtx;
 use crate::build::helpers::resolve_spot_date;
-use crate::quotes::CdsQuote;
 use crate::quotes::Pillar;
+use crate::quotes::{CdsQuote, CdsUpfrontBasis};
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::{
     Date, DateExt, Tenor, TenorUnit, is_cds_date, prev_cds_date, prev_cds_semiannual_roll,
@@ -177,6 +177,7 @@ pub(crate) fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<C
             convention,
             pillar,
             upfront_pct,
+            upfront_basis,
             recovery_rate,
             ..
         } => (
@@ -185,7 +186,7 @@ pub(crate) fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<C
             entity,
             pillar,
             *recovery_rate,
-            Some(*upfront_pct),
+            Some((*upfront_pct, *upfront_basis)),
         ),
     };
 
@@ -197,17 +198,8 @@ pub(crate) fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<C
     // Credit curve ID: usually defaulted to entity name if not mapped
     let credit_id = ctx.require_curve_id("credit")?.to_string();
 
-    // Amount = Notional * pct; Date = Spot (Settlement)
-    let upfront = upfront
-        .map(|pct| {
-            Ok::<_, finstack_quant_core::Error>((
-                dates.spot,
-                Money::new(ctx.notional() * pct, convention_key.currency)?,
-            ))
-        })
-        .transpose()?;
-
-    let cds = CreditDefaultSwap {
+    let mut cds = CreditDefaultSwap {
+        include_valuation_date_cashflows: false,
         id: InstrumentId::new(id.as_str()),
         notional: Money::new(ctx.notional(), convention_key.currency)?,
         // Calibration instruments buy protection and pay premium.
@@ -234,12 +226,33 @@ pub(crate) fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<C
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
         valuation_convention: ctx.cds_valuation_convention().unwrap_or_default(),
-        upfront,
+        upfront: None,
         doc_clause: Some(convention_key.doc_clause),
         protection_effective_date: None,
         margin_spec: None,
         attributes: Attributes::new().with_meta("entity", entity.as_str()),
     };
+
+    let is_upfront_quote = upfront.is_some();
+    let upfront = upfront.or_else(|| {
+        (cds.valuation_convention.uses_clean_price()
+            && !cds.valuation_convention.par_spread_uses_full_premium())
+        .then_some((0.0, CdsUpfrontBasis::Clean))
+    });
+    if let Some((fraction, basis)) = upfront {
+        let actual_fraction = match basis {
+            CdsUpfrontBasis::Clean => {
+                fraction - spread_bp / 10_000.0 * cds.clean_quote_accrual(ctx.as_of())?
+            }
+            CdsUpfrontBasis::ActualCash => fraction,
+        };
+        if is_upfront_quote || actual_fraction != 0.0 {
+            cds.upfront = Some((
+                dates.spot,
+                Money::new(ctx.notional() * actual_fraction, convention_key.currency)?,
+            ));
+        }
+    }
 
     Ok(cds)
 }

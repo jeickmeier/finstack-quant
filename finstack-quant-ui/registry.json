@@ -187,7 +187,7 @@
           "target": "lib/finstack/generated/meta/calibration.ts"
         }
       ],
-      "registryDependencies": [],
+      "registryDependencies": ["@finstack/shared-schema-defs"],
       "dependencies": [],
       "categories": [],
       "meta": {

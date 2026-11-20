@@ -34,6 +34,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ScheduleInstrument {
 }
 
 impl Instrument for ScheduleInstrument {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     fn id(&self) -> &str {
         self.id.as_str()
     }

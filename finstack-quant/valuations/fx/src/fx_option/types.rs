@@ -153,10 +153,59 @@ impl FxDeltaConvention {
     }
 }
 
-/// European FX option with same-day cash settlement at expiry.
-///
-/// Physical delivery is intentionally not represented: exercised payoff is a
-/// quote-currency cash amount on `expiry`.
+/// Holder direction of a physically delivered FX option.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum FxOptionPosition {
+    /// Holder receives the exercised option exchange.
+    Long,
+    /// Writer owes the opposite exchange when exercised.
+    Short,
+}
+
+/// Settlement profile of the FX option.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+pub enum FxOptionDelivery {
+    /// Cash-settled benchmark option whose intrinsic payoff is due at expiry.
+    CashAtExpiry,
+    /// Deliverable option with a fixed native cash exchange on exercise.
+    Physical {
+        /// Booked value date of both currency legs, on or after expiry.
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::DateWire")
+        )]
+        date: Date,
+        /// Signed holder position with positive base notional.
+        position: FxOptionPosition,
+        /// Confirmed expiry outcome. The live option has no known outcome.
+        exercised: Option<bool>,
+    },
+}
+
+impl FxOptionDelivery {
+    pub(crate) fn position_sign(self) -> f64 {
+        match self {
+            Self::Physical {
+                position: FxOptionPosition::Short,
+                ..
+            } => -1.0,
+            _ => 1.0,
+        }
+    }
+
+    pub(crate) fn value_date(self, expiry: Date) -> Date {
+        match self {
+            Self::CashAtExpiry => expiry,
+            Self::Physical { date, .. } => date,
+        }
+    }
+}
+
+/// European FX option with an explicit cash or physical settlement profile.
 #[derive(
     PartialEq,
     Clone,
@@ -168,6 +217,10 @@ impl FxDeltaConvention {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FxOption {
+    /// Selected spot quote's fixed value-date basis.
+    pub spot_basis: crate::shared::FxSpotBasis,
+    /// Booked payoff and settlement profile.
+    pub delivery: FxOptionDelivery,
     /// Unique instrument identifier
     pub id: InstrumentId,
     /// Base currency (foreign currency)
@@ -236,6 +289,10 @@ pub struct FxOption {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FxOptionParams {
+    /// Selected spot quote's fixed value-date basis.
+    pub spot_basis: crate::shared::FxSpotBasis,
+    /// Booked payoff and settlement profile.
+    pub delivery: FxOptionDelivery,
     /// Unique instrument identifier.
     pub id: InstrumentId,
     /// Base (foreign) currency: the notional currency.
@@ -244,7 +301,7 @@ pub struct FxOptionParams {
     pub quote_currency: Currency,
     /// Strike exchange rate, quote currency per unit of base currency.
     pub strike: f64,
-    /// Expiry date; the cash payoff settles on this date.
+    /// Date anchoring expiry and the option volatility clock.
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -269,6 +326,10 @@ impl FxOption {
             self.quote_currency,
             "FxOption",
         )?;
+        finstack_quant_core::validation::require_with(
+            self.delivery.value_date(self.expiry) >= self.expiry,
+            || "FX option delivery must be on or after expiry".to_owned(),
+        )?;
         if self.notional.currency() != self.base_currency {
             return Err(finstack_quant_core::Error::CurrencyMismatch {
                 expected: self.base_currency,
@@ -291,6 +352,12 @@ impl FxOption {
                 self.strike
             )));
         }
+        if matches!(self.delivery, FxOptionDelivery::Physical { .. }) {
+            finstack_quant_core::validation::validate_f64_positive(
+                self.strike,
+                "deliverable FX strike",
+            )?;
+        }
         finstack_quant_core::validation::validate_money_gt(
             self.notional,
             0.0,
@@ -307,6 +374,8 @@ impl FxOption {
     /// pricing path rather than the expired-option intrinsic-only branch.
     pub fn example() -> finstack_quant_core::Result<Self> {
         Self::builder()
+            .spot_basis(crate::shared::FxSpotBasis::Cash)
+            .delivery(FxOptionDelivery::CashAtExpiry)
             .id(InstrumentId::new("FXOPT-EURUSD-CALL"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
@@ -343,6 +412,8 @@ impl FxOption {
     /// Returns an error if the builder fails validation.
     pub fn european(params: FxOptionParams) -> finstack_quant_core::Result<Self> {
         let FxOptionParams {
+            spot_basis,
+            delivery,
             id,
             base_currency,
             quote_currency,
@@ -354,6 +425,8 @@ impl FxOption {
             delta_convention,
         } = params;
         Self::builder()
+            .spot_basis(spot_basis)
+            .delivery(delivery)
             .id(id)
             .base_currency(base_currency)
             .quote_currency(quote_currency)
@@ -453,6 +526,9 @@ impl FxOption {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for FxOption {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::FxOption,
         crate::FX
@@ -545,8 +621,8 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxOpt
                     gamma: Some(greeks.gamma),
                     vega: Some(greeks.vega),
                     theta: Some(greeks.theta),
-                    rho_bp: Some(greeks.rho_domestic / 100.0),
-                    foreign_rho_bp: Some(greeks.rho_foreign / 100.0),
+                    rho_bp: Some(greeks.rho_domestic_bp),
+                    foreign_rho_bp: Some(greeks.rho_foreign_bp),
                     ..OptionGreeks::default()
                 })
             }
@@ -699,6 +775,8 @@ mod validation_tests {
     #[test]
     fn builder_rejects_same_base_and_quote_currency() {
         let result = FxOption::builder()
+            .spot_basis(crate::fx_option::FxSpotBasis::Cash)
+            .delivery(crate::fx_option::FxOptionDelivery::CashAtExpiry)
             .id(InstrumentId::new("FXOPT-USDUSD"))
             .base_currency(Currency::USD)
             .quote_currency(Currency::USD)

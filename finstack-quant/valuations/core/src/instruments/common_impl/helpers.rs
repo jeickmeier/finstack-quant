@@ -144,20 +144,30 @@ where
 /// behaviour required by callers that short-circuit on `t <= 0` before using
 /// the returned rate.
 ///
+/// # Arguments
+///
+/// * `df` - Finite positive unitless discount factor.
+/// * `t` - Finite year fraction on the discount curve's clock.
+/// * `context` - Pricing operation reported in input validation errors.
+///
 /// # Errors
 ///
-/// Returns a `Validation` error when `df` is not finite or non-positive.
-/// `df <= 0` would yield `NaN` or `+inf` from `ln`, masking a corrupted curve
-/// or extreme rate environment.
+/// Returns a `Validation` error for a non-finite time or a discount factor
+/// that is non-finite or non-positive, including at expiry.
 #[inline]
 pub fn zero_rate_from_df(df: f64, t: f64, context: &str) -> finstack_quant_core::Result<f64> {
-    if t <= 0.0 {
-        return Ok(0.0);
-    }
     if !df.is_finite() || df <= 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
             "{context}: discount factor must be finite and > 0, got {df:.6e} for t={t:.6}"
         )));
+    }
+    if !t.is_finite() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{context}: discount time must be finite, got {t}"
+        )));
+    }
+    if t <= 0.0 {
+        return Ok(0.0);
     }
     Ok(-df.ln() / t)
 }
@@ -624,6 +634,7 @@ pub(crate) fn compute_metrics_dyn(
         .collect();
     extras.sort_by(|(a, _), (b, _)| a.as_str().cmp(b.as_str()));
     for (metric_id, value) in extras {
+        crate::metrics::registry::validate_measure(metric_id, value)?;
         measures.insert(metric_id.clone(), value);
     }
 
@@ -682,6 +693,17 @@ mod tests {
     use finstack_quant_core::types::CurveId;
     use std::any::Any;
     use std::sync::Arc;
+
+    #[test]
+    fn zero_rate_validates_inputs_before_expiry_return() {
+        for df in [f64::NAN, 0.0] {
+            assert!(zero_rate_from_df(df, 0.0, "test").is_err());
+        }
+        for time in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(zero_rate_from_df(1.0, time, "test").is_err());
+        }
+        assert_eq!(zero_rate_from_df(1.0, -1.0, "test").unwrap(), 0.0);
+    }
 
     #[test]
     fn resolve_mc_paths_uses_default_when_override_missing() {
@@ -787,6 +809,9 @@ mod tests {
     }
 
     impl Instrument for StubInstrument {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
         /// Test mock: reads no market data.
         fn market_dependencies(
             &self,

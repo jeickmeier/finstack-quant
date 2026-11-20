@@ -204,6 +204,7 @@ class Basket:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         metric_id: str,
         model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> float:
         """
         Compute a registered scalar metric for this basket.
@@ -218,6 +219,9 @@ class Basket:
             Registered metric identifier (see :func:`list_standard_metrics`).
         model : str, default "default"
             Model key.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -410,11 +414,28 @@ class Basket:
         Returns
         -------
         float
-            Total expense ratio (as decimal, e.g., 0.0025 = 0.25%) This affects pricing through expense drag calculations
+            Total expense ratio (as decimal, e.g., 0.0025 = 0.25%) The annual ratio is a disclosure. The expense election supplies the accrued cash.
 
         Notes
         -----
         This property does not raise.
+        """
+        ...
+
+    @property
+    def expense(self) -> dict[str, object]:
+        """Read the accrued operating expense election at the valuation cut.
+
+        Returns
+        -------
+        dict[str, object]
+            A wire object with type "none", or type "accrued" with a
+            nonnegative reporting-currency amount per basket unit.
+
+        Raises
+        ------
+        ValueError
+            If the election cannot be serialized.
         """
         ...
 
@@ -553,7 +574,7 @@ class BasketBuilder:
         Parameters
         ----------
         value : float
-            Total expense ratio (as decimal, e.g., 0.0025 = 0.25%) This affects pricing through expense drag calculations
+            Total expense ratio (as decimal, e.g., 0.0025 = 0.25%) The annual ratio is a disclosure. The expense election supplies the accrued cash.
 
         Returns
         -------
@@ -564,6 +585,27 @@ class BasketBuilder:
         ------
         ValueError
             If the value cannot be converted or the builder has been consumed.
+        """
+        ...
+
+    def expense(self, value: dict[str, object] | str) -> BasketBuilder:
+        """Set the explicit operating expense to apply at the valuation cut.
+
+        Parameters
+        ----------
+        value : dict[str, object] or str
+            Wire object or JSON text with type "none", or type "accrued"
+            and reporting-currency money per basket unit.
+
+        Returns
+        -------
+        BasketBuilder
+            The builder for further edits.
+
+        Raises
+        ------
+        ValueError
+            If the election is invalid or the builder was already consumed.
         """
         ...
 

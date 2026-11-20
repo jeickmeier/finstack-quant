@@ -10,5 +10,5 @@ pub(crate) mod risk_factors;
 pub mod var_calculator;
 
 pub use hvar::{GenericExpectedShortfall, GenericHVar};
-pub use market_history::{MarketHistory, MarketScenario, RiskFactorShift};
+pub use market_history::{MarketHistory, MarketScenario, RiskFactorShift, UnshiftedHazardPolicy};
 pub use risk_factors::RiskFactorType;

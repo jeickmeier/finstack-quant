@@ -2583,7 +2583,8 @@ export interface CalibrationNamespace {
    *   - `convention` (object): CDS convention key `{ currency, doc_clause }`; `currency` is an upper-case ISO-4217 code and `doc_clause` one of `"cr14"`, `"mr14"`, `"mm14"`, `"xr14"`, `"isda_na"`, `"isda_eu"`, `"isda_as"`, `"isda_au"`, `"isda_nz"` or `"custom"`.
    *   - `pillar` (object): Maturity pillar in its serde form, a tenor `{ tenor: { count: 5, unit: "years" } }` (units `"days"`, `"weeks"`, `"months"`, `"years"`) or a date `{ date: "2029-06-20" }`.
    *   - `coupon_bp` (number): Standard running coupon in basis points (for example `100.0`).
-   *   - `upfront_pct` (number): Upfront payment as a decimal fraction of notional (`0.01` is 1%), positive when the protection buyer pays.
+   *   - `upfront_pct` (number): Signed quote as a decimal fraction of notional (`0.01` is 1%).
+   *   - `upfront_basis` (string): `"clean"` before the accrued rebate, or `"actual_cash"` for booked buyer cash.
    *   - `recovery_rate` (number): Assumed recovery rate as a decimal in `[0, 1)`.
    * @returns A validated `CdsQuote` object with `type: "cds_upfront"`.
    *
@@ -9121,6 +9122,41 @@ export interface ValuationsInstrumentsNamespace {
    * @returns An empty tranche builder.
    */
   readonly trancheBuilder: typeof wasm.trancheBuilder;
+  /**
+   * Sum the tranche balances on the structure's native currency basis.
+   * @param structure - Tranche structure object or JSON text.
+   * @returns Total tranche balance as a Money wire value.
+   * @throws Error - Throws if the structure is malformed, currencies differ, or the amount overflows.
+   */
+  readonly trancheStructureTotalSize: typeof wasm.trancheStructureTotalSize;
+  /**
+   * Resolve whether the tranche's interest must be paid without deferral.
+   * @param tranche - Tranche object or JSON text, including any explicit non-deferrable election.
+   * @returns The resolved interest treatment, using the tranche rules when the flag is absent.
+   * @throws Error - Throws if the input does not match the tranche schema.
+   */
+  readonly trancheIsNonDeferrable: typeof wasm.trancheIsNonDeferrable;
+  /**
+   * Read the tranche's waterfall payment priority.
+   * @param tranche - Tranche object or JSON text, including its optional authored priority.
+   * @returns The nonnegative integer priority used to order tranche payments.
+   * @throws Error - Throws if the input does not match the tranche schema.
+   */
+  readonly tranchePaymentPriority: typeof wasm.tranchePaymentPriority;
+  /**
+   * Resolve liquidation proceeds after modeled costs.
+   * @param spec - Liquidation specification object or JSON text, with recovery and cost terms.
+   * @returns Net proceeds as a decimal fraction of the liquidated balance.
+   * @throws Error - Throws if the input does not match the liquidation specification.
+   */
+  readonly liquidationSpecNetProceedsFraction: typeof wasm.liquidationSpecNetProceedsFraction;
+  /**
+   * Compute lender cashflows of an asset-backed facility projection.
+   * @param projection - Facility projection object or JSON text containing the projected payments, fees and draws.
+   * @returns Dated signed lender cashflows as ISO date and Money wire value pairs.
+   * @throws Error - Throws for malformed projection data or when the signed cashflows cannot be combined.
+   */
+  readonly facilityProjectionLenderCashflows: typeof wasm.facilityProjectionLenderCashflows;
   /**
    * Build a tranche structure whose attachment points come from the balances.
    *

@@ -82,4 +82,3 @@ mod tests;
 pub use engine::CdsPricer;
 pub use engine::PreparedCds;
 pub(crate) use helpers::date_from_hazard_time;
-pub(crate) use metrics::AccrualDayCountPolicy;

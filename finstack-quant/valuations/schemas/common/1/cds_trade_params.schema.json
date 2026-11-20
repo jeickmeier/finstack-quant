@@ -26,6 +26,7 @@
       "discount_curve_id": "USD-OIS",
       "end": "2029-06-20",
       "id": "CDX-IG-42",
+      "include_valuation_date_cashflows": false,
       "notional": {
         "amount": "10000000",
         "currency": "USD"
@@ -52,6 +53,10 @@
       "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
       "description": "Unique instrument identifier."
     },
+    "include_valuation_date_cashflows": {
+      "description": "Whether scheduled premium and actual upfront dated as of valuation are still due.",
+      "type": "boolean"
+    },
     "notional": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
       "description": "Contract notional; its currency is the premium and protection currency."
@@ -71,6 +76,7 @@
     }
   },
   "required": [
+    "include_valuation_date_cashflows",
     "id",
     "notional",
     "side",

@@ -122,12 +122,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/conditional_default_prob",
-    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/conditional_default_prob",
-    "description": "Interval default probability `SP(t_{i-1}) − SP(t_i)` (hazard mode only).",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_674830a94dacf97e7ac8/properties/currency",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/currency",
     "description": "Row currency (matters for instruments whose legs settle in several currencies).",

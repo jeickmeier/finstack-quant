@@ -70,6 +70,7 @@ fn test_upfront_payment_buyer_payfast() {
 
     // Add Upfront Payment: 500k USD paid by Buyer (me)
     let upfront_amount = 500_000.0;
+    cds.include_valuation_date_cashflows = true;
     cds.upfront = Some((
         as_of,
         Money::new(upfront_amount, Currency::USD).expect("valid money fixture"),
@@ -118,6 +119,7 @@ fn test_upfront_payment_seller_receivefast() {
 
     // Add Upfront Payment: 500k USD paid by Buyer (to ME, the Seller)
     let upfront_amount = 500_000.0;
+    cds.include_valuation_date_cashflows = true;
     cds.upfront = Some((
         as_of,
         Money::new(upfront_amount, Currency::USD).expect("valid money fixture"),

@@ -62,7 +62,11 @@ where
         let defaults = sens_config::resolve(context)?;
 
         let dependencies = instrument.market_dependencies()?;
-        let vol_surface_ids = dependencies.present_vol_surface_ids(&context.curves);
+        let vol_surface_ids = if volatility_override(instrument).is_some() {
+            Vec::new()
+        } else {
+            dependencies.grid_vol_surface_ids(&context.curves)?
+        };
         if vol_surface_ids.is_empty() && volatility_override(instrument).is_none() {
             return Err(finstack_quant_core::Error::Validation(
                 "vega requires a vol surface dependency or a volatility override".to_string(),
@@ -309,6 +313,9 @@ mod tests {
     }
 
     impl Instrument for MultiSurfaceVegaInstrument {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
         fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
             let mut dependencies = MarketDependencies::new();
             for (vol_surface_id, _) in &self.surface_terms {

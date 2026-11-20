@@ -455,6 +455,9 @@ mod tests {
     }
 
     impl Instrument for MissingCashflows {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
         fn id(&self) -> &str {
             "missing-cashflows"
         }

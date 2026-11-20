@@ -280,7 +280,18 @@
         "path": "finstack-quant/valuations/tests/instruments/json_examples/basket.json",
         "pointer": []
       },
-      "instrumentPatches": [],
+      "instrumentPatches": [
+        {
+          "path": ["instrument", "spec", "expense"],
+          "value": {
+            "type": "accrued",
+            "amount": {
+              "amount": "0.01",
+              "currency": "USD"
+            }
+          }
+        }
+      ],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
         "pointer": []
@@ -294,14 +305,20 @@
         "marketHistory": null
       },
       "edit": {
-        "path": ["instrument", "spec", "expense_ratio"],
-        "from": 0.0025,
-        "to": 0.0035,
-        "description": "Change expense_ratio from 0.0025 to 0.0035; native present value must change."
+        "path": ["instrument", "spec", "expense", "amount", "amount"],
+        "from": "0.01",
+        "to": "0.02",
+        "description": "Change accrued expense per basket unit from USD 0.01 to USD 0.02."
       },
       "reference": {
-        "baseline": { "amount": "147198992.4709103", "currency": "USD" },
-        "edited": { "amount": "147198589.4592744", "currency": "USD" }
+        "baseline": {
+          "amount": "147190000",
+          "currency": "USD"
+        },
+        "edited": {
+          "amount": "147180000",
+          "currency": "USD"
+        }
       }
     },
     {
@@ -351,7 +368,7 @@
         "model": "discounting",
         "metrics": ["theta", "hvar"],
         "metricPricingOverrides": "{\"theta_period\":{\"count\":1,\"unit\":\"weeks\"}}",
-        "marketHistory": "{\"base_date\":\"2023-12-28\",\"window_days\":2,\"scenarios\":[{\"date\":\"2023-12-26\",\"shifts\":[{\"factor\":{\"type\":\"discount_rate\",\"curve_id\":\"USD-TREASURY\",\"tenor_years\":1},\"shift\":0.001}]},{\"date\":\"2023-12-27\",\"shifts\":[{\"factor\":{\"type\":\"discount_rate\",\"curve_id\":\"USD-TREASURY\",\"tenor_years\":1},\"shift\":-0.0005}]}]}"
+        "marketHistory": "{\"base_date\":\"2023-12-28\",\"window_days\":2,\"scenarios\":[{\"date\":\"2023-12-26\",\"shifts\":[{\"factor\":{\"type\":\"discount_rate\",\"curve_id\":\"USD-TREASURY\",\"tenor_years\":1,\"grid_years\":[1]},\"shift\":0.001}]},{\"date\":\"2023-12-27\",\"shifts\":[{\"factor\":{\"type\":\"discount_rate\",\"curve_id\":\"USD-TREASURY\",\"tenor_years\":1,\"grid_years\":[1]},\"shift\":-0.0005}]}]}"
       },
       "edit": {
         "path": ["instrument", "spec", "notional", "amount"],

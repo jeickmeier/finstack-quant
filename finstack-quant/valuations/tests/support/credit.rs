@@ -224,6 +224,7 @@ pub fn cds_buy_protection(
     })?;
 
     let cds = CreditDefaultSwap::builder()
+        .include_valuation_date_cashflows(false)
         .id(id.into())
         .notional(notional)
         .side(PayReceive::Pay)
@@ -288,6 +289,7 @@ pub fn cds_sell_protection(
     })?;
 
     let cds = CreditDefaultSwap::builder()
+        .include_valuation_date_cashflows(false)
         .id(id.into())
         .notional(notional)
         .side(PayReceive::Receive)
@@ -322,4 +324,39 @@ pub fn cds_sell_protection(
 
     cds.validate()?;
     Ok(cds)
+}
+
+/// Check that the chosen rate basis partitions across buckets on a replayable
+/// credit market. A 1 bp stencil allows two cents of absolute difference or
+/// 2% of parallel DV01 for nonlinear rebootstrap and grid effects.
+pub(crate) fn assert_rate_bucket_reconciliation(
+    instrument: &dyn finstack_quant_valuations::instruments::Instrument,
+    market: &MarketContext,
+    as_of: Date,
+) {
+    use finstack_quant_valuations::metrics::MetricId;
+
+    let result = instrument
+        .price_with_metrics(
+            market,
+            as_of,
+            &[MetricId::Dv01, MetricId::BucketedDv01],
+            pricing_options(),
+        )
+        .expect("parallel and bucketed rate replay");
+    let parallel = result.measures["dv01"];
+    let base = "bucketed_dv01::";
+    let mut buckets = result
+        .measures
+        .iter()
+        .filter(|(id, _)| id.as_str().starts_with(base))
+        .peekable();
+    assert!(buckets.peek().is_some(), "rate buckets are required");
+    let sum: f64 = buckets.map(|(_, value)| value).sum();
+    let tolerance = 0.02_f64.max(0.02 * parallel.abs());
+    assert!(
+        (sum - parallel).abs() <= tolerance,
+        "{} bucket sum {sum} vs parallel {parallel}, tolerance {tolerance}",
+        instrument.key()
+    );
 }

@@ -33,8 +33,10 @@ use crate::utils::input::{
     js_opt_string, js_opt_string_seq, js_string, js_string_seq, json_text, opt_from_js_json,
     opt_json_text,
 };
-use crate::utils::{to_js_err, to_js_value};
+use crate::utils::{contract_to_js_err, to_js_err, to_js_value};
+use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::market_data::context::MarketContext;
+#[cfg(test)]
 use finstack_quant_valuations::metrics::risk::MarketHistory;
 use finstack_quant_valuations::pricer::PriceExtras;
 use finstack_quant_valuations::results::ValuationResult;
@@ -42,7 +44,13 @@ use wasm_bindgen::prelude::*;
 
 /// Parse a market-context argument (JSON string or plain object).
 pub(super) fn parse_market(market_json: &JsValue) -> Result<MarketContext, JsValue> {
-    serde_json::from_str(&json_text(market_json, "marketJson")?).map_err(to_js_err)
+    parse_market_text(&json_text(market_json, "marketJson")?)
+}
+
+pub(super) fn parse_market_text(market_json: &str) -> Result<MarketContext, JsValue> {
+    MarketContext::from_state_slice(market_json.as_bytes(), &LoadLimits::default())
+        .map(|(market, _)| market)
+        .map_err(contract_to_js_err)
 }
 
 pub(super) fn parse_pricing_instrument_json(
@@ -63,23 +71,12 @@ pub(super) fn price_result_with_context(
     as_of: &str,
     model: &str,
     metrics: Vec<String>,
-    market_history: Option<&MarketHistory>,
-    explain: bool,
+    extras: &PriceExtras,
 ) -> Result<ValuationResult, JsValue> {
-    let options = finstack_quant_calibration::recalibration::pricing_options();
-    let options = if explain {
-        options.with_explain(finstack_quant_core::explain::ExplainOpts::enabled())
-    } else {
-        options
-    };
+    let options =
+        extras.pricing_options(finstack_quant_calibration::recalibration::pricing_options());
     finstack_quant_valuations::pricer::price_instrument(
-        instrument,
-        market,
-        as_of,
-        model,
-        &metrics,
-        market_history,
-        options,
+        instrument, market, as_of, model, &metrics, None, options,
     )
     .map_err(to_js_err)
 }
@@ -216,16 +213,8 @@ pub(super) struct PriceRequest {
     pub(super) model: Option<String>,
     /// Canonical metric identifiers to compute.
     pub(super) metrics: Vec<String>,
-    /// Metric-pricing override patch (`extras.metric_pricing_overrides`) as
-    /// JSON text, merged into the envelope when the instrument is parsed.
-    pub(super) metric_pricing_overrides: Option<String>,
-    /// Call-time patch for stored instrument market quotes and model settings.
-    instrument_pricing_overrides: Option<serde_json::Value>,
-    /// Market history (`extras.market_history`) for historical risk metrics.
-    pub(super) market_history: Option<MarketHistory>,
-    /// Whether to attach the per-flow step trace as `result.explanation`
-    /// (`extras.explain`).
-    pub(super) explain: bool,
+    /// Optional request configuration, market history, and override patches.
+    pub(super) extras: PriceExtras,
 }
 
 impl PriceRequest {
@@ -247,10 +236,7 @@ impl PriceRequest {
             as_of,
             model,
             metrics,
-            metric_pricing_overrides: extras.metric_pricing_overrides_json(),
-            instrument_pricing_overrides: extras.instrument_pricing_overrides,
-            market_history: extras.market_history,
-            explain: extras.explain,
+            extras,
         })
     }
 
@@ -261,8 +247,8 @@ impl PriceRequest {
     ) -> Result<finstack_quant_valuations::pricer::ParsedInstrument, JsValue> {
         finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
             instrument_json,
-            self.metric_pricing_overrides.as_deref(),
-            self.instrument_pricing_overrides.as_ref(),
+            self.extras.metric_pricing_overrides_json().as_deref(),
+            self.extras.instrument_pricing_overrides.as_ref(),
         )
         .map_err(to_js_err)
     }
@@ -274,8 +260,8 @@ impl PriceRequest {
     ) -> Result<finstack_quant_valuations::pricer::ParsedInstrument, JsValue> {
         finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
             instrument,
-            self.metric_pricing_overrides.as_deref(),
-            self.instrument_pricing_overrides.as_ref(),
+            self.extras.metric_pricing_overrides_json().as_deref(),
+            self.extras.instrument_pricing_overrides.as_ref(),
         )
         .map_err(to_js_err)
     }
@@ -292,8 +278,7 @@ impl PriceRequest {
             &self.as_of,
             self.model.as_deref().unwrap_or("default"),
             self.metrics,
-            self.market_history.as_ref(),
-            self.explain,
+            &self.extras,
         )?;
         valuation_result_value(&result)
     }
@@ -757,8 +742,10 @@ pub(super) mod tests {
             as_of,
             model,
             metrics,
-            market_history,
-            false,
+            &PriceExtras {
+                market_history: market_history.cloned(),
+                ..Default::default()
+            },
         )?)
     }
 
@@ -781,8 +768,7 @@ pub(super) mod tests {
             as_of,
             model.unwrap_or("default"),
             Vec::new(),
-            None,
-            false,
+            &PriceExtras::default(),
         )
     }
 
@@ -792,10 +778,7 @@ pub(super) mod tests {
             as_of: "not-a-date".to_string(),
             model: Some("not-a-model".to_string()),
             metrics: Vec::new(),
-            metric_pricing_overrides: None,
-            instrument_pricing_overrides: None,
-            market_history: None,
-            explain: false,
+            extras: PriceExtras::default(),
         }
     }
 
@@ -1392,8 +1375,7 @@ pub(super) mod tests {
             "2024-01-01",
             "discounting",
             Vec::new(),
-            None,
-            false,
+            &PriceExtras::default(),
         )
         .expect("price");
         let parsed = serde_json::to_value(&priced).expect("price json");

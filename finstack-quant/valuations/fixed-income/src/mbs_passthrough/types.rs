@@ -187,11 +187,12 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AgencyMbsPassthrough {
         as_of: Date,
     ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let _ = curves;
-        let schedule = crate::mbs_passthrough::pricer::build_projected_schedule(
+        let mut schedule = crate::mbs_passthrough::pricer::build_projected_schedule(
             self,
             as_of,
             Some(self.wam_months + 12),
         )?;
+        schedule.retain_flows(|flow| flow.get_date() > as_of);
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
         ))
@@ -576,6 +577,9 @@ impl AgencyMbsPassthrough {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for AgencyMbsPassthrough {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
     fn cashflow_export_terms(
         &self,
         _market: &finstack_quant_core::market_data::context::MarketContext,

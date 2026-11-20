@@ -1130,6 +1130,9 @@ mod tests {
     );
 
     impl Instrument for MockInstrument {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
         fn id(&self) -> &str {
             &self.id
         }

@@ -51,7 +51,7 @@
     },
     "FxOption": {
       "additionalProperties": false,
-      "description": "European FX option with same-day cash settlement at expiry.\n\nPhysical delivery is intentionally not represented: exercised payoff is a\nquote-currency cash amount on `expiry`.",
+      "description": "European FX option with an explicit cash or physical settlement profile.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -65,6 +65,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
           "default": "act_365f",
           "description": "Day count convention"
+        },
+        "delivery": {
+          "$ref": "#/$defs/FxOptionDelivery",
+          "description": "Booked payoff and settlement profile."
         },
         "delta_convention": {
           "$ref": "#/$defs/FxDeltaConvention",
@@ -110,6 +114,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
         },
+        "spot_basis": {
+          "$ref": "#/$defs/FxSpotBasis",
+          "description": "Selected spot quote's fixed value-date basis."
+        },
         "strike": {
           "description": "Strike exchange rate (quote per base).\n\n**Note on ATM convention**: Professional FX markets define ATM as the\nDelta-Neutral Straddle (DNS) strike, not the forward rate. See module\ndocumentation for details. If constructing an \"ATM\" option, compute\nthe forward rate or DNS strike externally.",
           "format": "double",
@@ -121,6 +129,8 @@
         }
       },
       "required": [
+        "spot_basis",
+        "delivery",
         "id",
         "base_currency",
         "quote_currency",
@@ -135,6 +145,109 @@
         "attributes"
       ],
       "type": "object"
+    },
+    "FxOptionDelivery": {
+      "description": "Settlement profile of the FX option.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Cash-settled benchmark option whose intrinsic payoff is due at expiry.",
+          "properties": {
+            "type": {
+              "const": "cash_at_expiry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Deliverable option with a fixed native cash exchange on exercise.",
+          "properties": {
+            "date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Booked value date of both currency legs, on or after expiry."
+            },
+            "exercised": {
+              "description": "Confirmed expiry outcome. The live option has no known outcome.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "position": {
+              "$ref": "#/$defs/FxOptionPosition",
+              "description": "Signed holder position with positive base notional."
+            },
+            "type": {
+              "const": "physical",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "date",
+            "position"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "FxOptionPosition": {
+      "description": "Holder direction of a physically delivered FX option.",
+      "oneOf": [
+        {
+          "const": "long",
+          "description": "Holder receives the exercised option exchange.",
+          "type": "string"
+        },
+        {
+          "const": "short",
+          "description": "Writer owes the opposite exchange when exercised.",
+          "type": "string"
+        }
+      ]
+    },
+    "FxSpotBasis": {
+      "description": "Value-date basis of the selected ordered FX quote.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "The selected quote is cash FX at the valuation date.",
+          "properties": {
+            "type": {
+              "const": "cash",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The selected outright is quoted for a stated value date.",
+          "properties": {
+            "date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Fixed value date of the spot quote."
+            },
+            "type": {
+              "const": "value_date",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "date"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "InstrumentSchema": {
       "const": "finstack_quant.instrument/1",
@@ -185,6 +298,9 @@
           "attributes": {},
           "base_currency": "EUR",
           "day_count": "act_365f",
+          "delivery": {
+            "type": "cash_at_expiry"
+          },
           "delta_convention": {
             "kind": "forward",
             "premium_currency": "USD",
@@ -200,6 +316,9 @@
           },
           "option_type": "call",
           "quote_currency": "USD",
+          "spot_basis": {
+            "type": "cash"
+          },
           "strike": 1.12,
           "vol_surface_id": "EURUSD-VOL"
         },

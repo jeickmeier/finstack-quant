@@ -15,6 +15,7 @@ use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 /// Historical shift for a single risk factor on a single date.
@@ -34,6 +35,17 @@ pub struct RiskFactorShift {
     pub shift: f64,
 }
 
+/// Treatment of a hazard source whose calibration discount curve moves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum UnshiftedHazardPolicy {
+    /// Hold the source's original intensity while the rate scenario moves.
+    FrozenIntensity,
+    /// Refit to unchanged original credit observations on the shocked discount curve.
+    RefitOriginalQuotes,
+}
+
 /// Collection of all risk factor shifts for a single historical date.
 ///
 /// Represents a complete market scenario that can be applied to revalue
@@ -50,6 +62,9 @@ pub struct MarketScenario {
     pub date: Date,
     /// All risk factor shifts on this date (relative to base date)
     pub shifts: Vec<RiskFactorShift>,
+    /// Required treatments for unshifted calibrated hazards whose discount dependencies move.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub unshifted_hazard_policies: BTreeMap<CurveId, UnshiftedHazardPolicy>,
 }
 
 struct VolPointShift {
@@ -67,7 +82,11 @@ fn same_grid_coordinate(left: f64, right: f64) -> bool {
 impl MarketScenario {
     /// Create a new market scenario.
     pub fn new(date: Date, shifts: Vec<RiskFactorShift>) -> Self {
-        Self { date, shifts }
+        Self {
+            date,
+            shifts,
+            unshifted_hazard_policies: BTreeMap::new(),
+        }
     }
 
     /// Re-date this scenario so its shifts apply as of `date`.
@@ -139,15 +158,19 @@ impl MarketScenario {
                 RiskFactorType::DiscountRate {
                     curve_id,
                     tenor_years,
+                    grid_years,
                 } => {
-                    let (id, spec) = key_rate_bp_bump(curve_id, *tenor_years, shift.shift);
+                    let (id, spec) =
+                        key_rate_bp_bump(curve_id, *tenor_years, grid_years, shift.shift)?;
                     MarketBump::DiscountCurve { id, spec }
                 }
                 RiskFactorType::ForwardRate {
                     curve_id,
                     tenor_years,
+                    grid_years,
                 } => {
-                    let (id, spec) = key_rate_bp_bump(curve_id, *tenor_years, shift.shift);
+                    let (id, spec) =
+                        key_rate_bp_bump(curve_id, *tenor_years, grid_years, shift.shift)?;
                     MarketBump::ForwardCurve { id, spec }
                 }
                 RiskFactorType::CreditSpread {
@@ -283,6 +306,57 @@ impl MarketScenario {
             bumped_market = bumped_market.insert_surface(surface);
         }
 
+        let discount_changes: std::collections::BTreeSet<_> = self
+            .shifts
+            .iter()
+            .filter_map(|shift| match &shift.factor {
+                RiskFactorType::DiscountRate { curve_id, .. } if shift.shift != 0.0 => {
+                    Some(curve_id)
+                }
+                _ => None,
+            })
+            .collect();
+        if !discount_changes.is_empty() {
+            let hazards: Vec<_> = base_market
+                .curve_ids()
+                .into_iter()
+                .filter_map(|id| base_market.get_hazard(id).ok())
+                .filter(|hazard| hazard.hazard_calibration().is_some())
+                .filter(|hazard| !credit_shifts.iter().any(|(id, _)| id == hazard.id()))
+                .collect();
+            if !hazards.is_empty() {
+                let provider = provider
+                    .ok_or_else(|| provider_missing("historical_hazard_rate_dependency"))?;
+                let source_market = Arc::new(base_market.clone());
+                for hazard in hazards {
+                    let discount_curve_id = provider.get_hazard_discount_curve_id(&hazard)?;
+                    if !discount_changes.contains(&discount_curve_id) {
+                        continue;
+                    }
+                    let policy = self.unshifted_hazard_policies.get(hazard.id()).ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(format!(
+                            "historical scenario requires an explicit hazard replay policy for '{}' after discount curve '{}' moves",
+                            hazard.id(), discount_curve_id
+                        ))
+                    })?;
+                    if *policy == UnshiftedHazardPolicy::RefitOriginalQuotes {
+                        let rebuilt =
+                            provider.rebuild_hazard_curve(&HazardRecalibrationRequest {
+                                hazard,
+                                source_market: Arc::clone(&source_market),
+                                target_market: Arc::new(bumped_market.clone()),
+                                discount_curve_id,
+                                doc_clause: None,
+                                cds_valuation_convention: None,
+                                deal_quote_override: None,
+                                action: HazardRecalibrationAction::DependencyMarketReplay,
+                            })?;
+                        bumped_market.try_insert_mut(rebuilt.as_ref().clone())?;
+                    }
+                }
+            }
+        }
+
         if !credit_shifts.is_empty() {
             let provider = provider.ok_or_else(|| provider_missing("historical_credit_spread"))?;
             let source_market = Arc::new(base_market.clone());
@@ -306,19 +380,36 @@ impl MarketScenario {
     }
 }
 
-/// Build a triangular key-rate bump for a specific tenor on a curve.
-///
-/// Uses the standard bucket grid to determine the triangular weight neighbors,
-/// ensuring that localized shifts preserve curve shape.
-fn key_rate_bp_bump(curve_id: &CurveId, tenor_years: f64, shift: f64) -> (CurveId, BumpSpec) {
-    let shift_bp = shift * 10_000.0;
-
-    // Wing buckets use the dedicated half-triangle constructors so the
-    // partition-of-unity invariant holds and no infinite sentinel reaches the
-    // curve bump paths (non-finite bounds are rejected there).
-    let (prev, next) = find_triangular_neighbors(tenor_years);
-    let spec = BumpSpec::triangular_key_rate_bucket_bp(prev, tenor_years, next, shift_bp);
-    (curve_id.clone(), spec)
+fn key_rate_bp_bump(
+    curve_id: &CurveId,
+    tenor_years: f64,
+    grid_years: &[f64],
+    shift: f64,
+) -> Result<(CurveId, BumpSpec)> {
+    if grid_years.iter().any(|&t| !t.is_finite() || t <= 0.0) {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "historical rate grid for '{curve_id}' requires finite positive coordinates"
+        )));
+    }
+    crate::metrics::sensitivities::cs01::validate_buckets_strictly_increasing(grid_years)?;
+    let index = grid_years.iter().position(|&t| same_grid_coordinate(t, tenor_years)).ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "historical rate tenor {tenor_years} must be an exact grid coordinate for '{curve_id}'"
+        ))
+    })?;
+    let bp = shift * 10_000.0;
+    if !bp.is_finite() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "historical rate shock is outside the basis-point range for '{curve_id}'"
+        )));
+    }
+    let spec = BumpSpec::triangular_key_rate_bucket_bp(
+        grid_years[..index].last().copied(),
+        tenor_years,
+        grid_years.get(index + 1).copied(),
+        bp,
+    );
+    Ok((curve_id.clone(), spec))
 }
 
 /// Return the `CurveId` a bump is keyed by, if it is routed through the
@@ -327,34 +418,6 @@ fn key_rate_bp_bump(curve_id: &CurveId, tenor_years: f64, shift: f64) -> (CurveI
 /// independently (e.g. FX), which never collide.
 fn bump_curve_id(bump: &MarketBump) -> Option<CurveId> {
     bump.curve_id().cloned()
-}
-
-/// Find the neighboring bucket boundaries for a triangular key-rate bump.
-///
-/// `None` means "no neighbour on that side" (wing bucket): the caller must
-/// use the flat half-triangle constructors rather than 0.0/∞ sentinels,
-/// which break the Σwᵢ(t)=1 invariant (and ∞ produces NaN weights).
-fn find_triangular_neighbors(tenor: f64) -> (Option<f64>, Option<f64>) {
-    let buckets = &crate::metrics::STANDARD_BUCKETS_YEARS;
-
-    // Absolute tolerance for exact-tenor matching. `f64::EPSILON` (~2.2e-16)
-    // is too tight: a tenor like `0.5` that has been serde round-tripped can
-    // differ by more than that, missing the equality branch and selecting the
-    // wrong triangular bucket. `1e-6` is the project-wide tenor tolerance.
-    const TENOR_TOL: f64 = 1e-6;
-
-    let mut prev = None;
-    for (i, &bucket) in buckets.iter().enumerate() {
-        if (tenor - bucket).abs() <= TENOR_TOL {
-            return (prev, buckets.get(i + 1).copied());
-        }
-        if tenor < bucket {
-            return (prev, Some(bucket));
-        }
-        prev = Some(bucket);
-    }
-
-    (prev, None)
 }
 
 /// Historical market data for VaR calculation.
@@ -484,36 +547,6 @@ mod tests {
     use time::macros::date;
 
     #[test]
-    fn triangular_neighbors_surround_non_standard_tenor() {
-        let (prev, next) = find_triangular_neighbors(4.0);
-
-        assert_eq!(prev, Some(3.0));
-        assert_eq!(next, Some(5.0));
-    }
-
-    #[test]
-    fn triangular_neighbors_wings_have_no_sentinels() {
-        // First standard bucket: no left neighbour (flat half triangle), the
-        // next standard bucket on the right.
-        let buckets = &crate::metrics::STANDARD_BUCKETS_YEARS;
-        let (prev, next) = find_triangular_neighbors(buckets[0]);
-        assert_eq!(prev, None);
-        assert_eq!(next, Some(buckets[1]));
-
-        // Last standard bucket and beyond: no right neighbour. Infinite
-        // sentinels are rejected by the curve bump paths, so they must never
-        // be produced here.
-        let last = *buckets.last().unwrap();
-        let (prev, next) = find_triangular_neighbors(last);
-        assert_eq!(prev, Some(buckets[buckets.len() - 2]));
-        assert_eq!(next, None);
-
-        let (prev, next) = find_triangular_neighbors(last + 10.0);
-        assert_eq!(prev, Some(last));
-        assert_eq!(next, None);
-    }
-
-    #[test]
     fn test_market_scenario_creation() {
         let scenario_date = date!(2024 - 01 - 02);
         let shifts = vec![
@@ -521,6 +554,7 @@ mod tests {
                 factor: RiskFactorType::DiscountRate {
                     curve_id: CurveId::from("USD-OIS"),
                     tenor_years: 5.0,
+                    grid_years: crate::metrics::STANDARD_BUCKETS_YEARS.to_vec(),
                 },
                 shift: 0.0015, // +15bp
             },
@@ -576,6 +610,7 @@ mod tests {
                     factor: RiskFactorType::DiscountRate {
                         curve_id: CurveId::from("USD-OIS"),
                         tenor_years: 5.0,
+                        grid_years: crate::metrics::STANDARD_BUCKETS_YEARS.to_vec(),
                     },
                     shift: 0.0010,
                 },
@@ -583,6 +618,7 @@ mod tests {
                     factor: RiskFactorType::DiscountRate {
                         curve_id: CurveId::from("USD-OIS"),
                         tenor_years: 10.0,
+                        grid_years: crate::metrics::STANDARD_BUCKETS_YEARS.to_vec(),
                     },
                     shift: -0.0005,
                 },
@@ -619,6 +655,7 @@ mod tests {
                 factor: RiskFactorType::DiscountRate {
                     curve_id: CurveId::from("USD-OIS"),
                     tenor_years: 5.0,
+                    grid_years: crate::metrics::STANDARD_BUCKETS_YEARS.to_vec(),
                 },
                 shift: 0.0010, // +10bp
             }],

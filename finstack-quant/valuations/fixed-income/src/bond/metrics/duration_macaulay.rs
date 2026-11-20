@@ -34,6 +34,7 @@ impl MetricCalculator for MacaulayDurationCalculator {
         let super::YieldRiskBasis {
             yield_rate,
             timed,
+            compounding,
             price,
         } = super::yield_risk_basis(context, ytm)?;
         let bond: &Bond = context.instrument_as()?;
@@ -51,7 +52,7 @@ impl MetricCalculator for MacaulayDurationCalculator {
             let df = crate::bond::pricing::quote_conversions::df_from_yield(
                 yield_rate,
                 t,
-                crate::bond::pricing::quote_conversions::YieldCompounding::Street,
+                compounding,
                 bond.cashflow_spec.frequency(),
             )?;
             weighted_time.add(t * amount.amount() * df)?;

@@ -278,7 +278,11 @@ export type MarketDatum =
           recovery_rate: number;
           type: "cds_upfront";
           /**
-           * Upfront payment percentage of notional (e.g. 0.01 for 1%).
+           * Whether the fraction is a clean quote or actual buyer cash at settlement.
+           */
+          upfront_basis: CdsUpfrontBasis;
+          /**
+           * Signed upfront fraction of notional (0.01 is 1%).
            */
           upfront_pct: number;
           [k: string]: unknown;
@@ -759,6 +763,10 @@ export type IrFutureContractId = string;
  */
 export type CdsDocClause =
   "cr14" | "mr14" | "mm14" | "xr14" | "isda_na" | "isda_eu" | "isda_as" | "isda_au" | "isda_nz" | "custom";
+/**
+ * Representation of a single-name CDS upfront quote.
+ */
+export type CdsUpfrontBasis = "clean" | "actual_cash";
 /**
  * Identifier for Inflation Swap market conventions (e.g., "USD-CPI", "UK-RPI").
  *
@@ -2897,7 +2905,11 @@ export type CdsQuote =
       recovery_rate: number;
       type: "cds_upfront";
       /**
-       * Upfront payment percentage of notional (e.g. 0.01 for 1%).
+       * Whether the fraction is a clean quote or actual buyer cash at settlement.
+       */
+      upfront_basis: CdsUpfrontBasis;
+      /**
+       * Signed upfront fraction of notional (0.01 is 1%).
        */
       upfront_pct: number;
     };
@@ -3133,7 +3145,11 @@ export type MarketQuote =
           recovery_rate: number;
           type: "cds_upfront";
           /**
-           * Upfront payment percentage of notional (e.g. 0.01 for 1%).
+           * Whether the fraction is a clean quote or actual buyer cash at settlement.
+           */
+          upfront_basis: CdsUpfrontBasis;
+          /**
+           * Signed upfront fraction of notional (0.01 is 1%).
            */
           upfront_pct: number;
           [k: string]: unknown;

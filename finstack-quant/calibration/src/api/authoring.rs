@@ -852,6 +852,7 @@ mod tests {
             pillar: "5Y".parse().expect("tenor"),
             coupon_bp: 100.0,
             upfront_pct: 0.01,
+            upfront_basis: crate::quotes::CdsUpfrontBasis::Clean,
             recovery_rate: 0.4,
         };
         upfront.validate().expect("upfront");

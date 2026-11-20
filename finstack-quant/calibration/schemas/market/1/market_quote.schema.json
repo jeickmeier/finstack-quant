@@ -73,6 +73,21 @@
         }
       ]
     },
+    "CdsUpfrontBasis": {
+      "description": "Representation of a single-name CDS upfront quote.",
+      "oneOf": [
+        {
+          "const": "clean",
+          "description": "Clean fraction of notional, before deducting the accrued premium rebate.",
+          "type": "string"
+        },
+        {
+          "const": "actual_cash",
+          "description": "Actual signed cash as a fraction of notional, including the rebate.",
+          "type": "string"
+        }
+      ]
+    },
     "InflationSwapConventionId": {
       "description": "Identifier for Inflation Swap market conventions (e.g., \"USD-CPI\", \"UK-RPI\").\n\nUsed to look up [`InflationSwapConventions`](crate::market::conventions::InflationSwapConventions)\nfrom the convention registry.",
       "type": "string"
@@ -433,8 +448,12 @@
               "const": "cds_upfront",
               "type": "string"
             },
+            "upfront_basis": {
+              "$ref": "#/$defs/CdsUpfrontBasis",
+              "description": "Whether the fraction is a clean quote or actual buyer cash at settlement."
+            },
             "upfront_pct": {
-              "description": "Upfront payment percentage of notional (e.g. 0.01 for 1%).",
+              "description": "Signed upfront fraction of notional (0.01 is 1%).",
               "format": "double",
               "type": "number"
             }
@@ -447,6 +466,7 @@
             "pillar",
             "coupon_bp",
             "upfront_pct",
+            "upfront_basis",
             "recovery_rate"
           ],
           "type": "object"

@@ -82,7 +82,7 @@ pub(crate) fn register_convertible_metrics(
             (BucketedCs01, cs01::BucketedCs01Calculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-            (Accrued, accrued_interest::AccruedInterestCalculator),
+            (Accrued, accrued_interest::AccruedInterestCalculator, NativeMoney),
             (CleanPrice, accrued_interest::CleanPriceCalculator),
             (Dividend01, dividend_risk::DividendRiskCalculator),
             (Conversion01, conversion01::Conversion01Calculator),

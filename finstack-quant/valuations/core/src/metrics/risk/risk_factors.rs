@@ -6,11 +6,10 @@ use finstack_quant_core::types::CurveId;
 /// Risk factor categories for VaR calculation.
 ///
 /// Each risk factor represents a market variable that can shift and impact
-/// portfolio valuations. Risk factors are bucketed at standard tenors/strikes
-/// to enable historical simulation.
+/// portfolio valuations. Rate changes carry exact source-year coordinates.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case", tag = "type")]
+#[serde(rename_all = "snake_case", tag = "type", deny_unknown_fields)]
 pub enum RiskFactorType {
     /// Discount curve rate at a specific tenor (in years).
     DiscountRate {
@@ -18,6 +17,8 @@ pub enum RiskFactorType {
         curve_id: CurveId,
         /// Tenor in years (e.g., 1.0, 5.0, 10.0)
         tenor_years: f64,
+        /// Strictly increasing positive source-year grid containing this center exactly.
+        grid_years: Vec<f64>,
     },
 
     /// Forward curve rate at a specific tenor (in years).
@@ -26,6 +27,8 @@ pub enum RiskFactorType {
         curve_id: CurveId,
         /// Tenor in years
         tenor_years: f64,
+        /// Strictly increasing positive source-year grid containing this center exactly.
+        grid_years: Vec<f64>,
     },
 
     /// Credit spread (hazard rate) at a specific tenor (in years).

@@ -43,6 +43,10 @@ pub(super) fn enrich(
         mut base_result,
     } = request;
     let err_ctx = PricingErrorContext::from_instrument(instrument).model(model);
+    for (metric_id, &value) in &base_result.measures {
+        crate::metrics::registry::validate_measure(metric_id, value)
+            .map_err(|error| PricingError::from_core(error, err_ctx.clone()))?;
+    }
     // The pricer's seed serves this request's metric evaluation only; the
     // returned result does not carry it.
     let pricer_seed = base_result.metric_seed.take();
@@ -62,7 +66,8 @@ pub(super) fn enrich(
         .map_err(|error| PricingError::from_core(error, err_ctx.clone()))?
     {
         base_result.details = Some(details);
-        attach_metric_measures(&mut base_result, metric_measures);
+        attach_metric_measures(&mut base_result, metric_measures)
+            .map_err(|error| PricingError::from_core(error, err_ctx))?;
         return Ok(base_result);
     }
 
@@ -126,7 +131,8 @@ pub(super) fn enrich(
         compute(Arc::from(instrument.clone_box()), metrics, pricer_seed)?
     };
 
-    attach_metric_measures(&mut base_result, metric_measures);
+    attach_metric_measures(&mut base_result, metric_measures)
+        .map_err(|error| PricingError::from_core(error, err_ctx))?;
     Ok(base_result)
 }
 
@@ -156,6 +162,9 @@ mod tests {
     );
 
     impl Instrument for Probe {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
         fn id(&self) -> &str {
             "probe"
         }
@@ -335,6 +344,34 @@ mod tests {
             result.measures.keys().cloned().collect::<Vec<_>>(),
             vec![MetricId::ZSpread, MetricId::Dv01, MetricId::ExpectedLoss]
         );
+    }
+
+    #[test]
+    fn model_measure_must_be_finite_even_without_requested_metrics() {
+        let as_of = date!(2026 - 01 - 01);
+        let mut base_result = ValuationResult::stamped(
+            "probe",
+            as_of,
+            Money::new(123.0, Currency::USD).expect("money"),
+        );
+        base_result
+            .measures
+            .insert(MetricId::ExpectedLoss, f64::NAN);
+        let err = enrich(EnrichmentRequest {
+            instrument: &Probe::default(),
+            model: ModelKey::Discounting,
+            market: &MarketContext::new(),
+            as_of,
+            metrics: &[],
+            cfg: None,
+            market_history: None,
+            metric_registry: None,
+            recalibration_provider: None,
+            pricer_registry: Arc::new(PricerRegistry::new()),
+            base_result,
+        })
+        .expect_err("a nonfinite model measure must fail pricing");
+        assert!(err.to_string().contains("expected_loss"));
     }
 
     #[test]

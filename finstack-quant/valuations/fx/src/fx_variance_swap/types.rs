@@ -419,6 +419,9 @@ impl FxVarianceSwap {
 }
 
 impl Instrument for FxVarianceSwap {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::FxVarianceSwap,
         crate::FX

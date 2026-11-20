@@ -51,6 +51,9 @@ impl SpotVolTestInstrument {
 }
 
 impl Instrument for SpotVolTestInstrument {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -784,9 +787,11 @@ fn credit_nonstandard_buckets_all_contribute_to_public_attribution() {
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::HazardCurve;
     let base = date!(2025 - 01 - 15);
-    let p1 = date!(2026 - 01 - 15);
-    let p4 = date!(2029 - 01 - 15);
-    let p9 = date!(2034 - 01 - 15);
+    // The USD CDS recipe uses ACT/360. Set exact tenor coordinates on
+    // that clock so this fixture exercises the nonstandard integer buckets.
+    let p1 = base + time::Duration::days(360);
+    let p4 = base + time::Duration::days(4 * 360);
+    let p9 = base + time::Duration::days(9 * 360);
     let instrument: Arc<dyn Instrument> = Arc::new(CreditCurvesTestInstrument::new(
         "NONSTANDARD-CREDIT",
         Money::from((100_000_i64, Currency::USD)),
@@ -959,7 +964,7 @@ fn credit_duplicate_display_labels_match_exact_quote_id_and_pillar() {
     use finstack_quant_valuations::recalibration::RecalibrationProvider;
     let base = date!(2025 - 01 - 15);
     let first = date!(2026 - 03 - 20);
-    let second = date!(2026 - 06 - 20);
+    let second = date!(2026 - 03 - 23);
     let source =
         exact_credit_recipe_curve(base, &[(first, "FIRST", 100.0), (second, "SECOND", 200.0)]);
     let provider = CachedRecalibrationProvider::default();
@@ -970,7 +975,7 @@ fn credit_duplicate_display_labels_match_exact_quote_id_and_pillar() {
         .iter()
         .map(|bucket| bucket.get_metric_label(&coordinates))
         .collect();
-    assert!(labels.iter().all(|label| label.starts_with("1y@")));
+    assert!(labels.iter().all(|label| label.starts_with("14m@")));
     let measures = IndexMap::from([
         (
             MetricId::custom(format!("bucketed_cs01::HZ::{}", labels[0])),
@@ -1483,6 +1488,9 @@ impl CreditVolTestInstrument {
 }
 
 impl Instrument for CreditVolTestInstrument {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -1679,6 +1687,9 @@ impl CreditCurvesTestInstrument {
 }
 
 impl Instrument for CreditCurvesTestInstrument {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -1829,6 +1840,9 @@ impl MultiSpotTestInstrument {
 }
 
 impl Instrument for MultiSpotTestInstrument {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     fn id(&self) -> &str {
         &self.id
     }

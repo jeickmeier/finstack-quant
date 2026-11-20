@@ -131,7 +131,6 @@ pub mod cms_option;
 pub mod cms_spread_option;
 /// CMS swap module - Constant maturity swaps.
 pub mod cms_swap;
-/// Deposit module - Money market deposits.
 pub mod deposit;
 /// Forward swap rate and annuity helpers shared by the CMS instruments.
 pub(crate) mod forward_swap_rate;
@@ -149,6 +148,8 @@ pub mod ir_future;
 pub mod ir_future_option;
 /// IRS module - Interest rate swaps.
 pub mod irs;
+/// Deposit module - Money market deposits.
+mod rate_bucketed_dv01;
 /// Rate-magnitude checks shared by the rates instruments.
 pub(crate) mod rate_validation;
 /// Repo module - Repurchase agreements.

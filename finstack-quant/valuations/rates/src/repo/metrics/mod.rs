@@ -37,7 +37,7 @@ pub(crate) fn register_repo_metrics(
         registry: registry,
         instrument: InstrumentType::Repo,
         metrics: [
-            (Accrued, accrued_interest::AccruedInterestCalculator),
+            (Accrued, accrued_interest::AccruedInterestCalculator, NativeMoney),
             (CollateralValue, CollateralValueCalculator),
             (RequiredCollateral, RequiredCollateralCalculator),
             (CollateralCoverage, CollateralCoverageCalculator),

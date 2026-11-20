@@ -133,6 +133,7 @@ fn test_builder_pattern() {
     let convention = CdsConvention::IsdaNa;
 
     let cds = CreditDefaultSwap::builder()
+        .include_valuation_date_cashflows(false)
         .id("BUILDER_TEST".into())
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)

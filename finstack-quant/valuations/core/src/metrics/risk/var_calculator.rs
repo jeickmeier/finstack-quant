@@ -552,9 +552,38 @@ pub(crate) fn relevant_taylor_scenario(
     currency: Currency,
     reporting_currency: Currency,
     scenario: &super::MarketScenario,
+    market: &MarketContext,
+    as_of: Date,
 ) -> Result<super::MarketScenario> {
     use super::RiskFactorType;
-    let deps = instrument.market_dependencies()?;
+    let deps = instrument.market_dependencies_at(market, as_of)?;
+    let mut fx_directions = Vec::new();
+    if scenario
+        .shifts
+        .iter()
+        .any(|shift| matches!(shift.factor, RiskFactorType::FxSpot { .. }))
+    {
+        let queries = deps
+            .fx_pairs
+            .iter()
+            .map(|pair| (pair.base, pair.quote))
+            .chain((currency != reporting_currency).then_some((currency, reporting_currency)));
+        for (base, quote) in queries.filter(|(base, quote)| base != quote) {
+            fx_directions.push((base, quote));
+            let fx = market.fx_required()?;
+            let rate = fx.rate(FxQuery::new(
+                base,
+                quote,
+                as_of,
+                FxConversionPolicy::CashflowDate,
+            ))?;
+            if rate.triangulated
+                && let Some(pivot) = fx.config().pivot_currency
+            {
+                fx_directions.extend([(base, pivot), (pivot, quote)]);
+            }
+        }
+    }
     let shifts: Vec<super::RiskFactorShift> = scenario
         .shifts
         .iter()
@@ -573,13 +602,9 @@ pub(crate) fn relevant_taylor_scenario(
                 .volatility_dependencies
                 .iter()
                 .any(|d| &d.vol_surface_id == vol_surface_id),
-            RiskFactorType::FxSpot { base, quote } => {
-                currency != reporting_currency
-                    || deps.fx_pairs.iter().any(|p| {
-                        (p.base == *base && p.quote == *quote)
-                            || (p.base == *quote && p.quote == *base)
-                    })
-            }
+            RiskFactorType::FxSpot { base, quote } => fx_directions
+                .iter()
+                .any(|&(from, to)| (from, to) == (*base, *quote) || (from, to) == (*quote, *base)),
         })
         .cloned()
         .collect();
@@ -595,7 +620,10 @@ pub(crate) fn relevant_taylor_scenario(
         }
         net.push(shift);
     }
-    Ok(super::MarketScenario::new(scenario.date, net))
+    Ok(super::MarketScenario {
+        shifts: net,
+        ..scenario.clone()
+    })
 }
 
 /// A scalar parameter multiplies the exact dated scenario, preserving every
@@ -665,18 +693,16 @@ fn directional_taylor_pnl(
             _ => {}
         }
     }
-    let scaled = |scale: f64| {
-        super::MarketScenario::new(
-            scenario.date,
-            scenario
-                .shifts
-                .iter()
-                .map(|shift| super::RiskFactorShift {
-                    factor: shift.factor.clone(),
-                    shift: shift.shift * scale,
-                })
-                .collect(),
-        )
+    let scaled = |scale: f64| super::MarketScenario {
+        shifts: scenario
+            .shifts
+            .iter()
+            .map(|shift| super::RiskFactorShift {
+                factor: shift.factor.clone(),
+                shift: shift.shift * scale,
+            })
+            .collect(),
+        ..scenario.clone()
     };
     let mut h = 1.0 / normalized_size;
     if symmetric_limit > 0.0 {
@@ -724,6 +750,8 @@ fn calculate_var_taylor(
                 base_money.currency(),
                 reporting_currency,
                 scenario,
+                base_market,
+                as_of,
             )?
             .at_date(as_of);
             if scenario.shifts.iter().all(|s| s.shift == 0.0) {
@@ -920,6 +948,9 @@ mod tests {
     }
 
     impl Instrument for CurrencyScalarInstrument {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
         /// Test mock: declares only the discount curves it was given.
         fn market_dependencies(
             &self,
@@ -999,6 +1030,59 @@ mod tests {
     /// The Taylor path differentiates only along the instrument's own
     /// dependencies: a shift on a curve the instrument never reads is dropped.
     #[test]
+    fn taylor_keeps_fx_shocks_to_a_reporting_cross_leg() -> Result<()> {
+        use finstack_quant_core::money::fx::FxMatrix;
+
+        let as_of = sample_as_of();
+        let matrix = FxMatrix::from_quotes(
+            &[
+                (Currency::EUR, Currency::USD, 1.1),
+                (Currency::USD, Currency::JPY, 140.0),
+            ],
+            Some(Currency::USD),
+        )?;
+        let cross = FxQuery::new(
+            Currency::EUR,
+            Currency::JPY,
+            as_of,
+            FxConversionPolicy::CashflowDate,
+        );
+        let leg = FxQuery::new(
+            Currency::EUR,
+            Currency::USD,
+            as_of,
+            FxConversionPolicy::CashflowDate,
+        );
+        let base = matrix.rate(cross)?;
+        assert!(base.triangulated);
+        let bumped = matrix.with_bumped_rate(leg, 0.01)?.rate(cross)?;
+        assert!((bumped.rate - base.rate * 1.01).abs() < 1e-12);
+
+        let market = MarketContext::new().insert_fx(matrix);
+        let instrument = CurrencyScalarInstrument::new("EUR", "EUR-PX", Currency::EUR);
+        let scenario = MarketScenario::new(
+            as_of,
+            vec![RiskFactorShift {
+                factor: RiskFactorType::FxSpot {
+                    base: Currency::EUR,
+                    quote: Currency::USD,
+                },
+                shift: 0.01,
+            }],
+        );
+        let relevant = relevant_taylor_scenario(
+            &instrument,
+            Currency::EUR,
+            Currency::JPY,
+            &scenario,
+            &market,
+            as_of,
+        )?;
+        assert_eq!(relevant.shifts.len(), 1);
+        Ok(())
+    }
+
+    #[test]
     fn relevant_taylor_scenario_keeps_only_instrument_dependencies() -> Result<()> {
         let as_of = sample_as_of();
         let instrument = CurrencyScalarInstrument::new("USD", "USD-PX", Currency::USD)
@@ -1010,6 +1094,7 @@ mod tests {
                     factor: RiskFactorType::DiscountRate {
                         curve_id: "USD-OIS".into(),
                         tenor_years: 1.4,
+                        grid_years: vec![1.4],
                     },
                     shift: 0.0005,
                 },
@@ -1017,13 +1102,20 @@ mod tests {
                     factor: RiskFactorType::DiscountRate {
                         curve_id: "EUR-OIS".into(),
                         tenor_years: 2.3,
+                        grid_years: vec![2.3],
                     },
                     shift: -0.0004,
                 },
             ],
         );
-        let relevant =
-            relevant_taylor_scenario(&instrument, Currency::USD, Currency::USD, &scenario)?;
+        let relevant = relevant_taylor_scenario(
+            &instrument,
+            Currency::USD,
+            Currency::USD,
+            &scenario,
+            &MarketContext::new(),
+            as_of,
+        )?;
         assert_eq!(relevant.shifts.len(), 1);
         assert!(matches!(
             &relevant.shifts[0].factor,
@@ -1338,6 +1430,7 @@ mod tests {
                 factor: RiskFactorType::ForwardRate {
                     curve_id: "F".into(),
                     tenor_years: 1.4,
+                    grid_years: vec![1.4],
                 },
                 shift: 0.001,
             }],

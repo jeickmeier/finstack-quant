@@ -71,6 +71,24 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         self.default_pricing_model()
     }
 
+    fn applicable_metrics(
+        &self,
+        menu: &[finstack_quant_valuations_core::metrics::MetricId],
+        registry: &finstack_quant_valuations_core::metrics::MetricRegistry,
+    ) -> Vec<finstack_quant_valuations_core::metrics::MetricId> {
+        use finstack_quant_valuations_core::metrics::MetricId;
+        use finstack_quant_valuations_core::pricer::ModelKey;
+
+        let mut metrics = registry.applicable_subset(menu, self.key());
+        if !matches!(
+            self.default_model(),
+            ModelKey::HazardRate | ModelKey::RatesCredit
+        ) {
+            metrics.retain(|metric| *metric != MetricId::BucketedCs01);
+        }
+        metrics
+    }
+
     fn base_value(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,

@@ -5,9 +5,8 @@
 # Install: pre-commit install
 # Run manually: mise run pre-commit-run (the Lint stage of `mise run all`)
 #
-# The language hooks call the mise tasks, so each tool's flags are written once,
-# in mise.toml: the format hooks run the mutating `*-fmt` tasks, the lint hooks
-# the check-only `*-lint` tasks. Supply-chain audits are `mise run all-audit`.
+# The lint hooks check formatting and code. Run `mise run all-fmt` to apply
+# fixes explicitly and `mise run all-audit` for supply-chain audits.
 
 default_stages: [pre-commit]
 fail_fast: false
@@ -20,10 +19,12 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: ^(finstack-quant-wasm/pkg|finstack-quant-py/finstack_quant/.*\.pyi|.*/coverage/)
+        stages: [manual]
+        exclude: &trailing_exclude ^(finstack-quant-wasm/pkg|finstack-quant-py/finstack_quant/.*\.pyi|.*/coverage/)
       - id: end-of-file-fixer
         # Canonical fixtures intentionally preserve exact serialized bytes.
-        exclude: ^(finstack-quant-wasm/pkg|finstack-quant-py/finstack_quant/.*\.pyi|finstack-quant/.*/tests/data/canonical/.*|.*/coverage/)
+        stages: [manual]
+        exclude: &eof_exclude ^(finstack-quant-wasm/pkg|finstack-quant-py/finstack_quant/.*\.pyi|finstack-quant/.*/tests/data/canonical/.*|.*/coverage/)
       - id: check-yaml
         args: [--allow-multiple-documents]
       - id: check-toml
@@ -32,43 +33,44 @@ repos:
         exclude: ^(finstack-quant-wasm/pkg|node_modules|package-lock\.json|.*tsconfig.*\.json)
       - id: check-merge-conflict
       - id: check-added-large-files
+        stages: [pre-commit, pre-push]
         args: [--maxkb=500]
         # Independent numerical pins remain large even with compact formatting.
         exclude: ^(scripts|docs)/|^finstack-quant/valuations/credit/tests/fixtures/valuation_b4_tranche_reference\.json$
       - id: mixed-line-ending
         args: [--fix=lf]
+        stages: [manual]
       - id: detect-private-key
 
   # ============================================
-  # Formatting (mutating `*-fmt` tasks)
+  # Text and Markdown formatting
   # ============================================
   - repo: local
     hooks:
-      - id: rust-fmt
-        name: Rust format (mise run rust-fmt)
-        entry: mise run rust-fmt
+      - id: check-trailing-whitespace
+        name: Check for trailing whitespace
+        entry: uv run --no-sync python scripts/check_text_format.py trailing-whitespace
         language: system
-        types: [rust]
-        pass_filenames: false
-
-      - id: python-fmt
-        name: Python format and auto-fix (mise run python-fmt)
-        entry: mise run python-fmt
+        types: [text]
+        stages: [pre-commit, pre-push]
+        exclude: *trailing_exclude
+      - id: check-end-of-file
+        name: Check final newline
+        entry: uv run --no-sync python scripts/check_text_format.py end-of-file
         language: system
-        types: [python]
-        pass_filenames: false
-
-      - id: wasm-fmt
-        name: WASM format and auto-fix (mise run wasm-fmt)
-        entry: mise run wasm-fmt
+        types: [text]
+        stages: [pre-commit, pre-push]
+        exclude: *eof_exclude
+      - id: check-line-endings
+        name: Check LF line endings
+        entry: uv run --no-sync python scripts/check_text_format.py lf
         language: system
-        files: ^finstack-quant-wasm/.*\.(ts|tsx|js|jsx|mjs|cjs|json|css|md)$
-        pass_filenames: false
+        types: [text]
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.43.0
     hooks:
-      - id: markdownlint-fix
+      - id: markdownlint
         # Unpinned, nodeenv installs "latest" from nodejs.org. That index
         # currently leads with the Node 27 alpha, which nodeenv 1.10 cannot
         # parse, so Lint dies before any hook runs. mise already provides Node.
@@ -78,8 +80,13 @@ repos:
         # MD024: duplicate headings, MD040: fenced code language
         # MD036: emphasis as heading, MD029: ordered list prefix
         # MD032: blanks around lists, MD051: link fragments
-        args: [--disable, MD013, MD033, MD041, MD024, MD040, MD036, MD029, MD032, MD051, --]
-        exclude: ^(PARITY_AUDIT\.md|book/src/SUMMARY\.md|finstack-quant-wasm/pkg|node_modules|vendor|\.cursor|\.agent|\.zenflow|\.zencoder)
+        args: &markdown_args [--disable, MD013, MD033, MD041, MD024, MD040, MD036, MD029, MD032, MD051, --]
+        exclude: &markdown_exclude ^(PARITY_AUDIT\.md|book/src/SUMMARY\.md|finstack-quant-wasm/pkg|node_modules|vendor|\.cursor|\.agent|\.zenflow|\.zencoder)
+      - id: markdownlint-fix
+        language_version: system
+        args: *markdown_args
+        exclude: *markdown_exclude
+        stages: [manual]
 
   # ============================================
   # Linting and type checking (check-only `*-lint` tasks)

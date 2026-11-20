@@ -43,6 +43,13 @@
             "$ref": "#/$defs/RiskFactorShift"
           },
           "type": "array"
+        },
+        "unshifted_hazard_policies": {
+          "additionalProperties": {
+            "$ref": "#/$defs/UnshiftedHazardPolicy"
+          },
+          "description": "Required treatments for unshifted calibrated hazards whose discount dependencies move.",
+          "type": "object"
         }
       },
       "required": [
@@ -72,14 +79,23 @@
       "type": "object"
     },
     "RiskFactorType": {
-      "description": "Risk factor categories for VaR calculation.\n\nEach risk factor represents a market variable that can shift and impact\nportfolio valuations. Risk factors are bucketed at standard tenors/strikes\nto enable historical simulation.",
+      "description": "Risk factor categories for VaR calculation.\n\nEach risk factor represents a market variable that can shift and impact\nportfolio valuations. Rate changes carry exact source-year coordinates.",
       "oneOf": [
         {
+          "additionalProperties": false,
           "description": "Discount curve rate at a specific tenor (in years).",
           "properties": {
             "curve_id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
               "description": "Curve identifier"
+            },
+            "grid_years": {
+              "description": "Strictly increasing positive source-year grid containing this center exactly.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
             },
             "tenor_years": {
               "description": "Tenor in years (e.g., 1.0, 5.0, 10.0)",
@@ -94,16 +110,26 @@
           "required": [
             "type",
             "curve_id",
-            "tenor_years"
+            "tenor_years",
+            "grid_years"
           ],
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Forward curve rate at a specific tenor (in years).",
           "properties": {
             "curve_id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
               "description": "Curve identifier"
+            },
+            "grid_years": {
+              "description": "Strictly increasing positive source-year grid containing this center exactly.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
             },
             "tenor_years": {
               "description": "Tenor in years",
@@ -118,11 +144,13 @@
           "required": [
             "type",
             "curve_id",
-            "tenor_years"
+            "tenor_years",
+            "grid_years"
           ],
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Credit spread (hazard rate) at a specific tenor (in years).",
           "properties": {
             "curve_id": {
@@ -147,6 +175,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Equity spot price.",
           "properties": {
             "ticker": {
@@ -165,6 +194,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "FX spot rate as quote currency per one unit of base currency.",
           "properties": {
             "base": {
@@ -188,6 +218,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Implied volatility at specific expiry and strike.",
           "properties": {
             "expiry_years": {
@@ -218,6 +249,21 @@
           "type": "object"
         }
       ]
+    },
+    "UnshiftedHazardPolicy": {
+      "description": "Treatment of a hazard source whose calibration discount curve moves.",
+      "oneOf": [
+        {
+          "const": "frozen_intensity",
+          "description": "Hold the source's original intensity while the rate scenario moves.",
+          "type": "string"
+        },
+        {
+          "const": "refit_original_quotes",
+          "description": "Refit to unchanged original credit observations on the shocked discount curve.",
+          "type": "string"
+        }
+      ]
     }
   },
   "$id": "https://finstack_quant.dev/schemas/common/1/price_extras.schema.json",
@@ -236,6 +282,19 @@
               {
                 "factor": {
                   "curve_id": "USD-OIS",
+                  "grid_years": [
+                    0.25,
+                    0.5,
+                    1.0,
+                    2.0,
+                    3.0,
+                    5.0,
+                    7.0,
+                    10.0,
+                    15.0,
+                    20.0,
+                    30.0
+                  ],
                   "tenor_years": 5.0,
                   "type": "discount_rate"
                 },
@@ -256,6 +315,19 @@
               {
                 "factor": {
                   "curve_id": "USD-OIS",
+                  "grid_years": [
+                    0.25,
+                    0.5,
+                    1.0,
+                    2.0,
+                    3.0,
+                    5.0,
+                    7.0,
+                    10.0,
+                    15.0,
+                    20.0,
+                    30.0
+                  ],
                   "tenor_years": 5.0,
                   "type": "discount_rate"
                 },
@@ -282,6 +354,14 @@
     }
   ],
   "properties": {
+    "config": {
+      "additionalProperties": true,
+      "description": "Per-request configuration for metric settings and monetary conventions.",
+      "type": [
+        "object",
+        "null"
+      ]
+    },
     "explain": {
       "default": false,
       "description": "When `true`, attaches a step trace to the result as `explanation`.\nDefaults to `false` (no trace).",

@@ -4,25 +4,21 @@
 //! ([`rate_bumped_market_with_hazard_replay`]), applied to the index curve in
 //! single-curve mode or to every live constituent curve in constituents mode.
 
-use crate::cds::metrics::dv01::{HazardReplay, rate_bumped_market_with_hazard_replay};
+use crate::cds::metrics::dv01::{
+    DiscountShock, HazardReplay, calculate_credit_dv01, rate_bumped_market_with_hazard_replay,
+};
 use crate::cds::metrics::{deal_quote_override, market_doc_clause};
 use crate::cds_index::{CdsIndex, IndexPricing};
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
-use finstack_quant_valuations_core::metrics::sensitivities::cs01::sensitivity_central_diff;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-pub(crate) struct CdsIndexDv01Calculator;
+pub(crate) struct CdsIndexDv01Calculator(pub(crate) bool);
 
 impl MetricCalculator for CdsIndexDv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let idx = context.instrument_as::<CdsIndex>()?.clone();
-        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
-        if bump_bp.abs() <= 1e-10 {
-            return Ok(0.0);
-        }
         let synthetic = idx.to_synthetic_cds()?;
         let doc_clause = Some(market_doc_clause(&synthetic));
         let cds_valuation_convention = Some(synthetic.valuation_convention);
@@ -50,7 +46,7 @@ impl MetricCalculator for CdsIndexDv01Calculator {
             .map(|curve_id| context.curves.get_hazard(curve_id.as_str()))
             .collect::<Result<Vec<_>>>()?;
 
-        let reprice = |bp: f64| -> Result<f64> {
+        let reprice = |context: &MetricContext, shock: DiscountShock| -> Result<f64> {
             let replays = hazards.iter().map(|hazard| HazardReplay {
                 hazard: Arc::clone(hazard),
                 doc_clause,
@@ -60,16 +56,12 @@ impl MetricCalculator for CdsIndexDv01Calculator {
             let (bumped_market, _) = rate_bumped_market_with_hazard_replay(
                 context,
                 &idx.premium_leg.discount_curve_id,
-                bp,
+                shock,
                 replays,
             )?;
             context.reprice_raw(&bumped_market, context.as_of)
         };
 
-        Ok(sensitivity_central_diff(
-            reprice(bump_bp)?,
-            reprice(-bump_bp)?,
-            bump_bp,
-        ))
+        calculate_credit_dv01(context, &idx.premium_leg.discount_curve_id, self.0, reprice)
     }
 }

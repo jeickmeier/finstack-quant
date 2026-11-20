@@ -110,6 +110,8 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
+pub use crate::shared::FxSpotBasis;
 pub use types::{
-    FxDeltaConvention, FxDeltaConventionKind, FxOption, FxOptionBuilder, FxOptionParams,
+    FxDeltaConvention, FxDeltaConventionKind, FxOption, FxOptionBuilder, FxOptionDelivery,
+    FxOptionParams, FxOptionPosition,
 };

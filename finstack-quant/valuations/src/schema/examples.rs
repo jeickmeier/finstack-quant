@@ -605,6 +605,7 @@ pub(super) fn cds_trade_params() -> Result<Vec<Value>> {
             id: InstrumentId::new("CDX-IG-42"),
             notional: Money::from((10_000_000_i64, Currency::USD)),
             side: PayReceive::Pay,
+            include_valuation_date_cashflows: false,
             start: date(2024, time::Month::March, 20)?,
             end: date(2029, time::Month::June, 20)?,
             recovery_rate: 0.40,
@@ -706,6 +707,8 @@ pub(super) fn fx_option_params() -> Result<Vec<Value>> {
     use crate::instruments::fx::fx_option::{FxDeltaConvention, FxDeltaConventionKind};
     use finstack_quant_core::types::{CurveId, InstrumentId};
     example(&crate::instruments::fx::fx_option::FxOptionParams {
+        spot_basis: crate::instruments::fx::fx_option::FxSpotBasis::Cash,
+        delivery: crate::instruments::fx::fx_option::FxOptionDelivery::CashAtExpiry,
         id: InstrumentId::new("EURUSD-CALL-6M"),
         base_currency: Currency::EUR,
         quote_currency: Currency::USD,
@@ -843,6 +846,7 @@ pub(super) fn market_history() -> Result<Vec<Value>> {
                 factor: RiskFactorType::DiscountRate {
                     curve_id: "USD-OIS".into(),
                     tenor_years: 5.0,
+                    grid_years: crate::metrics::STANDARD_BUCKETS_YEARS.to_vec(),
                 },
                 shift: rate,
             },
@@ -860,10 +864,12 @@ pub(super) fn market_history() -> Result<Vec<Value>> {
         scenarios: vec![
             MarketScenario {
                 date: date(2025, time::Month::January, 14)?,
+                unshifted_hazard_policies: Default::default(),
                 shifts: shifts(0.0004, -0.012),
             },
             MarketScenario {
                 date: date(2025, time::Month::January, 13)?,
+                unshifted_hazard_policies: Default::default(),
                 shifts: shifts(-0.0002, 0.006),
             },
         ],

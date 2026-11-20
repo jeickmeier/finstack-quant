@@ -308,3 +308,76 @@ fn discount_replay_supports_negative_shifted_positive_curve()
     assert!(down.df(2.0)? > 1.0);
     Ok(())
 }
+
+#[test]
+fn bucketed_swap_dv01_replays_one_exact_projection_quote()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    use finstack_quant_valuations_core::metrics::{MetricId, format_key_rate_label};
+
+    let input = joint_swap_fixture()?;
+    let center = calibrate(&input.to_string())?;
+    let curve = center.get_forward("USD-SOFR-3M")?;
+    let binding = curve
+        .rate_calibration()
+        .unwrap()
+        .execution
+        .as_ref()
+        .unwrap()
+        .bindings
+        .iter()
+        .find(|binding| binding.quote_id == "FWD-2Y")
+        .expect("executed quote");
+    let as_of = center.get_discount("USD-OIS")?.base_date();
+    let registry = ConventionRegistry::try_global()?;
+    let convention = registry.require_rate_index(&"USD-SOFR-3M".into())?;
+    let calendar = calendar_by_id_strict(&convention.market_calendar_id)?;
+    let start = adjust(
+        as_of.add_business_days(convention.market_settlement_days, calendar)?,
+        convention.market_business_day_convention,
+        calendar,
+    )?;
+    let mut swap = InterestRateSwap::from_conventions(ConventionSwapParams {
+        id: "EXACT-QUOTE-RISK".into(),
+        notional: Money::new(1_000_000.0, convention.currency)?,
+        side: PayReceive::Pay,
+        fixed_rate: 0.043,
+        start_date: start,
+        maturity: binding.pillar_date,
+        index_id: "USD-SOFR-3M".into(),
+        discount_curve_id: "USD-OIS".into(),
+        forward_curve_id: "USD-SOFR-3M".into(),
+    })?;
+    swap.fixed_leg.business_day_convention = convention.market_business_day_convention;
+    swap.float_leg.business_day_convention = convention.market_business_day_convention;
+    let recompute = |shift| -> std::result::Result<f64, Box<dyn std::error::Error>> {
+        let mut shocked = input.clone();
+        let quote = shocked["market_data"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|quote| quote["id"] == "FWD-2Y")
+            .expect("authored quote");
+        quote["rate"] = json!(quote["rate"].as_f64().unwrap() + shift);
+        let markets = calibrate(&shocked.to_string())?;
+        Ok(swap.base_value_raw(&markets, as_of)?)
+    };
+    let expected = (recompute(0.0001)? - recompute(-0.0001)?) / 2.0;
+    let result = swap.price_with_metrics(
+        &center,
+        as_of,
+        &[MetricId::BucketedDv01, MetricId::Dv01],
+        crate::recalibration::pricing_options(),
+    )?;
+    let key = format!(
+        "bucketed_dv01::USD-SOFR-3M::{}",
+        format_key_rate_label(binding.pillar_time)
+    );
+    assert!((result.measures[key.as_str()] - expected).abs() < 1e-6);
+    let total = result.measures["bucketed_dv01"];
+    let parallel = result.measures["dv01"];
+    assert!(
+        (total - parallel).abs() <= 0.02,
+        "bucketed {total}; parallel {parallel}"
+    );
+    Ok(())
+}

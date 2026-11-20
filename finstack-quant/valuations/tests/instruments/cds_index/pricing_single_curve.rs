@@ -188,6 +188,7 @@ fn test_single_curve_buy_vs_sell_protection() {
             id: finstack_quant_core::types::InstrumentId::new("CDX-SELL"),
             notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             side: PayReceive::Receive,
+            include_valuation_date_cashflows: false,
             start,
             end,
             recovery_rate: STANDARD_RECOVERY_SENIOR,
@@ -395,6 +396,7 @@ fn test_single_curve_upfront_payment() {
 
     // Add upfront payment
     let upfront = Money::new(100_000.0, Currency::USD).expect("valid money fixture");
+    idx.include_valuation_date_cashflows = true;
     idx.upfront = Some((as_of, upfront));
 
     let npv_with_upfront = idx.value(&ctx, as_of).unwrap();

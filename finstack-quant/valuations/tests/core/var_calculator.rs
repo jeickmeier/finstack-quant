@@ -65,6 +65,7 @@ fn usd_ois_rate_scenario(date: Date, shift: f64) -> MarketScenario {
             factor: RiskFactorType::DiscountRate {
                 curve_id: CurveId::from("USD-OIS"),
                 tenor_years: 5.0,
+                grid_years: finstack_quant_valuations::metrics::STANDARD_BUCKETS_YEARS.to_vec(),
             },
             shift,
         }],
@@ -650,6 +651,7 @@ fn directional_taylor_keeps_nonstandard_tenor_and_unrelated_curves() -> Result<(
                 factor: RiskFactorType::DiscountRate {
                     curve_id: "USD-OIS".into(),
                     tenor_years: 1.4,
+                    grid_years: vec![1.4],
                 },
                 shift: 0.0005,
             },
@@ -657,6 +659,7 @@ fn directional_taylor_keeps_nonstandard_tenor_and_unrelated_curves() -> Result<(
                 factor: RiskFactorType::DiscountRate {
                     curve_id: "EUR-OIS".into(),
                     tenor_years: 2.3,
+                    grid_years: vec![2.3],
                 },
                 shift: -0.0004,
             },

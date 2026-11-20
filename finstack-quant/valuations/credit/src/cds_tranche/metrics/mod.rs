@@ -35,13 +35,13 @@ pub(crate) fn register_cds_tranche_metrics(
             (SpreadDv01, SpreadDv01Calculator),
             (Correlation01, Correlation01Calculator),
             (Recovery01, recovery01::Recovery01Calculator),
-            (Cs01, cs01::CdsTrancheCs01Calculator),
-            (BucketedCs01, cs01::CdsTrancheBucketedCs01Calculator),
+            (Cs01, cs01::CdsTrancheCs01Calculator, NativeMoney),
+            (BucketedCs01, cs01::CdsTrancheBucketedCs01Calculator, NativeMoney),
             (ParSpread, ParSpreadCalculator),
             (ExpectedLoss, ExpectedLossCalculator),
             (JumpToDefault, JumpToDefaultCalculator),
-            (Dv01, dv01::CdsTrancheDv01Calculator),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, dv01::CdsTrancheDv01Calculator(false)),
+            (BucketedDv01, dv01::CdsTrancheDv01Calculator(true)),
         ]
     }
     Ok(())

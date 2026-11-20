@@ -81,6 +81,7 @@
     },
     "upfront": {
       "type": "cds_upfront",
+      "upfront_basis": "clean",
       "id": "ACME-5Y-U",
       "entity": "ACME",
       "convention": {

@@ -99,15 +99,23 @@ impl PyEquityOption {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.greeks")]
-    #[pyo3(signature = (market, as_of, model="default"))]
+    #[pyo3(signature = (market, as_of, model="default", extras=None))]
     fn greeks<'py>(
         &self,
         py: Python<'py>,
         market: &Bound<'py, PyAny>,
         as_of: &Bound<'py, PyAny>,
         model: &str,
+        extras: Option<&Bound<'py, PyAny>>,
     ) -> PyResult<Bound<'py, PyDict>> {
-        typed_option_greeks(py, Box::new(self.inner.clone()), market, as_of, model)
+        typed_option_greeks(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            model,
+            super::pricing::price_extras_from_py(py, extras)?,
+        )
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.expiry")]

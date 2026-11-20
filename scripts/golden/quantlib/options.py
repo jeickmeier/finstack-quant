@@ -194,6 +194,8 @@ def build_european_fx_option() -> dict[str, Any]:
             "instrument": {
                 "type": "fx_option",
                 "spec": {
+                    "spot_basis": {"type": "cash"},
+                    "delivery": {"type": "cash_at_expiry"},
                     "id": "EURUSD-ATM-CALL-3M-QUANTLIB",
                     "delta_convention": {
                         "kind": "premium_adjusted_forward",

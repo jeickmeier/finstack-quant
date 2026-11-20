@@ -5104,8 +5104,7 @@
           "#/$defs/CompositeState/properties/weighting_inputs/additionalProperties",
           "#/$defs/BasketConstituent/properties/units",
           "#/$defs/BasketConstituent/properties/weight",
-          "#/$defs/Basket/properties/expense_ratio",
-          "#/$defs/BasketPricingConfig/properties/days_in_year"
+          "#/$defs/Basket/properties/expense_ratio"
         ],
         "enum": [
           {
@@ -5174,6 +5173,16 @@
           },
           {
             "pointer": "#/$defs/Monitoring",
+            "keyword": "oneOf",
+            "discriminators": ["type"]
+          },
+          {
+            "pointer": "#/$defs/FxSpotBasis",
+            "keyword": "oneOf",
+            "discriminators": ["type"]
+          },
+          {
+            "pointer": "#/$defs/FxOptionDelivery",
             "keyword": "oneOf",
             "discriminators": ["type"]
           },
@@ -5281,6 +5290,11 @@
             "pointer": "#/$defs/WeightingMethod",
             "keyword": "oneOf",
             "discriminators": ["kind"]
+          },
+          {
+            "pointer": "#/$defs/BasketExpense",
+            "keyword": "oneOf",
+            "discriminators": ["type"]
           }
         ],
         "map": [
@@ -5497,6 +5511,7 @@
           "#/$defs/DayCountContextState/properties/end_is_termination_date",
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic",
           "#/$defs/BarrierOption/properties/observed_barrier_breached",
+          "#/$defs/FxOptionDelivery/oneOf/1/properties/exercised",
           "#/$defs/FxTouchOption/properties/observed_barrier_breached",
           "#/$defs/FxBarrierOption/properties/observed_barrier_breached",
           "#/$defs/StructuredCredit/properties/principal_covers_senior_interest",
@@ -6901,6 +6916,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/CompositeSpec/properties/fx01_pair",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/RebalanceRule/oneOf/2/properties/end",
             "keyword": "anyOf"
           }
@@ -7226,6 +7245,7 @@
           { "pointer": "#/$defs/RealizedVarMethod", "keyword": "oneOf" },
           { "pointer": "#/$defs/NdfFixingSource", "keyword": "oneOf" },
           { "pointer": "#/$defs/NdfQuoteConvention", "keyword": "oneOf" },
+          { "pointer": "#/$defs/FxOptionPosition", "keyword": "oneOf" },
           { "pointer": "#/$defs/FxDeltaConventionKind", "keyword": "oneOf" },
           { "pointer": "#/$defs/DigitalPayoutType", "keyword": "oneOf" },
           { "pointer": "#/$defs/BarrierDirection", "keyword": "oneOf" },
@@ -16806,7 +16826,6 @@
           "#/$defs/BasketConstituent/properties/units",
           "#/$defs/BasketConstituent/properties/weight",
           "#/$defs/Basket/properties/expense_ratio",
-          "#/$defs/BasketPricingConfig/properties/days_in_year",
           "#/$defs/ClawbackSpec/properties/holdback_decimal",
           "#/$defs/PeFundWaterfallTranche/oneOf/1/properties/preferred_irr/properties/hurdle_irr",
           "#/$defs/PeFundWaterfallTranche/oneOf/2/properties/catch_up/properties/gp_share",
@@ -17081,7 +17100,22 @@
             "discriminators": ["type"]
           },
           {
+            "pointer": "#/$defs/FxSpotBasis",
+            "keyword": "oneOf",
+            "discriminators": ["type"]
+          },
+          {
+            "pointer": "#/$defs/FxOptionDelivery",
+            "keyword": "oneOf",
+            "discriminators": ["type"]
+          },
+          {
             "pointer": "#/$defs/CommodityFutureFixing",
+            "keyword": "oneOf",
+            "discriminators": ["type"]
+          },
+          {
+            "pointer": "#/$defs/BasketExpense",
             "keyword": "oneOf",
             "discriminators": ["type"]
           },
@@ -17400,6 +17434,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic",
           "#/$defs/DayCountContextState/properties/end_is_termination_date",
           "#/$defs/BarrierOption/properties/observed_barrier_breached",
+          "#/$defs/FxOptionDelivery/oneOf/1/properties/exercised",
           "#/$defs/FxTouchOption/properties/observed_barrier_breached",
           "#/$defs/FxBarrierOption/properties/observed_barrier_breached",
           "#/$defs/StructuredCredit/properties/principal_covers_senior_interest",
@@ -17662,6 +17697,10 @@
           },
           {
             "pointer": "#/$defs/d_e49387f97c0f9d510642/properties/reporting_currency",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CompositeSpec/properties/fx01_pair",
             "keyword": "anyOf"
           },
           { "pointer": "#/$defs/Bond/properties/call_put", "keyword": "anyOf" },
@@ -19058,6 +19097,7 @@
           { "pointer": "#/$defs/d_f80f2b90e7af690c5898", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_b556bbeb1ecf96c44c5a", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_9bbbe0cc70b45831cb71", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_be98333e68c25ab5ae57", "keyword": "oneOf" },
           { "pointer": "#/$defs/AccrualMethod", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_01cd6b2e4ad257352fdb", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_c0401254ec268b317b65", "keyword": "oneOf" },
@@ -19076,7 +19116,6 @@
           { "pointer": "#/$defs/DividendAdjustment", "keyword": "oneOf" },
           { "pointer": "#/$defs/DeflationProtection", "keyword": "oneOf" },
           { "pointer": "#/$defs/IndexationMethod", "keyword": "oneOf" },
-          { "pointer": "#/$defs/d_be98333e68c25ab5ae57", "keyword": "oneOf" },
           { "pointer": "#/$defs/CommitmentFeeBase", "keyword": "oneOf" },
           { "pointer": "#/$defs/YieldBasis", "keyword": "oneOf" },
           { "pointer": "#/$defs/AgencyProgram", "keyword": "oneOf" },
@@ -19129,6 +19168,7 @@
           { "pointer": "#/$defs/RealizedVarMethod", "keyword": "oneOf" },
           { "pointer": "#/$defs/NdfFixingSource", "keyword": "oneOf" },
           { "pointer": "#/$defs/NdfQuoteConvention", "keyword": "oneOf" },
+          { "pointer": "#/$defs/FxOptionPosition", "keyword": "oneOf" },
           { "pointer": "#/$defs/FxDeltaConventionKind", "keyword": "oneOf" },
           { "pointer": "#/$defs/DigitalPayoutType", "keyword": "oneOf" },
           { "pointer": "#/$defs/BarrierDirection", "keyword": "oneOf" },
@@ -25348,6 +25388,13 @@
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
+        "internal-union": [
+          {
+            "pointer": "#/$defs/d_c120b552f8627ee5856a",
+            "keyword": "oneOf",
+            "discriminators": ["type"]
+          }
+        ],
         "map": ["#/$defs/d_2c88e4d1e2e4f7c22e02/properties/meta"],
         "mixed-unit-external-union": [
           { "pointer": "#/$defs/d_5c13df5a55f1da604df2", "keyword": "oneOf" }
@@ -26659,6 +26706,18 @@
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp",
           "#/$defs/d_f2834e0dc8039c010dc1/properties/strike"
         ],
+        "internal-union": [
+          {
+            "pointer": "#/$defs/d_78102f94ceb92cc3f3ca",
+            "keyword": "oneOf",
+            "discriminators": ["type"]
+          },
+          {
+            "pointer": "#/$defs/d_a813281b23253f1d49c3",
+            "keyword": "oneOf",
+            "discriminators": ["type"]
+          }
+        ],
         "map": ["#/$defs/d_2c88e4d1e2e4f7c22e02/properties/meta"],
         "mixed-unit-external-union": [
           { "pointer": "#/$defs/d_5c13df5a55f1da604df2", "keyword": "oneOf" }
@@ -26830,6 +26889,7 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
+          "#/$defs/d_78102f94ceb92cc3f3ca/oneOf/1/properties/exercised",
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
         ],
         "nullable-integer": [
@@ -26951,6 +27011,7 @@
         "unit-union": [
           { "pointer": "#/$defs/d_be98333e68c25ab5ae57", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_c0401254ec268b317b65", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_8262d0a7fe31a173e8ec", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_5dc0cd94145cbc704a95", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_02a11b30ee627630f221", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_948cdc4db846a21357a4", "keyword": "oneOf" },

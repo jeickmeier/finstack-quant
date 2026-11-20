@@ -739,6 +739,9 @@ mod tests {
     );
 
     impl Instrument for CountingPvInstrument {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
         /// Test mock: reads no market data.
         fn market_dependencies(
             &self,

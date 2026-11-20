@@ -22,6 +22,10 @@ use time::macros::date;
 fn test_builder_pattern_creates_valid_option() {
     // Arrange & Act
     let option = FxOption::builder()
+        .spot_basis(finstack_quant_valuations::instruments::fx::fx_option::FxSpotBasis::Cash)
+        .delivery(
+            finstack_quant_valuations::instruments::fx::fx_option::FxOptionDelivery::CashAtExpiry,
+        )
         .id(InstrumentId::new("TEST_CALL"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
@@ -96,6 +100,10 @@ fn test_builder_with_underlying_params() {
 
     // Act
     let option = FxOption::builder()
+        .spot_basis(finstack_quant_valuations::instruments::fx::fx_option::FxSpotBasis::Cash)
+        .delivery(
+            finstack_quant_valuations::instruments::fx::fx_option::FxOptionDelivery::CashAtExpiry,
+        )
         .id("TEST_OPTION".into())
         .base_currency(underlying_params.base_currency)
         .quote_currency(underlying_params.quote_currency)

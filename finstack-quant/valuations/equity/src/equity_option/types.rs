@@ -689,6 +689,9 @@ impl EquityOption {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for EquityOption {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::EquityOption,
         crate::EQUITY
@@ -1559,6 +1562,24 @@ mod tests {
             continuous_pv,
             discrete_pv,
         );
+    }
+
+    #[test]
+    fn live_american_option_with_zero_model_time_prices_intrinsic() {
+        let as_of = date(2025, 1, 30);
+        let expiry = date(2025, 1, 31);
+        let mut option = base_option(expiry);
+        option.exercise_style = ExerciseStyle::American;
+        option.day_count = finstack_quant_core::dates::DayCount::ThirtyE360;
+        let market = build_market_context(as_of, 105.0, 0.22, 0.03, 0.0);
+        let expected = option.option_type.intrinsic(105.0, option.strike) * option.quantity;
+        for dividends in [vec![(expiry, 1.0)], vec![]] {
+            option.discrete_dividends = dividends;
+            let value = option
+                .value(&market, as_of)
+                .expect("zero model-time option");
+            assert_eq!(value.amount(), expected);
+        }
     }
 
     #[test]

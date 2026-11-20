@@ -4975,11 +4975,13 @@
       "coverageRulesCloStandard",
       "coverageRulesValidate",
       "equityMetricsFieldUnits",
+      "facilityProjectionLenderCashflows",
       "futureOptionTerms",
       "futureOptionTermsExample",
       "instrumentCashflows",
       "instrumentCashflowsWithMarket",
       "instrumentEnvelopeFromSpec",
+      "liquidationSpecNetProceedsFraction",
       "listModels",
       "listModelsGrouped",
       "listStandardMetrics",
@@ -5011,12 +5013,15 @@
       "trancheBuilder",
       "trancheCashflowsTable",
       "trancheDiscountMargin",
+      "trancheIsNonDeferrable",
       "trancheMetricFieldUnits",
       "trancheMetrics",
       "trancheOas",
+      "tranchePaymentPriority",
       "trancheScenarioTable",
       "trancheSolveFieldUnits",
       "trancheStructureFromBalances",
+      "trancheStructureTotalSize",
       "validateInstrumentJson",
       "validateTypedInstrumentJson",
       "waterfallCoverageTests"
@@ -5905,6 +5910,7 @@
       "docClauseEffective",
       "expiry",
       "id",
+      "includeValuationDateCashflows",
       "instrumentPricingOverrides",
       "marginSpec",
       "metricPricingOverrides",
@@ -5941,6 +5947,7 @@
       "defaultModel",
       "expiry",
       "id",
+      "includeValuationDateCashflows",
       "indexFactor",
       "indexName",
       "instrumentPricingOverrides",
@@ -6930,6 +6937,7 @@
       "constituents",
       "defaultModel",
       "discountCurveId",
+      "expense",
       "expenseRatio",
       "expiry",
       "id",
@@ -6950,6 +6958,7 @@
       "build",
       "constituents",
       "discountCurveId",
+      "expense",
       "expenseRatio",
       "free",
       "id",
@@ -8635,7 +8644,8 @@
       "quoteCalendarId",
       "quoteCurrency",
       "quotedSpot",
-      "scenarioPricingOverrides"
+      "scenarioPricingOverrides",
+      "spotBasis"
     ]
   },
   "valuations.instruments.FxSwap": {
@@ -8713,6 +8723,7 @@
       "baseCurrency",
       "dayCount",
       "defaultModel",
+      "delivery",
       "deltaConvention",
       "domesticDiscountCurveId",
       "expiry",
@@ -8724,6 +8735,7 @@
       "optionType",
       "quoteCurrency",
       "scenarioPricingOverrides",
+      "spotBasis",
       "strike",
       "volSurfaceId"
     ]
@@ -9187,6 +9199,7 @@
       "docClause",
       "free",
       "id",
+      "includeValuationDateCashflows",
       "instrumentPricingOverrides",
       "marginSpec",
       "metricPricingOverrides",
@@ -9212,6 +9225,7 @@
       "convention",
       "free",
       "id",
+      "includeValuationDateCashflows",
       "indexFactor",
       "indexName",
       "instrumentPricingOverrides",
@@ -9433,7 +9447,8 @@
       "quoteCalendarId",
       "quoteCurrency",
       "quotedSpot",
-      "scenarioPricingOverrides"
+      "scenarioPricingOverrides",
+      "spotBasis"
     ],
     "getters": []
   },
@@ -9446,6 +9461,7 @@
       "baseCurrency",
       "build",
       "dayCount",
+      "delivery",
       "deltaConvention",
       "domesticDiscountCurveId",
       "expiry",
@@ -9458,6 +9474,7 @@
       "optionType",
       "quoteCurrency",
       "scenarioPricingOverrides",
+      "spotBasis",
       "strike",
       "volSurfaceId"
     ],
@@ -9515,6 +9532,21 @@
     "kind": "function"
   },
   "valuations.instruments.trancheBuilder": {
+    "kind": "function"
+  },
+  "valuations.instruments.trancheStructureTotalSize": {
+    "kind": "function"
+  },
+  "valuations.instruments.trancheIsNonDeferrable": {
+    "kind": "function"
+  },
+  "valuations.instruments.tranchePaymentPriority": {
+    "kind": "function"
+  },
+  "valuations.instruments.liquidationSpecNetProceedsFraction": {
+    "kind": "function"
+  },
+  "valuations.instruments.facilityProjectionLenderCashflows": {
     "kind": "function"
   },
   "valuations.instruments.trancheStructureFromBalances": {

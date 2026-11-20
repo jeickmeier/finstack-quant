@@ -70,6 +70,8 @@ fn make_history(as_of: Date, n: usize) -> MarketHistory {
                     factor: RiskFactorType::DiscountRate {
                         curve_id: CurveId::from("USD-OIS"),
                         tenor_years: 5.0,
+                        grid_years: finstack_quant_valuations::metrics::STANDARD_BUCKETS_YEARS
+                            .to_vec(),
                     },
                     shift: bump,
                 }],

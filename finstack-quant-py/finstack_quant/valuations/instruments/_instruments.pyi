@@ -695,6 +695,7 @@ class Bond:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         metric_id: str,
         model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> float:
         """
         Compute one scalar metric for this bond (e.g. ``"ytm"``).
@@ -714,6 +715,9 @@ class Bond:
             ``"tree"`` for rates-only exercise rights, and ``"rates_credit"``
             for joint rates-credit valuation including call, put, and
             return-floor rights.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -1899,6 +1903,7 @@ class TermLoan:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         metric_id: str,
         model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> float:
         """
         Compute one scalar metric for this term loan (e.g. ``"dv01"``).
@@ -1913,6 +1918,9 @@ class TermLoan:
             Registered metric identifier (see :func:`list_standard_metrics`).
         model : str, default "default"
             Model key.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------

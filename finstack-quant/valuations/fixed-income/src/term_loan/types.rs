@@ -835,6 +835,9 @@ impl TermLoan {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for TermLoan {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
     fn cashflow_export_terms(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,

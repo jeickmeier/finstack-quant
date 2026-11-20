@@ -270,11 +270,7 @@ fn test_explicit_discounting_with_attached_credit_uses_z_spread_cs01_fallback() 
         .price_with_metrics(
             &market,
             as_of,
-            &[
-                MetricId::BucketedDv01,
-                MetricId::Cs01,
-                MetricId::BucketedCs01,
-            ],
+            &[MetricId::BucketedDv01, MetricId::Cs01],
             PricingOptions::default().with_model(ModelKey::Discounting),
         )
         .expect("explicit Discounting must ignore the attached credit curve for rate risk");
@@ -288,9 +284,16 @@ fn test_explicit_discounting_with_attached_credit_uses_z_spread_cs01_fallback() 
             .any(|(key, value)| key.as_str().starts_with("bucketed_dv01::") && value.abs() > 1e-6)
     );
     let cs01 = result.measures["cs01"];
-    let bucketed_cs01 = result.measures["bucketed_cs01"];
     assert!(cs01.is_finite() && cs01.abs() > 1e-6);
-    assert!((bucketed_cs01 - cs01).abs() <= 1e-10 * cs01.abs().max(1.0));
+    let error = quoted
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::BucketedCs01],
+            PricingOptions::default().with_model(ModelKey::Discounting),
+        )
+        .expect_err("inactive hazard cannot supply credit-quote buckets");
+    assert!(error.to_string().contains("bucketed_cs01"), "{error}");
 }
 
 #[test]

@@ -13,6 +13,8 @@
   "instrument": {
     "instrument": {
       "spec": {
+        "spot_basis": {"type": "cash"},
+        "delivery": {"type": "cash_at_expiry"},
         "attributes": {
           "meta": {},
           "tags": [

@@ -26,6 +26,7 @@
 ///
 /// ```text
 /// impl Instrument for MyInstrument {
+///     fn includes_valuation_date_cashflows(&self) -> bool { false }
 ///     impl_instrument_base!(InstrumentType::MyInstrument, crate::instruments::rates::RATES);
 ///
 ///     fn base_value(&self, market: &MarketContext, as_of: Date) -> Result<Money> {

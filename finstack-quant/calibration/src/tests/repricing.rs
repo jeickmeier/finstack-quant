@@ -964,6 +964,7 @@ fn hazard_recipe_upfront_inputs_support_par_space_replay() {
             pillar: Pillar::Date(Date::from_calendar_date(2028, Month::March, 20).unwrap()),
             coupon_bp: 100.0,
             upfront_pct: 0.015,
+            upfront_basis: crate::quotes::CdsUpfrontBasis::Clean,
             recovery_rate: 0.40,
             convention: CdsConventionKey {
                 currency,
@@ -976,6 +977,7 @@ fn hazard_recipe_upfront_inputs_support_par_space_replay() {
             pillar: Pillar::Date(Date::from_calendar_date(2030, Month::March, 20).unwrap()),
             coupon_bp: 500.0,
             upfront_pct: 0.045,
+            upfront_basis: crate::quotes::CdsUpfrontBasis::Clean,
             recovery_rate: 0.40,
             convention: CdsConventionKey {
                 currency,

@@ -58,6 +58,12 @@ instrument_pricing_methods!(
 
 #[pymethods]
 impl PyFxForward {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.spot_basis")]
+    #[getter]
+    fn spot_basis<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.spot_basis)
+    }
+
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
@@ -190,6 +196,22 @@ pub struct PyFxForwardBuilder {
 
 #[pymethods]
 impl PyFxForwardBuilder {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForwardBuilder.spot_basis")]
+    #[pyo3(text_signature = "($self, value)")]
+    fn spot_basis<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let spec: finstack_quant_valuations::instruments::fx::fx_option::FxSpotBasis =
+            crate::bindings::module_utils::spec_from_py(value.py(), value, "FxSpotBasis")?;
+        builder_set!(
+            slf,
+            spot_basis,
+            format!("{spec:?}"),
+            |b: FxForwardBuilder| b.spot_basis(spec)
+        )
+    }
+
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForwardBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
@@ -373,6 +395,18 @@ instrument_pricing_methods!(
 
 #[pymethods]
 impl PyFxOption {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.delivery")]
+    #[getter]
+    fn delivery<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.delivery)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.spot_basis")]
+    #[getter]
+    fn spot_basis<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.spot_basis)
+    }
+
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.example")]
     #[staticmethod]
     #[pyo3(text_signature = "()")]
@@ -411,15 +445,23 @@ impl PyFxOption {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.greeks")]
-    #[pyo3(signature = (market, as_of, model="default"))]
+    #[pyo3(signature = (market, as_of, model="default", extras=None))]
     fn greeks<'py>(
         &self,
         py: Python<'py>,
         market: &Bound<'py, PyAny>,
         as_of: &Bound<'py, PyAny>,
         model: &str,
+        extras: Option<&Bound<'py, PyAny>>,
     ) -> PyResult<Bound<'py, PyDict>> {
-        typed_option_greeks(py, Box::new(self.inner.clone()), market, as_of, model)
+        typed_option_greeks(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            model,
+            super::pricing::price_extras_from_py(py, extras)?,
+        )
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.delta_convention")]
@@ -499,6 +541,34 @@ pub struct PyFxOptionBuilder {
 
 #[pymethods]
 impl PyFxOptionBuilder {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.delivery")]
+    #[pyo3(text_signature = "($self, value)")]
+    fn delivery<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let spec: finstack_quant_valuations::instruments::fx::fx_option::FxOptionDelivery =
+            crate::bindings::module_utils::spec_from_py(value.py(), value, "FxOptionDelivery")?;
+        builder_set!(slf, delivery, format!("{spec:?}"), |b: FxOptionBuilder| b
+            .delivery(spec))
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.spot_basis")]
+    #[pyo3(text_signature = "($self, value)")]
+    fn spot_basis<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let spec: finstack_quant_valuations::instruments::fx::fx_option::FxSpotBasis =
+            crate::bindings::module_utils::spec_from_py(value.py(), value, "FxSpotBasis")?;
+        builder_set!(
+            slf,
+            spot_basis,
+            format!("{spec:?}"),
+            |b: FxOptionBuilder| b.spot_basis(spec)
+        )
+    }
+
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.id")]
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {

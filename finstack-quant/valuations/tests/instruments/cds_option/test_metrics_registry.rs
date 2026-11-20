@@ -348,3 +348,15 @@ fn test_spread_dv01_requires_replay_recipe() {
         .expect_err("standard spread DV01 requires quote-space replay");
     assert!(error.to_string().contains("calibration recipe"));
 }
+
+#[test]
+fn rate_buckets_reconcile_with_hazard_replay() {
+    let as_of = date!(2025 - 01 - 01);
+    let instrument = CdsOptionBuilder::new().build(as_of);
+    let market = super::common::replayable_standard_market(as_of);
+    crate::instruments::test_support::credit::assert_rate_bucket_reconciliation(
+        &instrument,
+        &market,
+        as_of,
+    );
+}

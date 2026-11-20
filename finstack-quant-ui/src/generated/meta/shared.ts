@@ -2505,9 +2505,16 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
+    "path": "#/$defs/Basket/properties/expense",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Basket/properties/expense",
+    "description": "Explicit accrued expense election at the valuation cut.",
+    "ref": "#/$defs/BasketExpense",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasketExpense"
+  },
+  {
     "path": "#/$defs/Basket/properties/expense_ratio",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Basket/properties/expense_ratio",
-    "description": "Total expense ratio (as decimal, e.g., 0.0025 = 0.25%)\nThis affects pricing through expense drag calculations",
+    "description": "Annual expense-ratio disclosure in decimal units (0.0025 is 0.25%).",
     "format": "double"
   },
   {
@@ -2635,15 +2642,41 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/BasketExpense",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasketExpense",
+    "description": "Operating expense accrued at the basket's valuation cut."
+  },
+  {
+    "path": "#/$defs/BasketExpense/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasketExpense/oneOf/0",
+    "description": "Explicitly elect no accrued expense at this cut."
+  },
+  {
+    "path": "#/$defs/BasketExpense/oneOf/0/properties/type",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasketExpense/oneOf/0/properties/type",
+    "const": "none"
+  },
+  {
+    "path": "#/$defs/BasketExpense/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasketExpense/oneOf/1",
+    "description": "Deduct the qualified accrued expense once for each basket unit."
+  },
+  {
+    "path": "#/$defs/BasketExpense/oneOf/1/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasketExpense/oneOf/1/properties/amount",
+    "description": "Nonnegative accrued cash per basket unit in the reporting currency.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+  },
+  {
+    "path": "#/$defs/BasketExpense/oneOf/1/properties/type",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasketExpense/oneOf/1/properties/type",
+    "const": "accrued"
+  },
+  {
     "path": "#/$defs/BasketPricingConfig",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasketPricingConfig",
     "description": "Configuration for basket pricing behaviour."
-  },
-  {
-    "path": "#/$defs/BasketPricingConfig/properties/days_in_year",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasketPricingConfig/properties/days_in_year",
-    "description": "Day basis used for fee accrual (e.g., 365.0 or 365.25). Avoid hardcoding in logic.",
-    "format": "double"
   },
   {
     "path": "#/$defs/BasketPricingConfig/properties/fx_policy",
@@ -4398,6 +4431,11 @@ export default [
     "description": "Unique instrument identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/CdsIndex/properties/include_valuation_date_cashflows",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/include_valuation_date_cashflows",
+    "description": "Whether scheduled premium and actual upfront payable on the valuation date\nare still due. A booked trade must explicitly elect this boundary."
   },
   {
     "path": "#/$defs/CdsIndex/properties/index_factor",
@@ -7808,6 +7846,21 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
+    "path": "#/$defs/CompositeSpec/properties/fx01_pair",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CompositeSpec/properties/fx01_pair",
+    "description": "Ordered market FX direction for whole-composite FX01."
+  },
+  {
+    "path": "#/$defs/CompositeSpec/properties/fx01_pair/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CompositeSpec/properties/fx01_pair/anyOf/0",
+    "ref": "#/$defs/FxPair",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxPair"
+  },
+  {
+    "path": "#/$defs/CompositeSpec/properties/fx01_pair/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CompositeSpec/properties/fx01_pair/anyOf/1"
+  },
+  {
     "path": "#/$defs/CompositeSpec/properties/id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CompositeSpec/properties/id",
     "description": "Stable composite instrument identifier.",
@@ -8857,6 +8910,11 @@ export default [
     "description": "Unique instrument identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/CreditDefaultSwap/properties/include_valuation_date_cashflows",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CreditDefaultSwap/properties/include_valuation_date_cashflows",
+    "description": "Whether scheduled premium and actual upfront payable on the valuation date\nare still due. A booked trade must explicitly elect this boundary."
   },
   {
     "path": "#/$defs/CreditDefaultSwap/properties/instrument_pricing_overrides",
@@ -19199,7 +19257,7 @@ export default [
   {
     "path": "#/$defs/FxForward",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxForward",
-    "description": "FX forward (outright forward) instrument.\n\nRepresents a commitment to exchange one currency for another at a specified\nfuture date at a predetermined rate. The position is long base currency\n(foreign) and short quote currency (domestic).\n\n# Pricing\n\nForward value is calculated using covered interest rate parity:\n```text\nF_market = S × DF_foreign(T) / DF_domestic(T)\nPV = notional × (F_market - F_contract) × DF_domestic(T)\n```\nwhere:\n- S = spot FX rate (from FxMatrix or quoted_spot)\n- DF_foreign(T) = discount factor in base currency to maturity\n- DF_domestic(T) = discount factor in quote currency to maturity\n- F_contract = contract_rate (if provided, else F_market for at-market forward)\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fx::fx_forward::FxForward;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet forward = FxForward::builder()\n    .id(InstrumentId::new(\"EURUSD-FWD-6M\"))\n    .base_currency(Currency::EUR)\n    .quote_currency(Currency::USD)\n    .maturity(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .notional(Money::from((1_000_000_i64, Currency::EUR)))\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .foreign_discount_curve_id(CurveId::new(\"EUR-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```"
+    "description": "FX forward (outright forward) instrument.\n\nRepresents a commitment to exchange one currency for another at a specified\nfuture date at a predetermined rate. The position is long base currency\n(foreign) and short quote currency (domestic).\n\n# Pricing\n\nForward value is calculated using covered interest rate parity:\n```text\nF_market = S × DF_foreign(T) / DF_domestic(T)\nPV = notional × (F_market - F_contract) × DF_domestic(T)\n```\nwhere:\n- S = spot FX rate (from FxMatrix or quoted_spot)\n- DF_foreign(T) = discount factor in base currency to maturity\n- DF_domestic(T) = discount factor in quote currency to maturity\n- F_contract = contract_rate (if provided, else F_market for at-market forward)\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fx::fx_forward::FxForward;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet forward = FxForward::builder()\n    .spot_basis(finstack_quant_valuations_fx::FxSpotBasis::Cash)\n    .id(InstrumentId::new(\"EURUSD-FWD-6M\"))\n    .base_currency(Currency::EUR)\n    .quote_currency(Currency::USD)\n    .maturity(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .notional(Money::from((1_000_000_i64, Currency::EUR)))\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .foreign_discount_curve_id(CurveId::new(\"EUR-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```"
   },
   {
     "path": "#/$defs/FxForward/properties/attributes",
@@ -19319,6 +19377,13 @@ export default [
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/FxForward/properties/spot_basis",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxForward/properties/spot_basis",
+    "description": "Basis of the selected spot quote, held fixed across reprices.",
+    "ref": "#/$defs/FxSpotBasis",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpotBasis"
   },
   {
     "path": "#/$defs/FxFuture",
@@ -19446,7 +19511,7 @@ export default [
   {
     "path": "#/$defs/FxOption",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOption",
-    "description": "European FX option with same-day cash settlement at expiry.\n\nPhysical delivery is intentionally not represented: exercised payoff is a\nquote-currency cash amount on `expiry`."
+    "description": "European FX option with an explicit cash or physical settlement profile."
   },
   {
     "path": "#/$defs/FxOption/properties/attributes",
@@ -19469,6 +19534,13 @@ export default [
     "description": "Day count convention",
     "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
+  },
+  {
+    "path": "#/$defs/FxOption/properties/delivery",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOption/properties/delivery",
+    "description": "Booked payoff and settlement profile.",
+    "ref": "#/$defs/FxOptionDelivery",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOptionDelivery"
   },
   {
     "path": "#/$defs/FxOption/properties/delta_convention",
@@ -19548,6 +19620,13 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
   },
   {
+    "path": "#/$defs/FxOption/properties/spot_basis",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOption/properties/spot_basis",
+    "description": "Selected spot quote's fixed value-date basis.",
+    "ref": "#/$defs/FxSpotBasis",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpotBasis"
+  },
+  {
     "path": "#/$defs/FxOption/properties/strike",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOption/properties/strike",
     "description": "Strike exchange rate (quote per base).\n\n**Note on ATM convention**: Professional FX markets define ATM as the\nDelta-Neutral Straddle (DNS) strike, not the forward rate. See module\ndocumentation for details. If constructing an \"ATM\" option, compute\nthe forward rate or DNS strike externally.",
@@ -19559,6 +19638,86 @@ export default [
     "description": "FX volatility surface ID",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/FxOptionDelivery",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOptionDelivery",
+    "description": "Settlement profile of the FX option."
+  },
+  {
+    "path": "#/$defs/FxOptionDelivery/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOptionDelivery/oneOf/0",
+    "description": "Cash-settled benchmark option whose intrinsic payoff is due at expiry."
+  },
+  {
+    "path": "#/$defs/FxOptionDelivery/oneOf/0/properties/type",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOptionDelivery/oneOf/0/properties/type",
+    "const": "cash_at_expiry"
+  },
+  {
+    "path": "#/$defs/FxOptionDelivery/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOptionDelivery/oneOf/1",
+    "description": "Deliverable option with a fixed native cash exchange on exercise."
+  },
+  {
+    "path": "#/$defs/FxOptionDelivery/oneOf/1/properties/date",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOptionDelivery/oneOf/1/properties/date",
+    "description": "Booked value date of both currency legs, on or after expiry.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/FxOptionDelivery/oneOf/1/properties/exercised",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOptionDelivery/oneOf/1/properties/exercised",
+    "description": "Confirmed expiry outcome. The live option has no known outcome."
+  },
+  {
+    "path": "#/$defs/FxOptionDelivery/oneOf/1/properties/position",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOptionDelivery/oneOf/1/properties/position",
+    "description": "Signed holder position with positive base notional.",
+    "ref": "#/$defs/FxOptionPosition",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOptionPosition"
+  },
+  {
+    "path": "#/$defs/FxOptionDelivery/oneOf/1/properties/type",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOptionDelivery/oneOf/1/properties/type",
+    "const": "physical"
+  },
+  {
+    "path": "#/$defs/FxOptionPosition",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOptionPosition",
+    "description": "Holder direction of a physically delivered FX option."
+  },
+  {
+    "path": "#/$defs/FxOptionPosition/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOptionPosition/oneOf/0",
+    "const": "long",
+    "description": "Holder receives the exercised option exchange."
+  },
+  {
+    "path": "#/$defs/FxOptionPosition/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOptionPosition/oneOf/1",
+    "const": "short",
+    "description": "Writer owes the opposite exchange when exercised."
+  },
+  {
+    "path": "#/$defs/FxPair",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxPair",
+    "description": "FX pair identifier using base/quote currency ordering."
+  },
+  {
+    "path": "#/$defs/FxPair/properties/base",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxPair/properties/base",
+    "description": "Base currency (numerator).",
+    "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
+  },
+  {
+    "path": "#/$defs/FxPair/properties/quote",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxPair/properties/quote",
+    "description": "Quote currency (denominator).",
+    "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
   },
   {
     "path": "#/$defs/FxSpot",
@@ -19694,6 +19853,38 @@ export default [
     "description": "Contractual spot lag in business days on the joint calendar, required\nwhen `settlement_date` is not provided.",
     "format": "uint32",
     "minimum": 0
+  },
+  {
+    "path": "#/$defs/FxSpotBasis",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpotBasis",
+    "description": "Value-date basis of the selected ordered FX quote."
+  },
+  {
+    "path": "#/$defs/FxSpotBasis/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpotBasis/oneOf/0",
+    "description": "The selected quote is cash FX at the valuation date."
+  },
+  {
+    "path": "#/$defs/FxSpotBasis/oneOf/0/properties/type",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpotBasis/oneOf/0/properties/type",
+    "const": "cash"
+  },
+  {
+    "path": "#/$defs/FxSpotBasis/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpotBasis/oneOf/1",
+    "description": "The selected outright is quoted for a stated value date."
+  },
+  {
+    "path": "#/$defs/FxSpotBasis/oneOf/1/properties/date",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpotBasis/oneOf/1/properties/date",
+    "description": "Fixed value date of the spot quote.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/FxSpotBasis/oneOf/1/properties/type",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpotBasis/oneOf/1/properties/type",
+    "const": "value_date"
   },
   {
     "path": "#/$defs/FxSwap",
@@ -32046,6 +32237,12 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasketConstituent"
   },
   {
+    "path": "#/properties/BasketExpense",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/BasketExpense",
+    "ref": "#/$defs/BasketExpense",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasketExpense"
+  },
+  {
     "path": "#/properties/BasketPricingConfig",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/BasketPricingConfig",
     "ref": "#/$defs/BasketPricingConfig",
@@ -33054,10 +33251,34 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOption"
   },
   {
+    "path": "#/properties/FxOptionDelivery",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/FxOptionDelivery",
+    "ref": "#/$defs/FxOptionDelivery",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOptionDelivery"
+  },
+  {
+    "path": "#/properties/FxOptionPosition",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/FxOptionPosition",
+    "ref": "#/$defs/FxOptionPosition",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxOptionPosition"
+  },
+  {
+    "path": "#/properties/FxPair",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/FxPair",
+    "ref": "#/$defs/FxPair",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxPair"
+  },
+  {
     "path": "#/properties/FxSpot",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/FxSpot",
     "ref": "#/$defs/FxSpot",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpot"
+  },
+  {
+    "path": "#/properties/FxSpotBasis",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/FxSpotBasis",
+    "ref": "#/$defs/FxSpotBasis",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxSpotBasis"
   },
   {
     "path": "#/properties/FxSwap",

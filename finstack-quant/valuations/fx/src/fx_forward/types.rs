@@ -47,6 +47,7 @@ use time::macros::date;
 /// use time::Month;
 ///
 /// let forward = FxForward::builder()
+///     .spot_basis(finstack_quant_valuations_fx::FxSpotBasis::Cash)
 ///     .id(InstrumentId::new("EURUSD-FWD-6M"))
 ///     .base_currency(Currency::EUR)
 ///     .quote_currency(Currency::USD)
@@ -68,6 +69,8 @@ use time::macros::date;
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields, remote = "Self")]
 pub struct FxForward {
+    /// Basis of the selected spot quote, held fixed across reprices.
+    pub spot_basis: crate::shared::FxSpotBasis,
     /// Unique instrument identifier.
     pub id: InstrumentId,
     /// Base currency (foreign currency, numerator of the pair).
@@ -235,6 +238,7 @@ impl FxForward {
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .maturity(date!(2025 - 06 - 15))
+            .spot_basis(crate::shared::FxSpotBasis::Cash)
             .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
@@ -296,6 +300,7 @@ impl FxForward {
             .base_currency(base_currency)
             .quote_currency(quote_currency)
             .maturity(maturity)
+            .spot_basis(crate::shared::FxSpotBasis::ValueDate { date: spot_date })
             .notional(notional)
             .domestic_discount_curve_id(domestic_discount_curve_id)
             .foreign_discount_curve_id(foreign_discount_curve_id)
@@ -343,6 +348,7 @@ impl FxForward {
     /// let forward_points = pips * pip_size; // = 0.0050
     ///
     /// let forward = FxForward::builder()
+    ///     .spot_basis(finstack_quant_valuations_fx::FxSpotBasis::Cash)
     ///     .id(InstrumentId::new("EURUSD-FWD"))
     ///     .base_currency(Currency::EUR)
     ///     .quote_currency(Currency::USD)
@@ -422,6 +428,7 @@ impl FxForward {
     /// # use time::Month;
     /// let eurusd = FxPairConvention::new(Currency::EUR, Currency::USD, 0.0001).unwrap();
     /// let forward = FxForward::builder()
+    ///     .spot_basis(finstack_quant_valuations_fx::FxSpotBasis::Cash)
     ///     .id(InstrumentId::new("EURUSD-FWD"))
     ///     .base_currency(Currency::EUR)
     ///     .quote_currency(Currency::USD)
@@ -476,6 +483,7 @@ impl FxForward {
             domestic_discount_curve_id: &self.domestic_discount_curve_id,
             foreign_discount_curve_id: &self.foreign_discount_curve_id,
             quoted_spot: self.quoted_spot,
+            spot_basis: self.spot_basis,
             context: "FxForward",
         })
     }
@@ -488,6 +496,9 @@ impl FxForward {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for FxForward {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     fn with_bumped_fx_quote(
         &self,
         relative: f64,
@@ -555,6 +566,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxForward {
                 domestic_discount_curve_id: &self.domestic_discount_curve_id,
                 foreign_discount_curve_id: &self.foreign_discount_curve_id,
                 quoted_spot: self.quoted_spot,
+                spot_basis: self.spot_basis,
                 context: "FxForward",
             })?;
         let pv = self.contract_rate.map_or(0.0, |contract_rate| {
@@ -704,6 +716,7 @@ mod tests {
     #[test]
     fn test_validation_same_currency_fails() {
         let forward = FxForward {
+            spot_basis: crate::shared::FxSpotBasis::Cash,
             id: InstrumentId::new("TEST"),
             base_currency: Currency::EUR,
             quote_currency: Currency::EUR, // Same as base - invalid
@@ -734,6 +747,7 @@ mod tests {
     #[test]
     fn test_validation_notional_currency_mismatch_fails() {
         let forward = FxForward {
+            spot_basis: crate::shared::FxSpotBasis::Cash,
             id: InstrumentId::new("TEST"),
             base_currency: Currency::EUR,
             quote_currency: Currency::USD,
@@ -764,6 +778,7 @@ mod tests {
     #[test]
     fn test_validation_negative_contract_rate_fails() {
         let forward = FxForward {
+            spot_basis: crate::shared::FxSpotBasis::Cash,
             id: InstrumentId::new("TEST"),
             base_currency: Currency::EUR,
             quote_currency: Currency::USD,
@@ -794,6 +809,7 @@ mod tests {
     #[test]
     fn test_validation_negative_spot_override_fails() {
         let forward = FxForward {
+            spot_basis: crate::shared::FxSpotBasis::Cash,
             id: InstrumentId::new("TEST"),
             base_currency: Currency::EUR,
             quote_currency: Currency::USD,
@@ -830,6 +846,7 @@ mod tests {
     fn forward_points_set_contract_rate_without_pinning_market_spot() {
         let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid date");
         let forward = FxForward::builder()
+            .spot_basis(crate::shared::FxSpotBasis::Cash)
             .id(InstrumentId::new("EURUSD-POINTS"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
@@ -895,6 +912,7 @@ mod tests {
         let market = test_market(as_of);
 
         let forward = FxForward::builder()
+            .spot_basis(crate::shared::FxSpotBasis::Cash)
             .id(InstrumentId::new("EURUSD-CF"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)

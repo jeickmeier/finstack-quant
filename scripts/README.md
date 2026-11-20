@@ -24,12 +24,20 @@ enforces, the task that runs it, and its tier.
 `gen-check`, `rust-test`, `python-test`, `wasm-test`, `ui-check`,
 `all-audit`); `scripts/tests/test_gate_parity.py` keeps the two equal.
 Generated files are refreshed by one command, `mise run gen-write`.
+The lint stage checks formatting without editing files. Run `mise run all-fmt`
+to apply Rust, Python, WASM, text and Markdown formatting fixes.
 
-`mise run slice-gate` (`slice_gate.py`) is the per-slice subset of that gate: it
+Resume a failed PR gate with `mise run all --from <task>` when earlier test
+results and build outputs still apply. For example, `mise run all --from ui-check`
+reuses the WASM packages from the earlier stage and continues through the
+remaining checks.
+
+`mise run slice-gate` (`slice_gate.py`) is the per-slice subset of that gate. It
 maps the changed paths to the stages of `all` they can affect, runs those as the
 same tasks, cheapest first, and stops at the first failure. A path no rule
-recognises selects every stage. `scripts/tests/test_slice_gate.py` keeps its
-stage table equal to `all`.
+recognises selects every stage. Use it before committing a slice. For a batch
+that stays uncommitted, run scoped checks during implementation and `mise run all`
+once at the end.
 
 ## Running them
 

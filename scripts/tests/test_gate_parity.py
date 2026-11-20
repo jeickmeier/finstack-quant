@@ -18,6 +18,8 @@ import tomllib
 
 import pytest
 
+from scripts import slice_gate
+
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github" / "workflows"
 TASKS = tomllib.loads((ROOT / "mise.toml").read_text(encoding="utf-8"))["tasks"]
@@ -72,22 +74,37 @@ def test_rust_coverage_selects_its_budget_without_changing_test_selection(
     assert ("--profile slow" in command) == slow
 
 
-def _stage_tasks(run: list[object]) -> list[str]:
-    """Task names referenced by `{ task = ... }` and `{ tasks = [...] }` steps."""
-    names: list[str] = []
-    for step in run:
-        if isinstance(step, dict):
-            if "task" in step:
-                names.append(step["task"])
-            names.extend(step.get("tasks", []))
-    return names
-
-
-def _tier_script() -> str:
-    """The shell step of `all` that runs the `--full` and `--release` tiers."""
-    scripts = [step for step in TASKS["all"]["run"] if isinstance(step, str)]
-    assert len(scripts) == 1, "`all` must keep its --full/--release tiers in one shell step"
-    return scripts[0]
+def _record_pr_gate(
+    tmp_path: Path, resume_from: str = "", failing_stage: str = ""
+) -> tuple[list[list[str]], subprocess.CompletedProcess[str]]:
+    """Execute the real gate orchestration with a recording mise stub."""
+    mise = tmp_path / "mise"
+    mise.write_text(
+        '#!/bin/sh\nprintf "%s\\n" "$*" >> "$FQ_TEST_MISE_CALLS"\n[ "$2" != "$FQ_TEST_FAILING_STAGE" ]\n',
+        encoding="utf-8",
+    )
+    mise.chmod(0o755)
+    calls = tmp_path / "mise-calls"
+    calls.touch()
+    env = {key: value for key, value in os.environ.items() if not key.startswith("usage_")}
+    env.update({
+        "PATH": f"{tmp_path}{os.pathsep}{env.get('PATH', '')}",
+        "FQ_TEST_MISE_CALLS": str(calls),
+        "FQ_TEST_FAILING_STAGE": failing_stage,
+        "usage_from": resume_from,
+    })
+    shell = shutil.which("sh")
+    assert shell, "a POSIX shell is required"
+    result = subprocess.run(  # noqa: S603 -- fixed repository task with a recording mise stub.
+        [shell, "-c", TASKS["all"]["run"]],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    groups = [line.removeprefix("run ").split(" ::: ") for line in calls.read_text().splitlines()]
+    return groups, result
 
 
 def _workflow_runs(name: str) -> list[str]:
@@ -96,16 +113,57 @@ def _workflow_runs(name: str) -> list[str]:
     return MISE_RUN.findall("\n".join(line for line in lines if not line.lstrip().startswith("#")))
 
 
-def test_all_runs_exactly_the_checks_workflow() -> None:
-    """Each `checks.yml` job is one stage of `mise run all`, and vice versa."""
-    local = set(_stage_tasks(TASKS["all"]["run"])) - LOCAL_BUILD
+def test_all_runs_exactly_the_checks_workflow(tmp_path: Path) -> None:
+    """The full gate, CI and the slice gate have the same check stages."""
+    groups, result = _record_pr_gate(tmp_path)
+    assert result.returncode == 0, result.stderr
+    local = {task for group in groups for task in group} - LOCAL_BUILD
     ci = {run.split()[0] for run in _workflow_runs("checks.yml")} - RUNNER_SETUP
     assert local == ci, f"only in `all`: {sorted(local - ci)}; only in checks.yml: {sorted(ci - local)}"
+    assert local == set(slice_gate.STAGES.values())
+    assert groups == [
+        ["pre-commit-run"],
+        ["wasm-test"],
+        ["rust-build-tests"],
+        ["gen-check", "ui-check", "all-audit"],
+        ["rust-test"],
+        ["python-test"],
+    ]
+
+
+@pytest.mark.parametrize(
+    ("start", "expected"),
+    [
+        ("ui-check", [["ui-check", "all-audit"], ["rust-test"], ["python-test"]]),
+        ("rust-test", [["rust-test"], ["python-test"]]),
+        ("python-test", [["python-test"]]),
+    ],
+)
+def test_all_resumes_at_the_selected_pr_stage(tmp_path: Path, start: str, expected: list[list[str]]) -> None:
+    """Earlier stages are skipped, including earlier members of a parallel group."""
+    groups, result = _record_pr_gate(tmp_path, resume_from=start)
+    assert result.returncode == 0, result.stderr
+    assert groups == expected
+
+
+def test_all_rejects_an_unknown_stage(tmp_path: Path) -> None:
+    """An invalid stage fails before invoking any checks."""
+    groups, result = _record_pr_gate(tmp_path, resume_from="typo")
+    assert result.returncode == 2
+    assert "Unknown PR gate stage: typo" in result.stderr
+    assert groups == []
+
+
+def test_all_stops_on_stage_failure(tmp_path: Path) -> None:
+    """A failing stage prevents later groups from starting."""
+    groups, result = _record_pr_gate(tmp_path, failing_stage="wasm-test")
+    assert result.returncode == 1
+    assert groups == [["pre-commit-run"], ["wasm-test"]]
 
 
 def test_full_tier_runs_the_full_checks_workflow() -> None:
     """Every `full-checks.yml` step except coverage instrumentation runs under `all --full`."""
-    local = set(MISE_RUN.findall(_tier_script()))
+    local = set(MISE_RUN.findall(TASKS["all"]["run"]))
     ci = {run for run in _workflow_runs("full-checks.yml") if "--coverage" not in run}
     assert ci <= local, f"full-checks.yml runs {sorted(ci - local)}, which `all --full` does not"
 
@@ -113,8 +171,7 @@ def test_full_tier_runs_the_full_checks_workflow() -> None:
 def test_all_does_not_regenerate() -> None:
     """A check gate must not rewrite generated files first: `gen-write` stays out of `all`."""
     assert "depends" not in TASKS["all"]
-    assert "gen-write" not in _stage_tasks(TASKS["all"]["run"])
-    assert "gen-write" not in _tier_script()
+    assert "gen-write" not in TASKS["all"]["run"]
 
 
 def test_retired_gates_are_gone() -> None:
@@ -124,8 +181,35 @@ def test_retired_gates_are_gone() -> None:
 
 
 def test_checks_workflow_skips_no_hooks() -> None:
-    """CI's Lint job runs every pre-commit hook, as `mise run all` does locally."""
+    """CI and the local workspace gate run all check-stage hooks."""
     assert "SKIP:" not in (WORKFLOWS / "checks.yml").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("check", "invalid"),
+    [
+        ("trailing-whitespace", b"text \n"),
+        ("end-of-file", b"text"),
+        ("end-of-file", b"text\n\n"),
+        ("lf", b"text\r\n"),
+    ],
+)
+def test_text_format_checks_report_without_editing(tmp_path: Path, check: str, invalid: bytes) -> None:
+    """Each text check reports invalid input and leaves the bytes intact."""
+    clean = tmp_path / "clean.txt"
+    clean.write_bytes(b"text\n")
+    dirty = tmp_path / "dirty.txt"
+    dirty.write_bytes(invalid)
+    result = subprocess.run(  # noqa: S603 -- fixed local checker with test files.
+        [sys.executable, str(ROOT / "scripts" / "check_text_format.py"), check, str(clean), str(dirty)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 1
+    assert str(dirty) in result.stdout
+    assert str(clean) not in result.stdout
+    assert dirty.read_bytes() == invalid
 
 
 def test_every_generated_root_is_marked_generated() -> None:

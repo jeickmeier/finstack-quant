@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 from typing import Any, Literal
 import pandas as pd
+from finstack_quant.core.config import FinstackConfig
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import Tenor
 from finstack_quant.core.market_data import MarketContext
@@ -66,6 +67,7 @@ class PriceExtras:
         instrument_pricing_overrides: dict[str, Any] | None = None,
         market_history: MarketHistory | None = None,
         explain: bool = False,
+        config: FinstackConfig | None = None,
     ) -> None:
         """Build transient pricing inputs for the instrument pricing entry points.
 
@@ -84,6 +86,8 @@ class PriceExtras:
             expected shortfall. Omitting it supplies no history.
         explain : bool, default False
             Attach the native valuation trace to the result when true.
+        config : FinstackConfig, optional
+            Per-request metric and monetary configuration. Omit to use defaults.
 
         Raises
         ------
@@ -92,6 +96,21 @@ class PriceExtras:
         ValueError
             If a supplied patch is not a finite JSON-compatible object.
             The merged controls are validated at pricing time.
+        """
+        ...
+
+    @property
+    def config(self) -> FinstackConfig | None:
+        """Read the pricing configuration supplied for this request.
+
+        Returns
+        -------
+        FinstackConfig or None
+            A copy of the configuration, or None when defaults apply.
+
+        Notes
+        -----
+        This property does not raise.
         """
         ...
 
@@ -1046,7 +1065,11 @@ class MarketHistory:
         ``{"type": "equity_spot", "ticker": str}``, ``{"type": "fx_spot",
         "base": "EUR", "quote": "USD"}`` or ``{"type": "implied_vol",
         "vol_surface_id": str, "expiry_years": float, "strike": float}``.
-        Rate and spread shifts are decimal (``0.0015`` = 15bp); spot
+        Discount and forward factors also require an ascending ``grid_years`` list containing
+        the exact ``tenor_years`` center. Scenarios that shift a calibrated hazard’s
+        discount dependency without shifting its credit quotes require
+        ``unshifted_hazard_policies`` keyed by hazard ID, with
+        ``"frozen_intensity"`` or ``"refit_original_quotes"``. Rate and spread shifts are decimal (``0.0015`` = 15bp); spot
         shifts are relative (``-0.025`` = -2.5%); vol shifts are absolute
         vol points.
 
@@ -1068,7 +1091,12 @@ class MarketHistory:
     ...             "date": "2023-12-29",
     ...             "shifts": [
     ...                 {
-    ...                     "factor": {"type": "discount_rate", "curve_id": "USD-OIS", "tenor_years": 5.0},
+    ...                     "factor": {
+    ...                         "type": "discount_rate",
+    ...                         "curve_id": "USD-OIS",
+    ...                         "tenor_years": 5.0,
+    ...                         "grid_years": [3.0, 5.0, 7.0],
+    ...                     },
     ...                     "shift": 0.0010,
     ...                 }
     ...             ],
@@ -1077,7 +1105,12 @@ class MarketHistory:
     ...             "date": "2023-12-28",
     ...             "shifts": [
     ...                 {
-    ...                     "factor": {"type": "discount_rate", "curve_id": "USD-OIS", "tenor_years": 5.0},
+    ...                     "factor": {
+    ...                         "type": "discount_rate",
+    ...                         "curve_id": "USD-OIS",
+    ...                         "tenor_years": 5.0,
+    ...                         "grid_years": [3.0, 5.0, 7.0],
+    ...                     },
     ...                     "shift": -0.0005,
     ...                 }
     ...             ],

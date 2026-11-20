@@ -352,6 +352,9 @@ impl SnowballCouponSpec {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for Snowball {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Snowball,
         crate::EXOTICS

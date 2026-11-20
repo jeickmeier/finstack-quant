@@ -180,6 +180,7 @@ class EquityOption:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         metric_id: str,
         model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> float:
         """
         Compute one scalar metric for this instrument (e.g. ``"delta"`` or ``"vega"``).
@@ -194,6 +195,9 @@ class EquityOption:
             Registered metric identifier (see :func:`list_standard_metrics`).
         model : str, default "default"
             Model key.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------
@@ -448,6 +452,7 @@ class EquityOption:
         market: MarketContext | str,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
+        extras: PriceExtras | dict[str, Any] | str | None = None,
     ) -> dict[str, float]:
         """
         Compute the standard option Greek set as a dict (mirrors the WASM
@@ -462,6 +467,9 @@ class EquityOption:
             Valuation date.
         model : str, default "default"
             Model key.
+        extras : PriceExtras or dict or str, optional
+            Request configuration and overrides accepted by ``price``.
+            Omit to use the stored instrument controls.
 
         Returns
         -------

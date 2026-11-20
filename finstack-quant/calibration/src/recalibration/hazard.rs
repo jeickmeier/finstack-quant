@@ -52,7 +52,7 @@ enum HazardBumpKey {
 impl From<Option<&QuoteBump>> for HazardBumpKey {
     fn from(bump: Option<&QuoteBump>) -> Self {
         match bump {
-            None => Self::None,
+            None | Some(QuoteBump::RateQuoteBp { .. }) => Self::None,
             Some(QuoteBump::ParallelBp(bp)) => Self::Parallel(bp.to_bits()),
             Some(QuoteBump::TenorsBp(tenors)) => Self::Tenors(
                 tenors
@@ -157,6 +157,11 @@ fn recalibrate_from_par_spreads_cached(
     cache: &HazardRecalibrationCache,
     request: HazardParRecalibration<'_>,
 ) -> finstack_quant_core::Result<Arc<HazardCurve>> {
+    if matches!(request.spread_bump, Some(QuoteBump::RateQuoteBp { .. })) {
+        return Err(finstack_quant_core::Error::Validation(
+            "hazard spread replay requires a hazard quote target".into(),
+        ));
+    }
     let target = hazard_dependencies(request.context, request.discount_id, request.hazard.id())?;
     let dependencies = match request.identity_context {
         Some(context) => hazard_dependencies(context, request.discount_id, request.hazard.id())?,
@@ -356,6 +361,11 @@ fn validate_tenor_bump_targets(
     quotes: &[ReplayQuote],
     bump: Option<&QuoteBump>,
 ) -> finstack_quant_core::Result<()> {
+    if matches!(bump, Some(QuoteBump::RateQuoteBp { .. })) {
+        return Err(finstack_quant_core::Error::Validation(
+            "hazard spread replay requires a hazard quote target".into(),
+        ));
+    }
     let Some(QuoteBump::TenorsBp(targets)) = bump else {
         return Ok(());
     };
@@ -396,7 +406,7 @@ fn bump_for_pillar(tenor_years: f64, bump: Option<&QuoteBump>) -> f64 {
                 tenor_years.to_bits() == target.to_bits() || (tenor_years == 0.0 && *target == 0.0)
             })
             .map_or(0.0, |(_, bp)| *bp),
-        None => 0.0,
+        None | Some(QuoteBump::RateQuoteBp { .. }) => 0.0,
     }
 }
 
@@ -564,6 +574,11 @@ fn validate_replay_source(
 fn recalibrate_from_par_spreads(
     request: HazardParRecalibration<'_>,
 ) -> finstack_quant_core::Result<HazardCurve> {
+    if matches!(request.spread_bump, Some(QuoteBump::RateQuoteBp { .. })) {
+        return Err(finstack_quant_core::Error::Validation(
+            "hazard spread replay requires a hazard quote target".into(),
+        ));
+    }
     let source = validate_replay_source(request)?;
     replay_from_source(request, &source)
 }

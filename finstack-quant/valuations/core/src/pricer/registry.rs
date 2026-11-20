@@ -586,11 +586,15 @@ pub(crate) fn stamp_results_meta(
 pub(super) fn attach_metric_measures(
     result: &mut crate::results::ValuationResult,
     mut metric_measures: indexmap::IndexMap<crate::metrics::MetricId, f64>,
-) {
+) -> finstack_quant_core::Result<()> {
+    for (metric_id, &value) in &metric_measures {
+        crate::metrics::registry::validate_measure(metric_id, value)?;
+    }
     for (metric_id, value) in std::mem::take(&mut result.measures) {
         metric_measures.insert(metric_id, value);
     }
     result.measures = metric_measures;
+    Ok(())
 }
 
 /// Walk an instrument's declared curve dependencies and join any `fx_policy`
@@ -656,6 +660,9 @@ mod tests {
     );
 
     impl Instrument for InvalidTestInstrument {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
         /// Test mock: reads no market data.
         fn market_dependencies(
             &self,
@@ -709,6 +716,9 @@ mod tests {
     );
 
     impl Instrument for RawLifecycleInstrument {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
         /// Test mock: reads no market data.
         fn market_dependencies(
             &self,

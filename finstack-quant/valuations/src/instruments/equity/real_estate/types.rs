@@ -426,6 +426,9 @@ impl RealEstateAsset {
 }
 
 impl Instrument for RealEstateAsset {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     impl_instrument_base!(InstrumentType::RealEstateAsset, crate::pricer::STANDARD);
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {

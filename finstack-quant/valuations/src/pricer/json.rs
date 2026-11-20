@@ -463,6 +463,13 @@ pub struct PriceExtras {
     /// those metrics then fails.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub market_history: Option<MarketHistory>,
+    /// Per-request configuration for metric settings and monetary conventions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<serde_json::Map<String, Value>>")
+    )]
+    pub config: Option<finstack_quant_core::config::FinstackConfig>,
     /// When `true`, attaches a step trace to the result as `explanation`.
     /// Defaults to `false` (no trace).
     #[serde(default)]
@@ -470,6 +477,29 @@ pub struct PriceExtras {
 }
 
 impl PriceExtras {
+    /// Configure valuation and metric calculation for this request.
+    ///
+    /// # Arguments
+    ///
+    /// * `options` - Host pricing services, including any recalibration provider.
+    ///   Supplied configuration, history and the explanation flag are applied
+    ///   for this request.
+    pub fn pricing_options(
+        &self,
+        mut options: crate::instruments::PricingOptions,
+    ) -> crate::instruments::PricingOptions {
+        if let Some(config) = &self.config {
+            options = options.with_config(config);
+        }
+        if let Some(history) = &self.market_history {
+            options = options.with_market_history(Arc::new(history.clone()));
+        }
+        if self.explain {
+            options = options.with_explain(finstack_quant_core::explain::ExplainOpts::enabled());
+        }
+        options
+    }
+
     /// The metric-pricing override patch as JSON text, for
     /// [`ParsedInstrument::from_instrument`] and [`parse_boxed_instrument_from_json`].
     ///
@@ -1745,6 +1775,7 @@ mod tests {
                         factor: crate::metrics::risk::RiskFactorType::DiscountRate {
                             curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
                             tenor_years: 5.0,
+                            grid_years: crate::metrics::STANDARD_BUCKETS_YEARS.to_vec(),
                         },
                         shift: 0.0005,
                     }],
@@ -1760,6 +1791,7 @@ mod tests {
                         factor: crate::metrics::risk::RiskFactorType::DiscountRate {
                             curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
                             tenor_years: 10.0,
+                            grid_years: crate::metrics::STANDARD_BUCKETS_YEARS.to_vec(),
                         },
                         shift: -0.0003,
                     }],

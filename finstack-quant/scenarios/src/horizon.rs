@@ -1185,6 +1185,9 @@ mod tests {
     }
 
     impl Instrument for CountingEndpoints {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
         fn id(&self) -> &str {
             "COUNT-ENDPOINTS"
         }

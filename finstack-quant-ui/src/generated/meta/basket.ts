@@ -38,6 +38,9 @@ export default [
               }
             ],
             "discount_curve_id": "USD-OIS",
+            "expense": {
+              "type": "none"
+            },
             "expense_ratio": 0.0025,
             "id": "BASKET-60-40",
             "notional": {
@@ -45,7 +48,6 @@ export default [
               "currency": "USD"
             },
             "pricing_config": {
-              "days_in_year": 365.25,
               "fx_policy": "cashflow_date"
             },
             "reporting_currency": "USD"

@@ -72,6 +72,9 @@ impl FxLinkedInstrument {
 }
 
 impl Instrument for FxLinkedInstrument {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
     fn id(&self) -> &str {
         &self.id
     }

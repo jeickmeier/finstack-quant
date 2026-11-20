@@ -99,18 +99,18 @@ pub(crate) fn register_cds_metrics(
             (RiskyAnnuity, RiskyAnnuityCalculator),
             (Cs01, crate::cs01::CreditParallelCs01::<
                 crate::cds::CreditDefaultSwap,
-            >::default()),
+            >::default(), NativeMoney),
             (BucketedCs01, crate::cs01::CreditBucketedCs01::<
                 crate::cds::CreditDefaultSwap,
-            >::default()),
+            >::default(), NativeMoney),
             (CsGamma, cs_gamma::CsGammaCalculator),
             (ProtectionLegPv, ProtectionLegPvCalculator),
             (PremiumLegPv, PremiumLegPvCalculator),
             (ExpectedLoss, ExpectedLossCalculator),
             (JumpToDefault, jump_to_default::JumpToDefaultCalculator),
             (DefaultExposure, jump_to_default::DefaultExposureCalculator),
-            (Dv01, dv01::CdsDv01Calculator),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, dv01::CdsDv01Calculator(false)),
+            (BucketedDv01, dv01::CdsDv01Calculator(true)),
             (RiskyPv01, RiskyPv01Calculator),
             // Recovery01 (custom metric - recovery rate sensitivity)
             (Recovery01, recovery01::Recovery01Calculator),
