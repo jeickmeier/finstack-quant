@@ -715,18 +715,11 @@ impl FxMatrix {
         &self,
         quotes: &[(Currency, Currency, Date, FxConversionPolicy, f64)],
     ) -> crate::Result<()> {
-        let mut batch = FxHashMap::default();
-        for &(from, to, on, policy, rate) in quotes {
-            let rate = validate_stored_quote(from, to, rate)?;
-            if batch
-                .insert(FxQuery::new(from, to, on, policy), rate)
-                .is_some()
-            {
-                return Err(crate::Error::Validation(format!(
-                    "pinned FX quotes repeat {from}->{to} on {on} ({policy})"
-                )));
-            }
-        }
+        let batch: FxHashMap<FxQuery, f64> =
+            super::provider::validate_pinned_batch(quotes, "pinned FX quotes repeat")?
+                .into_iter()
+                .map(|((from, to, on, policy), rate)| (FxQuery::new(from, to, on, policy), rate))
+                .collect();
         {
             let _writer = lock(&self.writer);
             self.ensure_revision_available()?;

@@ -10,26 +10,6 @@
 
 use super::algo;
 use smallvec::{Array, SmallVec};
-
-/// Required table lookup: a missing year is an error, not an absent holiday.
-fn required(value: Option<Date>, table: &str, year: i32) -> crate::Result<Date> {
-    value.ok_or_else(|| {
-        crate::Error::from(crate::InputError::NotFound {
-            id: format!("{table} table entry for year {year}"),
-        })
-    })
-}
-
-/// Gregorian Easter Monday for a positive representable year.
-fn easter_monday(year: i32) -> crate::Result<Date> {
-    algo::easter_monday(year)
-        .filter(|_| year > 0)
-        .ok_or_else(|| {
-            crate::Error::Validation(format!(
-                "invalid holiday rule: Gregorian Easter is not supported for year {year}"
-            ))
-        })
-}
 use time::{Date, Duration, Month, Weekday};
 
 type Dates = SmallVec<[Date; 32]>;
@@ -112,7 +92,7 @@ pub(super) fn hong_kong<A: Array<Item = Date>>(
         }
     }
     {
-        let cny = required(algo::cny_date(year), "Chinese New Year", year)?;
+        let cny = algo::required_table_date(algo::cny_date(year), "Chinese New Year", year)?;
         for offset in 0..3 {
             let date = cny + Duration::days(offset);
             dates.push(if date.weekday() == Weekday::Sunday {
@@ -124,14 +104,14 @@ pub(super) fn hong_kong<A: Array<Item = Date>>(
         }
     }
     for date in [
-        required(algo::qing_ming_date(year), "Qing Ming", year)?,
-        required(algo::dragon_boat_date(year), "Dragon Boat", year)?,
-        required(algo::chung_yeung_date(year), "Chung Yeung", year)?,
+        algo::required_table_date(algo::qing_ming_date(year), "Qing Ming", year)?,
+        algo::required_table_date(algo::dragon_boat_date(year), "Dragon Boat", year)?,
+        algo::required_table_date(algo::chung_yeung_date(year), "Chung Yeung", year)?,
     ] {
         dates.push(sunday_substitute(date));
     }
     {
-        let easter = easter_monday(year)?;
+        let easter = algo::require_easter_monday(year)?;
         dates.extend([
             easter - Duration::days(3),
             easter - Duration::days(2),
@@ -139,7 +119,7 @@ pub(super) fn hong_kong<A: Array<Item = Date>>(
         ]);
     }
     {
-        let autumn = required(algo::mid_autumn_date(year), "Mid-Autumn", year)?;
+        let autumn = algo::required_table_date(algo::mid_autumn_date(year), "Mid-Autumn", year)?;
         let after = autumn + Duration::days(1);
         dates.push(
             if after.weekday() == Weekday::Sunday && (1983..=2011).contains(&year) {
@@ -151,7 +131,7 @@ pub(super) fn hong_kong<A: Array<Item = Date>>(
     }
     if year >= 1999 {
         fixed(year, Month::May, 1, &mut dates);
-        dates.push(required(
+        dates.push(algo::required_table_date(
             algo::buddhas_birthday_date(year),
             "Buddha's Birthday",
             year,
@@ -199,12 +179,12 @@ pub(super) fn japan<A: Array<Item = Date>>(year: i32, out: &mut SmallVec<A>) -> 
     ] {
         fixed(year, month, day, &mut national);
     }
-    national.push(required(
+    national.push(algo::required_table_date(
         algo::vernal_equinox_jp_date(year),
         "Japanese vernal equinox",
         year,
     )?);
-    national.push(required(
+    national.push(algo::required_table_date(
         algo::autumnal_equinox_jp_date(year),
         "Japanese autumnal equinox",
         year,

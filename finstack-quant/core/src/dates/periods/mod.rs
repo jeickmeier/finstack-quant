@@ -747,34 +747,10 @@ impl PeriodPlan {
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     pub fn validate_canonical(&self) -> crate::Result<()> {
-        let Some(first) = self.periods.first() else {
+        if self.periods.is_empty() {
             return Err(crate::Error::Validation(
                 "a period plan must hold at least one period".to_string(),
             ));
-        };
-        for period in &self.periods {
-            let id = period.id;
-            if id.kind() != first.id.kind() {
-                return Err(invalid_period(
-                    &id.to_string(),
-                    &format!(
-                        "a plan holds one period kind, but this {} period follows {} period {}",
-                        id.kind(),
-                        first.id.kind(),
-                        first.id
-                    ),
-                ));
-            }
-            let (start, end) = self.calendar.bounds(id.year(), id.kind(), id.index())?;
-            if (period.start, period.end) != (start, end) {
-                return Err(invalid_period(
-                    &id.to_string(),
-                    &format!(
-                        "its bounds [{}, {}) differ from the calendar's [{start}, {end})",
-                        period.start, period.end
-                    ),
-                ));
-            }
         }
         for pair in self.periods.windows(2) {
             if let [previous, next] = pair

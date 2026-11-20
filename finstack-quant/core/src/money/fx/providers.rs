@@ -3,7 +3,7 @@
 //! This module provides reusable FX provider types that can be shared across
 //! bindings (Python, WASM, etc.) without duplication.
 
-use super::provider::{FxProviderSnapshot, directional_rate, validate_stored_quote};
+use super::provider::{FxProviderSnapshot, directional_rate, validate_pinned_batch};
 use super::{FxConversionPolicy, FxProvider};
 use crate::InputError;
 use crate::currency::Currency;
@@ -120,15 +120,7 @@ impl SimpleFxProvider {
         &self,
         quotes: &[(Currency, Currency, Date, FxConversionPolicy, f64)],
     ) -> crate::Result<()> {
-        let mut validated = FxHashMap::default();
-        for &(from, to, on, policy, rate) in quotes {
-            let rate = validate_stored_quote(from, to, rate)?;
-            if validated.insert((from, to, on, policy), rate).is_some() {
-                return Err(crate::Error::Validation(format!(
-                    "duplicate scoped provider quote for {from}->{to} on {on}/{policy}"
-                )));
-            }
-        }
+        let validated = validate_pinned_batch(quotes, "duplicate scoped provider quote for")?;
         let _writer = recover(self.writer.lock());
         self.ensure_revision_available()?;
         let mut quotes = recover(self.pinned_quotes.write());

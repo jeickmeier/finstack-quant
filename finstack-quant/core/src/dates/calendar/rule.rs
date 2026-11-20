@@ -487,15 +487,6 @@ fn recurring_date(year: i32, month: Month, day: u8) -> crate::Result<Option<Date
     Ok(Date::from_calendar_date(year, month, day).ok())
 }
 
-/// Required table lookup: a missing year is an error, not an absent holiday.
-fn required(value: Option<Date>, table: &str, year: i32) -> crate::Result<Date> {
-    value.ok_or_else(|| {
-        crate::Error::from(crate::InputError::NotFound {
-            id: format!("{table} table entry for year {year}"),
-        })
-    })
-}
-
 /// Nth weekday of a month without stepping outside the month: `n` in
 /// `1..=5` counts from the 1st, `-5..=-1` from the last day. A nonexistent
 /// fifth occurrence is a valid empty result; any other ordinal is invalid.
@@ -505,42 +496,7 @@ fn nth_weekday(year: i32, month: Month, weekday: Weekday, n: i8) -> crate::Resul
             "weekday ordinal {n} is outside ±1..=5"
         )));
     }
-    let last_day = month.length(year);
-    let target = i64::from(weekday.number_days_from_monday());
-    let day = if n > 0 {
-        let Ok(first) = Date::from_calendar_date(year, month, 1) else {
-            return Ok(None);
-        };
-        let offset = (target - i64::from(first.weekday().number_days_from_monday())).rem_euclid(7);
-        1 + offset + 7 * (i64::from(n) - 1)
-    } else {
-        let Ok(last) = Date::from_calendar_date(year, month, last_day) else {
-            return Ok(None);
-        };
-        let offset = (i64::from(last.weekday().number_days_from_monday()) - target).rem_euclid(7);
-        i64::from(last_day) - offset - 7 * (i64::from(-n) - 1)
-    };
-    if day < 1 || day > i64::from(last_day) {
-        return Ok(None);
-    }
-    Ok(u8::try_from(day)
-        .ok()
-        .and_then(|day| Date::from_calendar_date(year, month, day).ok()))
-}
-
-/// Gregorian Easter Monday for a positive representable year; an active
-/// Easter rule outside that domain is an error.
-fn easter_monday(year: i32) -> crate::Result<Date> {
-    if year <= 0 {
-        return Err(invalid_rule(format!(
-            "Gregorian Easter is not supported for year {year}"
-        )));
-    }
-    algo::easter_monday(year).ok_or_else(|| {
-        invalid_rule(format!(
-            "Easter Monday for year {year} is not representable"
-        ))
-    })
+    Ok(algo::nth_weekday_of_month(year, month, weekday, n))
 }
 
 /// Day offsets, relative to January 1 of the nominal year, that bound every
@@ -662,7 +618,10 @@ impl Rule {
                 }
             }
             Rule::EasterOffset(offset) => {
-                out.extend(shift(easter_monday(year)?, i64::from(*offset)));
+                out.extend(shift(
+                    algo::require_easter_monday(year)?,
+                    i64::from(*offset),
+                ));
             }
             Rule::Span { start, len, offset } => {
                 if *len == 0 {
@@ -674,14 +633,26 @@ impl Rule {
                     }
                 }
             }
-            Rule::ChineseNewYear => {
-                out.push(required(algo::cny_date(year), "Chinese New Year", year)?)
-            }
-            Rule::DragonBoat => {
-                out.push(required(algo::dragon_boat_date(year), "Dragon Boat", year)?)
-            }
-            Rule::MidAutumn => out.push(required(algo::mid_autumn_date(year), "Mid-Autumn", year)?),
-            Rule::QingMing => out.push(required(algo::qing_ming_date(year), "Qing Ming", year)?),
+            Rule::ChineseNewYear => out.push(algo::required_table_date(
+                algo::cny_date(year),
+                "Chinese New Year",
+                year,
+            )?),
+            Rule::DragonBoat => out.push(algo::required_table_date(
+                algo::dragon_boat_date(year),
+                "Dragon Boat",
+                year,
+            )?),
+            Rule::MidAutumn => out.push(algo::required_table_date(
+                algo::mid_autumn_date(year),
+                "Mid-Autumn",
+                year,
+            )?),
+            Rule::QingMing => out.push(algo::required_table_date(
+                algo::qing_ming_date(year),
+                "Qing Ming",
+                year,
+            )?),
             Rule::HongKongPublicHolidays => super::jurisdictions::hong_kong(year, &mut out)?,
             Rule::JapanPublicHolidays => super::jurisdictions::japan(year, &mut out)?,
             Rule::Effective {

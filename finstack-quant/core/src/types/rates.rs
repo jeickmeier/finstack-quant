@@ -373,55 +373,12 @@ fn split_unit(lower: &str) -> (&str, QuoteUnit) {
 ///
 /// Returns `None` for a grammar violation or an exponent outside `i64`.
 fn parse_quote_number(token: &str, unit: QuoteUnit) -> Option<std::result::Result<f64, Error>> {
-    let bytes = token.as_bytes();
-    let mut index = 0;
-    let negative = match bytes.first() {
-        Some(b'+') => {
-            index = 1;
-            false
-        }
-        Some(b'-') => {
-            index = 1;
-            true
-        }
-        _ => false,
-    };
-    let int_start = index;
-    while index < bytes.len() && bytes[index].is_ascii_digit() {
-        index += 1;
-    }
-    let int_digits = &token[int_start..index];
-    let mut frac_digits = "";
-    if index < bytes.len() && bytes[index] == b'.' {
-        index += 1;
-        let frac_start = index;
-        while index < bytes.len() && bytes[index].is_ascii_digit() {
-            index += 1;
-        }
-        frac_digits = &token[frac_start..index];
-    }
-    if int_digits.is_empty() && frac_digits.is_empty() {
-        return None;
-    }
-    let mut exponent: i64 = 0;
-    if index < bytes.len() && bytes[index] == b'e' {
-        index += 1;
-        let exp_start = index;
-        if index < bytes.len() && (bytes[index] == b'+' || bytes[index] == b'-') {
-            index += 1;
-        }
-        let digits_start = index;
-        while index < bytes.len() && bytes[index].is_ascii_digit() {
-            index += 1;
-        }
-        if index == digits_start {
-            return None;
-        }
-        exponent = token[exp_start..index].parse::<i64>().ok()?;
-    }
-    if index != bytes.len() {
-        return None;
-    }
+    let crate::decimal::ScannedDecimal {
+        negative,
+        int_digits,
+        frac_digits,
+        exponent,
+    } = crate::decimal::scan_decimal_literal(token)?;
     let digits = format!("{int_digits}{frac_digits}");
     let significant = digits.trim_start_matches('0');
     if significant.is_empty() {
