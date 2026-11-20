@@ -11,18 +11,15 @@ use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
-use tracing::warn;
 
+use crate::builder::floating_replay::settle_floating_rate_amount;
 use crate::builder::overnight::overnight_day_count_basis;
 use crate::builder::overnight::{OvernightObservationSchedule, OvernightRateConstraints};
 use crate::builder::rate_helpers::{
     apply_bp_bounds, calculate_floating_rate, observed_index_fixing, project_index_rate,
     project_overnight_rate,
 };
-use crate::builder::{
-    CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod, FloatingRateFallback,
-    FloatingRateObservation, SchedulePeriod,
-};
+use crate::builder::{FloatingCouponEconomics, FloatingRateObservation, SchedulePeriod};
 
 use crate::builder::compiler::{FixedSchedule, FloatSchedule};
 use crate::builder::periods::compute_reset_date;
@@ -170,26 +167,37 @@ fn is_absent_market_source(
     }
 }
 
-/// Resolve the floating-rate fallback for one coupon: propagate `error` when
-/// the policy demands it, otherwise log and return the fallback index rate.
-/// The caller builds `error`: a `NotFound` for a missing curve, or the original
-/// projection error.
-fn resolve_floating_rate_fallback(
-    error: finstack_quant_core::Error,
-    reset_date: Date,
-    spread_bp: f64,
-    fallback: &FloatingRateFallback,
-) -> finstack_quant_core::Result<f64> {
-    if !matches!(fallback, FloatingRateFallback::Error) {
-        warn!(
-            reset_date = %reset_date,
-            spread_bp = %spread_bp,
-            ?fallback,
-            error = %error,
-            "Floating rate unavailable, using the configured fallback index rate"
-        );
-    }
-    fallback.index_rate(error)
+/// Split a contractual Decimal coupon total into `(cash, pik)` legs with the
+/// rounding residual allocated to PIK so `cash + pik == total`.
+fn split_cash_pik_decimal(
+    total: Decimal,
+    cash_fraction: Decimal,
+    pik_fraction: Decimal,
+    context: &str,
+) -> finstack_quant_core::Result<(Decimal, Decimal)> {
+    let cash = if pik_fraction.is_zero() {
+        total
+    } else if cash_fraction.is_zero() {
+        Decimal::ZERO
+    } else {
+        total.checked_mul(cash_fraction).ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "{context} cash coupon amount exceeds the supported decimal range"
+            ))
+        })?
+    };
+    let pik = if pik_fraction.is_zero() {
+        Decimal::ZERO
+    } else if cash_fraction.is_zero() {
+        total
+    } else {
+        total.checked_sub(cash).ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "{context} PIK coupon amount exceeds the supported decimal range"
+            ))
+        })?
+    };
+    Ok((cash, pik))
 }
 
 /// Emit fixed coupon cashflows on a specific date.
@@ -277,13 +285,8 @@ pub(crate) fn emit_fixed_coupons_on(
                         _ => None,
                     };
                 }
-                let context = finstack_quant_core::dates::DayCountContextState::try_new(
-                    Some(spec.schedule.calendar_id.to_string()),
-                    is_icma.then_some(spec.schedule.frequency),
-                    None,
-                    reference,
-                    Some(is_termination_date),
-                )?;
+                let context =
+                    super::accrual_context_state(&spec.schedule, reference, is_termination_date)?;
                 let accrual = if nominal_dates.len() > 2 {
                     CashFlowAccrual::from_nominal_dates(
                         accrual_start,
@@ -325,28 +328,8 @@ pub(crate) fn emit_fixed_coupons_on(
                     })?;
 
                 let (cash_fraction, pik_fraction) = spec.coupon_type.split_parts()?;
-                let cash_amt_dec = if pik_fraction.is_zero() {
-                    coupon_total_dec
-                } else if cash_fraction.is_zero() {
-                    Decimal::ZERO
-                } else {
-                    coupon_total_dec.checked_mul(cash_fraction).ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "fixed cash coupon amount exceeds Decimal range".into(),
-                        )
-                    })?
-                };
-                let pik_amt_dec = if pik_fraction.is_zero() {
-                    Decimal::ZERO
-                } else if cash_fraction.is_zero() {
-                    coupon_total_dec
-                } else {
-                    coupon_total_dec.checked_sub(cash_amt_dec).ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "fixed PIK coupon amount exceeds Decimal range".into(),
-                        )
-                    })?
-                };
+                let (cash_amt_dec, pik_amt_dec) =
+                    split_cash_pik_decimal(coupon_total_dec, cash_fraction, pik_fraction, "fixed")?;
 
                 let rate_f64 = spec.rate.as_f64();
                 // Gate on cash split, not amount sign, so negative-rate coupons emit.
@@ -748,11 +731,11 @@ pub(crate) fn emit_float_coupons_on(
                     ) {
                         return Err(error);
                     }
-                    let index_rate = resolve_floating_rate_fallback(
+                    let index_rate = spec.rate_spec.fallback.resolve_with_warning(
                         error,
                         reset_date,
                         params.spread_bp,
-                        &spec.rate_spec.fallback,
+                        "Floating rate unavailable, using the configured fallback index rate",
                     )?;
                     let constrained_index =
                         apply_bp_bounds(index_rate, params.index_floor_bp, params.index_cap_bp);
@@ -760,37 +743,18 @@ pub(crate) fn emit_float_coupons_on(
                 }
             };
             let (cash_fraction_dec, pik_fraction_dec) = spec.coupon_type.split_parts()?;
-            let cash_fraction = cash_fraction_dec.as_f64();
-            let compiled = CompiledFloatingCoupon::compile(
-                FloatingCouponPeriod {
-                    accrual_start: period.accrual_start,
-                    accrual_end: period.accrual_end,
-                    payment_date: period.payment_date,
-                    day_count: spec.schedule.day_count,
-                    day_count_context: floating_accrual_context(
-                        schedule,
-                        period,
-                        period.accrual_end,
-                    )?,
-                    accrual_factor: floating_year_fraction(
-                        schedule,
-                        period,
-                        period.accrual_start,
-                        period.accrual_end,
-                    )?,
-                },
-                FloatingCouponEconomics {
-                    cash_fraction,
-                    pik_fraction: pik_fraction_dec.as_f64(),
-                    rate_params: settlement_params,
-                },
-                observation,
-            )?;
+            settlement_params.validate()?;
+            let economics = FloatingCouponEconomics {
+                cash_fraction: cash_fraction_dec.as_f64(),
+                pik_fraction: pik_fraction_dec.as_f64(),
+                rate_params: settlement_params,
+            };
             let settlements = segments
                 .iter()
                 .zip(indices)
                 .map(|(segment, (index_rate, projected_index_rate))| {
-                    compiled.settle_index_rate(
+                    settle_floating_rate_amount(
+                        &economics,
                         segment.notional.as_f64(),
                         index_rate,
                         projected_index_rate,
@@ -810,29 +774,12 @@ pub(crate) fn emit_float_coupons_on(
                 let total_dec = finstack_quant_core::decimal::f64_to_decimal_model_value(
                     settlement.total_amount,
                 )?;
-                let cash_dec = if pik_fraction_dec.is_zero() {
-                    total_dec
-                } else if cash_fraction_dec.is_zero() {
-                    Decimal::ZERO
-                } else {
-                    total_dec.checked_mul(cash_fraction_dec).ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "floating cash coupon amount exceeds the supported decimal range"
-                                .into(),
-                        )
-                    })?
-                };
-                let pik_dec = if pik_fraction_dec.is_zero() {
-                    Decimal::ZERO
-                } else if cash_fraction_dec.is_zero() {
-                    total_dec
-                } else {
-                    total_dec.checked_sub(cash_dec).ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "floating PIK coupon amount exceeds the supported decimal range".into(),
-                        )
-                    })?
-                };
+                let (cash_dec, pik_dec) = split_cash_pik_decimal(
+                    total_dec,
+                    cash_fraction_dec,
+                    pik_fraction_dec,
+                    "floating",
+                )?;
                 period_pik = period_pik.checked_add(pik_dec).ok_or_else(|| {
                     finstack_quant_core::Error::Validation(
                         "PIK coupon net amount exceeds the supported decimal range".into(),
@@ -856,14 +803,10 @@ pub(crate) fn emit_float_coupons_on(
                     segment.end,
                     spec.schedule.day_count,
                     Some(settlement.projected_index_rate),
-                    finstack_quant_core::dates::DayCountContextState::try_new(
-                        Some(spec.schedule.calendar_id.to_string()),
-                        (spec.schedule.day_count
-                            == finstack_quant_core::dates::DayCount::ActActIsma)
-                            .then_some(spec.schedule.frequency),
-                        None,
+                    super::accrual_context_state(
+                        &spec.schedule,
                         float_ctx.coupon_period,
-                        Some(schedule.terminal_accrual_end == Some(segment.end)),
+                        schedule.terminal_accrual_end == Some(segment.end),
                     )?,
                 )?;
                 if !cash_fraction_dec.is_zero() {

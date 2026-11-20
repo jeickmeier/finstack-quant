@@ -132,14 +132,10 @@ pub(in crate::builder) fn emit_fees_on(
                             accrual_end,
                             pf.schedule.day_count,
                             None,
-                            finstack_quant_core::dates::DayCountContextState::try_new(
-                                Some(pf.schedule.calendar_id.to_string()),
-                                (pf.schedule.day_count
-                                    == finstack_quant_core::dates::DayCount::ActActIsma)
-                                    .then_some(pf.schedule.frequency),
-                                None,
+                            super::accrual_context_state(
+                                &pf.schedule,
                                 coupon_period,
-                                Some(is_termination_date),
+                                is_termination_date,
                             )?,
                         )?)
                         .build()?,

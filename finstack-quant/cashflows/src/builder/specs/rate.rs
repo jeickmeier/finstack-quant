@@ -150,17 +150,12 @@ impl RateSpec {
                             return Ok(crate::builder::calculate_floating_rate(raw, &params));
                         }
                         Err(err) => {
-                            if !matches!(spec.fallback, crate::builder::FloatingRateFallback::Error)
-                            {
-                                tracing::warn!(
-                                    reset_date = %reset_date,
-                                    spread_bp = %spec.spread_bp,
-                                    fallback = ?spec.fallback,
-                                    error = %err,
-                                    "Floating fixing series unavailable, using configured fallback"
-                                );
-                            }
-                            let raw = spec.fallback.index_rate(err)?;
+                            let raw = spec.fallback.resolve_with_warning(
+                                err,
+                                reset_date,
+                                params.spread_bp,
+                                "Floating fixing series unavailable, using configured fallback",
+                            )?;
                             return Ok(crate::builder::calculate_floating_rate(raw, &params));
                         }
                     }
@@ -179,17 +174,12 @@ impl RateSpec {
                                 fwd.id(),
                                 fwd.base_date(),
                             ));
-                            if !matches!(spec.fallback, crate::builder::FloatingRateFallback::Error)
-                            {
-                                tracing::warn!(
-                                    reset_date = %reset_date,
-                                    spread_bp = %spec.spread_bp,
-                                    fallback = ?spec.fallback,
-                                    error = %err,
-                                    "Floating reset precedes curve base date, using configured fallback"
-                                );
-                            }
-                            let raw = spec.fallback.index_rate(err)?;
+                            let raw = spec.fallback.resolve_with_warning(
+                                err,
+                                reset_date,
+                                params.spread_bp,
+                                "Floating reset precedes curve base date, using configured fallback",
+                            )?;
                             return Ok(crate::builder::calculate_floating_rate(raw, &params));
                         }
                         crate::builder::project_floating_rate(
@@ -210,16 +200,12 @@ impl RateSpec {
                             )
                         ) =>
                     {
-                        if !matches!(spec.fallback, crate::builder::FloatingRateFallback::Error) {
-                            tracing::warn!(
-                                reset_date = %reset_date,
-                                spread_bp = %spec.spread_bp,
-                                fallback = ?spec.fallback,
-                                error = %err,
-                                "Forward curve unavailable, using configured fallback"
-                            );
-                        }
-                        let raw = spec.fallback.index_rate(err)?;
+                        let raw = spec.fallback.resolve_with_warning(
+                            err,
+                            reset_date,
+                            params.spread_bp,
+                            "Forward curve unavailable, using configured fallback",
+                        )?;
                         Ok(crate::builder::calculate_floating_rate(raw, &params))
                     }
                     Err(err) => Err(err),

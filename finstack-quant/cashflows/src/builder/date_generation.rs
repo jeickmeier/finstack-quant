@@ -440,35 +440,6 @@ fn is_regular_imm_period(start: Date, end: Date, frequency: Tenor) -> bool {
             .is_some_and(|months| month_index(end) - month_index(start) == i64::from(months))
 }
 
-/// Test helper: generate skeletal periods with unadjusted accrual boundaries.
-#[cfg(test)]
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn generate_periods(
-    start: Date,
-    end: Date,
-    frequency: Tenor,
-    stub: StubKind,
-    business_day_convention: BusinessDayConvention,
-    end_of_month: bool,
-    payment_lag_days: i32,
-    calendar_id: &str,
-) -> finstack_quant_core::Result<Vec<SchedulePeriod>> {
-    generate_periods_with_adjustment(&BuildPeriodsParams {
-        start,
-        end,
-        frequency,
-        stub,
-        business_day_convention,
-        calendar_id,
-        end_of_month,
-        day_count: DayCount::Act360,
-        payment_lag_days,
-        reset_lag_days: None,
-        adjust_accrual_dates: false,
-        roll_rule: RollRule::None,
-    })
-}
-
 /// Generate skeletal periods and apply the optional accrual-boundary policy.
 ///
 /// Reads the window, frequency, stub, business-day convention, end-of-month
@@ -559,6 +530,33 @@ mod tests {
     fn d(y: i32, m: u8, day: u8) -> Date {
         Date::from_calendar_date(y, Month::try_from(m).expect("Valid month (1-12)"), day)
             .expect("Valid test date")
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn generate_periods(
+        start: Date,
+        end: Date,
+        frequency: Tenor,
+        stub: StubKind,
+        business_day_convention: BusinessDayConvention,
+        end_of_month: bool,
+        payment_lag_days: i32,
+        calendar_id: &str,
+    ) -> finstack_quant_core::Result<Vec<SchedulePeriod>> {
+        generate_periods_with_adjustment(&BuildPeriodsParams {
+            start,
+            end,
+            frequency,
+            stub,
+            business_day_convention,
+            calendar_id,
+            end_of_month,
+            day_count: DayCount::Act360,
+            payment_lag_days,
+            reset_lag_days: None,
+            adjust_accrual_dates: false,
+            roll_rule: RollRule::None,
+        })
     }
 
     /// Quarterly, unstubbed, Modified Following on `usny` with adjusted

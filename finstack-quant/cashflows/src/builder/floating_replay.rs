@@ -52,6 +52,50 @@ pub struct FloatingCouponEconomics {
     pub rate_params: FloatingRateParams,
 }
 
+pub(crate) fn settle_floating_rate_amount(
+    economics: &FloatingCouponEconomics,
+    notional: f64,
+    constrained_index_rate: f64,
+    projected_index_rate: f64,
+    accrual_factor: f64,
+) -> Result<FloatingCouponSettlement> {
+    if !accrual_factor.is_finite() || accrual_factor < 0.0 {
+        return Err(Error::Validation(
+            "floating coupon segment accrual factor must be non-negative and finite".to_string(),
+        ));
+    }
+    if !notional.is_finite() || notional < 0.0 {
+        return Err(Error::Validation(format!(
+            "floating coupon notional must be non-negative and finite, got {notional}"
+        )));
+    }
+    if !constrained_index_rate.is_finite() || !projected_index_rate.is_finite() {
+        return Err(Error::Validation(
+            "floating coupon index rates must be finite".to_string(),
+        ));
+    }
+    let all_in_rate = calculate_floating_rate(constrained_index_rate, &economics.rate_params);
+    let total_amount = notional * accrual_factor * all_in_rate;
+    let cash_amount = total_amount * economics.cash_fraction;
+    let pik_amount = total_amount * economics.pik_fraction;
+    if !all_in_rate.is_finite()
+        || !total_amount.is_finite()
+        || !cash_amount.is_finite()
+        || !pik_amount.is_finite()
+    {
+        return Err(Error::Validation(
+            "floating coupon settlement produced a non-finite value".to_string(),
+        ));
+    }
+    Ok(FloatingCouponSettlement {
+        projected_index_rate,
+        all_in_rate,
+        total_amount,
+        cash_amount,
+        pik_amount,
+    })
+}
+
 /// Market-rate observation convention for a compiled floating coupon.
 #[derive(Debug, Clone)]
 pub enum FloatingRateObservation {
@@ -423,43 +467,13 @@ impl CompiledFloatingCoupon {
         projected_index_rate: f64,
         accrual_factor: f64,
     ) -> Result<FloatingCouponSettlement> {
-        if !accrual_factor.is_finite() || accrual_factor < 0.0 {
-            return Err(Error::Validation(
-                "floating coupon segment accrual factor must be non-negative and finite"
-                    .to_string(),
-            ));
-        }
-        if !notional.is_finite() || notional < 0.0 {
-            return Err(Error::Validation(format!(
-                "floating coupon notional must be non-negative and finite, got {notional}"
-            )));
-        }
-        if !constrained_index_rate.is_finite() || !projected_index_rate.is_finite() {
-            return Err(Error::Validation(
-                "floating coupon index rates must be finite".to_string(),
-            ));
-        }
-        let all_in_rate =
-            calculate_floating_rate(constrained_index_rate, &self.economics.rate_params);
-        let total_amount = notional * accrual_factor * all_in_rate;
-        let cash_amount = total_amount * self.economics.cash_fraction;
-        let pik_amount = total_amount * self.economics.pik_fraction;
-        if !all_in_rate.is_finite()
-            || !total_amount.is_finite()
-            || !cash_amount.is_finite()
-            || !pik_amount.is_finite()
-        {
-            return Err(Error::Validation(
-                "floating coupon settlement produced a non-finite value".to_string(),
-            ));
-        }
-        Ok(FloatingCouponSettlement {
+        settle_floating_rate_amount(
+            &self.economics,
+            notional,
+            constrained_index_rate,
             projected_index_rate,
-            all_in_rate,
-            total_amount,
-            cash_amount,
-            pik_amount,
-        })
+            accrual_factor,
+        )
     }
 
     /// Settle this coupon from its locked replay state.

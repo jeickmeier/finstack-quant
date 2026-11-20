@@ -619,12 +619,11 @@ fn build_period_inputs(
     }
 
     for p in periods {
-        let idx = outstanding_path.partition_point(|(d, _)| *d <= p.start);
-        let notional_start = if idx > 0 {
-            outstanding_path[idx - 1].1.amount()
-        } else {
-            schedule.notional.initial.amount()
-        };
+        let notional_start = crate::builder::outstanding_on(
+            outstanding_path,
+            p.start,
+            schedule.notional.initial.amount(),
+        );
 
         let coupon_total = p.bucket.cash_amount + p.bucket.pik_amount;
 
@@ -715,7 +714,7 @@ fn find_active_periods_and_elapsed<'a>(
                         inputs.coupon_start
                     )));
                 }
-                ex.is_ex_coupon(inputs.payment_date, as_of)?
+                record_date <= as_of
             } else {
                 false
             };

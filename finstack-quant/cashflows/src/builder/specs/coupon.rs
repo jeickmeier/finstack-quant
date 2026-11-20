@@ -330,6 +330,25 @@ impl FloatingRateFallback {
             Self::FixedRate(rate) => Ok(rate.as_f64()),
         }
     }
+
+    pub(crate) fn resolve_with_warning(
+        &self,
+        error: finstack_quant_core::Error,
+        reset_date: Date,
+        spread_bp: f64,
+        message: &'static str,
+    ) -> finstack_quant_core::Result<f64> {
+        if !matches!(self, Self::Error) {
+            tracing::warn!(
+                reset_date = %reset_date,
+                spread_bp = %spread_bp,
+                fallback = ?self,
+                error = %error,
+                "{message}"
+            );
+        }
+        self.index_rate(error)
+    }
 }
 
 /// Where overnight index floors/caps are applied for daily-compounded rates.
@@ -673,13 +692,13 @@ fn default_gearing_includes_spread() -> bool {
 
 impl FloatingRateSpec {
     /// Gearing applied when a spec omits it: `1` (the index passes through).
-    pub const DEFAULT_GEARING: Decimal = Decimal::ONE;
+    pub(crate) const DEFAULT_GEARING: Decimal = Decimal::ONE;
 
     /// Whether gearing scales the spread when a spec omits it: `true`.
-    pub const DEFAULT_GEARING_INCLUDES_SPREAD: bool = true;
+    pub(crate) const DEFAULT_GEARING_INCLUDES_SPREAD: bool = true;
 
     /// Reset lag in business days when a spec omits it: `2` (T-2).
-    pub const DEFAULT_RESET_LAG_DAYS: i32 = 2;
+    pub(crate) const DEFAULT_RESET_LAG_DAYS: i32 = 2;
 
     /// Shared preset skeleton: unit gearing, no floors/caps, `Error` fallback.
     fn preset(
