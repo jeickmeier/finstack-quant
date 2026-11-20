@@ -672,27 +672,49 @@ mod tests {
             let times = uniform_grid(n, t_end);
             let disc = RoughHestonHybrid::new(&times, h).expect("valid");
 
-            let mut rng = PhiloxRng::new(192837);
-            let mut normals = vec![0.0; 3 * n];
+            const SEED: u64 = 192837;
+            const PATHS_PER_BATCH: usize = 32;
+            let draws_per_path = 3 * n;
+            // Both grids consume whole Box-Muller pairs per path. Position
+            // each batch in stream zero at its original serial draw offset,
+            // so the path samples do not depend on Rayon scheduling.
+            assert!(draws_per_path.is_multiple_of(2));
+            let mut payoffs = vec![0.0; num_paths];
+            #[cfg(not(target_arch = "wasm32"))]
+            use rayon::prelude::*;
+            #[cfg(not(target_arch = "wasm32"))]
+            let batches = payoffs.par_chunks_mut(PATHS_PER_BATCH).enumerate();
+            #[cfg(target_arch = "wasm32")]
+            let batches = payoffs.chunks_mut(PATHS_PER_BATCH).enumerate();
+
+            batches.for_each(|(batch, payoffs)| {
+                let draw_offset = (batch * PATHS_PER_BATCH * draws_per_path) as u64;
+                let mut rng = PhiloxRng::with_stream_u01_offset(SEED, 0, draw_offset);
+                let mut normals = vec![0.0; draws_per_path];
+                let mut work = vec![0.0; disc.work_size(&process)];
+                for payoff in payoffs {
+                    rng.fill_std_normals(&mut normals).expect("normal draws");
+                    let mut x = [s0, v0];
+                    work.fill(0.0);
+                    for (window, z) in times.windows(2).zip(normals.chunks_exact(3)) {
+                        disc.step(
+                            &process,
+                            window[0],
+                            window[1] - window[0],
+                            &mut x,
+                            z,
+                            &mut work,
+                        )
+                        .expect("valid simulation step");
+                    }
+                    *payoff = (x[0] - strike).max(0.0);
+                }
+            });
+
+            // Keep the original path-order accumulation, including rounding.
             let mut sum_payoff = 0.0;
             let mut sum_payoff_squared = 0.0;
-            for _ in 0..num_paths {
-                rng.fill_std_normals(&mut normals).expect("normal draws");
-                let mut x = vec![s0, v0];
-                let mut work = vec![0.0; disc.work_size(&process)];
-                for k in 0..n {
-                    let z = [normals[3 * k], normals[3 * k + 1], normals[3 * k + 2]];
-                    disc.step(
-                        &process,
-                        times[k],
-                        times[k + 1] - times[k],
-                        &mut x,
-                        &z,
-                        &mut work,
-                    )
-                    .expect("valid simulation step");
-                }
-                let payoff = (x[0] - strike).max(0.0);
+            for payoff in payoffs {
                 sum_payoff += payoff;
                 sum_payoff_squared += payoff * payoff;
             }
