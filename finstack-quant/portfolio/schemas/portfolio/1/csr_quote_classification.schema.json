@@ -845,6 +845,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Dated issuer identity and approved ordinary CSR risk bucket.",
+  "examples": [
+    {
+      "as_of": "2024-01-02",
+      "bucket": 4,
+      "currency": "USD",
+      "issuer": "EXAMPLE-CORP",
+      "seniority": "senior",
+      "source_id": "example-approved-classification"
+    }
+  ],
   "properties": {
     "as_of": {
       "$ref": "#/$defs/DateWire",

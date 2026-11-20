@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario_validation_report.schema.json",
-      "bytes": 1439,
+      "bytes": 1635,
       "kind": "output",
       "path": "schemas/scenarios/1/scenario_validation_report.schema.json",
       "summary": "Structural validation diagnostics without scenario application.",

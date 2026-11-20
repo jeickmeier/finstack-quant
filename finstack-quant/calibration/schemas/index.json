@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/step_with_quotes.schema.json",
-      "bytes": 128307,
+      "bytes": 129162,
       "kind": "input",
       "path": "schemas/calibration/1/step_with_quotes.schema.json",
       "summary": "One typed calibration step with inline observations.",
