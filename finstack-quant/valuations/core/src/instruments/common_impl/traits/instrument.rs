@@ -32,6 +32,7 @@ use super::pricing_options::PricingOptions;
 /// use finstack_quant_core::dates::{Date, DayCount};
 /// use finstack_quant_core::market_data::context::MarketContext;
 /// use finstack_quant_core::market_data::term_structures::DiscountCurve;
+/// use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 /// use finstack_quant_core::market_data::traits::Discounting;
 /// use finstack_quant_core::money::Money;
 /// use finstack_quant_core::types::{Attributes, CurveId};
@@ -93,7 +94,10 @@ use super::pricing_options::PricingOptions;
 /// let market = MarketContext::new().try_insert(
 ///     DiscountCurve::builder("USD-OIS")
 ///         .base_date(date!(2026-01-01))
+///         .day_count(DayCount::Act365F)
 ///         .knots([(0.0, 1.0), (1.0, 0.95)])
+///         .interp(InterpStyle::Linear)
+///         .extrapolation(ExtrapolationPolicy::Extend)
 ///         .build()?,
 /// )?;
 /// let value = note.value(&market, date!(2026-01-01))?;

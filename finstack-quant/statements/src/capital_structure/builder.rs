@@ -139,6 +139,7 @@ impl ModelBuilder {
     ///         credits: Vec::new(),
     ///         sweep_percentage: 0.5, // 50% sweep
     ///         facilities: FacilitySelection::Named(vec!["TL-A".to_string()]),
+    ///         payment_lag_days: None,
     ///     }),
     ///     ..WaterfallSpec::default()
     /// };

@@ -30,6 +30,8 @@
 //! use finstack_quant_valuations_core::instruments::Instrument;
 //! use finstack_quant_core::market_data::context::MarketContext;
 //! use finstack_quant_core::market_data::term_structures::DiscountCurve;
+//! use finstack_quant_core::dates::DayCount;
+//! use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 //! use time::macros::date;
 //!
 //! # fn main() -> finstack_quant_core::Result<()> {
@@ -38,7 +40,10 @@
 //! let market = MarketContext::new().try_insert(
 //!     DiscountCurve::builder("USD-TREASURY")
 //!         .base_date(as_of)
+//!         .day_count(DayCount::Act365F)
 //!         .knots([(0.0, 1.0), (30.0, 0.40)])
+//!         .interp(InterpStyle::Linear)
+//!         .extrapolation(ExtrapolationPolicy::Extend)
 //!         .build()?,
 //! ).expect("insert market curve");
 //!
