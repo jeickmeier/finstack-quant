@@ -5,7 +5,7 @@ use super::monte_carlo::{PyMonteCarloResults, extract_config};
 use super::parse_period_id;
 use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::core::table::{envelope_to_pandas, selected_envelope_to_pandas};
+use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::{extract_market_ref, extract_model_ref};
 use crate::bindings::macros::wire_methods;
@@ -400,22 +400,11 @@ impl PyStatementResult {
     fn to_dataframe<'py>(&self, py: Python<'py>, orient: &str) -> PyResult<Bound<'py, PyAny>> {
         match orient {
             "long" => {
-                let table = self.inner.to_table_long().map_err(statements_to_py)?;
-                selected_envelope_to_pandas(
-                    py,
-                    &table,
-                    &[
-                        ("node_id", "node_id"),
-                        ("period_id", "period"),
-                        ("status", "status"),
-                        ("value", "value"),
-                        ("amount", "amount"),
-                        ("currency", "currency"),
-                        ("value_type", "value_type"),
-                        ("reason", "reason"),
-                        ("source", "source"),
-                    ],
-                )
+                let mut table = self.inner.to_table_long().map_err(statements_to_py)?;
+                if let Some(col) = table.columns.iter_mut().find(|c| c.name == "period_id") {
+                    col.name = "period".to_string();
+                }
+                envelope_to_pandas(py, &table)
             }
             "wide" => {
                 let table = self.inner.to_table_wide().map_err(statements_to_py)?;

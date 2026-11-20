@@ -42,7 +42,8 @@ use crate::errors::value_error;
 /// >>> table = value_portfolio(portfolio, MarketContext()).to_arrow_positions()
 /// >>> (len(table), table.num_columns)
 /// (0, 8)
-#[pyclass(module = "finstack_quant.core.table", name = "ArrowTable", frozen)]
+#[pyclass(module = "finstack_quant.core.table", name = "ArrowTable", frozen, eq)]
+#[derive(PartialEq)]
 pub struct PyArrowTable {
     pub(crate) batch: RecordBatch,
 }
@@ -53,21 +54,6 @@ impl PyArrowTable {
         let batch =
             finstack_quant_arrow::to_record_batch(table).map_err(crate::errors::core_to_py)?;
         Ok(Self { batch })
-    }
-
-    fn to_ipc_bytes(&self) -> PyResult<Vec<u8>> {
-        let mut buffer = Vec::new();
-        {
-            let mut writer = StreamWriter::try_new(&mut buffer, &self.batch.schema())
-                .map_err(|e| value_error(format!("Arrow IPC encode failed: {e}")))?;
-            writer
-                .write(&self.batch)
-                .map_err(|e| value_error(format!("Arrow IPC encode failed: {e}")))?;
-            writer
-                .finish()
-                .map_err(|e| value_error(format!("Arrow IPC encode failed: {e}")))?;
-        }
-        Ok(buffer)
     }
 }
 
@@ -112,14 +98,6 @@ impl PyArrowTable {
             .collect()
     }
 
-    /// Structural equality: same schema and identical column contents.
-    fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
-        other
-            .extract::<PyRef<'_, PyArrowTable>>()
-            .map(|rhs| self.batch == rhs.batch)
-            .unwrap_or(false)
-    }
-
     /// Export the table via the Arrow PyCapsule C-stream protocol.
     ///
     /// Returns a ``PyCapsule`` named ``arrow_array_stream`` containing an
@@ -145,7 +123,18 @@ impl PyArrowTable {
     /// Serialize to Arrow IPC stream bytes (the pickle wire format).
     #[pyo3(text_signature = "($self)")]
     fn to_ipc<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
-        Ok(PyBytes::new(py, &self.to_ipc_bytes()?))
+        let mut buffer = Vec::new();
+        {
+            let mut writer = StreamWriter::try_new(&mut buffer, &self.batch.schema())
+                .map_err(|e| value_error(format!("Arrow IPC encode failed: {e}")))?;
+            writer
+                .write(&self.batch)
+                .map_err(|e| value_error(format!("Arrow IPC encode failed: {e}")))?;
+            writer
+                .finish()
+                .map_err(|e| value_error(format!("Arrow IPC encode failed: {e}")))?;
+        }
+        Ok(PyBytes::new(py, &buffer))
     }
 
     /// Rebuild a table from Arrow IPC stream bytes produced by ``to_ipc``.
@@ -210,29 +199,6 @@ pub(crate) fn envelope_to_pandas<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let arrow = Bound::new(py, PyArrowTable::from_envelope(table)?)?;
     PyArrowTable::to_pandas(&arrow, py)
-}
-
-/// The named columns of `table`, renamed to their targets, as a `pandas.DataFrame`.
-pub(crate) fn selected_envelope_to_pandas<'py>(
-    py: Python<'py>,
-    table: &TableEnvelope,
-    selected_columns: &[(&str, &str)],
-) -> PyResult<Bound<'py, PyAny>> {
-    let columns = selected_columns
-        .iter()
-        .map(|(source, target)| {
-            let column = table
-                .column(source)
-                .ok_or_else(|| value_error(format!("missing required table column '{source}'")))?;
-            Ok(finstack_quant_core::table::TableColumn::new(
-                *target,
-                column.data.clone(),
-            ))
-        })
-        .collect::<PyResult<Vec<_>>>()?;
-    let projected =
-        TableEnvelope::new(columns, Default::default()).map_err(crate::errors::core_to_py)?;
-    envelope_to_pandas(py, &projected)
 }
 
 /// Build the `finstack_quant.core.table` submodule.

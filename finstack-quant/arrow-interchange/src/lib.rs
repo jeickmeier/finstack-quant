@@ -46,7 +46,6 @@ use std::sync::Arc;
 
 use arrow::array::{ArrayRef, BooleanArray, Float64Array, Int64Array, StringArray, UInt32Array};
 use arrow::datatypes::{DataType, Field, Schema};
-use arrow::error::ArrowError;
 use arrow::record_batch::{RecordBatch, RecordBatchOptions};
 use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
 use finstack_quant_core::{Error, Result};
@@ -65,11 +64,6 @@ pub const ROLE_METADATA_KEY: &str = "finstack:role";
 /// (`IndexMap<String, serde_json::Value>` as JSON). On the **schema**, the
 /// value is the table-level `TableEnvelope::metadata` map.
 pub const METADATA_KEY: &str = "finstack:metadata";
-
-/// Map an [`ArrowError`] into the core validation error with context.
-fn arrow_err(context: &str, err: &ArrowError) -> Error {
-    Error::Validation(format!("arrow {context}: {err}"))
-}
 
 /// Build the Arrow field + array for one envelope column.
 fn column_to_arrow(column: &TableColumn) -> Result<(Field, ArrayRef)> {
@@ -192,7 +186,7 @@ pub fn to_record_batch(table: &TableEnvelope) -> Result<RecordBatch> {
     let schema = Arc::new(Schema::new_with_metadata(fields, schema_metadata));
     let options = RecordBatchOptions::new().with_row_count(Some(table.row_count));
     RecordBatch::try_new_with_options(schema, arrays, &options)
-        .map_err(|e| arrow_err("record batch construction", &e))
+        .map_err(|e| Error::Validation(format!("arrow record batch construction: {e}")))
 }
 
 #[cfg(test)]
