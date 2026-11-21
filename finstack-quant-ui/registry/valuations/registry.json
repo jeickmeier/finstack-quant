@@ -716,7 +716,7 @@
       "name": "valuation-details",
       "type": "registry:component",
       "title": "Valuation details",
-      "description": "Routes a result's detail payload to its view: Monte Carlo diagnostics, explanation, covenants or raw JSON.",
+      "description": "Routes a result's detail payload to its view: Monte Carlo diagnostics, explanation or raw JSON.",
       "docs": "Lazy native result detail routing. Only Monte Carlo has a complete published host shape; composite, credit, FX and structured-credit payloads stay raw. Unknown tags show a warning; full result metadata and nullable fields remain available.",
       "files": [
         {
@@ -729,8 +729,7 @@
         "@finstack/json-viewer",
         "@finstack/finstack-codec",
         "@finstack/monte-carlo-diagnostics",
-        "@finstack/explanation-trace",
-        "@finstack/covenant-report"
+        "@finstack/explanation-trace"
       ],
       "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.11.0"],
       "categories": ["Individual Components"],
@@ -738,7 +737,6 @@
         "version": "0.2.0",
         "wasmVersion": "0.11.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
@@ -1213,7 +1211,6 @@
           "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json",
           "https://finstack_quant.dev/schemas/common/1/scenario_grid.schema.json",
           "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
-          "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future.schema.json",

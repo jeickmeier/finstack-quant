@@ -145,7 +145,7 @@ class MertonMcCalibrationSpec:
     Set on a configuration with :meth:`MertonMcConfig.calibration`. The
     ``merton_mc`` pricing model (``Bond.price(..., model="merton_mc")`` with
     the configuration in the bond's
-    ``instrument_pricing_overrides.model_config.merton_mc_config``) first
+    ``bond.merton_mc_config``) first
     solves ``parameter`` by low-path bisection so the cash base-case price
     matches ``target``, then re-prices with full paths and reports the solved
     value as the ``calibrated_debt_barrier`` / ``calibrated_asset_vol``
@@ -622,7 +622,7 @@ class MertonMcConfig:
 
         Honoured by the ``merton_mc`` pricing model (``Bond.price(...,
         model="merton_mc")`` with this configuration in the bond's
-        ``instrument_pricing_overrides.model_config.merton_mc_config``), which
+        ``bond.merton_mc_config``), which
         solves the structural parameter to the target quote before the
         full-path price. ``Bond.price_merton_mc`` prices the configuration as
         given and does not calibrate.

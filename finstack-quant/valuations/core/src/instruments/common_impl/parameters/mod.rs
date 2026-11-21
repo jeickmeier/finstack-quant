@@ -6,10 +6,8 @@
 //! - **conventions**: Standard market conventions for bonds and swaps
 //! - **bermudan_call**: Issuer call provision shared by callable rate exotics
 
-pub(crate) mod bond_quote;
 pub(crate) mod conventions;
 pub(crate) mod market;
-pub(crate) mod merton_mc;
 pub(crate) mod monitoring;
 pub(crate) mod quanto;
 pub(crate) mod trs_common;

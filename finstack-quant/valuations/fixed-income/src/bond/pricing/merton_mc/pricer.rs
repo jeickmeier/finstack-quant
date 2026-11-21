@@ -1,6 +1,7 @@
 use super::MertonMcResult;
 use super::calibration::{MertonMcCalibrationOutput, calibrate_parameter_to_market};
 use crate::bond::Bond;
+use crate::bond::MertonMcConfig;
 use crate::bond::pricing::time_basis::{
     BondModelSchedule, bond_cashflow_dfs_on_model_grid, bond_model_schedule,
     implied_flat_discount_rate_from_curve,
@@ -9,7 +10,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::instruments::MertonMcConfig;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, expect_inst,
 };
@@ -82,17 +82,12 @@ impl SimpleBondMertonMcPricer {
         bond.validate_merton_mc_embedded_rights()
             .map_err(|error| PricingError::from_core(error, ctx.clone()))?;
 
-        let base_config = bond
-            .instrument_pricing_overrides
-            .model_config
-            .merton_mc_config
-            .as_ref()
-            .ok_or_else(|| {
-                PricingError::invalid_input_with_context(
-                    "MertonMc pricer requires instrument_pricing_overrides.model_config.merton_mc_config",
-                    ctx.clone(),
-                )
-            })?;
+        let base_config = bond.merton_mc_config.as_deref().ok_or_else(|| {
+            PricingError::invalid_input_with_context(
+                "MertonMc pricer requires bond.merton_mc_config",
+                ctx.clone(),
+            )
+        })?;
 
         let disc = market
             .get_discount(bond.discount_curve_id.as_str())
@@ -262,10 +257,10 @@ mod tests {
             "USD-OIS",
         )
         .expect("valid bond");
+        bond = bond.with_merton_mc_config(config.clone());
         bond.instrument_pricing_overrides = bond
             .instrument_pricing_overrides
             .clone()
-            .with_merton_mc_config(config.clone())
             .with_mc_paths(32)
             .with_mc_antithetic(false);
         (bond, config)
@@ -384,10 +379,10 @@ mod tests {
             "USD-OIS",
         )
         .expect("valid bond");
+        bond = bond.with_merton_mc_config(default_free_config());
         bond.instrument_pricing_overrides = bond
             .instrument_pricing_overrides
             .clone()
-            .with_merton_mc_config(default_free_config())
             .with_mc_paths(8)
             .with_mc_antithetic(false);
 
@@ -456,10 +451,10 @@ mod tests {
             "USD-OIS",
         )
         .expect("valid gilt");
+        gilt = gilt.with_merton_mc_config(default_free_config());
         gilt.instrument_pricing_overrides = gilt
             .instrument_pricing_overrides
             .clone()
-            .with_merton_mc_config(default_free_config())
             .with_mc_paths(8)
             .with_mc_antithetic(false);
 

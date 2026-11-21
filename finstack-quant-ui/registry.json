@@ -1433,7 +1433,10 @@
           "target": "lib/finstack/generated/examples/levered_real_estate_equity.json"
         }
       ],
-      "registryDependencies": ["@finstack/finstack-codec"],
+      "registryDependencies": [
+        "@finstack/finstack-codec",
+        "@finstack/shared-schema-defs"
+      ],
       "dependencies": [],
       "categories": [],
       "meta": {

@@ -228,10 +228,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
     ) -> Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>> {
         let mut clone = self.clone();
         clone.cashflow_spec.make_cash_pay();
-        clone
-            .instrument_pricing_overrides
-            .model_config
-            .merton_mc_config = None;
+        clone.merton_mc_config = None;
         Some(Box::new(clone))
     }
 }
@@ -297,7 +294,7 @@ impl Bond {
     /// unsupported cashflow shapes, invalid dates, or invalid MC inputs.
     pub fn price_merton_mc(
         &self,
-        config: &finstack_quant_valuations_core::instruments::MertonMcConfig,
+        config: &crate::bond::MertonMcConfig,
         discount_rate: f64,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<crate::bond::pricing::merton_mc::MertonMcResult> {
@@ -313,14 +310,14 @@ impl Bond {
     /// Shared by [`Bond::price_merton_mc`] and the low-path market calibration.
     pub(crate) fn price_merton_mc_with_run(
         &self,
-        config: &finstack_quant_valuations_core::instruments::MertonMcConfig,
+        config: &crate::bond::MertonMcConfig,
         run: &crate::bond::pricing::merton_mc::MertonMcRun,
         discount_rate: f64,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<crate::bond::pricing::merton_mc::MertonMcResult> {
         use crate::bond::pricing::merton_mc::{MertonBondTerms, MertonMcEngine};
+        use crate::bond::{MertonMcConfig, PikMode, PikSchedule};
         use finstack_quant_cashflows::builder::CouponType;
-        use finstack_quant_valuations_core::instruments::{MertonMcConfig, PikMode, PikSchedule};
         use rust_decimal::prelude::ToPrimitive;
 
         self.validate_merton_mc_embedded_rights()?;
@@ -491,8 +488,8 @@ mod metrics_equivalent_tests {
 
     #[test]
     fn metrics_equivalent_preserves_all_other_bond_state() {
+        use crate::bond::MertonMcConfig;
         use finstack_quant_models::credit::{AssetDynamics, MertonBarrierType, MertonModel};
-        use finstack_quant_valuations_core::instruments::MertonMcConfig;
 
         let mut bond = Bond::example().expect("bond example");
         bond.cashflow_spec = pik_step_up_spec();
@@ -506,9 +503,9 @@ mod metrics_equivalent_tests {
             AssetDynamics::GeometricBrownian,
         )
         .expect("Merton model");
+        bond = bond.with_merton_mc_config(MertonMcConfig::new(merton, 0.4).expect("Merton config"));
         bond.instrument_pricing_overrides = bond
             .instrument_pricing_overrides
-            .with_merton_mc_config(MertonMcConfig::new(merton, 0.4).expect("Merton config"))
             .with_implied_volatility(0.3);
         bond.instrument_pricing_overrides.model_config.tree_steps = Some(71);
         bond.metric_pricing_overrides.theta_period = Some(Tenor::semi_annual());
@@ -517,13 +514,7 @@ mod metrics_equivalent_tests {
         let equivalent = bond.metrics_equivalent().expect("bond equivalent");
         let equivalent = equivalent.as_any().downcast_ref::<Bond>().expect("bond");
         assert_eq!(coupon_type_of(&equivalent.cashflow_spec), CouponType::Cash);
-        assert!(
-            equivalent
-                .instrument_pricing_overrides
-                .model_config
-                .merton_mc_config
-                .is_none()
-        );
+        assert!(equivalent.merton_mc_config.is_none());
         assert_eq!(
             serde_json::to_value(&bond).expect("original unchanged"),
             original
@@ -531,9 +522,9 @@ mod metrics_equivalent_tests {
         let mut expected = original;
         let actual = serde_json::to_value(equivalent).expect("equivalent bond");
         expected["cashflow_spec"] = actual["cashflow_spec"].clone();
-        expected["instrument_pricing_overrides"]["model_config"]
+        expected
             .as_object_mut()
-            .expect("model config")
+            .expect("bond object")
             .remove("merton_mc_config");
         assert_eq!(actual, expected);
     }

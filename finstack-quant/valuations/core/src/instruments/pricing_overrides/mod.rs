@@ -233,16 +233,6 @@ impl InstrumentPricingOverrides {
         self
     }
 
-    /// Set the Merton Monte Carlo configuration.
-    ///
-    /// # Arguments
-    ///
-    /// * `config` - Merton structural-credit Monte Carlo configuration.
-    pub fn with_merton_mc_config(mut self, config: crate::instruments::MertonMcConfig) -> Self {
-        self.model_config.merton_mc_config = Some(config);
-        self
-    }
-
     /// Set the independent-estimator count for Monte Carlo pricing.
     ///
     /// Antithetic sampling evaluates two factor paths per estimator. The

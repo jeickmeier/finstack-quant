@@ -298,6 +298,21 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
   },
   {
+    "path": "#/$defs/d_0c72f5cb09b10476ecb7/properties/merton_mc_config",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Bond/properties/merton_mc_config",
+    "description": "Optional Merton Monte Carlo configuration for structural credit PIK/toggle pricing.\n\nUsed when pricing this bond with the `\"merton_mc\"` model key."
+  },
+  {
+    "path": "#/$defs/d_0c72f5cb09b10476ecb7/properties/merton_mc_config/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Bond/properties/merton_mc_config/anyOf/0",
+    "ref": "#/$defs/MertonMcConfig",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcConfig"
+  },
+  {
+    "path": "#/$defs/d_0c72f5cb09b10476ecb7/properties/merton_mc_config/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Bond/properties/merton_mc_config/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_0c72f5cb09b10476ecb7/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Bond/properties/metric_pricing_overrides",
     "description": "Metric-time pricing configuration.",
@@ -4043,21 +4058,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/mc_target_ci_half_width",
     "description": "Optional absolute target for the Monte Carlo confidence-interval\nhalf-width in instrument currency.\n\nEngines that support adaptive sampling may stop before `mc_paths` after\ntheir minimum sample count when this positive finite target is reached.\nThe rates-credit bond engine always consumes its fixed estimator budget\nand validates this target against the final 95% confidence interval.",
     "format": "double"
-  },
-  {
-    "path": "#/$defs/d_65b0652ed08913529246/properties/merton_mc_config",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/merton_mc_config",
-    "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (at `instrument_pricing_overrides.model_config.merton_mc_config`\nor via the Rust builder), the `MertonMc` pricer in the registry uses this\nmodel and grid; the path count, antithetic flag and seed label come from\n`mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config."
-  },
-  {
-    "path": "#/$defs/d_65b0652ed08913529246/properties/merton_mc_config/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/merton_mc_config/anyOf/0",
-    "ref": "#/$defs/MertonMcConfig",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcConfig"
-  },
-  {
-    "path": "#/$defs/d_65b0652ed08913529246/properties/merton_mc_config/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/merton_mc_config/anyOf/1"
   },
   {
     "path": "#/$defs/d_65b0652ed08913529246/properties/oas_quote_compounding",
@@ -8523,7 +8523,7 @@ export default [
   {
     "path": "#/$defs/d_cfda8e57db9764a22d4b",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikSchedule",
-    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_core::instruments::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
+    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_fixed_income::bond::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
   },
   {
     "path": "#/$defs/d_cfda8e57db9764a22d4b/oneOf/0",

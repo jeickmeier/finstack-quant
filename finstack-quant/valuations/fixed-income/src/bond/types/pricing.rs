@@ -412,6 +412,9 @@ impl Bond {
         self.instrument_pricing_overrides.validate()?;
         self.metric_pricing_overrides.validate()?;
         self.scenario_pricing_overrides.validate()?;
+        if let Some(ref merton_mc_config) = self.merton_mc_config {
+            merton_mc_config.validate()?;
+        }
         validation::require_with(self.maturity > self.issue_date, || {
             format!(
                 "Bond issue date ({}) must be before maturity date ({})",

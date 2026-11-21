@@ -2,7 +2,7 @@
 ///
 /// These are the per-instrument Monte Carlo controls, resolved from the bond's
 /// `instrument_pricing_overrides.model_config` by [`MertonMcRun::resolve`]; the
-/// wire [`MertonMcConfig`](finstack_quant_valuations_core::instruments::MertonMcConfig) carries only the model and grid.
+/// wire [`MertonMcConfig`](crate::bond::MertonMcConfig) carries only the model and grid.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MertonMcRun {
     /// Number of independent estimators; antithetic sampling simulates two
@@ -37,16 +37,16 @@ impl MertonMcRun {
         instrument_id: &finstack_quant_core::types::InstrumentId,
         model_config: &finstack_quant_valuations_core::instruments::pricing_overrides::ModelConfig,
     ) -> finstack_quant_core::Result<Self> {
-        let defaults =
-            &finstack_quant_valuations_core::pricer::defaults::embedded_defaults()?.merton_pik_bond;
         Ok(Self {
             num_paths:
                 finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_mc_paths(
                     model_config.mc_paths,
-                    defaults.num_paths,
+                    crate::bond::merton_mc_config::DEFAULT_MERTON_PIK_MC_PATHS,
                 )?,
             seed: model_config.mc_seed(instrument_id),
-            antithetic: model_config.mc_antithetic.unwrap_or(defaults.antithetic),
+            antithetic: model_config
+                .mc_antithetic
+                .unwrap_or(crate::bond::merton_mc_config::DEFAULT_MERTON_PIK_ANTITHETIC),
         })
     }
 }

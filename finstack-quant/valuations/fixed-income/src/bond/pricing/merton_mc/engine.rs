@@ -1,11 +1,9 @@
 use super::{MertonMcResult, MertonMcRun, PathStatistics};
+use crate::bond::{BarrierCrossing, MertonMcConfig, PikMode, PikSchedule};
 use finstack_quant_core::Result;
 use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
 use finstack_quant_models::credit::CreditState;
 use finstack_quant_models::credit::{AssetDynamics, MertonBarrierType};
-use finstack_quant_valuations_core::instruments::{
-    BarrierCrossing, MertonMcConfig, PikMode, PikSchedule,
-};
 use smallvec::SmallVec;
 
 /// Contractual terms of the bond leg simulated by [`MertonMcEngine`].

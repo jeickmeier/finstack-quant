@@ -1037,6 +1037,22 @@ impl Bond {
         self
     }
 
+    /// Attach a Merton Monte Carlo structural credit configuration for `"merton_mc"` pricing.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - [`MertonMcConfig`](crate::bond::MertonMcConfig) specifying the
+    ///   structural Merton asset model, recovery rate, PIK schedule, and simulation grid.
+    ///
+    /// # Returns
+    ///
+    /// `self` with `merton_mc_config` set.
+    #[must_use]
+    pub fn with_merton_mc_config(mut self, config: crate::bond::MertonMcConfig) -> Self {
+        self.merton_mc_config = Some(Box::new(config));
+        self
+    }
+
     /// Shortcut: guarantee a minimum money multiple (MOIC) on early redemption.
     ///
     /// Equivalent to `.with_return_floor(ReturnFloorSpec::moic(multiple))`.

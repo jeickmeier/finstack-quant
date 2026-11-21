@@ -306,6 +306,17 @@
           "$ref": "#/$defs/d_2331411247fb4fdd46dd",
           "description": "Maturity date of the bond."
         },
+        "merton_mc_config": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_ff1d6292ff0f5bd76a70"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional Merton Monte Carlo configuration for structural credit PIK/toggle pricing.\n\nUsed when pricing this bond with the `\"merton_mc\"` model key."
+        },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_3883c45b3701884ad50b",
           "description": "Metric-time pricing configuration."
@@ -3913,17 +3924,6 @@
             "number",
             "null"
           ]
-        },
-        "merton_mc_config": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_ff1d6292ff0f5bd76a70"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (at `instrument_pricing_overrides.model_config.merton_mc_config`\nor via the Rust builder), the `MertonMc` pricer in the registry uses this\nmodel and grid; the path count, antithetic flag and seed label come from\n`mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config."
         },
         "oas_quote_compounding": {
           "$ref": "#/$defs/d_91709081651bb45619b0",
@@ -8050,7 +8050,7 @@
       "type": "object"
     },
     "d_cfda8e57db9764a22d4b": {
-      "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_core::instruments::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```",
+      "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_fixed_income::bond::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```",
       "oneOf": [
         {
           "additionalProperties": false,

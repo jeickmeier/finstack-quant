@@ -1,10 +1,10 @@
 use super::*;
+use crate::bond::MertonMcCalibrationSpec;
 use finstack_quant_models::credit::ThresholdDirection;
 use finstack_quant_models::credit::{
     AssetDynamics, CreditStateVariable, DynamicRecoverySpec, EndogenousHazardSpec,
     MertonBarrierType, MertonModel, ToggleExerciseModel,
 };
-use finstack_quant_valuations_core::instruments::MertonMcCalibrationSpec;
 
 fn test_merton() -> MertonModel {
     MertonModel::new_with_dynamics(
@@ -946,53 +946,66 @@ fn antithetic_bridge_uses_complementary_uniform() {
 }
 
 #[test]
-fn merton_mc_config_roundtrips_via_pricing_overrides_json() {
-    // Ensures the canonical nested model configuration can deserialize.
-    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+fn merton_mc_config_roundtrips_via_bond_json() {
+    use crate::bond::Bond;
+    // Ensures MertonMcConfig round-trips directly on Bond alongside ModelConfig sampling settings.
     let cfg = MertonMcConfig::new(test_merton(), 0.40)
         .expect("0.40 recovery should be valid")
         .pik_schedule(PikSchedule::Uniform(PikMode::Cash))
         .steps_per_year(24);
-    let mut ov = InstrumentPricingOverrides::default();
-    ov = ov.with_merton_mc_config(cfg);
-    let json = serde_json::to_string(&ov).expect("ser");
-    let back: InstrumentPricingOverrides = serde_json::from_str(&json).expect("de");
+    let bond = Bond::example()
+        .expect("example bond")
+        .with_merton_mc_config(cfg);
+    let json = serde_json::to_string(&bond).expect("ser");
+    let back: Bond = serde_json::from_str(&json).expect("de");
     let restored = back
-        .model_config
         .merton_mc_config
-        .as_ref()
+        .as_deref()
         .expect("merton_mc_config should be populated");
     assert_eq!(restored.steps_per_year, 24);
     assert_eq!(restored.recovery_rate, 0.40);
 
-    let notebook_shape = serde_json::json!({
-        "model_config": {
-            "mc_paths": 2000,
-            "mc_seed_scenario": "notebook",
-            "merton_mc_config": {
-                "merton": {
-                    "asset_value": 200.0,
-                    "asset_vol": 0.25,
-                    "debt_barrier": 100.0,
-                    "risk_free_rate": 0.04,
-                    "payout_rate": 0.0,
-                    "barrier_type": {"first_passage": {"barrier_growth_rate": 0.0}},
-                    "dynamics": "geometric_brownian"
-                },
-                "pik_schedule": {"uniform": "pik"},
-                "steps_per_year": 50,
-                "recovery_rate": 0.40,
-                "barrier_crossing": "brownian_bridge"
+    let mut notebook_shape = serde_json::to_value(&bond).expect("bond json value");
+    let spec = notebook_shape.as_object_mut().expect("bond object");
+    spec.insert(
+        "instrument_pricing_overrides".to_string(),
+        serde_json::json!({
+            "model_config": {
+                "mc_paths": 2000,
+                "mc_seed_scenario": "notebook"
             }
-        }
-    });
-    let from_notebook: InstrumentPricingOverrides =
+        }),
+    );
+    spec.insert(
+        "merton_mc_config".to_string(),
+        serde_json::json!({
+            "merton": {
+                "asset_value": 200.0,
+                "asset_vol": 0.25,
+                "debt_barrier": 100.0,
+                "risk_free_rate": 0.04,
+                "payout_rate": 0.0,
+                "barrier_type": {"first_passage": {"barrier_growth_rate": 0.0}},
+                "dynamics": "geometric_brownian"
+            },
+            "pik_schedule": {"uniform": "pik"},
+            "steps_per_year": 50,
+            "recovery_rate": 0.40,
+            "barrier_crossing": "brownian_bridge"
+        }),
+    );
+    let from_notebook: Bond =
         serde_json::from_value(notebook_shape).expect("notebook merton_mc_config shape");
-    assert_eq!(from_notebook.model_config.mc_paths, Some(2000));
+    assert_eq!(
+        from_notebook
+            .instrument_pricing_overrides
+            .model_config
+            .mc_paths,
+        Some(2000)
+    );
     let restored = from_notebook
-        .model_config
         .merton_mc_config
-        .as_ref()
+        .as_deref()
         .expect("merton_mc_config should be populated");
     assert_eq!(restored.steps_per_year, 50);
     assert_eq!(restored.recovery_rate, 0.40);

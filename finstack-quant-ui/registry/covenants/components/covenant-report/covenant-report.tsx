@@ -12,7 +12,7 @@ export type CovenantReports = Readonly<Record<string, CovenantReportWire>>;
 export type CovenantReportNumber = "actual_value" | "threshold" | "headroom";
 type Row = { key: string; report: CovenantReportWire };
 export interface CovenantReportProps {
-  /** Native reports (CovenantEngine#evaluate, a dated series row, or a valuation result's covenants). */
+  /** Native reports (CovenantEngine#evaluate or a dated series row). */
   reports: CovenantReports;
   caption?: string;
   captionVisibility?: "visible" | "sr-only";

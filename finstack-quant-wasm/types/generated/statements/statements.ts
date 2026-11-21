@@ -840,6 +840,65 @@ export type CFKind =
  */
 export type CashflowRepresentation = "contractual" | "projected" | "placeholder" | "no_residual";
 /**
+ * Compounding convention for interest rates.
+ *
+ * Used to specify how interest rates should be quoted or converted.
+ * All variants produce mathematically equivalent discount factors when
+ * applied consistently.
+ *
+ * # Relationship Between Conventions
+ *
+ * For a given discount factor DF at time t, the rates under different
+ * conventions are related by:
+ *
+ * ```text
+ * DF = e^(-r_cc × t)                    [Continuous]
+ *    = (1 + r_ann)^(-t)                 [Periodic(1)]
+ *    = (1 + r_per/n)^(-n×t)             [Periodic(n)]
+ *    = 1 / (1 + r_simple × t)           [Simple]
+ * ```
+ *
+ * # Ordering of Rates
+ *
+ * For a common discount factor below one, annual and simple rates both exceed
+ * the continuous rate. Their ordering depends on the maturity `t` in years:
+ * `r_annual > r_simple` for `0 < t < 1`, they agree at `t = 1`, and
+ * `r_simple > r_annual` for `t > 1`.
+ */
+export type Compounding =
+  | "continuous"
+  | {
+      periodic: number;
+    }
+  | "simple";
+/**
+ * AssetPool-granularity policy for the structured-credit default engine.
+ *
+ * Selects whether each scenario realizes defaults name-by-name (finite-pool
+ * copula simulation) or applies the closed-form LHP conditional default
+ * probability uniformly to the pool.
+ */
+export type PoolGranularity = "per_name" | "large_homogeneous";
+/**
+ * Short-rate lattice used by the rates-only bond tree.
+ *
+ * Selected by `instrument_pricing_overrides.model_config.tree_model`; when the
+ * field is absent the bond tree uses Hull-White.
+ */
+export type ShortRateTreeModel = "hull_white" | "black_derman_toy" | "black_karasinski";
+/**
+ * Policy for evaluating volatility surfaces outside their calibrated grid.
+ *
+ * Market-standard production systems typically make this choice explicit because
+ * extrapolation can materially affect PV and greeks.
+ *
+ * # Market Standards
+ *
+ * - **Error**: Conservative approach for production systems; forces explicit handling.
+ * - **Clamp**: Simple flat extrapolation; common for quick prototyping.
+ */
+export type VolSurfaceExtrapolation = "error" | "clamp";
+/**
  * Which structural parameter to calibrate in the MC engine.
  */
 export type CalibrationParameter = "debt_barrier" | "asset_vol";
@@ -1022,65 +1081,6 @@ export type ThresholdDirection = "above" | "below";
  * Which credit metric drives the toggle decision.
  */
 export type CreditStateVariable = "hazard_rate" | "distance_to_default" | "leverage";
-/**
- * Compounding convention for interest rates.
- *
- * Used to specify how interest rates should be quoted or converted.
- * All variants produce mathematically equivalent discount factors when
- * applied consistently.
- *
- * # Relationship Between Conventions
- *
- * For a given discount factor DF at time t, the rates under different
- * conventions are related by:
- *
- * ```text
- * DF = e^(-r_cc × t)                    [Continuous]
- *    = (1 + r_ann)^(-t)                 [Periodic(1)]
- *    = (1 + r_per/n)^(-n×t)             [Periodic(n)]
- *    = 1 / (1 + r_simple × t)           [Simple]
- * ```
- *
- * # Ordering of Rates
- *
- * For a common discount factor below one, annual and simple rates both exceed
- * the continuous rate. Their ordering depends on the maturity `t` in years:
- * `r_annual > r_simple` for `0 < t < 1`, they agree at `t = 1`, and
- * `r_simple > r_annual` for `t > 1`.
- */
-export type Compounding =
-  | "continuous"
-  | {
-      periodic: number;
-    }
-  | "simple";
-/**
- * AssetPool-granularity policy for the structured-credit default engine.
- *
- * Selects whether each scenario realizes defaults name-by-name (finite-pool
- * copula simulation) or applies the closed-form LHP conditional default
- * probability uniformly to the pool.
- */
-export type PoolGranularity = "per_name" | "large_homogeneous";
-/**
- * Short-rate lattice used by the rates-only bond tree.
- *
- * Selected by `instrument_pricing_overrides.model_config.tree_model`; when the
- * field is absent the bond tree uses Hull-White.
- */
-export type ShortRateTreeModel = "hull_white" | "black_derman_toy" | "black_karasinski";
-/**
- * Policy for evaluating volatility surfaces outside their calibrated grid.
- *
- * Market-standard production systems typically make this choice explicit because
- * extrapolation can materially affect PV and greeks.
- *
- * # Market Standards
- *
- * - **Error**: Conservative approach for production systems; forces explicit handling.
- * - **Clamp**: Simple flat extrapolation; common for quick prototyping.
- */
-export type VolSurfaceExtrapolation = "error" | "clamp";
 /**
  * Risk calculation basis for callable/putable bonds.
  *
@@ -2534,6 +2534,12 @@ export interface Bond {
    */
   maturity: DateWire;
   /**
+   * Optional Merton Monte Carlo configuration for structural credit PIK/toggle pricing.
+   *
+   * Used when pricing this bond with the `"merton_mc"` model key.
+   */
+  merton_mc_config?: MertonMcConfig | null;
+  /**
    * Metric-time pricing configuration.
    */
   metric_pricing_overrides?: MetricPricingOverrides;
@@ -3671,15 +3677,6 @@ export interface ModelConfig {
    * and validates this target against the final 95% confidence interval.
    */
   mc_target_ci_half_width?: number | null;
-  /**
-   * Merton Monte Carlo configuration for structural credit PIK pricing.
-   *
-   * When set (at `instrument_pricing_overrides.model_config.merton_mc_config`
-   * or via the Rust builder), the `MertonMc` pricer in the registry uses this
-   * model and grid; the path count, antithetic flag and seed label come from
-   * `mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config.
-   */
-  merton_mc_config?: MertonMcConfig | null;
   /**
    * Quote compounding convention for OAS inputs and outputs.
    *

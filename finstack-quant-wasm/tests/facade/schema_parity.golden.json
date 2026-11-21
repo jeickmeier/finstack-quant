@@ -303,7 +303,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1272662
+            "bytes": 1272452
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
@@ -2333,7 +2333,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1156874
+            "bytes": 1156664
           },
           {
             "path": "schemas/scenarios/1/horizon_result.schema.json",
@@ -2469,7 +2469,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 411507
+            "bytes": 411297
           },
           {
             "path": "schemas/statements/1/forecast_method.schema.json",
@@ -3149,14 +3149,14 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
             "type_name": "InstrumentJson",
             "kind": "component",
-            "bytes": 1018475
+            "bytes": 1053506
           },
           {
             "path": "schemas/common/1/instrument_pricing_overrides.schema.json",
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
             "type_name": "InstrumentPricingOverrides",
             "kind": "component",
-            "bytes": 61391
+            "bytes": 26150
           },
           {
             "path": "schemas/common/1/ir_future_conventions.schema.json",
@@ -3240,7 +3240,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
             "type_name": "StandardDealParams",
             "kind": "component",
-            "bytes": 242843
+            "bytes": 277874
           },
           {
             "path": "schemas/common/1/swaption_conventions.schema.json",
@@ -3331,7 +3331,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1026394
+            "bytes": 1061425
           },
           {
             "path": "schemas/instruments/1/credit_derivatives/cds_index.schema.json",
@@ -3422,7 +3422,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 198419
+            "bytes": 233450
           },
           {
             "path": "schemas/instruments/1/equity/private_markets_fund.schema.json",
@@ -3485,7 +3485,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1025398
+            "bytes": 1060429
           },
           {
             "path": "schemas/instruments/1/exotics/callable_range_accrual.schema.json",
@@ -3548,21 +3548,21 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 289893
+            "bytes": 324924
           },
           {
             "path": "schemas/instruments/1/fixed_income/bond.schema.json",
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 101445
+            "bytes": 136476
           },
           {
             "path": "schemas/instruments/1/fixed_income/bond_future.schema.json",
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 114867
+            "bytes": 149898
           },
           {
             "path": "schemas/instruments/1/fixed_income/convertible_bond.schema.json",
@@ -3597,14 +3597,14 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 404001
+            "bytes": 439032
           },
           {
             "path": "schemas/instruments/1/fixed_income/structured_credit_tranche.schema.json",
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit_tranche.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 405004
+            "bytes": 440035
           },
           {
             "path": "schemas/instruments/1/fixed_income/term_loan.schema.json",
@@ -3709,7 +3709,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
             "type_name": "InstrumentEnvelope",
             "kind": "input",
-            "bytes": 1123199
+            "bytes": 1158230
           },
           {
             "path": "schemas/instruments/1/rates/basis_swap.schema.json",
@@ -3870,7 +3870,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
             "type_name": "CompositeRebalanceResult",
             "kind": "output",
-            "bytes": 1028002
+            "bytes": 1063033
           },
           {
             "path": "schemas/results/1/convertible_greeks.schema.json",
@@ -4088,8 +4088,12 @@
         "definitions": [
           "AccrualMethod",
           "AmortizationSpec",
+          "AssetDynamics",
+          "BarrierCrossing",
           "Bond",
+          "BondQuoteInput",
           "CFKind",
+          "CalibrationParameter",
           "CallPut",
           "CallPutSchedule",
           "CashFlow",
@@ -4100,23 +4104,39 @@
           "CashflowSpec",
           "Compounding",
           "CouponType",
+          "CreditStateVariable",
           "DayCountContextState",
+          "DynamicRecoveryModel",
+          "DynamicRecoverySpec",
+          "EndogenousHazardSpec",
           "FloatingCouponSpec",
           "FloatingLegCompounding",
           "FloatingRateFallback",
           "FloatingRateSpec",
           "InstrumentSchema",
           "IssuePrice",
+          "LeverageHazardMap",
           "MakeWholeSpec",
+          "MertonBarrierType",
+          "MertonMcCalibrationSpec",
+          "MertonMcConfig",
+          "MertonModel",
           "Notional",
+          "OptimalToggle",
           "OvernightIndexConstraintApplication",
+          "PikMode",
+          "PikSchedule",
           "ProjectedFixing",
           "ProtectionWindow",
           "ReturnFloorKind",
           "ReturnFloorSpec",
           "RollRule",
           "StepUpCouponSpec",
+          "StochasticToggle",
           "StubKind",
+          "ThresholdDirection",
+          "ThresholdToggle",
+          "ToggleExerciseModel",
           "bond"
         ]
       },
@@ -4138,10 +4158,14 @@
         "definitions": [
           "AccrualMethod",
           "AmortizationSpec",
+          "AssetDynamics",
           "Attributes",
+          "BarrierCrossing",
           "Bond",
+          "BondQuoteInput",
           "BusinessDayConvention",
           "CFKind",
+          "CalibrationParameter",
           "CallPut",
           "CallPutSchedule",
           "CashFlow",
@@ -4153,12 +4177,16 @@
           "Compounding",
           "CouponSpecs",
           "CouponType",
+          "CreditStateVariable",
           "Currency",
           "Date",
           "DayCount",
           "DayCountContextState",
           "Decimal",
           "DecimalWire",
+          "DynamicRecoveryModel",
+          "DynamicRecoverySpec",
+          "EndogenousHazardSpec",
           "FloatingCouponSpec",
           "FloatingLegCompounding",
           "FloatingRateFallback",
@@ -4167,11 +4195,19 @@
           "InstrumentPricingOverrides",
           "InstrumentSchema",
           "IssuePrice",
+          "LeverageHazardMap",
           "MakeWholeSpec",
+          "MertonBarrierType",
+          "MertonMcCalibrationSpec",
+          "MertonMcConfig",
+          "MertonModel",
           "MetricPricingOverrides",
           "Money",
           "Notional",
+          "OptimalToggle",
           "OvernightIndexConstraintApplication",
+          "PikMode",
+          "PikSchedule",
           "ProjectedFixing",
           "ProtectionWindow",
           "ReturnFloorKind",
@@ -4179,9 +4215,13 @@
           "RollRule",
           "ScenarioPricingOverrides",
           "StepUpCouponSpec",
+          "StochasticToggle",
           "StubKind",
           "Tenor",
           "TenorUnit",
+          "ThresholdDirection",
+          "ThresholdToggle",
+          "ToggleExerciseModel",
           "bond"
         ]
       },
@@ -4331,7 +4371,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1272662
+            "bytes": 1272452
           },
           {
             "domain": "attribution",
@@ -5355,7 +5395,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1156874
+            "bytes": 1156664
           },
           {
             "domain": "scenarios",
@@ -5427,7 +5467,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 411507
+            "bytes": 411297
           },
           {
             "domain": "statements",
@@ -5699,7 +5739,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
             "type_name": "InstrumentJson",
             "kind": "component",
-            "bytes": 1018475
+            "bytes": 1053506
           },
           {
             "domain": "valuations",
@@ -5707,7 +5747,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
             "type_name": "InstrumentPricingOverrides",
             "kind": "component",
-            "bytes": 61391
+            "bytes": 26150
           },
           {
             "domain": "valuations",
@@ -5803,7 +5843,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
             "type_name": "StandardDealParams",
             "kind": "component",
-            "bytes": 242843
+            "bytes": 277874
           },
           {
             "domain": "valuations",
@@ -5907,7 +5947,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1026394
+            "bytes": 1061425
           },
           {
             "domain": "valuations",
@@ -6011,7 +6051,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 198419
+            "bytes": 233450
           },
           {
             "domain": "valuations",
@@ -6083,7 +6123,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1025398
+            "bytes": 1060429
           },
           {
             "domain": "valuations",
@@ -6155,7 +6195,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 289893
+            "bytes": 324924
           },
           {
             "domain": "valuations",
@@ -6163,7 +6203,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 101445
+            "bytes": 136476
           },
           {
             "domain": "valuations",
@@ -6171,7 +6211,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 114867
+            "bytes": 149898
           },
           {
             "domain": "valuations",
@@ -6211,7 +6251,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 404001
+            "bytes": 439032
           },
           {
             "domain": "valuations",
@@ -6219,7 +6259,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit_tranche.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 405004
+            "bytes": 440035
           },
           {
             "domain": "valuations",
@@ -6339,7 +6379,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
             "type_name": "InstrumentEnvelope",
             "kind": "input",
-            "bytes": 1123199
+            "bytes": 1158230
           },
           {
             "domain": "valuations",
@@ -6523,7 +6563,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
             "type_name": "CompositeRebalanceResult",
             "kind": "output",
-            "bytes": 1028002
+            "bytes": 1063033
           },
           {
             "domain": "valuations",
@@ -6769,8 +6809,12 @@
         "definitions": [
           "AccrualMethod",
           "AmortizationSpec",
+          "AssetDynamics",
+          "BarrierCrossing",
           "Bond",
+          "BondQuoteInput",
           "CFKind",
+          "CalibrationParameter",
           "CallPut",
           "CallPutSchedule",
           "CashFlow",
@@ -6781,23 +6825,39 @@
           "CashflowSpec",
           "Compounding",
           "CouponType",
+          "CreditStateVariable",
           "DayCountContextState",
+          "DynamicRecoveryModel",
+          "DynamicRecoverySpec",
+          "EndogenousHazardSpec",
           "FloatingCouponSpec",
           "FloatingLegCompounding",
           "FloatingRateFallback",
           "FloatingRateSpec",
           "InstrumentSchema",
           "IssuePrice",
+          "LeverageHazardMap",
           "MakeWholeSpec",
+          "MertonBarrierType",
+          "MertonMcCalibrationSpec",
+          "MertonMcConfig",
+          "MertonModel",
           "Notional",
+          "OptimalToggle",
           "OvernightIndexConstraintApplication",
+          "PikMode",
+          "PikSchedule",
           "ProjectedFixing",
           "ProtectionWindow",
           "ReturnFloorKind",
           "ReturnFloorSpec",
           "RollRule",
           "StepUpCouponSpec",
+          "StochasticToggle",
           "StubKind",
+          "ThresholdDirection",
+          "ThresholdToggle",
+          "ToggleExerciseModel",
           "bond"
         ]
       },
@@ -6819,10 +6879,14 @@
         "definitions": [
           "AccrualMethod",
           "AmortizationSpec",
+          "AssetDynamics",
           "Attributes",
+          "BarrierCrossing",
           "Bond",
+          "BondQuoteInput",
           "BusinessDayConvention",
           "CFKind",
+          "CalibrationParameter",
           "CallPut",
           "CallPutSchedule",
           "CashFlow",
@@ -6834,12 +6898,16 @@
           "Compounding",
           "CouponSpecs",
           "CouponType",
+          "CreditStateVariable",
           "Currency",
           "Date",
           "DayCount",
           "DayCountContextState",
           "Decimal",
           "DecimalWire",
+          "DynamicRecoveryModel",
+          "DynamicRecoverySpec",
+          "EndogenousHazardSpec",
           "FloatingCouponSpec",
           "FloatingLegCompounding",
           "FloatingRateFallback",
@@ -6848,11 +6916,19 @@
           "InstrumentPricingOverrides",
           "InstrumentSchema",
           "IssuePrice",
+          "LeverageHazardMap",
           "MakeWholeSpec",
+          "MertonBarrierType",
+          "MertonMcCalibrationSpec",
+          "MertonMcConfig",
+          "MertonModel",
           "MetricPricingOverrides",
           "Money",
           "Notional",
+          "OptimalToggle",
           "OvernightIndexConstraintApplication",
+          "PikMode",
+          "PikSchedule",
           "ProjectedFixing",
           "ProtectionWindow",
           "ReturnFloorKind",
@@ -6860,9 +6936,13 @@
           "RollRule",
           "ScenarioPricingOverrides",
           "StepUpCouponSpec",
+          "StochasticToggle",
           "StubKind",
           "Tenor",
           "TenorUnit",
+          "ThresholdDirection",
+          "ThresholdToggle",
+          "ToggleExerciseModel",
           "bond"
         ]
       },

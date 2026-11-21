@@ -44,6 +44,9 @@
     "AssetBackedFacility": {
       "$ref": "#/$defs/AssetBackedFacility"
     },
+    "AssetDynamics": {
+      "$ref": "#/$defs/AssetDynamics"
+    },
     "AssetPool": {
       "$ref": "#/$defs/AssetPool"
     },
@@ -58,6 +61,9 @@
     },
     "BalloonSpec": {
       "$ref": "#/$defs/BalloonSpec"
+    },
+    "BarrierCrossing": {
+      "$ref": "#/$defs/BarrierCrossing"
     },
     "BarrierDirection": {
       "$ref": "#/$defs/BarrierDirection"
@@ -110,6 +116,9 @@
     "BondFutureSpecs": {
       "$ref": "#/$defs/BondFutureSpecs"
     },
+    "BondQuoteInput": {
+      "$ref": "#/$defs/BondQuoteInput"
+    },
     "BorrowingBaseRules": {
       "$ref": "#/$defs/BorrowingBaseRules"
     },
@@ -118,6 +127,9 @@
     },
     "CFKind": {
       "$ref": "#/$defs/CFKind"
+    },
+    "CalibrationParameter": {
+      "$ref": "#/$defs/CalibrationParameter"
     },
     "CallAssumption": {
       "$ref": "#/$defs/CallAssumption"
@@ -371,6 +383,9 @@
     "CreditSpreadProcessSpec": {
       "$ref": "#/$defs/CreditSpreadProcessSpec"
     },
+    "CreditStateVariable": {
+      "$ref": "#/$defs/CreditStateVariable"
+    },
     "CsaSpec": {
       "$ref": "#/$defs/CsaSpec"
     },
@@ -431,6 +446,12 @@
     "DrawRepaySpec": {
       "$ref": "#/$defs/DrawRepaySpec"
     },
+    "DynamicRecoveryModel": {
+      "$ref": "#/$defs/DynamicRecoveryModel"
+    },
+    "DynamicRecoverySpec": {
+      "$ref": "#/$defs/DynamicRecoverySpec"
+    },
     "EarlyAmortizationSpec": {
       "$ref": "#/$defs/EarlyAmortizationSpec"
     },
@@ -439,6 +460,9 @@
     },
     "EligibleCollateralSchedule": {
       "$ref": "#/$defs/EligibleCollateralSchedule"
+    },
+    "EndogenousHazardSpec": {
+      "$ref": "#/$defs/EndogenousHazardSpec"
     },
     "Equity": {
       "$ref": "#/$defs/Equity"
@@ -680,6 +704,9 @@
     "LetterOfCreditSpec": {
       "$ref": "#/$defs/LetterOfCreditSpec"
     },
+    "LeverageHazardMap": {
+      "$ref": "#/$defs/LeverageHazardMap"
+    },
     "LeveredRealEstateEquity": {
       "$ref": "#/$defs/LeveredRealEstateEquity"
     },
@@ -737,6 +764,18 @@
     "McConfig": {
       "$ref": "#/$defs/McConfig"
     },
+    "MertonBarrierType": {
+      "$ref": "#/$defs/MertonBarrierType"
+    },
+    "MertonMcCalibrationSpec": {
+      "$ref": "#/$defs/MertonMcCalibrationSpec"
+    },
+    "MertonMcConfig": {
+      "$ref": "#/$defs/MertonMcConfig"
+    },
+    "MertonModel": {
+      "$ref": "#/$defs/MertonModel"
+    },
     "Metadata": {
       "$ref": "#/$defs/Metadata"
     },
@@ -769,6 +808,9 @@
     },
     "OidPolicy": {
       "$ref": "#/$defs/OidPolicy"
+    },
+    "OptimalToggle": {
+      "$ref": "#/$defs/OptimalToggle"
     },
     "OptionType": {
       "$ref": "#/$defs/OptionType"
@@ -814,6 +856,12 @@
     },
     "PenaltyStep": {
       "$ref": "#/$defs/PenaltyStep"
+    },
+    "PikMode": {
+      "$ref": "#/$defs/PikMode"
+    },
+    "PikSchedule": {
+      "$ref": "#/$defs/PikSchedule"
     },
     "PikToggle": {
       "$ref": "#/$defs/PikToggle"
@@ -1016,6 +1064,9 @@
     "StochasticPrepaySpec": {
       "$ref": "#/$defs/StochasticPrepaySpec"
     },
+    "StochasticToggle": {
+      "$ref": "#/$defs/StochasticToggle"
+    },
     "StochasticUtilizationSpec": {
       "$ref": "#/$defs/StochasticUtilizationSpec"
     },
@@ -1057,6 +1108,15 @@
     },
     "TerminalValueSpec": {
       "$ref": "#/$defs/TerminalValueSpec"
+    },
+    "ThresholdDirection": {
+      "$ref": "#/$defs/ThresholdDirection"
+    },
+    "ThresholdToggle": {
+      "$ref": "#/$defs/ThresholdToggle"
+    },
+    "ToggleExerciseModel": {
+      "$ref": "#/$defs/ToggleExerciseModel"
     },
     "TouchType": {
       "$ref": "#/$defs/TouchType"
@@ -2292,6 +2352,82 @@
       ],
       "type": "object"
     },
+    "AssetDynamics": {
+      "description": "Asset dynamics specification for the Merton model.\n\nControls the stochastic process assumed for the firm's asset value.",
+      "oneOf": [
+        {
+          "const": "geometric_brownian",
+          "description": "Standard geometric Brownian motion (lognormal diffusion).",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Jump-diffusion process (Merton 1976) with Poisson jumps.",
+          "properties": {
+            "jump_diffusion": {
+              "additionalProperties": false,
+              "properties": {
+                "jump_intensity": {
+                  "description": "Poisson jump arrival intensity (jumps per year).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "jump_mean": {
+                  "description": "Mean log-jump size.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "jump_vol": {
+                  "description": "Volatility of log-jump size.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "jump_intensity",
+                "jump_mean",
+                "jump_vol"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "jump_diffusion"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "CreditGrades model extension with stochastic-barrier survival adjustment.\n\n`default_probability()` applies the standard approximate CreditGrades\nsurvival function using the log-barrier volatility parameter.",
+          "properties": {
+            "credit_grades": {
+              "additionalProperties": false,
+              "properties": {
+                "barrier_uncertainty": {
+                  "description": "Log-normal barrier volatility `λ`: the standard deviation of the\nnatural log of the default barrier (Finger et al. 2002,\n\"CreditGrades Technical Document\"). Despite the field name, this\nis *not* a generic uncertainty scalar — it is the lognormal\ndispersion of the global recovery rate, entering the survival\nformula as `a_t² = σ²t + λ²` and the barrier shift `exp(λ²)`.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "mean_recovery": {
+                  "description": "Mean recovery rate at default.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "barrier_uncertainty",
+                "mean_recovery"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "credit_grades"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "AssetPool": {
       "additionalProperties": false,
       "description": "Main asset pool structure",
@@ -3216,6 +3352,21 @@
       ],
       "type": "object"
     },
+    "BarrierCrossing": {
+      "description": "Barrier-crossing detection policy for first-passage default simulation.\n\n`Discrete` only checks the barrier at grid points (fast but biased for\ncoarse time steps). `BrownianBridge` uses a Brownian-bridge crossing\nprobability between grid points to approximate continuous monitoring.",
+      "oneOf": [
+        {
+          "const": "discrete",
+          "description": "Discrete monitoring: default if `V(t_i) < B(t_i)` at time steps.",
+          "type": "string"
+        },
+        {
+          "const": "brownian_bridge",
+          "description": "Brownian-bridge correction for continuous monitoring between steps.",
+          "type": "string"
+        }
+      ]
+    },
     "BarrierDirection": {
       "description": "Inequality sense of an inclusive barrier touch.\n\nAt a contractually eligible observation `x` of barrier `H` (finite, same\nunits), `Up` is hit when `x >= H` and `Down` when `x <= H`. Equality is a\nhit. The direction does not assert where the barrier sits relative to\ncurrent spot: an observation already at or beyond the barrier is a hit.",
       "oneOf": [
@@ -3965,6 +4116,17 @@
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
           "description": "Maturity date of the bond."
         },
+        "merton_mc_config": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MertonMcConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional Merton Monte Carlo configuration for structural credit PIK/toggle pricing.\n\nUsed when pricing this bond with the `\"merton_mc\"` model key."
+        },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "description": "Metric-time pricing configuration."
@@ -4142,6 +4304,151 @@
       ],
       "type": "object"
     },
+    "BondQuoteInput": {
+      "description": "Quote input for the bond quote engine.\n\nAll spreads are expressed in **decimal** (`0.01 = 100bp`).",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Clean price quoted as percentage of par (e.g., 99.5 = 99.5% of par).",
+          "properties": {
+            "clean_price_pct": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "clean_price_pct"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Dirty price in currency units.",
+          "properties": {
+            "dirty_price_currency": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "dirty_price_currency"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Yield to maturity (decimal).",
+          "properties": {
+            "ytm": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "ytm"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Yield to worst (decimal).\n\nFor non-callable bonds this is equivalent to [`BondQuoteInput::Ytm`].\nFor callable, puttable, or return-floor bonds, inversion prices every\nadmissible workout path at this Street yield and selects the minimum\ndirty price.",
+          "properties": {
+            "ytw": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "ytw"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Z-spread over the discount curve (decimal).",
+          "properties": {
+            "z_spread": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "z_spread"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Discount margin for FRNs (decimal).",
+          "properties": {
+            "discount_margin": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "discount_margin"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Option-adjusted spread (decimal).",
+          "properties": {
+            "oas": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "oas"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Asset swap market spread (decimal).",
+          "properties": {
+            "asw_market": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "asw_market"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "I-spread (decimal).",
+          "properties": {
+            "i_spread": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "i_spread"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Japanese simple yield (単利, decimal).\n\nClosed-form Tokyo quote: remaining ACT/365F life versus dirty price as\na percent of par. This is **not** a discount-factor convention and does\nnot alter Street [`BondQuoteInput::Ytm`].",
+          "properties": {
+            "japanese_simple_yield": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "japanese_simple_yield"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "BorrowingBaseRules": {
       "additionalProperties": false,
       "description": "Advance rates and concentration limits that define a borrowing base.",
@@ -4178,6 +4485,21 @@
         {
           "const": "relative_to_initial_spot",
           "description": "Bounds are relative to initial spot (e.g., 0.95 = 95% of initial).\nCommon for equity-linked range accruals.",
+          "type": "string"
+        }
+      ]
+    },
+    "CalibrationParameter": {
+      "description": "Which structural parameter to calibrate in the MC engine.",
+      "oneOf": [
+        {
+          "const": "debt_barrier",
+          "description": "Calibrate the debt barrier B.",
+          "type": "string"
+        },
+        {
+          "const": "asset_vol",
+          "description": "Calibrate the asset volatility sigma_V.",
           "type": "string"
         }
       ]
@@ -9315,6 +9637,26 @@
         }
       ]
     },
+    "CreditStateVariable": {
+      "description": "Which credit metric drives the toggle decision.",
+      "oneOf": [
+        {
+          "const": "hazard_rate",
+          "description": "Use the hazard rate.",
+          "type": "string"
+        },
+        {
+          "const": "distance_to_default",
+          "description": "Use the distance-to-default.",
+          "type": "string"
+        },
+        {
+          "const": "leverage",
+          "description": "Use the leverage ratio.",
+          "type": "string"
+        }
+      ]
+    },
     "CsaSpec": {
       "additionalProperties": false,
       "description": "Credit Support Annex specification (ISDA standard).\n\nThe CSA governs the exchange of collateral between counterparties\nfor OTC derivatives. This specification captures all key commercial\nterms needed for margin calculation and management.\n\n# ISDA Documentation\n\nThis type represents terms from:\n- ISDA 2016 Credit Support Annex for Variation Margin (VM CSA)\n- ISDA 2018 Credit Support Annex for Initial Margin (IM CSA)\n\n# References\n\n- ISDA 2016 VM CSA: `docs/REFERENCES.md#isda-vm-csa-2016`\n- ISDA 2018 IM CSA: `docs/REFERENCES.md#isda-im-csa-2018`\n- BCBS-IOSCO uncleared margin framework: `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`\n\n# Example\n\n```\nuse finstack_quant_margin::types::{CsaSpec, VmParameters, ImParameters, EligibleCollateralSchedule, MarginCallTiming, ImMethodology, MarginTenor};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet csa = CsaSpec {\n    id: \"USD-CSA-2024\".to_string(),\n    base_currency: Currency::USD,\n    vm_params: VmParameters::regulatory_standard(Currency::USD)?,\n    im_params: Some(ImParameters::for_methodology(finstack_quant_margin::types::ImMethodology::Simm, Currency::USD)?),\n    eligible_collateral: EligibleCollateralSchedule::bcbs_standard()?,\n    call_timing: MarginCallTiming::regulatory_standard()?,\n    collateral_curve_id: \"USD-OIS\".into(),\n    calendar_id: \"usny\".into(),\n};\n# Ok(())\n# }\n```",
@@ -9498,180 +9840,6 @@
         }
       ]
     },
-    "d_10a2b628165f3f3e10e7": {
-      "additionalProperties": false,
-      "description": "Configuration for Monte Carlo PIK bond pricing.",
-      "properties": {
-        "barrier_crossing": {
-          "$ref": "#/$defs/d_d4ba69c121b73ac48a10",
-          "description": "Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`."
-        },
-        "calibration": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_d760eef55c5bd7d5b1f6"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional market-calibration specification.\n\nWhen set, the pricer first calibrates a structural parameter\n(barrier or asset vol) to match a market quote using low-path MC\nwith common random numbers, then re-prices with full paths."
-        },
-        "cashflow_dfs": {
-          "description": "Pre-computed discount factors for term-structure cashflow discounting.\n\nEach entry is `(year_fraction, discount_factor)`, sorted by time.\nWhen set, cashflows are discounted using log-linear interpolation of\nthese factors instead of the flat `discount_rate`. The flat rate is\nstill used for the Merton risk-neutral drift.",
-          "items": {
-            "maxItems": 2,
-            "minItems": 2,
-            "prefixItems": [
-              {
-                "format": "double",
-                "type": "number"
-              },
-              {
-                "format": "double",
-                "type": "number"
-              }
-            ],
-            "type": "array"
-          },
-          "type": [
-            "array",
-            "null"
-          ]
-        },
-        "dynamic_recovery": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_16451e0bf3b6b78178d8"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional dynamic (notional-dependent) recovery rate model.\n\nRecovery on default is evaluated pathwise as\n`DynamicRecoverySpec::recovery_at_notional(N(τ))`, which hard-clamps\nthe result to `[0, base_recovery]`. The clamp introduces a small kink\nin recovery as a function of the accreted notional; paths far into\nthe clamped region all contribute the same (floored/capped) recovery.\nNo smoothed (e.g. logistic) recovery rule is applied."
-        },
-        "endogenous_hazard": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_cc8ed166abbb10ad4451"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional endogenous (leverage-dependent) hazard rate model."
-        },
-        "merton": {
-          "$ref": "#/$defs/d_ee4323acfdb49e4fe15b",
-          "description": "Merton structural credit model."
-        },
-        "pik_schedule": {
-          "$ref": "#/$defs/d_10afa2c48803544dc415",
-          "description": "PIK schedule controlling per-coupon cash/PIK/toggle behavior."
-        },
-        "recovery_rate": {
-          "description": "Recovery on default as a decimal fraction in `[0, 1]`.\n\n`dynamic_recovery`, when set, takes precedence over this flat rate.",
-          "format": "double",
-          "type": "number"
-        },
-        "steps_per_year": {
-          "description": "Time steps per year for the simulation grid.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "toggle_model": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_2701caf4934336a2dd86"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional toggle exercise model for PIK/cash coupon decisions.\nActive only for coupon dates where [`PikSchedule`] resolves to\n[`PikMode::Toggle`]."
-        }
-      },
-      "required": [
-        "merton",
-        "pik_schedule",
-        "steps_per_year",
-        "barrier_crossing",
-        "recovery_rate"
-      ],
-      "type": "object"
-    },
-    "d_10afa2c48803544dc415": {
-      "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_core::instruments::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```",
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "Same mode for all coupon dates.",
-          "properties": {
-            "uniform": {
-              "$ref": "#/$defs/d_7f97be2823a694f2735d"
-            }
-          },
-          "required": [
-            "uniform"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Step function: each `(t, mode)` entry means `mode` applies from\ntime `t` onward. Entries must be sorted by time ascending.",
-          "properties": {
-            "stepped": {
-              "items": {
-                "maxItems": 2,
-                "minItems": 2,
-                "prefixItems": [
-                  {
-                    "format": "double",
-                    "type": "number"
-                  },
-                  {
-                    "$ref": "#/$defs/d_7f97be2823a694f2735d"
-                  }
-                ],
-                "type": "array"
-              },
-              "type": "array"
-            }
-          },
-          "required": [
-            "stepped"
-          ],
-          "type": "object"
-        }
-      ]
-    },
-    "d_16451e0bf3b6b78178d8": {
-      "additionalProperties": false,
-      "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`DynamicRecoveryModel`].\nDeserialization enforces the same parameter invariants as the constructors.",
-      "properties": {
-        "base_notional": {
-          "description": "Base (reference) notional `N_0`.",
-          "format": "double",
-          "type": "number"
-        },
-        "base_recovery": {
-          "description": "Base (reference) recovery rate `R_0`.",
-          "format": "double",
-          "type": "number"
-        },
-        "model": {
-          "$ref": "#/$defs/d_c428e03de1abac8e49c9",
-          "description": "Recovery model governing the notional-to-recovery mapping."
-        }
-      },
-      "required": [
-        "base_recovery",
-        "base_notional",
-        "model"
-      ],
-      "type": "object"
-    },
     "d_176cce21985eadf0161c": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
@@ -9851,75 +10019,6 @@
         }
       ]
     },
-    "d_2701caf4934336a2dd86": {
-      "description": "Toggle exercise model for PIK/cash decision.",
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "Hard threshold: PIK when credit metric crosses boundary.",
-          "properties": {
-            "threshold": {
-              "$ref": "#/$defs/d_313a34fa2d102f9dc6db"
-            }
-          },
-          "required": [
-            "threshold"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Stochastic: PIK probability is smooth sigmoid of credit state.",
-          "properties": {
-            "stochastic": {
-              "$ref": "#/$defs/d_2b471f7f53831ad9c93c"
-            }
-          },
-          "required": [
-            "stochastic"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Optimal exercise via nested Monte Carlo simulation.",
-          "properties": {
-            "optimal_exercise": {
-              "$ref": "#/$defs/d_8a837e6f142b34e8cfd4"
-            }
-          },
-          "required": [
-            "optimal_exercise"
-          ],
-          "type": "object"
-        }
-      ]
-    },
-    "d_2b471f7f53831ad9c93c": {
-      "description": "Stochastic (sigmoid) toggle configuration.",
-      "properties": {
-        "intercept": {
-          "description": "Intercept of the logistic function: `P(PIK) = 1 / (1 + exp(-(intercept + sensitivity * state)))`.",
-          "format": "double",
-          "type": "number"
-        },
-        "sensitivity": {
-          "description": "Sensitivity (slope) of the logistic function with respect to the state variable.",
-          "format": "double",
-          "type": "number"
-        },
-        "state_variable": {
-          "$ref": "#/$defs/d_6347b87cc04573a369d9",
-          "description": "Credit metric to observe."
-        }
-      },
-      "required": [
-        "state_variable",
-        "intercept",
-        "sensitivity"
-      ],
-      "type": "object"
-    },
     "d_2c88e4d1e2e4f7c22e02": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
@@ -9956,175 +10055,6 @@
       "title": "Attributes",
       "type": "object"
     },
-    "d_305c1a38cfd98cc3ea44": {
-      "description": "Quote input for the bond quote engine.\n\nAll spreads are expressed in **decimal** (`0.01 = 100bp`).",
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "Clean price quoted as percentage of par (e.g., 99.5 = 99.5% of par).",
-          "properties": {
-            "clean_price_pct": {
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "clean_price_pct"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Dirty price in currency units.",
-          "properties": {
-            "dirty_price_currency": {
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "dirty_price_currency"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Yield to maturity (decimal).",
-          "properties": {
-            "ytm": {
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "ytm"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Yield to worst (decimal).\n\nFor non-callable bonds this is equivalent to [`BondQuoteInput::Ytm`].\nFor callable, puttable, or return-floor bonds, inversion prices every\nadmissible workout path at this Street yield and selects the minimum\ndirty price.",
-          "properties": {
-            "ytw": {
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "ytw"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Z-spread over the discount curve (decimal).",
-          "properties": {
-            "z_spread": {
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "z_spread"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Discount margin for FRNs (decimal).",
-          "properties": {
-            "discount_margin": {
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "discount_margin"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Option-adjusted spread (decimal).",
-          "properties": {
-            "oas": {
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "oas"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Asset swap market spread (decimal).",
-          "properties": {
-            "asw_market": {
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "asw_market"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "I-spread (decimal).",
-          "properties": {
-            "i_spread": {
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "i_spread"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Japanese simple yield (単利, decimal).\n\nClosed-form Tokyo quote: remaining ACT/365F life versus dirty price as\na percent of par. This is **not** a discount-factor convention and does\nnot alter Street [`BondQuoteInput::Ytm`].",
-          "properties": {
-            "japanese_simple_yield": {
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "japanese_simple_yield"
-          ],
-          "type": "object"
-        }
-      ]
-    },
-    "d_313a34fa2d102f9dc6db": {
-      "description": "Hard threshold toggle configuration.",
-      "properties": {
-        "direction": {
-          "$ref": "#/$defs/d_dac40cc461a10112dd7b",
-          "description": "Direction for comparison."
-        },
-        "state_variable": {
-          "$ref": "#/$defs/d_6347b87cc04573a369d9",
-          "description": "Credit metric to observe."
-        },
-        "threshold": {
-          "description": "Threshold value.",
-          "format": "double",
-          "type": "number"
-        }
-      },
-      "required": [
-        "state_variable",
-        "threshold",
-        "direction"
-      ],
-      "type": "object"
-    },
     "d_41e4cae128a1dd3269e5": {
       "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: the IMM roll convention (FpML `IMM`). Regular periods roll on\n  the third Wednesday of Mar/Jun/Sep/Dec at the schedule `frequency`, which\n  must be a whole number of quarters; the `stub` rule picks forward or\n  backward generation and short or long stubs, as in\n  `ScheduleBuilder::imm`. The contractual start and maturity are always\n  kept, so an off-cycle date becomes a stub period, and a schedule with no\n  IMM date strictly inside it is a single period.\n\nThere is no generic CDS grid: a CDS product selects its own named date\nregime (record CALIBRATION-FRAMEWORK-007, O7).\n\nAn IMM roll grid cannot be combined with `end_of_month`. Third-Wednesday\nIMM with ACT/ACT ICMA is rejected because the available ICMA reference\ncalculation requires nominal month-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
       "oneOf": [
@@ -10137,82 +10067,6 @@
           "const": "imm",
           "description": "Standard IMM dates: third Wednesday of Mar/Jun/Sep/Dec.",
           "type": "string"
-        }
-      ]
-    },
-    "d_46455be5cce6b8020e50": {
-      "description": "Asset dynamics specification for the Merton model.\n\nControls the stochastic process assumed for the firm's asset value.",
-      "oneOf": [
-        {
-          "const": "geometric_brownian",
-          "description": "Standard geometric Brownian motion (lognormal diffusion).",
-          "type": "string"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Jump-diffusion process (Merton 1976) with Poisson jumps.",
-          "properties": {
-            "jump_diffusion": {
-              "additionalProperties": false,
-              "properties": {
-                "jump_intensity": {
-                  "description": "Poisson jump arrival intensity (jumps per year).",
-                  "format": "double",
-                  "type": "number"
-                },
-                "jump_mean": {
-                  "description": "Mean log-jump size.",
-                  "format": "double",
-                  "type": "number"
-                },
-                "jump_vol": {
-                  "description": "Volatility of log-jump size.",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "jump_intensity",
-                "jump_mean",
-                "jump_vol"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "jump_diffusion"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "CreditGrades model extension with stochastic-barrier survival adjustment.\n\n`default_probability()` applies the standard approximate CreditGrades\nsurvival function using the log-barrier volatility parameter.",
-          "properties": {
-            "credit_grades": {
-              "additionalProperties": false,
-              "properties": {
-                "barrier_uncertainty": {
-                  "description": "Log-normal barrier volatility `λ`: the standard deviation of the\nnatural log of the default barrier (Finger et al. 2002,\n\"CreditGrades Technical Document\"). Despite the field name, this\nis *not* a generic uncertainty scalar — it is the lognormal\ndispersion of the global recovery rate, entering the survival\nformula as `a_t² = σ²t + λ²` and the barrier shift `exp(λ²)`.",
-                  "format": "double",
-                  "type": "number"
-                },
-                "mean_recovery": {
-                  "description": "Mean recovery rate at default.",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "barrier_uncertainty",
-                "mean_recovery"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "credit_grades"
-          ],
-          "type": "object"
         }
       ]
     },
@@ -10447,17 +10301,6 @@
             "null"
           ]
         },
-        "merton_mc_config": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_10a2b628165f3f3e10e7"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (at `instrument_pricing_overrides.model_config.merton_mc_config`\nor via the Rust builder), the `MertonMc` pricer in the registry uses this\nmodel and grid; the path count, antithetic flag and seed label come from\n`mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config."
-        },
         "oas_quote_compounding": {
           "$ref": "#/$defs/d_5c13df5a55f1da604df2",
           "default": "continuous",
@@ -10548,26 +10391,6 @@
         {
           "const": "simple",
           "description": "Simple interest (no compounding): r = (1/DF - 1) / t\n\nUsed for money market instruments with maturity < 1 year, including:\n- Interbank deposits\n- T-bills and commercial paper\n- SOFR, SONIA, €STR fixings\n\nTypically paired with ACT/360 (USD, EUR) or ACT/365F (GBP) day counts.",
-          "type": "string"
-        }
-      ]
-    },
-    "d_6347b87cc04573a369d9": {
-      "description": "Which credit metric drives the toggle decision.",
-      "oneOf": [
-        {
-          "const": "hazard_rate",
-          "description": "Use the hazard rate.",
-          "type": "string"
-        },
-        {
-          "const": "distance_to_default",
-          "description": "Use the distance-to-default.",
-          "type": "string"
-        },
-        {
-          "const": "leverage",
-          "description": "Use the leverage ratio.",
           "type": "string"
         }
       ]
@@ -10719,40 +10542,6 @@
       "title": "RecoveryModelSpec",
       "type": "object"
     },
-    "d_780b68ee5d41351b65ca": {
-      "description": "Barrier monitoring type for default determination.",
-      "oneOf": [
-        {
-          "const": "terminal",
-          "description": "Default only assessed at maturity (classic Merton).",
-          "type": "string"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Continuous barrier monitoring (Black-Cox extension).",
-          "properties": {
-            "first_passage": {
-              "additionalProperties": false,
-              "properties": {
-                "barrier_growth_rate": {
-                  "description": "Growth rate of the default barrier over time.",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "barrier_growth_rate"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "first_passage"
-          ],
-          "type": "object"
-        }
-      ]
-    },
     "d_7bbbddac6f6b1d1f4de1": {
       "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: the IMM roll convention (FpML `IMM`). Regular periods roll on\n  the third Wednesday of Mar/Jun/Sep/Dec at the schedule `frequency`, which\n  must be a whole number of quarters; the `stub` rule picks forward or\n  backward generation and short or long stubs, as in\n  `ScheduleBuilder::imm`. The contractual start and maturity are always\n  kept, so an off-cycle date becomes a stub period, and a schedule with no\n  IMM date strictly inside it is a single period.\n\nThere is no generic CDS grid: a CDS product selects its own named date\nregime (record CALIBRATION-FRAMEWORK-007, O7).\n\nAn IMM roll grid cannot be combined with `end_of_month`. Third-Wednesday\nIMM with ACT/ACT ICMA is rejected because the available ICMA reference\ncalculation requires nominal month-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
       "oneOf": [
@@ -10795,89 +10584,6 @@
       "exclusiveMinimum": 0,
       "format": "double",
       "type": "number"
-    },
-    "d_7f97be2823a694f2735d": {
-      "description": "Per-coupon PIK behavior for the MC engine.\n\nDetermines how each coupon payment is handled: paid in cash, accreted\nto notional (PIK), split between cash and PIK, or decided dynamically\nby a [`ToggleExerciseModel`].",
-      "oneOf": [
-        {
-          "const": "cash",
-          "description": "Coupon paid in cash.",
-          "type": "string"
-        },
-        {
-          "const": "pik",
-          "description": "Coupon accreted to notional (payment-in-kind).",
-          "type": "string"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Coupon split between cash and PIK.",
-          "properties": {
-            "split": {
-              "properties": {
-                "cash_fraction": {
-                  "description": "Fraction paid in cash (e.g. 0.5 for 50%).",
-                  "format": "double",
-                  "type": "number"
-                },
-                "pik_fraction": {
-                  "description": "Fraction accreted to notional.",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "cash_fraction",
-                "pik_fraction"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "split"
-          ],
-          "type": "object"
-        },
-        {
-          "const": "toggle",
-          "description": "Deferred to the [`ToggleExerciseModel`] on the config.\nFalls back to `Cash` if no toggle model is set.",
-          "type": "string"
-        }
-      ]
-    },
-    "d_8a837e6f142b34e8cfd4": {
-      "additionalProperties": false,
-      "description": "Optimal toggle configuration using nested Monte Carlo simulation.\n\nAt each coupon date the toggle runs a small nested MC to estimate the\nequity value (call-option payoff on the firm's assets) under two\nscenarios:\n\n1. **Cash** – the firm pays out the coupon, reducing asset value by\n   the coupon amount while notional stays unchanged.\n2. **PIK** – the coupon accretes to notional (no cash outflow), so\n   asset value is preserved but the default barrier rises.\n\nPIK is elected when the estimated equity value under PIK exceeds\nthat under cash.  The nested simulation uses a simple GBM forward\nevolution of asset value with a first-passage barrier check.",
-      "properties": {
-        "asset_vol": {
-          "description": "Annualised asset volatility for the nested GBM simulation.",
-          "format": "double",
-          "type": "number"
-        },
-        "horizon": {
-          "description": "Forward-looking horizon in years for the nested simulation (e.g. 1.0).",
-          "format": "double",
-          "type": "number"
-        },
-        "nested_paths": {
-          "description": "Number of nested Monte Carlo paths for continuation value estimation.\nRecommended range: 100–500.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "risk_free_rate": {
-          "description": "Risk-free rate (continuous) used as drift in the nested simulation.",
-          "format": "double",
-          "type": "number"
-        }
-      },
-      "required": [
-        "nested_paths",
-        "asset_vol",
-        "risk_free_rate",
-        "horizon"
-      ],
-      "type": "object"
     },
     "d_8e27f171215cebb9cdba": {
       "description": "Stub period handling when start/end dates don't align with payment frequency.\n\nControls how schedules are generated when the start and end dates don't\ndivide evenly by the payment frequency, resulting in an irregular period\n(stub) at the beginning or end of the schedule.\n\n# Variants\n\n- **`None`**: No stub allowed (default). Generates regular periods from\n  start to end and returns an error\n  ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide\n  evenly by the frequency. Use a stub variant for misaligned schedules.\n\n[`InputError::NonIntegerScheduleTenor`]: crate::InputError::NonIntegerScheduleTenor\n- **`ShortFront`**: Short stub period at the start. Schedule is built\n  backward from the end date, creating a short first period.\n- **`ShortBack`**: Short stub period at the end. Schedule is built forward\n  from the start date, creating a short final period.\n- **`LongFront`**: Long stub period at the start. Combines the first two\n  periods into a single longer period.\n- **`LongBack`**: Long stub period at the end. Combines the last two periods\n  into a single longer period.\n\n# Financial Context\n\nStub conventions are important for:\n- Interest accrual calculations (short/long first coupons)\n- Cash flow present value computations\n- Matching market conventions for specific instruments\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{GridMode, Schedule, StubKind, Tenor};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::January, 10)?;\nlet end = Date::from_calendar_date(2025, Month::December, 15)?;\n\n// Short stub at front\nlet sched = Schedule::builder(start, end)?\n    .frequency(Tenor::quarterly())\n    .stub_rule(StubKind::ShortFront)\n    .grid(GridMode::Natural)\n    .unadjusted()\n    .build()?;\n# Ok::<(), Box<dyn std::error::Error>>(())\n```\n\n# See Also\n\n- [`ScheduleBuilder::stub_rule`] to configure stub behavior",
@@ -10932,92 +10638,6 @@
     "d_94cb251104de5cf587b6": {
       "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
       "type": "string"
-    },
-    "d_9b99d9188ef6cc4cff48": {
-      "description": "Map from leverage to hazard rate.",
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "`lambda(t) = lambda_0 * (L(t) / L_0)^beta`",
-          "properties": {
-            "power_law": {
-              "properties": {
-                "exponent": {
-                  "description": "Power-law exponent (`beta`).",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "exponent"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "power_law"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "`lambda(t) = lambda_0 * exp(beta * (L(t) - L_0))`",
-          "properties": {
-            "exponential": {
-              "properties": {
-                "sensitivity": {
-                  "description": "Exponential sensitivity (`beta`).",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "sensitivity"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "exponential"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Tabular: linear interpolation from empirical calibration.",
-          "properties": {
-            "tabular": {
-              "properties": {
-                "hazard_points": {
-                  "description": "Corresponding hazard rates at each breakpoint.",
-                  "items": {
-                    "format": "double",
-                    "type": "number"
-                  },
-                  "type": "array"
-                },
-                "leverage_points": {
-                  "description": "Leverage breakpoints (must be sorted ascending).",
-                  "items": {
-                    "format": "double",
-                    "type": "number"
-                  },
-                  "type": "array"
-                }
-              },
-              "required": [
-                "leverage_points",
-                "hazard_points"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "tabular"
-          ],
-          "type": "object"
-        }
-      ]
     },
     "d_9bbbe0cc70b45831cb71": {
       "description": "ISO 4217 currency enumeration",
@@ -14014,122 +13634,6 @@
       ],
       "title": "DefaultModelSpec"
     },
-    "d_c428e03de1abac8e49c9": {
-      "description": "Recovery model specification.",
-      "oneOf": [
-        {
-          "const": "constant",
-          "description": "Constant recovery (ignores notional changes).",
-          "type": "string"
-        },
-        {
-          "const": "inverse_linear",
-          "description": "`R(t) = R_0 * (N_0 / N(t))` -- direct proportional dilution.",
-          "type": "string"
-        },
-        {
-          "additionalProperties": false,
-          "description": "`R(t) = R_0 * (N_0 / N(t))^alpha`, `alpha in (0, 1]` -- softened decline.",
-          "properties": {
-            "inverse_power": {
-              "properties": {
-                "exponent": {
-                  "description": "Power exponent (`alpha`).",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "exponent"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "inverse_power"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "`R(t) = max(floor, R_0 * (N_0 / N(t)))`.",
-          "properties": {
-            "floored_inverse": {
-              "properties": {
-                "floor": {
-                  "description": "Minimum recovery rate floor.",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "floor"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "floored_inverse"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "`R(t) = clamp(R_0 * (1 - beta * (N(t)/N_0 - 1)), floor, R_0)`.",
-          "properties": {
-            "linear_decline": {
-              "properties": {
-                "floor": {
-                  "description": "Minimum recovery rate floor.",
-                  "format": "double",
-                  "type": "number"
-                },
-                "sensitivity": {
-                  "description": "Sensitivity of recovery to leverage increase (`beta`).",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "sensitivity",
-                "floor"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "linear_decline"
-          ],
-          "type": "object"
-        }
-      ]
-    },
-    "d_cc8ed166abbb10ad4451": {
-      "additionalProperties": false,
-      "description": "Specification for endogenous (leverage-dependent) hazard rate.\n\nModels the relationship between a firm's leverage and its instantaneous\nhazard rate, enabling a feedback loop where PIK accrual increases the\nnotional (and hence leverage), which drives the hazard rate higher.\nDeserialization validates the parameters and rejects incomplete or\ninconsistent tabular calibrations before they can be evaluated.",
-      "properties": {
-        "base_hazard_rate": {
-          "description": "Base (reference) hazard rate `lambda_0`.",
-          "format": "double",
-          "type": "number"
-        },
-        "base_leverage": {
-          "description": "Base (reference) leverage level `L_0`.",
-          "format": "double",
-          "type": "number"
-        },
-        "leverage_hazard_map": {
-          "$ref": "#/$defs/d_9b99d9188ef6cc4cff48",
-          "description": "Mapping function from leverage to hazard rate."
-        }
-      },
-      "required": [
-        "base_hazard_rate",
-        "base_leverage",
-        "leverage_hazard_map"
-      ],
-      "type": "object"
-    },
     "d_cdb8fddc0106047270c4": {
       "additionalProperties": false,
       "description": "A finite, right-continuous piecewise-constant curve.",
@@ -14174,88 +13678,6 @@
         }
       ]
     },
-    "d_d4ba69c121b73ac48a10": {
-      "description": "Barrier-crossing detection policy for first-passage default simulation.\n\n`Discrete` only checks the barrier at grid points (fast but biased for\ncoarse time steps). `BrownianBridge` uses a Brownian-bridge crossing\nprobability between grid points to approximate continuous monitoring.",
-      "oneOf": [
-        {
-          "const": "discrete",
-          "description": "Discrete monitoring: default if `V(t_i) < B(t_i)` at time steps.",
-          "type": "string"
-        },
-        {
-          "const": "brownian_bridge",
-          "description": "Brownian-bridge correction for continuous monitoring between steps.",
-          "type": "string"
-        }
-      ]
-    },
-    "d_d760eef55c5bd7d5b1f6": {
-      "additionalProperties": false,
-      "description": "Calibration settings for MC-to-market matching.\n\nWhen set on [`MertonMcConfig::calibration`], the pricer runs a low-path\nbisection to solve for a structural parameter so that the cash base-case\nMC price matches the target market quote, then re-prices with full paths.",
-      "properties": {
-        "bracket": {
-          "description": "Search bracket for the calibrated parameter (low, high).\nWhen `None`, auto-brackets based on the calibration parameter type.",
-          "maxItems": 2,
-          "minItems": 2,
-          "prefixItems": [
-            {
-              "format": "double",
-              "type": "number"
-            },
-            {
-              "format": "double",
-              "type": "number"
-            }
-          ],
-          "type": [
-            "array",
-            "null"
-          ]
-        },
-        "low_paths": {
-          "description": "Number of independent MC estimators used during calibration iterations (low paths).",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "max_iterations": {
-          "description": "Maximum bisection iterations.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "parameter": {
-          "$ref": "#/$defs/d_e42076b4d2ef6e393ce5",
-          "description": "Which structural parameter to solve for."
-        },
-        "seed": {
-          "description": "Optional seed override used for the calibration run.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "target": {
-          "$ref": "#/$defs/d_305c1a38cfd98cc3ea44",
-          "description": "Target market quote to match (interpreted at quote/settlement date)."
-        },
-        "tolerance_pv": {
-          "description": "Absolute tolerance on the **PV residual** (currency units at `as_of`).",
-          "format": "double",
-          "type": "number"
-        }
-      },
-      "required": [
-        "target",
-        "parameter",
-        "low_paths",
-        "max_iterations",
-        "tolerance_pv"
-      ],
-      "type": "object"
-    },
     "d_d962ef8db4edf11dc092": {
       "additionalProperties": false,
       "description": "Configuration for the breakeven calculator.",
@@ -14274,36 +13696,6 @@
         "mode"
       ],
       "type": "object"
-    },
-    "d_dac40cc461a10112dd7b": {
-      "description": "Direction for threshold comparison.",
-      "oneOf": [
-        {
-          "const": "above",
-          "description": "PIK when state > threshold (e.g., hazard rate above limit).",
-          "type": "string"
-        },
-        {
-          "const": "below",
-          "description": "PIK when state < threshold (e.g., distance-to-default below limit).",
-          "type": "string"
-        }
-      ]
-    },
-    "d_e42076b4d2ef6e393ce5": {
-      "description": "Which structural parameter to calibrate in the MC engine.",
-      "oneOf": [
-        {
-          "const": "debt_barrier",
-          "description": "Calibrate the debt barrier B.",
-          "type": "string"
-        },
-        {
-          "const": "asset_vol",
-          "description": "Calibrate the asset volatility sigma_V.",
-          "type": "string"
-        }
-      ]
     },
     "d_e49387f97c0f9d510642": {
       "additionalProperties": false,
@@ -14373,55 +13765,6 @@
           "type": "string"
         }
       ]
-    },
-    "d_ee4323acfdb49e4fe15b": {
-      "additionalProperties": false,
-      "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n`RawMertonModel`, so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. Unknown fields are rejected.",
-      "properties": {
-        "asset_value": {
-          "description": "Current firm asset value `V_0`, in the issuer's reporting currency.\nStrictly positive.",
-          "format": "double",
-          "type": "number"
-        },
-        "asset_vol": {
-          "description": "Asset volatility `sigma_V`, annualized and expressed as a decimal\nfraction (`0.25` is 25%). Strictly positive.",
-          "format": "double",
-          "type": "number"
-        },
-        "barrier_type": {
-          "$ref": "#/$defs/d_780b68ee5d41351b65ca",
-          "description": "Whether default is tested only at maturity or continuously over the\nlife of the debt."
-        },
-        "debt_barrier": {
-          "description": "Default barrier `B`, the debt face value the asset value is compared\nagainst. Strictly positive and in the same currency as `asset_value`.",
-          "format": "double",
-          "type": "number"
-        },
-        "dynamics": {
-          "$ref": "#/$defs/d_46455be5cce6b8020e50",
-          "description": "Stochastic process governing the asset value."
-        },
-        "payout_rate": {
-          "description": "Continuous payout (dividend) rate on assets, as a decimal fraction.\nReduces the drift of the asset process under the risk-neutral measure.",
-          "format": "double",
-          "type": "number"
-        },
-        "risk_free_rate": {
-          "description": "Continuously compounded risk-free rate `r`, as a decimal fraction.",
-          "format": "double",
-          "type": "number"
-        }
-      },
-      "required": [
-        "asset_value",
-        "asset_vol",
-        "debt_barrier",
-        "risk_free_rate",
-        "payout_rate",
-        "barrier_type",
-        "dynamics"
-      ],
-      "type": "object"
     },
     "d_f80c8a31d359e1cb5dd4": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -15391,6 +14734,122 @@
         }
       ]
     },
+    "DynamicRecoveryModel": {
+      "description": "Recovery model specification.",
+      "oneOf": [
+        {
+          "const": "constant",
+          "description": "Constant recovery (ignores notional changes).",
+          "type": "string"
+        },
+        {
+          "const": "inverse_linear",
+          "description": "`R(t) = R_0 * (N_0 / N(t))` -- direct proportional dilution.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`R(t) = R_0 * (N_0 / N(t))^alpha`, `alpha in (0, 1]` -- softened decline.",
+          "properties": {
+            "inverse_power": {
+              "properties": {
+                "exponent": {
+                  "description": "Power exponent (`alpha`).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "exponent"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "inverse_power"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`R(t) = max(floor, R_0 * (N_0 / N(t)))`.",
+          "properties": {
+            "floored_inverse": {
+              "properties": {
+                "floor": {
+                  "description": "Minimum recovery rate floor.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "floor"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "floored_inverse"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`R(t) = clamp(R_0 * (1 - beta * (N(t)/N_0 - 1)), floor, R_0)`.",
+          "properties": {
+            "linear_decline": {
+              "properties": {
+                "floor": {
+                  "description": "Minimum recovery rate floor.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "sensitivity": {
+                  "description": "Sensitivity of recovery to leverage increase (`beta`).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "sensitivity",
+                "floor"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "linear_decline"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "DynamicRecoverySpec": {
+      "additionalProperties": false,
+      "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`DynamicRecoveryModel`].\nDeserialization enforces the same parameter invariants as the constructors.",
+      "properties": {
+        "base_notional": {
+          "description": "Base (reference) notional `N_0`.",
+          "format": "double",
+          "type": "number"
+        },
+        "base_recovery": {
+          "description": "Base (reference) recovery rate `R_0`.",
+          "format": "double",
+          "type": "number"
+        },
+        "model": {
+          "$ref": "#/$defs/DynamicRecoveryModel",
+          "description": "Recovery model governing the notional-to-recovery mapping."
+        }
+      },
+      "required": [
+        "base_recovery",
+        "base_notional",
+        "model"
+      ],
+      "type": "object"
+    },
     "EarlyAmortizationSpec": {
       "additionalProperties": false,
       "description": "Early-amortization specification for revolving (master-trust) deals.\n\nWhile a deal's reinvestment/revolving period is active, principal is recycled\nand the investor (tranche) balances are held flat. If cumulative losses reach\n`max_cumulative_loss` or the trailing excess spread falls below\n`min_excess_spread_3m`, an early-amortization event is triggered: the\nrevolving period ends immediately and the deal begins paying principal down\n(amortizing) even before its scheduled revolving-period end.",
@@ -15481,6 +14940,32 @@
       },
       "required": [
         "eligible"
+      ],
+      "type": "object"
+    },
+    "EndogenousHazardSpec": {
+      "additionalProperties": false,
+      "description": "Specification for endogenous (leverage-dependent) hazard rate.\n\nModels the relationship between a firm's leverage and its instantaneous\nhazard rate, enabling a feedback loop where PIK accrual increases the\nnotional (and hence leverage), which drives the hazard rate higher.\nDeserialization validates the parameters and rejects incomplete or\ninconsistent tabular calibrations before they can be evaluated.",
+      "properties": {
+        "base_hazard_rate": {
+          "description": "Base (reference) hazard rate `lambda_0`.",
+          "format": "double",
+          "type": "number"
+        },
+        "base_leverage": {
+          "description": "Base (reference) leverage level `L_0`.",
+          "format": "double",
+          "type": "number"
+        },
+        "leverage_hazard_map": {
+          "$ref": "#/$defs/LeverageHazardMap",
+          "description": "Mapping function from leverage to hazard rate."
+        }
+      },
+      "required": [
+        "base_hazard_rate",
+        "base_leverage",
+        "leverage_hazard_map"
       ],
       "type": "object"
     },
@@ -21831,6 +21316,92 @@
       ],
       "type": "object"
     },
+    "LeverageHazardMap": {
+      "description": "Map from leverage to hazard rate.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "`lambda(t) = lambda_0 * (L(t) / L_0)^beta`",
+          "properties": {
+            "power_law": {
+              "properties": {
+                "exponent": {
+                  "description": "Power-law exponent (`beta`).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "exponent"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "power_law"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`lambda(t) = lambda_0 * exp(beta * (L(t) - L_0))`",
+          "properties": {
+            "exponential": {
+              "properties": {
+                "sensitivity": {
+                  "description": "Exponential sensitivity (`beta`).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "sensitivity"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "exponential"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Tabular: linear interpolation from empirical calibration.",
+          "properties": {
+            "tabular": {
+              "properties": {
+                "hazard_points": {
+                  "description": "Corresponding hazard rates at each breakpoint.",
+                  "items": {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "leverage_points": {
+                  "description": "Leverage breakpoints (must be sorted ascending).",
+                  "items": {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "leverage_points",
+                "hazard_points"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "tabular"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "LeveredRealEstateEquity": {
       "additionalProperties": false,
       "description": "Levered real estate equity = unlevered asset + financing.\n\nValue convention:\n- `PV_equity = PV_asset - PV_financing` (financing valued from lender perspective).\n\nReturn/coverage metrics are computed from a simplified equity cashflow schedule:\n- Initial outflow: `-(purchase_price + Σ acquisition_costs)` at `as_of`\n- Financing funding legs on/after `as_of` are included as equity inflows\n- Interim equity CFs: `(NOI - CapEx) - debt_service_cash`\n- Exit: `(sale_proceeds - financing_payoff)` at the asset horizon (`asset.sale_date`, else the last NOI date)",
@@ -22501,6 +22072,259 @@
       ],
       "type": "object"
     },
+    "MertonBarrierType": {
+      "description": "Barrier monitoring type for default determination.",
+      "oneOf": [
+        {
+          "const": "terminal",
+          "description": "Default only assessed at maturity (classic Merton).",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Continuous barrier monitoring (Black-Cox extension).",
+          "properties": {
+            "first_passage": {
+              "additionalProperties": false,
+              "properties": {
+                "barrier_growth_rate": {
+                  "description": "Growth rate of the default barrier over time.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "barrier_growth_rate"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "first_passage"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "MertonMcCalibrationSpec": {
+      "additionalProperties": false,
+      "description": "Calibration settings for MC-to-market matching.\n\nWhen set on [`MertonMcConfig::calibration`], the pricer runs a low-path\nbisection to solve for a structural parameter so that the cash base-case\nMC price matches the target market quote, then re-prices with full paths.",
+      "properties": {
+        "bracket": {
+          "description": "Search bracket for the calibrated parameter (low, high).\nWhen `None`, auto-brackets based on the calibration parameter type.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "double",
+              "type": "number"
+            },
+            {
+              "format": "double",
+              "type": "number"
+            }
+          ],
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "low_paths": {
+          "description": "Number of independent MC estimators used during calibration iterations (low paths).",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_iterations": {
+          "description": "Maximum bisection iterations.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "parameter": {
+          "$ref": "#/$defs/CalibrationParameter",
+          "description": "Which structural parameter to solve for."
+        },
+        "seed": {
+          "description": "Optional seed override used for the calibration run.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "target": {
+          "$ref": "#/$defs/BondQuoteInput",
+          "description": "Target market quote to match (interpreted at quote/settlement date)."
+        },
+        "tolerance_pv": {
+          "description": "Absolute tolerance on the **PV residual** (currency units at `as_of`).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "target",
+        "parameter",
+        "low_paths",
+        "max_iterations",
+        "tolerance_pv"
+      ],
+      "type": "object"
+    },
+    "MertonMcConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for Monte Carlo PIK bond pricing.",
+      "properties": {
+        "barrier_crossing": {
+          "$ref": "#/$defs/BarrierCrossing",
+          "description": "Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`."
+        },
+        "calibration": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MertonMcCalibrationSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional market-calibration specification.\n\nWhen set, the pricer first calibrates a structural parameter\n(barrier or asset vol) to match a market quote using low-path MC\nwith common random numbers, then re-prices with full paths."
+        },
+        "cashflow_dfs": {
+          "description": "Pre-computed discount factors for term-structure cashflow discounting.\n\nEach entry is `(year_fraction, discount_factor)`, sorted by time.\nWhen set, cashflows are discounted using log-linear interpolation of\nthese factors instead of the flat `discount_rate`. The flat rate is\nstill used for the Merton risk-neutral drift.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "double",
+                "type": "number"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "dynamic_recovery": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DynamicRecoverySpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional dynamic (notional-dependent) recovery rate model.\n\nRecovery on default is evaluated pathwise as\n`DynamicRecoverySpec::recovery_at_notional(N(τ))`, which hard-clamps\nthe result to `[0, base_recovery]`. The clamp introduces a small kink\nin recovery as a function of the accreted notional; paths far into\nthe clamped region all contribute the same (floored/capped) recovery.\nNo smoothed (e.g. logistic) recovery rule is applied."
+        },
+        "endogenous_hazard": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EndogenousHazardSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional endogenous (leverage-dependent) hazard rate model."
+        },
+        "merton": {
+          "$ref": "#/$defs/MertonModel",
+          "description": "Merton structural credit model."
+        },
+        "pik_schedule": {
+          "$ref": "#/$defs/PikSchedule",
+          "description": "PIK schedule controlling per-coupon cash/PIK/toggle behavior."
+        },
+        "recovery_rate": {
+          "description": "Recovery on default as a decimal fraction in `[0, 1]`.\n\n`dynamic_recovery`, when set, takes precedence over this flat rate.",
+          "format": "double",
+          "type": "number"
+        },
+        "steps_per_year": {
+          "description": "Time steps per year for the simulation grid.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "toggle_model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToggleExerciseModel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional toggle exercise model for PIK/cash coupon decisions.\nActive only for coupon dates where [`PikSchedule`] resolves to\n[`PikMode::Toggle`]."
+        }
+      },
+      "required": [
+        "merton",
+        "pik_schedule",
+        "steps_per_year",
+        "barrier_crossing",
+        "recovery_rate"
+      ],
+      "type": "object"
+    },
+    "MertonModel": {
+      "additionalProperties": false,
+      "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n`RawMertonModel`, so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. Unknown fields are rejected.",
+      "properties": {
+        "asset_value": {
+          "description": "Current firm asset value `V_0`, in the issuer's reporting currency.\nStrictly positive.",
+          "format": "double",
+          "type": "number"
+        },
+        "asset_vol": {
+          "description": "Asset volatility `sigma_V`, annualized and expressed as a decimal\nfraction (`0.25` is 25%). Strictly positive.",
+          "format": "double",
+          "type": "number"
+        },
+        "barrier_type": {
+          "$ref": "#/$defs/MertonBarrierType",
+          "description": "Whether default is tested only at maturity or continuously over the\nlife of the debt."
+        },
+        "debt_barrier": {
+          "description": "Default barrier `B`, the debt face value the asset value is compared\nagainst. Strictly positive and in the same currency as `asset_value`.",
+          "format": "double",
+          "type": "number"
+        },
+        "dynamics": {
+          "$ref": "#/$defs/AssetDynamics",
+          "description": "Stochastic process governing the asset value."
+        },
+        "payout_rate": {
+          "description": "Continuous payout (dividend) rate on assets, as a decimal fraction.\nReduces the drift of the asset process under the risk-neutral measure.",
+          "format": "double",
+          "type": "number"
+        },
+        "risk_free_rate": {
+          "description": "Continuously compounded risk-free rate `r`, as a decimal fraction.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "asset_value",
+        "asset_vol",
+        "debt_barrier",
+        "risk_free_rate",
+        "payout_rate",
+        "barrier_type",
+        "dynamics"
+      ],
+      "type": "object"
+    },
     "Metadata": {
       "additionalProperties": false,
       "description": "Deal metadata (counterparties and identifiers).",
@@ -22957,6 +22781,40 @@
           "type": "object"
         }
       ]
+    },
+    "OptimalToggle": {
+      "additionalProperties": false,
+      "description": "Optimal toggle configuration using nested Monte Carlo simulation.\n\nAt each coupon date the toggle runs a small nested MC to estimate the\nequity value (call-option payoff on the firm's assets) under two\nscenarios:\n\n1. **Cash** – the firm pays out the coupon, reducing asset value by\n   the coupon amount while notional stays unchanged.\n2. **PIK** – the coupon accretes to notional (no cash outflow), so\n   asset value is preserved but the default barrier rises.\n\nPIK is elected when the estimated equity value under PIK exceeds\nthat under cash.  The nested simulation uses a simple GBM forward\nevolution of asset value with a first-passage barrier check.",
+      "properties": {
+        "asset_vol": {
+          "description": "Annualised asset volatility for the nested GBM simulation.",
+          "format": "double",
+          "type": "number"
+        },
+        "horizon": {
+          "description": "Forward-looking horizon in years for the nested simulation (e.g. 1.0).",
+          "format": "double",
+          "type": "number"
+        },
+        "nested_paths": {
+          "description": "Number of nested Monte Carlo paths for continuation value estimation.\nRecommended range: 100–500.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "risk_free_rate": {
+          "description": "Risk-free rate (continuous) used as drift in the nested simulation.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "nested_paths",
+        "asset_vol",
+        "risk_free_rate",
+        "horizon"
+      ],
+      "type": "object"
     },
     "OptionType": {
       "description": "Option payoff direction used by analytical and numerical model engines.",
@@ -23708,6 +23566,100 @@
         "pct"
       ],
       "type": "object"
+    },
+    "PikMode": {
+      "description": "Per-coupon PIK behavior for the MC engine.\n\nDetermines how each coupon payment is handled: paid in cash, accreted\nto notional (PIK), split between cash and PIK, or decided dynamically\nby a [`ToggleExerciseModel`].",
+      "oneOf": [
+        {
+          "const": "cash",
+          "description": "Coupon paid in cash.",
+          "type": "string"
+        },
+        {
+          "const": "pik",
+          "description": "Coupon accreted to notional (payment-in-kind).",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Coupon split between cash and PIK.",
+          "properties": {
+            "split": {
+              "properties": {
+                "cash_fraction": {
+                  "description": "Fraction paid in cash (e.g. 0.5 for 50%).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "pik_fraction": {
+                  "description": "Fraction accreted to notional.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "cash_fraction",
+                "pik_fraction"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "split"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "toggle",
+          "description": "Deferred to the [`ToggleExerciseModel`] on the config.\nFalls back to `Cash` if no toggle model is set.",
+          "type": "string"
+        }
+      ]
+    },
+    "PikSchedule": {
+      "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_fixed_income::bond::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Same mode for all coupon dates.",
+          "properties": {
+            "uniform": {
+              "$ref": "#/$defs/PikMode"
+            }
+          },
+          "required": [
+            "uniform"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Step function: each `(t, mode)` entry means `mode` applies from\ntime `t` onward. Entries must be sorted by time ascending.",
+          "properties": {
+            "stepped": {
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  {
+                    "$ref": "#/$defs/PikMode"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "stepped"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "PikToggle": {
       "additionalProperties": false,
@@ -27850,6 +27802,31 @@
         }
       ]
     },
+    "StochasticToggle": {
+      "description": "Stochastic (sigmoid) toggle configuration.",
+      "properties": {
+        "intercept": {
+          "description": "Intercept of the logistic function: `P(PIK) = 1 / (1 + exp(-(intercept + sensitivity * state)))`.",
+          "format": "double",
+          "type": "number"
+        },
+        "sensitivity": {
+          "description": "Sensitivity (slope) of the logistic function with respect to the state variable.",
+          "format": "double",
+          "type": "number"
+        },
+        "state_variable": {
+          "$ref": "#/$defs/CreditStateVariable",
+          "description": "Credit metric to observe."
+        }
+      },
+      "required": [
+        "state_variable",
+        "intercept",
+        "sensitivity"
+      ],
+      "type": "object"
+    },
     "StochasticUtilizationSpec": {
       "additionalProperties": false,
       "description": "Specification for stochastic utilization modeling.\n\nDefines the stochastic process for Monte Carlo pricing with uncertain\ndraw/repayment patterns. Credit risk is incorporated via hazard-rate\nsurvival weighting (no explicit default events). The estimator count,\nantithetic flag and seed label are pricing settings, read from\n`instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`,\n`mc_seed_scenario`); see [`RevolvingCreditMcRun::resolve`].",
@@ -28860,6 +28837,89 @@
         "months"
       ],
       "type": "object"
+    },
+    "ThresholdDirection": {
+      "description": "Direction for threshold comparison.",
+      "oneOf": [
+        {
+          "const": "above",
+          "description": "PIK when state > threshold (e.g., hazard rate above limit).",
+          "type": "string"
+        },
+        {
+          "const": "below",
+          "description": "PIK when state < threshold (e.g., distance-to-default below limit).",
+          "type": "string"
+        }
+      ]
+    },
+    "ThresholdToggle": {
+      "description": "Hard threshold toggle configuration.",
+      "properties": {
+        "direction": {
+          "$ref": "#/$defs/ThresholdDirection",
+          "description": "Direction for comparison."
+        },
+        "state_variable": {
+          "$ref": "#/$defs/CreditStateVariable",
+          "description": "Credit metric to observe."
+        },
+        "threshold": {
+          "description": "Threshold value.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "state_variable",
+        "threshold",
+        "direction"
+      ],
+      "type": "object"
+    },
+    "ToggleExerciseModel": {
+      "description": "Toggle exercise model for PIK/cash decision.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Hard threshold: PIK when credit metric crosses boundary.",
+          "properties": {
+            "threshold": {
+              "$ref": "#/$defs/ThresholdToggle"
+            }
+          },
+          "required": [
+            "threshold"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Stochastic: PIK probability is smooth sigmoid of credit state.",
+          "properties": {
+            "stochastic": {
+              "$ref": "#/$defs/StochasticToggle"
+            }
+          },
+          "required": [
+            "stochastic"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Optimal exercise via nested Monte Carlo simulation.",
+          "properties": {
+            "optimal_exercise": {
+              "$ref": "#/$defs/OptimalToggle"
+            }
+          },
+          "required": [
+            "optimal_exercise"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "TouchType": {
       "description": "Touch type: one-touch (pays if barrier is hit) or no-touch (pays if not hit).",

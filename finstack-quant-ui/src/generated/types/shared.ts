@@ -114,49 +114,6 @@ export type Id1 = string;
  */
 export type D_94Cb251104De5Cf587B6 = string;
 /**
- * Per-coupon PIK behavior for the MC engine.
- *
- * Determines how each coupon payment is handled: paid in cash, accreted
- * to notional (PIK), split between cash and PIK, or decided dynamically
- * by a [`ToggleExerciseModel`].
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_7f97be2823a694f2735d".
- */
-export type D_7F97Be2823A694F2735D =
-  | "cash"
-  | "pik"
-  | {
-      split: {
-        /**
-         * Fraction paid in cash (e.g. 0.5 for 50%).
-         */
-        cash_fraction: number;
-        /**
-         * Fraction accreted to notional.
-         */
-        pik_fraction: number;
-        [k: string]: unknown;
-      };
-    }
-  | "toggle";
-/**
- * Toggle exercise model for PIK/cash decision.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_2701caf4934336a2dd86".
- */
-export type D_2701Caf4934336A2Dd86 =
-  | {
-      threshold: D_313A34Fa2D102F9Dc6Db;
-    }
-  | {
-      stochastic: D_2B471F7F53831Ad9C93C;
-    }
-  | {
-      optimal_exercise: D_8A837E6F142B34E8Cfd4;
-    };
-/**
  * AssetPool-granularity policy for the structured-credit default engine.
  *
  * Selects whether each scenario realizes defaults name-by-name (finite-pool
@@ -1570,6 +1527,49 @@ export type Date18 = string;
  */
 export type Date19 = string;
 /**
+ * Per-coupon PIK behavior for the MC engine.
+ *
+ * Determines how each coupon payment is handled: paid in cash, accreted
+ * to notional (PIK), split between cash and PIK, or decided dynamically
+ * by a [`ToggleExerciseModel`].
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "PikMode".
+ */
+export type PikMode =
+  | "cash"
+  | "pik"
+  | {
+      split: {
+        /**
+         * Fraction paid in cash (e.g. 0.5 for 50%).
+         */
+        cash_fraction: number;
+        /**
+         * Fraction accreted to notional.
+         */
+        pik_fraction: number;
+        [k: string]: unknown;
+      };
+    }
+  | "toggle";
+/**
+ * Toggle exercise model for PIK/cash decision.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "ToggleExerciseModel".
+ */
+export type ToggleExerciseModel =
+  | {
+      threshold: ThresholdToggle;
+    }
+  | {
+      stochastic: StochasticToggle;
+    }
+  | {
+      optimal_exercise: OptimalToggle;
+    };
+/**
  * ISO 8601 calendar date string.
  */
 export type Date20 = string;
@@ -2607,6 +2607,49 @@ export type RecoverySpec =
  */
 export type ClosedUnitIntervalF64Wire = number;
 /**
+ * Asset dynamics specification for the Merton model.
+ *
+ * Controls the stochastic process assumed for the firm's asset value.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "AssetDynamics".
+ */
+export type AssetDynamics =
+  | "geometric_brownian"
+  | {
+      jump_diffusion: {
+        /**
+         * Poisson jump arrival intensity (jumps per year).
+         */
+        jump_intensity: number;
+        /**
+         * Mean log-jump size.
+         */
+        jump_mean: number;
+        /**
+         * Volatility of log-jump size.
+         */
+        jump_vol: number;
+      };
+    }
+  | {
+      credit_grades: {
+        /**
+         * Log-normal barrier volatility `λ`: the standard deviation of the
+         * natural log of the default barrier (Finger et al. 2002,
+         * "CreditGrades Technical Document"). Despite the field name, this
+         * is *not* a generic uncertainty scalar — it is the lognormal
+         * dispersion of the global recovery rate, entering the survival
+         * formula as `a_t² = σ²t + λ²` and the barrier shift `exp(λ²)`.
+         */
+        barrier_uncertainty: number;
+        /**
+         * Mean recovery rate at default.
+         */
+        mean_recovery: number;
+      };
+    };
+/**
  * Asset type classification for pool composition (flattened hierarchy)
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -2819,6 +2862,17 @@ export type Id34 = string;
  * via the `definition` "AveragingMethod".
  */
 export type AveragingMethod = "arithmetic" | "geometric";
+/**
+ * Barrier-crossing detection policy for first-passage default simulation.
+ *
+ * `Discrete` only checks the barrier at grid points (fast but biased for
+ * coarse time steps). `BrownianBridge` uses a Brownian-bridge crossing
+ * probability between grid points to approximate continuous monitoring.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "BarrierCrossing".
+ */
+export type BarrierCrossing = "discrete" | "brownian_bridge";
 /**
  * Inequality sense of an inclusive barrier touch.
  *
@@ -14131,6 +14185,45 @@ export type BermudanType = "co_terminal" | "non_co_terminal";
  */
 export type BinOp = "add" | "sub" | "mul" | "div" | "mod" | "eq" | "ne" | "lt" | "le" | "gt" | "ge" | "and" | "or";
 /**
+ * Quote input for the bond quote engine.
+ *
+ * All spreads are expressed in **decimal** (`0.01 = 100bp`).
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "BondQuoteInput".
+ */
+export type BondQuoteInput =
+  | {
+      clean_price_pct: number;
+    }
+  | {
+      dirty_price_currency: number;
+    }
+  | {
+      ytm: number;
+    }
+  | {
+      ytw: number;
+    }
+  | {
+      z_spread: number;
+    }
+  | {
+      discount_margin: number;
+    }
+  | {
+      oas: number;
+    }
+  | {
+      asw_market: number;
+    }
+  | {
+      i_spread: number;
+    }
+  | {
+      japanese_simple_yield: number;
+    };
+/**
  * Specifies how the range bounds are interpreted.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -14211,6 +14304,13 @@ export type CFKind =
   | "collateral_substitution_in"
   | "collateral_substitution_out"
   | "derivative_settlement";
+/**
+ * Which structural parameter to calibrate in the MC engine.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "CalibrationParameter".
+ */
+export type CalibrationParameter = "debt_barrier" | "asset_vol";
 /**
  * Which notes an assumed call redeems.
  *
@@ -14755,6 +14855,13 @@ export type CreditSpreadProcessSpec =
       };
     };
 /**
+ * Which credit metric drives the toggle decision.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "CreditStateVariable".
+ */
+export type CreditStateVariable = "hazard_rate" | "distance_to_default" | "leverage";
+/**
  * Primary structured credit deal classification
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -14833,6 +14940,46 @@ export type DrawRepaySpec =
     }
   | {
       stochastic: StochasticUtilizationSpec;
+    };
+/**
+ * Recovery model specification.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "DynamicRecoveryModel".
+ */
+export type DynamicRecoveryModel =
+  | "constant"
+  | "inverse_linear"
+  | {
+      inverse_power: {
+        /**
+         * Power exponent (`alpha`).
+         */
+        exponent: number;
+        [k: string]: unknown;
+      };
+    }
+  | {
+      floored_inverse: {
+        /**
+         * Minimum recovery rate floor.
+         */
+        floor: number;
+        [k: string]: unknown;
+      };
+    }
+  | {
+      linear_decline: {
+        /**
+         * Minimum recovery rate floor.
+         */
+        floor: number;
+        /**
+         * Sensitivity of recovery to leverage increase (`beta`).
+         */
+        sensitivity: number;
+        [k: string]: unknown;
+      };
     };
 /**
  * Explicit stochastic model policy for path-dependent equity structures.
@@ -15197,6 +15344,44 @@ export type IssuePrice =
       pct_of_par: number;
     };
 /**
+ * Map from leverage to hazard rate.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "LeverageHazardMap".
+ */
+export type LeverageHazardMap =
+  | {
+      power_law: {
+        /**
+         * Power-law exponent (`beta`).
+         */
+        exponent: number;
+        [k: string]: unknown;
+      };
+    }
+  | {
+      exponential: {
+        /**
+         * Exponential sensitivity (`beta`).
+         */
+        sensitivity: number;
+        [k: string]: unknown;
+      };
+    }
+  | {
+      tabular: {
+        /**
+         * Corresponding hazard rates at each breakpoint.
+         */
+        hazard_points: number[];
+        /**
+         * Leverage breakpoints (must be sorted ascending).
+         */
+        leverage_points: number[];
+        [k: string]: unknown;
+      };
+    };
+/**
  * Final settlement mode for a listed future.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -15261,6 +15446,22 @@ export type LookbackType = "fixed_strike" | "floating_strike";
  * via the `definition` "MarginTenor".
  */
 export type MarginTenor = "daily" | "weekly" | "monthly" | "on_demand";
+/**
+ * Barrier monitoring type for default determination.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "MertonBarrierType".
+ */
+export type MertonBarrierType =
+  | "terminal"
+  | {
+      first_passage: {
+        /**
+         * Growth rate of the default barrier over time.
+         */
+        barrier_growth_rate: number;
+      };
+    };
 /**
  * Contractual barrier-monitoring convention.
  *
@@ -15479,6 +15680,37 @@ export type PaymentCalculation =
  * via the `definition` "PaymentType".
  */
 export type PaymentType = "fee" | "interest" | "principal" | "residual" | "coverage_test";
+/**
+ * Time-varying PIK schedule for the MC engine.
+ *
+ * Controls per-coupon PIK behavior, either uniformly or as a step
+ * function over time.
+ *
+ * # Examples
+ *
+ * ```
+ * use finstack_quant_valuations_fixed_income::bond::{PikMode, PikSchedule};
+ *
+ * // All coupons PIK
+ * let uniform = PikSchedule::Uniform(PikMode::Pik);
+ *
+ * // PIK for first 2 years, then cash
+ * let stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);
+ *
+ * // Toggle for 3 years, then mandatory cash
+ * let toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);
+ * ```
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "PikSchedule".
+ */
+export type PikSchedule =
+  | {
+      uniform: PikMode;
+    }
+  | {
+      stepped: [number, PikMode][];
+    };
 /**
  * Pool type classification.
  *
@@ -15934,6 +16166,13 @@ export type TerminalValueSpec =
       [k: string]: unknown;
     };
 /**
+ * Direction for threshold comparison.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "ThresholdDirection".
+ */
+export type ThresholdDirection = "above" | "below";
+/**
  * Touch type: one-touch (pays if barrier is hit) or no-touch (pays if not hit).
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -16104,37 +16343,6 @@ export type WeightingMethod =
  */
 export type YieldBasis = "act_365f" | "act_360";
 /**
- * Time-varying PIK schedule for the MC engine.
- *
- * Controls per-coupon PIK behavior, either uniformly or as a step
- * function over time.
- *
- * # Examples
- *
- * ```
- * use finstack_quant_valuations_core::instruments::{PikMode, PikSchedule};
- *
- * // All coupons PIK
- * let uniform = PikSchedule::Uniform(PikMode::Pik);
- *
- * // PIK for first 2 years, then cash
- * let stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);
- *
- * // Toggle for 3 years, then mandatory cash
- * let toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);
- * ```
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_10afa2c48803544dc415".
- */
-export type D_10Afa2C48803544Dc415 =
-  | {
-      uniform: D_7F97Be2823A694F2735D;
-    }
-  | {
-      stepped: [number, D_7F97Be2823A694F2735D][];
-    };
-/**
  * Stub period handling when start/end dates don't align with payment frequency.
  *
  * Controls how schedules are generated when the start and end dates don't
@@ -16193,45 +16401,6 @@ export type D_10Afa2C48803544Dc415 =
  */
 export type D_1E501B18C12Dfea3123D = "none" | "short_front" | "short_back" | "long_front" | "long_back";
 /**
- * Quote input for the bond quote engine.
- *
- * All spreads are expressed in **decimal** (`0.01 = 100bp`).
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_305c1a38cfd98cc3ea44".
- */
-export type D_305C1A38Cfd98Cc3Ea44 =
-  | {
-      clean_price_pct: number;
-    }
-  | {
-      dirty_price_currency: number;
-    }
-  | {
-      ytm: number;
-    }
-  | {
-      ytw: number;
-    }
-  | {
-      z_spread: number;
-    }
-  | {
-      discount_margin: number;
-    }
-  | {
-      oas: number;
-    }
-  | {
-      asw_market: number;
-    }
-  | {
-      i_spread: number;
-    }
-  | {
-      japanese_simple_yield: number;
-    };
-/**
  * Roll-date rule applied when generating schedule anchors.
  *
  * Selects the core `ScheduleBuilder` date-generation mode.
@@ -16272,49 +16441,6 @@ export type D_305C1A38Cfd98Cc3Ea44 =
  * via the `definition` "d_41e4cae128a1dd3269e5".
  */
 export type D_41E4Cae128A1Dd3269E5 = "none" | "imm";
-/**
- * Asset dynamics specification for the Merton model.
- *
- * Controls the stochastic process assumed for the firm's asset value.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_46455be5cce6b8020e50".
- */
-export type D_46455Be5Cce6B8020E50 =
-  | "geometric_brownian"
-  | {
-      jump_diffusion: {
-        /**
-         * Poisson jump arrival intensity (jumps per year).
-         */
-        jump_intensity: number;
-        /**
-         * Mean log-jump size.
-         */
-        jump_mean: number;
-        /**
-         * Volatility of log-jump size.
-         */
-        jump_vol: number;
-      };
-    }
-  | {
-      credit_grades: {
-        /**
-         * Log-normal barrier volatility `λ`: the standard deviation of the
-         * natural log of the default barrier (Finger et al. 2002,
-         * "CreditGrades Technical Document"). Despite the field name, this
-         * is *not* a generic uncertainty scalar — it is the lognormal
-         * dispersion of the global recovery rate, entering the survival
-         * formula as `a_t² = σ²t + λ²` and the barrier shift `exp(λ²)`.
-         */
-        barrier_uncertainty: number;
-        /**
-         * Mean recovery rate at default.
-         */
-        mean_recovery: number;
-      };
-    };
 /**
  * Policy for evaluating volatility surfaces outside their calibrated grid.
  *
@@ -16366,35 +16492,12 @@ export type D_5C13Df5A55F1Da604Df2 =
     }
   | "simple";
 /**
- * Which credit metric drives the toggle decision.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_6347b87cc04573a369d9".
- */
-export type D_6347B87Cc04573A369D9 = "hazard_rate" | "distance_to_default" | "leverage";
-/**
  * Unit of a tenor period.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "d_69148dfad1155676d8a6".
  */
 export type D_69148Dfad1155676D8A6 = "days" | "weeks" | "months" | "years";
-/**
- * Barrier monitoring type for default determination.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_780b68ee5d41351b65ca".
- */
-export type D_780B68Ee5D41351B65Ca =
-  | "terminal"
-  | {
-      first_passage: {
-        /**
-         * Growth rate of the default barrier over time.
-         */
-        barrier_growth_rate: number;
-      };
-    };
 /**
  * Roll-date rule applied when generating schedule anchors.
  *
@@ -16501,44 +16604,6 @@ export type D_7E19Cc4Df9954B864180 = number;
  * via the `definition` "d_8e27f171215cebb9cdba".
  */
 export type D_8E27F171215Cebb9Cdba = "none" | "short_front" | "short_back" | "long_front" | "long_back";
-/**
- * Map from leverage to hazard rate.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_9b99d9188ef6cc4cff48".
- */
-export type D_9B99D9188Ef6Cc4Cff48 =
-  | {
-      power_law: {
-        /**
-         * Power-law exponent (`beta`).
-         */
-        exponent: number;
-        [k: string]: unknown;
-      };
-    }
-  | {
-      exponential: {
-        /**
-         * Exponential sensitivity (`beta`).
-         */
-        sensitivity: number;
-        [k: string]: unknown;
-      };
-    }
-  | {
-      tabular: {
-        /**
-         * Corresponding hazard rates at each breakpoint.
-         */
-        hazard_points: number[];
-        /**
-         * Leverage breakpoints (must be sorted ascending).
-         */
-        leverage_points: number[];
-        [k: string]: unknown;
-      };
-    };
 /**
  * ISO 4217 currency enumeration
  *
@@ -16982,71 +17047,6 @@ export type DefaultModelSpec3 =
       curve: "timing";
     };
 /**
- * Recovery model specification.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_c428e03de1abac8e49c9".
- */
-export type DC428E03De1Abac8E49C9 =
-  | "constant"
-  | "inverse_linear"
-  | {
-      inverse_power: {
-        /**
-         * Power exponent (`alpha`).
-         */
-        exponent: number;
-        [k: string]: unknown;
-      };
-    }
-  | {
-      floored_inverse: {
-        /**
-         * Minimum recovery rate floor.
-         */
-        floor: number;
-        [k: string]: unknown;
-      };
-    }
-  | {
-      linear_decline: {
-        /**
-         * Minimum recovery rate floor.
-         */
-        floor: number;
-        /**
-         * Sensitivity of recovery to leverage increase (`beta`).
-         */
-        sensitivity: number;
-        [k: string]: unknown;
-      };
-    };
-/**
- * Barrier-crossing detection policy for first-passage default simulation.
- *
- * `Discrete` only checks the barrier at grid points (fast but biased for
- * coarse time steps). `BrownianBridge` uses a Brownian-bridge crossing
- * probability between grid points to approximate continuous monitoring.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_d4ba69c121b73ac48a10".
- */
-export type DD4Ba69C121B73Ac48A10 = "discrete" | "brownian_bridge";
-/**
- * Direction for threshold comparison.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_dac40cc461a10112dd7b".
- */
-export type DDac40Cc461A10112Dd7B = "above" | "below";
-/**
- * Which structural parameter to calibrate in the MC engine.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_e42076b4d2ef6e393ce5".
- */
-export type DE42076B4D2Ef6E393Ce5 = "debt_barrier" | "asset_vol";
-/**
  * Unit of a tenor period.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -17096,11 +17096,13 @@ export interface SharedDefs {
   AntiDilutionPolicy?: AntiDilutionPolicy;
   AsianOption?: AsianOption;
   AssetBackedFacility?: AssetBackedFacility;
+  AssetDynamics?: AssetDynamics;
   AssetPool?: AssetPool1;
   AssetType?: AssetType;
   Autocallable?: Autocallable;
   AveragingMethod?: AveragingMethod;
   BalloonSpec?: BalloonSpec;
+  BarrierCrossing?: BarrierCrossing;
   BarrierDirection?: BarrierDirection;
   BarrierOption?: BarrierOption;
   BarrierType?: BarrierType;
@@ -17118,9 +17120,11 @@ export interface SharedDefs {
   Bond?: Bond;
   BondFuture?: BondFuture;
   BondFutureSpecs?: BondFutureSpecs1;
+  BondQuoteInput?: BondQuoteInput;
   BorrowingBaseRules?: BorrowingBaseRules1;
   BoundsType?: BoundsType;
   CFKind?: CFKind;
+  CalibrationParameter?: CalibrationParameter;
   CallAssumption?: CallAssumption;
   CallExercisePolicy?: CallExercisePolicy;
   CallPut?: CallPut;
@@ -17205,6 +17209,7 @@ export interface SharedDefs {
   CreditParams?: CreditParams1;
   CreditRating?: CreditRating;
   CreditSpreadProcessSpec?: CreditSpreadProcessSpec;
+  CreditStateVariable?: CreditStateVariable;
   CsaSpec?: CsaSpec1;
   DayCountContextState?: DayCountContextState1;
   DdtlSpec?: DdtlSpec;
@@ -17225,9 +17230,12 @@ export interface SharedDefs {
   DrawEvent?: DrawEvent;
   DrawRepayEvent?: DrawRepayEvent;
   DrawRepaySpec?: DrawRepaySpec;
+  DynamicRecoveryModel?: DynamicRecoveryModel;
+  DynamicRecoverySpec?: DynamicRecoverySpec;
   EarlyAmortizationSpec?: EarlyAmortizationSpec;
   EligibilityRule?: EligibilityRule1;
   EligibleCollateralSchedule?: EligibleCollateralSchedule1;
+  EndogenousHazardSpec?: EndogenousHazardSpec;
   Equity?: Equity;
   EquityBridge?: EquityBridge1;
   EquityFuture?: EquityFuture;
@@ -17308,6 +17316,7 @@ export interface SharedDefs {
   IssuePrice?: IssuePrice;
   LcEvent?: LcEvent;
   LetterOfCreditSpec?: LetterOfCreditSpec;
+  LeverageHazardMap?: LeverageHazardMap;
   LeveredRealEstateEquity?: LeveredRealEstateEquity;
   LiquidationSpec?: LiquidationSpec;
   ListedFutureSettlement?: ListedFutureSettlement;
@@ -17327,6 +17336,10 @@ export interface SharedDefs {
   MarketConditions?: MarketConditions1;
   MaturityConstraints?: MaturityConstraints;
   McConfig?: McConfig;
+  MertonBarrierType?: MertonBarrierType;
+  MertonMcCalibrationSpec?: MertonMcCalibrationSpec;
+  MertonMcConfig?: MertonMcConfig;
+  MertonModel?: MertonModel1;
   Metadata?: Metadata1;
   MetricId?: MetricId;
   ModificationSpec?: ModificationSpec;
@@ -17338,6 +17351,7 @@ export interface SharedDefs {
   NotionalExchange?: NotionalExchange;
   OidEirSpec?: OidEirSpec;
   OidPolicy?: OidPolicy;
+  OptimalToggle?: OptimalToggle;
   OptionType?: OptionType;
   OtcMarginSpec?: OtcMarginSpec;
   OvernightCouponConvention?: OvernightCouponConvention;
@@ -17353,6 +17367,8 @@ export interface SharedDefs {
   PeFundWaterfallSpec?: PeFundWaterfallSpec1;
   PeFundWaterfallTranche?: PeFundWaterfallTranche;
   PenaltyStep?: PenaltyStep;
+  PikMode?: PikMode;
+  PikSchedule?: PikSchedule;
   PikToggle?: PikToggle;
   PoolAsset?: PoolAsset;
   PoolType?: PoolType;
@@ -17420,6 +17436,7 @@ export interface SharedDefs {
   StepUpCouponSpec?: StepUpCouponSpec;
   StochasticDefaultSpec?: StochasticDefaultSpec;
   StochasticPrepaySpec?: StochasticPrepaySpec;
+  StochasticToggle?: StochasticToggle;
   StochasticUtilizationSpec?: StochasticUtilizationSpec;
   StructuredCredit?: StructuredCredit;
   StructuredCreditTranche?: StructuredCreditTranche;
@@ -17434,6 +17451,9 @@ export interface SharedDefs {
   TermLoanCovenantEvents?: TermLoanCovenantEvents;
   TermOutSpec?: TermOutSpec;
   TerminalValueSpec?: TerminalValueSpec;
+  ThresholdDirection?: ThresholdDirection;
+  ThresholdToggle?: ThresholdToggle;
+  ToggleExerciseModel?: ToggleExerciseModel;
   TouchType?: TouchType;
   Tranche?: Tranche;
   TrancheDraw?: TrancheDraw;
@@ -18176,15 +18196,6 @@ export interface D_572Ad1Befb7D94914652 {
    */
   mc_target_ci_half_width?: number | null;
   /**
-   * Merton Monte Carlo configuration for structural credit PIK pricing.
-   *
-   * When set (at `instrument_pricing_overrides.model_config.merton_mc_config`
-   * or via the Rust builder), the `MertonMc` pricer in the registry uses this
-   * model and grid; the path count, antithetic flag and seed label come from
-   * `mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config.
-   */
-  merton_mc_config?: D_10A2B628165F3F3E10E7 | null;
-  /**
    * Quote compounding convention for OAS inputs and outputs.
    *
    * The OAS is added to each short rate on this basis: a semiannual
@@ -18258,430 +18269,6 @@ export interface DCdb8Fddc0106047270C4 {
    * @minItems 1
    */
   values: [number, ...number[]];
-}
-/**
- * Configuration for Monte Carlo PIK bond pricing.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_10a2b628165f3f3e10e7".
- */
-export interface D_10A2B628165F3F3E10E7 {
-  /**
-   * Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.
-   *
-   * Default: `BrownianBridge` when the Merton model uses `FirstPassage`,
-   * otherwise `Discrete`.
-   */
-  barrier_crossing: "discrete" | "brownian_bridge";
-  /**
-   * Optional market-calibration specification.
-   *
-   * When set, the pricer first calibrates a structural parameter
-   * (barrier or asset vol) to match a market quote using low-path MC
-   * with common random numbers, then re-prices with full paths.
-   */
-  calibration?: DD760Eef55C5Bd7D5B1F6 | null;
-  /**
-   * Pre-computed discount factors for term-structure cashflow discounting.
-   *
-   * Each entry is `(year_fraction, discount_factor)`, sorted by time.
-   * When set, cashflows are discounted using log-linear interpolation of
-   * these factors instead of the flat `discount_rate`. The flat rate is
-   * still used for the Merton risk-neutral drift.
-   */
-  cashflow_dfs?: [number, number][] | null;
-  /**
-   * Optional dynamic (notional-dependent) recovery rate model.
-   *
-   * Recovery on default is evaluated pathwise as
-   * `DynamicRecoverySpec::recovery_at_notional(N(τ))`, which hard-clamps
-   * the result to `[0, base_recovery]`. The clamp introduces a small kink
-   * in recovery as a function of the accreted notional; paths far into
-   * the clamped region all contribute the same (floored/capped) recovery.
-   * No smoothed (e.g. logistic) recovery rule is applied.
-   */
-  dynamic_recovery?: D_16451E0Bf3B6B78178D8 | null;
-  /**
-   * Optional endogenous (leverage-dependent) hazard rate model.
-   */
-  endogenous_hazard?: DCc8Ed166Abbb10Ad4451 | null;
-  merton: DEe4323Acfdb49E4Fe15B;
-  /**
-   * PIK schedule controlling per-coupon cash/PIK/toggle behavior.
-   */
-  pik_schedule:
-    | {
-        uniform: D_7F97Be2823A694F2735D;
-      }
-    | {
-        stepped: [number, D_7F97Be2823A694F2735D][];
-      };
-  /**
-   * Recovery on default as a decimal fraction in `[0, 1]`.
-   *
-   * `dynamic_recovery`, when set, takes precedence over this flat rate.
-   */
-  recovery_rate: number;
-  /**
-   * Time steps per year for the simulation grid.
-   */
-  steps_per_year: number;
-  /**
-   * Optional toggle exercise model for PIK/cash coupon decisions.
-   * Active only for coupon dates where [`PikSchedule`] resolves to
-   * [`PikMode::Toggle`].
-   */
-  toggle_model?: D_2701Caf4934336A2Dd86 | null;
-}
-/**
- * Calibration settings for MC-to-market matching.
- *
- * When set on [`MertonMcConfig::calibration`], the pricer runs a low-path
- * bisection to solve for a structural parameter so that the cash base-case
- * MC price matches the target market quote, then re-prices with full paths.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_d760eef55c5bd7d5b1f6".
- */
-export interface DD760Eef55C5Bd7D5B1F6 {
-  /**
-   * Search bracket for the calibrated parameter (low, high).
-   * When `None`, auto-brackets based on the calibration parameter type.
-   *
-   * @minItems 2
-   * @maxItems 2
-   */
-  bracket?: [number, number] | null;
-  /**
-   * Number of independent MC estimators used during calibration iterations (low paths).
-   */
-  low_paths: number;
-  /**
-   * Maximum bisection iterations.
-   */
-  max_iterations: number;
-  /**
-   * Which structural parameter to solve for.
-   */
-  parameter: "debt_barrier" | "asset_vol";
-  /**
-   * Optional seed override used for the calibration run.
-   */
-  seed?: number | null;
-  /**
-   * Target market quote to match (interpreted at quote/settlement date).
-   */
-  target:
-    | {
-        clean_price_pct: number;
-      }
-    | {
-        dirty_price_currency: number;
-      }
-    | {
-        ytm: number;
-      }
-    | {
-        ytw: number;
-      }
-    | {
-        z_spread: number;
-      }
-    | {
-        discount_margin: number;
-      }
-    | {
-        oas: number;
-      }
-    | {
-        asw_market: number;
-      }
-    | {
-        i_spread: number;
-      }
-    | {
-        japanese_simple_yield: number;
-      };
-  /**
-   * Absolute tolerance on the **PV residual** (currency units at `as_of`).
-   */
-  tolerance_pv: number;
-}
-/**
- * Specification for dynamic (notional-dependent) recovery rate.
- *
- * Models the relationship between the accreted notional and the recovery
- * rate in default. As PIK accrual increases the notional relative to the
- * original base, recovery declines according to the chosen [`DynamicRecoveryModel`].
- * Deserialization enforces the same parameter invariants as the constructors.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_16451e0bf3b6b78178d8".
- */
-export interface D_16451E0Bf3B6B78178D8 {
-  /**
-   * Base (reference) notional `N_0`.
-   */
-  base_notional: number;
-  /**
-   * Base (reference) recovery rate `R_0`.
-   */
-  base_recovery: number;
-  /**
-   * Recovery model governing the notional-to-recovery mapping.
-   */
-  model:
-    | "constant"
-    | "inverse_linear"
-    | {
-        inverse_power: {
-          /**
-           * Power exponent (`alpha`).
-           */
-          exponent: number;
-          [k: string]: unknown;
-        };
-      }
-    | {
-        floored_inverse: {
-          /**
-           * Minimum recovery rate floor.
-           */
-          floor: number;
-          [k: string]: unknown;
-        };
-      }
-    | {
-        linear_decline: {
-          /**
-           * Minimum recovery rate floor.
-           */
-          floor: number;
-          /**
-           * Sensitivity of recovery to leverage increase (`beta`).
-           */
-          sensitivity: number;
-          [k: string]: unknown;
-        };
-      };
-}
-/**
- * Specification for endogenous (leverage-dependent) hazard rate.
- *
- * Models the relationship between a firm's leverage and its instantaneous
- * hazard rate, enabling a feedback loop where PIK accrual increases the
- * notional (and hence leverage), which drives the hazard rate higher.
- * Deserialization validates the parameters and rejects incomplete or
- * inconsistent tabular calibrations before they can be evaluated.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_cc8ed166abbb10ad4451".
- */
-export interface DCc8Ed166Abbb10Ad4451 {
-  /**
-   * Base (reference) hazard rate `lambda_0`.
-   */
-  base_hazard_rate: number;
-  /**
-   * Base (reference) leverage level `L_0`.
-   */
-  base_leverage: number;
-  /**
-   * Mapping function from leverage to hazard rate.
-   */
-  leverage_hazard_map:
-    | {
-        power_law: {
-          /**
-           * Power-law exponent (`beta`).
-           */
-          exponent: number;
-          [k: string]: unknown;
-        };
-      }
-    | {
-        exponential: {
-          /**
-           * Exponential sensitivity (`beta`).
-           */
-          sensitivity: number;
-          [k: string]: unknown;
-        };
-      }
-    | {
-        tabular: {
-          /**
-           * Corresponding hazard rates at each breakpoint.
-           */
-          hazard_points: number[];
-          /**
-           * Leverage breakpoints (must be sorted ascending).
-           */
-          leverage_points: number[];
-          [k: string]: unknown;
-        };
-      };
-}
-/**
- * Merton structural credit model.
- */
-export interface DEe4323Acfdb49E4Fe15B {
-  /**
-   * Current firm asset value `V_0`, in the issuer's reporting currency.
-   * Strictly positive.
-   */
-  asset_value: number;
-  /**
-   * Asset volatility `sigma_V`, annualized and expressed as a decimal
-   * fraction (`0.25` is 25%). Strictly positive.
-   */
-  asset_vol: number;
-  /**
-   * Whether default is tested only at maturity or continuously over the
-   * life of the debt.
-   */
-  barrier_type:
-    | "terminal"
-    | {
-        first_passage: {
-          /**
-           * Growth rate of the default barrier over time.
-           */
-          barrier_growth_rate: number;
-        };
-      };
-  /**
-   * Default barrier `B`, the debt face value the asset value is compared
-   * against. Strictly positive and in the same currency as `asset_value`.
-   */
-  debt_barrier: number;
-  /**
-   * Stochastic process governing the asset value.
-   */
-  dynamics:
-    | "geometric_brownian"
-    | {
-        jump_diffusion: {
-          /**
-           * Poisson jump arrival intensity (jumps per year).
-           */
-          jump_intensity: number;
-          /**
-           * Mean log-jump size.
-           */
-          jump_mean: number;
-          /**
-           * Volatility of log-jump size.
-           */
-          jump_vol: number;
-        };
-      }
-    | {
-        credit_grades: {
-          /**
-           * Log-normal barrier volatility `λ`: the standard deviation of the
-           * natural log of the default barrier (Finger et al. 2002,
-           * "CreditGrades Technical Document"). Despite the field name, this
-           * is *not* a generic uncertainty scalar — it is the lognormal
-           * dispersion of the global recovery rate, entering the survival
-           * formula as `a_t² = σ²t + λ²` and the barrier shift `exp(λ²)`.
-           */
-          barrier_uncertainty: number;
-          /**
-           * Mean recovery rate at default.
-           */
-          mean_recovery: number;
-        };
-      };
-  /**
-   * Continuous payout (dividend) rate on assets, as a decimal fraction.
-   * Reduces the drift of the asset process under the risk-neutral measure.
-   */
-  payout_rate: number;
-  /**
-   * Continuously compounded risk-free rate `r`, as a decimal fraction.
-   */
-  risk_free_rate: number;
-}
-/**
- * Hard threshold toggle configuration.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_313a34fa2d102f9dc6db".
- */
-export interface D_313A34Fa2D102F9Dc6Db {
-  /**
-   * Direction for comparison.
-   */
-  direction: "above" | "below";
-  /**
-   * Credit metric to observe.
-   */
-  state_variable: "hazard_rate" | "distance_to_default" | "leverage";
-  /**
-   * Threshold value.
-   */
-  threshold: number;
-  [k: string]: unknown;
-}
-/**
- * Stochastic (sigmoid) toggle configuration.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_2b471f7f53831ad9c93c".
- */
-export interface D_2B471F7F53831Ad9C93C {
-  /**
-   * Intercept of the logistic function: `P(PIK) = 1 / (1 + exp(-(intercept + sensitivity * state)))`.
-   */
-  intercept: number;
-  /**
-   * Sensitivity (slope) of the logistic function with respect to the state variable.
-   */
-  sensitivity: number;
-  /**
-   * Credit metric to observe.
-   */
-  state_variable: "hazard_rate" | "distance_to_default" | "leverage";
-  [k: string]: unknown;
-}
-/**
- * Optimal toggle configuration using nested Monte Carlo simulation.
- *
- * At each coupon date the toggle runs a small nested MC to estimate the
- * equity value (call-option payoff on the firm's assets) under two
- * scenarios:
- *
- * 1. **Cash** – the firm pays out the coupon, reducing asset value by
- *    the coupon amount while notional stays unchanged.
- * 2. **PIK** – the coupon accretes to notional (no cash outflow), so
- *    asset value is preserved but the default barrier rises.
- *
- * PIK is elected when the estimated equity value under PIK exceeds
- * that under cash.  The nested simulation uses a simple GBM forward
- * evolution of asset value with a first-passage barrier check.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_8a837e6f142b34e8cfd4".
- */
-export interface D_8A837E6F142B34E8Cfd4 {
-  /**
-   * Annualised asset volatility for the nested GBM simulation.
-   */
-  asset_vol: number;
-  /**
-   * Forward-looking horizon in years for the nested simulation (e.g. 1.0).
-   */
-  horizon: number;
-  /**
-   * Number of nested Monte Carlo paths for continuation value estimation.
-   * Recommended range: 100–500.
-   */
-  nested_paths: number;
-  /**
-   * Risk-free rate (continuous) used as drift in the nested simulation.
-   */
-  risk_free_rate: number;
 }
 /**
  * Metric-time pricing configuration.
@@ -22721,6 +22308,12 @@ export interface Bond {
   instrument_pricing_overrides?: InstrumentPricingOverrides4;
   issue_date: Date18;
   maturity: Date19;
+  /**
+   * Optional Merton Monte Carlo configuration for structural credit PIK/toggle pricing.
+   *
+   * Used when pricing this bond with the `"merton_mc"` model key.
+   */
+  merton_mc_config?: MertonMcConfig | null;
   metric_pricing_overrides?: MetricPricingOverrides4;
   notional: Money16;
   /**
@@ -23980,6 +23573,430 @@ export interface Money15 {
 export interface InstrumentPricingOverrides4 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
+}
+/**
+ * Configuration for Monte Carlo PIK bond pricing.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "MertonMcConfig".
+ */
+export interface MertonMcConfig {
+  /**
+   * Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.
+   *
+   * Default: `BrownianBridge` when the Merton model uses `FirstPassage`,
+   * otherwise `Discrete`.
+   */
+  barrier_crossing: "discrete" | "brownian_bridge";
+  /**
+   * Optional market-calibration specification.
+   *
+   * When set, the pricer first calibrates a structural parameter
+   * (barrier or asset vol) to match a market quote using low-path MC
+   * with common random numbers, then re-prices with full paths.
+   */
+  calibration?: MertonMcCalibrationSpec | null;
+  /**
+   * Pre-computed discount factors for term-structure cashflow discounting.
+   *
+   * Each entry is `(year_fraction, discount_factor)`, sorted by time.
+   * When set, cashflows are discounted using log-linear interpolation of
+   * these factors instead of the flat `discount_rate`. The flat rate is
+   * still used for the Merton risk-neutral drift.
+   */
+  cashflow_dfs?: [number, number][] | null;
+  /**
+   * Optional dynamic (notional-dependent) recovery rate model.
+   *
+   * Recovery on default is evaluated pathwise as
+   * `DynamicRecoverySpec::recovery_at_notional(N(τ))`, which hard-clamps
+   * the result to `[0, base_recovery]`. The clamp introduces a small kink
+   * in recovery as a function of the accreted notional; paths far into
+   * the clamped region all contribute the same (floored/capped) recovery.
+   * No smoothed (e.g. logistic) recovery rule is applied.
+   */
+  dynamic_recovery?: DynamicRecoverySpec | null;
+  /**
+   * Optional endogenous (leverage-dependent) hazard rate model.
+   */
+  endogenous_hazard?: EndogenousHazardSpec | null;
+  merton: MertonModel;
+  /**
+   * PIK schedule controlling per-coupon cash/PIK/toggle behavior.
+   */
+  pik_schedule:
+    | {
+        uniform: PikMode;
+      }
+    | {
+        stepped: [number, PikMode][];
+      };
+  /**
+   * Recovery on default as a decimal fraction in `[0, 1]`.
+   *
+   * `dynamic_recovery`, when set, takes precedence over this flat rate.
+   */
+  recovery_rate: number;
+  /**
+   * Time steps per year for the simulation grid.
+   */
+  steps_per_year: number;
+  /**
+   * Optional toggle exercise model for PIK/cash coupon decisions.
+   * Active only for coupon dates where [`PikSchedule`] resolves to
+   * [`PikMode::Toggle`].
+   */
+  toggle_model?: ToggleExerciseModel | null;
+}
+/**
+ * Calibration settings for MC-to-market matching.
+ *
+ * When set on [`MertonMcConfig::calibration`], the pricer runs a low-path
+ * bisection to solve for a structural parameter so that the cash base-case
+ * MC price matches the target market quote, then re-prices with full paths.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "MertonMcCalibrationSpec".
+ */
+export interface MertonMcCalibrationSpec {
+  /**
+   * Search bracket for the calibrated parameter (low, high).
+   * When `None`, auto-brackets based on the calibration parameter type.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  bracket?: [number, number] | null;
+  /**
+   * Number of independent MC estimators used during calibration iterations (low paths).
+   */
+  low_paths: number;
+  /**
+   * Maximum bisection iterations.
+   */
+  max_iterations: number;
+  /**
+   * Which structural parameter to solve for.
+   */
+  parameter: "debt_barrier" | "asset_vol";
+  /**
+   * Optional seed override used for the calibration run.
+   */
+  seed?: number | null;
+  /**
+   * Target market quote to match (interpreted at quote/settlement date).
+   */
+  target:
+    | {
+        clean_price_pct: number;
+      }
+    | {
+        dirty_price_currency: number;
+      }
+    | {
+        ytm: number;
+      }
+    | {
+        ytw: number;
+      }
+    | {
+        z_spread: number;
+      }
+    | {
+        discount_margin: number;
+      }
+    | {
+        oas: number;
+      }
+    | {
+        asw_market: number;
+      }
+    | {
+        i_spread: number;
+      }
+    | {
+        japanese_simple_yield: number;
+      };
+  /**
+   * Absolute tolerance on the **PV residual** (currency units at `as_of`).
+   */
+  tolerance_pv: number;
+}
+/**
+ * Specification for dynamic (notional-dependent) recovery rate.
+ *
+ * Models the relationship between the accreted notional and the recovery
+ * rate in default. As PIK accrual increases the notional relative to the
+ * original base, recovery declines according to the chosen [`DynamicRecoveryModel`].
+ * Deserialization enforces the same parameter invariants as the constructors.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "DynamicRecoverySpec".
+ */
+export interface DynamicRecoverySpec {
+  /**
+   * Base (reference) notional `N_0`.
+   */
+  base_notional: number;
+  /**
+   * Base (reference) recovery rate `R_0`.
+   */
+  base_recovery: number;
+  /**
+   * Recovery model governing the notional-to-recovery mapping.
+   */
+  model:
+    | "constant"
+    | "inverse_linear"
+    | {
+        inverse_power: {
+          /**
+           * Power exponent (`alpha`).
+           */
+          exponent: number;
+          [k: string]: unknown;
+        };
+      }
+    | {
+        floored_inverse: {
+          /**
+           * Minimum recovery rate floor.
+           */
+          floor: number;
+          [k: string]: unknown;
+        };
+      }
+    | {
+        linear_decline: {
+          /**
+           * Minimum recovery rate floor.
+           */
+          floor: number;
+          /**
+           * Sensitivity of recovery to leverage increase (`beta`).
+           */
+          sensitivity: number;
+          [k: string]: unknown;
+        };
+      };
+}
+/**
+ * Specification for endogenous (leverage-dependent) hazard rate.
+ *
+ * Models the relationship between a firm's leverage and its instantaneous
+ * hazard rate, enabling a feedback loop where PIK accrual increases the
+ * notional (and hence leverage), which drives the hazard rate higher.
+ * Deserialization validates the parameters and rejects incomplete or
+ * inconsistent tabular calibrations before they can be evaluated.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "EndogenousHazardSpec".
+ */
+export interface EndogenousHazardSpec {
+  /**
+   * Base (reference) hazard rate `lambda_0`.
+   */
+  base_hazard_rate: number;
+  /**
+   * Base (reference) leverage level `L_0`.
+   */
+  base_leverage: number;
+  /**
+   * Mapping function from leverage to hazard rate.
+   */
+  leverage_hazard_map:
+    | {
+        power_law: {
+          /**
+           * Power-law exponent (`beta`).
+           */
+          exponent: number;
+          [k: string]: unknown;
+        };
+      }
+    | {
+        exponential: {
+          /**
+           * Exponential sensitivity (`beta`).
+           */
+          sensitivity: number;
+          [k: string]: unknown;
+        };
+      }
+    | {
+        tabular: {
+          /**
+           * Corresponding hazard rates at each breakpoint.
+           */
+          hazard_points: number[];
+          /**
+           * Leverage breakpoints (must be sorted ascending).
+           */
+          leverage_points: number[];
+          [k: string]: unknown;
+        };
+      };
+}
+/**
+ * Merton structural credit model.
+ */
+export interface MertonModel {
+  /**
+   * Current firm asset value `V_0`, in the issuer's reporting currency.
+   * Strictly positive.
+   */
+  asset_value: number;
+  /**
+   * Asset volatility `sigma_V`, annualized and expressed as a decimal
+   * fraction (`0.25` is 25%). Strictly positive.
+   */
+  asset_vol: number;
+  /**
+   * Whether default is tested only at maturity or continuously over the
+   * life of the debt.
+   */
+  barrier_type:
+    | "terminal"
+    | {
+        first_passage: {
+          /**
+           * Growth rate of the default barrier over time.
+           */
+          barrier_growth_rate: number;
+        };
+      };
+  /**
+   * Default barrier `B`, the debt face value the asset value is compared
+   * against. Strictly positive and in the same currency as `asset_value`.
+   */
+  debt_barrier: number;
+  /**
+   * Stochastic process governing the asset value.
+   */
+  dynamics:
+    | "geometric_brownian"
+    | {
+        jump_diffusion: {
+          /**
+           * Poisson jump arrival intensity (jumps per year).
+           */
+          jump_intensity: number;
+          /**
+           * Mean log-jump size.
+           */
+          jump_mean: number;
+          /**
+           * Volatility of log-jump size.
+           */
+          jump_vol: number;
+        };
+      }
+    | {
+        credit_grades: {
+          /**
+           * Log-normal barrier volatility `λ`: the standard deviation of the
+           * natural log of the default barrier (Finger et al. 2002,
+           * "CreditGrades Technical Document"). Despite the field name, this
+           * is *not* a generic uncertainty scalar — it is the lognormal
+           * dispersion of the global recovery rate, entering the survival
+           * formula as `a_t² = σ²t + λ²` and the barrier shift `exp(λ²)`.
+           */
+          barrier_uncertainty: number;
+          /**
+           * Mean recovery rate at default.
+           */
+          mean_recovery: number;
+        };
+      };
+  /**
+   * Continuous payout (dividend) rate on assets, as a decimal fraction.
+   * Reduces the drift of the asset process under the risk-neutral measure.
+   */
+  payout_rate: number;
+  /**
+   * Continuously compounded risk-free rate `r`, as a decimal fraction.
+   */
+  risk_free_rate: number;
+}
+/**
+ * Hard threshold toggle configuration.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "ThresholdToggle".
+ */
+export interface ThresholdToggle {
+  /**
+   * Direction for comparison.
+   */
+  direction: "above" | "below";
+  /**
+   * Credit metric to observe.
+   */
+  state_variable: "hazard_rate" | "distance_to_default" | "leverage";
+  /**
+   * Threshold value.
+   */
+  threshold: number;
+  [k: string]: unknown;
+}
+/**
+ * Stochastic (sigmoid) toggle configuration.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "StochasticToggle".
+ */
+export interface StochasticToggle {
+  /**
+   * Intercept of the logistic function: `P(PIK) = 1 / (1 + exp(-(intercept + sensitivity * state)))`.
+   */
+  intercept: number;
+  /**
+   * Sensitivity (slope) of the logistic function with respect to the state variable.
+   */
+  sensitivity: number;
+  /**
+   * Credit metric to observe.
+   */
+  state_variable: "hazard_rate" | "distance_to_default" | "leverage";
+  [k: string]: unknown;
+}
+/**
+ * Optimal toggle configuration using nested Monte Carlo simulation.
+ *
+ * At each coupon date the toggle runs a small nested MC to estimate the
+ * equity value (call-option payoff on the firm's assets) under two
+ * scenarios:
+ *
+ * 1. **Cash** – the firm pays out the coupon, reducing asset value by
+ *    the coupon amount while notional stays unchanged.
+ * 2. **PIK** – the coupon accretes to notional (no cash outflow), so
+ *    asset value is preserved but the default barrier rises.
+ *
+ * PIK is elected when the estimated equity value under PIK exceeds
+ * that under cash.  The nested simulation uses a simple GBM forward
+ * evolution of asset value with a first-passage barrier check.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "OptimalToggle".
+ */
+export interface OptimalToggle {
+  /**
+   * Annualised asset volatility for the nested GBM simulation.
+   */
+  asset_vol: number;
+  /**
+   * Forward-looking horizon in years for the nested simulation (e.g. 1.0).
+   */
+  horizon: number;
+  /**
+   * Number of nested Monte Carlo paths for continuation value estimation.
+   * Recommended range: 100–500.
+   */
+  nested_paths: number;
+  /**
+   * Risk-free rate (continuous) used as drift in the nested simulation.
+   */
+  risk_free_rate: number;
 }
 /**
  * Metric-time pricing configuration.
@@ -58624,6 +58641,109 @@ export interface MarketConditions1 {
   refi_rate: number;
 }
 /**
+ * Merton structural credit model.
+ *
+ * Models a firm's equity as a call option on its assets, where default
+ * occurs when asset value falls below the debt barrier.
+ *
+ * # Fields
+ *
+ * - `asset_value` (V_0): Current market value of the firm's assets.
+ * - `asset_vol` (sigma_V): Annualized volatility of asset returns.
+ * - `debt_barrier` (B): Face value of debt / default point.
+ * - `risk_free_rate` (r): Continuous risk-free rate.
+ * - `payout_rate` (q): Continuous dividend / payout yield on assets.
+ * - `barrier_type`: Terminal or first-passage barrier monitoring.
+ * - `dynamics`: Asset return dynamics specification.
+ *
+ * # Wire format
+ *
+ * Deserialization is routed through [`MertonModel::new_with_dynamics`] via
+ * `RawMertonModel`, so a model loaded from JSON satisfies exactly the same
+ * invariants as one built in Rust. Unknown fields are rejected.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "MertonModel".
+ */
+export interface MertonModel1 {
+  /**
+   * Current firm asset value `V_0`, in the issuer's reporting currency.
+   * Strictly positive.
+   */
+  asset_value: number;
+  /**
+   * Asset volatility `sigma_V`, annualized and expressed as a decimal
+   * fraction (`0.25` is 25%). Strictly positive.
+   */
+  asset_vol: number;
+  /**
+   * Whether default is tested only at maturity or continuously over the
+   * life of the debt.
+   */
+  barrier_type:
+    | "terminal"
+    | {
+        first_passage: {
+          /**
+           * Growth rate of the default barrier over time.
+           */
+          barrier_growth_rate: number;
+        };
+      };
+  /**
+   * Default barrier `B`, the debt face value the asset value is compared
+   * against. Strictly positive and in the same currency as `asset_value`.
+   */
+  debt_barrier: number;
+  /**
+   * Stochastic process governing the asset value.
+   */
+  dynamics:
+    | "geometric_brownian"
+    | {
+        jump_diffusion: {
+          /**
+           * Poisson jump arrival intensity (jumps per year).
+           */
+          jump_intensity: number;
+          /**
+           * Mean log-jump size.
+           */
+          jump_mean: number;
+          /**
+           * Volatility of log-jump size.
+           */
+          jump_vol: number;
+        };
+      }
+    | {
+        credit_grades: {
+          /**
+           * Log-normal barrier volatility `λ`: the standard deviation of the
+           * natural log of the default barrier (Finger et al. 2002,
+           * "CreditGrades Technical Document"). Despite the field name, this
+           * is *not* a generic uncertainty scalar — it is the lognormal
+           * dispersion of the global recovery rate, entering the survival
+           * formula as `a_t² = σ²t + λ²` and the barrier shift `exp(λ²)`.
+           */
+          barrier_uncertainty: number;
+          /**
+           * Mean recovery rate at default.
+           */
+          mean_recovery: number;
+        };
+      };
+  /**
+   * Continuous payout (dividend) rate on assets, as a decimal fraction.
+   * Reduces the drift of the asset process under the risk-neutral measure.
+   */
+  payout_rate: number;
+  /**
+   * Continuously compounded risk-free rate `r`, as a decimal fraction.
+   */
+  risk_free_rate: number;
+}
+/**
  * Deal metadata (counterparties and identifiers).
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -59461,15 +59581,6 @@ export interface D_572Ad1Befb7D949146521 {
    */
   mc_target_ci_half_width?: number | null;
   /**
-   * Merton Monte Carlo configuration for structural credit PIK pricing.
-   *
-   * When set (at `instrument_pricing_overrides.model_config.merton_mc_config`
-   * or via the Rust builder), the `MertonMc` pricer in the registry uses this
-   * model and grid; the path count, antithetic flag and seed label come from
-   * `mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config.
-   */
-  merton_mc_config?: D_10A2B628165F3F3E10E7 | null;
-  /**
    * Quote compounding convention for OAS inputs and outputs.
    *
    * The OAS is added to each short rate on this basis: a semiannual
@@ -59653,109 +59764,6 @@ export interface DB0A5Fc543381Da6A57221 {
 export interface InstrumentPricingOverrides78 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-}
-/**
- * Merton structural credit model.
- *
- * Models a firm's equity as a call option on its assets, where default
- * occurs when asset value falls below the debt barrier.
- *
- * # Fields
- *
- * - `asset_value` (V_0): Current market value of the firm's assets.
- * - `asset_vol` (sigma_V): Annualized volatility of asset returns.
- * - `debt_barrier` (B): Face value of debt / default point.
- * - `risk_free_rate` (r): Continuous risk-free rate.
- * - `payout_rate` (q): Continuous dividend / payout yield on assets.
- * - `barrier_type`: Terminal or first-passage barrier monitoring.
- * - `dynamics`: Asset return dynamics specification.
- *
- * # Wire format
- *
- * Deserialization is routed through [`MertonModel::new_with_dynamics`] via
- * `RawMertonModel`, so a model loaded from JSON satisfies exactly the same
- * invariants as one built in Rust. Unknown fields are rejected.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_ee4323acfdb49e4fe15b".
- */
-export interface DEe4323Acfdb49E4Fe15B1 {
-  /**
-   * Current firm asset value `V_0`, in the issuer's reporting currency.
-   * Strictly positive.
-   */
-  asset_value: number;
-  /**
-   * Asset volatility `sigma_V`, annualized and expressed as a decimal
-   * fraction (`0.25` is 25%). Strictly positive.
-   */
-  asset_vol: number;
-  /**
-   * Whether default is tested only at maturity or continuously over the
-   * life of the debt.
-   */
-  barrier_type:
-    | "terminal"
-    | {
-        first_passage: {
-          /**
-           * Growth rate of the default barrier over time.
-           */
-          barrier_growth_rate: number;
-        };
-      };
-  /**
-   * Default barrier `B`, the debt face value the asset value is compared
-   * against. Strictly positive and in the same currency as `asset_value`.
-   */
-  debt_barrier: number;
-  /**
-   * Stochastic process governing the asset value.
-   */
-  dynamics:
-    | "geometric_brownian"
-    | {
-        jump_diffusion: {
-          /**
-           * Poisson jump arrival intensity (jumps per year).
-           */
-          jump_intensity: number;
-          /**
-           * Mean log-jump size.
-           */
-          jump_mean: number;
-          /**
-           * Volatility of log-jump size.
-           */
-          jump_vol: number;
-        };
-      }
-    | {
-        credit_grades: {
-          /**
-           * Log-normal barrier volatility `λ`: the standard deviation of the
-           * natural log of the default barrier (Finger et al. 2002,
-           * "CreditGrades Technical Document"). Despite the field name, this
-           * is *not* a generic uncertainty scalar — it is the lognormal
-           * dispersion of the global recovery rate, entering the survival
-           * formula as `a_t² = σ²t + λ²` and the barrier shift `exp(λ²)`.
-           */
-          barrier_uncertainty: number;
-          /**
-           * Mean recovery rate at default.
-           */
-          mean_recovery: number;
-        };
-      };
-  /**
-   * Continuous payout (dividend) rate on assets, as a decimal fraction.
-   * Reduces the drift of the asset process under the risk-neutral measure.
-   */
-  payout_rate: number;
-  /**
-   * Continuously compounded risk-free rate `r`, as a decimal fraction.
-   */
-  risk_free_rate: number;
 }
 /**
  * Scenario-only price and spread shocks.

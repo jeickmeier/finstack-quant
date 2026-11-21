@@ -72,11 +72,10 @@ def _merton_bond_with_config(config: MertonMcConfig, as_of: datetime.date) -> Bo
         "USD-OIS",
     )
     envelope = json.loads(bond.to_json())
-    model_config = (
-        envelope["instrument"]["spec"].setdefault("instrument_pricing_overrides", {}).setdefault("model_config", {})
-    )
+    spec = envelope["instrument"]["spec"]
+    model_config = spec.setdefault("instrument_pricing_overrides", {}).setdefault("model_config", {})
     model_config["mc_paths"] = 2000
-    model_config["merton_mc_config"] = config.to_dict()
+    spec["merton_mc_config"] = config.to_dict()
     return Bond.from_json(json.dumps(envelope))
 
 

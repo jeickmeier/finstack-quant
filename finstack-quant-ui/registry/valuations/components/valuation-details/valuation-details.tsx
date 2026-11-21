@@ -13,13 +13,6 @@ const Explanation = lazy(() =>
     default: module.ExplanationTrace,
   })),
 );
-const Covenants = lazy(() =>
-  import("@/components/finstack/covenants/components/covenant-report/covenant-report").then(
-    (module) => ({
-      default: module.CovenantReport,
-    }),
-  ),
-);
 const rawLabels: Record<string, string> = {
   composite: "Composite details JSON",
   credit_derivative: "Credit derivative details JSON",
@@ -76,9 +69,6 @@ export function ValuationDetails({
         )}
         {includeExplanation && result.explanation != null && (
           <Explanation value={result.explanation} density={density} />
-        )}
-        {result.covenants != null && (
-          <Covenants reports={result.covenants} density={density} />
         )}
       </Suspense>
       <details>

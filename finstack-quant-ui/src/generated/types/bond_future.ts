@@ -437,43 +437,6 @@ export type Id8 = string;
  */
 export type D_94Cb251104De5Cf587B6 = string;
 /**
- * Per-coupon PIK behavior for the MC engine.
- *
- * Determines how each coupon payment is handled: paid in cash, accreted
- * to notional (PIK), split between cash and PIK, or decided dynamically
- * by a [`ToggleExerciseModel`].
- */
-export type D_7F97Be2823A694F2735D =
-  | "cash"
-  | "pik"
-  | {
-      split: {
-        /**
-         * Fraction paid in cash (e.g. 0.5 for 50%).
-         */
-        cash_fraction: number;
-        /**
-         * Fraction accreted to notional.
-         */
-        pik_fraction: number;
-        [k: string]: unknown;
-      };
-    }
-  | "toggle";
-/**
- * Toggle exercise model for PIK/cash decision.
- */
-export type D_2701Caf4934336A2Dd86 =
-  | {
-      threshold: D_313A34Fa2D102F9Dc6Db;
-    }
-  | {
-      stochastic: D_2B471F7F53831Ad9C93C;
-    }
-  | {
-      optimal_exercise: D_8A837E6F142B34E8Cfd4;
-    };
-/**
  * AssetPool-granularity policy for the structured-credit default engine.
  *
  * Selects whether each scenario realizes defaults name-by-name (finite-pool
@@ -496,6 +459,43 @@ export type Date9 = string;
  * ISO 8601 calendar date string.
  */
 export type Date10 = string;
+/**
+ * Per-coupon PIK behavior for the MC engine.
+ *
+ * Determines how each coupon payment is handled: paid in cash, accreted
+ * to notional (PIK), split between cash and PIK, or decided dynamically
+ * by a [`ToggleExerciseModel`].
+ */
+export type D_5307Cfd099D1544Efbe2 =
+  | "cash"
+  | "pik"
+  | {
+      split: {
+        /**
+         * Fraction paid in cash (e.g. 0.5 for 50%).
+         */
+        cash_fraction: number;
+        /**
+         * Fraction accreted to notional.
+         */
+        pik_fraction: number;
+        [k: string]: unknown;
+      };
+    }
+  | "toggle";
+/**
+ * Toggle exercise model for PIK/cash decision.
+ */
+export type D_0Ed4371A777Dbb29C0Fb =
+  | {
+      threshold: D_4D533E1B19Efe9771F51;
+    }
+  | {
+      stochastic: DE886Edd2B63Ffb088Fee;
+    }
+  | {
+      optimal_exercise: D_6C697589A29457598Aa4;
+    };
 /**
  * Risk calculation basis for callable/putable bonds.
  *
@@ -1144,6 +1144,12 @@ export interface D_0E4F6595F5E014Bbb86A {
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   issue_date: Date9;
   maturity: Date10;
+  /**
+   * Optional Merton Monte Carlo configuration for structural credit PIK/toggle pricing.
+   *
+   * Used when pricing this bond with the `"merton_mc"` model key.
+   */
+  merton_mc_config?: D_4Fb49Ab29Beacf97Ee15 | null;
   metric_pricing_overrides?: MetricPricingOverrides;
   notional: Money4;
   /**
@@ -2979,15 +2985,6 @@ export interface D_572Ad1Befb7D94914652 {
    */
   mc_target_ci_half_width?: number | null;
   /**
-   * Merton Monte Carlo configuration for structural credit PIK pricing.
-   *
-   * When set (at `instrument_pricing_overrides.model_config.merton_mc_config`
-   * or via the Rust builder), the `MertonMc` pricer in the registry uses this
-   * model and grid; the path count, antithetic flag and seed label come from
-   * `mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config.
-   */
-  merton_mc_config?: D_10A2B628165F3F3E10E7 | null;
-  /**
    * Quote compounding convention for OAS inputs and outputs.
    *
    * The OAS is added to each short rate on this basis: a semiannual
@@ -3062,7 +3059,7 @@ export interface DCdb8Fddc0106047270C4 {
 /**
  * Configuration for Monte Carlo PIK bond pricing.
  */
-export interface D_10A2B628165F3F3E10E7 {
+export interface D_4Fb49Ab29Beacf97Ee15 {
   /**
    * Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.
    *
@@ -3077,7 +3074,7 @@ export interface D_10A2B628165F3F3E10E7 {
    * (barrier or asset vol) to match a market quote using low-path MC
    * with common random numbers, then re-prices with full paths.
    */
-  calibration?: DD760Eef55C5Bd7D5B1F6 | null;
+  calibration?: DAaec871Be443C63A3A1F | null;
   /**
    * Pre-computed discount factors for term-structure cashflow discounting.
    *
@@ -3097,21 +3094,21 @@ export interface D_10A2B628165F3F3E10E7 {
    * the clamped region all contribute the same (floored/capped) recovery.
    * No smoothed (e.g. logistic) recovery rule is applied.
    */
-  dynamic_recovery?: D_16451E0Bf3B6B78178D8 | null;
+  dynamic_recovery?: D_37Fde52404E6Ddec96C1 | null;
   /**
    * Optional endogenous (leverage-dependent) hazard rate model.
    */
-  endogenous_hazard?: DCc8Ed166Abbb10Ad4451 | null;
-  merton: DEe4323Acfdb49E4Fe15B;
+  endogenous_hazard?: DAbf59Ea05Bbcbfe8D1D1 | null;
+  merton: DD32B2D1035Ad1Aed15Dd;
   /**
    * PIK schedule controlling per-coupon cash/PIK/toggle behavior.
    */
   pik_schedule:
     | {
-        uniform: D_7F97Be2823A694F2735D;
+        uniform: D_5307Cfd099D1544Efbe2;
       }
     | {
-        stepped: [number, D_7F97Be2823A694F2735D][];
+        stepped: [number, D_5307Cfd099D1544Efbe2][];
       };
   /**
    * Recovery on default as a decimal fraction in `[0, 1]`.
@@ -3128,7 +3125,7 @@ export interface D_10A2B628165F3F3E10E7 {
    * Active only for coupon dates where [`PikSchedule`] resolves to
    * [`PikMode::Toggle`].
    */
-  toggle_model?: D_2701Caf4934336A2Dd86 | null;
+  toggle_model?: D_0Ed4371A777Dbb29C0Fb | null;
 }
 /**
  * Calibration settings for MC-to-market matching.
@@ -3137,7 +3134,7 @@ export interface D_10A2B628165F3F3E10E7 {
  * bisection to solve for a structural parameter so that the cash base-case
  * MC price matches the target market quote, then re-prices with full paths.
  */
-export interface DD760Eef55C5Bd7D5B1F6 {
+export interface DAaec871Be443C63A3A1F {
   /**
    * Search bracket for the calibrated parameter (low, high).
    * When `None`, auto-brackets based on the calibration parameter type.
@@ -3209,7 +3206,7 @@ export interface DD760Eef55C5Bd7D5B1F6 {
  * original base, recovery declines according to the chosen [`DynamicRecoveryModel`].
  * Deserialization enforces the same parameter invariants as the constructors.
  */
-export interface D_16451E0Bf3B6B78178D8 {
+export interface D_37Fde52404E6Ddec96C1 {
   /**
    * Base (reference) notional `N_0`.
    */
@@ -3265,7 +3262,7 @@ export interface D_16451E0Bf3B6B78178D8 {
  * Deserialization validates the parameters and rejects incomplete or
  * inconsistent tabular calibrations before they can be evaluated.
  */
-export interface DCc8Ed166Abbb10Ad4451 {
+export interface DAbf59Ea05Bbcbfe8D1D1 {
   /**
    * Base (reference) hazard rate `lambda_0`.
    */
@@ -3313,7 +3310,7 @@ export interface DCc8Ed166Abbb10Ad4451 {
 /**
  * Merton structural credit model.
  */
-export interface DEe4323Acfdb49E4Fe15B {
+export interface DD32B2D1035Ad1Aed15Dd {
   /**
    * Current firm asset value `V_0`, in the issuer's reporting currency.
    * Strictly positive.
@@ -3394,7 +3391,7 @@ export interface DEe4323Acfdb49E4Fe15B {
 /**
  * Hard threshold toggle configuration.
  */
-export interface D_313A34Fa2D102F9Dc6Db {
+export interface D_4D533E1B19Efe9771F51 {
   /**
    * Direction for comparison.
    */
@@ -3412,7 +3409,7 @@ export interface D_313A34Fa2D102F9Dc6Db {
 /**
  * Stochastic (sigmoid) toggle configuration.
  */
-export interface D_2B471F7F53831Ad9C93C {
+export interface DE886Edd2B63Ffb088Fee {
   /**
    * Intercept of the logistic function: `P(PIK) = 1 / (1 + exp(-(intercept + sensitivity * state)))`.
    */
@@ -3443,7 +3440,7 @@ export interface D_2B471F7F53831Ad9C93C {
  * that under cash.  The nested simulation uses a simple GBM forward
  * evolution of asset value with a first-passage barrier check.
  */
-export interface D_8A837E6F142B34E8Cfd4 {
+export interface D_6C697589A29457598Aa4 {
   /**
    * Annualised asset volatility for the nested GBM simulation.
    */

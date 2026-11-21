@@ -200,7 +200,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
-      "bytes": 1018475,
+      "bytes": 1053506,
       "kind": "component",
       "path": "schemas/common/1/instrument_json.schema.json",
       "summary": "The instrument union embedded by portfolio positions and candidates; the same branches as the instrument envelope's `instrument` field.",
@@ -209,7 +209,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-      "bytes": 61391,
+      "bytes": 26150,
       "kind": "component",
       "path": "schemas/common/1/instrument_pricing_overrides.schema.json",
       "summary": "Instrument-owned market quote and model configuration overrides.",
@@ -317,7 +317,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
-      "bytes": 242843,
+      "bytes": 277874,
       "kind": "component",
       "path": "schemas/common/1/standard_deal_params.schema.json",
       "summary": "Inputs for the standard structured-credit registry constructor.",
@@ -434,7 +434,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1026394,
+      "bytes": 1061425,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -551,7 +551,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
-      "bytes": 198419,
+      "bytes": 233450,
       "kind": "input",
       "path": "schemas/instruments/1/equity/levered_real_estate_equity.schema.json",
       "summary": "Property equity net of its financing stack.",
@@ -632,7 +632,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1025398,
+      "bytes": 1060429,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -713,7 +713,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
-      "bytes": 289893,
+      "bytes": 324924,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
       "summary": "Warehouse line against a collateral pool: advance rates, concentration limits, borrowing base.",
@@ -722,7 +722,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
-      "bytes": 101445,
+      "bytes": 136476,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/bond.schema.json",
       "summary": "Fixed- or floating-rate cash bond with a coupon schedule.",
@@ -731,7 +731,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json",
-      "bytes": 114867,
+      "bytes": 149898,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/bond_future.schema.json",
       "summary": "Exchange-traded bond future with a deliverable basket and CTD.",
@@ -776,7 +776,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
-      "bytes": 404001,
+      "bytes": 439032,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/structured_credit.schema.json",
       "summary": "ABS/CLO/RMBS/CMBS deal: collateral pool, tranches and waterfall.",
@@ -785,7 +785,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit_tranche.schema.json",
-      "bytes": 405004,
+      "bytes": 440035,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/structured_credit_tranche.schema.json",
       "summary": "Individual note priced on its originating collateral waterfall.",
@@ -920,7 +920,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1123199,
+      "bytes": 1158230,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -1127,7 +1127,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
-      "bytes": 1028002,
+      "bytes": 1063033,
       "kind": "output",
       "path": "schemas/results/1/composite_rebalance_result.schema.json",
       "summary": "Result of resolving a new composite holdings state.",

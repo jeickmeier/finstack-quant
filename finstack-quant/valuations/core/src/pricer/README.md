@@ -48,7 +48,6 @@ in a different crate, reached by the MC instrument pricers.
 | Path | Contents | Visibility |
 |------|----------|------------|
 | [`mod.rs`](mod.rs) | The `register_generic!` macro and all re-exports | mixed |
-| [`defaults.rs`](defaults.rs) | Embedded product-specific Monte Carlo defaults | `pub mod` |
 | [`keys.rs`](keys.rs) | `InstrumentType`, `ModelKey`, `PricerKey` — enums, `as_str`, `Display`, `FromStr`, serde | private mod, types re-exported |
 | [`registry.rs`](registry.rs) | `Pricer` trait, `PricerRegistry`, the pricing pipeline, `expect_inst`, FX-policy collection | private mod, items re-exported |
 | [`errors.rs`](errors.rs) | `PricingError`, `PricingErrorContext`, the two lossy conversions to/from `finstack_quant_core::Error` | private mod, types re-exported |

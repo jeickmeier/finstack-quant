@@ -405,6 +405,21 @@ export type D_8D25A1938646339Aff0F =
       };
     };
 /**
+ * AssetPool-granularity policy for the structured-credit default engine.
+ *
+ * Selects whether each scenario realizes defaults name-by-name (finite-pool
+ * copula simulation) or applies the closed-form LHP conditional default
+ * probability uniformly to the pool.
+ */
+export type D_1C3B976A7Fc1B410D03D = "per_name" | "large_homogeneous";
+/**
+ * Short-rate lattice used by the rates-only bond tree.
+ *
+ * Selected by `instrument_pricing_overrides.model_config.tree_model`; when the
+ * field is absent the bond tree uses Hull-White.
+ */
+export type D_8A8763Ce1Ff719C6F1Fa = "hull_white" | "black_derman_toy" | "black_karasinski";
+/**
  * Per-coupon PIK behavior for the MC engine.
  *
  * Determines how each coupon payment is handled: paid in cash, accreted
@@ -441,21 +456,6 @@ export type D_41A1415Cf392C5202C60 =
   | {
       optimal_exercise: D_0E807393633D9F0E7907;
     };
-/**
- * AssetPool-granularity policy for the structured-credit default engine.
- *
- * Selects whether each scenario realizes defaults name-by-name (finite-pool
- * copula simulation) or applies the closed-form LHP conditional default
- * probability uniformly to the pool.
- */
-export type D_1C3B976A7Fc1B410D03D = "per_name" | "large_homogeneous";
-/**
- * Short-rate lattice used by the rates-only bond tree.
- *
- * Selected by `instrument_pricing_overrides.model_config.tree_model`; when the
- * field is absent the bond tree uses Hull-White.
- */
-export type D_8A8763Ce1Ff719C6F1Fa = "hull_white" | "black_derman_toy" | "black_karasinski";
 /**
  * Risk calculation basis for callable/putable bonds.
  *
@@ -1371,6 +1371,12 @@ export interface D_0C72F5Cb09B10476Ecb7 {
    * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */
   maturity: string;
+  /**
+   * Optional Merton Monte Carlo configuration for structural credit PIK/toggle pricing.
+   *
+   * Used when pricing this bond with the `"merton_mc"` model key.
+   */
+  merton_mc_config?: DFf1D6292Ff0F5Bd76A70 | null;
   metric_pricing_overrides?: D_3883C45B3701884Ad50B;
   notional: DD5Bd42D8B6Ec6C31D7864;
   /**
@@ -4235,15 +4241,6 @@ export interface D_65B0652Ed08913529246 {
    * and validates this target against the final 95% confidence interval.
    */
   mc_target_ci_half_width?: number | null;
-  /**
-   * Merton Monte Carlo configuration for structural credit PIK pricing.
-   *
-   * When set (at `instrument_pricing_overrides.model_config.merton_mc_config`
-   * or via the Rust builder), the `MertonMc` pricer in the registry uses this
-   * model and grid; the path count, antithetic flag and seed label come from
-   * `mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config.
-   */
-  merton_mc_config?: DFf1D6292Ff0F5Bd76A70 | null;
   /**
    * Quote compounding convention for OAS inputs and outputs.
    *

@@ -112,12 +112,20 @@
 //! - `AmortizationSpec` for amortizing bonds
 //! - bond metrics module for bond-specific risk metrics
 
+mod bond_quote;
 mod cashflow_spec;
 pub mod conventions;
+mod merton_mc_config;
 pub(crate) mod metrics;
 /// Bond pricing engines including tree-based and analytical methods.
 pub mod pricing;
 mod types;
+
+pub use bond_quote::BondQuoteInput;
+pub use merton_mc_config::{
+    BarrierCrossing, CalibrationParameter, MertonMcCalibrationSpec, MertonMcConfig, PikMode,
+    PikSchedule,
+};
 
 pub use cashflow_spec::CashflowSpec;
 pub use conventions::BondConvention;

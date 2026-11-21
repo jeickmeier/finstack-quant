@@ -105,6 +105,12 @@ pub struct Bond {
     )]
     pub scenario_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
+    /// Optional Merton Monte Carlo configuration for structural credit PIK/toggle pricing.
+    ///
+    /// Used when pricing this bond with the `"merton_mc"` model key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(default)]
+    pub merton_mc_config: Option<Box<crate::bond::MertonMcConfig>>,
     /// Optional call/put schedule (dates and redemption prices as % of par amount).
     pub call_put: Option<CallPutSchedule>,
     /// Optional guaranteed minimum-return ("return floor") call protection.
@@ -167,6 +173,8 @@ impl<'de> serde::Deserialize<'de> for Bond {
             #[serde(default)]
             scenario_pricing_overrides:
                 finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
+            #[serde(default)]
+            merton_mc_config: Option<Box<crate::bond::MertonMcConfig>>,
             call_put: Option<CallPutSchedule>,
             #[serde(default)]
             return_floor: Option<super::return_floor::ReturnFloorSpec>,
@@ -224,6 +232,7 @@ impl<'de> serde::Deserialize<'de> for Bond {
             instrument_pricing_overrides: helper.instrument_pricing_overrides,
             metric_pricing_overrides: helper.metric_pricing_overrides,
             scenario_pricing_overrides: helper.scenario_pricing_overrides,
+            merton_mc_config: helper.merton_mc_config,
             call_put: helper.call_put,
             return_floor: helper.return_floor,
             custom_cashflows: helper.custom_cashflows,

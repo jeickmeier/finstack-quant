@@ -1208,7 +1208,7 @@ fn test_ytm_roundtrip_settlement_lag_two_days() {
     use finstack_quant_core::dates::{DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_valuations_core::instruments::BondQuoteInput;
+    use finstack_quant_valuations_fixed_income::bond::BondQuoteInput;
     use finstack_quant_valuations_fixed_income::bond::CashflowSpec;
     use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::compute_quotes;
 
@@ -1721,7 +1721,7 @@ fn test_z_spread_on_curve_model_pv_is_zero_with_settlement_lag() {
 fn callable_i_spread_uses_par_rate_to_workout_and_round_trips() {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
-    use finstack_quant_valuations_core::instruments::BondQuoteInput;
+    use finstack_quant_valuations_fixed_income::bond::BondQuoteInput;
     use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::compute_quotes;
 
     let as_of = date!(2025 - 01 - 15);

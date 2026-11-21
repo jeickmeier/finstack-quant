@@ -401,237 +401,6 @@ export type DayCount =
  */
 export type Id = string;
 /**
- * Barrier-crossing detection policy for first-passage default simulation.
- *
- * `Discrete` only checks the barrier at grid points (fast but biased for
- * coarse time steps). `BrownianBridge` uses a Brownian-bridge crossing
- * probability between grid points to approximate continuous monitoring.
- */
-export type BarrierCrossing = "discrete" | "brownian_bridge";
-/**
- * Which structural parameter to calibrate in the MC engine.
- */
-export type CalibrationParameter = "debt_barrier" | "asset_vol";
-/**
- * Quote input for the bond quote engine.
- *
- * All spreads are expressed in **decimal** (`0.01 = 100bp`).
- */
-export type BondQuoteInput =
-  | {
-      clean_price_pct: number;
-    }
-  | {
-      dirty_price_currency: number;
-    }
-  | {
-      ytm: number;
-    }
-  | {
-      ytw: number;
-    }
-  | {
-      z_spread: number;
-    }
-  | {
-      discount_margin: number;
-    }
-  | {
-      oas: number;
-    }
-  | {
-      asw_market: number;
-    }
-  | {
-      i_spread: number;
-    }
-  | {
-      japanese_simple_yield: number;
-    };
-/**
- * Recovery model specification.
- */
-export type DynamicRecoveryModel =
-  | "constant"
-  | "inverse_linear"
-  | {
-      inverse_power: {
-        /**
-         * Power exponent (`alpha`).
-         */
-        exponent: number;
-        [k: string]: unknown;
-      };
-    }
-  | {
-      floored_inverse: {
-        /**
-         * Minimum recovery rate floor.
-         */
-        floor: number;
-        [k: string]: unknown;
-      };
-    }
-  | {
-      linear_decline: {
-        /**
-         * Minimum recovery rate floor.
-         */
-        floor: number;
-        /**
-         * Sensitivity of recovery to leverage increase (`beta`).
-         */
-        sensitivity: number;
-        [k: string]: unknown;
-      };
-    };
-/**
- * Map from leverage to hazard rate.
- */
-export type LeverageHazardMap =
-  | {
-      power_law: {
-        /**
-         * Power-law exponent (`beta`).
-         */
-        exponent: number;
-        [k: string]: unknown;
-      };
-    }
-  | {
-      exponential: {
-        /**
-         * Exponential sensitivity (`beta`).
-         */
-        sensitivity: number;
-        [k: string]: unknown;
-      };
-    }
-  | {
-      tabular: {
-        /**
-         * Corresponding hazard rates at each breakpoint.
-         */
-        hazard_points: number[];
-        /**
-         * Leverage breakpoints (must be sorted ascending).
-         */
-        leverage_points: number[];
-        [k: string]: unknown;
-      };
-    };
-/**
- * Barrier monitoring type for default determination.
- */
-export type MertonBarrierType =
-  | "terminal"
-  | {
-      first_passage: {
-        /**
-         * Growth rate of the default barrier over time.
-         */
-        barrier_growth_rate: number;
-      };
-    };
-/**
- * Asset dynamics specification for the Merton model.
- *
- * Controls the stochastic process assumed for the firm's asset value.
- */
-export type AssetDynamics =
-  | "geometric_brownian"
-  | {
-      jump_diffusion: {
-        /**
-         * Poisson jump arrival intensity (jumps per year).
-         */
-        jump_intensity: number;
-        /**
-         * Mean log-jump size.
-         */
-        jump_mean: number;
-        /**
-         * Volatility of log-jump size.
-         */
-        jump_vol: number;
-      };
-    }
-  | {
-      credit_grades: {
-        /**
-         * Log-normal barrier volatility `λ`: the standard deviation of the
-         * natural log of the default barrier (Finger et al. 2002,
-         * "CreditGrades Technical Document"). Despite the field name, this
-         * is *not* a generic uncertainty scalar — it is the lognormal
-         * dispersion of the global recovery rate, entering the survival
-         * formula as `a_t² = σ²t + λ²` and the barrier shift `exp(λ²)`.
-         */
-        barrier_uncertainty: number;
-        /**
-         * Mean recovery rate at default.
-         */
-        mean_recovery: number;
-      };
-    };
-/**
- * Time-varying PIK schedule for the MC engine.
- *
- * Controls per-coupon PIK behavior, either uniformly or as a step
- * function over time.
- */
-export type PikSchedule =
-  | {
-      uniform: PikMode;
-    }
-  | {
-      stepped: [number, PikMode][];
-    };
-/**
- * Per-coupon PIK behavior for the MC engine.
- *
- * Determines how each coupon payment is handled: paid in cash, accreted
- * to notional (PIK), split between cash and PIK, or decided dynamically
- * by a [`ToggleExerciseModel`].
- */
-export type PikMode =
-  | "cash"
-  | "pik"
-  | {
-      split: {
-        /**
-         * Fraction paid in cash (e.g. 0.5 for 50%).
-         */
-        cash_fraction: number;
-        /**
-         * Fraction accreted to notional.
-         */
-        pik_fraction: number;
-        [k: string]: unknown;
-      };
-    }
-  | "toggle";
-/**
- * Toggle exercise model for PIK/cash decision.
- */
-export type ToggleExerciseModel =
-  | {
-      threshold: ThresholdToggle;
-    }
-  | {
-      stochastic: StochasticToggle;
-    }
-  | {
-      optimal_exercise: OptimalToggle;
-    };
-/**
- * Direction for threshold comparison.
- */
-export type ThresholdDirection = "above" | "below";
-/**
- * Which credit metric drives the toggle decision.
- */
-export type CreditStateVariable = "hazard_rate" | "distance_to_default" | "leverage";
-/**
  * Compounding convention for interest rates.
  *
  * Used to specify how interest rates should be quoted or converted.
@@ -1518,6 +1287,237 @@ export type CFKind =
  * Meaning of the emitted schedule relative to pricing and waterfall policy.
  */
 export type CashflowRepresentation = "contractual" | "projected" | "placeholder" | "no_residual";
+/**
+ * Barrier-crossing detection policy for first-passage default simulation.
+ *
+ * `Discrete` only checks the barrier at grid points (fast but biased for
+ * coarse time steps). `BrownianBridge` uses a Brownian-bridge crossing
+ * probability between grid points to approximate continuous monitoring.
+ */
+export type BarrierCrossing = "discrete" | "brownian_bridge";
+/**
+ * Which structural parameter to calibrate in the MC engine.
+ */
+export type CalibrationParameter = "debt_barrier" | "asset_vol";
+/**
+ * Quote input for the bond quote engine.
+ *
+ * All spreads are expressed in **decimal** (`0.01 = 100bp`).
+ */
+export type BondQuoteInput =
+  | {
+      clean_price_pct: number;
+    }
+  | {
+      dirty_price_currency: number;
+    }
+  | {
+      ytm: number;
+    }
+  | {
+      ytw: number;
+    }
+  | {
+      z_spread: number;
+    }
+  | {
+      discount_margin: number;
+    }
+  | {
+      oas: number;
+    }
+  | {
+      asw_market: number;
+    }
+  | {
+      i_spread: number;
+    }
+  | {
+      japanese_simple_yield: number;
+    };
+/**
+ * Recovery model specification.
+ */
+export type DynamicRecoveryModel =
+  | "constant"
+  | "inverse_linear"
+  | {
+      inverse_power: {
+        /**
+         * Power exponent (`alpha`).
+         */
+        exponent: number;
+        [k: string]: unknown;
+      };
+    }
+  | {
+      floored_inverse: {
+        /**
+         * Minimum recovery rate floor.
+         */
+        floor: number;
+        [k: string]: unknown;
+      };
+    }
+  | {
+      linear_decline: {
+        /**
+         * Minimum recovery rate floor.
+         */
+        floor: number;
+        /**
+         * Sensitivity of recovery to leverage increase (`beta`).
+         */
+        sensitivity: number;
+        [k: string]: unknown;
+      };
+    };
+/**
+ * Map from leverage to hazard rate.
+ */
+export type LeverageHazardMap =
+  | {
+      power_law: {
+        /**
+         * Power-law exponent (`beta`).
+         */
+        exponent: number;
+        [k: string]: unknown;
+      };
+    }
+  | {
+      exponential: {
+        /**
+         * Exponential sensitivity (`beta`).
+         */
+        sensitivity: number;
+        [k: string]: unknown;
+      };
+    }
+  | {
+      tabular: {
+        /**
+         * Corresponding hazard rates at each breakpoint.
+         */
+        hazard_points: number[];
+        /**
+         * Leverage breakpoints (must be sorted ascending).
+         */
+        leverage_points: number[];
+        [k: string]: unknown;
+      };
+    };
+/**
+ * Barrier monitoring type for default determination.
+ */
+export type MertonBarrierType =
+  | "terminal"
+  | {
+      first_passage: {
+        /**
+         * Growth rate of the default barrier over time.
+         */
+        barrier_growth_rate: number;
+      };
+    };
+/**
+ * Asset dynamics specification for the Merton model.
+ *
+ * Controls the stochastic process assumed for the firm's asset value.
+ */
+export type AssetDynamics =
+  | "geometric_brownian"
+  | {
+      jump_diffusion: {
+        /**
+         * Poisson jump arrival intensity (jumps per year).
+         */
+        jump_intensity: number;
+        /**
+         * Mean log-jump size.
+         */
+        jump_mean: number;
+        /**
+         * Volatility of log-jump size.
+         */
+        jump_vol: number;
+      };
+    }
+  | {
+      credit_grades: {
+        /**
+         * Log-normal barrier volatility `λ`: the standard deviation of the
+         * natural log of the default barrier (Finger et al. 2002,
+         * "CreditGrades Technical Document"). Despite the field name, this
+         * is *not* a generic uncertainty scalar — it is the lognormal
+         * dispersion of the global recovery rate, entering the survival
+         * formula as `a_t² = σ²t + λ²` and the barrier shift `exp(λ²)`.
+         */
+        barrier_uncertainty: number;
+        /**
+         * Mean recovery rate at default.
+         */
+        mean_recovery: number;
+      };
+    };
+/**
+ * Time-varying PIK schedule for the MC engine.
+ *
+ * Controls per-coupon PIK behavior, either uniformly or as a step
+ * function over time.
+ */
+export type PikSchedule =
+  | {
+      uniform: PikMode;
+    }
+  | {
+      stepped: [number, PikMode][];
+    };
+/**
+ * Per-coupon PIK behavior for the MC engine.
+ *
+ * Determines how each coupon payment is handled: paid in cash, accreted
+ * to notional (PIK), split between cash and PIK, or decided dynamically
+ * by a [`ToggleExerciseModel`].
+ */
+export type PikMode =
+  | "cash"
+  | "pik"
+  | {
+      split: {
+        /**
+         * Fraction paid in cash (e.g. 0.5 for 50%).
+         */
+        cash_fraction: number;
+        /**
+         * Fraction accreted to notional.
+         */
+        pik_fraction: number;
+        [k: string]: unknown;
+      };
+    }
+  | "toggle";
+/**
+ * Toggle exercise model for PIK/cash decision.
+ */
+export type ToggleExerciseModel =
+  | {
+      threshold: ThresholdToggle;
+    }
+  | {
+      stochastic: StochasticToggle;
+    }
+  | {
+      optimal_exercise: OptimalToggle;
+    };
+/**
+ * Direction for threshold comparison.
+ */
+export type ThresholdDirection = "above" | "below";
+/**
+ * Which credit metric drives the toggle decision.
+ */
+export type CreditStateVariable = "hazard_rate" | "distance_to_default" | "leverage";
 /**
  * Issue price = invested capital `V0` (amount funded at issue; IRR initial outflow
  * and MOIC denominator).
@@ -5631,15 +5631,6 @@ export interface ModelConfig {
    */
   mc_target_ci_half_width?: number | null;
   /**
-   * Merton Monte Carlo configuration for structural credit PIK pricing.
-   *
-   * When set (at `instrument_pricing_overrides.model_config.merton_mc_config`
-   * or via the Rust builder), the `MertonMc` pricer in the registry uses this
-   * model and grid; the path count, antithetic flag and seed label come from
-   * `mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config.
-   */
-  merton_mc_config?: MertonMcConfig | null;
-  /**
    * Quote compounding convention for OAS inputs and outputs.
    *
    * The OAS is added to each short rate on this basis: a semiannual
@@ -5705,288 +5696,6 @@ export interface PiecewiseConstantCurve {
    * @minItems 1
    */
   values: [number, ...number[]];
-}
-/**
- * Configuration for Monte Carlo PIK bond pricing.
- */
-export interface MertonMcConfig {
-  /**
-   * Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.
-   *
-   * Default: `BrownianBridge` when the Merton model uses `FirstPassage`,
-   * otherwise `Discrete`.
-   */
-  barrier_crossing: BarrierCrossing;
-  /**
-   * Optional market-calibration specification.
-   *
-   * When set, the pricer first calibrates a structural parameter
-   * (barrier or asset vol) to match a market quote using low-path MC
-   * with common random numbers, then re-prices with full paths.
-   */
-  calibration?: MertonMcCalibrationSpec | null;
-  /**
-   * Pre-computed discount factors for term-structure cashflow discounting.
-   *
-   * Each entry is `(year_fraction, discount_factor)`, sorted by time.
-   * When set, cashflows are discounted using log-linear interpolation of
-   * these factors instead of the flat `discount_rate`. The flat rate is
-   * still used for the Merton risk-neutral drift.
-   */
-  cashflow_dfs?: [number, number][] | null;
-  /**
-   * Optional dynamic (notional-dependent) recovery rate model.
-   *
-   * Recovery on default is evaluated pathwise as
-   * `DynamicRecoverySpec::recovery_at_notional(N(τ))`, which hard-clamps
-   * the result to `[0, base_recovery]`. The clamp introduces a small kink
-   * in recovery as a function of the accreted notional; paths far into
-   * the clamped region all contribute the same (floored/capped) recovery.
-   * No smoothed (e.g. logistic) recovery rule is applied.
-   */
-  dynamic_recovery?: DynamicRecoverySpec | null;
-  /**
-   * Optional endogenous (leverage-dependent) hazard rate model.
-   */
-  endogenous_hazard?: EndogenousHazardSpec | null;
-  /**
-   * Merton structural credit model.
-   */
-  merton: MertonModel;
-  /**
-   * PIK schedule controlling per-coupon cash/PIK/toggle behavior.
-   */
-  pik_schedule: PikSchedule;
-  /**
-   * Recovery on default as a decimal fraction in `[0, 1]`.
-   *
-   * `dynamic_recovery`, when set, takes precedence over this flat rate.
-   */
-  recovery_rate: number;
-  /**
-   * Time steps per year for the simulation grid.
-   */
-  steps_per_year: number;
-  /**
-   * Optional toggle exercise model for PIK/cash coupon decisions.
-   * Active only for coupon dates where [`PikSchedule`] resolves to
-   * [`PikMode::Toggle`].
-   */
-  toggle_model?: ToggleExerciseModel | null;
-}
-/**
- * Calibration settings for MC-to-market matching.
- *
- * When set on [`MertonMcConfig::calibration`], the pricer runs a low-path
- * bisection to solve for a structural parameter so that the cash base-case
- * MC price matches the target market quote, then re-prices with full paths.
- */
-export interface MertonMcCalibrationSpec {
-  /**
-   * Search bracket for the calibrated parameter (low, high).
-   * When `None`, auto-brackets based on the calibration parameter type.
-   *
-   * @minItems 2
-   * @maxItems 2
-   */
-  bracket?: [number, number] | null;
-  /**
-   * Number of independent MC estimators used during calibration iterations (low paths).
-   */
-  low_paths: number;
-  /**
-   * Maximum bisection iterations.
-   */
-  max_iterations: number;
-  /**
-   * Which structural parameter to solve for.
-   */
-  parameter: CalibrationParameter;
-  /**
-   * Optional seed override used for the calibration run.
-   */
-  seed?: number | null;
-  /**
-   * Target market quote to match (interpreted at quote/settlement date).
-   */
-  target: BondQuoteInput;
-  /**
-   * Absolute tolerance on the **PV residual** (currency units at `as_of`).
-   */
-  tolerance_pv: number;
-}
-/**
- * Specification for dynamic (notional-dependent) recovery rate.
- *
- * Models the relationship between the accreted notional and the recovery
- * rate in default. As PIK accrual increases the notional relative to the
- * original base, recovery declines according to the chosen [`DynamicRecoveryModel`].
- * Deserialization enforces the same parameter invariants as the constructors.
- */
-export interface DynamicRecoverySpec {
-  /**
-   * Base (reference) notional `N_0`.
-   */
-  base_notional: number;
-  /**
-   * Base (reference) recovery rate `R_0`.
-   */
-  base_recovery: number;
-  /**
-   * Recovery model governing the notional-to-recovery mapping.
-   */
-  model: DynamicRecoveryModel;
-}
-/**
- * Specification for endogenous (leverage-dependent) hazard rate.
- *
- * Models the relationship between a firm's leverage and its instantaneous
- * hazard rate, enabling a feedback loop where PIK accrual increases the
- * notional (and hence leverage), which drives the hazard rate higher.
- * Deserialization validates the parameters and rejects incomplete or
- * inconsistent tabular calibrations before they can be evaluated.
- */
-export interface EndogenousHazardSpec {
-  /**
-   * Base (reference) hazard rate `lambda_0`.
-   */
-  base_hazard_rate: number;
-  /**
-   * Base (reference) leverage level `L_0`.
-   */
-  base_leverage: number;
-  /**
-   * Mapping function from leverage to hazard rate.
-   */
-  leverage_hazard_map: LeverageHazardMap;
-}
-/**
- * Merton structural credit model.
- *
- * Models a firm's equity as a call option on its assets, where default
- * occurs when asset value falls below the debt barrier.
- *
- * # Fields
- *
- * - `asset_value` (V_0): Current market value of the firm's assets.
- * - `asset_vol` (sigma_V): Annualized volatility of asset returns.
- * - `debt_barrier` (B): Face value of debt / default point.
- * - `risk_free_rate` (r): Continuous risk-free rate.
- * - `payout_rate` (q): Continuous dividend / payout yield on assets.
- * - `barrier_type`: Terminal or first-passage barrier monitoring.
- * - `dynamics`: Asset return dynamics specification.
- *
- * # Wire format
- *
- * Deserialization is routed through [`MertonModel::new_with_dynamics`] via
- * `RawMertonModel`, so a model loaded from JSON satisfies exactly the same
- * invariants as one built in Rust. Unknown fields are rejected.
- */
-export interface MertonModel {
-  /**
-   * Current firm asset value `V_0`, in the issuer's reporting currency.
-   * Strictly positive.
-   */
-  asset_value: number;
-  /**
-   * Asset volatility `sigma_V`, annualized and expressed as a decimal
-   * fraction (`0.25` is 25%). Strictly positive.
-   */
-  asset_vol: number;
-  /**
-   * Whether default is tested only at maturity or continuously over the
-   * life of the debt.
-   */
-  barrier_type: MertonBarrierType;
-  /**
-   * Default barrier `B`, the debt face value the asset value is compared
-   * against. Strictly positive and in the same currency as `asset_value`.
-   */
-  debt_barrier: number;
-  /**
-   * Stochastic process governing the asset value.
-   */
-  dynamics: AssetDynamics;
-  /**
-   * Continuous payout (dividend) rate on assets, as a decimal fraction.
-   * Reduces the drift of the asset process under the risk-neutral measure.
-   */
-  payout_rate: number;
-  /**
-   * Continuously compounded risk-free rate `r`, as a decimal fraction.
-   */
-  risk_free_rate: number;
-}
-/**
- * Hard threshold toggle configuration.
- */
-export interface ThresholdToggle {
-  /**
-   * Direction for comparison.
-   */
-  direction: ThresholdDirection;
-  /**
-   * Credit metric to observe.
-   */
-  state_variable: CreditStateVariable;
-  /**
-   * Threshold value.
-   */
-  threshold: number;
-  [k: string]: unknown;
-}
-/**
- * Stochastic (sigmoid) toggle configuration.
- */
-export interface StochasticToggle {
-  /**
-   * Intercept of the logistic function: `P(PIK) = 1 / (1 + exp(-(intercept + sensitivity * state)))`.
-   */
-  intercept: number;
-  /**
-   * Sensitivity (slope) of the logistic function with respect to the state variable.
-   */
-  sensitivity: number;
-  /**
-   * Credit metric to observe.
-   */
-  state_variable: CreditStateVariable;
-  [k: string]: unknown;
-}
-/**
- * Optimal toggle configuration using nested Monte Carlo simulation.
- *
- * At each coupon date the toggle runs a small nested MC to estimate the
- * equity value (call-option payoff on the firm's assets) under two
- * scenarios:
- *
- * 1. **Cash** – the firm pays out the coupon, reducing asset value by
- *    the coupon amount while notional stays unchanged.
- * 2. **PIK** – the coupon accretes to notional (no cash outflow), so
- *    asset value is preserved but the default barrier rises.
- *
- * PIK is elected when the estimated equity value under PIK exceeds
- * that under cash.  The nested simulation uses a simple GBM forward
- * evolution of asset value with a first-passage barrier check.
- */
-export interface OptimalToggle {
-  /**
-   * Annualised asset volatility for the nested GBM simulation.
-   */
-  asset_vol: number;
-  /**
-   * Forward-looking horizon in years for the nested simulation (e.g. 1.0).
-   */
-  horizon: number;
-  /**
-   * Number of nested Monte Carlo paths for continuation value estimation.
-   * Recommended range: 100–500.
-   */
-  nested_paths: number;
-  /**
-   * Risk-free rate (continuous) used as drift in the nested simulation.
-   */
-  risk_free_rate: number;
 }
 /**
  * Metric-time overrides derived from an instrument's pricing metadata.
@@ -7230,6 +6939,12 @@ export interface Bond {
    */
   maturity: DateWire;
   /**
+   * Optional Merton Monte Carlo configuration for structural credit PIK/toggle pricing.
+   *
+   * Used when pricing this bond with the `"merton_mc"` model key.
+   */
+  merton_mc_config?: MertonMcConfig | null;
+  /**
    * Metric-time pricing configuration.
    */
   metric_pricing_overrides?: MetricPricingOverrides;
@@ -8061,6 +7776,288 @@ export interface Notional {
    * Initial principal amount outstanding at leg inception.
    */
   initial: Money;
+}
+/**
+ * Configuration for Monte Carlo PIK bond pricing.
+ */
+export interface MertonMcConfig {
+  /**
+   * Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.
+   *
+   * Default: `BrownianBridge` when the Merton model uses `FirstPassage`,
+   * otherwise `Discrete`.
+   */
+  barrier_crossing: BarrierCrossing;
+  /**
+   * Optional market-calibration specification.
+   *
+   * When set, the pricer first calibrates a structural parameter
+   * (barrier or asset vol) to match a market quote using low-path MC
+   * with common random numbers, then re-prices with full paths.
+   */
+  calibration?: MertonMcCalibrationSpec | null;
+  /**
+   * Pre-computed discount factors for term-structure cashflow discounting.
+   *
+   * Each entry is `(year_fraction, discount_factor)`, sorted by time.
+   * When set, cashflows are discounted using log-linear interpolation of
+   * these factors instead of the flat `discount_rate`. The flat rate is
+   * still used for the Merton risk-neutral drift.
+   */
+  cashflow_dfs?: [number, number][] | null;
+  /**
+   * Optional dynamic (notional-dependent) recovery rate model.
+   *
+   * Recovery on default is evaluated pathwise as
+   * `DynamicRecoverySpec::recovery_at_notional(N(τ))`, which hard-clamps
+   * the result to `[0, base_recovery]`. The clamp introduces a small kink
+   * in recovery as a function of the accreted notional; paths far into
+   * the clamped region all contribute the same (floored/capped) recovery.
+   * No smoothed (e.g. logistic) recovery rule is applied.
+   */
+  dynamic_recovery?: DynamicRecoverySpec | null;
+  /**
+   * Optional endogenous (leverage-dependent) hazard rate model.
+   */
+  endogenous_hazard?: EndogenousHazardSpec | null;
+  /**
+   * Merton structural credit model.
+   */
+  merton: MertonModel;
+  /**
+   * PIK schedule controlling per-coupon cash/PIK/toggle behavior.
+   */
+  pik_schedule: PikSchedule;
+  /**
+   * Recovery on default as a decimal fraction in `[0, 1]`.
+   *
+   * `dynamic_recovery`, when set, takes precedence over this flat rate.
+   */
+  recovery_rate: number;
+  /**
+   * Time steps per year for the simulation grid.
+   */
+  steps_per_year: number;
+  /**
+   * Optional toggle exercise model for PIK/cash coupon decisions.
+   * Active only for coupon dates where [`PikSchedule`] resolves to
+   * [`PikMode::Toggle`].
+   */
+  toggle_model?: ToggleExerciseModel | null;
+}
+/**
+ * Calibration settings for MC-to-market matching.
+ *
+ * When set on [`MertonMcConfig::calibration`], the pricer runs a low-path
+ * bisection to solve for a structural parameter so that the cash base-case
+ * MC price matches the target market quote, then re-prices with full paths.
+ */
+export interface MertonMcCalibrationSpec {
+  /**
+   * Search bracket for the calibrated parameter (low, high).
+   * When `None`, auto-brackets based on the calibration parameter type.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  bracket?: [number, number] | null;
+  /**
+   * Number of independent MC estimators used during calibration iterations (low paths).
+   */
+  low_paths: number;
+  /**
+   * Maximum bisection iterations.
+   */
+  max_iterations: number;
+  /**
+   * Which structural parameter to solve for.
+   */
+  parameter: CalibrationParameter;
+  /**
+   * Optional seed override used for the calibration run.
+   */
+  seed?: number | null;
+  /**
+   * Target market quote to match (interpreted at quote/settlement date).
+   */
+  target: BondQuoteInput;
+  /**
+   * Absolute tolerance on the **PV residual** (currency units at `as_of`).
+   */
+  tolerance_pv: number;
+}
+/**
+ * Specification for dynamic (notional-dependent) recovery rate.
+ *
+ * Models the relationship between the accreted notional and the recovery
+ * rate in default. As PIK accrual increases the notional relative to the
+ * original base, recovery declines according to the chosen [`DynamicRecoveryModel`].
+ * Deserialization enforces the same parameter invariants as the constructors.
+ */
+export interface DynamicRecoverySpec {
+  /**
+   * Base (reference) notional `N_0`.
+   */
+  base_notional: number;
+  /**
+   * Base (reference) recovery rate `R_0`.
+   */
+  base_recovery: number;
+  /**
+   * Recovery model governing the notional-to-recovery mapping.
+   */
+  model: DynamicRecoveryModel;
+}
+/**
+ * Specification for endogenous (leverage-dependent) hazard rate.
+ *
+ * Models the relationship between a firm's leverage and its instantaneous
+ * hazard rate, enabling a feedback loop where PIK accrual increases the
+ * notional (and hence leverage), which drives the hazard rate higher.
+ * Deserialization validates the parameters and rejects incomplete or
+ * inconsistent tabular calibrations before they can be evaluated.
+ */
+export interface EndogenousHazardSpec {
+  /**
+   * Base (reference) hazard rate `lambda_0`.
+   */
+  base_hazard_rate: number;
+  /**
+   * Base (reference) leverage level `L_0`.
+   */
+  base_leverage: number;
+  /**
+   * Mapping function from leverage to hazard rate.
+   */
+  leverage_hazard_map: LeverageHazardMap;
+}
+/**
+ * Merton structural credit model.
+ *
+ * Models a firm's equity as a call option on its assets, where default
+ * occurs when asset value falls below the debt barrier.
+ *
+ * # Fields
+ *
+ * - `asset_value` (V_0): Current market value of the firm's assets.
+ * - `asset_vol` (sigma_V): Annualized volatility of asset returns.
+ * - `debt_barrier` (B): Face value of debt / default point.
+ * - `risk_free_rate` (r): Continuous risk-free rate.
+ * - `payout_rate` (q): Continuous dividend / payout yield on assets.
+ * - `barrier_type`: Terminal or first-passage barrier monitoring.
+ * - `dynamics`: Asset return dynamics specification.
+ *
+ * # Wire format
+ *
+ * Deserialization is routed through [`MertonModel::new_with_dynamics`] via
+ * `RawMertonModel`, so a model loaded from JSON satisfies exactly the same
+ * invariants as one built in Rust. Unknown fields are rejected.
+ */
+export interface MertonModel {
+  /**
+   * Current firm asset value `V_0`, in the issuer's reporting currency.
+   * Strictly positive.
+   */
+  asset_value: number;
+  /**
+   * Asset volatility `sigma_V`, annualized and expressed as a decimal
+   * fraction (`0.25` is 25%). Strictly positive.
+   */
+  asset_vol: number;
+  /**
+   * Whether default is tested only at maturity or continuously over the
+   * life of the debt.
+   */
+  barrier_type: MertonBarrierType;
+  /**
+   * Default barrier `B`, the debt face value the asset value is compared
+   * against. Strictly positive and in the same currency as `asset_value`.
+   */
+  debt_barrier: number;
+  /**
+   * Stochastic process governing the asset value.
+   */
+  dynamics: AssetDynamics;
+  /**
+   * Continuous payout (dividend) rate on assets, as a decimal fraction.
+   * Reduces the drift of the asset process under the risk-neutral measure.
+   */
+  payout_rate: number;
+  /**
+   * Continuously compounded risk-free rate `r`, as a decimal fraction.
+   */
+  risk_free_rate: number;
+}
+/**
+ * Hard threshold toggle configuration.
+ */
+export interface ThresholdToggle {
+  /**
+   * Direction for comparison.
+   */
+  direction: ThresholdDirection;
+  /**
+   * Credit metric to observe.
+   */
+  state_variable: CreditStateVariable;
+  /**
+   * Threshold value.
+   */
+  threshold: number;
+  [k: string]: unknown;
+}
+/**
+ * Stochastic (sigmoid) toggle configuration.
+ */
+export interface StochasticToggle {
+  /**
+   * Intercept of the logistic function: `P(PIK) = 1 / (1 + exp(-(intercept + sensitivity * state)))`.
+   */
+  intercept: number;
+  /**
+   * Sensitivity (slope) of the logistic function with respect to the state variable.
+   */
+  sensitivity: number;
+  /**
+   * Credit metric to observe.
+   */
+  state_variable: CreditStateVariable;
+  [k: string]: unknown;
+}
+/**
+ * Optimal toggle configuration using nested Monte Carlo simulation.
+ *
+ * At each coupon date the toggle runs a small nested MC to estimate the
+ * equity value (call-option payoff on the firm's assets) under two
+ * scenarios:
+ *
+ * 1. **Cash** – the firm pays out the coupon, reducing asset value by
+ *    the coupon amount while notional stays unchanged.
+ * 2. **PIK** – the coupon accretes to notional (no cash outflow), so
+ *    asset value is preserved but the default barrier rises.
+ *
+ * PIK is elected when the estimated equity value under PIK exceeds
+ * that under cash.  The nested simulation uses a simple GBM forward
+ * evolution of asset value with a first-passage barrier check.
+ */
+export interface OptimalToggle {
+  /**
+   * Annualised asset volatility for the nested GBM simulation.
+   */
+  asset_vol: number;
+  /**
+   * Forward-looking horizon in years for the nested simulation (e.g. 1.0).
+   */
+  horizon: number;
+  /**
+   * Number of nested Monte Carlo paths for continuation value estimation.
+   * Recommended range: 100–500.
+   */
+  nested_paths: number;
+  /**
+   * Risk-free rate (continuous) used as drift in the nested simulation.
+   */
+  risk_free_rate: number;
 }
 /**
  * Guaranteed minimum-return call protection on a bond or loan.

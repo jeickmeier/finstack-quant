@@ -8,12 +8,14 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Rate;
 use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations_core::instruments::{BondQuoteInput, Instrument, PricingOptions};
+use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::{
     BondQuoteSet, compute_quotes,
 };
-use finstack_quant_valuations_fixed_income::bond::{Bond, CallPut, CallPutSchedule};
+use finstack_quant_valuations_fixed_income::bond::{
+    Bond, BondQuoteInput, CallPut, CallPutSchedule,
+};
 use time::Date;
 use time::macros::date;
 

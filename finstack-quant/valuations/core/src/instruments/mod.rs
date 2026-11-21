@@ -113,11 +113,6 @@ pub use common_impl::parameters::quanto::QuantoSpec;
 pub use legs::FinancingLegSpec;
 pub use legs::PayReceive;
 
-pub use common_impl::parameters::bond_quote::BondQuoteInput;
-pub use common_impl::parameters::merton_mc::{
-    BarrierCrossing, CalibrationParameter, MertonMcCalibrationSpec, MertonMcConfig, PikMode,
-    PikSchedule,
-};
 pub use common_impl::parameters::trs_common::TrsScheduleSpec;
 
 pub use common_impl::listed::future_option::FutureOptionExercise;

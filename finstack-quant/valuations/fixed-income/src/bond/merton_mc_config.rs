@@ -3,8 +3,8 @@
 //! policy and recovery assumptions.
 //!
 //! The engine that consumes [`MertonMcConfig`] lives with the bond; this
-//! module holds only the serializable vocabulary embedded in
-//! [`ModelConfig`](crate::instruments::pricing_overrides::ModelConfig).
+//! module holds only the serializable vocabulary stored directly on
+//! [`Bond::merton_mc_config`](crate::bond::Bond::merton_mc_config).
 
 use finstack_quant_models::credit::DynamicRecoverySpec;
 use finstack_quant_models::credit::EndogenousHazardSpec;
@@ -110,7 +110,7 @@ pub enum PikMode {
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_valuations_core::instruments::{PikMode, PikSchedule};
+/// use finstack_quant_valuations_fixed_income::bond::{PikMode, PikSchedule};
 ///
 /// // All coupons PIK
 /// let uniform = PikSchedule::Uniform(PikMode::Pik);
@@ -208,12 +208,16 @@ pub struct MertonMcConfig {
     pub cashflow_dfs: Option<Vec<(f64, f64)>>,
 }
 
+pub(crate) const DEFAULT_MERTON_PIK_MC_PATHS: usize = 5_000;
+pub(crate) const DEFAULT_MERTON_PIK_ANTITHETIC: bool = true;
+const DEFAULT_MERTON_PIK_STEPS_PER_YEAR: usize = 12;
+
 impl MertonMcConfig {
     /// Create a new configuration with default simulation parameters.
     ///
-    /// The time-grid density is sourced from the embedded Monte Carlo
-    /// registry; recovery is always supplied explicitly by the caller. Path
-    /// count, antithetic sampling and the seed are resolved separately into a
+    /// Uses `12` steps per year on the simulation grid (`DEFAULT_MERTON_PIK_STEPS_PER_YEAR`);
+    /// recovery is always supplied explicitly by the caller. Path count,
+    /// antithetic sampling and the seed are resolved separately into a
     /// `MertonMcRun`.
     ///
     /// # Arguments
@@ -229,7 +233,6 @@ impl MertonMcConfig {
     /// outside `[0, 1]`.
     pub fn new(merton: MertonModel, recovery_rate: f64) -> finstack_quant_core::Result<Self> {
         validate_recovery_rate(recovery_rate)?;
-        let defaults = &crate::pricer::defaults::embedded_defaults()?.merton_pik_bond;
         let barrier_crossing = match merton.barrier_type() {
             MertonBarrierType::FirstPassage { .. } => BarrierCrossing::BrownianBridge,
             MertonBarrierType::Terminal => BarrierCrossing::Discrete,
@@ -240,7 +243,7 @@ impl MertonMcConfig {
             endogenous_hazard: None,
             dynamic_recovery: None,
             toggle_model: None,
-            steps_per_year: defaults.steps_per_year,
+            steps_per_year: DEFAULT_MERTON_PIK_STEPS_PER_YEAR,
             barrier_crossing,
             recovery_rate,
             calibration: None,
@@ -329,6 +332,16 @@ impl MertonMcConfig {
     pub fn toggle_model(mut self, t: ToggleExerciseModel) -> Self {
         self.toggle_model = Some(t);
         self
+    }
+
+    /// Validate that recovery rate and configuration invariants hold.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `recovery_rate` is non-finite or lies
+    /// outside `[0, 1]`.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        validate_recovery_rate(self.recovery_rate)
     }
 }
 

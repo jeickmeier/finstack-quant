@@ -283,29 +283,29 @@
       "instrument_pricing_overrides": {
         "model_config": {
           "mc_antithetic": true,
-          "mc_paths": 1000,
-          "merton_mc_config": {
-          "barrier_crossing": "brownian_bridge",
-          "recovery_rate": 0.4,
-          "merton": {
-            "asset_value": 200.0,
-            "asset_vol": 0.25,
-            "barrier_type": {
-              "first_passage": {
-                "barrier_growth_rate": 0.0
-              }
-            },
-            "debt_barrier": 100.0,
-            "dynamics": "geometric_brownian",
-            "payout_rate": 0.0,
-            "risk_free_rate": 0.04
-          },
-          "pik_schedule": {
-            "uniform": "pik"
-          },
-          "steps_per_year": 50
-          }
+          "mc_paths": 1000
         }
+      },
+      "merton_mc_config": {
+        "barrier_crossing": "brownian_bridge",
+        "recovery_rate": 0.4,
+        "merton": {
+          "asset_value": 200.0,
+          "asset_vol": 0.25,
+          "barrier_type": {
+            "first_passage": {
+              "barrier_growth_rate": 0.0
+            }
+          },
+          "debt_barrier": 100.0,
+          "dynamics": "geometric_brownian",
+          "payout_rate": 0.0,
+          "risk_free_rate": 0.04
+        },
+        "pik_schedule": {
+          "uniform": "pik"
+        },
+        "steps_per_year": 50
       },
       "settlement_days": 0
     },

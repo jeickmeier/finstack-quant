@@ -172,13 +172,11 @@ it("shows absence distinctly", () => {
   const absent = decode(fixture.cases[0]);
   delete absent.details;
   delete absent.explanation;
-  absent.covenants = null;
   render(<ValuationDetails result={absent} />);
   expect(screen.getByText("No valuation details returned")).toBeTruthy();
   expect(screen.queryByText("Explanation")).toBeNull();
-  expect(screen.queryByText("Covenants")).toBeNull();
 });
-it("preserves optional canonical trace and covenant sections as raw transport", async () => {
+it("preserves optional canonical trace section as raw transport", async () => {
   // Core explain.rs test_cashflow_pv_entry supplies this trace shape and values.
   // This validates transport of a supplied trace, not a generated pricing trace.
   const explanation: NonNullable<ValuationResult["explanation"]> = {
@@ -196,15 +194,9 @@ it("preserves optional canonical trace and covenant sections as raw transport", 
       },
     ],
   };
-  const reports = native.evaluateEngine(
-    fixture.covenantRequest.engineJson,
-    fixture.covenantRequest.metricsJson,
-    fixture.covenantRequest.asOf,
-  );
   const result = {
     ...decode(fixture.cases[0]),
     explanation,
-    covenants: reports,
   };
   expect(() =>
     native.valuationResultToJson(serializeHost(result)),
@@ -217,14 +209,6 @@ it("preserves optional canonical trace and covenant sections as raw transport", 
   showOriginal(trace);
   expect(trace.querySelector("pre")!.textContent).toBe(
     serializeHost(explanation),
-  );
-  const covenants = await screen.findByRole("region", {
-    name: "Covenant reports JSON",
-    hidden: true,
-  });
-  showOriginal(covenants);
-  expect(covenants.querySelector("pre")!.textContent).toBe(
-    serializeHost(result.covenants),
   );
 });
 

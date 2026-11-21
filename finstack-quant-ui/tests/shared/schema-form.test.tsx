@@ -144,13 +144,7 @@ it("preserves real bond wide-integer fields until the generated codec checks the
     recovery_rate: 0.4,
     calibration,
   };
-  spec.instrument_pricing_overrides = {
-    model_config: {
-      mc_paths: 5000,
-      mc_antithetic: true,
-      merton_mc_config: config,
-    },
-  };
+  spec.merton_mc_config = config;
   const validator = structuralValidator(bond);
   const text = bond.codec.stringify(validator.parse(edited));
   expect(text).toContain('"seed":18446744073709551615');
@@ -166,9 +160,7 @@ it("preserves real bond wide-integer fields until the generated codec checks the
       module={bond}
       defaultValues={edited}
       fields={{
-        allow: [
-          "instrument.spec.instrument_pricing_overrides.model_config.merton_mc_config.calibration.seed",
-        ],
+        allow: ["instrument.spec.merton_mc_config.calibration.seed"],
       }}
       validate={validate}
       onSubmit={submit}

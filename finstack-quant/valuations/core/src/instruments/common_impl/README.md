@@ -46,8 +46,6 @@ that keep instrument invariants uniform.
 | `../legs.rs` | `PayReceive`, `FinancingLegSpec` |
 | `market.rs` | `SettlementType` (`OptionType` and `ExerciseStyle` live in `finstack-quant-models`) |
 | `conventions.rs` | `NotionalExchange`, `ResettingSide` |
-| `merton_mc.rs` | `MertonMcConfig`, `MertonMcCalibrationSpec`, `CalibrationParameter`, `BarrierCrossing`, `PikMode`, `PikSchedule` |
-| `bond_quote.rs` | `BondQuoteInput` |
 | `monitoring.rs`, `quanto.rs` | `Monitoring`, `QuantoSpec` (validated correlation in `[-1, 1]`) |
 | `trs_common.rs` | `TrsScheduleSpec` — shared by equity and fixed-income TRS |
 

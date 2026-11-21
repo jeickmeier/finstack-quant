@@ -78,14 +78,6 @@ pub struct ModelConfig {
     pub tree_model: Option<ShortRateTreeModel>,
     /// Number of time steps for tree-based pricing (e.g., 100).
     pub tree_steps: Option<usize>,
-    /// Merton Monte Carlo configuration for structural credit PIK pricing.
-    ///
-    /// When set (at `instrument_pricing_overrides.model_config.merton_mc_config`
-    /// or via the Rust builder), the `MertonMc` pricer in the registry uses this
-    /// model and grid; the path count, antithetic flag and seed label come from
-    /// `mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub merton_mc_config: Option<crate::instruments::MertonMcConfig>,
     /// Exercise friction cost for issuer/borrower calls, expressed as **cents per 100 of par**.
     ///
     /// This models the real-world costs of refinancing / reissue (fees, OID, documentation),
@@ -291,7 +283,6 @@ impl Default for ModelConfig {
             vol_surface_extrapolation: VolSurfaceExtrapolation::default(),
             tree_model: None,
             tree_steps: None,
-            merton_mc_config: None,
             call_friction_cents: None,
             hw1f_sigma: None,
             hw1f_sigma_schedule: None,

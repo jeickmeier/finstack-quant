@@ -24,8 +24,6 @@
 //! its `finstack_quant_valuations::pricer::STANDARD.pricers()` is that pricer registry.
 
 // Core submodules
-#[doc(hidden)]
-pub mod defaults;
 mod enrichment;
 mod errors;
 mod family;

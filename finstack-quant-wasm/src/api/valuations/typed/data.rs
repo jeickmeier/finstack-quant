@@ -189,7 +189,7 @@ impl JsMertonMcConfig {
     ///
     /// Honoured by the `merton_mc` pricing model (`Bond.price` with model
     /// `"merton_mc"` and this configuration in the bond's
-    /// `instrument_pricing_overrides.model_config.merton_mc_config`), which
+    /// `merton_mc_config`), which
     /// solves the structural parameter to the target quote before the
     /// full-path price. `Bond.priceMertonMc` prices the configuration as
     /// given and does not calibrate.
