@@ -292,9 +292,15 @@ impl FactorModelConfig {
     /// issuer rows are duplicated, or a confidence-bearing risk measure is
     /// outside its accepted range.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        let factor_ids: Vec<&FactorId> = self.factors.iter().map(|factor| &factor.id).collect();
-        let covariance_ids: Vec<&FactorId> = self.covariance.factor_ids().iter().collect();
-        if factor_ids != covariance_ids {
+        if self.factors.len() != self.covariance.factor_ids().len()
+            || !self
+                .factors
+                .iter()
+                .map(|factor| &factor.id)
+                .eq(self.covariance.factor_ids().iter())
+        {
+            let factor_ids: Vec<&FactorId> = self.factors.iter().map(|factor| &factor.id).collect();
+            let covariance_ids: Vec<&FactorId> = self.covariance.factor_ids().iter().collect();
             return Err(finstack_quant_core::Error::Validation(format!(
                 "FactorModelConfig: covariance factor ids must exactly match factors in order; \
                  factors={factor_ids:?}, covariance={covariance_ids:?}"
@@ -305,24 +311,8 @@ impl FactorModelConfig {
     }
 
     /// Validates that every factor identifier the matcher can emit is also
-    /// present in `factors`.
-    ///
-    /// This is the static counterpart to runtime "missing factor" failures:
-    /// catching the misalignment at config-load time avoids surprises during
-    /// portfolio analysis. Cascades and credit hierarchies are walked
-    /// recursively so every reachable factor ID is checked.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`finstack_quant_core::Error::Validation`] when any factor ID emitted by the
-    /// matching config is not declared in [`Self::factors`].
-    ///
-    /// # Limitations
-    ///
-    /// This validation only enumerates factor IDs for issuers known to the calibrated
-    /// `issuer_betas`. If a runtime issuer with full tags is treated as `BucketOnly`,
-    /// its bucket factor IDs are not checked here.
-    pub fn validate_matching_factor_ids(&self) -> finstack_quant_core::Result<()> {
+    /// present in `factors` and no issuer beta row is duplicated.
+    fn validate_matching_factor_ids(&self) -> finstack_quant_core::Result<()> {
         use std::collections::BTreeSet;
         let known: BTreeSet<&FactorId> = self.factors.iter().map(|f| &f.id).collect();
         for fid in self.matching.enumerate_factor_ids() {
@@ -339,40 +329,22 @@ impl FactorModelConfig {
 
 /// Reject matching configs with more than one beta row for the same issuer —
 /// within a single credit-hierarchical config **or across cascade members**.
-///
-/// Row lookup (binary search) resolves within-config duplicates arbitrarily,
-/// and the idiosyncratic-variance collector lets a later cascade member's row
-/// silently overwrite an earlier one's adder variance, so either form of
-/// duplication can source betas and idiosyncratic variance from two
-/// different rows for the same issuer.
 fn check_no_duplicate_issuer_rows(matching: &MatchingConfig) -> finstack_quant_core::Result<()> {
     use std::collections::BTreeSet;
-    fn walk<'a>(
-        matching: &'a MatchingConfig,
-        seen: &mut BTreeSet<&'a str>,
-    ) -> finstack_quant_core::Result<()> {
-        match matching {
-            MatchingConfig::Cascade(configs) => {
-                configs.iter().try_for_each(|config| walk(config, seen))
+    let mut seen = BTreeSet::new();
+    for config in matching.credit_configs() {
+        for row in &config.issuer_betas {
+            if !seen.insert(row.issuer_id.as_str()) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "FactorModelConfig: duplicate issuer_id {:?} in credit \
+                     hierarchical matching config (within one config or \
+                     across cascade members)",
+                    row.issuer_id.as_str()
+                )));
             }
-            MatchingConfig::CreditHierarchical(config) => {
-                for row in &config.issuer_betas {
-                    if !seen.insert(row.issuer_id.as_str()) {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "FactorModelConfig: duplicate issuer_id {:?} in credit \
-                             hierarchical matching config (within one config or \
-                             across cascade members)",
-                            row.issuer_id.as_str()
-                        )));
-                    }
-                }
-                Ok(())
-            }
-            _ => Ok(()),
         }
     }
-    let mut seen = BTreeSet::new();
-    walk(matching, &mut seen)
+    Ok(())
 }
 
 #[cfg(test)]

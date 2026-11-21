@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::FactorModelConfig;
 
 /// Persistence contract for [`FactorModelConfigEnvelope`].
-pub const FACTOR_MODEL_CONFIG_CONTRACT: ContractDescriptor =
+pub(crate) const FACTOR_MODEL_CONFIG_CONTRACT: ContractDescriptor =
     ContractDescriptor::new("finstack_quant.factor_model_config");
 
 /// Exact schema marker accepted by [`FactorModelConfigEnvelope`].

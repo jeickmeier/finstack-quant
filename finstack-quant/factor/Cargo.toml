@@ -15,8 +15,8 @@ finstack-quant-core = { path = "../core", version = "0.11.0-dev.202610210600", d
 finstack-quant-analytics = { path = "../analytics", version = "0.11.0-dev.202610210600", default-features = false }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tracing = { version = "0.1", default-features = false, features = ["attributes"] }
-time = { workspace = true }
+tracing = { version = "0.1", default-features = false }
+time = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 thiserror = { workspace = true }
 
@@ -24,6 +24,7 @@ thiserror = { workspace = true }
 default = ["json-schema"]
 json-schema = [
     "dep:schemars",
+    "dep:time",
     "finstack-quant-core/json-schema",
     "finstack-quant-analytics/json-schema",
 ]
@@ -32,7 +33,7 @@ json-schema = [
 criterion = { workspace = true }
 jsonschema = { version = "0.28", default-features = false }
 proptest = "1.11.0"
-time = { workspace = true, features = ["macros"] }
+time = { workspace = true }
 
 [[bench]]
 name = "factor_model"

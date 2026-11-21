@@ -1017,9 +1017,8 @@ impl CreditFactorModel {
     /// - `factor_histories` has vectors of inconsistent length.
     /// - `static_correlation` fails structural checks (shape, diagonal, symmetry, duplicate IDs).
     /// - the matching config can emit a factor ID not declared in
-    ///   `config.factors` (see
-    ///   [`crate::FactorModelConfig::validate_matching_factor_ids`]) — such a
-    ///   factor would silently contribute zero risk at lookup time.
+    ///   `config.factors` (see [`crate::FactorModelConfig::validate`]) — such
+    ///   a factor would silently contribute zero risk at lookup time.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         // Duplicate issuers
         let mut seen_issuers: BTreeSet<&IssuerId> = BTreeSet::new();

@@ -25,10 +25,7 @@ use finstack_quant_factor::credit::decomposition::{decompose_levels, decompose_p
 use finstack_quant_factor::{
     CurveType, FactorCovarianceMatrix, FactorId, MarketDependency, SensitivityMatrix,
 };
-use finstack_quant_factor::{
-    DependencyFilter, FactorMatcher, FactorNode, HierarchicalConfig, MappingTableMatcher,
-    MatchingConfig,
-};
+use finstack_quant_factor::{DependencyFilter, FactorNode, HierarchicalConfig, MatchingConfig};
 use fixtures::{
     CreditBook, credit_dependency, credit_hierarchical_config, factor_ids, known_issuer_attrs,
     mapping_rules, psd_matrix, unknown_issuer_attrs, zero_sensitivity_matrix,
@@ -86,12 +83,13 @@ fn bench_covariance_batch_lookups(c: &mut Criterion) {
 
     {
         let n = 50;
+        let ids = factor_ids(n);
         let data = psd_matrix(n);
-        let matrix = FactorCovarianceMatrix::new(factor_ids(n), data).unwrap();
+        let matrix = FactorCovarianceMatrix::new(ids.clone(), data).unwrap();
 
         group.bench_with_input(BenchmarkId::new("all_variances", n), &n, |b, _| {
             b.iter(|| {
-                let vars: Vec<f64> = (0..n).map(|i| matrix.variance_at(i)).collect();
+                let vars: Vec<f64> = ids.iter().map(|id| matrix.variance(id)).collect();
                 black_box(vars);
             })
         });
@@ -101,7 +99,7 @@ fn bench_covariance_batch_lookups(c: &mut Criterion) {
                 let mut corrs = Vec::with_capacity(n * (n - 1) / 2);
                 for i in 0..n {
                     for j in (i + 1)..n {
-                        corrs.push(matrix.correlation_at(i, j));
+                        corrs.push(matrix.correlation(&ids[i], &ids[j]));
                     }
                 }
                 black_box(corrs);
@@ -118,7 +116,7 @@ fn bench_mapping_table_matcher(c: &mut Criterion) {
     {
         let n = 50;
         let rules = mapping_rules(n);
-        let matcher = MappingTableMatcher::new(rules);
+        let matcher = MatchingConfig::MappingTable(rules).build_matcher();
         let attrs = Attributes::default();
 
         let first_dep = MarketDependency::Curve {

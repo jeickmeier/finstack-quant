@@ -122,7 +122,7 @@ pub enum MarketDependency {
 impl MarketDependency {
     /// Returns whether this dependency matches the requested dependency class.
     #[must_use]
-    pub fn matches_dependency_type(&self, dependency_type: DependencyType) -> bool {
+    pub(crate) fn matches_dependency_type(&self, dependency_type: DependencyType) -> bool {
         match (self, dependency_type) {
             (Self::Curve { curve_type, .. }, DependencyType::Discount) => {
                 *curve_type == CurveType::Discount
@@ -148,7 +148,7 @@ impl MarketDependency {
     /// variant, but `Curve { curve_type: CurveType::Hazard, .. }` also matches
     /// so callers can treat both representations consistently.
     #[must_use]
-    pub fn matches_curve_type(&self, curve_type: CurveType) -> bool {
+    pub(crate) fn matches_curve_type(&self, curve_type: CurveType) -> bool {
         match (self, curve_type) {
             (
                 Self::Curve {
@@ -161,18 +161,28 @@ impl MarketDependency {
         }
     }
 
+    /// Canonical identifier used for rule lookup and `DependencyFilter::id` matching.
+    ///
+    /// FX pairs use the canonical `BASE/QUOTE` form, for example `USD/EUR`.
+    #[must_use]
+    pub(crate) fn lookup_id(&self) -> std::borrow::Cow<'_, str> {
+        match self {
+            Self::Curve { id, .. } | Self::CreditCurve { id } | Self::CreditIndex { id } => {
+                std::borrow::Cow::Borrowed(id.as_ref())
+            }
+            Self::Spot { id } | Self::VolSurface { id } | Self::Series { id } => {
+                std::borrow::Cow::Borrowed(id.as_str())
+            }
+            Self::FxPair { base, quote } => std::borrow::Cow::Owned(format!("{base}/{quote}")),
+        }
+    }
+
     /// Returns whether the dependency matches the provided identifier.
     ///
     /// FX pairs use the canonical `BASE/QUOTE` form, for example `USD/EUR`.
     #[must_use]
-    pub fn matches_id(&self, expected_id: &str) -> bool {
-        match self {
-            Self::Curve { id, .. } | Self::CreditCurve { id } | Self::CreditIndex { id } => {
-                id.as_ref() == expected_id
-            }
-            Self::Spot { id } | Self::VolSurface { id } | Self::Series { id } => id == expected_id,
-            Self::FxPair { base, quote } => format!("{base}/{quote}") == expected_id,
-        }
+    pub(crate) fn matches_id(&self, expected_id: &str) -> bool {
+        self.lookup_id().as_ref() == expected_id
     }
 }
 

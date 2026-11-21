@@ -61,6 +61,26 @@ impl MatchingConfig {
         }
     }
 
+    /// Collect every [`CreditHierarchicalConfig`] contained within `self`
+    /// (including any nested inside cascades).
+    #[must_use]
+    pub fn credit_configs(&self) -> Vec<&CreditHierarchicalConfig> {
+        fn collect<'a>(cfg: &'a MatchingConfig, out: &mut Vec<&'a CreditHierarchicalConfig>) {
+            match cfg {
+                MatchingConfig::Cascade(configs) => {
+                    for child in configs {
+                        collect(child, out);
+                    }
+                }
+                MatchingConfig::CreditHierarchical(credit) => out.push(credit),
+                MatchingConfig::MappingTable(_) | MatchingConfig::Hierarchical(_) => {}
+            }
+        }
+        let mut out = Vec::new();
+        collect(self, &mut out);
+        out
+    }
+
     /// Returns every factor identifier this matcher config can emit.
     ///
     /// Used by [`FactorModelConfig`](crate::FactorModelConfig)
@@ -109,23 +129,12 @@ fn collect_node_factor_ids(node: &FactorNode, ids: &mut std::collections::BTreeS
 
 #[cfg(test)]
 mod tests {
+    use super::super::deepest_match;
     use super::*;
     use crate::FactorId;
     use crate::matching::{AttributeFilter, DependencyFilter};
     use crate::{DependencyType, MarketDependency};
     use finstack_quant_core::types::{Attributes, CurveId};
-
-    fn deepest_match(
-        matcher: &dyn FactorMatcher,
-        dependency: &MarketDependency,
-        attributes: &Attributes,
-    ) -> Option<FactorId> {
-        matcher
-            .match_factor(dependency, attributes)
-            .ok()
-            .flatten()
-            .and_then(|entries| entries.last().map(|entry| entry.factor_id.clone()))
-    }
 
     #[test]
     fn test_matching_config_mapping_table() {

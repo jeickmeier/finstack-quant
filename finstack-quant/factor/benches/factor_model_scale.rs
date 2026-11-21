@@ -17,8 +17,7 @@ use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, 
 use finstack_quant_core::types::Attributes;
 use finstack_quant_factor::credit::calibration::{CovarianceStrategy, CreditCalibrator};
 use finstack_quant_factor::credit::decomposition::decompose_levels;
-use finstack_quant_factor::{CurveType, FactorCovarianceMatrix, MarketDependency};
-use finstack_quant_factor::{FactorMatcher, MappingTableMatcher, MatchingConfig};
+use finstack_quant_factor::{CurveType, FactorCovarianceMatrix, MarketDependency, MatchingConfig};
 use fixtures::{
     CreditBook, credit_dependency, credit_hierarchical_config, factor_ids, known_issuer_attrs,
     mapping_rules, psd_matrix, zero_sensitivity_matrix,
@@ -45,7 +44,7 @@ fn scaling_mapping_table(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_mapping_table");
     let attrs = Attributes::default();
     for n in [50_usize, 200, 500] {
-        let matcher = MappingTableMatcher::new(mapping_rules(n));
+        let matcher = MatchingConfig::MappingTable(mapping_rules(n)).build_matcher();
         let last_dep = MarketDependency::Curve {
             id: finstack_quant_core::types::CurveId::new(format!("CURVE-{}", n - 1)),
             curve_type: CurveType::Discount,
@@ -201,7 +200,8 @@ fn scaling_sensitivity_matrix(c: &mut Criterion) {
 fn scaling_covariance_batch_lookups(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_covariance_batch_lookups");
     for n in [20_usize, 50, 100] {
-        let matrix = FactorCovarianceMatrix::new(factor_ids(n), psd_matrix(n)).unwrap();
+        let ids = factor_ids(n);
+        let matrix = FactorCovarianceMatrix::new(ids.clone(), psd_matrix(n)).unwrap();
         let pairs = n * (n - 1) / 2;
         group.throughput(Throughput::Elements(pairs as u64));
         group.bench_with_input(BenchmarkId::new("all_correlations", n), &n, |b, _| {
@@ -209,7 +209,7 @@ fn scaling_covariance_batch_lookups(c: &mut Criterion) {
                 let mut corrs = Vec::with_capacity(pairs);
                 for i in 0..n {
                     for j in (i + 1)..n {
-                        corrs.push(matrix.correlation_at(i, j));
+                        corrs.push(matrix.correlation(&ids[i], &ids[j]));
                     }
                 }
                 black_box(corrs);

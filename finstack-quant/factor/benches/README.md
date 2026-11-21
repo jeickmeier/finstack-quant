@@ -16,8 +16,8 @@ a risk run repeats once per instrument leg.
 |-------|-----|----------|
 | `covariance_construction` | `validated/50` | `FactorCovarianceMatrix::new` on a 50×50 matrix, including the symmetry and PSD validation it performs on every construction |
 | `covariance_lookups` | `variance/50`, `covariance/50`, `correlation/50` | Single-entry lookups by `FactorId` |
-| `covariance_batch_lookups` | `all_variances/50`, `all_correlations/50` | The N and N(N−1)/2 loop shapes a risk run actually issues |
-| `mapping_table_matcher` | `hit_first/50`, `hit_last/50`, `miss/50` | `MappingTableMatcher::match_factor` over 50 rules; the three ids bracket best case, worst case, and full-scan miss |
+| `covariance_batch_lookups` | `all_variances/50`, `all_correlations/50` | The N and N(N−1)/2 keyed lookup loop shapes a risk run issues |
+| `mapping_table_matcher` | `hit_first/50`, `hit_last/50`, `miss/50` | `MatchingConfig::MappingTable` (`FactorMatcher::match_factor`) over 50 rules; the three ids bracket best case, worst case, and full-scan miss |
 | `hierarchical_matcher` | `{shallow_2x3,medium_3x3,deep_4x2}_{hit,fallback}` | `MatchingConfig::Hierarchical` tree traversal at three depth/branching shapes, matched on an `Attributes` tag and on a tag that hits no child |
 | `cascade_matcher` | `hit_first_stage`, `hit_second_stage`, `miss_all_stages` | `MatchingConfig::Cascade` over two `MatchingConfig::MappingTable` stages (exact rule, then generic-credit fallback) |
 

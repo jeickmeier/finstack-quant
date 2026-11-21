@@ -11,6 +11,17 @@ pub use credit::{
     parse_bucket_factor_id,
 };
 pub use filter::{AttributeFilter, DependencyFilter};
-pub use matchers::{
-    FactorMatchEntry, FactorMatchError, FactorMatcher, FactorNode, MappingRule, MappingTableMatcher,
-};
+pub use matchers::{FactorMatchEntry, FactorMatchError, FactorMatcher, FactorNode, MappingRule};
+
+#[cfg(test)]
+pub(super) fn deepest_match(
+    matcher: &dyn FactorMatcher,
+    dependency: &crate::MarketDependency,
+    attributes: &finstack_quant_core::types::Attributes,
+) -> Option<crate::FactorId> {
+    matcher
+        .match_factor(dependency, attributes)
+        .ok()
+        .flatten()
+        .and_then(|entries| entries.last().map(|entry| entry.factor_id.clone()))
+}

@@ -1,7 +1,7 @@
 //! `FactorMatcher` trait and its built-in implementations.
 //!
 //! Three matchers are provided:
-//! - [`MappingTableMatcher`]: flat rule-table lookup, first match wins.
+//! - `MappingTableMatcher`: flat rule-table lookup, first match wins.
 //! - `HierarchicalMatcher`: tree traversal, deepest match wins.
 //! - `CascadeMatcher`: ordered fallback chain over other matchers.
 //!
@@ -15,7 +15,6 @@ use crate::MarketDependency;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_core::types::Attributes;
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 
 /// One factor match decorated with a beta loading.
 ///
@@ -102,19 +101,6 @@ fn one_entry(factor_id: FactorId) -> Vec<FactorMatchEntry> {
     }]
 }
 
-#[cfg(test)]
-fn deepest_match(
-    matcher: &dyn FactorMatcher,
-    dependency: &MarketDependency,
-    attributes: &Attributes,
-) -> Option<FactorId> {
-    matcher
-        .match_factor(dependency, attributes)
-        .ok()
-        .flatten()
-        .and_then(|entries| entries.last().map(|entry| entry.factor_id.clone()))
-}
-
 /// A single matching rule from dependency and attribute filters to a factor.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -130,7 +116,7 @@ pub struct MappingRule {
 
 /// Flat lookup-table matcher where the first matching rule wins.
 #[derive(Debug, Clone, Default)]
-pub struct MappingTableMatcher {
+pub(crate) struct MappingTableMatcher {
     rules: Vec<MappingRule>,
     /// Rule indices with an exact `dependency_filter.id`, grouped by that id
     /// in declaration order.
@@ -150,7 +136,7 @@ impl MappingTableMatcher {
     /// * `rules` - Ordered mapping rules. Exact-id rules are indexed for
     ///   lookup; rules with no id remain a sequential wildcard scan.
     #[must_use]
-    pub fn new(rules: Vec<MappingRule>) -> Self {
+    pub(crate) fn new(rules: Vec<MappingRule>) -> Self {
         let (exact_by_id, wildcards) = index_mapping_rules(&rules);
         Self {
             rules,
@@ -172,24 +158,13 @@ fn index_mapping_rules(rules: &[MappingRule]) -> (FxHashMap<String, Vec<usize>>,
     (exact_by_id, wildcards)
 }
 
-fn dependency_lookup_id(dep: &MarketDependency) -> Cow<'_, str> {
-    match dep {
-        MarketDependency::Curve { id, .. }
-        | MarketDependency::CreditCurve { id }
-        | MarketDependency::CreditIndex { id } => Cow::Borrowed(id.as_ref()),
-        MarketDependency::Spot { id }
-        | MarketDependency::VolSurface { id }
-        | MarketDependency::Series { id } => Cow::Borrowed(id.as_str()),
-        MarketDependency::FxPair { base, quote } => Cow::Owned(format!("{base}/{quote}")),
-    }
-}
-
 fn rule_matches(
     rule: &MappingRule,
     dependency: &MarketDependency,
     attributes: &Attributes,
 ) -> bool {
-    rule.dependency_filter.matches(dependency) && rule.attribute_filter.matches(attributes)
+    rule.dependency_filter.matches_without_id(dependency)
+        && rule.attribute_filter.matches(attributes)
 }
 
 impl FactorMatcher for MappingTableMatcher {
@@ -198,7 +173,7 @@ impl FactorMatcher for MappingTableMatcher {
         dependency: &MarketDependency,
         attributes: &Attributes,
     ) -> Result<Option<Vec<FactorMatchEntry>>, FactorMatchError> {
-        let lookup_id = dependency_lookup_id(dependency);
+        let lookup_id = dependency.lookup_id();
         let mut best: Option<usize> = None;
         if let Some(indices) = self.exact_by_id.get(lookup_id.as_ref()) {
             for &idx in indices {
@@ -334,6 +309,9 @@ impl FactorMatcher for CascadeMatcher {
         Ok(None)
     }
 }
+
+#[cfg(test)]
+use super::deepest_match;
 
 #[cfg(test)]
 mod tests_mapping_table {

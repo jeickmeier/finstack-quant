@@ -650,30 +650,15 @@ fn credit_idiosyncratic_variance(
     matching: &MatchingConfig,
 ) -> BTreeMap<finstack_quant_core::types::IssuerId, f64> {
     let mut out = BTreeMap::new();
-    collect_credit_idiosyncratic_variance(matching, &mut out);
-    out
-}
-
-fn collect_credit_idiosyncratic_variance(
-    matching: &MatchingConfig,
-    out: &mut BTreeMap<finstack_quant_core::types::IssuerId, f64>,
-) {
-    match matching {
-        MatchingConfig::CreditHierarchical(config) => {
-            for row in &config.issuer_betas {
-                out.insert(
-                    row.issuer_id.clone(),
-                    row.adder_vol_annualized * row.adder_vol_annualized,
-                );
-            }
+    for config in matching.credit_configs() {
+        for row in &config.issuer_betas {
+            out.insert(
+                row.issuer_id.clone(),
+                row.adder_vol_annualized * row.adder_vol_annualized,
+            );
         }
-        MatchingConfig::Cascade(configs) => {
-            for config in configs {
-                collect_credit_idiosyncratic_variance(config, out);
-            }
-        }
-        _ => {}
     }
+    out
 }
 
 fn credit_curve_id(dependency: &MarketDependency) -> Option<finstack_quant_core::types::CurveId> {

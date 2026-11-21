@@ -53,23 +53,26 @@ pub struct DependencyFilter {
 }
 
 impl DependencyFilter {
+    /// Returns whether the dependency satisfies type and curve-role filters (excluding `id`).
+    #[must_use]
+    pub(super) fn matches_without_id(&self, dep: &MarketDependency) -> bool {
+        let dependency_type_matches = self
+            .dependency_type
+            .is_none_or(|dependency_type| dep.matches_dependency_type(dependency_type));
+        let curve_type_matches = self
+            .curve_type
+            .is_none_or(|curve_type| dep.matches_curve_type(curve_type));
+        dependency_type_matches && curve_type_matches
+    }
+
     /// Returns whether the dependency satisfies this filter.
     #[must_use]
     pub fn matches(&self, dep: &MarketDependency) -> bool {
-        let dependency_type_matches = match self.dependency_type {
-            Some(dependency_type) => dep.matches_dependency_type(dependency_type),
-            None => true,
-        };
-        let curve_type_matches = match self.curve_type {
-            Some(curve_type) => dep.matches_curve_type(curve_type),
-            None => true,
-        };
-        let id_matches = match self.id.as_deref() {
-            Some(expected_id) => dep.matches_id(expected_id),
-            None => true,
-        };
-
-        dependency_type_matches && curve_type_matches && id_matches
+        self.matches_without_id(dep)
+            && self
+                .id
+                .as_deref()
+                .is_none_or(|expected_id| dep.matches_id(expected_id))
     }
 }
 
