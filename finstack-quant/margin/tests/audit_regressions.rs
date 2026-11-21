@@ -157,24 +157,26 @@ fn simm_preserves_ir_direction_and_does_not_erase_unrelated_equities() {
     same.add_ir_delta(Currency::EUR, "5Y", 1000.0);
     let mut opposite = same.clone();
     opposite.add_ir_delta(Currency::EUR, "5Y", -2000.0);
+    let date = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 10)
+        .expect("date");
     let positive = calc
-        .calculate_from_sensitivities_parts(&same, Currency::USD)
+        .calculate_from_sensitivities(&same, Currency::USD, date)
         .expect("IM")
-        .0;
+        .amount
+        .amount();
     let hedged = calc
-        .calculate_from_sensitivities_parts(&opposite, Currency::USD)
+        .calculate_from_sensitivities(&opposite, Currency::USD, date)
         .expect("IM")
-        .0;
+        .amount
+        .amount();
     assert!(hedged < positive);
     assert!(
-        calc.calculate_from_sensitivities_parts(&same, Currency::EUR)
+        calc.calculate_from_sensitivities(&same, Currency::EUR, date)
             .is_err()
     );
     let mut equity = SimmSensitivities::new(Currency::USD);
     equity.add_equity_delta("AAPL", 100_000.0);
     equity.add_equity_delta("MSFT", -100_000.0);
-    let date = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 10)
-        .expect("date");
     let result = calc
         .calculate_from_sensitivities(&equity, Currency::USD, date)
         .expect("indicative IM");

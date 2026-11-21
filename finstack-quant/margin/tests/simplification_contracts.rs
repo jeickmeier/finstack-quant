@@ -123,12 +123,15 @@ fn published_simm_wire_examples_are_accepted_by_the_calculator() {
         .expect("canonical SIMM wire artifact");
     let schema = artifact.generate().expect("generate schema");
     let calculator = SimmCalculator::new(SimmVersion::default()).expect("embedded registry");
+    let as_of =
+        finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 15)
+            .expect("valid date");
     for example in schema["examples"].as_array().expect("published examples") {
         let wire: SimmSensitivitiesJson =
             serde_json::from_value(example.clone()).expect("decode wire example");
         let sensitivities: SimmSensitivities = wire.into();
         calculator
-            .calculate_from_sensitivities_parts(&sensitivities, Currency::USD)
+            .calculate_from_sensitivities(&sensitivities, Currency::USD, as_of)
             .expect("example accepted by model");
     }
 }

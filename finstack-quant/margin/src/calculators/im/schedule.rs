@@ -255,7 +255,7 @@ impl RegulatorySchedule {
 
     /// Build from a registry entry.
     #[must_use]
-    pub fn from_registry(entry: crate::registry::ScheduleImSchedule) -> Self {
+    pub(crate) fn from_registry(entry: crate::registry::ScheduleImSchedule) -> Self {
         Self {
             rates: entry.rates,
             short_to_medium: entry.boundaries.short_to_medium,
@@ -562,13 +562,8 @@ impl ScheduleImCalculator {
         )))
     }
 
-    /// Canonical schedule IM breakdown key for NGR-reduced netting-set results.
-    ///
-    /// # Arguments
-    ///
-    /// * `asset_class` - SIMM asset class selecting the applicable schedule or risk weights.
     #[must_use]
-    pub fn ngr_breakdown_key(asset_class: &ScheduleAssetClass) -> String {
+    fn ngr_breakdown_key(asset_class: &ScheduleAssetClass) -> String {
         format!("{asset_class}_ngr")
     }
 
@@ -592,14 +587,12 @@ impl ScheduleImCalculator {
         as_of: Date,
         breakdown_key: impl Into<String>,
     ) -> ImResult {
-        let mut breakdown = FxHashMap::default();
-        breakdown.insert(breakdown_key.into(), amount);
-        ImResult::with_breakdown(
+        ImResult::with_single_breakdown(
             amount,
             ImMethodology::Schedule,
             as_of,
             self.mpor_days,
-            breakdown,
+            breakdown_key,
         )
     }
 }

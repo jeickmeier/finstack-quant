@@ -1,7 +1,7 @@
 //! Cross-sectional panel transforms partitioned by timestamp.
 
 use crate::types::{
-    f64_param, finite, mean, op_from_str, population_std, quantile_cont, reject_unknown_params,
+    f64_param, finite, impl_op_enum, mean, population_std, quantile_cont, reject_unknown_params,
     scaled_centered, usize_param, validate_lengths, validate_output,
 };
 use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
@@ -9,7 +9,7 @@ use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::cmp::Ordering;
-use std::str::FromStr;
+use std::collections::BTreeMap;
 
 /// Supported cross-sectional transform operation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize)]
@@ -50,47 +50,30 @@ pub enum CrossSectionalOp {
     Winsorize,
 }
 
-impl FromStr for CrossSectionalOp {
-    type Err = Error;
-
-    fn from_str(op: &str) -> Result<Self> {
-        op_from_str(op, "cross-sectional", &Self::names())
-    }
-}
+impl_op_enum!(
+    CrossSectionalOp,
+    "cross-sectional",
+    [
+        Zscore,
+        Rank,
+        PercentileRank,
+        QuantileBucket,
+        Demean,
+        RobustZscore,
+        MinmaxScale,
+        Clip,
+        ClipBySigma,
+        NormalScoreTransform,
+        LongShortWeights,
+        CapWeights,
+        FillMissing,
+        IsFinite,
+        NanMask,
+        Winsorize,
+    ]
+);
 
 impl CrossSectionalOp {
-    /// Every operation, in declaration order.
-    pub const ALL: &'static [Self] = &[
-        Self::Zscore,
-        Self::Rank,
-        Self::PercentileRank,
-        Self::QuantileBucket,
-        Self::Demean,
-        Self::RobustZscore,
-        Self::MinmaxScale,
-        Self::Clip,
-        Self::ClipBySigma,
-        Self::NormalScoreTransform,
-        Self::LongShortWeights,
-        Self::CapWeights,
-        Self::FillMissing,
-        Self::IsFinite,
-        Self::NanMask,
-        Self::Winsorize,
-    ];
-
-    /// Canonical snake_case name used by JSON and host-language APIs.
-    #[must_use]
-    pub fn name(self) -> String {
-        crate::types::op_name(&self)
-    }
-
-    /// Canonical names of every operation, in [`Self::ALL`] order.
-    #[must_use]
-    pub fn names() -> Vec<String> {
-        Self::ALL.iter().map(|op| op.name()).collect()
-    }
-
     /// JSON parameter keys this operation reads; any other key is rejected.
     #[must_use]
     pub fn param_keys(self) -> &'static [&'static str] {
@@ -145,14 +128,8 @@ pub fn transform_cross_sectional(
 ) -> Result<Vec<Option<f64>>> {
     validate_lengths(values.len(), &[("time_key", time_key.len())])?;
     let op = ResolvedCrossSectionalOp::resolve(op, params)?;
-    let partitions = crate::index::partition_by_key(time_key);
-
-    let mut output = vec![None; values.len()];
-    for indices in partitions.values() {
-        op.apply(values, indices, &mut output)?;
-    }
-    validate_output(&output)?;
-    Ok(output)
+    let partitions = crate::index::partition_by(time_key.iter().map(String::as_str));
+    op.apply_partitions(values, &partitions)
 }
 
 /// A cross-sectional operation with its parameters parsed and validated.
@@ -264,10 +241,23 @@ impl ResolvedCrossSectionalOp {
             Self::LongShortWeights => long_short_weights(values, indices, output)?,
             Self::CapWeights { max_abs } => cap_weights(values, indices, max_abs, output)?,
             Self::FillMissing { value } => fill_missing(values, indices, value, output),
-            Self::IsFinite => is_finite(values, indices, output),
-            Self::NanMask => nan_mask(values, indices, output),
+            Self::IsFinite => finite_mask(values, indices, false, output),
+            Self::NanMask => finite_mask(values, indices, true, output),
         }
         Ok(())
+    }
+
+    pub(crate) fn apply_partitions<K: Ord>(
+        self,
+        values: &[Option<f64>],
+        partitions: &BTreeMap<K, Vec<usize>>,
+    ) -> Result<Vec<Option<f64>>> {
+        let mut output = vec![None; values.len()];
+        for indices in partitions.values() {
+            self.apply(values, indices, &mut output)?;
+        }
+        validate_output(&output)?;
+        Ok(output)
     }
 }
 
@@ -561,23 +551,15 @@ fn fill_missing(
     }
 }
 
-fn is_finite(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>]) {
+fn finite_mask(
+    values: &[Option<f64>],
+    indices: &[usize],
+    invert: bool,
+    output: &mut [Option<f64>],
+) {
     for &idx in indices {
-        output[idx] = Some(if finite(values[idx]).is_some() {
-            1.0
-        } else {
-            0.0
-        });
-    }
-}
-
-fn nan_mask(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>]) {
-    for &idx in indices {
-        output[idx] = Some(if finite(values[idx]).is_none() {
-            1.0
-        } else {
-            0.0
-        });
+        let matched = finite(values[idx]).is_none() == invert;
+        output[idx] = Some(if matched { 1.0 } else { 0.0 });
     }
 }
 

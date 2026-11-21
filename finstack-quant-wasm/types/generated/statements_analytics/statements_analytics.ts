@@ -3188,7 +3188,7 @@ export interface Covenant {
    */
   is_active: boolean;
   /**
-   * Optional instance label disambiguating covenants of the same type.
+   * Required instance label disambiguating covenants of the same type.
    *
    * [`CovenantType::covenant_id`] is discriminant-only, so two covenants of
    * the same type (e.g. a senior and a total leverage test, or two baskets)

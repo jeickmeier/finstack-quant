@@ -13,23 +13,25 @@
 //!   amounts before conversion into [`finstack_quant_core::money::Money`].
 //! - `mpor_days` and VM settlement lags are stored in business days.
 //! - Schedule maturities are stored as year fractions.
+use std::fmt::Display;
+use std::str::FromStr;
 use std::sync::OnceLock;
 
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, FxHashMap, Result};
+use serde::Deserialize;
 use serde_json::Value;
 use tracing::{debug, info};
 
 mod validation;
-use validation::{to_validation, validate_haircut, validate_non_negative, validate_rate};
+use validation::{to_validation, validate_haircut, validate_non_negative};
 
 use crate::SimmVersion;
 use crate::calculators::im::schedule::{MaturityBucket, ScheduleAssetClass};
 use crate::types::{
     CollateralAssetClass, CollateralEligibility, EligibleCollateralSchedule, ImMethodology,
-    ImParameters, MarginCallTiming, MarginTenor, MaturityConstraints, VmParameters,
-    ordered_credit_sector_pair, ordered_risk_class_pair, ordered_tenor_pair,
+    ImParameters, MarginCallTiming, MarginTenor, VmParameters, ordered_pair, ordered_tenor_pair,
 };
 use crate::types::{SimmCreditSector, SimmRiskClass};
 
@@ -42,145 +44,150 @@ mod wire;
 /// This is the public, parsed view of the embedded margin registry after any
 /// optional JSON overlay has been applied.
 #[derive(Debug, Clone)]
-pub struct MarginRegistry {
+pub(crate) struct MarginRegistry {
     /// Workspace-wide default VM, IM, timing, and settlement settings.
-    pub defaults: MarginDefaults,
+    pub(crate) defaults: MarginDefaults,
     /// Regulatory schedule IM grids keyed by registry id such as `"bcbs_iosco"`.
-    pub schedule_im: FxHashMap<String, ScheduleImSchedule>,
+    pub(crate) schedule_im: FxHashMap<String, ScheduleImSchedule>,
     /// Default collateral haircuts keyed by collateral asset class.
-    pub collateral_asset_class_defaults: FxHashMap<CollateralAssetClass, AssetClassDefault>,
+    pub(crate) collateral_asset_class_defaults: FxHashMap<CollateralAssetClass, AssetClassDefault>,
     /// Eligible collateral schedules keyed by registry id.
-    pub collateral_schedules: FxHashMap<String, EligibleCollateralSchedule>,
+    pub(crate) collateral_schedules: FxHashMap<String, EligibleCollateralSchedule>,
     /// CCP conservative fallback parameters keyed by CCP identifier.
-    pub ccp: FxHashMap<String, CcpParams>,
+    pub(crate) ccp: FxHashMap<String, CcpParams>,
     /// Resolved default CCP conservative fallback parameters.
-    pub ccp_default_params: CcpParams,
+    pub(crate) ccp_default_params: CcpParams,
     /// SIMM parameter sets keyed by registry id such as `"v2_6"`.
-    pub simm: FxHashMap<String, SimmParams>,
+    pub(crate) simm: FxHashMap<String, SimmParams>,
 }
 
 /// Top-level default settings shared across margin methodologies.
 #[derive(Debug, Clone)]
-pub struct MarginDefaults {
+pub(crate) struct MarginDefaults {
     /// Variation-margin defaults.
-    pub vm: VmDefaults,
+    pub(crate) vm: VmDefaults,
     /// Initial-margin defaults split by methodology.
-    pub im: ImDefaults,
+    pub(crate) im: ImDefaults,
     /// Margin call timing defaults for different agreement types.
-    pub timing: TimingDefaults,
+    pub(crate) timing: TimingDefaults,
     /// Settlement defaults for cleared margin flows.
-    pub cleared_settlement: ClearedSettlementDefaults,
+    pub(crate) cleared_settlement: ClearedSettlementDefaults,
 }
 
 /// Default variation-margin parameters stored in raw numeric form.
 #[derive(Debug, Clone)]
-pub struct VmDefaults {
+pub(crate) struct VmDefaults {
     /// VM threshold amount in base-currency units before conversion to [`finstack_quant_core::money::Money`].
-    pub threshold: f64,
+    pub(crate) threshold: f64,
     /// Minimum transfer amount in base-currency units before conversion to [`finstack_quant_core::money::Money`].
-    pub mta: f64,
+    pub(crate) mta: f64,
     /// Rounding amount in base-currency units before conversion to [`finstack_quant_core::money::Money`].
-    pub rounding: f64,
+    pub(crate) rounding: f64,
     /// Independent amount in base-currency units before conversion to [`finstack_quant_core::money::Money`].
-    pub independent_amount: f64,
+    pub(crate) independent_amount: f64,
     /// Margin-call frequency.
-    pub frequency: MarginTenor,
+    pub(crate) frequency: MarginTenor,
     /// Settlement lag in business days.
-    pub settlement_lag: u32,
+    pub(crate) settlement_lag: u32,
 }
 
 /// Default initial-margin settings grouped by methodology.
-#[derive(Debug, Clone)]
-pub struct ImDefaults {
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ImDefaults {
     /// Defaults for SIMM-based bilateral IM.
-    pub simm: ImMethodDefaults,
+    pub(crate) simm: ImMethodDefaults,
     /// Defaults for schedule-based IM.
-    pub schedule: ImMethodDefaults,
+    pub(crate) schedule: ImMethodDefaults,
     /// Defaults for cleared-derivative CCP IM.
-    pub cleared: ImMethodDefaults,
+    pub(crate) cleared: ImMethodDefaults,
     /// Defaults for repo haircut IM.
-    pub repo_haircut: ImMethodDefaults,
+    pub(crate) repo_haircut: ImMethodDefaults,
 }
 
 /// Raw default parameters for a single IM methodology.
-#[derive(Debug, Clone)]
-pub struct ImMethodDefaults {
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ImMethodDefaults {
     /// Margin period of risk in business days.
-    pub mpor_days: u32,
+    pub(crate) mpor_days: u32,
     /// Threshold amount in base-currency units before conversion to [`finstack_quant_core::money::Money`].
-    pub threshold: f64,
+    pub(crate) threshold: f64,
     /// Minimum transfer amount in base-currency units before conversion to [`finstack_quant_core::money::Money`].
-    pub mta: f64,
+    pub(crate) mta: f64,
     /// Whether the methodology assumes segregated collateral.
-    pub segregated: bool,
+    pub(crate) segregated: bool,
 }
 
 /// Default timing conventions for margin calls and responses.
-#[derive(Debug, Clone)]
-pub struct TimingDefaults {
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TimingDefaults {
     /// Standard bilateral timing defaults.
     // Retained in the registry record for schema examples.
     #[cfg_attr(not(feature = "json-schema"), allow(dead_code))]
-    pub standard: MarginCallTiming,
+    pub(crate) standard: MarginCallTiming,
     /// Regulatory VM timing defaults.
-    pub regulatory_vm: MarginCallTiming,
+    pub(crate) regulatory_vm: MarginCallTiming,
     /// Cleared or CCP timing defaults.
-    pub ccp: MarginCallTiming,
+    pub(crate) ccp: MarginCallTiming,
 }
 
 /// Default settlement handling for cleared collateral flows.
-#[derive(Debug, Clone)]
-pub struct ClearedSettlementDefaults {
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ClearedSettlementDefaults {
     /// Settlement rounding amount in base-currency units before conversion to [`finstack_quant_core::money::Money`].
-    pub rounding: f64,
+    pub(crate) rounding: f64,
     /// Settlement lag in business days.
-    pub settlement_lag: u32,
+    pub(crate) settlement_lag: u32,
 }
 
 /// Parsed regulatory schedule IM entry from the registry.
 #[derive(Debug, Clone)]
-pub struct ScheduleImSchedule {
+pub(crate) struct ScheduleImSchedule {
     /// Year-fraction boundaries separating short, medium, and long buckets.
-    pub boundaries: ScheduleBucketBoundaries,
+    pub(crate) boundaries: ScheduleBucketBoundaries,
     /// Fallback decimal rate used when a bucket-specific entry is absent.
-    pub default_rate: f64,
+    pub(crate) default_rate: f64,
     /// Default asset class used by the schedule calculator's trait-based fallback path.
-    pub default_asset_class: ScheduleAssetClass,
+    pub(crate) default_asset_class: ScheduleAssetClass,
     /// Default maturity expressed as a year fraction.
-    pub default_maturity_years: f64,
+    pub(crate) default_maturity_years: f64,
     /// Margin period of risk in business days.
-    pub mpor_days: u32,
+    pub(crate) mpor_days: u32,
     /// Decimal rates keyed by `(asset_class, maturity_bucket)`.
-    pub rates: FxHashMap<(ScheduleAssetClass, MaturityBucket), f64>,
+    pub(crate) rates: FxHashMap<(ScheduleAssetClass, MaturityBucket), f64>,
 }
 
 /// Boundaries, in years, for the schedule IM maturity buckets.
-#[derive(Debug, Clone)]
-pub struct ScheduleBucketBoundaries {
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ScheduleBucketBoundaries {
     /// Cutoff between short and medium maturity buckets, in years.
-    pub short_to_medium: f64,
+    pub(crate) short_to_medium: f64,
     /// Cutoff between medium and long maturity buckets, in years.
-    pub medium_to_long: f64,
+    pub(crate) medium_to_long: f64,
 }
 
 /// Default collateral haircut settings for an asset class.
 #[derive(Debug, Clone)]
-pub struct AssetClassDefault {
+pub(crate) struct AssetClassDefault {
     /// Standard collateral haircut as a decimal fraction.
-    pub standard_haircut: f64,
+    pub(crate) standard_haircut: f64,
     /// Additional FX haircut as a decimal fraction when collateral currency differs.
-    pub fx_addon: f64,
+    pub(crate) fx_addon: f64,
     /// Optional concentration limit as a fraction of total collateral.
-    pub concentration_limit: Option<f64>,
+    pub(crate) concentration_limit: Option<f64>,
 }
 
 /// Conservative fallback CCP parameters.
 #[derive(Debug, Clone)]
-pub struct CcpParams {
+pub(crate) struct CcpParams {
     /// Margin period of risk in business days.
-    pub mpor_days: u32,
+    pub(crate) mpor_days: u32,
     /// Conservative fallback margin rate as a decimal fraction.
-    pub conservative_rate: f64,
+    pub(crate) conservative_rate: f64,
 }
 
 struct ParsedCcpRegistry {
@@ -190,7 +197,7 @@ struct ParsedCcpRegistry {
 
 /// Registry-backed SIMM parameter set.
 #[derive(Debug, Clone)]
-pub struct SimmParams {
+pub(crate) struct SimmParams {
     /// SIMM version identifier for this parameter set.
     pub version: SimmVersion,
     /// Margin period of risk in business days.
@@ -314,7 +321,7 @@ static EMBEDDED_REGISTRY: OnceLock<MarginRegistry> = OnceLock::new();
 ///
 /// Returns an error if the embedded JSON assets cannot be parsed into a valid
 /// [`MarginRegistry`].
-pub fn embedded_registry() -> Result<&'static MarginRegistry> {
+pub(crate) fn embedded_registry() -> Result<&'static MarginRegistry> {
     if EMBEDDED_REGISTRY.get().is_none() {
         let registry = build_registry(None)?;
         let _ = EMBEDDED_REGISTRY.set(registry);
@@ -329,7 +336,7 @@ pub fn embedded_registry() -> Result<&'static MarginRegistry> {
 /// Use [`embedded_registry`] when the caller can surface a runtime error.
 #[must_use]
 #[allow(clippy::expect_used)]
-pub fn embedded_registry_or_panic() -> &'static MarginRegistry {
+pub(crate) fn embedded_registry_or_panic() -> &'static MarginRegistry {
     embedded_registry().expect("embedded margin registry is a compile-time asset")
 }
 
@@ -347,7 +354,7 @@ pub fn embedded_registry_or_panic() -> &'static MarginRegistry {
 ///
 /// Returns an error if the embedded assets are invalid, if the overlay is
 /// malformed, or if any parsed values violate registry validation rules.
-pub fn build_registry(overlay: Option<&Value>) -> Result<MarginRegistry> {
+pub(crate) fn build_registry(overlay: Option<&Value>) -> Result<MarginRegistry> {
     let mut root = embedded::load_embedded_root()?;
     if let Some(ov) = overlay {
         debug!("Applying margin registry overlay");
@@ -421,10 +428,7 @@ fn parse_schedule_im(value: Option<&Value>) -> Result<FxHashMap<String, Schedule
     for entry in file.entries {
         let record = entry.record;
         validate_non_negative("default_rate", record.default_rate)?;
-        let boundaries = ScheduleBucketBoundaries {
-            short_to_medium: record.bucket_boundaries_years.short_to_medium,
-            medium_to_long: record.bucket_boundaries_years.medium_to_long,
-        };
+        let boundaries = record.bucket_boundaries_years;
         if !boundaries.short_to_medium.is_finite() || !boundaries.medium_to_long.is_finite() {
             return Err(Error::Validation(
                 "schedule_im bucket boundaries must be finite".to_string(),
@@ -447,11 +451,11 @@ fn parse_schedule_im(value: Option<&Value>) -> Result<FxHashMap<String, Schedule
                 record.default_maturity_years
             )));
         }
-        let default_asset_class = parse_schedule_asset_class(&record.default_asset_class)?;
+        let default_asset_class = parse_enum("schedule asset class", &record.default_asset_class)?;
         let mut rates = FxHashMap::default();
         for rate in record.rates {
-            validate_rate("schedule_im.rate", rate.rate)?;
-            let asset_class = parse_schedule_asset_class(&rate.asset_class)?;
+            validate_non_negative("schedule_im.rate", rate.rate)?;
+            let asset_class = parse_enum("schedule asset class", &rate.asset_class)?;
             let bucket = parse_maturity_bucket(&rate.bucket)?;
             rates.insert((asset_class, bucket), rate.rate);
         }
@@ -495,7 +499,7 @@ fn parse_collateral_schedules(
 
     let mut defaults = FxHashMap::default();
     for def in file.asset_class_defaults {
-        let asset = parse_collateral_asset_class(&def.asset_class)?;
+        let asset = parse_enum("collateral asset class", &def.asset_class)?;
         validate_haircut("standard_haircut", def.standard_haircut)?;
         validate_haircut("fx_addon", def.fx_addon)?;
         if let Some(concentration_limit) = def.concentration_limit {
@@ -517,18 +521,11 @@ fn parse_collateral_schedules(
         for elig in entry.record.eligible {
             validate_haircut("haircut", elig.haircut)?;
             validate_haircut("fx_haircut_addon", elig.fx_haircut_addon)?;
-            let asset_class = parse_collateral_asset_class(&elig.asset_class)?;
-            let constraints = elig
-                .maturity_constraints
-                .as_ref()
-                .map(|c| MaturityConstraints {
-                    min_remaining_years: c.min_remaining_years,
-                    max_remaining_years: c.max_remaining_years,
-                });
+            let asset_class = parse_enum("collateral asset class", &elig.asset_class)?;
             eligible.push(CollateralEligibility {
                 asset_class,
-                min_rating: elig.min_rating.clone(),
-                maturity_constraints: constraints,
+                min_rating: elig.min_rating,
+                maturity_constraints: elig.maturity_constraints,
                 haircut: elig.haircut,
                 fx_haircut_addon: elig.fx_haircut_addon,
                 concentration_limit: elig.concentration_limit,
@@ -563,7 +560,7 @@ fn parse_defaults(value: Option<&Value>) -> Result<MarginDefaults> {
         "finstack_quant.margin.defaults.v1",
     )?;
 
-    let vm_frequency = parse_margin_tenor(&file.defaults.vm.frequency)?;
+    let vm_frequency = parse_enum("margin frequency", &file.defaults.vm.frequency)?;
     let vm = VmDefaults {
         threshold: file.defaults.vm.threshold,
         mta: file.defaults.vm.mta,
@@ -573,29 +570,11 @@ fn parse_defaults(value: Option<&Value>) -> Result<MarginDefaults> {
         settlement_lag: file.defaults.vm.settlement_lag,
     };
 
-    let im = ImDefaults {
-        simm: to_im_method(&file.defaults.im.simm),
-        schedule: to_im_method(&file.defaults.im.schedule),
-        cleared: to_im_method(&file.defaults.im.cleared),
-        repo_haircut: to_im_method(&file.defaults.im.repo_haircut),
-    };
-
-    let timing = TimingDefaults {
-        standard: to_timing(&file.defaults.timing.standard),
-        regulatory_vm: to_timing(&file.defaults.timing.regulatory_vm),
-        ccp: to_timing(&file.defaults.timing.ccp),
-    };
-
-    let cleared_settlement = ClearedSettlementDefaults {
-        rounding: file.defaults.cleared_settlement.rounding,
-        settlement_lag: file.defaults.cleared_settlement.settlement_lag,
-    };
-
     Ok(MarginDefaults {
         vm,
-        im,
-        timing,
-        cleared_settlement,
+        im: file.defaults.im,
+        timing: file.defaults.timing,
+        cleared_settlement: file.defaults.cleared_settlement,
     })
 }
 
@@ -612,7 +591,7 @@ fn parse_ccp(value: Option<&Value>) -> Result<ParsedCcpRegistry> {
     let mut map = FxHashMap::default();
     let mut default_params: Option<CcpParams> = None;
     for entry in file.entries {
-        validate_rate("ccp.conservative_rate", entry.record.conservative_rate)?;
+        validate_non_negative("ccp.conservative_rate", entry.record.conservative_rate)?;
         let record = CcpParams {
             mpor_days: entry.record.mpor_days,
             conservative_rate: entry.record.conservative_rate,
@@ -663,9 +642,9 @@ fn parse_simm(value: Option<&Value>) -> Result<FxHashMap<String, SimmParams>> {
             "simm.commodity_bucket_weights",
         )?;
 
-        validate_rate("simm.cnq_delta_weight", record.cnq_delta_weight)?;
-        validate_rate("simm.equity_delta_weight", record.equity_delta_weight)?;
-        validate_rate("simm.fx_delta_weight", record.fx_delta_weight)?;
+        validate_non_negative("simm.cnq_delta_weight", record.cnq_delta_weight)?;
+        validate_non_negative("simm.equity_delta_weight", record.equity_delta_weight)?;
+        validate_non_negative("simm.fx_delta_weight", record.fx_delta_weight)?;
         let fx_intra_bucket_correlation = record.fx_intra_bucket_correlation;
         if !(-1.0..=1.0).contains(&fx_intra_bucket_correlation) {
             return Err(Error::Validation(
@@ -675,14 +654,14 @@ fn parse_simm(value: Option<&Value>) -> Result<FxHashMap<String, SimmParams>> {
 
         let mut correlations: FxHashMap<(SimmRiskClass, SimmRiskClass), f64> = FxHashMap::default();
         for cor in record.risk_class_correlations {
-            let a = parse_simm_risk_class(&cor.a)?;
-            let b = parse_simm_risk_class(&cor.b)?;
+            let a = parse_enum("SIMM risk class", &cor.a)?;
+            let b = parse_enum("SIMM risk class", &cor.b)?;
             if !(cor.rho >= -1.0 && cor.rho <= 1.0) {
                 return Err(Error::Validation(format!(
                     "simm correlation for ({a:?},{b:?}) must be in [-1,1]"
                 )));
             }
-            let key = ordered_risk_class_pair(a, b);
+            let key = ordered_pair(a, b);
             correlations.insert(key, cor.rho);
         }
 
@@ -822,7 +801,7 @@ fn parse_simm(value: Option<&Value>) -> Result<FxHashMap<String, SimmParams>> {
 
 /// Extension key used by [`finstack_quant_core::config::FinstackConfig`] for
 /// margin-registry JSON overlays.
-pub const MARGIN_REGISTRY_EXTENSION_KEY: &str = "margin.registry.v1";
+pub(crate) const MARGIN_REGISTRY_EXTENSION_KEY: &str = "margin.registry.v1";
 
 /// Build a margin registry from a [`finstack_quant_core::config::FinstackConfig`] extension overlay.
 ///
@@ -837,17 +816,21 @@ pub const MARGIN_REGISTRY_EXTENSION_KEY: &str = "margin.registry.v1";
 /// # Errors
 ///
 /// Returns an error if the embedded registry or the configured overlay fails validation.
-pub fn margin_registry_from_config(cfg: &FinstackConfig) -> Result<MarginRegistry> {
+pub(crate) fn margin_registry_from_config(cfg: &FinstackConfig) -> Result<MarginRegistry> {
     let overlay = cfg.extensions.get(MARGIN_REGISTRY_EXTENSION_KEY);
     build_registry(overlay)
 }
 
 // Conversions and validations
 
-fn parse_schedule_asset_class(value: &str) -> Result<ScheduleAssetClass> {
+fn parse_enum<T>(label: &str, value: &str) -> Result<T>
+where
+    T: FromStr,
+    T::Err: Display,
+{
     value
-        .parse::<ScheduleAssetClass>()
-        .map_err(|e| Error::Validation(format!("invalid schedule asset class '{value}': {e}")))
+        .parse::<T>()
+        .map_err(|e| Error::Validation(format!("invalid {label} '{value}': {e}")))
 }
 
 fn parse_maturity_bucket(value: &str) -> Result<MaturityBucket> {
@@ -861,36 +844,9 @@ fn parse_maturity_bucket(value: &str) -> Result<MaturityBucket> {
     }
 }
 
-fn parse_collateral_asset_class(value: &str) -> Result<CollateralAssetClass> {
-    value
-        .parse::<CollateralAssetClass>()
-        .map_err(|e| Error::Validation(format!("invalid collateral asset class '{value}': {e}")))
-}
-
-fn parse_margin_tenor(value: &str) -> Result<MarginTenor> {
-    value
-        .parse::<MarginTenor>()
-        .map_err(|e| Error::Validation(format!("invalid margin frequency '{value}': {e}")))
-}
-
 fn parse_simm_version(id: Option<&str>) -> Result<SimmVersion> {
     let id = id.ok_or_else(|| Error::Validation("SIMM version id is required".to_string()))?;
-    id.parse::<SimmVersion>()
-        .map_err(|error| Error::Validation(format!("invalid SIMM version id '{id}': {error}")))
-}
-
-fn parse_simm_risk_class(value: &str) -> Result<SimmRiskClass> {
-    value
-        .parse::<SimmRiskClass>()
-        .map_err(|error| Error::Validation(format!("invalid SIMM risk class '{value}': {error}")))
-}
-
-fn parse_simm_credit_sector(value: &str) -> Result<SimmCreditSector> {
-    value.parse::<SimmCreditSector>().map_err(|error| {
-        Error::Validation(format!(
-            "invalid SIMM credit qualifying sector '{value}': {error}"
-        ))
-    })
+    parse_enum("SIMM version id", id)
 }
 
 fn parse_number_map(value: &Value, context: &str) -> Result<FxHashMap<String, f64>> {
@@ -935,7 +891,7 @@ fn parse_credit_sector_number_map(
         .ok_or_else(|| Error::Validation(format!("{context} must be an object")))?;
     let mut out = FxHashMap::default();
     for (k, v) in obj {
-        let sector = parse_simm_credit_sector(k)?;
+        let sector = parse_enum("SIMM credit qualifying sector", k)?;
         let num = v.as_f64().ok_or_else(|| {
             Error::Validation(format!("{context} value for key '{k}' must be a number"))
         })?;
@@ -977,7 +933,10 @@ fn parse_cq_inter_bucket_correlations(
             )));
         }
         out.insert(
-            ordered_credit_sector_pair(parse_simm_credit_sector(a)?, parse_simm_credit_sector(b)?),
+            ordered_pair(
+                parse_enum("SIMM credit qualifying sector", a)?,
+                parse_enum("SIMM credit qualifying sector", b)?,
+            ),
             rho,
         );
     }
@@ -1030,7 +989,7 @@ fn parse_concentration_thresholds(value: &Value) -> Result<FxHashMap<SimmRiskCla
     })?;
     let mut out = FxHashMap::default();
     for (k, v) in obj {
-        let rc = parse_simm_risk_class(k)?;
+        let rc = parse_enum("SIMM risk class", k)?;
         let threshold = v.as_f64().ok_or_else(|| {
             Error::Validation(format!(
                 "concentration_thresholds value for '{k}' must be a number"
@@ -1040,24 +999,6 @@ fn parse_concentration_thresholds(value: &Value) -> Result<FxHashMap<SimmRiskCla
         out.insert(rc, threshold);
     }
     Ok(out)
-}
-
-fn to_im_method(record: &wire::ImMethodDefaultsRecord) -> ImMethodDefaults {
-    ImMethodDefaults {
-        mpor_days: record.mpor_days,
-        threshold: record.threshold,
-        mta: record.mta,
-        segregated: record.segregated,
-    }
-}
-
-fn to_timing(record: &wire::MarginCallTimingRecord) -> MarginCallTiming {
-    MarginCallTiming {
-        notification_deadline_hours: record.notification_deadline_hours,
-        response_deadline_hours: record.response_deadline_hours,
-        dispute_resolution_days: record.dispute_resolution_days,
-        delivery_grace_days: record.delivery_grace_days,
-    }
 }
 
 fn simm_cq_validation_sectors() -> [SimmCreditSector; 13] {
@@ -1229,9 +1170,6 @@ pub(crate) fn validate_simm_params(p: &SimmParams) -> Result<()> {
             }
         }
     }
-    for (k, v) in &p.ir_delta_weights {
-        validate_non_negative(&format!("simm.ir_delta_weights[{k}]"), *v)?;
-    }
     let tenors: Vec<&String> = p.ir_delta_weights.keys().collect();
     let mut missing_pairs = Vec::new();
     for (i, tenor_i) in tenors.iter().enumerate() {
@@ -1256,9 +1194,6 @@ pub(crate) fn validate_simm_params(p: &SimmParams) -> Result<()> {
             sample
         )));
     }
-    for (k, v) in &p.commodity_bucket_weights {
-        validate_non_negative(&format!("simm.commodity_bucket_weights[{k}]"), *v)?;
-    }
     validate_non_negative("simm.cnq_delta_weight", p.cnq_delta_weight)?;
     validate_non_negative("simm.equity_delta_weight", p.equity_delta_weight)?;
     validate_non_negative("simm.fx_delta_weight", p.fx_delta_weight)?;
@@ -1273,9 +1208,6 @@ pub(crate) fn validate_simm_params(p: &SimmParams) -> Result<()> {
     validate_non_negative("simm.equity_vega_weight", p.equity_vega_weight)?;
     validate_non_negative("simm.fx_vega_weight", p.fx_vega_weight)?;
     validate_non_negative("simm.commodity_vega_weight", p.commodity_vega_weight)?;
-    for (rc, v) in &p.concentration_thresholds {
-        validate_non_negative(&format!("simm.concentration_thresholds[{rc:?}]"), *v)?;
-    }
     validate_cq_tables(p)?;
     validate_simm_correlations_psd(p)?;
     Ok(())
@@ -1310,7 +1242,7 @@ fn validate_cq_tables(p: &SimmParams) -> Result<()> {
 
     for (i, &a) in sectors.iter().enumerate() {
         for &b in sectors.iter().skip(i + 1) {
-            let key = ordered_credit_sector_pair(a, b);
+            let key = ordered_pair(a, b);
             let rho = p.cq_inter_bucket_correlations.get(&key).copied();
             if p.version == SimmVersion::V2_6 && rho.is_none() {
                 return Err(Error::Validation(format!(
@@ -1368,7 +1300,7 @@ fn validate_simm_correlations_psd(p: &SimmParams) -> Result<()> {
         "risk_class_correlations",
         p.version,
         |a, b| {
-            let key = ordered_risk_class_pair(*a, *b);
+            let key = ordered_pair(*a, *b);
             p.risk_class_correlations.get(&key).copied().unwrap_or(1.0)
         },
     )?;
@@ -1401,7 +1333,7 @@ fn validate_simm_correlations_psd(p: &SimmParams) -> Result<()> {
         "cq_inter_bucket_correlations",
         p.version,
         |a, b| {
-            let key = ordered_credit_sector_pair(*a, *b);
+            let key = ordered_pair(*a, *b);
             p.cq_inter_bucket_correlations
                 .get(&key)
                 .copied()
@@ -1412,7 +1344,7 @@ fn validate_simm_correlations_psd(p: &SimmParams) -> Result<()> {
     // 4. Commodity inter-bucket correlations (17x17). Already dense in
     //    row-major form, loaded from the SIMM registry, and validated directly
     //    without densification.
-    let n = crate::calculators::im::simm::COMMODITY_BUCKET_COUNT;
+    let n = usize::from(crate::types::SIMM_COMMODITY_BUCKET_COUNT);
     let expected_len = n * n;
     if p.commodity_inter_bucket_correlations.len() != expected_len {
         return Err(Error::Validation(format!(
@@ -1487,7 +1419,7 @@ impl VmDefaults {
     /// # Returns
     ///
     /// Concrete VM parameters in `currency`.
-    pub fn to_vm_params(
+    pub(crate) fn to_vm_params(
         &self,
         currency: finstack_quant_core::currency::Currency,
     ) -> finstack_quant_core::Result<VmParameters> {
@@ -1513,7 +1445,7 @@ impl ImMethodDefaults {
     /// # Returns
     ///
     /// Concrete IM parameters in `currency`.
-    pub fn to_im_params(
+    pub(crate) fn to_im_params(
         &self,
         methodology: ImMethodology,
         currency: finstack_quant_core::currency::Currency,
@@ -1643,7 +1575,7 @@ mod tests {
         assert_eq!(
             params
                 .cq_inter_bucket_correlations
-                .get(&ordered_credit_sector_pair(
+                .get(&ordered_pair(
                     SimmCreditSector::Sovereign,
                     SimmCreditSector::Financial
                 ))
@@ -1668,15 +1600,15 @@ mod tests {
         // check targets.
         let mut params = base_simm_params();
         params.risk_class_correlations.insert(
-            ordered_risk_class_pair(SimmRiskClass::InterestRate, SimmRiskClass::CreditQualifying),
+            ordered_pair(SimmRiskClass::InterestRate, SimmRiskClass::CreditQualifying),
             0.9,
         );
         params.risk_class_correlations.insert(
-            ordered_risk_class_pair(SimmRiskClass::InterestRate, SimmRiskClass::Equity),
+            ordered_pair(SimmRiskClass::InterestRate, SimmRiskClass::Equity),
             0.9,
         );
         params.risk_class_correlations.insert(
-            ordered_risk_class_pair(SimmRiskClass::CreditQualifying, SimmRiskClass::Equity),
+            ordered_pair(SimmRiskClass::CreditQualifying, SimmRiskClass::Equity),
             -0.9,
         );
 
@@ -1694,18 +1626,18 @@ mod tests {
         // Same 3-way non-PSD pattern applied to the CQ inter-bucket matrix.
         let mut params = base_simm_params();
         params.cq_inter_bucket_correlations.insert(
-            ordered_credit_sector_pair(SimmCreditSector::Sovereign, SimmCreditSector::Financial),
+            ordered_pair(SimmCreditSector::Sovereign, SimmCreditSector::Financial),
             0.9,
         );
         params.cq_inter_bucket_correlations.insert(
-            ordered_credit_sector_pair(
+            ordered_pair(
                 SimmCreditSector::Sovereign,
                 SimmCreditSector::BasicMaterials,
             ),
             0.9,
         );
         params.cq_inter_bucket_correlations.insert(
-            ordered_credit_sector_pair(
+            ordered_pair(
                 SimmCreditSector::Financial,
                 SimmCreditSector::BasicMaterials,
             ),
@@ -1735,7 +1667,7 @@ mod tests {
         // Same 3-way non-PSD pattern applied to the commodity matrix.
         // Write (i,j) and (j,i) symmetrically so only the PSD branch fires.
         let mut params = base_simm_params();
-        let n = crate::calculators::im::simm::COMMODITY_BUCKET_COUNT;
+        let n = usize::from(crate::types::SIMM_COMMODITY_BUCKET_COUNT);
         let set = |m: &mut Vec<f64>, i: usize, j: usize, v: f64| {
             m[i * n + j] = v;
             m[j * n + i] = v;
@@ -1774,7 +1706,7 @@ mod tests {
         // sqrt downstream.
         let mut params = base_simm_params();
         params.risk_class_correlations.insert(
-            ordered_risk_class_pair(SimmRiskClass::InterestRate, SimmRiskClass::Equity),
+            ordered_pair(SimmRiskClass::InterestRate, SimmRiskClass::Equity),
             1.5,
         );
         let err = validate_simm_correlations_psd(&params).expect_err("|ρ| > 1 must be rejected");

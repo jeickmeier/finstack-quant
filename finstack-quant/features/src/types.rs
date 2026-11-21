@@ -8,12 +8,12 @@ use serde_json::Value;
 pub(crate) fn op_from_str<T: DeserializeOwned>(
     op: &str,
     kind: &str,
-    accepted: &[String],
+    accepted: impl FnOnce() -> Vec<String>,
 ) -> Result<T> {
     serde_json::from_value(Value::String(op.to_owned())).map_err(|_| {
         Error::Validation(format!(
             "unsupported {kind} transform op '{op}'; accepted ops: {}",
-            accepted.join(", ")
+            accepted().join(", ")
         ))
     })
 }
@@ -25,6 +25,37 @@ pub(crate) fn op_name<T: serde::Serialize>(op: &T) -> String {
         .and_then(|value| value.as_str().map(str::to_owned))
         .unwrap_or_default()
 }
+
+/// Generate `FromStr`, `ALL`, `name`, and `names` for an operation enum.
+macro_rules! impl_op_enum {
+    ($ty:ident, $kind:literal, [$($variant:ident),+ $(,)?]) => {
+        impl ::core::str::FromStr for $ty {
+            type Err = ::finstack_quant_core::Error;
+
+            fn from_str(op: &str) -> ::finstack_quant_core::Result<Self> {
+                $crate::types::op_from_str(op, $kind, Self::names)
+            }
+        }
+
+        impl $ty {
+            /// Every operation, in declaration order.
+            pub const ALL: &'static [Self] = &[$(Self::$variant),+];
+
+            /// Canonical snake_case name used by JSON and host-language APIs.
+            #[must_use]
+            pub fn name(self) -> String {
+                $crate::types::op_name(&self)
+            }
+
+            /// Canonical names of every operation, in [`Self::ALL`] order.
+            #[must_use]
+            pub fn names() -> Vec<String> {
+                Self::ALL.iter().map(|op| op.name()).collect()
+            }
+        }
+    };
+}
+pub(crate) use impl_op_enum;
 
 /// Reject `params` that are not a JSON object or carry keys the operation
 /// does not read, so a misspelt key (`"windows"`) fails instead of silently

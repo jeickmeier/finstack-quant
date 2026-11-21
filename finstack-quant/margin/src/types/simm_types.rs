@@ -130,7 +130,9 @@ pub enum SimmRiskClass {
 ///
 /// Maps reference entities to ISDA SIMM credit qualifying buckets.
 /// See ISDA SIMM v2.6 Table 2.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -359,14 +361,14 @@ impl From<&SimmSensitivities> for SimmSensitivitiesJson {
         }
         json.curvature.sort_by(|a, b| {
             (
-                simm_risk_class_sort_key(a.risk_class),
+                a.risk_class,
                 &a.bucket,
                 &a.factor,
                 &a.risk_tenor,
                 &a.expiry_tenor,
             )
                 .cmp(&(
-                    simm_risk_class_sort_key(b.risk_class),
+                    b.risk_class,
                     &b.bucket,
                     &b.factor,
                     &b.risk_tenor,
@@ -382,42 +384,13 @@ impl From<&SimmSensitivities> for SimmSensitivitiesJson {
             &mut json.credit_qualifying_vega,
         ] {
             entries.sort_by(|left, right| {
-                simm_credit_sector_sort_key(left.0)
-                    .cmp(&simm_credit_sector_sort_key(right.0))
+                left.0
+                    .cmp(&right.0)
                     .then_with(|| left.1.cmp(&right.1))
                     .then_with(|| left.2.cmp(&right.2))
             });
         }
         json
-    }
-}
-
-const fn simm_risk_class_sort_key(risk_class: SimmRiskClass) -> u8 {
-    match risk_class {
-        SimmRiskClass::InterestRate => 0,
-        SimmRiskClass::CreditQualifying => 1,
-        SimmRiskClass::CreditNonQualifying => 2,
-        SimmRiskClass::Equity => 3,
-        SimmRiskClass::Commodity => 4,
-        SimmRiskClass::Fx => 5,
-    }
-}
-
-const fn simm_credit_sector_sort_key(sector: SimmCreditSector) -> u8 {
-    match sector {
-        SimmCreditSector::Sovereign => 0,
-        SimmCreditSector::Financial => 1,
-        SimmCreditSector::BasicMaterials => 2,
-        SimmCreditSector::ConsumerGoods => 3,
-        SimmCreditSector::TechnologyMedia => 4,
-        SimmCreditSector::HealthCare => 5,
-        SimmCreditSector::HighYieldSovereign => 6,
-        SimmCreditSector::HighYieldFinancial => 7,
-        SimmCreditSector::HighYieldBasicMaterials => 8,
-        SimmCreditSector::HighYieldConsumerGoods => 9,
-        SimmCreditSector::HighYieldTechnologyMedia => 10,
-        SimmCreditSector::HighYieldHealthCare => 11,
-        SimmCreditSector::Residual => 12,
     }
 }
 
@@ -1010,26 +983,14 @@ impl SimmSensitivities {
 
 // Symmetric-map ordering helpers
 
-/// Canonical ordering of a risk-class pair for symmetric correlation lookups.
+/// Canonical ordering of a pair of comparable keys for symmetric correlation lookups.
 ///
 /// SIMM correlation matrices are symmetric, so only `(min, max)` keys are
 /// stored in the registry. All callers MUST route pair lookups through this
 /// helper to avoid missing entries.
-///
-/// # Arguments
-///
-/// * `a` - First SIMM risk class to normalize for a symmetric lookup.
-/// * `b` - Second SIMM risk class to normalize for a symmetric lookup.
 #[must_use]
-pub(crate) fn ordered_risk_class_pair(
-    a: SimmRiskClass,
-    b: SimmRiskClass,
-) -> (SimmRiskClass, SimmRiskClass) {
-    if (a as u8) <= (b as u8) {
-        (a, b)
-    } else {
-        (b, a)
-    }
+pub(crate) fn ordered_pair<T: Ord>(a: T, b: T) -> (T, T) {
+    if a <= b { (a, b) } else { (b, a) }
 }
 
 /// Canonical ordering of a tenor-label pair for symmetric correlation lookups.
@@ -1046,24 +1007,6 @@ pub(crate) fn ordered_tenor_pair(a: &str, b: &str) -> (String, String) {
         (a.to_string(), b.to_string())
     } else {
         (b.to_string(), a.to_string())
-    }
-}
-
-/// Canonical ordering of a credit-sector pair for symmetric correlation lookups.
-///
-/// # Arguments
-///
-/// * `a` - First SIMM credit sector to normalize for a symmetric lookup.
-/// * `b` - Second SIMM credit sector to normalize for a symmetric lookup.
-#[must_use]
-pub(crate) fn ordered_credit_sector_pair(
-    a: SimmCreditSector,
-    b: SimmCreditSector,
-) -> (SimmCreditSector, SimmCreditSector) {
-    if (a as u8) <= (b as u8) {
-        (a, b)
-    } else {
-        (b, a)
     }
 }
 

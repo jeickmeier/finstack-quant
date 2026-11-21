@@ -10,31 +10,12 @@ use super::types::{PyEligibleCollateralSchedule, extract_asset_class};
 use crate::bindings::core::config::PyFinstackConfig;
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::py_to_date;
-use crate::bindings::macros::tabular_methods;
+use crate::bindings::extract::parse_label;
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
 use crate::bindings::module_utils::parse_currency;
 use crate::errors::core_to_py;
 use finstack_quant_margin as fm;
 use pyo3::prelude::*;
-
-fn parse_simm_version(version: &str) -> PyResult<fm::SimmVersion> {
-    version
-        .parse::<fm::SimmVersion>()
-        .map_err(crate::errors::value_error)
-}
-
-fn parse_credit_sector(sector: &str) -> PyResult<fm::types::SimmCreditSector> {
-    sector
-        .parse::<fm::types::SimmCreditSector>()
-        .map_err(crate::errors::value_error)
-}
-
-fn parse_schedule_asset_class(
-    asset_class: &str,
-) -> PyResult<fm::calculators::im::schedule::ScheduleAssetClass> {
-    asset_class
-        .parse::<fm::calculators::im::schedule::ScheduleAssetClass>()
-        .map_err(crate::errors::value_error)
-}
 
 /// ISDA SIMM sensitivity portfolio.
 ///
@@ -56,6 +37,17 @@ pub struct PySimmSensitivities {
     pub(crate) inner: fm::types::SimmSensitivities,
 }
 
+wire_methods!(
+    PySimmSensitivities,
+    fm::types::SimmSensitivities,
+    "SimmSensitivities",
+    rust_json
+);
+py_getters!(PySimmSensitivities |s| {
+    /// Base currency of the sensitivity set.
+    base_currency -> String = s.inner.base_currency.to_string();
+});
+
 #[pymethods]
 impl PySimmSensitivities {
     /// Create an empty SIMM sensitivity container in ``base_currency``
@@ -66,29 +58,6 @@ impl PySimmSensitivities {
         Ok(Self {
             inner: fm::types::SimmSensitivities::new(parse_currency(base_currency)?),
         })
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Construct from the canonical JSON shape; raises ``ValueError`` on
-    /// malformed input.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = fm::types::SimmSensitivities::from_json(json).map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to the canonical JSON shape.
-    fn to_json(&self) -> PyResult<String> {
-        self.inner.to_json().map_err(core_to_py)
     }
 
     /// Bulk-load sensitivities from the long-format table ``to_pandas`` /
@@ -159,7 +128,7 @@ impl PySimmSensitivities {
         amount: f64,
     ) -> PyResult<()> {
         self.inner
-            .add_credit_qualifying_delta(parse_credit_sector(sector)?, name, tenor, amount);
+            .add_credit_qualifying_delta(parse_label(sector)?, name, tenor, amount);
         Ok(())
     }
 
@@ -175,7 +144,7 @@ impl PySimmSensitivities {
         amount: f64,
     ) -> PyResult<()> {
         self.inner
-            .add_credit_qualifying_vega(parse_credit_sector(sector)?, name, tenor, amount);
+            .add_credit_qualifying_vega(parse_label(sector)?, name, tenor, amount);
         Ok(())
     }
 
@@ -302,12 +271,6 @@ impl PySimmSensitivities {
         self.inner.is_empty()
     }
 
-    /// Base currency of the sensitivity set.
-    #[getter]
-    fn base_currency(&self) -> String {
-        self.inner.base_currency.to_string()
-    }
-
     /// Summarise the container by populated bucket counts per risk class.
     fn __repr__(&self) -> String {
         let s = &self.inner;
@@ -352,6 +315,13 @@ pub struct PySimmCalculator {
     pub(super) inner: fm::calculators::im::SimmCalculator,
 }
 
+py_getters!(PySimmCalculator |s| {
+    /// Supported SIMM version label (`"v2_6"`).
+    version -> &'static str = s.inner.version().as_str();
+    /// Margin period of risk in business days.
+    mpor_days -> u32 = s.inner.mpor_days();
+});
+
 #[pymethods]
 impl PySimmCalculator {
     /// Create a SIMM calculator from the embedded margin registry.
@@ -364,7 +334,7 @@ impl PySimmCalculator {
     #[pyo3(signature = (version = None, mpor_days = None))]
     fn new(version: Option<&str>, mpor_days: Option<u32>) -> PyResult<Self> {
         let version = match version {
-            Some(version) => parse_simm_version(version)?,
+            Some(version) => parse_label(version)?,
             None => fm::SimmVersion::default(),
         };
         let mut inner = fm::calculators::im::SimmCalculator::new(version).map_err(core_to_py)?;
@@ -400,23 +370,11 @@ impl PySimmCalculator {
     #[pyo3(signature = (version, config))]
     fn from_finstack_config(version: &str, config: PyRef<'_, PyFinstackConfig>) -> PyResult<Self> {
         let inner = fm::calculators::im::SimmCalculator::from_finstack_config(
-            parse_simm_version(version)?,
+            parse_label(version)?,
             &config.inner,
         )
         .map_err(core_to_py)?;
         Ok(Self { inner })
-    }
-
-    /// Supported SIMM version label (`"v2_6"`).
-    #[getter]
-    fn version(&self) -> &'static str {
-        self.inner.version().as_str()
-    }
-
-    /// Margin period of risk in business days.
-    #[getter]
-    fn mpor_days(&self) -> u32 {
-        self.inner.mpor_days()
     }
 
     /// Identify this calculator in notebooks and logs.
@@ -483,6 +441,11 @@ pub struct PyScheduleImCalculator {
     inner: fm::calculators::im::schedule::ScheduleImCalculator,
 }
 
+py_getters!(PyScheduleImCalculator |s| {
+    /// Margin period of risk in business days stamped on results.
+    mpor_days -> u32 = s.inner.mpor_days;
+});
+
 #[pymethods]
 impl PyScheduleImCalculator {
     /// Create a schedule calculator from the embedded BCBS-IOSCO grid.
@@ -539,18 +502,12 @@ impl PyScheduleImCalculator {
         })
     }
 
-    /// Margin period of risk in business days stamped on results.
-    #[getter]
-    fn mpor_days(&self) -> u32 {
-        self.inner.mpor_days
-    }
-
     /// Schedule IM rate (decimal fraction of notional, ``0.04`` = 4%) for an
     /// asset class label and remaining maturity in years. Raises
     /// ``ValueError`` for an unknown label.
     fn rate(&self, asset_class: &str, maturity_years: f64) -> PyResult<f64> {
         self.inner
-            .rate(parse_schedule_asset_class(asset_class)?, maturity_years)
+            .rate(parse_label(asset_class)?, maturity_years)
             .map_err(core_to_py)
     }
 
@@ -583,7 +540,7 @@ impl PyScheduleImCalculator {
     ) -> PyResult<PyImResult> {
         let ccy = parse_currency(currency)?;
         let as_of = py_to_date(as_of)?;
-        let asset_class = parse_schedule_asset_class(asset_class)?;
+        let asset_class = parse_label(asset_class)?;
         Ok(PyImResult::from_inner(
             self.inner
                 .calculate_for_notional(
@@ -626,7 +583,7 @@ impl PyScheduleImCalculator {
                 Ok((
                     finstack_quant_core::money::Money::new(mtm, ccy).map_err(core_to_py)?,
                     finstack_quant_core::money::Money::new(notional, ccy).map_err(core_to_py)?,
-                    parse_schedule_asset_class(&asset_class)?,
+                    parse_label(&asset_class)?,
                     maturity,
                 ))
             })
@@ -664,6 +621,16 @@ pub struct PyHaircutImCalculator {
     inner: fm::calculators::im::HaircutImCalculator,
 }
 
+py_getters!(PyHaircutImCalculator |s| {
+    /// Eligible-collateral schedule the haircuts are read from.
+    eligible_collateral -> PyEligibleCollateralSchedule = PyEligibleCollateralSchedule {
+        inner: s.inner.eligible_collateral().clone(),
+    };
+    /// Margin period of risk in business days stamped on every result
+    /// (``CONSTANTS["HAIRCUT_MPOR_DAYS"]``).
+    mpor_days -> u32 = s.inner.mpor_days();
+});
+
 #[pymethods]
 impl PyHaircutImCalculator {
     /// Create a haircut calculator with the BCBS-IOSCO schedule. Raises
@@ -690,21 +657,6 @@ impl PyHaircutImCalculator {
         Self {
             inner: fm::calculators::im::HaircutImCalculator::new(schedule.inner.clone()),
         }
-    }
-
-    /// Eligible-collateral schedule the haircuts are read from.
-    #[getter]
-    fn eligible_collateral(&self) -> PyEligibleCollateralSchedule {
-        PyEligibleCollateralSchedule {
-            inner: self.inner.eligible_collateral().clone(),
-        }
-    }
-
-    /// Margin period of risk in business days stamped on every result
-    /// (``CONSTANTS["HAIRCUT_MPOR_DAYS"]``).
-    #[getter]
-    fn mpor_days(&self) -> u32 {
-        self.inner.mpor_days()
     }
 
     /// Return a calculator with collateral residual maturity in years and an

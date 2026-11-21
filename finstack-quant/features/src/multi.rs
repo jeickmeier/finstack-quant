@@ -5,9 +5,11 @@
 //! on more than one aligned column.
 
 use crate::cross_sectional::ResolvedCrossSectionalOp;
-use crate::index::{sorted_indices, try_for_each_entity, try_for_each_trailing_window};
+use crate::index::{
+    partition_by, sorted_indices, try_for_each_entity, try_for_each_trailing_window,
+};
 use crate::types::{
-    bool_param, finite, mean, op_from_str, reject_unknown_params, scaled_centered,
+    bool_param, finite, impl_op_enum, mean, reject_unknown_params, scaled_centered,
     validate_lengths, validate_output, window_params,
 };
 use crate::{CrossSectionalOp, transform_cross_sectional};
@@ -16,7 +18,6 @@ use finstack_quant_core::{Error, Result};
 use nalgebra::{DMatrix, DVector};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::str::FromStr;
 
 /// Supported pairwise rolling time-series transform operation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize)]
@@ -31,30 +32,13 @@ pub enum PairwiseOp {
     RollingBeta,
 }
 
-impl FromStr for PairwiseOp {
-    type Err = Error;
-
-    fn from_str(op: &str) -> Result<Self> {
-        op_from_str(op, "pairwise time-series", &Self::names())
-    }
-}
+impl_op_enum!(
+    PairwiseOp,
+    "pairwise time-series",
+    [RollingCov, RollingCorr, RollingBeta]
+);
 
 impl PairwiseOp {
-    /// Every operation, in declaration order.
-    pub const ALL: &'static [Self] = &[Self::RollingCov, Self::RollingCorr, Self::RollingBeta];
-
-    /// Canonical snake_case name used by JSON and host-language APIs.
-    #[must_use]
-    pub fn name(self) -> String {
-        crate::types::op_name(&self)
-    }
-
-    /// Canonical names of every operation, in [`Self::ALL`] order.
-    #[must_use]
-    pub fn names() -> Vec<String> {
-        Self::ALL.iter().map(|op| op.name()).collect()
-    }
-
     /// JSON parameter keys every pairwise operation reads (`window`,
     /// `min_periods`); any other key is rejected.
     #[must_use]
@@ -92,14 +76,13 @@ pub fn transform_cross_sectional_grouped(
         &[("time_key", time_key.len()), ("groups", groups.len())],
     )?;
     let op = ResolvedCrossSectionalOp::resolve(op, params)?;
-    let partitions = crate::index::partition_by_pair(time_key, groups);
-
-    let mut output = vec![None; values.len()];
-    for indices in partitions.values() {
-        op.apply(values, indices, &mut output)?;
-    }
-    validate_output(&output)?;
-    Ok(output)
+    let partitions = partition_by(
+        time_key
+            .iter()
+            .zip(groups.iter())
+            .map(|(a, b)| (a.as_str(), b.as_str())),
+    );
+    op.apply_partitions(values, &partitions)
 }
 
 /// Remove cross-sectional exposure effects by OLS residualization per time key.
@@ -134,7 +117,7 @@ pub fn neutralize(
     validate_lengths(values.len(), &[("time_key", time_key.len())])?;
     reject_unknown_params(params, "neutralize", &["fit_intercept"])?;
     let fit_intercept = bool_param(params, "fit_intercept", true)?;
-    let partitions = crate::index::partition_by_key(time_key);
+    let partitions = partition_by(time_key.iter().map(String::as_str));
 
     let mut output = vec![None; values.len()];
     for (key, indices) in &partitions {

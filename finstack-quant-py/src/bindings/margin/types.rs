@@ -2,12 +2,12 @@
 
 use crate::bindings::core::config::PyFinstackConfig;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::macros::tabular_methods;
+use crate::bindings::macros::{py_getters, tabular_methods, typed_or_label, wire_methods};
 use crate::bindings::module_utils::parse_currency;
 use crate::bindings::table_builders::{
     serde_object_to_single_row_arrow_table, serde_rows_to_arrow_table,
 };
-use crate::errors::{core_to_py, display_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_core::money::Money;
 use finstack_quant_margin as fm;
 use pyo3::prelude::*;
@@ -24,38 +24,59 @@ pub struct PyImCollateralResult {
     pub(crate) inner: fm::types::ImCollateralResult,
 }
 
-#[pymethods]
-impl PyImCollateralResult {
+py_getters!(PyImCollateralResult |s| {
     /// Gross model IM before contractual terms. Amount is in major units of `currency`.
-    #[getter]
-    fn gross_initial_margin(&self) -> f64 {
-        self.inner.gross_initial_margin.amount()
-    }
+    gross_initial_margin -> f64 = s.inner.gross_initial_margin.amount();
     /// Target collateral balance after the allocated CSA threshold. Amount is in major units of `currency`.
-    #[getter]
-    fn required_collateral(&self) -> f64 {
-        self.inner.required_collateral.amount()
-    }
+    required_collateral -> f64 = s.inner.required_collateral.amount();
     /// Existing balance of this one-way IM account. Amount is in major units of `currency`.
-    #[getter]
-    fn current_collateral(&self) -> f64 {
-        self.inner.current_collateral.amount()
-    }
+    current_collateral -> f64 = s.inner.current_collateral.amount();
     /// Signed MTA-filtered transfer: positive posts, negative returns excess. Amount is in major units of `currency`.
-    #[getter]
-    fn transfer(&self) -> f64 {
-        self.inner.transfer.amount()
-    }
+    transfer -> f64 = s.inner.transfer.amount();
     /// ISO currency of all account amounts.
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.gross_initial_margin.currency().to_string()
-    }
+    currency -> String = s.inner.gross_initial_margin.currency().to_string();
     /// Whether the required IM is segregated and unavailable to meet VM.
-    #[getter]
-    fn segregated(&self) -> bool {
-        self.inner.segregated
-    }
+    segregated -> bool = s.inner.segregated;
+});
+
+macro_rules! margin_label_enum {
+    (
+        $py_type:ident,
+        $rust_type:ty,
+        $py_name:literal,
+        from_str: $(#[$from_doc:meta])*,
+        variants: [ $( $(#[$vdoc:meta])* $fn_name:ident => $variant:ident ),+ $(,)? ]
+    ) => {
+        #[pymethods]
+        impl $py_type {
+            $(
+                $(#[$vdoc])*
+                #[staticmethod]
+                fn $fn_name() -> Self {
+                    Self {
+                        inner: <$rust_type>::$variant,
+                    }
+                }
+            )+
+
+            $(#[$from_doc])*
+            #[staticmethod]
+            fn from_str(s: &str) -> PyResult<Self> {
+                let inner: $rust_type = s
+                    .parse()
+                    .map_err(|e: String| crate::errors::value_error(e))?;
+                Ok(Self { inner })
+            }
+
+            fn __repr__(&self) -> String {
+                format!(concat!($py_name, "({})"), self.inner)
+            }
+
+            fn __str__(&self) -> String {
+                self.inner.to_string()
+            }
+        }
+    };
 }
 
 /// Initial margin calculation methodology.
@@ -76,68 +97,29 @@ pub struct PyImMethodology {
     pub(crate) inner: fm::types::ImMethodology,
 }
 
-#[pymethods]
-impl PyImMethodology {
-    /// Haircut-based IM (repos and securities financing).
-    #[staticmethod]
-    fn haircut() -> Self {
-        Self {
-            inner: fm::types::ImMethodology::Haircut,
-        }
-    }
-
-    /// ISDA SIMM (sensitivities-based, OTC derivatives).
-    #[staticmethod]
-    fn simm() -> Self {
-        Self {
-            inner: fm::types::ImMethodology::Simm,
-        }
-    }
-
-    /// BCBS-IOSCO regulatory schedule approach.
-    #[staticmethod]
-    fn schedule() -> Self {
-        Self {
-            inner: fm::types::ImMethodology::Schedule,
-        }
-    }
-
-    /// Internal model approved by regulator.
-    #[staticmethod]
-    fn internal_model() -> Self {
-        Self {
-            inner: fm::types::ImMethodology::InternalModel,
-        }
-    }
-
-    /// Clearing house (CCP-specific) methodology.
-    #[staticmethod]
-    fn clearing_house() -> Self {
-        Self {
-            inner: fm::types::ImMethodology::ClearingHouse,
-        }
-    }
-
-    /// Parse the lower-case wire label (``"simm"``, ``"schedule"``,
-    /// ``"haircut"``, ``"internal_model"``, ``"clearing_house"``).
-    ///
-    /// Raises ``ValueError`` for any other spelling, including ``"SIMM"``.
-    #[staticmethod]
-    fn from_str(s: &str) -> PyResult<Self> {
-        let inner: fm::types::ImMethodology = s
-            .parse()
-            .map_err(|e: String| crate::errors::value_error(e))?;
-        Ok(Self { inner })
-    }
-
-    fn __repr__(&self) -> String {
-        format!("ImMethodology({})", self.inner)
-    }
-
-    fn __str__(&self) -> String {
-        self.inner.to_string()
-    }
-}
+margin_label_enum!(
+    PyImMethodology,
+    fm::types::ImMethodology,
+    "ImMethodology",
+    from_str:
+        /// Parse the lower-case wire label (``"simm"``, ``"schedule"``,
+        /// ``"haircut"``, ``"internal_model"``, ``"clearing_house"``).
+        ///
+        /// Raises ``ValueError`` for any other spelling, including ``"SIMM"``.
+    ,
+    variants: [
+        /// Haircut-based IM (repos and securities financing).
+        haircut => Haircut,
+        /// ISDA SIMM (sensitivities-based, OTC derivatives).
+        simm => Simm,
+        /// BCBS-IOSCO regulatory schedule approach.
+        schedule => Schedule,
+        /// Internal model approved by regulator.
+        internal_model => InternalModel,
+        /// Clearing house (CCP-specific) methodology.
+        clearing_house => ClearingHouse,
+    ]
+);
 
 /// Margin call frequency.
 ///
@@ -156,57 +138,24 @@ pub struct PyMarginTenor {
     pub(super) inner: fm::types::MarginTenor,
 }
 
-#[pymethods]
-impl PyMarginTenor {
-    /// Daily margin calls (standard for OTC derivatives post-2016).
-    #[staticmethod]
-    fn daily() -> Self {
-        Self {
-            inner: fm::types::MarginTenor::Daily,
-        }
-    }
-
-    /// Weekly margin calls.
-    #[staticmethod]
-    fn weekly() -> Self {
-        Self {
-            inner: fm::types::MarginTenor::Weekly,
-        }
-    }
-
-    /// Monthly margin calls.
-    #[staticmethod]
-    fn monthly() -> Self {
-        Self {
-            inner: fm::types::MarginTenor::Monthly,
-        }
-    }
-
-    /// On-demand margin calls.
-    #[staticmethod]
-    fn on_demand() -> Self {
-        Self {
-            inner: fm::types::MarginTenor::OnDemand,
-        }
-    }
-
-    /// Parse the lower-case wire label; raises ``ValueError`` otherwise.
-    #[staticmethod]
-    fn from_str(s: &str) -> PyResult<Self> {
-        let inner: fm::types::MarginTenor = s
-            .parse()
-            .map_err(|e: String| crate::errors::value_error(e))?;
-        Ok(Self { inner })
-    }
-
-    fn __repr__(&self) -> String {
-        format!("MarginTenor({})", self.inner)
-    }
-
-    fn __str__(&self) -> String {
-        self.inner.to_string()
-    }
-}
+margin_label_enum!(
+    PyMarginTenor,
+    fm::types::MarginTenor,
+    "MarginTenor",
+    from_str:
+        /// Parse the lower-case wire label; raises ``ValueError`` otherwise.
+    ,
+    variants: [
+        /// Daily margin calls (standard for OTC derivatives post-2016).
+        daily => Daily,
+        /// Weekly margin calls.
+        weekly => Weekly,
+        /// Monthly margin calls.
+        monthly => Monthly,
+        /// On-demand margin calls.
+        on_demand => OnDemand,
+    ]
+);
 
 /// Type of margin call.
 ///
@@ -228,65 +177,26 @@ pub struct PyMarginCallType {
     pub(super) inner: fm::types::MarginCallType,
 }
 
-#[pymethods]
-impl PyMarginCallType {
-    /// Initial margin posting requirement.
-    #[staticmethod]
-    fn initial_margin() -> Self {
-        Self {
-            inner: fm::types::MarginCallType::InitialMargin,
-        }
-    }
-
-    /// Variation margin delivery (margin to be posted).
-    #[staticmethod]
-    fn variation_margin_post() -> Self {
-        Self {
-            inner: fm::types::MarginCallType::VariationMarginPost,
-        }
-    }
-
-    /// Variation margin return (margin to be received back).
-    #[staticmethod]
-    fn variation_margin_collect() -> Self {
-        Self {
-            inner: fm::types::MarginCallType::VariationMarginCollect,
-        }
-    }
-
-    /// Top-up margin call.
-    #[staticmethod]
-    fn top_up() -> Self {
-        Self {
-            inner: fm::types::MarginCallType::TopUp,
-        }
-    }
-
-    /// Collateral substitution request.
-    #[staticmethod]
-    fn substitution() -> Self {
-        Self {
-            inner: fm::types::MarginCallType::Substitution,
-        }
-    }
-
-    /// Parse the lower-case wire label; raises ``ValueError`` otherwise.
-    #[staticmethod]
-    fn from_str(s: &str) -> PyResult<Self> {
-        let inner: fm::types::MarginCallType = s
-            .parse()
-            .map_err(|e: String| crate::errors::value_error(e))?;
-        Ok(Self { inner })
-    }
-
-    fn __repr__(&self) -> String {
-        format!("MarginCallType({})", self.inner)
-    }
-
-    fn __str__(&self) -> String {
-        self.inner.to_string()
-    }
-}
+margin_label_enum!(
+    PyMarginCallType,
+    fm::types::MarginCallType,
+    "MarginCallType",
+    from_str:
+        /// Parse the lower-case wire label; raises ``ValueError`` otherwise.
+    ,
+    variants: [
+        /// Initial margin posting requirement.
+        initial_margin => InitialMargin,
+        /// Variation margin delivery (margin to be posted).
+        variation_margin_post => VariationMarginPost,
+        /// Variation margin return (margin to be received back).
+        variation_margin_collect => VariationMarginCollect,
+        /// Top-up margin call.
+        top_up => TopUp,
+        /// Collateral substitution request.
+        substitution => Substitution,
+    ]
+);
 
 /// Clearing status for OTC derivatives.
 #[pyclass(
@@ -301,6 +211,13 @@ impl PyMarginCallType {
 pub struct PyClearingStatus {
     pub(super) inner: fm::types::ClearingStatus,
 }
+
+py_getters!(PyClearingStatus |s| {
+    /// Whether this is a bilateral trade.
+    is_bilateral -> bool = matches!(s.inner, fm::types::ClearingStatus::Bilateral);
+    /// Whether this is a cleared trade.
+    is_cleared -> bool = matches!(s.inner, fm::types::ClearingStatus::Cleared { .. });
+});
 
 #[pymethods]
 impl PyClearingStatus {
@@ -320,18 +237,6 @@ impl PyClearingStatus {
                 ccp: ccp.to_string(),
             },
         }
-    }
-
-    /// Whether this is a bilateral trade.
-    #[getter]
-    fn is_bilateral(&self) -> bool {
-        matches!(self.inner, fm::types::ClearingStatus::Bilateral)
-    }
-
-    /// Whether this is a cleared trade.
-    #[getter]
-    fn is_cleared(&self) -> bool {
-        matches!(self.inner, fm::types::ClearingStatus::Cleared { .. })
     }
 
     fn __repr__(&self) -> String {
@@ -361,80 +266,35 @@ pub struct PyCollateralAssetClass {
     pub(super) inner: fm::types::CollateralAssetClass,
 }
 
+margin_label_enum!(
+    PyCollateralAssetClass,
+    fm::types::CollateralAssetClass,
+    "CollateralAssetClass",
+    from_str:
+        /// Parse the lower-case wire label; raises ``ValueError`` otherwise.
+    ,
+    variants: [
+        /// Cash in an eligible currency.
+        cash => Cash,
+        /// Sovereign government bonds.
+        government_bonds => GovernmentBonds,
+        /// Debt issued or guaranteed by eligible agencies.
+        agency_bonds => AgencyBonds,
+        /// Covered bonds meeting the applicable eligibility criteria.
+        covered_bonds => CoveredBonds,
+        /// Investment-grade corporate bonds.
+        corporate_bonds => CorporateBonds,
+        /// Eligible listed equity.
+        equity => Equity,
+        /// Eligible gold collateral.
+        gold => Gold,
+        /// Eligible mutual funds or exchange-traded funds.
+        mutual_funds => MutualFunds,
+    ]
+);
+
 #[pymethods]
 impl PyCollateralAssetClass {
-    /// Cash in an eligible currency.
-    #[staticmethod]
-    fn cash() -> Self {
-        Self {
-            inner: fm::types::CollateralAssetClass::Cash,
-        }
-    }
-
-    /// Sovereign government bonds.
-    #[staticmethod]
-    fn government_bonds() -> Self {
-        Self {
-            inner: fm::types::CollateralAssetClass::GovernmentBonds,
-        }
-    }
-
-    /// Debt issued or guaranteed by eligible agencies.
-    #[staticmethod]
-    fn agency_bonds() -> Self {
-        Self {
-            inner: fm::types::CollateralAssetClass::AgencyBonds,
-        }
-    }
-
-    /// Covered bonds meeting the applicable eligibility criteria.
-    #[staticmethod]
-    fn covered_bonds() -> Self {
-        Self {
-            inner: fm::types::CollateralAssetClass::CoveredBonds,
-        }
-    }
-
-    /// Investment-grade corporate bonds.
-    #[staticmethod]
-    fn corporate_bonds() -> Self {
-        Self {
-            inner: fm::types::CollateralAssetClass::CorporateBonds,
-        }
-    }
-
-    /// Eligible listed equity.
-    #[staticmethod]
-    fn equity() -> Self {
-        Self {
-            inner: fm::types::CollateralAssetClass::Equity,
-        }
-    }
-
-    /// Eligible gold collateral.
-    #[staticmethod]
-    fn gold() -> Self {
-        Self {
-            inner: fm::types::CollateralAssetClass::Gold,
-        }
-    }
-
-    /// Eligible mutual funds or exchange-traded funds.
-    #[staticmethod]
-    fn mutual_funds() -> Self {
-        Self {
-            inner: fm::types::CollateralAssetClass::MutualFunds,
-        }
-    }
-
-    /// Parse the lower-case wire label; raises ``ValueError`` otherwise.
-    #[staticmethod]
-    fn from_str(s: &str) -> PyResult<Self> {
-        let inner: fm::types::CollateralAssetClass =
-            s.parse().map_err(crate::errors::value_error)?;
-        Ok(Self { inner })
-    }
-
     /// BCBS-IOSCO standard haircut for this asset class, as a decimal
     /// fraction (``0.02`` = 2%). Raises ``ValueError`` if the registry has no
     /// entry for the class.
@@ -447,30 +307,14 @@ impl PyCollateralAssetClass {
     fn fx_addon(&self) -> PyResult<f64> {
         self.inner.fx_addon().map_err(core_to_py)
     }
-
-    fn __repr__(&self) -> String {
-        format!("CollateralAssetClass({})", self.inner)
-    }
-
-    fn __str__(&self) -> String {
-        self.inner.to_string()
-    }
 }
 
-/// Parse a ``CollateralAssetClass | str`` argument.
-pub(super) fn extract_asset_class(
-    obj: &Bound<'_, PyAny>,
-) -> PyResult<fm::types::CollateralAssetClass> {
-    if let Ok(wrapped) = obj.cast::<PyCollateralAssetClass>() {
-        return Ok(wrapped.borrow().inner.clone());
-    }
-    let label: String = obj.extract().map_err(|_| {
-        pyo3::exceptions::PyTypeError::new_err(
-            "expected a CollateralAssetClass or its lower-case wire label",
-        )
-    })?;
-    label.parse().map_err(crate::errors::value_error)
-}
+typed_or_label!(
+    pub(super) fn extract_asset_class -> fm::types::CollateralAssetClass,
+    PyCollateralAssetClass,
+    "a CollateralAssetClass or its lower-case wire label",
+    |label| label.parse().map_err(crate::errors::value_error)
+);
 
 /// Identifies a margin netting set.
 ///
@@ -491,6 +335,12 @@ pub struct PyNettingSetId {
     pub(crate) inner: fm::types::NettingSetId,
 }
 
+wire_methods!(PyNettingSetId, fm::types::NettingSetId, "NettingSetId");
+py_getters!(PyNettingSetId |s| {
+    /// Whether this is a cleared netting set.
+    is_cleared -> bool = s.inner.is_cleared();
+});
+
 #[pymethods]
 impl PyNettingSetId {
     /// Create a bilateral netting set keyed by counterparty and CSA ids.
@@ -507,35 +357,6 @@ impl PyNettingSetId {
         Self {
             inner: fm::types::NettingSetId::cleared(ccp_id),
         }
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from the JSON produced by ``to_json``; raises
-    /// ``ValueError`` on malformed input.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: fm::types::NettingSetId = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to the canonical JSON wire form.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Whether this is a cleared netting set.
-    #[getter]
-    fn is_cleared(&self) -> bool {
-        self.inner.is_cleared()
     }
 
     /// Counterparty identifier. For cleared netting sets this is the
@@ -582,20 +403,12 @@ pub(super) fn extract_netting_set_id(obj: &Bound<'_, PyAny>) -> PyResult<fm::typ
         })
 }
 
-/// Parse an ``ImMethodology | str`` argument.
-fn extract_im_methodology(obj: &Bound<'_, PyAny>) -> PyResult<fm::types::ImMethodology> {
-    if let Ok(wrapped) = obj.cast::<PyImMethodology>() {
-        return Ok(wrapped.borrow().inner);
-    }
-    let label: String = obj.extract().map_err(|_| {
-        pyo3::exceptions::PyTypeError::new_err(
-            "expected an ImMethodology or its lower-case wire label (e.g. \"simm\")",
-        )
-    })?;
-    label
-        .parse()
-        .map_err(|e: String| crate::errors::value_error(e))
-}
+typed_or_label!(
+    fn extract_im_methodology -> fm::types::ImMethodology,
+    PyImMethodology,
+    "an ImMethodology or its lower-case wire label (e.g. \"simm\")",
+    |label| label.parse().map_err(|e: String| crate::errors::value_error(e))
+);
 
 /// Credit Support Annex specification (ISDA standard).
 ///
@@ -631,6 +444,44 @@ impl PyCsaSpec {
 pub(crate) struct PyCsaSpecBuilder {
     inner: Option<fm::types::CsaSpecBuilder>,
 }
+
+wire_methods!(PyCsaSpec, fm::types::CsaSpec, "CsaSpec", validate);
+py_getters!(PyCsaSpec |s| {
+    /// Base currency code.
+    base_currency -> String = s.inner.base_currency.to_string();
+    /// Whether this CSA requires initial margin.
+    requires_im -> bool = s.inner.requires_im();
+    /// VM threshold in ``base_currency``.
+    vm_threshold -> f64 = s.inner.vm_threshold().amount();
+    /// VM minimum transfer amount in ``base_currency``.
+    vm_mta -> f64 = s.inner.vm_params.mta.amount();
+    /// VM transfer rounding increment in ``base_currency``.
+    vm_rounding -> f64 = s.inner.vm_params.rounding.amount();
+    /// VM independent amount in ``base_currency``.
+    vm_independent_amount -> f64 = s.inner.vm_params.independent_amount.amount();
+    /// VM call frequency.
+    vm_frequency -> PyMarginTenor = PyMarginTenor {
+        inner: s.inner.vm_params.frequency,
+    };
+    /// VM settlement lag in business days (T+n).
+    vm_settlement_lag -> u32 = s.inner.vm_params.settlement_lag;
+    /// IM methodology, or ``None`` when no IM is exchanged.
+    im_methodology -> Option<PyImMethodology> = s.inner.im_params.as_ref().map(|p| PyImMethodology {
+        inner: p.methodology,
+    });
+    /// IM margin period of risk in business days, or ``None`` without IM.
+    im_mpor_days -> Option<u32> = s.inner.im_params.as_ref().map(|p| p.mpor_days);
+    /// IM threshold in ``base_currency``, or ``None`` without IM.
+    im_threshold -> Option<f64> = s.inner.im_threshold().map(Money::amount);
+    /// IM minimum transfer amount in ``base_currency``, or ``None`` without IM.
+    im_mta -> Option<f64> = s.inner.im_params.as_ref().map(|p| p.mta.amount());
+    /// Whether IM must be segregated, or ``None`` without IM.
+    im_segregated -> Option<bool> = s.inner.im_params.as_ref().map(|p| p.segregated);
+    /// Eligible-collateral schedule governing what can be posted.
+    eligible_collateral -> PyEligibleCollateralSchedule = PyEligibleCollateralSchedule {
+        inner: s.inner.eligible_collateral.clone(),
+    };
+});
 
 #[pymethods]
 impl PyCsaSpec {
@@ -938,40 +789,10 @@ impl PyCsaSpec {
         })
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from a JSON string; raises ``ValueError`` on malformed
-    /// input or a spec that fails Rust-side validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: fm::types::CsaSpec = serde_json::from_str(json).map_err(display_to_py)?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to a JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// Stable CSA identifier used in margin lookups.
     #[getter]
     fn id(&self) -> &str {
         &self.inner.id
-    }
-
-    /// Base currency code.
-    #[getter]
-    fn base_currency(&self) -> String {
-        self.inner.base_currency.to_string()
     }
 
     /// Contractual business-day calendar identifier.
@@ -984,90 +805,6 @@ impl PyCsaSpec {
     #[getter]
     fn collateral_curve_id(&self) -> &str {
         self.inner.collateral_curve_id.as_str()
-    }
-
-    /// Whether this CSA requires initial margin.
-    #[getter]
-    fn requires_im(&self) -> bool {
-        self.inner.requires_im()
-    }
-
-    /// VM threshold in ``base_currency``.
-    #[getter]
-    fn vm_threshold(&self) -> f64 {
-        self.inner.vm_threshold().amount()
-    }
-
-    /// VM minimum transfer amount in ``base_currency``.
-    #[getter]
-    fn vm_mta(&self) -> f64 {
-        self.inner.vm_params.mta.amount()
-    }
-
-    /// VM transfer rounding increment in ``base_currency``.
-    #[getter]
-    fn vm_rounding(&self) -> f64 {
-        self.inner.vm_params.rounding.amount()
-    }
-
-    /// VM independent amount in ``base_currency``.
-    #[getter]
-    fn vm_independent_amount(&self) -> f64 {
-        self.inner.vm_params.independent_amount.amount()
-    }
-
-    /// VM call frequency.
-    #[getter]
-    fn vm_frequency(&self) -> PyMarginTenor {
-        PyMarginTenor {
-            inner: self.inner.vm_params.frequency,
-        }
-    }
-
-    /// VM settlement lag in business days (T+n).
-    #[getter]
-    fn vm_settlement_lag(&self) -> u32 {
-        self.inner.vm_params.settlement_lag
-    }
-
-    /// IM methodology, or ``None`` when no IM is exchanged.
-    #[getter]
-    fn im_methodology(&self) -> Option<PyImMethodology> {
-        self.inner.im_params.as_ref().map(|p| PyImMethodology {
-            inner: p.methodology,
-        })
-    }
-
-    /// IM margin period of risk in business days, or ``None`` without IM.
-    #[getter]
-    fn im_mpor_days(&self) -> Option<u32> {
-        self.inner.im_params.as_ref().map(|p| p.mpor_days)
-    }
-
-    /// IM threshold in ``base_currency``, or ``None`` without IM.
-    #[getter]
-    fn im_threshold(&self) -> Option<f64> {
-        self.inner.im_threshold().map(Money::amount)
-    }
-
-    /// IM minimum transfer amount in ``base_currency``, or ``None`` without IM.
-    #[getter]
-    fn im_mta(&self) -> Option<f64> {
-        self.inner.im_params.as_ref().map(|p| p.mta.amount())
-    }
-
-    /// Whether IM must be segregated, or ``None`` without IM.
-    #[getter]
-    fn im_segregated(&self) -> Option<bool> {
-        self.inner.im_params.as_ref().map(|p| p.segregated)
-    }
-
-    /// Eligible-collateral schedule governing what can be posted.
-    #[getter]
-    fn eligible_collateral(&self) -> PyEligibleCollateralSchedule {
-        PyEligibleCollateralSchedule {
-            inner: self.inner.eligible_collateral.clone(),
-        }
     }
 
     /// Margin-call timing terms as a dict (``notification_deadline_hours``,
@@ -1173,6 +910,21 @@ pub struct PyEligibleCollateralSchedule {
     pub(super) inner: fm::types::EligibleCollateralSchedule,
 }
 
+wire_methods!(
+    PyEligibleCollateralSchedule,
+    fm::types::EligibleCollateralSchedule,
+    "EligibleCollateralSchedule"
+);
+py_getters!(PyEligibleCollateralSchedule |s| {
+    /// Whether rehypothecation is allowed.
+    rehypothecation_allowed -> bool = s.inner.rehypothecation_allowed;
+    /// Number of eligible collateral types.
+    eligible_count -> usize = s.inner.eligible.len();
+    /// Haircut for collateral types not listed explicitly (decimal), or
+    /// ``None`` when only listed types are accepted.
+    default_haircut -> Option<f64> = s.inner.default_haircut;
+});
+
 #[pymethods]
 impl PyEligibleCollateralSchedule {
     /// Cash-only schedule. Raises ``ValueError`` if the registry cannot load.
@@ -1228,48 +980,6 @@ impl PyEligibleCollateralSchedule {
             fm::types::EligibleCollateralSchedule::from_finstack_config(&config.inner, schedule_id)
                 .map_err(core_to_py)?;
         Ok(Self { inner })
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from JSON; raises ``ValueError`` on malformed input.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: fm::types::EligibleCollateralSchedule =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Whether rehypothecation is allowed.
-    #[getter]
-    fn rehypothecation_allowed(&self) -> bool {
-        self.inner.rehypothecation_allowed
-    }
-
-    /// Number of eligible collateral types.
-    #[getter]
-    fn eligible_count(&self) -> usize {
-        self.inner.eligible.len()
-    }
-
-    /// Haircut for collateral types not listed explicitly (decimal), or
-    /// ``None`` when only listed types are accepted.
-    #[getter]
-    fn default_haircut(&self) -> Option<f64> {
-        self.inner.default_haircut
     }
 
     /// Whether an asset class (or its wire label) is eligible.

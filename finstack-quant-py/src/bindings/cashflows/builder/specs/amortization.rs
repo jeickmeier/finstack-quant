@@ -1,7 +1,7 @@
 //! Spec-type bindings for `finstack_quant_cashflows::builder`.
 
 use crate::bindings::cashflows::aggregation::extract_dated_flows;
-use crate::bindings::macros::wire_methods;
+use crate::bindings::macros::{py_getters, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::builder::{AmortizationSpec, Notional};
 use pyo3::prelude::*;
@@ -59,7 +59,7 @@ impl PyAmortizationSpec {
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.step_remaining")]
     #[staticmethod]
     #[pyo3(text_signature = "(schedule)")]
-    fn step_remaining(schedule: Vec<(Bound<'_, PyAny>, PyMoney)>) -> PyResult<Self> {
+    fn step_remaining(schedule: DateMoneyRows<'_>) -> PyResult<Self> {
         Ok(Self {
             inner: AmortizationSpec::StepRemaining {
                 schedule: extract_dated_flows(schedule)?,
@@ -100,29 +100,12 @@ impl PyAmortizationSpec {
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.custom_principal")]
     #[staticmethod]
     #[pyo3(text_signature = "(items)")]
-    fn custom_principal(items: Vec<(Bound<'_, PyAny>, PyMoney)>) -> PyResult<Self> {
+    fn custom_principal(items: DateMoneyRows<'_>) -> PyResult<Self> {
         Ok(Self {
             inner: AmortizationSpec::CustomPrincipal {
                 items: extract_dated_flows(items)?,
             },
         })
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.kind")]
-    #[getter]
-    fn kind(&self) -> PyResult<String> {
-        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.final_notional")]
-    #[getter]
-    fn final_notional(&self) -> Option<PyMoney> {
-        match self.inner {
-            AmortizationSpec::LinearTo { final_notional } => {
-                Some(PyMoney::from_inner(final_notional))
-            }
-            _ => None,
-        }
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.schedule")]
@@ -133,16 +116,6 @@ impl PyAmortizationSpec {
                 date_money_to_py(py, schedule).map(Some)
             }
             _ => Ok(None),
-        }
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.pct")]
-    #[getter]
-    fn pct(&self) -> Option<f64> {
-        match self.inner {
-            AmortizationSpec::PercentOfOriginalPerPeriod { pct }
-            | AmortizationSpec::PercentOfRemainingPerPeriod { pct } => Some(pct),
-            _ => None,
         }
     }
 
@@ -174,6 +147,24 @@ impl PyAmortizationSpec {
         enum_repr("AmortizationSpec", &self.inner)
     }
 }
+
+py_getters!(PyAmortizationSpec |s| {
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.kind")]
+    kind -> PyResult<String> = finstack_quant_core::wire::serde_tag(&s.inner).map_err(core_to_py);
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.final_notional")]
+    final_notional -> Option<PyMoney> = match s.inner {
+        AmortizationSpec::LinearTo { final_notional } => Some(PyMoney::from_inner(final_notional)),
+        _ => None,
+    };
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "AmortizationSpec.pct")]
+    pct -> Option<f64> = match s.inner {
+        AmortizationSpec::PercentOfOriginalPerPeriod { pct }
+        | AmortizationSpec::PercentOfRemainingPerPeriod { pct } => Some(pct),
+        _ => None,
+    };
+});
 
 #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "Notional")]
 #[pyclass(
@@ -227,24 +218,10 @@ impl PyNotional {
         Ok(Self { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "Notional.initial")]
-    #[getter]
-    fn initial(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.initial)
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "Notional.amort")]
-    #[getter]
-    fn amort(&self) -> PyAmortizationSpec {
-        PyAmortizationSpec {
-            inner: self.inner.amort.clone(),
-        }
-    }
-
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "Notional.currency")]
     #[pyo3(text_signature = "(self)")]
-    fn currency(&self, py: Python<'_>) -> PyResult<Py<PyCurrency>> {
-        Py::new(py, PyCurrency::from_inner(self.inner.currency()))
+    fn currency(&self) -> PyCurrency {
+        PyCurrency::from_inner(self.inner.currency())
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "Notional.validate")]
@@ -263,3 +240,13 @@ impl PyNotional {
         )
     }
 }
+
+py_getters!(PyNotional |s| {
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "Notional.initial")]
+    initial -> PyMoney = PyMoney::from_inner(s.inner.initial);
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.amortization", "Notional.amort")]
+    amort -> PyAmortizationSpec = PyAmortizationSpec {
+        inner: s.inner.amort.clone(),
+    };
+});

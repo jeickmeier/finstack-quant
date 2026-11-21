@@ -12,12 +12,10 @@ export interface ImResultWire {
    *
    * Approximations need not be conservative. Historical SIMM sets this flag
    * because its input dimensions and some aggregation stages are simplified.
-   * Also set by the clearing-house and internal-model calculators when
-   * they fall back to `|exposure_base| x conservative_rate` because no
-   * [`ExternalImSource`](crate::calculators::im::ExternalImSource) supplied
-   * a real margin amount. Portfolio-level consumers should surface this
-   * flag: an approximated IM is suitable for indicative funding/capacity
-   * analysis, not for reconciling actual CCP margin calls.
+   * Also set by the clearing-house calculator when it computes a conservative
+   * `|exposure_base| x conservative_rate` proxy. Portfolio-level consumers
+   * should surface this flag: an approximated IM is suitable for indicative
+   * funding/capacity analysis, not for reconciling actual CCP margin calls.
    */
   approximation: boolean;
   /**

@@ -44,6 +44,300 @@ pub struct JsFrtbSensitivities {
     inner: FrtbSensitivities,
 }
 
+json_round_trip!(JsFrtbSensitivities, FrtbSensitivities);
+
+macro_rules! frtb_wasm_adders {
+    (
+        ccy1: [$( $(#[$c_doc:meta])* ($c_method:ident, $c_js:ident) ),* $(,)?],
+        delta5: [$( $(#[$d_doc:meta])* ($d_method:ident, $d_js:ident, $d_id:ident) ),* $(,)?],
+        vega4: [$( $(#[$v_doc:meta])* ($v_method:ident, $v_js:ident, $v_id:ident) ),* $(,)?],
+        cvr4: [$( $(#[$k_doc:meta])* ($k_method:ident, $k_js:ident, $k_id:ident) ),* $(,)?],
+        eq3: [$( $(#[$e_doc:meta])* ($e_method:ident, $e_js:ident) ),* $(,)?] $(,)?
+    ) => {
+        #[finstack_quant_wasm_macros::plain_docs]
+        #[wasm_bindgen(js_class = FrtbSensitivities)]
+        impl JsFrtbSensitivities {
+            $(
+                $(#[$c_doc])*
+                #[wasm_bindgen(js_name = $c_js)]
+                pub fn $c_method(
+                    &mut self,
+                    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
+                ) -> Result<(), JsValue> {
+                    let amount = js_f64(&amount, "amount")?;
+                    let currency = js_currency(&currency, "currency")?;
+                    self.inner.$c_method(currency, amount);
+                    Ok(())
+                }
+            )*
+            $(
+                $(#[$d_doc])*
+                #[wasm_bindgen(js_name = $d_js)]
+                pub fn $d_method(
+                    &mut self,
+                    #[wasm_bindgen(unchecked_param_type = "string")] $d_id: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "string")] basis: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
+                ) -> Result<(), JsValue> {
+                    let $d_id = js_string(&$d_id, stringify!($d_id))?;
+                    let bucket: u8 = js_uint(&bucket, "bucket")?;
+                    let tenor = js_string(&tenor, "tenor")?;
+                    let basis = js_string(&basis, "basis")?;
+                    let amount = js_f64(&amount, "amount")?;
+                    self.inner.$d_method(&$d_id, bucket, &tenor, &basis, amount);
+                    Ok(())
+                }
+            )*
+            $(
+                $(#[$v_doc])*
+                #[wasm_bindgen(js_name = $v_js)]
+                pub fn $v_method(
+                    &mut self,
+                    #[wasm_bindgen(unchecked_param_type = "string")] $v_id: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
+                ) -> Result<(), JsValue> {
+                    let $v_id = js_string(&$v_id, stringify!($v_id))?;
+                    let bucket: u8 = js_uint(&bucket, "bucket")?;
+                    let maturity = js_string(&maturity, "maturity")?;
+                    let amount = js_f64(&amount, "amount")?;
+                    self.inner.$v_method(&$v_id, bucket, &maturity, amount);
+                    Ok(())
+                }
+            )*
+            $(
+                $(#[$k_doc])*
+                #[wasm_bindgen(js_name = $k_js)]
+                pub fn $k_method(
+                    &mut self,
+                    #[wasm_bindgen(unchecked_param_type = "string")] $k_id: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+                    #[wasm_bindgen(js_name = "cvrUp", unchecked_param_type = "number")] cvr_up: JsValue,
+                    #[wasm_bindgen(js_name = "cvrDown", unchecked_param_type = "number")] cvr_down: JsValue,
+                ) -> Result<(), JsValue> {
+                    let $k_id = js_string(&$k_id, stringify!($k_id))?;
+                    let bucket: u8 = js_uint(&bucket, "bucket")?;
+                    let cvr_up = js_f64(&cvr_up, "cvrUp")?;
+                    let cvr_down = js_f64(&cvr_down, "cvrDown")?;
+                    self.inner.$k_method(&$k_id, bucket, cvr_up, cvr_down);
+                    Ok(())
+                }
+            )*
+            $(
+                $(#[$e_doc])*
+                #[wasm_bindgen(js_name = $e_js)]
+                pub fn $e_method(
+                    &mut self,
+                    #[wasm_bindgen(unchecked_param_type = "string")] underlier: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+                    #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
+                ) -> Result<(), JsValue> {
+                    let underlier = js_string(&underlier, "underlier")?;
+                    let bucket: u8 = js_uint(&bucket, "bucket")?;
+                    let amount = js_f64(&amount, "amount")?;
+                    self.inner.$e_method(&underlier, bucket, amount);
+                    Ok(())
+                }
+            )*
+        }
+    };
+}
+
+frtb_wasm_adders!(
+    ccy1: [
+        /// Add a GIRR inflation delta sensitivity.
+        /// @param amount - Base-currency P&L per 1 percentage point of inflation shift.
+        /// @param currency - ISO-4217 currency of the inflation curve of the shocked risk factor.
+        ///
+        /// # Errors
+        ///
+        /// Throws if the currency is not a known ISO-4217 code.
+        (add_girr_inflation_delta, addGirrInflationDelta),
+        /// Add a GIRR cross-currency basis delta sensitivity.
+        /// @param amount - Base-currency P&L per 1 percentage point of basis shift.
+        /// @param currency - ISO-4217 currency whose basis moves of the shocked risk factor.
+        ///
+        /// # Errors
+        ///
+        /// Throws if the currency is not a known ISO-4217 code.
+        (add_girr_xccy_basis_delta, addGirrXccyBasisDelta),
+    ],
+    delta5: [
+        /// Add a CSR non-securitisation delta sensitivity.
+        /// @param issuer - Issuer or reference-entity identifier.
+        /// @param bucket - 1-based CSR non-securitisation bucket (MAR21.51).
+        /// @param tenor - Credit-spread tenor label such as `"5Y"`.
+        /// @param basis - Spread curve identifier (bond or CDS) or commodity delivery location; equal labels identify the same basis for correlation.
+        /// @param amount - Base-currency P&L per 1 percentage point of spread move (`100 * CS01`).
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+        (add_csr_nonsec_delta, addCsrNonsecDelta, issuer),
+        /// Add a CSR securitisation (correlation trading portfolio) delta sensitivity.
+        /// @param tranche - Tranche or index identifier.
+        /// @param bucket - 1-based CSR securitisation CTP bucket (MAR21.59).
+        /// @param tenor - Credit-spread tenor label such as `"5Y"`.
+        /// @param basis - Spread curve identifier (bond or CDS) or commodity delivery location; equal labels identify the same basis for correlation.
+        /// @param amount - Base-currency P&L per 1 percentage point of spread move (`100 * CS01`).
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+        (add_csr_sec_ctp_delta, addCsrSecCtpDelta, tranche),
+        /// Add a CSR securitisation (non-CTP) delta sensitivity.
+        /// @param tranche - Tranche identifier.
+        /// @param bucket - 1-based CSR securitisation non-CTP bucket (MAR21.64).
+        /// @param tenor - Credit-spread tenor label such as `"5Y"`.
+        /// @param basis - Spread curve identifier (bond or CDS) or commodity delivery location; equal labels identify the same basis for correlation.
+        /// @param amount - Base-currency P&L per 1 percentage point of spread move (`100 * CS01`).
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+        (add_csr_sec_nonctp_delta, addCsrSecNonctpDelta, tranche),
+        /// Add a commodity delta sensitivity.
+        /// @param name - Commodity identifier.
+        /// @param bucket - 1-based commodity bucket (MAR21.82).
+        /// @param tenor - Commodity tenor label such as `"1Y"`.
+        /// @param basis - Spread curve identifier (bond or CDS) or commodity delivery location; equal labels identify the same basis for correlation.
+        /// @param amount - Base-currency P&L per 1 percentage point move in the commodity price.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+        (add_commodity_delta, addCommodityDelta, name),
+    ],
+    vega4: [
+        /// Add a CSR non-securitisation vega sensitivity.
+        /// @param issuer - Issuer or reference-entity identifier.
+        /// @param bucket - 1-based CSR non-securitisation bucket (MAR21.51).
+        /// @param maturity - Option maturity label such as `"1Y"`.
+        /// @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+        (add_csr_nonsec_vega, addCsrNonsecVega, issuer),
+        /// Add a CSR securitisation (correlation trading portfolio) vega sensitivity.
+        /// @param tranche - Tranche or index identifier.
+        /// @param bucket - 1-based CSR securitisation CTP bucket (MAR21.59).
+        /// @param maturity - Option maturity label such as `"1Y"`.
+        /// @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+        (add_csr_sec_ctp_vega, addCsrSecCtpVega, tranche),
+        /// Add a CSR securitisation (non-CTP) vega sensitivity.
+        /// @param tranche - Tranche identifier.
+        /// @param bucket - 1-based CSR securitisation non-CTP bucket (MAR21.64).
+        /// @param maturity - Option maturity label such as `"1Y"`.
+        /// @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+        (add_csr_sec_nonctp_vega, addCsrSecNonctpVega, tranche),
+        /// Add a commodity vega sensitivity.
+        /// @param name - Commodity identifier.
+        /// @param bucket - 1-based commodity bucket (MAR21.82).
+        /// @param maturity - Option maturity label such as `"1Y"`.
+        /// @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+        (add_commodity_vega, addCommodityVega, name),
+        /// Add an equity vega sensitivity.
+        /// @param underlier - Equity underlier or index identifier.
+        /// @param bucket - 1-based equity bucket (MAR21.72).
+        /// @param maturity - Option maturity label such as `"1Y"`.
+        /// @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+        (add_equity_vega, addEquityVega, underlier),
+    ],
+    cvr4: [
+        /// Add a CSR non-securitisation curvature pair.
+        /// @param issuer - Issuer or reference-entity identifier.
+        /// @param bucket - 1-based CSR non-securitisation bucket (MAR21.51).
+        /// @param cvrUp - Curvature risk position under the upward spread shock, in the base currency.
+        /// @param cvrDown - Curvature risk position under the downward spread shock, in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+        (add_csr_nonsec_curvature, addCsrNonsecCurvature, issuer),
+        /// Add a CSR securitisation (correlation trading portfolio) curvature pair.
+        /// @param tranche - Tranche or index identifier.
+        /// @param bucket - 1-based CSR securitisation CTP bucket (MAR21.59).
+        /// @param cvrUp - Curvature risk position under the upward spread shock, in the base currency.
+        /// @param cvrDown - Curvature risk position under the downward spread shock, in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+        (add_csr_sec_ctp_curvature, addCsrSecCtpCurvature, tranche),
+        /// Add a CSR securitisation (non-CTP) curvature pair.
+        /// @param tranche - Tranche identifier.
+        /// @param bucket - 1-based CSR securitisation non-CTP bucket (MAR21.64).
+        /// @param cvrUp - Curvature risk position under the upward spread shock, in the base currency.
+        /// @param cvrDown - Curvature risk position under the downward spread shock, in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+        (add_csr_sec_nonctp_curvature, addCsrSecNonctpCurvature, tranche),
+        /// Add a commodity curvature pair.
+        /// @param name - Commodity identifier.
+        /// @param bucket - 1-based commodity bucket (MAR21.82).
+        /// @param cvrUp - Curvature risk position under the upward price shock, in the base currency.
+        /// @param cvrDown - Curvature risk position under the downward price shock, in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+        (add_commodity_curvature, addCommodityCurvature, name),
+        /// Add an equity curvature pair.
+        /// @param underlier - Equity underlier or index identifier.
+        /// @param bucket - 1-based equity bucket (MAR21.72).
+        /// @param cvrUp - Curvature risk position under the upward price shock, in the base currency.
+        /// @param cvrDown - Curvature risk position under the downward price shock, in the base currency.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+        (add_equity_curvature, addEquityCurvature, underlier),
+    ],
+    eq3: [
+        /// Add an equity delta sensitivity.
+        /// @param underlier - Equity underlier or index identifier.
+        /// @param bucket - 1-based equity bucket (MAR21.72).
+        /// @param amount - Base-currency P&L per 1 percentage point move in the underlier.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+        (add_equity_delta, addEquityDelta),
+        /// Add an equity repo-rate delta sensitivity.
+        /// @param underlier - Equity underlier or index identifier.
+        /// @param bucket - 1-based equity bucket (MAR21.72).
+        /// @param amount - Base-currency P&L per 1 percentage point parallel repo-rate shift.
+        ///
+        /// # Errors
+        ///
+        /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+        (add_equity_repo_delta, addEquityRepoDelta),
+    ],
+);
+
 #[wasm_bindgen(js_class = FrtbSensitivities)]
 impl JsFrtbSensitivities {
     /// Create an empty FRTB sensitivity set in one reporting currency.
@@ -60,33 +354,6 @@ impl JsFrtbSensitivities {
         Ok(Self {
             inner: FrtbSensitivities::new(js_currency(&base_currency, "baseCurrency")?),
         })
-    }
-
-    /// Deserialize sensitivities from the canonical Rust JSON shape.
-    /// @param json - `FrtbSensitivities` JSON text or plain object.
-    /// @returns A `FrtbSensitivities` handle.
-    ///
-    /// # Errors
-    ///
-    /// Throws if the JSON is malformed or has unknown fields.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "FrtbSensitivitiesWire | string")] json: JsValue,
-    ) -> Result<JsFrtbSensitivities, JsValue> {
-        Ok(Self {
-            inner: from_js_json(&json, "json")?,
-        })
-    }
-
-    /// Serialize these sensitivities to the canonical Rust JSON shape.
-    /// @returns Compact JSON text accepted by `FrtbSensitivities.fromJson`.
-    ///
-    /// # Errors
-    ///
-    /// Throws if serialization fails.
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
     }
 
     /// Validate labels, buckets, identifiers and amounts without pricing.
@@ -127,331 +394,6 @@ impl JsFrtbSensitivities {
             .map_err(to_js_err)
     }
 
-    /// Add a GIRR inflation delta sensitivity.
-    /// @param amount - Base-currency P&L per 1 percentage point of inflation shift.
-    /// @param currency - ISO-4217 currency of the inflation curve of the shocked risk factor.
-    ///
-    /// # Errors
-    ///
-    /// Throws if the currency is not a known ISO-4217 code.
-    #[wasm_bindgen(js_name = addGirrInflationDelta)]
-    pub fn add_girr_inflation_delta(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let amount = js_f64(&amount, "amount")?;
-        let currency = js_currency(&currency, "currency")?;
-        self.inner.add_girr_inflation_delta(currency, amount);
-        Ok(())
-    }
-
-    /// Add a GIRR cross-currency basis delta sensitivity.
-    /// @param amount - Base-currency P&L per 1 percentage point of basis shift.
-    /// @param currency - ISO-4217 currency whose basis moves of the shocked risk factor.
-    ///
-    /// # Errors
-    ///
-    /// Throws if the currency is not a known ISO-4217 code.
-    #[wasm_bindgen(js_name = addGirrXccyBasisDelta)]
-    pub fn add_girr_xccy_basis_delta(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let amount = js_f64(&amount, "amount")?;
-        let currency = js_currency(&currency, "currency")?;
-        self.inner.add_girr_xccy_basis_delta(currency, amount);
-        Ok(())
-    }
-
-    /// Add a CSR non-securitisation delta sensitivity.
-    /// @param issuer - Issuer or reference-entity identifier.
-    /// @param bucket - 1-based CSR non-securitisation bucket (MAR21.51).
-    /// @param tenor - Credit-spread tenor label such as `"5Y"`.
-    /// @param basis - Spread curve identifier (bond or CDS) or commodity delivery location; equal labels identify the same basis for correlation.
-    /// @param amount - Base-currency P&L per 1 percentage point of spread move (`100 * CS01`).
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
-    #[wasm_bindgen(js_name = addCsrNonsecDelta)]
-    pub fn add_csr_nonsec_delta(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] issuer: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] basis: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let issuer = js_string(&issuer, "issuer")?;
-        let bucket: u8 = js_uint(&bucket, "bucket")?;
-        let tenor = js_string(&tenor, "tenor")?;
-        let basis = js_string(&basis, "basis")?;
-        let amount = js_f64(&amount, "amount")?;
-        self.inner
-            .add_csr_nonsec_delta(&issuer, bucket, &tenor, &basis, amount);
-        Ok(())
-    }
-
-    /// Add a CSR non-securitisation vega sensitivity.
-    /// @param issuer - Issuer or reference-entity identifier.
-    /// @param bucket - 1-based CSR non-securitisation bucket (MAR21.51).
-    /// @param maturity - Option maturity label such as `"1Y"`.
-    /// @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
-    #[wasm_bindgen(js_name = addCsrNonsecVega)]
-    pub fn add_csr_nonsec_vega(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] issuer: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let issuer = js_string(&issuer, "issuer")?;
-        let bucket: u8 = js_uint(&bucket, "bucket")?;
-        let maturity = js_string(&maturity, "maturity")?;
-        let amount = js_f64(&amount, "amount")?;
-        self.inner
-            .add_csr_nonsec_vega(&issuer, bucket, &maturity, amount);
-        Ok(())
-    }
-
-    /// Add a CSR non-securitisation curvature pair.
-    /// @param issuer - Issuer or reference-entity identifier.
-    /// @param bucket - 1-based CSR non-securitisation bucket (MAR21.51).
-    /// @param cvrUp - Curvature risk position under the upward spread shock, in the base currency.
-    /// @param cvrDown - Curvature risk position under the downward spread shock, in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
-    #[wasm_bindgen(js_name = addCsrNonsecCurvature)]
-    pub fn add_csr_nonsec_curvature(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] issuer: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
-        #[wasm_bindgen(js_name = "cvrUp", unchecked_param_type = "number")] cvr_up: JsValue,
-        #[wasm_bindgen(js_name = "cvrDown", unchecked_param_type = "number")] cvr_down: JsValue,
-    ) -> Result<(), JsValue> {
-        let issuer = js_string(&issuer, "issuer")?;
-        let bucket: u8 = js_uint(&bucket, "bucket")?;
-        let cvr_up = js_f64(&cvr_up, "cvrUp")?;
-        let cvr_down = js_f64(&cvr_down, "cvrDown")?;
-        self.inner
-            .add_csr_nonsec_curvature(&issuer, bucket, cvr_up, cvr_down);
-        Ok(())
-    }
-
-    /// Add a CSR securitisation (correlation trading portfolio) delta sensitivity.
-    /// @param tranche - Tranche or index identifier.
-    /// @param bucket - 1-based CSR securitisation CTP bucket (MAR21.59).
-    /// @param tenor - Credit-spread tenor label such as `"5Y"`.
-    /// @param basis - Spread curve identifier (bond or CDS) or commodity delivery location; equal labels identify the same basis for correlation.
-    /// @param amount - Base-currency P&L per 1 percentage point of spread move (`100 * CS01`).
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
-    #[wasm_bindgen(js_name = addCsrSecCtpDelta)]
-    pub fn add_csr_sec_ctp_delta(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] tranche: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] basis: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let tranche = js_string(&tranche, "tranche")?;
-        let bucket: u8 = js_uint(&bucket, "bucket")?;
-        let tenor = js_string(&tenor, "tenor")?;
-        let basis = js_string(&basis, "basis")?;
-        let amount = js_f64(&amount, "amount")?;
-        self.inner
-            .add_csr_sec_ctp_delta(&tranche, bucket, &tenor, &basis, amount);
-        Ok(())
-    }
-
-    /// Add a CSR securitisation (correlation trading portfolio) vega sensitivity.
-    /// @param tranche - Tranche or index identifier.
-    /// @param bucket - 1-based CSR securitisation CTP bucket (MAR21.59).
-    /// @param maturity - Option maturity label such as `"1Y"`.
-    /// @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
-    #[wasm_bindgen(js_name = addCsrSecCtpVega)]
-    pub fn add_csr_sec_ctp_vega(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] tranche: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let tranche = js_string(&tranche, "tranche")?;
-        let bucket: u8 = js_uint(&bucket, "bucket")?;
-        let maturity = js_string(&maturity, "maturity")?;
-        let amount = js_f64(&amount, "amount")?;
-        self.inner
-            .add_csr_sec_ctp_vega(&tranche, bucket, &maturity, amount);
-        Ok(())
-    }
-
-    /// Add a CSR securitisation (correlation trading portfolio) curvature pair.
-    /// @param tranche - Tranche or index identifier.
-    /// @param bucket - 1-based CSR securitisation CTP bucket (MAR21.59).
-    /// @param cvrUp - Curvature risk position under the upward spread shock, in the base currency.
-    /// @param cvrDown - Curvature risk position under the downward spread shock, in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
-    #[wasm_bindgen(js_name = addCsrSecCtpCurvature)]
-    pub fn add_csr_sec_ctp_curvature(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] tranche: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
-        #[wasm_bindgen(js_name = "cvrUp", unchecked_param_type = "number")] cvr_up: JsValue,
-        #[wasm_bindgen(js_name = "cvrDown", unchecked_param_type = "number")] cvr_down: JsValue,
-    ) -> Result<(), JsValue> {
-        let tranche = js_string(&tranche, "tranche")?;
-        let bucket: u8 = js_uint(&bucket, "bucket")?;
-        let cvr_up = js_f64(&cvr_up, "cvrUp")?;
-        let cvr_down = js_f64(&cvr_down, "cvrDown")?;
-        self.inner
-            .add_csr_sec_ctp_curvature(&tranche, bucket, cvr_up, cvr_down);
-        Ok(())
-    }
-
-    /// Add a CSR securitisation (non-CTP) delta sensitivity.
-    /// @param tranche - Tranche identifier.
-    /// @param bucket - 1-based CSR securitisation non-CTP bucket (MAR21.64).
-    /// @param tenor - Credit-spread tenor label such as `"5Y"`.
-    /// @param basis - Spread curve identifier (bond or CDS) or commodity delivery location; equal labels identify the same basis for correlation.
-    /// @param amount - Base-currency P&L per 1 percentage point of spread move (`100 * CS01`).
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
-    #[wasm_bindgen(js_name = addCsrSecNonctpDelta)]
-    pub fn add_csr_sec_nonctp_delta(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] tranche: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] basis: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let tranche = js_string(&tranche, "tranche")?;
-        let bucket: u8 = js_uint(&bucket, "bucket")?;
-        let tenor = js_string(&tenor, "tenor")?;
-        let basis = js_string(&basis, "basis")?;
-        let amount = js_f64(&amount, "amount")?;
-        self.inner
-            .add_csr_sec_nonctp_delta(&tranche, bucket, &tenor, &basis, amount);
-        Ok(())
-    }
-
-    /// Add a CSR securitisation (non-CTP) vega sensitivity.
-    /// @param tranche - Tranche identifier.
-    /// @param bucket - 1-based CSR securitisation non-CTP bucket (MAR21.64).
-    /// @param maturity - Option maturity label such as `"1Y"`.
-    /// @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
-    #[wasm_bindgen(js_name = addCsrSecNonctpVega)]
-    pub fn add_csr_sec_nonctp_vega(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] tranche: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let tranche = js_string(&tranche, "tranche")?;
-        let bucket: u8 = js_uint(&bucket, "bucket")?;
-        let maturity = js_string(&maturity, "maturity")?;
-        let amount = js_f64(&amount, "amount")?;
-        self.inner
-            .add_csr_sec_nonctp_vega(&tranche, bucket, &maturity, amount);
-        Ok(())
-    }
-
-    /// Add a CSR securitisation (non-CTP) curvature pair.
-    /// @param tranche - Tranche identifier.
-    /// @param bucket - 1-based CSR securitisation non-CTP bucket (MAR21.64).
-    /// @param cvrUp - Curvature risk position under the upward spread shock, in the base currency.
-    /// @param cvrDown - Curvature risk position under the downward spread shock, in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
-    #[wasm_bindgen(js_name = addCsrSecNonctpCurvature)]
-    pub fn add_csr_sec_nonctp_curvature(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] tranche: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
-        #[wasm_bindgen(js_name = "cvrUp", unchecked_param_type = "number")] cvr_up: JsValue,
-        #[wasm_bindgen(js_name = "cvrDown", unchecked_param_type = "number")] cvr_down: JsValue,
-    ) -> Result<(), JsValue> {
-        let tranche = js_string(&tranche, "tranche")?;
-        let bucket: u8 = js_uint(&bucket, "bucket")?;
-        let cvr_up = js_f64(&cvr_up, "cvrUp")?;
-        let cvr_down = js_f64(&cvr_down, "cvrDown")?;
-        self.inner
-            .add_csr_sec_nonctp_curvature(&tranche, bucket, cvr_up, cvr_down);
-        Ok(())
-    }
-
-    /// Add an equity delta sensitivity.
-    /// @param underlier - Equity underlier or index identifier.
-    /// @param bucket - 1-based equity bucket (MAR21.72).
-    /// @param amount - Base-currency P&L per 1 percentage point move in the underlier.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
-    #[wasm_bindgen(js_name = addEquityDelta)]
-    pub fn add_equity_delta(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] underlier: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let underlier = js_string(&underlier, "underlier")?;
-        let bucket: u8 = js_uint(&bucket, "bucket")?;
-        let amount = js_f64(&amount, "amount")?;
-        self.inner.add_equity_delta(&underlier, bucket, amount);
-        Ok(())
-    }
-
-    /// Add an equity repo-rate delta sensitivity.
-    /// @param underlier - Equity underlier or index identifier.
-    /// @param bucket - 1-based equity bucket (MAR21.72).
-    /// @param amount - Base-currency P&L per 1 percentage point parallel repo-rate shift.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
-    #[wasm_bindgen(js_name = addEquityRepoDelta)]
-    pub fn add_equity_repo_delta(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] underlier: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let underlier = js_string(&underlier, "underlier")?;
-        let bucket: u8 = js_uint(&bucket, "bucket")?;
-        let amount = js_f64(&amount, "amount")?;
-        self.inner.add_equity_repo_delta(&underlier, bucket, amount);
-        Ok(())
-    }
-
     /// Add an FX delta sensitivity for a currency pair.
     /// @param ccy1 - First ISO-4217 currency of the FX pair.
     /// @param ccy2 - Second ISO-4217 currency of the FX pair.
@@ -471,87 +413,6 @@ impl JsFrtbSensitivities {
         let ccy2 = js_currency(&ccy2, "ccy2")?;
         let amount = js_f64(&amount, "amount")?;
         self.inner.add_fx_delta(ccy1, ccy2, amount);
-        Ok(())
-    }
-
-    /// Add a commodity delta sensitivity.
-    /// @param name - Commodity identifier.
-    /// @param bucket - 1-based commodity bucket (MAR21.82).
-    /// @param tenor - Commodity tenor label such as `"1Y"`.
-    /// @param basis - Spread curve identifier (bond or CDS) or commodity delivery location; equal labels identify the same basis for correlation.
-    /// @param amount - Base-currency P&L per 1 percentage point move in the commodity price.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
-    #[wasm_bindgen(js_name = addCommodityDelta)]
-    pub fn add_commodity_delta(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] basis: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let name = js_string(&name, "name")?;
-        let bucket: u8 = js_uint(&bucket, "bucket")?;
-        let tenor = js_string(&tenor, "tenor")?;
-        let basis = js_string(&basis, "basis")?;
-        let amount = js_f64(&amount, "amount")?;
-        self.inner
-            .add_commodity_delta(&name, bucket, &tenor, &basis, amount);
-        Ok(())
-    }
-
-    /// Add a commodity vega sensitivity.
-    /// @param name - Commodity identifier.
-    /// @param bucket - 1-based commodity bucket (MAR21.82).
-    /// @param maturity - Option maturity label such as `"1Y"`.
-    /// @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
-    #[wasm_bindgen(js_name = addCommodityVega)]
-    pub fn add_commodity_vega(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let name = js_string(&name, "name")?;
-        let bucket: u8 = js_uint(&bucket, "bucket")?;
-        let maturity = js_string(&maturity, "maturity")?;
-        let amount = js_f64(&amount, "amount")?;
-        self.inner
-            .add_commodity_vega(&name, bucket, &maturity, amount);
-        Ok(())
-    }
-
-    /// Add a commodity curvature pair.
-    /// @param name - Commodity identifier.
-    /// @param bucket - 1-based commodity bucket (MAR21.82).
-    /// @param cvrUp - Curvature risk position under the upward price shock, in the base currency.
-    /// @param cvrDown - Curvature risk position under the downward price shock, in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
-    #[wasm_bindgen(js_name = addCommodityCurvature)]
-    pub fn add_commodity_curvature(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
-        #[wasm_bindgen(js_name = "cvrUp", unchecked_param_type = "number")] cvr_up: JsValue,
-        #[wasm_bindgen(js_name = "cvrDown", unchecked_param_type = "number")] cvr_down: JsValue,
-    ) -> Result<(), JsValue> {
-        let name = js_string(&name, "name")?;
-        let bucket: u8 = js_uint(&bucket, "bucket")?;
-        let cvr_up = js_f64(&cvr_up, "cvrUp")?;
-        let cvr_down = js_f64(&cvr_down, "cvrDown")?;
-        self.inner
-            .add_commodity_curvature(&name, bucket, cvr_up, cvr_down);
         Ok(())
     }
 
@@ -580,32 +441,6 @@ impl JsFrtbSensitivities {
         let currency = js_currency(&currency, "currency")?;
         self.inner
             .add_girr_vega(currency, &option_maturity, &underlying_tenor, amount);
-        Ok(())
-    }
-
-    /// Add an equity vega sensitivity.
-    /// @param underlier - Equity underlier or index identifier.
-    /// @param bucket - 1-based equity bucket (MAR21.72).
-    /// @param maturity - Option maturity label such as `"1Y"`.
-    /// @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
-    #[wasm_bindgen(js_name = addEquityVega)]
-    pub fn add_equity_vega(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] underlier: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
-    ) -> Result<(), JsValue> {
-        let underlier = js_string(&underlier, "underlier")?;
-        let bucket: u8 = js_uint(&bucket, "bucket")?;
-        let maturity = js_string(&maturity, "maturity")?;
-        let amount = js_f64(&amount, "amount")?;
-        self.inner
-            .add_equity_vega(&underlier, bucket, &maturity, amount);
         Ok(())
     }
 
@@ -653,32 +488,6 @@ impl JsFrtbSensitivities {
         let cvr_down = js_f64(&cvr_down, "cvrDown")?;
         let currency = js_currency(&currency, "currency")?;
         self.inner.add_girr_curvature(currency, cvr_up, cvr_down);
-        Ok(())
-    }
-
-    /// Add an equity curvature pair.
-    /// @param underlier - Equity underlier or index identifier.
-    /// @param bucket - 1-based equity bucket (MAR21.72).
-    /// @param cvrUp - Curvature risk position under the upward price shock, in the base currency.
-    /// @param cvrDown - Curvature risk position under the downward price shock, in the base currency.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
-    #[wasm_bindgen(js_name = addEquityCurvature)]
-    pub fn add_equity_curvature(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] underlier: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
-        #[wasm_bindgen(js_name = "cvrUp", unchecked_param_type = "number")] cvr_up: JsValue,
-        #[wasm_bindgen(js_name = "cvrDown", unchecked_param_type = "number")] cvr_down: JsValue,
-    ) -> Result<(), JsValue> {
-        let underlier = js_string(&underlier, "underlier")?;
-        let bucket: u8 = js_uint(&bucket, "bucket")?;
-        let cvr_up = js_f64(&cvr_up, "cvrUp")?;
-        let cvr_down = js_f64(&cvr_down, "cvrDown")?;
-        self.inner
-            .add_equity_curvature(&underlier, bucket, cvr_up, cvr_down);
         Ok(())
     }
 

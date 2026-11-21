@@ -181,68 +181,34 @@ impl std::ops::Deref for PeriodAggregation {
     }
 }
 
-/// Date used to bucket a flow into a reporting period.
-trait HasDate {
-    fn flow_date(&self) -> Date;
-}
-
-impl HasDate for (Date, Money) {
-    fn flow_date(&self) -> Date {
-        self.0
-    }
-}
-
-impl HasDate for CashFlow {
-    fn flow_date(&self) -> Date {
-        self.get_date()
-    }
-}
-
-/// Sum per-flow values into `PeriodId -> (Currency -> Money)` buckets.
-///
-/// `sorted` must be ordered by date. Each flow in `[period.start, period.end)`
-/// contributes `value(index, flow)` to its currency's Neumaier accumulator, in
-/// flow order; periods without flows are omitted.
-fn sum_by_period<T: HasDate>(
+/// Visit each non-empty `[period.start, period.end)` slice of date-sorted items.
+fn for_each_period_bucket<T>(
     sorted: &[T],
     periods: &[Period],
-    mut value: impl FnMut(usize, &T) -> finstack_quant_core::Result<(Currency, f64)>,
-) -> finstack_quant_core::Result<PeriodAggregation> {
+    date_of: fn(&T) -> Date,
+    mut on_bucket: impl FnMut(&Period, usize, &[T]) -> finstack_quant_core::Result<()>,
+) -> finstack_quant_core::Result<()> {
     debug_assert!(
-        sorted
-            .windows(2)
-            .all(|w| w[0].flow_date() <= w[1].flow_date()),
-        "sum_by_period requires flows to be sorted by date"
+        sorted.windows(2).all(|w| date_of(&w[0]) <= date_of(&w[1])),
+        "period bucketing requires flows to be sorted by date"
     );
 
-    let mut out: IndexMap<PeriodId, IndexMap<Currency, Money>> =
-        IndexMap::with_capacity(periods.len());
-    let mut per_currency: IndexMap<Currency, NeumaierAccumulator> = IndexMap::new();
     let mut flow_idx = 0;
     let n = sorted.len();
 
     for p in periods {
-        while flow_idx < n && sorted[flow_idx].flow_date() < p.start {
+        while flow_idx < n && date_of(&sorted[flow_idx]) < p.start {
             flow_idx += 1;
         }
-
-        per_currency.clear();
-        while flow_idx < n && sorted[flow_idx].flow_date() < p.end {
-            let (ccy, amount) = value(flow_idx, &sorted[flow_idx])?;
-            per_currency.entry(ccy).or_default().add(amount)?;
+        let bucket_start = flow_idx;
+        while flow_idx < n && date_of(&sorted[flow_idx]) < p.end {
             flow_idx += 1;
         }
-        if per_currency.is_empty() {
-            continue;
+        if flow_idx > bucket_start {
+            on_bucket(p, bucket_start, &sorted[bucket_start..flow_idx])?;
         }
-
-        let mut result: IndexMap<Currency, Money> = IndexMap::with_capacity(per_currency.len());
-        for (&ccy, acc) in &per_currency {
-            result.insert(ccy, Money::new(acc.get_total()?, ccy)?);
-        }
-        out.insert(p.id, result);
     }
-    Ok(PeriodAggregation(out))
+    Ok(())
 }
 
 /// Accumulate nominal [`Money`] values across non-overlapping reporting periods
@@ -251,46 +217,35 @@ fn sum_by_period_money(
     sorted: &[(Date, Money)],
     periods: &[Period],
 ) -> finstack_quant_core::Result<PeriodAggregation> {
-    debug_assert!(
-        sorted.windows(2).all(|w| w[0].0 <= w[1].0),
-        "sum_by_period_money requires flows to be sorted by date"
-    );
-
     let mut out: IndexMap<PeriodId, IndexMap<Currency, Money>> =
         IndexMap::with_capacity(periods.len());
     let mut per_currency: IndexMap<Currency, Money> = IndexMap::new();
-    let mut flow_idx = 0;
-    let n = sorted.len();
 
-    for p in periods {
-        while flow_idx < n && sorted[flow_idx].0 < p.start {
-            flow_idx += 1;
-        }
-
-        per_currency.clear();
-        while flow_idx < n && sorted[flow_idx].0 < p.end {
-            let (_date, amount) = sorted[flow_idx];
-            let ccy = amount.currency();
-            if let Some(existing) = per_currency.get_mut(&ccy) {
-                *existing = existing.checked_add(amount)?;
-            } else {
-                per_currency.insert(ccy, amount);
+    for_each_period_bucket(
+        sorted,
+        periods,
+        |row| row.0,
+        |p, _, bucket| {
+            per_currency.clear();
+            for &(_, amount) in bucket {
+                let ccy = amount.currency();
+                if let Some(existing) = per_currency.get_mut(&ccy) {
+                    *existing = existing.checked_add(amount)?;
+                } else {
+                    per_currency.insert(ccy, amount);
+                }
             }
-            flow_idx += 1;
-        }
-        if per_currency.is_empty() {
-            continue;
-        }
-
-        out.insert(p.id, std::mem::take(&mut per_currency));
-    }
+            out.insert(p.id, std::mem::take(&mut per_currency));
+            Ok(())
+        },
+    )?;
     Ok(PeriodAggregation(out))
 }
 
 /// Validate the aggregation period contract: sorted by start, non-overlapping,
 /// and free of duplicate `PeriodId`s.
 ///
-/// The flow-bucketing cursor in [`sum_by_period`] never rewinds, so unsorted
+/// The flow-bucketing cursor in [`for_each_period_bucket`] never rewinds, so unsorted
 /// or overlapping periods would silently drop flows; duplicate ids would
 /// silently overwrite earlier results. Both are rejected loudly instead.
 ///
@@ -950,7 +905,7 @@ fn principal_repayment_amount(cf: &CashFlow, base: Date) -> finstack_quant_core:
 
 /// A principal row without its explicit delta or balance date: nothing is
 /// inferred from its cash or kind (record CORE-CONVENTIONS-015 #4).
-fn missing_principal_delta(cf: &CashFlow) -> finstack_quant_core::Error {
+pub(crate) fn missing_principal_delta(cf: &CashFlow) -> finstack_quant_core::Error {
     finstack_quant_core::Error::Validation(format!(
         "{} row on {} has no principal_delta or principal_date",
         cf.get_kind(),
@@ -1171,9 +1126,25 @@ pub(crate) fn pv_by_period(
     }
     let curves: Vec<&dyn Discounting> = vec![disc; sorted.len()];
     let pvs = credit_adjusted_cashflow_pvs(sorted, &curves, hazard, recovery_rate, as_of)?;
-    sum_by_period(sorted, periods, |index, cf| {
-        Ok((cf.get_amount().currency(), pvs[index]))
-    })
+    let mut out: IndexMap<PeriodId, IndexMap<Currency, Money>> =
+        IndexMap::with_capacity(periods.len());
+    let mut per_currency: IndexMap<Currency, NeumaierAccumulator> = IndexMap::new();
+    for_each_period_bucket(sorted, periods, CashFlow::get_date, |p, start, bucket| {
+        per_currency.clear();
+        for (offset, cf) in bucket.iter().enumerate() {
+            per_currency
+                .entry(cf.get_amount().currency())
+                .or_default()
+                .add(pvs[start + offset])?;
+        }
+        let mut result: IndexMap<Currency, Money> = IndexMap::with_capacity(per_currency.len());
+        for (&ccy, acc) in &per_currency {
+            result.insert(ccy, Money::new(acc.get_total()?, ccy)?);
+        }
+        out.insert(p.id, result);
+        Ok(())
+    })?;
+    Ok(PeriodAggregation(out))
 }
 
 #[cfg(test)]

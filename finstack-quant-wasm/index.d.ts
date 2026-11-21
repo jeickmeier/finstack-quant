@@ -6,7 +6,7 @@
 
 import type * as wasm from './pkg/finstack_quant_wasm.js';
 import type * as generated from './types/generated/index.js';
-import type { CashFlowBuilder, CashFlowSchedule, CreditIndexData, DayCountContext, DiscountCurve, FiscalConfig, FxMatrix, HazardCurve, HullWhiteParams, ImProfile, InflationIndex, JsonInput, LookbackReturns, MarketContext, MarketContextCurve, Money, MoneyValue, MvaResult, Performance, PeriodStats, ScalarTimeSeries, ScheduleBuilder, start } from './pkg/finstack_quant_wasm.js';
+import type { CashFlowBuilder, CashFlowSchedule, CreditIndexData, DiscountCurve, FxMatrix, HazardCurve, HullWhiteParams, ImProfile, InflationIndex, MarketContext, MarketContextCurve, Money, MoneyValue, MvaResult, ScalarTimeSeries, ScheduleBuilder, start } from './pkg/finstack_quant_wasm.js';
 
 export { default } from './pkg/finstack_quant_wasm.js';
 export type * from './pkg/finstack_quant_wasm.js';
@@ -268,40 +268,6 @@ declare module './pkg/finstack_quant_wasm.js' {
      * @param series - Series to store; one with the same id is replaced.
      */
     insertSeries(series: ScalarTimeSeries): this;
-  }
-  /** Members the facade adds to `Performance` (exports/analytics.js). */
-  interface Performance {
-    /**
-     * Period-to-date lookback returns.
-     *
-     * MTD, QTD and YTD start on the first calendar day of `refDate`'s month,
-     * calendar quarter and year. FYTD is the first observation on or after the
-     * fiscal calendar start of `fiscalConfig` through `refDate`. Holidays are not
-     * skipped. The first included simple return still spans the prior close.
-     * @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end. Omitted or `null` is the last active date; the result's `ref_date` states the date used.
-     * @param fiscalConfig - Optional `FiscalConfig` handle for FYTD. Omitted or `null` selects the explicit January 1 rule (`FiscalConfig.calendarYear()`, ANALYTICS-003).
-     * @returns LookbackReturns with return estimates, fiscal context and per-ticker counts and actual holding bounds for each selected window; unavailable numeric results remain NaN.
-     * @throws Error - Rejects an invalid ISO `ref_date`, an omitted one while no dates are active, or a result that cannot be serialized to JavaScript.
-     */
-    lookbackReturns(refDate?: string | null, fiscalConfig?: FiscalConfig | null): LookbackReturns;
-    /**
-     * Aggregated period statistics for one asset at the given frequency. Without
-     * a fiscal calendar, Gregorian periods are bucketed with ISO weeks.
-     * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
-     * @param aggregationFrequency - Required explicit grouping frequency token; no inference from observation frequency.
-     * @param fiscalConfig - Optional FiscalConfig handle; omitted or null buckets Gregorian periods with ISO weeks.
-     * @returns Period statistics object for the selected ticker at the requested frequency.
-     * @throws Error - Rejects an unsupported `aggregation_frequency`, an out-of-range `ticker_idx`, an unrepresentable period boundary, or period statistics that cannot be serialized to JavaScript.
-     */
-    periodStats(tickerIdx: number, aggregationFrequency: string, fiscalConfig?: FiscalConfig | null): PeriodStats;
-    /**
-     * Actual-date compound annual growth using ACT/365F unless another clock is selected.
-     * @param dayCount - Optional day-count label; default act_365f. Explicit act365_25 selects actual-days/365.25.
-     * @param ctx - Optional validated DayCountContext; omission supplies the empty context. Required calendar/coupon inputs must be explicitly populated for clocks that use them.
-     * @returns Per-ticker Float64Array with NaN for unavailable history or zero year fraction.
-     * @throws Error - Rejects unknown clocks, missing/incompatible context, invalid actual spans or unrepresentable requested results.
-     */
-    cagr(dayCount?: string, ctx?: DayCountContext): Float64Array;
   }
   /** Members the facade adds to `ScheduleBuilder` (exports/core.js). */
   interface ScheduleBuilder {
@@ -3609,26 +3575,26 @@ export interface CashflowsNamespace {
    * fixing; existing observations take precedence and are kept unchanged.
    *
    * @param market - `MarketContext` handle of the pre-roll market; it is not modified.
-   * @param schedules - Schedules projected on `market` at `oldDate`: `CashFlowSchedule` handles (the facade passes them as JSON), canonical JSON strings or plain objects.
+   * @param schedules - Schedules projected on `market` at `oldDate`: `CashFlowSchedule` handles, canonical JSON strings or plain objects.
    * @param oldDate - ISO-8601 inclusive start of the fixing window: same-day projections become observed.
    * @param newDate - ISO-8601 inclusive end of the window; must be on or after `oldDate`.
    * @returns A new `MarketContext` handle with the crossed fixings materialized; release it with free().
    * @throws If the window runs backward, a fixing-series identifier is malformed, a crossed projection is unavailable or non-finite, or two schedules project the same index and date differently (kind `validation`).
    */
-  readonly materializeFixings: (market: MarketContext, schedules: readonly (CashFlowSchedule | JsonInput)[], oldDate: string, newDate: string) => MarketContext;
+  readonly materializeFixings: typeof wasm.materializeFixings;
   /**
    * Merge several schedules into one under a new notional and day count.
    *
    * Flows are concatenated and put into canonical order; calendar ids and
    * projected fixings are merged.
    *
-   * @param schedules - Schedules to merge: `CashFlowSchedule` handles (the facade passes them as JSON), canonical JSON strings or plain objects.
+   * @param schedules - Schedules to merge: `CashFlowSchedule` handles, canonical JSON strings or plain objects.
    * @param notional - `Notional` wire object of the merged schedule.
    * @param dayCount - `DayCount` wire string of the merged schedule.
    * @returns The merged `CashFlowSchedule` handle.
    * @throws If `schedules` is not an array (kind `invalid_type`) or an argument does not match its wire type (kind `validation`).
    */
-  readonly mergeCashflowSchedules: (schedules: readonly (CashFlowSchedule | JsonInput)[], notional: generated.cashflows.Notional, dayCount: generated.core.DayCount) => CashFlowSchedule;
+  readonly mergeCashflowSchedules: typeof wasm.mergeCashflowSchedules;
   /**
    * Convert monthly conditional prepayment or default mortality to annual mortality.
    *
@@ -3848,61 +3814,6 @@ export interface CashflowsNamespace {
 export interface CovenantsNamespace {
   readonly CovenantEngine: typeof wasm.CovenantEngine;
   /**
-   * Breach consequence: the maturity is accelerated to a new date.
-   *
-   * @param newMaturity - ISO-8601 accelerated maturity date.
-   * @returns `CovenantConsequence` wire value `{ accelerate_maturity: { new_maturity } }`.
-   * @throws If `newMaturity` is not an ISO-8601 string (kind `invalid_type` or `validation`).
-   */
-  readonly covenantConsequenceAccelerateMaturity: typeof wasm.covenantConsequenceAccelerateMaturity;
-  /**
-   * Breach consequence: distributions to equity are blocked.
-   *
-   * @returns `CovenantConsequence` wire value `"block_distributions"`.
-   * @throws If the value cannot be serialized.
-   */
-  readonly covenantConsequenceBlockDistributions: typeof wasm.covenantConsequenceBlockDistributions;
-  /**
-   * Breach consequence: excess cash is swept to repay debt.
-   *
-   * @param sweepPercentage - Share of excess cash swept, as a decimal in `[0, 1]` (`0.5` = 50%).
-   * @returns `CovenantConsequence` wire value `{ cash_sweep: { sweep_percentage } }`.
-   * @throws If `sweepPercentage` is not a number (kind `invalid_type`).
-   */
-  readonly covenantConsequenceCashSweep: typeof wasm.covenantConsequenceCashSweep;
-  /**
-   * Breach consequence: event of default.
-   *
-   * @returns `CovenantConsequence` wire value `"default"`.
-   * @throws If the value cannot be serialized.
-   */
-  readonly covenantConsequenceDefault: typeof wasm.covenantConsequenceDefault;
-  /**
-   * Breach consequence: the borrowing rate steps up.
-   *
-   * @param bpIncrease - Rate increase in basis points per annum (`200` = +2.00%); must be finite and non-negative when the covenant is validated.
-   * @returns `CovenantConsequence` wire value `{ rate_increase: { bp_increase } }`.
-   * @throws If `bpIncrease` is not a number (kind `invalid_type`).
-   */
-  readonly covenantConsequenceRateIncrease: typeof wasm.covenantConsequenceRateIncrease;
-  /**
-   * Breach consequence: additional collateral must be posted.
-   *
-   * @param description - Non-empty description of the required collateral.
-   * @returns `CovenantConsequence` wire value `{ require_collateral: { description } }`.
-   * @throws If `description` is not a string (kind `invalid_type`).
-   */
-  readonly covenantConsequenceRequireCollateral: typeof wasm.covenantConsequenceRequireCollateral;
-  /**
-   * Copy of a forecast configuration with a different covenant scope.
-   *
-   * @param config - `CovenantForecastConfig` wire object.
-   * @param scope - `"maintenance"` (scheduled tests) or `"incurrence"` (hypothetical capacity for a contemplated action).
-   * @returns The updated `CovenantForecastConfig`.
-   * @throws If `config` is not a `CovenantForecastConfig` or `scope` is not one of the listed strings (kind `validation`).
-   */
-  readonly covenantForecastConfigWithScope: typeof wasm.covenantForecastConfigWithScope;
-  /**
    * Create a covenant with the Rust defaults.
    *
    * Mirrors Rust `Covenant::new` (the Python `Covenant(...)` constructor): an
@@ -3929,15 +3840,6 @@ export interface CovenantsNamespace {
    */
   readonly covenantSpecNew: typeof wasm.covenantSpecNew;
   /**
-   * Copy of a specification with an explicit earnings denominator metric.
-   *
-   * @param spec - `CovenantSpec` wire object of a built-in leverage covenant.
-   * @param metricId - Identifier of the earnings metric the leverage ratio divides by, for example `"adjusted_ebitda"`.
-   * @returns The updated `CovenantSpec`.
-   * @throws If `spec` is not a `CovenantSpec` (kind `validation`) or `metricId` is not a string (kind `invalid_type`).
-   */
-  readonly covenantSpecWithDenominatorMetric: typeof wasm.covenantSpecWithDenominatorMetric;
-  /**
    * Covenant specification that reads its test value from a named metric.
    *
    * Mirrors Rust `CovenantSpec::with_metric` (the Python `CovenantSpec(...)`
@@ -3951,15 +3853,6 @@ export interface CovenantsNamespace {
    */
   readonly covenantSpecWithMetric: typeof wasm.covenantSpecWithMetric;
   /**
-   * Copy of a specification with step-down (or step-up) thresholds.
-   *
-   * @param spec - `CovenantSpec` wire object.
-   * @param schedule - `ThresholdSchedule` wire value: `[isoDate, threshold]` pairs; from each date that threshold replaces the covenant's static one.
-   * @returns The updated `CovenantSpec`.
-   * @throws If `spec` is not a `CovenantSpec`, or `schedule` has a non-finite threshold or repeats a date (kind `validation`).
-   */
-  readonly covenantSpecWithThresholdSchedule: typeof wasm.covenantSpecWithThresholdSchedule;
-  /**
    * Build the covenant specs of one standard package.
    *
    * @param template - `CovenantTemplate` object or JSON text: `kind` (`"lbo_standard"`, `"cov_lite"`, `"real_estate"` or `"project_finance"`) and that package's thresholds by Rust field name (ratios in turns, `min_debt_yield` and `max_ltv` as decimals, `max_capex` and `min_liquidity` in the reporting currency).
@@ -3967,157 +3860,6 @@ export interface CovenantsNamespace {
    * @throws If the template is malformed, has an unknown kind or field, or a threshold is NaN, infinite or negative (kind `validation`).
    */
   readonly covenantTemplate: typeof wasm.covenantTemplate;
-  /**
-   * Affirmative covenant described in words.
-   *
-   * @param requirement - Description of the required action, for example `"deliver audited financials within 90 days"`.
-   * @returns `CovenantType` wire value `{ affirmative: { requirement } }`; it has no numeric test.
-   * @throws If `requirement` is not a string (kind `invalid_type`).
-   */
-  readonly covenantTypeAffirmative: typeof wasm.covenantTypeAffirmative;
-  /**
-   * Basket covenant: a capped amount for a named category.
-   *
-   * @param name - Basket name, for example `"restricted_payments"`.
-   * @param limit - Maximum basket usage in the reporting currency.
-   * @returns `CovenantType` wire value `{ basket: { name, limit } }`.
-   * @throws If `name` is not a string or `limit` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeBasket: typeof wasm.covenantTypeBasket;
-  /**
-   * Custom covenant on a caller-named metric.
-   *
-   * @param metric - Metric identifier the test reads, for example `"net_working_capital"`.
-   * @param test - `"maximum"` (the metric must not exceed `value`) or `"minimum"` (the metric must reach `value`).
-   * @param value - Finite threshold in the metric's own units.
-   * @returns `CovenantType` wire value `{ custom: { metric, test } }`.
-   * @throws If `metric` or `test` is not a string or `value` is not a number (kind `invalid_type`), or `test` is not one of the listed strings or `value` is non-finite (kind `validation`).
-   */
-  readonly covenantTypeCustom: typeof wasm.covenantTypeCustom;
-  /**
-   * Maximum capital expenditure covenant.
-   *
-   * @param threshold - Maximum allowed capex amount in the reporting currency.
-   * @returns `CovenantType` wire value `{ max_capex: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMaxCapex: typeof wasm.covenantTypeMaxCapex;
-  /**
-   * Maximum total debt / EBITDA covenant.
-   *
-   * @param threshold - Maximum allowed ratio in turns (`4.5` means 4.5x).
-   * @returns `CovenantType` wire value `{ max_debt_to_ebitda: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMaxDebtToEbitda: typeof wasm.covenantTypeMaxDebtToEbitda;
-  /**
-   * Maximum net debt / EBITDA covenant.
-   *
-   * @param threshold - Maximum allowed net debt / EBITDA in turns; the specification needs an earnings denominator metric.
-   * @returns `CovenantType` wire value `{ max_net_debt_to_ebitda: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMaxNetDebtToEbitda: typeof wasm.covenantTypeMaxNetDebtToEbitda;
-  /**
-   * Maximum senior leverage covenant.
-   *
-   * @param threshold - Maximum allowed senior debt / EBITDA in turns.
-   * @returns `CovenantType` wire value `{ max_senior_leverage: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMaxSeniorLeverage: typeof wasm.covenantTypeMaxSeniorLeverage;
-  /**
-   * Maximum total leverage covenant.
-   *
-   * @param threshold - Maximum allowed total debt / EBITDA in turns.
-   * @returns `CovenantType` wire value `{ max_total_leverage: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMaxTotalLeverage: typeof wasm.covenantTypeMaxTotalLeverage;
-  /**
-   * Minimum asset coverage covenant.
-   *
-   * @param threshold - Minimum required asset coverage ratio in turns.
-   * @returns `CovenantType` wire value `{ min_asset_coverage: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMinAssetCoverage: typeof wasm.covenantTypeMinAssetCoverage;
-  /**
-   * Minimum debt-service coverage ratio covenant.
-   *
-   * @param threshold - Minimum required DSCR in turns.
-   * @returns `CovenantType` wire value `{ min_dscr: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMinDscr: typeof wasm.covenantTypeMinDscr;
-  /**
-   * Minimum fixed-charge coverage covenant.
-   *
-   * @param threshold - Minimum required ratio in turns.
-   * @returns `CovenantType` wire value `{ min_fixed_charge_coverage: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMinFixedChargeCoverage: typeof wasm.covenantTypeMinFixedChargeCoverage;
-  /**
-   * Minimum interest coverage (EBIT / interest) covenant.
-   *
-   * @param threshold - Minimum required ratio in turns.
-   * @returns `CovenantType` wire value `{ min_interest_coverage: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMinInterestCoverage: typeof wasm.covenantTypeMinInterestCoverage;
-  /**
-   * Minimum liquidity covenant.
-   *
-   * @param threshold - Minimum required liquidity amount in the reporting currency.
-   * @returns `CovenantType` wire value `{ min_liquidity: { threshold } }`.
-   * @throws If `threshold` is not a number (kind `invalid_type`).
-   */
-  readonly covenantTypeMinLiquidity: typeof wasm.covenantTypeMinLiquidity;
-  /**
-   * Negative (restrictive) covenant described in words.
-   *
-   * @param restriction - Description of the restricted action, for example `"no additional senior debt"`.
-   * @returns `CovenantType` wire value `{ negative: { restriction } }`; it has no numeric test.
-   * @throws If `restriction` is not a string (kind `invalid_type`).
-   */
-  readonly covenantTypeNegative: typeof wasm.covenantTypeNegative;
-  /**
-   * Copy of a covenant with one more breach consequence.
-   *
-   * @param covenant - `Covenant` wire object.
-   * @param consequence - `CovenantConsequence` wire value appended to the covenant's consequences.
-   * @returns The updated `Covenant`.
-   * @throws If either argument does not match its wire type (kind `validation`).
-   */
-  readonly covenantWithConsequence: typeof wasm.covenantWithConsequence;
-  /**
-   * Copy of a covenant with a cure period.
-   *
-   * @param covenant - `Covenant` wire object.
-   * @param days - Calendar days the borrower has to cure a breach (integer); omitted or `null` means no cure period.
-   * @returns The updated `Covenant`.
-   * @throws If `covenant` is not a `Covenant` (kind `validation`) or `days` is not an integer (kind `invalid_type`).
-   */
-  readonly covenantWithCurePeriod: typeof wasm.covenantWithCurePeriod;
-  /**
-   * Copy of a covenant with a different scope.
-   *
-   * @param covenant - `Covenant` wire object.
-   * @param scope - `"maintenance"` (tested on a schedule) or `"incurrence"` (tested only when an action is taken).
-   * @returns The updated `Covenant`.
-   * @throws If `covenant` is not a `Covenant` or `scope` is not one of the listed strings (kind `validation`).
-   */
-  readonly covenantWithScope: typeof wasm.covenantWithScope;
-  /**
-   * Copy of a covenant that is tested only while a springing condition holds.
-   *
-   * @param covenant - `Covenant` wire object.
-   * @param condition - `SpringingCondition` wire object (`{ metric_id, test }`), for example revolver utilization above a level; the covenant is inactive while the condition is unmet.
-   * @returns The updated `Covenant`.
-   * @throws If either argument does not match its wire type (kind `validation`).
-   */
-  readonly covenantWithSpringingCondition: typeof wasm.covenantWithSpringingCondition;
   /**
    * Evaluate a covenant engine JSON string against a JSON metric map.
    *
@@ -4264,15 +4006,6 @@ export interface FeaturesNamespace {
    * Equal-weighted OLS always includes an intercept so z-scoring preserves
    * neutrality to the supplied exposures.
    *
-   * # Arguments
-   *
-   * * `values` - Numeric signal observations, with null or non-finite inputs
-   *   treated as missing, aligned with the partition and exposure columns.
-   * * `time_key` - String partition keys grouping observations into independent
-   *   cross-sections; exact equal strings select the same partition.
-   * * `exposures` - Column-major numeric factor exposures, each column aligned
-   *   with `values`; rows missing any exposure are excluded from the fit.
-   *
    * # Errors
    *
    * Rejects inputs that cannot be decoded into the declared arrays, unequal row
@@ -4355,15 +4088,6 @@ export interface FeaturesNamespace {
    * `analytics` Sharpe. Optional JSON `risk_free` defaults to `0.0` in the same
    * units as the return series.
    *
-   * # Arguments
-   *
-   * * `values` - Numeric observations aligned with the key columns; null and non-finite inputs are missing.
-   * * `entity` - String entity identifiers grouping observations into independent time series.
-   * * `order` - Lexicographic order keys within each entity; temporal keys require a common timezone and fixed precision.
-   * * `op` - Snake_case TimeSeriesOp selector accepted by timeSeriesOpValues; parsed by the canonical Rust enum.
-   * * `params` - Optional operation parameters; omitted or null uses Rust defaults and unknown keys fail validation.
-   *   `rolling_sharpe` accepts optional `risk_free` (default `0.0`) in the same units as the input return series, with no annualization.
-   *
    * # Errors
    *
    * Rejects values that cannot be decoded into the declared arrays or JSON
@@ -4383,15 +4107,6 @@ export interface FeaturesNamespace {
    * `window` spans entity rows including gaps; `min_periods <= window` counts
    * complete pairs within it. Results can emit at a missing current row.
    * `order` is lexicographic; temporal strings need a common timezone and precision.
-   *
-   * # Arguments
-   *
-   * * `values` - Primary numeric observations aligned with other and both key columns; null and non-finite inputs are missing.
-   * * `other` - Second numeric observation column; rolling windows retain only complete finite pairs.
-   * * `entity` - String entity identifiers grouping observations into independent time series.
-   * * `order` - Lexicographic order keys within each entity; temporal keys require a common timezone and fixed precision.
-   * * `op` - Snake_case PairwiseOp selector accepted by pairwiseOpValues; parsed by the canonical Rust enum.
-   * * `params` - Optional rolling parameters; window counts entity rows, min_periods counts complete pairs and cannot exceed window.
    *
    * # Errors
    *
@@ -4415,13 +4130,6 @@ export interface FeaturesNamespace {
    * Each demeaned-signal side must support gross 0.5 at the cap; otherwise it
    * fails. Constant signals produce zero weights. Signed zeros always tie.
    *
-   * # Arguments
-   *
-   * * `values` - Numeric observations aligned with time_key; null and non-finite inputs are missing.
-   * * `time_key` - String partition keys; equal keys select the same cross-section.
-   * * `op` - Snake_case CrossSectionalOp selector accepted by crossSectionalOpValues; parsed by the canonical Rust enum.
-   * * `params` - Optional operation parameters; omitted or null uses Rust defaults and unknown keys fail validation.
-   *
    * # Errors
    *
    * Rejects values that cannot be decoded into the declared arrays or JSON
@@ -4437,14 +4145,6 @@ export interface FeaturesNamespace {
   readonly transformCrossSectional: typeof wasm.transformCrossSectional;
   /**
    * Transform a cross-section within each time/group sub-partition.
-   *
-   * # Arguments
-   *
-   * * `values` - Numeric observations aligned with both key columns; null and non-finite inputs are missing.
-   * * `time_key` - String timestamp partition keys; equal keys select the same cross-section.
-   * * `groups` - String subgroup labels aligned with values; transforms run independently for each time_key and group pair.
-   * * `op` - Snake_case CrossSectionalOp selector accepted by crossSectionalOpValues; parsed by the canonical Rust enum.
-   * * `params` - Optional operation parameters; omitted or null uses Rust defaults and unknown keys fail validation.
    *
    * # Errors
    *
@@ -7317,14 +7017,6 @@ export interface MarginNamespace {
    */
   readonly otcMarginSpecCleared: typeof wasm.otcMarginSpecCleared;
   /**
-   * Add an explicit credit classification to an independent OTC margin specification.
-   * @param spec - Native OTC terms holding clearing and CSA settings.
-   * @param classification - Qualifying sector or non-qualifying class on the selected risk basis.
-   * @returns Native margin specification with that classification.
-   * @throws FinstackError if either native document cannot be decoded.
-   */
-  readonly otcMarginSpecWithSimmCreditClassification: typeof wasm.otcMarginSpecWithSimmCreditClassification;
-  /**
    * Compute bilateral XVA: CVA, DVA, FVA, MVA, and the all-in adjustment.
    *
    * All legs are weighted by joint (first-to-default) survival. MVA is computed
@@ -7432,26 +7124,6 @@ export interface MarginNamespace {
    * @throws Error if profile, funding spread, the chosen survival or a curve sample is invalid.
    */
   readonly computeMva: (imProfile: ImProfile | string, fundingSpread: generated.margin.MarginFundingSpread | string, discountCurve: DiscountCurve, ownSurvival: HazardCurve | null) => MvaResult;
-  /**
-   * Cleared status through a named central counterparty.
-   * @param ccp - CCP identifier, for example `"LCH"`, `"CME"`, `"ICE"` or `"JSCC"`.
-   * @returns The `ClearingStatus` value `{ cleared: { ccp } }`.
-   *
-   * # Errors
-   *
-   * Throws a `TypeError` when `ccp` is not a string.
-   */
-  readonly clearingStatusCleared: typeof wasm.clearingStatusCleared;
-  /**
-   * Parse a collateral asset class from its lower-case wire label.
-   * @param s - One of `"cash"`, `"government_bonds"`, `"agency_bonds"`, `"covered_bonds"`, `"corporate_bonds"`, `"equity"`, `"gold"`, `"mutual_funds"`.
-   * @returns The canonical `CollateralAssetClass` wire label.
-   *
-   * # Errors
-   *
-   * Throws a validation error for any other spelling.
-   */
-  readonly collateralAssetClassFromStr: typeof wasm.collateralAssetClassFromStr;
   /**
    * Additional haircut applied when collateral and exposure currencies differ.
    * @param assetClass - `CollateralAssetClass` wire label such as `"government_bonds"`.
@@ -7817,16 +7489,6 @@ export interface MarginNamespace {
    */
   readonly imDecayProfileSqrtTime: typeof wasm.imDecayProfileSqrtTime;
   /**
-   * Parse an initial margin methodology from its lower-case wire label.
-   * @param s - One of `"haircut"`, `"simm"`, `"schedule"`, `"internal_model"`, `"clearing_house"`.
-   * @returns The canonical `ImMethodology` wire label.
-   *
-   * # Errors
-   *
-   * Throws a validation error for any other spelling, including `"SIMM"`.
-   */
-  readonly imMethodologyFromStr: typeof wasm.imMethodologyFromStr;
-  /**
    * Project the opening historical SIMM value over a dated runoff schedule.
    * @param calculator - Elected SIMM parameter version and MPOR.
    * @param sensitivities - Signed risk of the admitted netting set.
@@ -7869,16 +7531,6 @@ export interface MarginNamespace {
    * Throws if `result` is malformed.
    */
   readonly imResultBreakdownKeys: typeof wasm.imResultBreakdownKeys;
-  /**
-   * Parse a margin call type from its lower-case wire label.
-   * @param s - One of `"initial_margin"`, `"variation_margin_post"`, `"variation_margin_collect"`, `"top_up"`, `"substitution"`.
-   * @returns The canonical `MarginCallType` wire label.
-   *
-   * # Errors
-   *
-   * Throws a validation error for any other spelling.
-   */
-  readonly marginCallTypeFromStr: typeof wasm.marginCallTypeFromStr;
   /**
    * Annualized cost of funding posted margin.
    *
@@ -7928,16 +7580,6 @@ export interface MarginNamespace {
    */
   readonly marginFundingCostSpreadRate: typeof wasm.marginFundingCostSpreadRate;
   /**
-   * Parse a margin call frequency from its lower-case wire label.
-   * @param s - One of `"daily"`, `"weekly"`, `"monthly"`, `"on_demand"`.
-   * @returns The canonical `MarginTenor` wire label.
-   *
-   * # Errors
-   *
-   * Throws a validation error for any other spelling.
-   */
-  readonly marginTenorFromStr: typeof wasm.marginTenorFromStr;
-  /**
    * Margin utilization: posted margin against required margin.
    *
    * The wire carries the two amounts; the ratio is derived from them (see
@@ -7982,27 +7624,6 @@ export interface MarginNamespace {
    * Throws if `utilization` is malformed, mixes currencies, or has a non-finite or negative amount.
    */
   readonly marginUtilizationShortfall: typeof wasm.marginUtilizationShortfall;
-  /**
-   * Netting set identifier for a bilateral CSA relationship.
-   * @param counterpartyId - Counterparty identifier.
-   * @param csaId - CSA agreement identifier.
-   * @returns The `NettingSetId` value `{ kind: "bilateral", counterparty_id, csa_id }`.
-   *
-   * # Errors
-   *
-   * Throws a `TypeError` when an argument is not a string.
-   */
-  readonly nettingSetIdBilateral: typeof wasm.nettingSetIdBilateral;
-  /**
-   * Netting set identifier for trades cleared through one CCP.
-   * @param ccpId - CCP identifier; also used as the counterparty id.
-   * @returns The `NettingSetId` value `{ kind: "cleared", ccp_id }`.
-   *
-   * # Errors
-   *
-   * Throws a `TypeError` when `ccp_id` is not a string.
-   */
-  readonly nettingSetIdCleared: typeof wasm.nettingSetIdCleared;
   /**
    * Margined SA-CCR netting-set configuration.
    * @param nettingSetId - `NettingSetId` (object or JSON), bilateral or cleared.

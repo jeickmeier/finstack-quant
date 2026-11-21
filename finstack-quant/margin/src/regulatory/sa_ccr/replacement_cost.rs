@@ -33,7 +33,7 @@ use super::types::{SaCcrNettingSetConfig, SaCcrTrade};
 /// # References
 ///
 /// - BCBS 279 SA-CCR: `docs/REFERENCES.md#bcbs-279-saccr`
-pub fn replacement_cost(config: &SaCcrNettingSetConfig, trades: &[SaCcrTrade]) -> f64 {
+pub(super) fn replacement_cost(config: &SaCcrNettingSetConfig, trades: &[SaCcrTrade]) -> f64 {
     let v: f64 = trades.iter().map(|t| t.mtm).sum();
     let c = config.collateral + config.nica; // total net collateral
 

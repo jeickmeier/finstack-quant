@@ -8,29 +8,27 @@
 //! - Haircut sensitivity (Haircut01)
 
 use finstack_quant_core::Result;
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use tracing::warn;
 
-/// Reject implicit cross-currency arithmetic between two [`Money`] operands.
+/// Reject implicit cross-currency operands.
 ///
 /// The workspace forbids implicit cross-currency math: converting requires an
 /// explicit [`finstack_quant_core::money::fx::FxProvider`] so the applied policy can be
-/// stamped into the result. Mirrors the guard in
-/// [`crate::calculators::VmCalculator::calculate`].
+/// stamped into the result.
 ///
 /// # Errors
 ///
-/// Returns [`finstack_quant_core::Error::Validation`] when the two amounts are
-/// denominated in different currencies.
-fn ensure_same_currency(what: &str, left: Money, right: Money) -> Result<()> {
-    if left.currency() == right.currency() {
+/// Returns [`finstack_quant_core::Error::Validation`] when `actual` differs
+/// from `expected`.
+pub(crate) fn ensure_same_currency(what: &str, expected: Currency, actual: Currency) -> Result<()> {
+    if expected == actual {
         return Ok(());
     }
-    warn!(metric = what, expected = %left.currency(), got = %right.currency(), "margin metric currency mismatch");
+    warn!(context = what, expected = %expected, got = %actual, "margin currency mismatch");
     Err(finstack_quant_core::Error::Validation(format!(
-        "{what} currency mismatch: expected {}, got {}",
-        left.currency(),
-        right.currency()
+        "{what} currency mismatch: expected {expected}, got {actual}"
     )))
 }
 
@@ -107,7 +105,7 @@ impl MarginUtilization {
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     pub fn new(posted: Money, required: Money) -> Result<Self> {
-        ensure_same_currency("margin utilization", posted, required)?;
+        ensure_same_currency("margin utilization", posted.currency(), required.currency())?;
         if [posted.amount(), required.amount()]
             .iter()
             .any(|x| !x.is_finite() || *x < 0.0)
@@ -198,7 +196,11 @@ impl ExcessCollateral {
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     pub fn new(collateral_value: Money, required_value: Money) -> Result<Self> {
-        ensure_same_currency("excess collateral", collateral_value, required_value)?;
+        ensure_same_currency(
+            "excess collateral",
+            collateral_value.currency(),
+            required_value.currency(),
+        )?;
 
         let currency = collateral_value.currency();
         let excess = Money::new(

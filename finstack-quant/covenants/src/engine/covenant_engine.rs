@@ -277,22 +277,11 @@ impl CovenantEngine {
     ) -> finstack_quant_core::Result<IndexMap<String, CovenantReport>> {
         tracing::debug!(spec_count = specs.len(), %test_date, "evaluating covenants");
 
-        let mut seen = BTreeSet::new();
-        for spec in specs {
-            let key = spec.covenant.instance_key();
-            if !seen.insert(key.clone()) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "duplicate covenant instance key '{key}': covenants sharing a type must \
-                     carry distinct labels",
-                )));
-            }
-        }
-
         let mut reports = IndexMap::new();
 
         for spec in specs {
             let (_, report) = self.assess_spec_at(spec, context, test_date)?;
-            reports.insert(spec.covenant.instance_key(), report);
+            reports.insert(spec.covenant.label.clone(), report);
         }
 
         Ok(reports)
@@ -304,8 +293,7 @@ impl CovenantEngine {
         context: &dyn CovenantMetricSource,
         test_date: Date,
     ) -> finstack_quant_core::Result<(CovenantAssessmentState, CovenantReport)> {
-        let id = spec.covenant.instance_key();
-        let cid = id.as_str();
+        let cid = spec.covenant.label.as_str();
         let description = spec.covenant.description();
         if !spec.covenant.is_active {
             return Ok((
@@ -410,7 +398,7 @@ impl CovenantEngine {
                         .iter()
                         .flat_map(|window| window.covenants.iter()),
                 )
-                .any(|spec| spec.covenant.scope == scope && spec.covenant.instance_key() == key)
+                .any(|spec| spec.covenant.scope == scope && spec.covenant.label == key)
         };
         selected
             .iter()
@@ -422,9 +410,7 @@ impl CovenantEngine {
                 }
                 let terms = effective
                     .iter()
-                    .find(|spec| {
-                        spec.covenant.scope == scope && spec.covenant.instance_key() == *key
-                    })
+                    .find(|spec| spec.covenant.scope == scope && spec.covenant.label == *key)
                     .copied();
                 let mut outcome = CovenantAssessment {
                     covenant_id: key.clone(),
@@ -497,9 +483,9 @@ impl CovenantEngine {
         let reports = self.evaluate_specs(&specs, context, test_date)?;
         let mut new_breaches = Vec::new();
         for spec in specs {
-            let cid = spec.covenant.instance_key();
-            let report = &reports[&cid];
-            if report.passed || self.find_active_breach(&cid, test_date).is_some() {
+            let cid = &spec.covenant.label;
+            let report = &reports[cid];
+            if report.passed || self.find_active_breach(cid, test_date).is_some() {
                 continue;
             }
             let cure_deadline = spec
@@ -516,7 +502,7 @@ impl CovenantEngine {
                 })
                 .transpose()?;
             new_breaches.push(CovenantBreach {
-                covenant_id: cid,
+                covenant_id: cid.clone(),
                 covenant_type: report.covenant_type.clone(),
                 breach_date: test_date,
                 actual_value: report.actual_value,
@@ -531,16 +517,12 @@ impl CovenantEngine {
             if !report.passed || !report.actual_value.is_some_and(f64::is_finite) {
                 continue;
             }
-            if let Some(breach) = self
-                .breach_history
-                .iter_mut()
-                .filter(|b| b.covenant_id == *cid && !b.is_cured && b.breach_date <= test_date)
-                .max_by_key(|b| b.breach_date)
-                && breach
+            if let Some(idx) = self.find_active_breach_idx(cid, test_date)
+                && self.breach_history[idx]
                     .cure_deadline
                     .is_some_and(|deadline| test_date <= deadline)
             {
-                breach.is_cured = true;
+                self.breach_history[idx].is_cured = true;
             }
         }
         self.breach_history.extend(new_breaches);
@@ -752,12 +734,18 @@ impl CovenantEngine {
         })
     }
 
-    fn find_active_breach(&self, cid: &str, as_of: Date) -> Option<&CovenantBreach> {
+    fn find_active_breach_idx(&self, cid: &str, as_of: Date) -> Option<usize> {
         self.breach_history
             .iter()
-            .filter(|b| b.covenant_id == cid && !b.is_cured)
-            .filter(|b| b.breach_date <= as_of)
-            .max_by_key(|b| b.breach_date)
+            .enumerate()
+            .filter(|(_, b)| b.covenant_id == cid && !b.is_cured && b.breach_date <= as_of)
+            .max_by_key(|(_, b)| b.breach_date)
+            .map(|(idx, _)| idx)
+    }
+
+    fn find_active_breach(&self, cid: &str, as_of: Date) -> Option<&CovenantBreach> {
+        self.find_active_breach_idx(cid, as_of)
+            .map(|idx| &self.breach_history[idx])
     }
 
     fn apply_single_consequence<T>(

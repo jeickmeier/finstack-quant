@@ -17,7 +17,8 @@ This is a supporting crate, not one of the 14 domain crates:
 - **not** re-exported by the `finstack-quant` umbrella crate — depend on it
   directly
 - depends on `finstack-quant-core` (for `TableEnvelope` and `Error`), `arrow`,
-  `serde_json`, and `indexmap`; nothing else in the workspace
+  and `serde_json` (`indexmap` is dev-only for tests); nothing else in the
+  workspace
 - consumed by the Python bindings (`finstack-quant-py`) to back
   `finstack_quant.core.table.ArrowTable`
 - no WASM binding: `arrow-rs` is not built for `wasm32`

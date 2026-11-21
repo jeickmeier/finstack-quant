@@ -5,7 +5,6 @@ use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use pyo3::prelude::*;
 
-use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::core_to_py;
 
@@ -27,8 +26,16 @@ wire_methods!(
     PrepaymentModelSpec,
     "PrepaymentModelSpec",
     module = "finstack_quant.cashflows.builder._specs.prepayment",
-    validate
+    validate,
+    to_dict
 );
+
+impl PyPrepaymentModelSpec {
+    fn validated(inner: PrepaymentModelSpec) -> PyResult<Self> {
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
+    }
+}
 
 #[pymethods]
 impl PyPrepaymentModelSpec {
@@ -36,56 +43,44 @@ impl PyPrepaymentModelSpec {
     #[staticmethod]
     #[pyo3(text_signature = "(cpr)")]
     fn constant_cpr(cpr: f64) -> PyResult<Self> {
-        let inner = PrepaymentModelSpec::constant_cpr(cpr);
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
+        Self::validated(PrepaymentModelSpec::constant_cpr(cpr))
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.prepayment", "PrepaymentModelSpec.psa")]
     #[staticmethod]
     #[pyo3(text_signature = "(speed_multiplier)")]
     fn psa(speed_multiplier: f64) -> PyResult<Self> {
-        let inner = PrepaymentModelSpec::psa(speed_multiplier);
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
+        Self::validated(PrepaymentModelSpec::psa(speed_multiplier))
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.prepayment", "PrepaymentModelSpec.cmbs_with_lockout")]
     #[staticmethod]
     #[pyo3(text_signature = "(lockout_months, post_lockout_cpr)")]
     fn cmbs_with_lockout(lockout_months: u32, post_lockout_cpr: f64) -> PyResult<Self> {
-        let inner = PrepaymentModelSpec::cmbs_with_lockout(lockout_months, post_lockout_cpr);
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
+        Self::validated(PrepaymentModelSpec::cmbs_with_lockout(
+            lockout_months,
+            post_lockout_cpr,
+        ))
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.prepayment", "PrepaymentModelSpec.abs")]
     #[staticmethod]
     #[pyo3(text_signature = "(speed)")]
     fn abs(speed: f64) -> PyResult<Self> {
-        let inner = PrepaymentModelSpec::abs(speed);
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
+        Self::validated(PrepaymentModelSpec::abs(speed))
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.prepayment", "PrepaymentModelSpec.vector")]
     #[staticmethod]
     #[pyo3(text_signature = "(monthly_cpr)")]
     fn vector(monthly_cpr: Vec<f64>) -> PyResult<Self> {
-        let inner = PrepaymentModelSpec::vector(monthly_cpr);
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
+        Self::validated(PrepaymentModelSpec::vector(monthly_cpr))
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.prepayment", "PrepaymentModelSpec.validate")]
     #[pyo3(text_signature = "(self)")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.prepayment", "PrepaymentModelSpec.to_dict")]
-    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner)
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.prepayment", "PrepaymentModelSpec.smm")]

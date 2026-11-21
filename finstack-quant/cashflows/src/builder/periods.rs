@@ -287,12 +287,22 @@ pub fn period_accrual(
     params: &BuildPeriodsParams<'_>,
 ) -> finstack_quant_core::Result<f64> {
     let params = params.validated_effective()?;
+    let cal = calendar_by_id_strict(params.calendar_id)?;
+    period_accrual_with_cal(period, start, end, &params, cal)
+}
+
+fn period_accrual_with_cal(
+    period: &SchedulePeriod,
+    start: Date,
+    end: Date,
+    params: &BuildPeriodsParams<'_>,
+    cal: &dyn finstack_quant_core::dates::HolidayCalendar,
+) -> finstack_quant_core::Result<f64> {
     if start < period.accrual_start || end > period.accrual_end || end < start {
         return Err(finstack_quant_core::Error::Validation(
             "accrual subinterval lies outside its contractual period".into(),
         ));
     }
-    let cal = calendar_by_id_strict(params.calendar_id)?;
     let grid_anchor = match params.stub {
         StubKind::ShortFront | StubKind::LongFront => params.end,
         _ => params.start,
@@ -411,8 +421,13 @@ fn enrich_period(
     params: &BuildPeriodsParams<'_>,
     cal: &dyn finstack_quant_core::dates::HolidayCalendar,
 ) -> finstack_quant_core::Result<SchedulePeriod> {
-    period.accrual_year_fraction =
-        period_accrual(&period, period.accrual_start, period.accrual_end, params)?;
+    period.accrual_year_fraction = period_accrual_with_cal(
+        &period,
+        period.accrual_start,
+        period.accrual_end,
+        params,
+        cal,
+    )?;
     period.reset_date = params
         .reset_lag_days
         .map(|lag| {

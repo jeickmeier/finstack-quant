@@ -172,12 +172,18 @@ fn vega_charge(
     component_charge(class, sens, scenario, "vega")
 }
 
+fn simm_test_date() -> finstack_quant_core::dates::Date {
+    finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 15)
+        .expect("valid date")
+}
+
 fn ir_delta(calc: &SimmCalculator, values: &FxHashMap<(Currency, String), f64>) -> f64 {
     let mut sens = finstack_quant_margin::types::SimmSensitivities::new(Currency::USD);
     sens.ir_delta = values.clone();
-    calc.calculate_from_sensitivities_parts(&sens, Currency::USD)
+    calc.calculate_from_sensitivities(&sens, Currency::USD, simm_test_date())
         .expect("valid IR fixture")
-        .0
+        .amount
+        .amount()
 }
 fn credit_delta(
     calc: &SimmCalculator,
@@ -185,16 +191,18 @@ fn credit_delta(
 ) -> f64 {
     let mut sens = finstack_quant_margin::types::SimmSensitivities::new(Currency::USD);
     sens.credit_qualifying_delta = values.clone();
-    calc.calculate_from_sensitivities_parts(&sens, Currency::USD)
+    calc.calculate_from_sensitivities(&sens, Currency::USD, simm_test_date())
         .expect("valid credit fixture")
-        .0
+        .amount
+        .amount()
 }
 fn fx_delta(calc: &SimmCalculator, values: &FxHashMap<Currency, f64>) -> f64 {
     let mut sens = finstack_quant_margin::types::SimmSensitivities::new(Currency::USD);
     sens.fx_delta = values.clone();
-    calc.calculate_from_sensitivities_parts(&sens, Currency::USD)
+    calc.calculate_from_sensitivities(&sens, Currency::USD, simm_test_date())
         .expect("valid FX fixture")
-        .0
+        .amount
+        .amount()
 }
 fn curvature(
     calc: &SimmCalculator,
@@ -203,6 +211,7 @@ fn curvature(
     let mut sens = finstack_quant_margin::types::SimmSensitivities::new(Currency::USD);
     sens.curvature = values.to_vec();
     Ok(calc
-        .calculate_from_sensitivities_parts(&sens, Currency::USD)?
-        .0)
+        .calculate_from_sensitivities(&sens, Currency::USD, simm_test_date())?
+        .amount
+        .amount())
 }

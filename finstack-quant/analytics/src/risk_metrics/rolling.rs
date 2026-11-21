@@ -301,7 +301,7 @@ pub(crate) fn rolling_sharpe(
         RollingMetric::Sharpe,
         |values, state| {
             if state.scale == 0.0 {
-                return Ok(super::ratio_or_sign_infinity(state.anchor - cash, 0.0));
+                return Ok(super::zero_denom_ratio(state.anchor - cash));
             }
             let sd = state.sd(window);
             let value = ((state.mean() - cash) / sd) * ann_factor.sqrt();

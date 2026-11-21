@@ -1,24 +1,18 @@
 //! Clearing house IM calculator — **conservative proxy, not a CCP replication**.
 //!
 //! This calculator does NOT replicate any CCP's SPAN or VaR methodology. It
-//! either passes through an externally supplied CCP margin amount
-//! ([`ExternalImSource`](super::ExternalImSource)), or falls back to a
-//! conservative `|exposure_base| × rate` proxy with registry-sourced rates.
-//! Results produced by the proxy path carry `ImResult::approximation == true`
-//! and emit a `tracing::warn!`. For production margin reconciliation, attach
-//! an external source fed by the CCP's own calculators (e.g. LCH SMART,
-//! CME CORE).
+//! scales an explicit exposure base (`Marginable::im_exposure_base`) by a
+//! conservative rate sourced from the margin registry. Results carry
+//! `ImResult::approximation == true` and emit a `tracing::warn!`.
 
 use crate::Marginable;
 use crate::calculators::traits::{ImCalculator, ImResult};
 use crate::registry::{CcpParams, MarginRegistry, embedded_registry_or_panic};
 use crate::types::ImMethodology;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use std::sync::Arc;
 
 /// CCP methodology type.
 ///
@@ -128,24 +122,15 @@ impl CcpMethodology {
 /// Clearing house IM calculator — a conservative proxy, not a CCP replication.
 ///
 /// Provides CCP-specific initial-margin approximations for cleared derivatives.
-/// When an [`ExternalImSource`](super::ExternalImSource) is attached, the calculator uses the
-/// externally supplied IM amount and optional MPOR override. Otherwise it
-/// requires [`Marginable::im_exposure_base`] and scales that explicit CCP
+/// It requires [`Marginable::im_exposure_base`] and scales that explicit CCP
 /// exposure base by a conservative rate. It refuses to use current MtM as a
 /// pseudo-notional.
-///
-/// # Real-World Implementation
-///
-/// In production, this would:
-/// 1. Interface with CCP margin APIs (e.g., LCH SMART, CME CORE)
-/// 2. Replicate VaR/SPAN calculations with historical scenarios
-/// 3. Apply portfolio margining and cross-product netting
 ///
 /// # Conventions
 ///
 /// - `conservative_rate` values are decimal fractions, so `0.02` means 2%.
 /// - MPOR is expressed in calendar days.
-/// - The proxy fallback uses [`Marginable::im_exposure_base`], not current MtM.
+/// - Calculations use [`Marginable::im_exposure_base`], not current MtM.
 ///
 /// # Example
 ///
@@ -172,27 +157,10 @@ impl CcpMethodology {
 ///
 /// - BCBS-IOSCO uncleared margin framework: `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`
 /// - Quantitative Risk Management: `docs/REFERENCES.md#mcneil-frey-embrechts-qrm`
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ClearingHouseImCalculator {
     /// CCP methodology
     pub methodology: CcpMethodology,
-    /// Optional external CCP margin input source
-    pub input_source: Option<Arc<dyn super::ExternalImSource>>,
-    /// Optional resolved parameters (overrides or pre-fetched config)
-    pub params_override: Option<CcpParams>,
-}
-
-impl std::fmt::Debug for ClearingHouseImCalculator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ClearingHouseImCalculator")
-            .field("methodology", &self.methodology)
-            .field("params_override", &self.params_override)
-            .field(
-                "input_source",
-                &self.input_source.as_ref().map(|_| "<dyn ExternalImSource>"),
-            )
-            .finish()
-    }
 }
 
 impl ClearingHouseImCalculator {
@@ -204,14 +172,10 @@ impl ClearingHouseImCalculator {
     ///
     /// # Returns
     ///
-    /// A calculator with no external input source and no parameter overrides.
+    /// A calculator using registry-backed conservative proxy parameters.
     #[must_use]
     pub fn new(methodology: CcpMethodology) -> Self {
-        Self {
-            methodology,
-            input_source: None,
-            params_override: None,
-        }
+        Self { methodology }
     }
 
     /// Create a calculator from a CCP display name.
@@ -226,40 +190,6 @@ impl ClearingHouseImCalculator {
     #[must_use]
     pub fn for_ccp(ccp: &str) -> Self {
         Self::new(CcpMethodology::from_ccp_name(ccp))
-    }
-
-    /// Create a calculator with explicitly resolved parameters.
-    ///
-    /// # Arguments
-    ///
-    /// * `methodology` - CCP methodology identifier
-    /// * `params` - Conservative fallback parameters with decimal rates and day counts
-    ///
-    /// # Returns
-    ///
-    /// A calculator using `params` instead of registry lookup.
-    #[must_use]
-    pub fn with_params(methodology: CcpMethodology, params: CcpParams) -> Self {
-        Self {
-            methodology,
-            input_source: None,
-            params_override: Some(params),
-        }
-    }
-
-    /// Attach a CCP input source that provides external VaR or SPAN outputs.
-    ///
-    /// # Arguments
-    ///
-    /// * `source` - Provider of CCP-supplied margin amounts and optional MPOR overrides
-    ///
-    /// # Returns
-    ///
-    /// The updated calculator.
-    #[must_use]
-    pub fn with_input_source(mut self, source: Arc<dyn super::ExternalImSource>) -> Self {
-        self.input_source = Some(source);
-        self
     }
 
     /// Calculate a conservative fallback IM amount from an exposure proxy.
@@ -289,68 +219,37 @@ impl ImCalculator for ClearingHouseImCalculator {
         context: &MarketContext,
         as_of: Date,
     ) -> Result<ImResult> {
-        let mut mpor_days = self.params().mpor_days;
-        let external_im = self.input_source.as_ref().and_then(|source| {
-            if let Some(override_mpor) = source.external_mpor_days() {
-                mpor_days = override_mpor;
-            }
-            source.external_initial_margin(instrument, context, as_of)
-        });
-        let approximation = external_im.is_none();
-        let im_amount = match external_im {
-            Some(amount) => amount,
-            None => self.conservative_fallback(instrument, context, as_of)?,
-        };
-
-        if approximation {
-            tracing::warn!(
-                methodology = %self.methodology,
-                instrument = instrument.id(),
-                "CCP IM computed via conservative proxy (|exposure_base| x rate); \
-                 this is NOT a SPAN/VaR replication of the CCP's methodology"
-            );
-        }
-
-        let mut breakdown = FxHashMap::default();
-        breakdown.insert(self.methodology.to_string(), im_amount);
-
-        let mut result = ImResult::with_breakdown(
-            im_amount,
-            ImMethodology::ClearingHouse,
-            as_of,
-            mpor_days,
-            breakdown,
-        );
-        result.approximation = approximation;
-        Ok(result)
-    }
-}
-
-impl ClearingHouseImCalculator {
-    /// Conservative `|exposure_base| × rate` fallback used when no
-    /// external CCP IM is available. Fails closed (via
-    /// [`super::require_im_exposure_base`]) if the instrument cannot
-    /// supply a regulatory exposure base.
-    fn conservative_fallback(
-        &self,
-        instrument: &dyn Marginable,
-        context: &MarketContext,
-        as_of: Date,
-    ) -> Result<Money> {
+        let mpor_days = self.params().mpor_days;
         let exposure_base = super::require_im_exposure_base(
             "ClearingHouse",
             instrument,
             context,
             as_of,
-            "an external IM source amount",
+            "an explicit CCP exposure base",
         )?;
-        self.calculate_conservative(exposure_base)
-    }
+        let im_amount = self.calculate_conservative(exposure_base)?;
 
+        tracing::warn!(
+            methodology = %self.methodology,
+            instrument = instrument.id(),
+            "CCP IM computed via conservative proxy (|exposure_base| x rate); \
+             this is NOT a SPAN/VaR replication of the CCP's methodology"
+        );
+
+        let mut result = ImResult::with_single_breakdown(
+            im_amount,
+            ImMethodology::ClearingHouse,
+            as_of,
+            mpor_days,
+            self.methodology.to_string(),
+        );
+        result.approximation = true;
+        Ok(result)
+    }
+}
+
+impl ClearingHouseImCalculator {
     fn params(&self) -> CcpParams {
-        if let Some(p) = &self.params_override {
-            return p.clone();
-        }
         self.methodology
             .params_from_registry(embedded_registry_or_panic())
     }
@@ -361,7 +260,6 @@ mod tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::context::MarketContext;
-    use std::sync::Arc;
 
     #[derive(Clone)]
     struct TestInstrument {
@@ -480,52 +378,8 @@ mod tests {
         );
     }
 
-    #[derive(Debug)]
-    struct TestInputSource {
-        amount: Money,
-        mpor_days: u32,
-    }
-
-    impl super::super::ExternalImSource for TestInputSource {
-        fn external_initial_margin(
-            &self,
-            _instrument: &dyn Marginable,
-            _context: &MarketContext,
-            _as_of: Date,
-        ) -> Option<Money> {
-            Some(self.amount)
-        }
-
-        fn external_mpor_days(&self) -> Option<u32> {
-            Some(self.mpor_days)
-        }
-    }
-
     #[test]
-    fn uses_ccp_input_source_when_available() {
-        let calc =
-            ClearingHouseImCalculator::new(crate::calculators::im::CcpMethodology::LchSwapClear)
-                .with_input_source(Arc::new(TestInputSource {
-                    amount: Money::from((3_000_000_i64, Currency::USD)),
-                    mpor_days: 7,
-                }));
-        let notional = Money::from((100_000_000_i64, Currency::USD));
-        let fallback = calc
-            .calculate_conservative(notional)
-            .expect("conservative im");
-
-        let fake_inst = TestInstrument::new(notional);
-        let market = MarketContext::new();
-        let as_of = Date::from_calendar_date(2024, time::Month::January, 1).expect("valid date");
-        let im = calc.calculate(&fake_inst, &market, as_of).expect("im");
-
-        assert_eq!(fallback.amount(), 2_000_000.0);
-        assert_eq!(im.amount.amount(), 3_000_000.0);
-        assert_eq!(im.mpor_days, 7);
-    }
-
-    #[test]
-    fn fails_closed_without_external_source_or_exposure_base() {
+    fn fails_closed_without_exposure_base() {
         let calc =
             ClearingHouseImCalculator::new(crate::calculators::im::CcpMethodology::LchSwapClear);
         let instrument = TestInstrument::new(Money::from((0_i64, Currency::USD)));
@@ -537,17 +391,15 @@ mod tests {
             .expect_err("CCP IM must not use zero MtM as a notional proxy");
 
         assert!(
-            err.to_string().contains("external IM source")
-                && err.to_string().contains("exposure base"),
-            "expected missing source/exposure-base error, got {err}"
+            err.to_string().contains("exposure base"),
+            "expected missing exposure-base error, got {err}"
         );
     }
 
     #[test]
     fn conservative_fallback_is_marked_as_approximation() {
-        // No external source: the calculator scales the exposure base by the
-        // conservative rate. That number is a proxy, not SPAN/VaR — the result
-        // must say so.
+        // The calculator scales the exposure base by the conservative rate.
+        // That number is a proxy, not SPAN/VaR — the result must say so.
         let calc =
             ClearingHouseImCalculator::new(crate::calculators::im::CcpMethodology::LchSwapClear);
         let notional = Money::from((100_000_000_i64, Currency::USD));
@@ -562,24 +414,5 @@ mod tests {
             "conservative proxy must set approximation = true"
         );
         assert_eq!(im.amount.amount(), 2_000_000.0); // 2% of 100mm
-    }
-
-    #[test]
-    fn external_source_amount_is_not_marked_as_approximation() {
-        let calc =
-            ClearingHouseImCalculator::new(crate::calculators::im::CcpMethodology::LchSwapClear)
-                .with_input_source(Arc::new(TestInputSource {
-                    amount: Money::from((3_000_000_i64, Currency::USD)),
-                    mpor_days: 7,
-                }));
-        let inst = TestInstrument::new(Money::from((100_000_000_i64, Currency::USD)));
-        let market = MarketContext::new();
-        let as_of = Date::from_calendar_date(2024, time::Month::January, 1).expect("valid date");
-
-        let im = calc.calculate(&inst, &market, as_of).expect("im");
-        assert!(
-            !im.approximation,
-            "external CCP-supplied IM is exact, not a proxy"
-        );
     }
 }

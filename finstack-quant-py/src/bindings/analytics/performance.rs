@@ -423,112 +423,6 @@ impl PyPerformance {
         self.metric_series("cagr", values)
     }
 
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.mean_return")]
-    #[pyo3(signature = (annualize))]
-    fn mean_return(&self, annualize: bool) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.mean_return(annualize).map_err(analytics_to_py)?;
-        self.metric_series("mean_return", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.volatility")]
-    #[pyo3(signature = (annualize))]
-    fn volatility(&self, annualize: bool) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.volatility(annualize).map_err(analytics_to_py)?;
-        self.metric_series("volatility", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.sharpe")]
-    #[pyo3(signature = (risk_free_rate))]
-    fn sharpe(&self, risk_free_rate: f64) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.sharpe(risk_free_rate).map_err(analytics_to_py)?;
-        self.metric_series("sharpe", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.sortino")]
-    #[pyo3(signature = (mar))]
-    fn sortino(&self, mar: f64) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.sortino(mar).map_err(analytics_to_py)?;
-        self.metric_series("sortino", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.calmar")]
-    fn calmar(&self) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.calmar().map_err(analytics_to_py)?;
-        self.metric_series("calmar", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.max_drawdown")]
-    fn max_drawdown(&self) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.max_drawdown().map_err(analytics_to_py)?;
-        self.metric_series("max_drawdown", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.mean_drawdown")]
-    fn mean_drawdown(&self) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.mean_drawdown().map_err(analytics_to_py)?;
-        self.metric_series("mean_drawdown", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.value_at_risk")]
-    #[pyo3(signature = (confidence))]
-    fn value_at_risk(&self, confidence: f64) -> PyResult<PyLabeledSeries> {
-        let values = self
-            .inner
-            .value_at_risk(confidence)
-            .map_err(analytics_to_py)?;
-        self.metric_series("value_at_risk", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.expected_shortfall")]
-    #[pyo3(signature = (confidence))]
-    fn expected_shortfall(&self, confidence: f64) -> PyResult<PyLabeledSeries> {
-        let values = self
-            .inner
-            .expected_shortfall(confidence)
-            .map_err(analytics_to_py)?;
-        self.metric_series("expected_shortfall", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.tracking_error")]
-    fn tracking_error(&self) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.tracking_error().map_err(analytics_to_py)?;
-        self.metric_series("tracking_error", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.information_ratio")]
-    fn information_ratio(&self) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.information_ratio().map_err(analytics_to_py)?;
-        self.metric_series("information_ratio", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.skewness")]
-    fn skewness(&self) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.skewness().map_err(analytics_to_py)?;
-        self.metric_series("skewness", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.kurtosis")]
-    fn kurtosis(&self) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.kurtosis().map_err(analytics_to_py)?;
-        self.metric_series("kurtosis", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.geometric_mean")]
-    fn geometric_mean(&self) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.geometric_mean().map_err(analytics_to_py)?;
-        self.metric_series("geometric_mean", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.downside_deviation")]
-    #[pyo3(signature = (mar))]
-    fn downside_deviation(&self, mar: f64) -> PyResult<PyLabeledSeries> {
-        let values = self
-            .inner
-            .downside_deviation(mar)
-            .map_err(analytics_to_py)?;
-        self.metric_series("downside_deviation", values)
-    }
-
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.max_drawdown_duration")]
     fn max_drawdown_duration(&self) -> PyResult<PyLabeledSeries> {
         let values = self
@@ -541,177 +435,6 @@ impl PyPerformance {
             values,
         )?
         .with_index_name("ticker"))
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.up_capture")]
-    fn up_capture(&self) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.up_capture().map_err(analytics_to_py)?;
-        self.metric_series("up_capture", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.down_capture")]
-    fn down_capture(&self) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.down_capture().map_err(analytics_to_py)?;
-        self.metric_series("down_capture", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.capture_ratio")]
-    fn capture_ratio(&self) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.capture_ratio().map_err(analytics_to_py)?;
-        self.metric_series("capture_ratio", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.omega_ratio")]
-    #[pyo3(signature = (threshold))]
-    fn omega_ratio(&self, threshold: f64) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.omega_ratio(threshold).map_err(analytics_to_py)?;
-        self.metric_series("omega_ratio", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.treynor")]
-    #[pyo3(signature = (risk_free_rate))]
-    fn treynor(&self, risk_free_rate: f64) -> PyResult<PyLabeledSeries> {
-        let values = self
-            .inner
-            .treynor(risk_free_rate)
-            .map_err(analytics_to_py)?;
-        self.metric_series("treynor", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.gain_to_pain")]
-    fn gain_to_pain(&self) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.gain_to_pain().map_err(analytics_to_py)?;
-        self.metric_series("gain_to_pain", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.ulcer_index")]
-    fn ulcer_index(&self) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.ulcer_index().map_err(analytics_to_py)?;
-        self.metric_series("ulcer_index", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.martin_ratio")]
-    fn martin_ratio(&self, risk_free_rate: f64) -> PyResult<PyLabeledSeries> {
-        let values = self
-            .inner
-            .martin_ratio(risk_free_rate)
-            .map_err(analytics_to_py)?;
-        self.metric_series("martin_ratio", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.recovery_factor")]
-    fn recovery_factor(&self) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.recovery_factor().map_err(analytics_to_py)?;
-        self.metric_series("recovery_factor", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.pain_index")]
-    fn pain_index(&self) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.pain_index().map_err(analytics_to_py)?;
-        self.metric_series("pain_index", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.pain_ratio")]
-    #[pyo3(signature = (risk_free_rate))]
-    fn pain_ratio(&self, risk_free_rate: f64) -> PyResult<PyLabeledSeries> {
-        let values = self
-            .inner
-            .pain_ratio(risk_free_rate)
-            .map_err(analytics_to_py)?;
-        self.metric_series("pain_ratio", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.tail_ratio")]
-    #[pyo3(signature = (confidence))]
-    fn tail_ratio(&self, confidence: f64) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.tail_ratio(confidence).map_err(analytics_to_py)?;
-        self.metric_series("tail_ratio", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.r_squared")]
-    fn r_squared(&self) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.r_squared().map_err(analytics_to_py)?;
-        self.metric_series("r_squared", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.batting_average")]
-    fn batting_average(&self) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.batting_average().map_err(analytics_to_py)?;
-        self.metric_series("batting_average", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.parametric_var")]
-    #[pyo3(signature = (confidence, horizon_periods = None))]
-    fn parametric_var(
-        &self,
-        confidence: f64,
-        horizon_periods: Option<u64>,
-    ) -> PyResult<PyLabeledSeries> {
-        let values = self
-            .inner
-            .parametric_var(confidence, horizon_periods)
-            .map_err(analytics_to_py)?;
-        self.metric_series("parametric_var", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.cornish_fisher_var")]
-    #[pyo3(signature = (confidence, horizon_periods = None))]
-    fn cornish_fisher_var(
-        &self,
-        confidence: f64,
-        horizon_periods: Option<u64>,
-    ) -> PyResult<PyLabeledSeries> {
-        let values = self
-            .inner
-            .cornish_fisher_var(confidence, horizon_periods)
-            .map_err(analytics_to_py)?;
-        self.metric_series("cornish_fisher_var", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.cdar")]
-    #[pyo3(signature = (confidence))]
-    fn cdar(&self, confidence: f64) -> PyResult<PyLabeledSeries> {
-        let values = self.inner.cdar(confidence).map_err(analytics_to_py)?;
-        self.metric_series("cdar", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.m_squared")]
-    #[pyo3(signature = (risk_free_rate))]
-    fn m_squared(&self, risk_free_rate: f64) -> PyResult<PyLabeledSeries> {
-        let values = self
-            .inner
-            .m_squared(risk_free_rate)
-            .map_err(analytics_to_py)?;
-        self.metric_series("m_squared", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.modified_sharpe")]
-    #[pyo3(signature = (risk_free_rate, confidence))]
-    fn modified_sharpe(&self, risk_free_rate: f64, confidence: f64) -> PyResult<PyLabeledSeries> {
-        let values = self
-            .inner
-            .modified_sharpe(risk_free_rate, confidence)
-            .map_err(analytics_to_py)?;
-        self.metric_series("modified_sharpe", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.sterling_ratio")]
-    #[pyo3(signature = (risk_free_rate, n))]
-    fn sterling_ratio(&self, risk_free_rate: f64, n: usize) -> PyResult<PyLabeledSeries> {
-        let values = self
-            .inner
-            .sterling_ratio(risk_free_rate, n)
-            .map_err(analytics_to_py)?;
-        self.metric_series("sterling_ratio", values)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.burke_ratio")]
-    fn burke_ratio(&self, risk_free_rate: f64) -> PyResult<PyLabeledSeries> {
-        let values = self
-            .inner
-            .burke_ratio(risk_free_rate)
-            .map_err(analytics_to_py)?;
-        self.metric_series("burke_ratio", values)
     }
 
     // -- Vector-per-ticker methods --
@@ -829,56 +552,6 @@ impl PyPerformance {
         Ok(PyRollingGreeks { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.rolling_volatility")]
-    #[pyo3(signature = (ticker_idx, window))]
-    fn rolling_volatility(
-        &self,
-        py: Python<'_>,
-        ticker_idx: &Bound<'_, PyAny>,
-        window: usize,
-    ) -> PyResult<PyDatedSeries> {
-        let ticker_idx = self.resolve_ticker(ticker_idx)?;
-        let inner = py
-            .detach(|| self.inner.rolling_volatility(ticker_idx, window))
-            .map_err(analytics_to_py)?;
-        Ok(PyDatedSeries { inner })
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.rolling_sortino")]
-    #[pyo3(signature = (ticker_idx, window, mar))]
-    fn rolling_sortino(
-        &self,
-        py: Python<'_>,
-        ticker_idx: &Bound<'_, PyAny>,
-        window: usize,
-        mar: f64,
-    ) -> PyResult<PyDatedSeries> {
-        let ticker_idx = self.resolve_ticker(ticker_idx)?;
-        let inner = py
-            .detach(|| self.inner.rolling_sortino(ticker_idx, window, mar))
-            .map_err(analytics_to_py)?;
-        Ok(PyDatedSeries { inner })
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.rolling_sharpe")]
-    #[pyo3(signature = (ticker_idx, window, risk_free_rate))]
-    fn rolling_sharpe(
-        &self,
-        py: Python<'_>,
-        ticker_idx: &Bound<'_, PyAny>,
-        window: usize,
-        risk_free_rate: f64,
-    ) -> PyResult<PyDatedSeries> {
-        let ticker_idx = self.resolve_ticker(ticker_idx)?;
-        let inner = py
-            .detach(|| {
-                self.inner
-                    .rolling_sharpe(ticker_idx, window, risk_free_rate)
-            })
-            .map_err(analytics_to_py)?;
-        Ok(PyDatedSeries { inner })
-    }
-
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.drawdown_details")]
     #[pyo3(signature = (ticker_idx, n))]
     fn drawdown_details(
@@ -931,21 +604,6 @@ impl PyPerformance {
         })
         .map(|r| PyMultiFactorResult { inner: r })
         .map_err(analytics_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.rolling_returns")]
-    #[pyo3(signature = (ticker_idx, window))]
-    fn rolling_returns(
-        &self,
-        py: Python<'_>,
-        ticker_idx: &Bound<'_, PyAny>,
-        window: usize,
-    ) -> PyResult<PyDatedSeries> {
-        let ticker_idx = self.resolve_ticker(ticker_idx)?;
-        let inner = py
-            .detach(|| self.inner.rolling_returns(ticker_idx, window))
-            .map_err(analytics_to_py)?;
-        Ok(PyDatedSeries { inner })
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.lookback_returns")]
@@ -1081,6 +739,152 @@ wire_methods!(
     Performance,
     "Performance",
     module = "finstack_quant.analytics._performance"
+);
+
+macro_rules! py_series_methods {
+    (
+        zero { $( $zmethod:ident => $zdoc:literal ),* $(,)? }
+        one { $( $omethod:ident ( $oarg:ident : $oty:ty ) => $odoc:literal ),* $(,)? }
+        two { $( $tmethod:ident ( $ta:ident : $taty:ty, $tb:ident : $tbty:ty ) => $tdoc:literal ),* $(,)? }
+        two_opt { $( $pmethod:ident ( $pa:ident : $paty:ty, $pb:ident : $pbty:ty = None ) => $pdoc:literal ),* $(,)? }
+    ) => {
+        #[pymethods]
+        impl PyPerformance {
+            $(
+                #[doc = pydoc!("finstack_quant.analytics._performance", $zdoc)]
+                fn $zmethod(&self) -> PyResult<PyLabeledSeries> {
+                    let values = self.inner.$zmethod().map_err(analytics_to_py)?;
+                    self.metric_series(stringify!($zmethod), values)
+                }
+            )*
+            $(
+                #[doc = pydoc!("finstack_quant.analytics._performance", $odoc)]
+                #[pyo3(signature = ($oarg))]
+                fn $omethod(&self, $oarg: $oty) -> PyResult<PyLabeledSeries> {
+                    let values = self.inner.$omethod($oarg).map_err(analytics_to_py)?;
+                    self.metric_series(stringify!($omethod), values)
+                }
+            )*
+            $(
+                #[doc = pydoc!("finstack_quant.analytics._performance", $tdoc)]
+                #[pyo3(signature = ($ta, $tb))]
+                fn $tmethod(&self, $ta: $taty, $tb: $tbty) -> PyResult<PyLabeledSeries> {
+                    let values = self.inner.$tmethod($ta, $tb).map_err(analytics_to_py)?;
+                    self.metric_series(stringify!($tmethod), values)
+                }
+            )*
+            $(
+                #[doc = pydoc!("finstack_quant.analytics._performance", $pdoc)]
+                #[pyo3(signature = ($pa, $pb = None))]
+                fn $pmethod(&self, $pa: $paty, $pb: $pbty) -> PyResult<PyLabeledSeries> {
+                    let values = self.inner.$pmethod($pa, $pb).map_err(analytics_to_py)?;
+                    self.metric_series(stringify!($pmethod), values)
+                }
+            )*
+        }
+    };
+}
+
+macro_rules! py_rolling_methods {
+    (
+        two { $( $rmethod2:ident => $rdoc2:literal ),* $(,)? }
+        three { $( $rmethod3:ident ( $rarg:ident : $rty:ty ) => $rdoc3:literal ),* $(,)? }
+    ) => {
+        #[pymethods]
+        impl PyPerformance {
+            $(
+                #[doc = pydoc!("finstack_quant.analytics._performance", $rdoc2)]
+                #[pyo3(signature = (ticker_idx, window))]
+                fn $rmethod2(
+                    &self,
+                    py: Python<'_>,
+                    ticker_idx: &Bound<'_, PyAny>,
+                    window: usize,
+                ) -> PyResult<PyDatedSeries> {
+                    let ticker_idx = self.resolve_ticker(ticker_idx)?;
+                    let inner = py
+                        .detach(|| self.inner.$rmethod2(ticker_idx, window))
+                        .map_err(analytics_to_py)?;
+                    Ok(PyDatedSeries { inner })
+                }
+            )*
+            $(
+                #[doc = pydoc!("finstack_quant.analytics._performance", $rdoc3)]
+                #[pyo3(signature = (ticker_idx, window, $rarg))]
+                fn $rmethod3(
+                    &self,
+                    py: Python<'_>,
+                    ticker_idx: &Bound<'_, PyAny>,
+                    window: usize,
+                    $rarg: $rty,
+                ) -> PyResult<PyDatedSeries> {
+                    let ticker_idx = self.resolve_ticker(ticker_idx)?;
+                    let inner = py
+                        .detach(|| self.inner.$rmethod3(ticker_idx, window, $rarg))
+                        .map_err(analytics_to_py)?;
+                    Ok(PyDatedSeries { inner })
+                }
+            )*
+        }
+    };
+}
+
+py_series_methods!(
+    zero {
+        calmar => "Performance.calmar",
+        max_drawdown => "Performance.max_drawdown",
+        mean_drawdown => "Performance.mean_drawdown",
+        tracking_error => "Performance.tracking_error",
+        information_ratio => "Performance.information_ratio",
+        skewness => "Performance.skewness",
+        kurtosis => "Performance.kurtosis",
+        geometric_mean => "Performance.geometric_mean",
+        up_capture => "Performance.up_capture",
+        down_capture => "Performance.down_capture",
+        capture_ratio => "Performance.capture_ratio",
+        gain_to_pain => "Performance.gain_to_pain",
+        ulcer_index => "Performance.ulcer_index",
+        recovery_factor => "Performance.recovery_factor",
+        pain_index => "Performance.pain_index",
+        r_squared => "Performance.r_squared",
+        batting_average => "Performance.batting_average",
+    }
+    one {
+        mean_return(annualize: bool) => "Performance.mean_return",
+        volatility(annualize: bool) => "Performance.volatility",
+        sharpe(risk_free_rate: f64) => "Performance.sharpe",
+        sortino(mar: f64) => "Performance.sortino",
+        value_at_risk(confidence: f64) => "Performance.value_at_risk",
+        expected_shortfall(confidence: f64) => "Performance.expected_shortfall",
+        downside_deviation(mar: f64) => "Performance.downside_deviation",
+        omega_ratio(threshold: f64) => "Performance.omega_ratio",
+        treynor(risk_free_rate: f64) => "Performance.treynor",
+        martin_ratio(risk_free_rate: f64) => "Performance.martin_ratio",
+        pain_ratio(risk_free_rate: f64) => "Performance.pain_ratio",
+        tail_ratio(confidence: f64) => "Performance.tail_ratio",
+        cdar(confidence: f64) => "Performance.cdar",
+        m_squared(risk_free_rate: f64) => "Performance.m_squared",
+        burke_ratio(risk_free_rate: f64) => "Performance.burke_ratio",
+    }
+    two {
+        modified_sharpe(risk_free_rate: f64, confidence: f64) => "Performance.modified_sharpe",
+        sterling_ratio(risk_free_rate: f64, n: usize) => "Performance.sterling_ratio",
+    }
+    two_opt {
+        parametric_var(confidence: f64, horizon_periods: Option<u64> = None) => "Performance.parametric_var",
+        cornish_fisher_var(confidence: f64, horizon_periods: Option<u64> = None) => "Performance.cornish_fisher_var",
+    }
+);
+
+py_rolling_methods!(
+    two {
+        rolling_volatility => "Performance.rolling_volatility",
+        rolling_returns => "Performance.rolling_returns",
+    }
+    three {
+        rolling_sortino(mar: f64) => "Performance.rolling_sortino",
+        rolling_sharpe(risk_free_rate: f64) => "Performance.rolling_sharpe",
+    }
 );
 
 #[doc = pydoc!("finstack_quant.analytics._performance", "sharpe")]

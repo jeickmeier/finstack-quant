@@ -6,9 +6,8 @@
 use super::csa::CsaSpec;
 use super::enums::{ClearingStatus, ImMethodology};
 use super::simm_types::SimmCreditSector;
-use crate::registry::{embedded_registry, margin_registry_from_config};
+use crate::registry::embedded_registry;
 use finstack_quant_core::Result;
-use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 
@@ -198,20 +197,7 @@ impl OtcMarginSpec {
                     "collateral schedule 'bcbs_standard' not found in registry".to_string(),
                 )
             })?;
-        Self::build_cleared(ccp.into(), currency, registry, eligible_collateral)
-    }
-
-    /// Shared construction path for `cleared` and `cleared_from_config`.
-    ///
-    /// Takes an already-resolved registry + eligible-collateral schedule and
-    /// assembles the CSA and spec. Keeping this as a `fn` (not a method) makes
-    /// the call from registry-owning contexts explicit.
-    fn build_cleared(
-        ccp_name: String,
-        currency: Currency,
-        registry: &crate::registry::MarginRegistry,
-        eligible_collateral: super::collateral::EligibleCollateralSchedule,
-    ) -> Result<Self> {
+        let ccp_name = ccp.into();
         let mut vm_params = registry.defaults.vm.to_vm_params(currency)?;
         vm_params.rounding = Money::new(registry.defaults.cleared_settlement.rounding, currency)?;
         vm_params.settlement_lag = registry.defaults.cleared_settlement.settlement_lag;
@@ -250,34 +236,6 @@ impl OtcMarginSpec {
     /// Returns an error if the embedded margin registry cannot be loaded.
     pub fn usd_bilateral() -> Result<Self> {
         Ok(Self::bilateral_simm(CsaSpec::usd_regulatory()?))
-    }
-
-    /// Create a EUR bilateral spec with standard regulatory terms.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the embedded margin registry cannot be loaded.
-    pub fn eur_bilateral() -> Result<Self> {
-        Ok(Self::bilateral_simm(CsaSpec::eur_regulatory()?))
-    }
-
-    /// Create a margin spec for cleared derivatives using overrides from a config.
-    pub fn cleared_from_config(
-        ccp: impl Into<String>,
-        currency: Currency,
-        cfg: &FinstackConfig,
-    ) -> Result<Self> {
-        let registry = margin_registry_from_config(cfg)?;
-        let eligible_collateral = registry
-            .collateral_schedules
-            .get("bcbs_standard")
-            .cloned()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(
-                    "collateral schedule 'bcbs_standard' not found".into(),
-                )
-            })?;
-        Self::build_cleared(ccp.into(), currency, &registry, eligible_collateral)
     }
 
     /// Attach an explicit SIMM credit risk-class and sector assignment.

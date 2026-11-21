@@ -7,14 +7,13 @@
 use super::types::{DrcPosition, DrcSector, DrcSeniority};
 use finstack_quant_core::FxHashMap;
 use std::collections::BTreeMap;
-use std::sync::LazyLock;
 
 /// Prescribed DRC risk weights by rating bucket.
 ///
 /// Source: Basel Framework MAR22.24 (FRTB Standardised Approach, DRC for
 /// non-securitisations). Unrated exposures receive the BB-equivalent 15%
 /// weight, and defaulted exposures receive 100%.
-pub const DRC_RISK_WEIGHTS: &[(u8, f64)] = &[
+pub(super) const DRC_RISK_WEIGHTS: &[(u8, f64)] = &[
     (1, 0.005), // AAA
     (2, 0.02),  // AA
     (3, 0.03),  // A
@@ -27,7 +26,7 @@ pub const DRC_RISK_WEIGHTS: &[(u8, f64)] = &[
 ];
 
 /// LGD assumptions by seniority.
-pub const DRC_LGD: &[(DrcSeniority, f64)] = &[
+pub(super) const DRC_LGD: &[(DrcSeniority, f64)] = &[
     (DrcSeniority::CoveredBond, 0.25),
     (DrcSeniority::SeniorUnsecured, 0.75),
     (DrcSeniority::Subordinated, 1.00),
@@ -69,7 +68,7 @@ pub const DRC_LGD: &[(DrcSeniority, f64)] = &[
 ///
 /// - BCBS FRTB Minimum Capital Requirements: `docs/REFERENCES.md#bcbs-frtb-minimum-capital-requirements`
 ///
-pub fn drc_charge(positions: &[DrcPosition]) -> finstack_quant_core::Result<f64> {
+pub(super) fn drc_charge(positions: &[DrcPosition]) -> finstack_quant_core::Result<f64> {
     struct Obligor {
         sector: DrcSector,
         rating: u8,
@@ -137,27 +136,22 @@ pub fn drc_charge(positions: &[DrcPosition]) -> finstack_quant_core::Result<f64>
         .sum())
 }
 
-static DRC_RW_BY_BUCKET: LazyLock<finstack_quant_core::FxHashMap<u8, f64>> =
-    LazyLock::new(|| DRC_RISK_WEIGHTS.iter().copied().collect());
-static DRC_LGD_BY_SENIORITY: LazyLock<finstack_quant_core::FxHashMap<DrcSeniority, f64>> =
-    LazyLock::new(|| DRC_LGD.iter().copied().collect());
-
 /// Look up DRC risk weight by rating bucket.
 ///
 /// Unknown buckets return NaN; the canonical position validator rejects them.
 fn drc_risk_weight(rating_bucket: u8) -> f64 {
-    DRC_RW_BY_BUCKET
-        .get(&rating_bucket)
-        .copied()
-        .unwrap_or(f64::NAN)
+    DRC_RISK_WEIGHTS
+        .iter()
+        .find(|(bucket, _)| *bucket == rating_bucket)
+        .map_or(f64::NAN, |(_, weight)| *weight)
 }
 
 /// Look up LGD by seniority.
 ///
 /// All supported seniorities have a prescribed value; no default is invented.
 fn drc_lgd(seniority: DrcSeniority) -> f64 {
-    DRC_LGD_BY_SENIORITY
-        .get(&seniority)
-        .copied()
-        .unwrap_or(f64::NAN)
+    DRC_LGD
+        .iter()
+        .find(|(kind, _)| *kind == seniority)
+        .map_or(f64::NAN, |(_, lgd)| *lgd)
 }

@@ -1,6 +1,6 @@
 //! Spec-type bindings for `finstack_quant_cashflows::builder`.
 
-use crate::bindings::macros::wire_methods;
+use crate::bindings::macros::{py_getters, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::builder::{FeeAccrualBasis, FeeBase, FeeSpec};
 use pyo3::prelude::*;
@@ -87,26 +87,22 @@ impl PyFeeBase {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeBase.kind")]
-    #[getter]
-    fn kind(&self) -> PyResult<String> {
-        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeBase.commitment")]
-    #[getter]
-    fn commitment(&self) -> Option<PyMoney> {
-        match self.inner {
-            FeeBase::Undrawn { commitment } => Some(PyMoney::from_inner(commitment)),
-            FeeBase::Drawn => None,
-        }
-    }
-
     /// Python-style representation.
     fn __repr__(&self) -> String {
         enum_repr("FeeBase", &self.inner)
     }
 }
+
+py_getters!(PyFeeBase |s| {
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeBase.kind")]
+    kind -> PyResult<String> = finstack_quant_core::wire::serde_tag(&s.inner).map_err(core_to_py);
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeBase.commitment")]
+    commitment -> Option<PyMoney> = match s.inner {
+        FeeBase::Undrawn { commitment } => Some(PyMoney::from_inner(commitment)),
+        FeeBase::Drawn => None,
+    };
+});
 
 #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec")]
 #[pyclass(
@@ -166,38 +162,12 @@ impl PyFeeSpec {
         Ok(Self { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.kind")]
-    #[getter]
-    fn kind(&self) -> PyResult<String> {
-        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
-    }
-
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.date")]
     #[getter]
     fn date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         match self.inner {
             FeeSpec::Fixed { date, .. } => date_to_py(py, date).map(Some),
             FeeSpec::PeriodicBp { .. } => Ok(None),
-        }
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.amount")]
-    #[getter]
-    fn amount(&self) -> Option<PyMoney> {
-        match self.inner {
-            FeeSpec::Fixed { amount, .. } => Some(PyMoney::from_inner(amount)),
-            FeeSpec::PeriodicBp { .. } => None,
-        }
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.base")]
-    #[getter]
-    fn base(&self) -> Option<PyFeeBase> {
-        match &self.inner {
-            FeeSpec::PeriodicBp { base, .. } => Some(PyFeeBase {
-                inner: base.clone(),
-            }),
-            FeeSpec::Fixed { .. } => None,
         }
     }
 
@@ -210,67 +180,68 @@ impl PyFeeSpec {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.frequency")]
-    #[getter]
-    fn frequency(&self) -> Option<PyTenor> {
-        match self.inner {
-            FeeSpec::PeriodicBp { frequency, .. } => Some(PyTenor::from_inner(frequency)),
-            FeeSpec::Fixed { .. } => None,
-        }
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.day_count")]
-    #[getter]
-    fn day_count(&self) -> Option<PyDayCount> {
-        match self.inner {
-            FeeSpec::PeriodicBp { day_count, .. } => Some(PyDayCount::from_inner(day_count)),
-            FeeSpec::Fixed { .. } => None,
-        }
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.business_day_convention")]
-    #[getter]
-    fn business_day_convention(&self) -> Option<PyBusinessDayConvention> {
-        match self.inner {
-            FeeSpec::PeriodicBp {
-                business_day_convention,
-                ..
-            } => Some(PyBusinessDayConvention::from_inner(business_day_convention)),
-            FeeSpec::Fixed { .. } => None,
-        }
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.calendar_id")]
-    #[getter]
-    fn calendar_id(&self) -> Option<String> {
-        match &self.inner {
-            FeeSpec::PeriodicBp { calendar_id, .. } => Some(calendar_id.clone()),
-            FeeSpec::Fixed { .. } => None,
-        }
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.stub")]
-    #[getter]
-    fn stub(&self) -> Option<PyStubKind> {
-        match self.inner {
-            FeeSpec::PeriodicBp { stub, .. } => Some(PyStubKind::from_inner(stub)),
-            FeeSpec::Fixed { .. } => None,
-        }
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.accrual_basis")]
-    #[getter]
-    fn accrual_basis(&self) -> Option<PyFeeAccrualBasis> {
-        match &self.inner {
-            FeeSpec::PeriodicBp { accrual_basis, .. } => Some(PyFeeAccrualBasis {
-                inner: accrual_basis.clone(),
-            }),
-            FeeSpec::Fixed { .. } => None,
-        }
-    }
-
     /// Python-style representation.
     fn __repr__(&self) -> String {
         enum_repr("FeeSpec", &self.inner)
     }
 }
+
+py_getters!(PyFeeSpec |s| {
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.kind")]
+    kind -> PyResult<String> = finstack_quant_core::wire::serde_tag(&s.inner).map_err(core_to_py);
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.amount")]
+    amount -> Option<PyMoney> = match s.inner {
+        FeeSpec::Fixed { amount, .. } => Some(PyMoney::from_inner(amount)),
+        FeeSpec::PeriodicBp { .. } => None,
+    };
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.base")]
+    base -> Option<PyFeeBase> = match &s.inner {
+        FeeSpec::PeriodicBp { base, .. } => Some(PyFeeBase {
+            inner: base.clone(),
+        }),
+        FeeSpec::Fixed { .. } => None,
+    };
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.frequency")]
+    frequency -> Option<PyTenor> = match s.inner {
+        FeeSpec::PeriodicBp { frequency, .. } => Some(PyTenor::from_inner(frequency)),
+        FeeSpec::Fixed { .. } => None,
+    };
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.day_count")]
+    day_count -> Option<PyDayCount> = match s.inner {
+        FeeSpec::PeriodicBp { day_count, .. } => Some(PyDayCount::from_inner(day_count)),
+        FeeSpec::Fixed { .. } => None,
+    };
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.business_day_convention")]
+    business_day_convention -> Option<PyBusinessDayConvention> = match s.inner {
+        FeeSpec::PeriodicBp {
+            business_day_convention,
+            ..
+        } => Some(PyBusinessDayConvention::from_inner(business_day_convention)),
+        FeeSpec::Fixed { .. } => None,
+    };
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.calendar_id")]
+    calendar_id -> Option<String> = match &s.inner {
+        FeeSpec::PeriodicBp { calendar_id, .. } => Some(calendar_id.clone()),
+        FeeSpec::Fixed { .. } => None,
+    };
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.stub")]
+    stub -> Option<PyStubKind> = match s.inner {
+        FeeSpec::PeriodicBp { stub, .. } => Some(PyStubKind::from_inner(stub)),
+        FeeSpec::Fixed { .. } => None,
+    };
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.accrual_basis")]
+    accrual_basis -> Option<PyFeeAccrualBasis> = match &s.inner {
+        FeeSpec::PeriodicBp { accrual_basis, .. } => Some(PyFeeAccrualBasis {
+            inner: accrual_basis.clone(),
+        }),
+        FeeSpec::Fixed { .. } => None,
+    };
+});

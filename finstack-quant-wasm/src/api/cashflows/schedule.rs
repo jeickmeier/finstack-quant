@@ -70,6 +70,8 @@ impl JsCashFlowSchedule {
     }
 }
 
+json_round_trip!(JsCashFlowSchedule, CashFlowSchedule);
+
 #[wasm_bindgen(js_class = CashFlowSchedule)]
 impl JsCashFlowSchedule {
     /// Start an empty schedule builder.
@@ -111,27 +113,6 @@ impl JsCashFlowSchedule {
             js_wire::<DayCount>(&day_count, "dayCount")?,
             js_opt_wire::<CashFlowMeta>(meta.as_ref(), "meta")?.unwrap_or_default(),
         )))
-    }
-
-    /// Parse a schedule from its canonical JSON.
-    ///
-    /// @param json - `CashFlowSchedule` JSON string or plain object; unknown fields are rejected.
-    /// @returns The parsed `CashFlowSchedule`; it is not validated until `validate()` or an analytic runs.
-    /// @throws If `json` is neither a string nor a plain object (kind `invalid_type`) or does not match the schedule schema (kind `validation`).
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsCashFlowSchedule, JsValue> {
-        crate::utils::input::from_js_json::<CashFlowSchedule>(&json, "json").map(Self::from_inner)
-    }
-
-    /// Serialize the schedule to canonical JSON.
-    ///
-    /// @returns `CashFlowSchedule` JSON accepted by `fromJson` and by every `scheduleJson` argument.
-    /// @throws If the schedule cannot be serialized.
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
     }
 
     /// Copy of the schedule tagged with a different representation.
@@ -738,6 +719,18 @@ impl JsCashFlowBuilder {
     }
 }
 
+fn build_cashflow_schedule_inner(
+    spec: &JsValue,
+    market: Option<&JsMarketContext>,
+    as_of: Option<&JsValue>,
+) -> Result<JsCashFlowSchedule, JsValue> {
+    let as_of = js_opt_date(as_of, "asOf")?;
+    crate::utils::input::from_js_json::<CashflowScheduleBuildSpec>(spec, "spec")?
+        .build_as_of(market.map(JsMarketContext::inner), as_of)
+        .map(JsCashFlowSchedule::from_inner)
+        .map_err(to_js_err)
+}
+
 /// Build a cashflow schedule from a build spec.
 ///
 /// Typed twin of `buildCashflowScheduleJson`: the same spec, returning a
@@ -758,11 +751,7 @@ pub fn build_cashflow_schedule(
     #[wasm_bindgen(js_name = "asOf", unchecked_optional_param_type = "string | null")]
     as_of: Option<JsValue>,
 ) -> Result<JsCashFlowSchedule, JsValue> {
-    let as_of = js_opt_date(as_of.as_ref(), "asOf")?;
-    crate::utils::input::from_js_json::<CashflowScheduleBuildSpec>(&spec, "spec")?
-        .build_as_of(None, as_of)
-        .map(JsCashFlowSchedule::from_inner)
-        .map_err(to_js_err)
+    build_cashflow_schedule_inner(&spec, None, as_of.as_ref())
 }
 
 /// Build a cashflow schedule from a build spec with market data; the published
@@ -773,7 +762,7 @@ pub fn build_cashflow_schedule(
 /// @param asOf - Optional ISO-8601 valuation cutoff date overriding `spec.as_of`; resets before the cutoff require historical fixings.
 /// @returns The built `CashFlowSchedule` handle.
 /// @throws If `spec` does not match the build-spec schema, `asOf` is not an ISO-8601 date string, a referenced curve or fixing is missing (kind `not_found`), or schedule construction fails (kind `validation`).
-#[wasm_bindgen(js_name = buildCashflowScheduleWithMarket)]
+#[wasm_bindgen(skip_typescript, js_name = buildCashflowScheduleWithMarket)]
 pub fn build_cashflow_schedule_with_market(
     #[wasm_bindgen(
         unchecked_param_type = "generated.cashflows.CashflowScheduleBuildSpec | string"
@@ -783,11 +772,7 @@ pub fn build_cashflow_schedule_with_market(
     #[wasm_bindgen(js_name = "asOf", unchecked_optional_param_type = "string | null")]
     as_of: Option<JsValue>,
 ) -> Result<JsCashFlowSchedule, JsValue> {
-    let as_of = js_opt_date(as_of.as_ref(), "asOf")?;
-    crate::utils::input::from_js_json::<CashflowScheduleBuildSpec>(&spec, "spec")?
-        .build_as_of(Some(market.inner()), as_of)
-        .map(JsCashFlowSchedule::from_inner)
-        .map_err(to_js_err)
+    build_cashflow_schedule_inner(&spec, Some(market), as_of.as_ref())
 }
 
 /// Settlement cash flows of a schedule as dated amounts.
@@ -857,10 +842,11 @@ pub fn schedule_from_classified_flows(
     ))
 }
 
-/// Parse an array of schedules given as canonical JSON or plain objects.
-///
-/// The facade turns `CashFlowSchedule` handles into JSON before calling: a
-/// wasm-bindgen parameter cannot borrow an array of handles.
+thread_local! {
+    static SCHEDULE_PROTOTYPE: std::cell::OnceCell<js_sys::Object> = const { std::cell::OnceCell::new() };
+}
+
+/// Parse an array of schedules given as live `CashFlowSchedule` handles, canonical JSON strings, or plain objects.
 pub(crate) fn schedules_arg(
     value: &JsValue,
     label: &str,
@@ -873,7 +859,28 @@ pub(crate) fn schedules_arg(
     }
     js_sys::Array::from(value)
         .iter()
-        .map(|item| crate::utils::input::from_js_json(&item, label))
+        .map(|item| {
+            if let Some(json) = crate::utils::input::wasm_handle_string(
+                &item,
+                label,
+                &SCHEDULE_PROTOTYPE,
+                || {
+                    Ok(JsCashFlowSchedule::from_inner(
+                        CashFlowSchedule::from_flows(
+                            Vec::new(),
+                            Notional::par(1.0, finstack_quant_core::currency::Currency::USD)
+                                .map_err(to_js_err)?,
+                            DayCount::Act365F,
+                            CashFlowMeta::default(),
+                        ),
+                    ))
+                },
+                "toJson",
+            )? {
+                return serde_json::from_str(&json).map_err(to_js_err);
+            }
+            crate::utils::input::from_js_json(&item, label)
+        })
         .collect()
 }
 
@@ -882,14 +889,15 @@ pub(crate) fn schedules_arg(
 /// Flows are concatenated and put into canonical order; calendar ids and
 /// projected fixings are merged.
 ///
-/// @param schedules - Schedules to merge: `CashFlowSchedule` handles (the facade passes them as JSON), canonical JSON strings or plain objects.
+/// @param schedules - Schedules to merge: `CashFlowSchedule` handles, canonical JSON strings or plain objects.
 /// @param notional - `Notional` wire object of the merged schedule.
 /// @param dayCount - `DayCount` wire string of the merged schedule.
 /// @returns The merged `CashFlowSchedule` handle.
 /// @throws If `schedules` is not an array (kind `invalid_type`) or an argument does not match its wire type (kind `validation`).
 #[wasm_bindgen(js_name = mergeCashflowSchedules)]
 pub fn merge_cashflow_schedules(
-    #[wasm_bindgen(unchecked_param_type = "readonly JsonInput[]")] schedules: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "readonly (CashFlowSchedule | JsonInput)[]")]
+    schedules: JsValue,
     #[wasm_bindgen(unchecked_param_type = "generated.cashflows.Notional")] notional: JsValue,
     #[wasm_bindgen(js_name = "dayCount", unchecked_param_type = "generated.core.DayCount")]
     day_count: JsValue,

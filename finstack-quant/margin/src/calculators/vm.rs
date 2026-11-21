@@ -9,7 +9,7 @@ use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DateExt, adjust, calendar_by_id_strict,
 };
 use finstack_quant_core::money::Money;
-use tracing::{debug, warn};
+use tracing::debug;
 
 /// Variation margin calculation result.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -193,22 +193,12 @@ impl VmCalculator {
         self.csa.validate()?;
         let currency = self.csa.base_currency;
 
-        if exposure.currency() != currency {
-            warn!(expected = %currency, got = %exposure.currency(), "VM exposure currency mismatch");
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "VM exposure currency mismatch: expected {}, got {}",
-                currency,
-                exposure.currency()
-            )));
-        }
-        if posted_collateral.currency() != currency {
-            warn!(expected = %currency, got = %posted_collateral.currency(), "VM collateral currency mismatch");
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "VM collateral currency mismatch: expected {}, got {}",
-                currency,
-                posted_collateral.currency()
-            )));
-        }
+        crate::metrics::ensure_same_currency("VM exposure", currency, exposure.currency())?;
+        crate::metrics::ensure_same_currency(
+            "VM collateral",
+            currency,
+            posted_collateral.currency(),
+        )?;
 
         let vm_params = &self.csa.vm_params;
         let steps = vm_params.margin_call_steps(exposure, posted_collateral)?;

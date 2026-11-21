@@ -112,7 +112,6 @@ The valuation owner supplies evidence for the full reprices and delta deductions
 Inspected tests cover squared equity, commodity and credit correlations, the sign indicator and raw bucket sums. Independent examples checked signed delta removal, the CSR floor and FX relief, zero floors, exact ties, residual addition and the opposite-direction FX case. Runtime verification remains pending.
 [Runtime and unit tests](../../../../finstack-quant/margin/src/regulatory/frtb/curvature.rs) ·
 [Quadratic aggregation](../../../../finstack-quant/margin/src/regulatory/frtb/aggregation.rs) ·
-[Scenario parameters](../../../../finstack-quant/margin/src/regulatory/frtb/params/correlation_scenarios.rs) ·
 [Audit regressions](../../../../finstack-quant/margin/tests/audit_regressions.rs) ·
 [Charge examples](../../../../finstack-quant/margin/tests/frtb_sba_charges.rs) ·
 [FRTB reference index](../../../REFERENCES.md#bcbs-frtb-minimum-capital-requirements).

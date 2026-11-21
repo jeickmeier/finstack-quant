@@ -1,6 +1,6 @@
 //! Spec-type bindings for `finstack_quant_cashflows::builder`.
 
-use crate::bindings::macros::wire_methods;
+use crate::bindings::macros::{py_getters, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::builder::RecoveryModelSpec;
 use pyo3::prelude::*;
@@ -40,30 +40,12 @@ impl PyRecoveryModelSpec {
         Ok(Self { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.recovery", "RecoveryModelSpec.rate")]
-    #[getter]
-    fn rate(&self) -> f64 {
-        self.inner.rate
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.recovery", "RecoveryModelSpec.recovery_lag")]
-    #[getter]
-    fn recovery_lag(&self) -> u32 {
-        self.inner.recovery_lag
-    }
-
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.recovery", "RecoveryModelSpec.with_severity_vector")]
     #[pyo3(text_signature = "(self, severity_vector)")]
     fn with_severity_vector(&self, severity_vector: Vec<f64>) -> PyResult<Self> {
         let inner = self.inner.clone().with_severity_vector(severity_vector);
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
-    }
-
-    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.recovery", "RecoveryModelSpec.severity_vector")]
-    #[getter]
-    fn severity_vector(&self) -> Option<Vec<f64>> {
-        self.inner.severity_vector.clone()
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.recovery", "RecoveryModelSpec.recovery_rate")]
@@ -85,3 +67,14 @@ impl PyRecoveryModelSpec {
         repr_from_serde("RecoveryModelSpec", &self.inner)
     }
 }
+
+py_getters!(PyRecoveryModelSpec |s| {
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.recovery", "RecoveryModelSpec.rate")]
+    rate -> f64 = s.inner.rate;
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.recovery", "RecoveryModelSpec.recovery_lag")]
+    recovery_lag -> u32 = s.inner.recovery_lag;
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._specs.recovery", "RecoveryModelSpec.severity_vector")]
+    severity_vector -> Option<Vec<f64>> = s.inner.severity_vector.clone();
+});

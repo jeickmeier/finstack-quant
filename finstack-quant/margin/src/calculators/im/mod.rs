@@ -45,21 +45,3 @@ pub(crate) fn require_im_exposure_base(
         ))
     })
 }
-
-/// External IM input (CCP feed or internal VaR/ES model).
-pub trait ExternalImSource: Send + Sync {
-    /// Return the externally sourced IM amount for `instrument`, if
-    /// available. Returning `None` causes the calculator to fall back to
-    /// its conservative proxy.
-    fn external_initial_margin(
-        &self,
-        instrument: &dyn Marginable,
-        context: &MarketContext,
-        as_of: Date,
-    ) -> Option<Money>;
-
-    /// Optional MPOR override in calendar days.
-    fn external_mpor_days(&self) -> Option<u32> {
-        None
-    }
-}

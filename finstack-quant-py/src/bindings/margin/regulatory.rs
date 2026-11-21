@@ -12,12 +12,12 @@ use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::parse_label;
 use crate::bindings::json_bridge::serde_to_py;
-use crate::bindings::macros::tabular_methods;
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
 use crate::bindings::module_utils::parse_currency;
 use crate::bindings::table_builders::{
     serde_object_to_single_row_arrow_table, serde_rows_to_arrow_table,
 };
-use crate::errors::{core_to_py, display_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_margin::regulatory::{
     frtb::{
         CorrelationScenario, DrcPosition, FrtbRiskClass, FrtbSbaEngine, FrtbSbaResult,
@@ -101,6 +101,136 @@ impl PyFrtbSensitivities {
     }
 }
 
+wire_methods!(PyFrtbSensitivities, FrtbSensitivities, "FrtbSensitivities");
+py_getters!(PyFrtbSensitivities |s| {
+    /// Base/reporting currency code.
+    base_currency -> String = s.inner.base_currency.to_string();
+});
+
+macro_rules! frtb_adders {
+    (
+        ccy_amount: [ $( $(#[$ca_doc:meta])* $ca_fn:ident ),+ $(,)? ],
+        delta5: [ $( $(#[$d5_doc:meta])* $d5_fn:ident($d5_id:ident) ),+ $(,)? ],
+        vega4: [ $( $(#[$v4_doc:meta])* $v4_fn:ident($v4_id:ident) ),+ $(,)? ],
+        cvr4: [ $( $(#[$c4_doc:meta])* $c4_fn:ident($c4_id:ident) ),+ $(,)? ],
+        eq3: [ $( $(#[$e3_doc:meta])* $e3_fn:ident ),+ $(,)? ],
+    ) => {
+        #[pymethods]
+        impl PyFrtbSensitivities {
+            $(
+                $(#[$ca_doc])*
+                #[pyo3(signature = (currency, amount))]
+                fn $ca_fn(&mut self, currency: &str, amount: f64) -> PyResult<()> {
+                    let ccy = parse_currency(currency)?;
+                    self.inner.$ca_fn(ccy, amount);
+                    Ok(())
+                }
+            )+
+            $(
+                $(#[$d5_doc])*
+                #[pyo3(signature = ($d5_id, bucket, tenor, basis, amount))]
+                fn $d5_fn(&mut self, $d5_id: &str, bucket: u8, tenor: &str, basis: &str, amount: f64) {
+                    self.inner.$d5_fn($d5_id, bucket, tenor, basis, amount);
+                }
+            )+
+            $(
+                $(#[$v4_doc])*
+                #[pyo3(signature = ($v4_id, bucket, maturity, amount))]
+                fn $v4_fn(&mut self, $v4_id: &str, bucket: u8, maturity: &str, amount: f64) {
+                    self.inner.$v4_fn($v4_id, bucket, maturity, amount);
+                }
+            )+
+            $(
+                $(#[$c4_doc])*
+                #[pyo3(signature = ($c4_id, bucket, cvr_up, cvr_down))]
+                fn $c4_fn(&mut self, $c4_id: &str, bucket: u8, cvr_up: f64, cvr_down: f64) {
+                    self.inner.$c4_fn($c4_id, bucket, cvr_up, cvr_down);
+                }
+            )+
+            $(
+                $(#[$e3_doc])*
+                #[pyo3(signature = (underlier, bucket, amount))]
+                fn $e3_fn(&mut self, underlier: &str, bucket: u8, amount: f64) {
+                    self.inner.$e3_fn(underlier, bucket, amount);
+                }
+            )+
+        }
+    };
+}
+
+frtb_adders!(
+    ccy_amount: [
+        /// Add a GIRR inflation delta: ``amount`` is base-currency P&L per 1
+        /// percentage point of inflation shift. Raises ``ValueError`` for an
+        /// unknown currency.
+        add_girr_inflation_delta,
+        /// Add a GIRR cross-currency basis delta: ``amount`` is base-currency
+        /// P&L per 1 percentage point of basis shift for ``currency``. Raises
+        /// ``ValueError`` for an unknown currency.
+        add_girr_xccy_basis_delta,
+    ],
+    delta5: [
+        /// Add a CSR non-securitisation delta: ``amount`` is base-currency P&L
+        /// per percentage-point spread move (100 times CS01); ``bucket`` is the 1-based CSR
+        /// non-sec bucket (MAR21.51).
+        add_csr_nonsec_delta(issuer),
+        /// Add a CSR securitisation (CTP) delta: ``amount`` is base-currency
+        /// P&L per percentage-point spread move (100 times CS01); ``bucket`` is the 1-based
+        /// sec-CTP bucket (MAR21.59).
+        add_csr_sec_ctp_delta(tranche),
+        /// Add a CSR securitisation (non-CTP) delta: ``amount`` is base-currency
+        /// P&L per percentage-point spread move (100 times CS01); ``bucket`` is the 1-based
+        /// sec non-CTP bucket (MAR21.64).
+        add_csr_sec_nonctp_delta(tranche),
+        /// Add a commodity delta: ``amount`` is base-currency P&L per 1
+        /// percentage point move in the commodity price at ``tenor``; ``bucket``
+        /// is the 1-based commodity bucket (MAR21.82).
+        add_commodity_delta(name),
+    ],
+    vega4: [
+        /// Add a CSR non-securitisation vega: ``amount`` is base-currency P&L
+        /// as volatility-scaled vega (sigma times dV/dsigma) at option ``maturity``.
+        add_csr_nonsec_vega(issuer),
+        /// Add a CSR securitisation (CTP) vega: ``amount`` is base-currency P&L
+        /// as volatility-scaled vega (sigma times dV/dsigma) at option ``maturity``.
+        add_csr_sec_ctp_vega(tranche),
+        /// Add a CSR securitisation (non-CTP) vega: ``amount`` is base-currency
+        /// P&L as volatility-scaled vega (sigma times dV/dsigma) at option ``maturity``.
+        add_csr_sec_nonctp_vega(tranche),
+        /// Add a commodity vega: ``amount`` is base-currency P&L per unit
+        /// implied-volatility move at option ``maturity``.
+        add_commodity_vega(name),
+        /// Add an equity vega: ``amount`` is base-currency P&L per unit
+        /// implied-volatility move at option ``maturity``.
+        add_equity_vega(underlier),
+    ],
+    cvr4: [
+        /// Add a CSR non-securitisation curvature pair (up / down shocked P&L
+        /// positions in base currency).
+        add_csr_nonsec_curvature(issuer),
+        /// Add a CSR securitisation (CTP) curvature pair (up / down shocked P&L
+        /// positions in base currency).
+        add_csr_sec_ctp_curvature(tranche),
+        /// Add a CSR securitisation (non-CTP) curvature pair (up / down shocked
+        /// P&L positions in base currency).
+        add_csr_sec_nonctp_curvature(tranche),
+        /// Add a commodity curvature pair (up / down shocked P&L positions in
+        /// base currency).
+        add_commodity_curvature(name),
+        /// Add an equity curvature pair (up / down shocked P&L positions in base
+        /// currency).
+        add_equity_curvature(underlier),
+    ],
+    eq3: [
+        /// Add an equity delta: ``amount`` is base-currency P&L per 1 percentage
+        /// point move in the underlier; ``bucket`` is the 1-based equity bucket
+        /// (MAR21.72).
+        add_equity_delta,
+        /// Add equity repo-rate P&L per one percentage-point rate shift.
+        add_equity_repo_delta,
+    ],
+);
+
 #[pymethods]
 impl PyFrtbSensitivities {
     /// Create an empty sensitivity container.
@@ -114,29 +244,6 @@ impl PyFrtbSensitivities {
         Ok(Self {
             inner: FrtbSensitivities::new(ccy),
         })
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Construct from a JSON serialization of `FrtbSensitivities`; raises
-    /// ``ValueError`` on malformed input.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: FrtbSensitivities = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to a JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
     /// Bulk-load sensitivities from the long-format table ``to_pandas`` /
@@ -192,142 +299,6 @@ impl PyFrtbSensitivities {
             .map_err(core_to_py)
     }
 
-    /// Add a GIRR inflation delta: ``amount`` is base-currency P&L per 1
-    /// percentage point of inflation shift. Raises ``ValueError`` for an
-    /// unknown currency.
-    #[pyo3(signature = (currency, amount))]
-    fn add_girr_inflation_delta(&mut self, currency: &str, amount: f64) -> PyResult<()> {
-        let ccy = parse_currency(currency)?;
-        self.inner.add_girr_inflation_delta(ccy, amount);
-        Ok(())
-    }
-
-    /// Add a GIRR cross-currency basis delta: ``amount`` is base-currency
-    /// P&L per 1 percentage point of basis shift for ``currency``. Raises
-    /// ``ValueError`` for an unknown currency.
-    #[pyo3(signature = (currency, amount))]
-    fn add_girr_xccy_basis_delta(&mut self, currency: &str, amount: f64) -> PyResult<()> {
-        let ccy = parse_currency(currency)?;
-        self.inner.add_girr_xccy_basis_delta(ccy, amount);
-        Ok(())
-    }
-
-    /// Add a CSR non-securitisation delta: ``amount`` is base-currency P&L
-    /// per percentage-point spread move (100 times CS01); ``bucket`` is the 1-based CSR
-    /// non-sec bucket (MAR21.51).
-    #[pyo3(signature = (issuer, bucket, tenor, basis, amount))]
-    fn add_csr_nonsec_delta(
-        &mut self,
-        issuer: &str,
-        bucket: u8,
-        tenor: &str,
-        basis: &str,
-        amount: f64,
-    ) {
-        self.inner
-            .add_csr_nonsec_delta(issuer, bucket, tenor, basis, amount);
-    }
-
-    /// Add a CSR non-securitisation vega: ``amount`` is base-currency P&L
-    /// as volatility-scaled vega (sigma times dV/dsigma) at option ``maturity``.
-    #[pyo3(signature = (issuer, bucket, maturity, amount))]
-    fn add_csr_nonsec_vega(&mut self, issuer: &str, bucket: u8, maturity: &str, amount: f64) {
-        self.inner
-            .add_csr_nonsec_vega(issuer, bucket, maturity, amount);
-    }
-
-    /// Add a CSR non-securitisation curvature pair (up / down shocked P&L
-    /// positions in base currency).
-    #[pyo3(signature = (issuer, bucket, cvr_up, cvr_down))]
-    fn add_csr_nonsec_curvature(&mut self, issuer: &str, bucket: u8, cvr_up: f64, cvr_down: f64) {
-        self.inner
-            .add_csr_nonsec_curvature(issuer, bucket, cvr_up, cvr_down);
-    }
-
-    /// Add a CSR securitisation (CTP) delta: ``amount`` is base-currency
-    /// P&L per percentage-point spread move (100 times CS01); ``bucket`` is the 1-based
-    /// sec-CTP bucket (MAR21.59).
-    #[pyo3(signature = (tranche, bucket, tenor, basis, amount))]
-    fn add_csr_sec_ctp_delta(
-        &mut self,
-        tranche: &str,
-        bucket: u8,
-        tenor: &str,
-        basis: &str,
-        amount: f64,
-    ) {
-        self.inner
-            .add_csr_sec_ctp_delta(tranche, bucket, tenor, basis, amount);
-    }
-
-    /// Add a CSR securitisation (CTP) vega: ``amount`` is base-currency P&L
-    /// as volatility-scaled vega (sigma times dV/dsigma) at option ``maturity``.
-    #[pyo3(signature = (tranche, bucket, maturity, amount))]
-    fn add_csr_sec_ctp_vega(&mut self, tranche: &str, bucket: u8, maturity: &str, amount: f64) {
-        self.inner
-            .add_csr_sec_ctp_vega(tranche, bucket, maturity, amount);
-    }
-
-    /// Add a CSR securitisation (CTP) curvature pair (up / down shocked P&L
-    /// positions in base currency).
-    #[pyo3(signature = (tranche, bucket, cvr_up, cvr_down))]
-    fn add_csr_sec_ctp_curvature(&mut self, tranche: &str, bucket: u8, cvr_up: f64, cvr_down: f64) {
-        self.inner
-            .add_csr_sec_ctp_curvature(tranche, bucket, cvr_up, cvr_down);
-    }
-
-    /// Add a CSR securitisation (non-CTP) delta: ``amount`` is base-currency
-    /// P&L per percentage-point spread move (100 times CS01); ``bucket`` is the 1-based
-    /// sec non-CTP bucket (MAR21.64).
-    #[pyo3(signature = (tranche, bucket, tenor, basis, amount))]
-    fn add_csr_sec_nonctp_delta(
-        &mut self,
-        tranche: &str,
-        bucket: u8,
-        tenor: &str,
-        basis: &str,
-        amount: f64,
-    ) {
-        self.inner
-            .add_csr_sec_nonctp_delta(tranche, bucket, tenor, basis, amount);
-    }
-
-    /// Add a CSR securitisation (non-CTP) vega: ``amount`` is base-currency
-    /// P&L as volatility-scaled vega (sigma times dV/dsigma) at option ``maturity``.
-    #[pyo3(signature = (tranche, bucket, maturity, amount))]
-    fn add_csr_sec_nonctp_vega(&mut self, tranche: &str, bucket: u8, maturity: &str, amount: f64) {
-        self.inner
-            .add_csr_sec_nonctp_vega(tranche, bucket, maturity, amount);
-    }
-
-    /// Add a CSR securitisation (non-CTP) curvature pair (up / down shocked
-    /// P&L positions in base currency).
-    #[pyo3(signature = (tranche, bucket, cvr_up, cvr_down))]
-    fn add_csr_sec_nonctp_curvature(
-        &mut self,
-        tranche: &str,
-        bucket: u8,
-        cvr_up: f64,
-        cvr_down: f64,
-    ) {
-        self.inner
-            .add_csr_sec_nonctp_curvature(tranche, bucket, cvr_up, cvr_down);
-    }
-
-    /// Add an equity delta: ``amount`` is base-currency P&L per 1 percentage
-    /// point move in the underlier; ``bucket`` is the 1-based equity bucket
-    /// (MAR21.72).
-    #[pyo3(signature = (underlier, bucket, amount))]
-    fn add_equity_delta(&mut self, underlier: &str, bucket: u8, amount: f64) {
-        self.inner.add_equity_delta(underlier, bucket, amount);
-    }
-
-    /// Add equity repo-rate P&L per one percentage-point rate shift.
-    #[pyo3(signature = (underlier, bucket, amount))]
-    fn add_equity_repo_delta(&mut self, underlier: &str, bucket: u8, amount: f64) {
-        self.inner.add_equity_repo_delta(underlier, bucket, amount);
-    }
-
     /// Add an FX delta for the pair ``(ccy1, ccy2)``: ``amount`` is
     /// base-currency P&L per 1 percentage point move in the exchange rate.
     /// Raises ``ValueError`` for an unknown currency.
@@ -337,38 +308,6 @@ impl PyFrtbSensitivities {
         let c2 = parse_currency(ccy2)?;
         self.inner.add_fx_delta(c1, c2, amount);
         Ok(())
-    }
-
-    /// Add a commodity delta: ``amount`` is base-currency P&L per 1
-    /// percentage point move in the commodity price at ``tenor``; ``bucket``
-    /// is the 1-based commodity bucket (MAR21.82).
-    #[pyo3(signature = (name, bucket, tenor, basis, amount))]
-    fn add_commodity_delta(
-        &mut self,
-        name: &str,
-        bucket: u8,
-        tenor: &str,
-        basis: &str,
-        amount: f64,
-    ) {
-        self.inner
-            .add_commodity_delta(name, bucket, tenor, basis, amount);
-    }
-
-    /// Add a commodity vega: ``amount`` is base-currency P&L per unit
-    /// implied-volatility move at option ``maturity``.
-    #[pyo3(signature = (name, bucket, maturity, amount))]
-    fn add_commodity_vega(&mut self, name: &str, bucket: u8, maturity: &str, amount: f64) {
-        self.inner
-            .add_commodity_vega(name, bucket, maturity, amount);
-    }
-
-    /// Add a commodity curvature pair (up / down shocked P&L positions in
-    /// base currency).
-    #[pyo3(signature = (name, bucket, cvr_up, cvr_down))]
-    fn add_commodity_curvature(&mut self, name: &str, bucket: u8, cvr_up: f64, cvr_down: f64) {
-        self.inner
-            .add_commodity_curvature(name, bucket, cvr_up, cvr_down);
     }
 
     /// Add a GIRR vega: ``amount`` is base-currency P&L per unit
@@ -389,14 +328,6 @@ impl PyFrtbSensitivities {
         Ok(())
     }
 
-    /// Add an equity vega: ``amount`` is base-currency P&L per unit
-    /// implied-volatility move at option ``maturity``.
-    #[pyo3(signature = (underlier, bucket, maturity, amount))]
-    fn add_equity_vega(&mut self, underlier: &str, bucket: u8, maturity: &str, amount: f64) {
-        self.inner
-            .add_equity_vega(underlier, bucket, maturity, amount);
-    }
-
     /// Add an FX vega: ``amount`` is base-currency P&L per unit
     /// implied-volatility move at option ``maturity``. Raises ``ValueError``
     /// for an unknown currency.
@@ -415,14 +346,6 @@ impl PyFrtbSensitivities {
         let ccy = parse_currency(currency)?;
         self.inner.add_girr_curvature(ccy, cvr_up, cvr_down);
         Ok(())
-    }
-
-    /// Add an equity curvature pair (up / down shocked P&L positions in base
-    /// currency).
-    #[pyo3(signature = (underlier, bucket, cvr_up, cvr_down))]
-    fn add_equity_curvature(&mut self, underlier: &str, bucket: u8, cvr_up: f64, cvr_down: f64) {
-        self.inner
-            .add_equity_curvature(underlier, bucket, cvr_up, cvr_down);
     }
 
     /// Add an FX curvature pair (up / down shocked P&L positions in base
@@ -477,12 +400,6 @@ impl PyFrtbSensitivities {
     fn add_rrao_position(&mut self, instrument_id: &str, notional: f64, is_exotic: bool) {
         self.inner
             .add_rrao_position(instrument_id, notional, is_exotic);
-    }
-
-    /// Base/reporting currency code.
-    #[getter]
-    fn base_currency(&self) -> String {
-        self.inner.base_currency.to_string()
     }
 
     /// Summarise the container by populated bucket counts.
@@ -542,6 +459,23 @@ pub struct PyFrtbSbaEngine {
     inner: FrtbSbaEngine,
 }
 
+py_getters!(PyFrtbSbaEngine |s| {
+    /// Correlation scenario labels evaluated, in configured order.
+    scenarios -> Vec<String> = s
+        .inner
+        .scenarios()
+        .iter()
+        .map(|sc| serde_label(*sc))
+        .collect();
+    /// Risk-class labels included, in configured order.
+    risk_classes -> Vec<String> = s
+        .inner
+        .risk_classes()
+        .iter()
+        .map(|rc| serde_label(*rc))
+        .collect();
+});
+
 #[pymethods]
 impl PyFrtbSbaEngine {
     /// Create an FRTB SBA engine.
@@ -579,26 +513,6 @@ impl PyFrtbSbaEngine {
             .transpose()?;
         let inner = FrtbSbaEngine::with_selection(scenarios, risk_classes).map_err(core_to_py)?;
         Ok(Self { inner })
-    }
-
-    /// Correlation scenario labels evaluated, in configured order.
-    #[getter]
-    fn scenarios(&self) -> Vec<String> {
-        self.inner
-            .scenarios()
-            .iter()
-            .map(|s| serde_label(*s))
-            .collect()
-    }
-
-    /// Risk-class labels included, in configured order.
-    #[getter]
-    fn risk_classes(&self) -> Vec<String> {
-        self.inner
-            .risk_classes()
-            .iter()
-            .map(|rc| serde_label(*rc))
-            .collect()
     }
 
     /// Calculate the FRTB SBA charge for a sensitivity portfolio.
@@ -644,6 +558,28 @@ impl PyFrtbSbaEngine {
 pub struct PySaCcrTrade {
     pub(super) inner: SaCcrTrade,
 }
+
+wire_methods!(PySaCcrTrade, SaCcrTrade, "SaCcrTrade", validate);
+py_getters!(PySaCcrTrade |s| {
+    /// SA-CCR asset class label (``interest_rate``, ``foreign_exchange``,
+    /// ``credit``, ``equity``, or ``commodity``).
+    asset_class -> String = serde_label(s.inner.asset_class);
+    /// Supervisory category wire label, or None for IR and FX.
+    supervisory_category -> Option<String> = s.inner.supervisory_category.map(serde_label);
+    /// Trade notional, in the netting set's reporting currency.
+    notional -> f64 = s.inner.notional;
+    /// ``+1.0`` for long, ``-1.0`` for short.
+    direction -> f64 = s.inner.direction;
+    /// Supervisory delta in ``[-1, 1]``.
+    supervisory_delta -> f64 = s.inner.supervisory_delta;
+    /// Current mark-to-market value, in the netting set's reporting currency.
+    mtm -> f64 = s.inner.mtm;
+    /// Whether the trade is an option.
+    is_option -> bool = s.inner.is_option;
+    /// Option type label (``call_long``, ``call_short``, ``put_long``,
+    /// ``put_short``) or ``None`` for a linear trade.
+    option_type -> Option<String> = s.inner.option_type.map(serde_label);
+});
 
 const TRADE_COLUMNS: &[(&str, &str)] = &[
     ("trade_id", "str"),
@@ -733,30 +669,6 @@ impl PySaCcrTrade {
         Ok(Self { inner })
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Construct and validate from the canonical `SaCcrTrade` JSON; raises
-    /// ``ValueError`` on malformed input or an incoherent trade.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: SaCcrTrade = serde_json::from_str(json).map_err(display_to_py)?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to a JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// Build one validated trade per row of a trade tape.
     ///
     /// ``frame`` must carry the columns ``to_pandas`` / ``to_arrow`` emits (``trade_id``,
@@ -804,19 +716,6 @@ impl PySaCcrTrade {
         &self.inner.trade_id
     }
 
-    /// SA-CCR asset class label (``interest_rate``, ``foreign_exchange``,
-    /// ``credit``, ``equity``, or ``commodity``).
-    #[getter]
-    fn asset_class(&self) -> String {
-        serde_label(self.inner.asset_class)
-    }
-
-    /// Supervisory category wire label, or None for IR and FX.
-    #[getter]
-    fn supervisory_category(&self) -> Option<String> {
-        self.inner.supervisory_category.map(serde_label)
-    }
-
     /// Option expiry as a date, distinct from the underlying end date.
     #[getter]
     fn option_maturity_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -824,12 +723,6 @@ impl PySaCcrTrade {
             .option_maturity_date
             .map(|date| date_to_py(py, date))
             .transpose()
-    }
-
-    /// Trade notional, in the netting set's reporting currency.
-    #[getter]
-    fn notional(&self) -> f64 {
-        self.inner.notional
     }
 
     /// Trade start date as ``datetime.date``.
@@ -854,37 +747,6 @@ impl PySaCcrTrade {
     #[getter]
     fn hedging_set(&self) -> &str {
         &self.inner.hedging_set
-    }
-
-    /// ``+1.0`` for long, ``-1.0`` for short.
-    #[getter]
-    fn direction(&self) -> f64 {
-        self.inner.direction
-    }
-
-    /// Supervisory delta in ``[-1, 1]``.
-    #[getter]
-    fn supervisory_delta(&self) -> f64 {
-        self.inner.supervisory_delta
-    }
-
-    /// Current mark-to-market value, in the netting set's reporting currency.
-    #[getter]
-    fn mtm(&self) -> f64 {
-        self.inner.mtm
-    }
-
-    /// Whether the trade is an option.
-    #[getter]
-    fn is_option(&self) -> bool {
-        self.inner.is_option
-    }
-
-    /// Option type label (``call_long``, ``call_short``, ``put_long``,
-    /// ``put_short``) or ``None`` for a linear trade.
-    #[getter]
-    fn option_type(&self) -> Option<String> {
-        self.inner.option_type.map(serde_label)
     }
 
     fn __repr__(&self) -> String {
@@ -925,6 +787,30 @@ tabular_methods!(PySaCcrTrade);
 pub struct PySaCcrNettingSetConfig {
     pub(super) inner: SaCcrNettingSetConfig,
 }
+
+wire_methods!(
+    PySaCcrNettingSetConfig,
+    SaCcrNettingSetConfig,
+    "SaCcrNettingSetConfig"
+);
+py_getters!(PySaCcrNettingSetConfig |s| {
+    /// Netting-set key.
+    netting_set_id -> PyNettingSetId = PyNettingSetId {
+        inner: s.inner.netting_set_id.clone(),
+    };
+    /// Whether the netting set is margined (a CSA with an MPoR applies).
+    is_margined -> bool = s.inner.is_margined;
+    /// Net variation margin held against the netting set, excluding NICA, in its reporting currency.
+    collateral -> f64 = s.inner.collateral;
+    /// CSA threshold (TH) in the reporting currency.
+    threshold -> f64 = s.inner.threshold;
+    /// Minimum transfer amount in the reporting currency.
+    mta -> f64 = s.inner.mta;
+    /// Net independent collateral amount in the reporting currency.
+    nica -> f64 = s.inner.nica;
+    /// Margin period of risk in business days.
+    mpor_days -> u32 = s.inner.mpor_days;
+});
 
 #[pymethods]
 impl PySaCcrNettingSetConfig {
@@ -1008,29 +894,6 @@ impl PySaCcrNettingSetConfig {
         Ok(Self { inner })
     }
 
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Construct from a JSON serialization of `SaCcrNettingSetConfig`;
-    /// raises ``ValueError`` on malformed input.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: SaCcrNettingSetConfig = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to a JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// Validate the collateral and margin-agreement terms; raises
     /// ``ValueError`` on a non-finite amount, negative threshold/MTA, or a
     /// margined set with zero MPOR.
@@ -1042,50 +905,6 @@ impl PySaCcrNettingSetConfig {
     #[getter]
     fn as_of<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.as_of)
-    }
-
-    /// Netting-set key.
-    #[getter]
-    fn netting_set_id(&self) -> PyNettingSetId {
-        PyNettingSetId {
-            inner: self.inner.netting_set_id.clone(),
-        }
-    }
-
-    /// Whether the netting set is margined (a CSA with an MPoR applies).
-    #[getter]
-    fn is_margined(&self) -> bool {
-        self.inner.is_margined
-    }
-
-    /// Net variation margin held against the netting set, excluding NICA, in its reporting currency.
-    #[getter]
-    fn collateral(&self) -> f64 {
-        self.inner.collateral
-    }
-
-    /// CSA threshold (TH) in the reporting currency.
-    #[getter]
-    fn threshold(&self) -> f64 {
-        self.inner.threshold
-    }
-
-    /// Minimum transfer amount in the reporting currency.
-    #[getter]
-    fn mta(&self) -> f64 {
-        self.inner.mta
-    }
-
-    /// Net independent collateral amount in the reporting currency.
-    #[getter]
-    fn nica(&self) -> f64 {
-        self.inner.nica
-    }
-
-    /// Margin period of risk in business days.
-    #[getter]
-    fn mpor_days(&self) -> u32 {
-        self.inner.mpor_days
     }
 
     fn __repr__(&self) -> String {
@@ -1116,12 +935,10 @@ pub struct PySaCcrEngine {
     inner: SaCcrEngine,
 }
 
-fn build_engine(alpha: Option<f64>) -> PyResult<SaCcrEngine> {
-    match alpha {
-        Some(a) => SaCcrEngine::with_alpha(a).map_err(core_to_py),
-        None => Ok(SaCcrEngine::default()),
-    }
-}
+py_getters!(PySaCcrEngine |s| {
+    /// Alpha multiplier applied to ``RC + PFE``.
+    alpha -> f64 = s.inner.alpha();
+});
 
 #[pymethods]
 impl PySaCcrEngine {
@@ -1130,15 +947,11 @@ impl PySaCcrEngine {
     #[new]
     #[pyo3(signature = (alpha = None))]
     fn new(alpha: Option<f64>) -> PyResult<Self> {
-        Ok(Self {
-            inner: build_engine(alpha)?,
-        })
-    }
-
-    /// Alpha multiplier applied to ``RC + PFE``.
-    #[getter]
-    fn alpha(&self) -> f64 {
-        self.inner.alpha()
+        let inner = match alpha {
+            Some(a) => SaCcrEngine::with_alpha(a).map_err(core_to_py)?,
+            None => SaCcrEngine::default(),
+        };
+        Ok(Self { inner })
     }
 
     /// Calculate SA-CCR EAD for a netting set and trade list.
@@ -1191,86 +1004,34 @@ impl PyFrtbSbaResult {
     }
 }
 
-#[pymethods]
-impl PyFrtbSbaResult {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from the JSON produced by ``to_json``; raises
-    /// ``ValueError`` on malformed input.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: FrtbSbaResult = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize back to the same JSON shape ``from_json`` accepts.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
+wire_methods!(PyFrtbSbaResult, FrtbSbaResult, "FrtbSbaResult");
+py_getters!(PyFrtbSbaResult |s| {
     /// Total capital charge, in the sensitivity portfolio's base currency.
-    #[getter]
-    fn total(&self) -> f64 {
-        self.inner.total
-    }
-
+    total -> f64 = s.inner.total;
     /// Default Risk Charge (credit + equity jump-to-default).
-    #[getter]
-    fn drc(&self) -> f64 {
-        self.inner.drc
-    }
-
+    drc -> f64 = s.inner.drc;
     /// Residual Risk Add-On.
-    #[getter]
-    fn rrao(&self) -> f64 {
-        self.inner.rrao
-    }
-
+    rrao -> f64 = s.inner.rrao;
     /// Correlation scenario that produced the binding charge
     /// (``"low"``, ``"medium"``, or ``"high"``).
-    #[getter]
-    fn binding_scenario(&self) -> String {
-        serde_label(self.inner.binding_scenario)
-    }
-
+    binding_scenario -> String = serde_label(s.inner.binding_scenario);
     /// Delta risk charge keyed by risk-class wire label (e.g. ``"girr"``).
-    #[getter]
-    fn delta_by_risk_class(&self) -> BTreeMap<String, f64> {
-        Self::labeled(&self.inner.delta_by_risk_class)
-    }
-
+    delta_by_risk_class -> BTreeMap<String, f64> = Self::labeled(&s.inner.delta_by_risk_class);
     /// Vega risk charge keyed by risk-class wire label.
-    #[getter]
-    fn vega_by_risk_class(&self) -> BTreeMap<String, f64> {
-        Self::labeled(&self.inner.vega_by_risk_class)
-    }
-
+    vega_by_risk_class -> BTreeMap<String, f64> = Self::labeled(&s.inner.vega_by_risk_class);
     /// Curvature risk charge keyed by risk-class wire label.
-    #[getter]
-    fn curvature_by_risk_class(&self) -> BTreeMap<String, f64> {
-        Self::labeled(&self.inner.curvature_by_risk_class)
-    }
-
+    curvature_by_risk_class -> BTreeMap<String, f64> = Self::labeled(&s.inner.curvature_by_risk_class);
     /// Delta+vega+curvature charge under each evaluated correlation scenario.
-    #[getter]
-    fn scenario_charges(&self) -> BTreeMap<String, f64> {
-        self.inner
-            .scenario_charges
-            .iter()
-            .map(|(s, v)| (serde_label(*s), *v))
-            .collect()
-    }
+    scenario_charges -> BTreeMap<String, f64> = s
+        .inner
+        .scenario_charges
+        .iter()
+        .map(|(sc, v)| (serde_label(*sc), *v))
+        .collect();
+});
 
+#[pymethods]
+impl PyFrtbSbaResult {
     /// Per-risk-class delta, vega and curvature charges under every evaluated
     /// correlation scenario, as
     /// ``{scenario: {"delta_by_risk_class": {...}, "vega_by_risk_class":
@@ -1407,87 +1168,35 @@ impl PyEadResult {
     }
 }
 
-#[pymethods]
-impl PyEadResult {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from the JSON produced by ``to_json``; raises
-    /// ``ValueError`` on malformed input.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: EadResult = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize back to the same JSON shape ``from_json`` accepts.
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
+wire_methods!(PyEadResult, EadResult, "EadResult");
+py_getters!(PyEadResult |s| {
     /// Exposure at Default: ``alpha * (rc + pfe)``, in the netting set's
     /// reporting currency.
-    #[getter]
-    fn ead(&self) -> f64 {
-        self.inner.ead
-    }
-
+    ead -> f64 = s.inner.ead;
     /// Replacement cost component.
-    #[getter]
-    fn rc(&self) -> f64 {
-        self.inner.rc
-    }
-
+    rc -> f64 = s.inner.rc;
     /// Potential future exposure: ``multiplier * add_on_aggregate``.
-    #[getter]
-    fn pfe(&self) -> f64 {
-        self.inner.pfe
-    }
-
+    pfe -> f64 = s.inner.pfe;
     /// PFE multiplier, which recognises over-collateralization and negative
     /// mark-to-market (1.0 when neither applies, floored at 0.05).
-    #[getter]
-    fn multiplier(&self) -> f64 {
-        self.inner.multiplier
-    }
-
+    multiplier -> f64 = s.inner.multiplier;
     /// Aggregate add-on across asset classes, before the multiplier.
-    #[getter]
-    fn add_on_aggregate(&self) -> f64 {
-        self.inner.add_on_aggregate
-    }
-
+    add_on_aggregate -> f64 = s.inner.add_on_aggregate;
     /// Alpha multiplier (1.4 per BCBS 279 unless overridden on the engine).
-    #[getter]
-    fn alpha(&self) -> f64 {
-        self.inner.alpha
-    }
-
+    alpha -> f64 = s.inner.alpha;
     /// Maturity factor applied to the netting set.
-    #[getter]
-    fn maturity_factor(&self) -> f64 {
-        self.inner.maturity_factor
-    }
-
+    maturity_factor -> f64 = s.inner.maturity_factor;
     /// Add-on keyed by asset-class wire label (e.g. ``"interest_rate"``).
-    #[getter]
-    fn add_on_by_asset_class(&self) -> BTreeMap<String, f64> {
-        self.inner
-            .add_on_by_asset_class
-            .iter()
-            .map(|(ac, v)| (serde_label(*ac), *v))
-            .collect()
-    }
+    add_on_by_asset_class -> BTreeMap<String, f64> = s
+        .inner
+        .add_on_by_asset_class
+        .iter()
+        .map(|(ac, v)| (serde_label(*ac), *v))
+        .collect();
+});
 
+#[pymethods]
+impl PyEadResult {
     /// Policy metadata stamped by the computing layer as a dict: numeric
     /// mode, active rounding context, any applied FX policy and the
     /// parallel-execution flag.

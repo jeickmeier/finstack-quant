@@ -9,8 +9,43 @@ use crate::drawdown::{
     deepest, max_drawdown_duration, mean_drawdown, mean_episode_drawdown, pain_index, ulcer_index,
     worst_episode_depths,
 };
-use crate::returns::{comp_total, validate_cash};
+use crate::returns::{comp_total, validate_cash, validate_confidence};
 use crate::risk_metrics::{self, CagrDayCount};
+
+const SUMMARY_METRICS: [&str; 22] = [
+    "cagr",
+    "mean_return",
+    "volatility",
+    "sharpe",
+    "sortino",
+    "calmar",
+    "max_drawdown",
+    "value_at_risk",
+    "expected_shortfall",
+    "tracking_error",
+    "information_ratio",
+    "skewness",
+    "kurtosis",
+    "geometric_mean",
+    "downside_deviation",
+    "omega_ratio",
+    "gain_to_pain",
+    "ulcer_index",
+    "pain_index",
+    "recovery_factor",
+    "tail_ratio",
+    "r_squared",
+];
+
+fn summary_units() -> serde_json::Value {
+    serde_json::json!({
+        "mean_return": "annual_arithmetic_decimal", "volatility": "annual_decimal",
+        "downside_deviation": "annual_decimal", "sharpe": "annual_ratio", "sortino": "annual_ratio",
+        "geometric_mean": "observation_decimal", "value_at_risk": "observation_signed_decimal",
+        "expected_shortfall": "observation_signed_decimal", "drawdown": "signed_decimal",
+        "kurtosis": "excess"
+    })
+}
 
 /// Divide available finite reward by measured nonnegative risk without a cutoff.
 fn reward_ratio(reward: f64, risk: f64) -> Result<f64> {
@@ -52,10 +87,6 @@ fn excess_reward(growth: f64, cash: f64) -> Result<f64> {
 }
 
 impl Performance {
-    fn scalar_map(&self, mut calculate: impl FnMut(usize) -> Result<f64>) -> Result<Vec<f64>> {
-        (0..self.ticker_names.len()).map(&mut calculate).collect()
-    }
-
     /// Dated compounded annual growth for each ticker's active holding interval.
     ///
     /// # Arguments
@@ -74,7 +105,7 @@ impl Performance {
     pub fn cagr(&self, day_count: CagrDayCount, context: DayCountContext<'_>) -> Result<Vec<f64>> {
         // Validate required context even when the selected window is empty.
         risk_metrics::validate_cagr_context(day_count, context)?;
-        self.scalar_map(|i| {
+        self.try_map_tickers(|i| {
             let Some((start, end)) = self.active_holding_period_for_ticker(i) else {
                 return Ok(f64::NAN);
             };
@@ -98,7 +129,7 @@ impl Performance {
     /// Rejects absent required frequency or unrepresentable calculated means.
     pub fn mean_return(&self, annualize: bool) -> Result<Vec<f64>> {
         let ann = if annualize { self.ann()? } else { 1.0 };
-        self.scalar_map(|i| risk_metrics::mean_return(self.active_returns(i), annualize, ann))
+        self.try_map_tickers(|i| risk_metrics::mean_return(self.active_returns(i), annualize, ann))
     }
 
     /// Sample standard deviation in explicitly selected observation or annual units.
@@ -117,7 +148,7 @@ impl Performance {
     /// Rejects absent required frequency and unrepresentable calculated risk.
     pub fn volatility(&self, annualize: bool) -> Result<Vec<f64>> {
         let ann = if annualize { self.ann()? } else { 1.0 };
-        self.scalar_map(|i| crate::volatility(self.active_returns(i), ann))
+        self.try_map_tickers(|i| crate::volatility(self.active_returns(i), ann))
     }
 
     /// Annualized arithmetic excess-return Sharpe using sample standard deviation.
@@ -138,7 +169,7 @@ impl Performance {
     pub fn sharpe(&self, risk_free_rate: f64) -> Result<Vec<f64>> {
         validate_cash(risk_free_rate)?;
         let ann = self.ann()?;
-        self.scalar_map(|i| crate::sharpe(self.active_returns(i), risk_free_rate, ann))
+        self.try_map_tickers(|i| crate::sharpe(self.active_returns(i), risk_free_rate, ann))
     }
 
     /// Annualized Sortino with all observations in its downside denominator.
@@ -157,7 +188,7 @@ impl Performance {
     /// Rejects invalid MAR, missing frequency and numerical failures.
     pub fn sortino(&self, mar: f64) -> Result<Vec<f64>> {
         let ann = self.ann()?;
-        self.scalar_map(|i| crate::sortino(self.active_returns(i), mar, ann))
+        self.try_map_tickers(|i| crate::sortino(self.active_returns(i), mar, ann))
     }
 
     /// ACT/365F CAGR divided by maximum drawdown magnitude over the active window.
@@ -172,7 +203,9 @@ impl Performance {
     /// Propagates growth and requested-ratio calculation failures.
     pub fn calmar(&self) -> Result<Vec<f64>> {
         let growth = self.cagr(CagrDayCount::default(), DayCountContext::default())?;
-        self.scalar_map(|i| reward_ratio(growth[i], deepest(self.active_drawdown_values(i)).abs()))
+        self.try_map_tickers(|i| {
+            reward_ratio(growth[i], deepest(self.active_drawdown_values(i)).abs())
+        })
     }
 
     /// Deepest signed decimal drawdown per ticker; empty histories are NaN.
@@ -190,7 +223,7 @@ impl Performance {
     ///
     /// Nonpositive decimal means in ticker order; empty histories are NaN.
     pub fn mean_drawdown(&self) -> Result<Vec<f64>> {
-        self.scalar_map(|i| mean_drawdown(self.active_drawdown_values(i)))
+        self.try_map_tickers(|i| mean_drawdown(self.active_drawdown_values(i)))
     }
 
     /// Signed historical R-7 return VaR in native observation-period units.
@@ -207,8 +240,8 @@ impl Performance {
     ///
     /// Rejects invalid confidence and unrepresentable requested estimates.
     pub fn value_at_risk(&self, confidence: f64) -> Result<Vec<f64>> {
-        Self::ensure_confidence(confidence)?;
-        self.scalar_map(|i| risk_metrics::value_at_risk(self.active_returns(i), confidence))
+        validate_confidence(confidence)?;
+        self.try_map_tickers(|i| risk_metrics::value_at_risk(self.active_returns(i), confidence))
     }
 
     /// Signed exact fractional empirical lower-tail expected shortfall.
@@ -226,8 +259,10 @@ impl Performance {
     ///
     /// Rejects invalid confidence and unrepresentable requested tail averages.
     pub fn expected_shortfall(&self, confidence: f64) -> Result<Vec<f64>> {
-        Self::ensure_confidence(confidence)?;
-        self.scalar_map(|i| risk_metrics::expected_shortfall(self.active_returns(i), confidence))
+        validate_confidence(confidence)?;
+        self.try_map_tickers(|i| {
+            risk_metrics::expected_shortfall(self.active_returns(i), confidence)
+        })
     }
 
     /// Ratio of absolute upper and lower empirical R-7 quantiles.
@@ -245,8 +280,8 @@ impl Performance {
     ///
     /// Rejects invalid confidence and numerical calculation failures.
     pub fn tail_ratio(&self, confidence: f64) -> Result<Vec<f64>> {
-        Self::ensure_confidence(confidence)?;
-        self.scalar_map(|i| risk_metrics::tail_ratio(self.active_returns(i), confidence))
+        validate_confidence(confidence)?;
+        self.try_map_tickers(|i| risk_metrics::tail_ratio(self.active_returns(i), confidence))
     }
 
     /// Root-mean-square endpoint drawdown, excluding the opening baseline.
@@ -255,7 +290,7 @@ impl Performance {
     ///
     /// Nonnegative decimal Ulcer indices in ticker order; empty histories are NaN.
     pub fn ulcer_index(&self) -> Result<Vec<f64>> {
-        self.scalar_map(|i| ulcer_index(self.active_drawdown_values(i)))
+        self.try_map_tickers(|i| ulcer_index(self.active_drawdown_values(i)))
     }
 
     /// Fisher-adjusted Type-2 sample skewness for each ticker.
@@ -269,7 +304,7 @@ impl Performance {
     ///
     /// Propagates numerical failures while evaluating the requested statistic.
     pub fn skewness(&self) -> Result<Vec<f64>> {
-        self.scalar_map(|i| risk_metrics::skewness(self.active_returns(i)))
+        self.try_map_tickers(|i| risk_metrics::skewness(self.active_returns(i)))
     }
 
     /// Fisher-adjusted Type-2 sample excess kurtosis for each ticker.
@@ -283,7 +318,7 @@ impl Performance {
     ///
     /// Propagates numerical failures while evaluating the requested statistic.
     pub fn kurtosis(&self) -> Result<Vec<f64>> {
-        self.scalar_map(|i| risk_metrics::kurtosis(self.active_returns(i)))
+        self.try_map_tickers(|i| risk_metrics::kurtosis(self.active_returns(i)))
     }
 
     /// Geometric mean simple investment return per observation.
@@ -297,7 +332,7 @@ impl Performance {
     ///
     /// Propagates unrepresentable requested growth calculations.
     pub fn geometric_mean(&self) -> Result<Vec<f64>> {
-        self.scalar_map(|i| risk_metrics::geometric_mean(self.active_returns(i)))
+        self.try_map_tickers(|i| risk_metrics::geometric_mean(self.active_returns(i)))
     }
 
     /// Annualized RMS shortfall from the explicit observation-period MAR.
@@ -316,9 +351,7 @@ impl Performance {
     /// Rejects invalid MAR, missing frequency and unrepresentable risk.
     pub fn downside_deviation(&self, mar: f64) -> Result<Vec<f64>> {
         let ann = self.ann()?;
-        self.scalar_map(|i| {
-            risk_metrics::downside_deviation(self.active_returns(i), mar, true, ann)
-        })
+        self.try_map_tickers(|i| risk_metrics::downside_deviation(self.active_returns(i), mar, ann))
     }
 
     /// Longest drawdown episode in actual calendar days over all episodes.
@@ -332,12 +365,10 @@ impl Performance {
     ///
     /// Rejects malformed date alignment or invalid cached paths.
     pub fn max_drawdown_duration(&self) -> Result<Vec<Option<i64>>> {
-        (0..self.ticker_names.len())
-            .map(|i| {
-                let (path, dates) = self.active_drawdown_path(i);
-                max_drawdown_duration(&path, dates)
-            })
-            .collect()
+        self.try_map_tickers(|i| {
+            let (path, dates) = self.active_drawdown_path(i);
+            max_drawdown_duration(&path, dates)
+        })
     }
 
     /// Empirical gain/shortfall Omega around a supplied observation hurdle.
@@ -355,7 +386,7 @@ impl Performance {
     ///
     /// Rejects invalid thresholds and numerical calculation failures.
     pub fn omega_ratio(&self, threshold: f64) -> Result<Vec<f64>> {
-        self.scalar_map(|i| risk_metrics::omega_ratio(self.active_returns(i), threshold))
+        self.try_map_tickers(|i| risk_metrics::omega_ratio(self.active_returns(i), threshold))
     }
 
     /// Arithmetic net return sum divided by negative-return magnitudes.
@@ -368,7 +399,7 @@ impl Performance {
     ///
     /// Propagates unrepresentable requested ratio calculations.
     pub fn gain_to_pain(&self) -> Result<Vec<f64>> {
-        self.scalar_map(|i| risk_metrics::gain_to_pain(self.active_returns(i)))
+        self.try_map_tickers(|i| risk_metrics::gain_to_pain(self.active_returns(i)))
     }
 
     /// Cash-adjusted dated CAGR divided by endpoint Ulcer index.
@@ -388,7 +419,7 @@ impl Performance {
     pub fn martin_ratio(&self, risk_free_rate: f64) -> Result<Vec<f64>> {
         validate_cash(risk_free_rate)?;
         let growth = self.cagr(CagrDayCount::default(), DayCountContext::default())?;
-        self.scalar_map(|i| {
+        self.try_map_tickers(|i| {
             reward_ratio(
                 excess_reward(growth[i], risk_free_rate)?,
                 ulcer_index(self.active_drawdown_values(i))?,
@@ -417,8 +448,8 @@ impl Performance {
         confidence: f64,
         horizon_periods: Option<u64>,
     ) -> Result<Vec<f64>> {
-        Self::ensure_confidence(confidence)?;
-        self.scalar_map(|i| {
+        validate_confidence(confidence)?;
+        self.try_map_tickers(|i| {
             risk_metrics::parametric_var(self.active_returns(i), confidence, horizon_periods)
         })
     }
@@ -445,8 +476,8 @@ impl Performance {
         confidence: f64,
         horizon_periods: Option<u64>,
     ) -> Result<Vec<f64>> {
-        Self::ensure_confidence(confidence)?;
-        self.scalar_map(|i| {
+        validate_confidence(confidence)?;
+        self.try_map_tickers(|i| {
             risk_metrics::cornish_fisher_var(self.active_returns(i), confidence, horizon_periods)
         })
     }
@@ -461,7 +492,7 @@ impl Performance {
     ///
     /// Propagates growth and requested-ratio calculation failures.
     pub fn recovery_factor(&self) -> Result<Vec<f64>> {
-        self.scalar_map(|i| {
+        self.try_map_tickers(|i| {
             reward_ratio(
                 comp_total(self.active_returns(i))?,
                 deepest(self.active_drawdown_values(i)).abs(),
@@ -494,7 +525,7 @@ impl Performance {
             ));
         }
         let growth = self.cagr(CagrDayCount::default(), DayCountContext::default())?;
-        self.scalar_map(|i| {
+        self.try_map_tickers(|i| {
             if self.active_returns(i).is_empty() {
                 return Ok(f64::NAN);
             }
@@ -523,7 +554,7 @@ impl Performance {
     pub fn burke_ratio(&self, risk_free_rate: f64) -> Result<Vec<f64>> {
         validate_cash(risk_free_rate)?;
         let growth = self.cagr(CagrDayCount::default(), DayCountContext::default())?;
-        self.scalar_map(|i| {
+        self.try_map_tickers(|i| {
             let path = self.active_drawdown_values(i);
             if path.is_empty() {
                 return Ok(f64::NAN);
@@ -555,7 +586,7 @@ impl Performance {
     ///
     /// Nonnegative decimal Pain indices in ticker order; empty is NaN.
     pub fn pain_index(&self) -> Result<Vec<f64>> {
-        self.scalar_map(|i| pain_index(self.active_drawdown_values(i)))
+        self.try_map_tickers(|i| pain_index(self.active_drawdown_values(i)))
     }
 
     /// Cash-adjusted ACT/365F CAGR per mean absolute endpoint drawdown.
@@ -575,7 +606,7 @@ impl Performance {
     pub fn pain_ratio(&self, risk_free_rate: f64) -> Result<Vec<f64>> {
         validate_cash(risk_free_rate)?;
         let growth = self.cagr(CagrDayCount::default(), DayCountContext::default())?;
-        self.scalar_map(|i| {
+        self.try_map_tickers(|i| {
             reward_ratio(
                 excess_reward(growth[i], risk_free_rate)?,
                 pain_index(self.active_drawdown_values(i))?,
@@ -599,8 +630,8 @@ impl Performance {
     ///
     /// Rejects invalid confidence and propagates requested-estimator failures.
     pub fn cdar(&self, confidence: f64) -> Result<Vec<f64>> {
-        Self::ensure_confidence(confidence)?;
-        self.scalar_map(|i| {
+        validate_confidence(confidence)?;
+        self.try_map_tickers(|i| {
             let mut path = self.active_drawdown_values(i).to_vec();
             if path.is_empty() {
                 return Ok(f64::NAN);
@@ -631,9 +662,9 @@ impl Performance {
     /// numerical failures without substituting another tail model.
     pub fn modified_sharpe(&self, risk_free_rate: f64, confidence: f64) -> Result<Vec<f64>> {
         validate_cash(risk_free_rate)?;
-        Self::ensure_confidence(confidence)?;
+        validate_confidence(confidence)?;
         let ann = self.ann()?;
-        self.scalar_map(|i| {
+        self.try_map_tickers(|i| {
             risk_metrics::modified_sharpe(self.active_returns(i), risk_free_rate, confidence, ann)
         })
     }
@@ -667,7 +698,7 @@ impl Performance {
         confidence: f64,
     ) -> Result<TableEnvelope> {
         validate_cash(risk_free_rate)?;
-        Self::ensure_confidence(confidence)?;
+        validate_confidence(confidence)?;
         if !mar.is_finite() || !omega_threshold.is_finite() {
             return Err(Error::Validation(
                 "summary MAR and Omega threshold must be finite".into(),
@@ -680,39 +711,36 @@ impl Performance {
             .collect::<Result<Vec<_>>>()?
             .into_iter()
             .unzip();
-        let metrics: [(&str, Vec<f64>); 22] = [
-            (
-                "cagr",
-                self.cagr(CagrDayCount::default(), DayCountContext::default())?,
-            ),
-            ("mean_return", self.mean_return(true)?),
-            ("volatility", self.volatility(true)?),
-            ("sharpe", self.sharpe(risk_free_rate)?),
-            ("sortino", self.sortino(mar)?),
-            ("calmar", self.calmar()?),
-            ("max_drawdown", self.max_drawdown()?),
-            ("value_at_risk", var),
-            ("expected_shortfall", es),
-            ("tracking_error", self.tracking_error()?),
-            ("information_ratio", self.information_ratio()?),
-            ("skewness", self.skewness()?),
-            ("kurtosis", self.kurtosis()?),
-            ("geometric_mean", self.geometric_mean()?),
-            ("downside_deviation", self.downside_deviation(mar)?),
-            ("omega_ratio", self.omega_ratio(omega_threshold)?),
-            ("gain_to_pain", self.gain_to_pain()?),
-            ("ulcer_index", self.ulcer_index()?),
-            ("pain_index", self.pain_index()?),
-            ("recovery_factor", self.recovery_factor()?),
-            ("tail_ratio", self.tail_ratio(confidence)?),
-            ("r_squared", self.r_squared()?),
+        let metrics: [Vec<f64>; 22] = [
+            self.cagr(CagrDayCount::default(), DayCountContext::default())?,
+            self.mean_return(true)?,
+            self.volatility(true)?,
+            self.sharpe(risk_free_rate)?,
+            self.sortino(mar)?,
+            self.calmar()?,
+            self.max_drawdown()?,
+            var,
+            es,
+            self.tracking_error()?,
+            self.information_ratio()?,
+            self.skewness()?,
+            self.kurtosis()?,
+            self.geometric_mean()?,
+            self.downside_deviation(mar)?,
+            self.omega_ratio(omega_threshold)?,
+            self.gain_to_pain()?,
+            self.ulcer_index()?,
+            self.pain_index()?,
+            self.recovery_factor()?,
+            self.tail_ratio(confidence)?,
+            self.r_squared()?,
         ];
         let mut columns = Vec::with_capacity(23);
         columns.push(
             TableColumn::new("ticker", TableColumnData::String(self.ticker_names.clone()))
                 .with_role(TableColumnRole::Dimension),
         );
-        for (name, values) in metrics {
+        for (name, values) in SUMMARY_METRICS.into_iter().zip(metrics) {
             columns.push(
                 TableColumn::new(name, TableColumnData::Float64(values))
                     .with_role(TableColumnRole::Measure),
@@ -743,13 +771,7 @@ impl Performance {
         table
             .metadata
             .insert("cagr_day_count".into(), "act_365f".into());
-        table.metadata.insert("units".into(), serde_json::json!({
-            "mean_return": "annual_arithmetic_decimal", "volatility": "annual_decimal",
-            "downside_deviation": "annual_decimal", "sharpe": "annual_ratio", "sortino": "annual_ratio",
-            "geometric_mean": "observation_decimal", "value_at_risk": "observation_signed_decimal",
-            "expected_shortfall": "observation_signed_decimal", "drawdown": "signed_decimal",
-            "kurtosis": "excess"
-        }));
+        table.metadata.insert("units".into(), summary_units());
         let rows = (0..self.ticker_names.len()).map(|i| {
             let own = self.active_span_for_ticker(i);
             let pair = self.active_two_ticker_span(i, benchmark);
@@ -791,30 +813,6 @@ impl Performance {
 pub fn validate_summary(table: &TableEnvelope) -> Result<()> {
     use finstack_quant_core::dates::{Date, PeriodKind, parse_iso_date};
     use serde_json::Value;
-    const METRICS: [&str; 22] = [
-        "cagr",
-        "mean_return",
-        "volatility",
-        "sharpe",
-        "sortino",
-        "calmar",
-        "max_drawdown",
-        "value_at_risk",
-        "expected_shortfall",
-        "tracking_error",
-        "information_ratio",
-        "skewness",
-        "kurtosis",
-        "geometric_mean",
-        "downside_deviation",
-        "omega_ratio",
-        "gain_to_pain",
-        "ulcer_index",
-        "pain_index",
-        "recovery_factor",
-        "tail_ratio",
-        "r_squared",
-    ];
     let bad = || Error::Validation("malformed canonical analytics summary".into());
     table.validate()?;
     if table.columns.len() != 23 || table.row_count == 0 {
@@ -835,7 +833,7 @@ pub fn validate_summary(table: &TableEnvelope) -> Result<()> {
         return Err(bad());
     }
     let mut metric_values = Vec::with_capacity(22);
-    for (column, name) in table.columns[1..].iter().zip(METRICS) {
+    for (column, name) in table.columns[1..].iter().zip(SUMMARY_METRICS) {
         if column.name != name || column.role != Some(TableColumnRole::Measure) {
             return Err(bad());
         }
@@ -871,7 +869,7 @@ pub fn validate_summary(table: &TableEnvelope) -> Result<()> {
             return Err(bad());
         }
     }
-    Performance::ensure_confidence(metadata["confidence"].as_f64().ok_or_else(bad)?)?;
+    validate_confidence(metadata["confidence"].as_f64().ok_or_else(bad)?)?;
     metadata["frequency"]
         .as_str()
         .ok_or_else(bad)?
@@ -880,13 +878,7 @@ pub fn validate_summary(table: &TableEnvelope) -> Result<()> {
     if !tickers.iter().any(|ticker| ticker == benchmark) {
         return Err(bad());
     }
-    let units = serde_json::json!({
-        "mean_return": "annual_arithmetic_decimal", "volatility": "annual_decimal",
-        "downside_deviation": "annual_decimal", "sharpe": "annual_ratio", "sortino": "annual_ratio",
-        "geometric_mean": "observation_decimal", "value_at_risk": "observation_signed_decimal",
-        "expected_shortfall": "observation_signed_decimal", "drawdown": "signed_decimal", "kurtosis": "excess"
-    });
-    if metadata["units"] != units {
+    if metadata["units"] != summary_units() {
         return Err(bad());
     }
     let rows = metadata["rows"].as_array().ok_or_else(bad)?;

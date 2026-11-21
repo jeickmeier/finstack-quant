@@ -294,7 +294,7 @@ export default [
     "path": "#/$defs/d_213f3b72cada138d8e2c/properties/covenant_id",
     "source": "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json#/$defs/CovenantBreach/properties/covenant_id",
     "default": "",
-    "description": "Stable identifier matching [`Covenant::instance_key`]."
+    "description": "Stable identifier matching [`Covenant::label`]."
   },
   {
     "path": "#/$defs/d_213f3b72cada138d8e2c/properties/covenant_type",
@@ -405,7 +405,7 @@ export default [
   {
     "path": "#/$defs/d_716a3fc5837303815e4b/properties/covenant_id",
     "source": "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json#/$defs/CovenantWaiver/properties/covenant_id",
-    "description": "Stable instance identifier of the waived covenant\n(from [`Covenant::instance_key`])."
+    "description": "Stable instance identifier of the waived covenant\n(from [`Covenant::label`])."
   },
   {
     "path": "#/$defs/d_716a3fc5837303815e4b/properties/description",
@@ -471,7 +471,7 @@ export default [
   {
     "path": "#/$defs/d_73e2a3d0b082dde59923/properties/label",
     "source": "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json#/$defs/Covenant/properties/label",
-    "description": "Optional instance label disambiguating covenants of the same type.\n\n[`CovenantType::covenant_id`] is discriminant-only, so two covenants of\nthe same type (e.g. a senior and a total leverage test, or two baskets)\nwould collide in compliance reports and breach tracking without a\ndistinct label. Waivers and breaches key off it."
+    "description": "Required instance label disambiguating covenants of the same type.\n\n[`CovenantType::covenant_id`] is discriminant-only, so two covenants of\nthe same type (e.g. a senior and a total leverage test, or two baskets)\nwould collide in compliance reports and breach tracking without a\ndistinct label. Waivers and breaches key off it."
   },
   {
     "path": "#/$defs/d_73e2a3d0b082dde59923/properties/scope",

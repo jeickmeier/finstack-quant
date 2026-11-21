@@ -11,6 +11,7 @@
 //! convert integer period keys to zero-padded strings. Mixed aware/naive datetime keys fail; opaque
 //! strings retain caller ordering.
 
+use crate::bindings::macros::wire_methods;
 use crate::bindings::module_utils::py_to_json_value;
 use crate::errors::core_to_py;
 use finstack_quant_features::{
@@ -281,8 +282,10 @@ where
     T: pyo3::PyClass,
     R: std::str::FromStr<Err = finstack_quant_core::Error>,
 {
-    if let Ok(text) = obj.extract::<String>() {
-        return text.parse().map_err(core_to_py);
+    use pyo3::types::{PyString, PyStringMethods};
+
+    if let Ok(text) = obj.cast::<PyString>() {
+        return text.to_str()?.parse().map_err(core_to_py);
     }
     if let Ok(op) = obj.extract::<PyRef<'_, T>>() {
         return Ok(inner_of(&op));
@@ -931,35 +934,6 @@ impl PyPanelTransformSpec {
         self.inner.values.clone()
     }
 
-    /// Serialize to the JSON accepted by ``transform_panel_json``.
-    #[allow(clippy::wrong_self_convention)]
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| {
-            crate::errors::serde_json_to_py(e, "failed to serialize PanelTransformSpec")
-        })
-    }
-
-    /// Deserialize from JSON (strict field names).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str::<PanelTransformSpec>(json)
-            .map(|inner| Self { inner })
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid PanelTransformSpec JSON"))
-    }
-
-    /// Support ``pickle`` through the JSON wire form.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Python-style summary.
     fn __repr__(&self) -> String {
         format!(
@@ -969,6 +943,12 @@ impl PyPanelTransformSpec {
         )
     }
 }
+
+wire_methods!(
+    PyPanelTransformSpec,
+    PanelTransformSpec,
+    "PanelTransformSpec"
+);
 
 /// Ordered output columns of a panel transform pipeline.
 ///
@@ -1022,35 +1002,6 @@ impl PyPanelTransformResult {
                     self.columns()
                 ))
             })
-    }
-
-    /// Serialize to the JSON produced by ``transform_panel_json``.
-    #[allow(clippy::wrong_self_convention)]
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| {
-            crate::errors::serde_json_to_py(e, "failed to serialize PanelTransformResult")
-        })
-    }
-
-    /// Deserialize from JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the JSON is malformed.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str::<PanelTransformResult>(json)
-            .map(|inner| Self { inner })
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid PanelTransformResult JSON"))
-    }
-
-    /// Support ``pickle`` through the JSON wire form.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
     /// Columns as a ``pandas.DataFrame`` (one float column per operation).
@@ -1110,6 +1061,11 @@ impl PyPanelTransformResult {
 }
 
 crate::bindings::macros::tabular_methods!(PyPanelTransformResult, custom_pandas);
+wire_methods!(
+    PyPanelTransformResult,
+    PanelTransformResult,
+    "PanelTransformResult"
+);
 
 /// Apply a named panel transform pipeline (typed twin of ``transform_panel_json``).
 ///

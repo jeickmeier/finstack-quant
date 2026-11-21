@@ -1586,7 +1586,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/im_result.schema.json",
             "type_name": "ImResult",
             "kind": "output",
-            "bytes": 13205
+            "bytes": 13094
           },
           {
             "path": "schemas/margin/1/margin.schema.json",
@@ -4824,7 +4824,7 @@
             "$id": "https://finstack_quant.dev/schemas/margin/1/im_result.schema.json",
             "type_name": "ImResult",
             "kind": "output",
-            "bytes": 13205
+            "bytes": 13094
           },
           {
             "domain": "margin",

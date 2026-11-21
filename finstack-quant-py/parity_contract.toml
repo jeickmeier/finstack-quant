@@ -284,7 +284,7 @@ rust_lib   = "finstack-quant/cashflows/src/lib.rs"
 python_package = "finstack_quant.cashflows"
 visibility = "pub"
 status = "exists"
-note = "Typed submodules (builder/accrual/aggregation/fixings/schema; the CashFlow/CFKind/CashFlowAccrual row types live in finstack_quant.core.cashflow) plus the JSON schedule bridge and its typed twins (build_cashflow_schedule / dated_flows, where dated_flows binds CashFlowSchedule::dated_flows). Rust-only at the crate root (deliberately unbound): the JSON-bridge spec types CashflowScheduleBuildSpec / CouponLegSpec / PaymentProgramSpec / MarginStepSpec / PaymentStepSpec / DatedFlowJson (hosts pass dict/JSON to build_cashflow_schedule), the CashflowProvider / CashflowScheduleSource traits, and the in-place CashFlowSchedule mutators update_flows / try_update_flows / retain_flows / push_flow / into_flows (host wrappers are frozen; rebuild via from_flows / scale_amounts instead)."
+note = "Typed submodules (builder/accrual/aggregation/fixings/schema; the CashFlow/CFKind/CashFlowAccrual row types live in finstack_quant.core.cashflow) plus the JSON schedule bridge and its typed twins (build_cashflow_schedule / dated_flows, where dated_flows binds CashFlowSchedule::dated_flows). Rust-only at the crate root (deliberately unbound): the JSON-bridge spec types CashflowScheduleBuildSpec / CouponLegSpec / PaymentProgramSpec / MarginStepSpec / PaymentStepSpec / DatedFlowJson (hosts pass dict/JSON to build_cashflow_schedule), the CashflowProvider / CashflowScheduleSource traits, and the in-place CashFlowSchedule mutators update_flows / retain_flows / push_flow / into_flows (host wrappers are frozen; rebuild via from_flows / scale_amounts instead)."
 
 [crates.cashflows.modules]
 fixings     = { python = "finstack_quant.cashflows.fixings",     status = "exists", note = "Typed raw rate/FX observations and atomic crossed-fixing materialization. Scenario rolls invoke the same Rust helper; WASM binds it as cashflows.materializeFixings over CashFlowSchedule handles or schedule JSON." }
@@ -311,11 +311,7 @@ python_package = "finstack_quant.cashflows.builder"
 # carried inside schedule JSON); evaluate_fee_tiers / FeeTier / RateSpec /
 # PrincipalEventSpec (spec internals reachable through the spec types); and the
 # credit-rate helpers psa_cpr /
-# PSA_RAMP_MONTHS / PSA_TERMINAL_CPR / SDA_PEAK_CDR. The FloatingRateSpec
-# DEFAULT_GEARING / DEFAULT_GEARING_INCLUDES_SPREAD / DEFAULT_RESET_LAG_DAYS
-# constants and ScheduleParams::DEFAULT_STUB are Rust-only; the keyword-only
-# Python constructors (FloatingRateSpec, ScheduleParams, FeeSpec.periodic_bp)
-# read the Rust serde struct, whose defaults are those constants.
+# PSA_RAMP_MONTHS / PSA_TERMINAL_CPR / SDA_PEAK_CDR.
 note = "Typed CashFlowBuilder includes build_as_of / buildAsOf for explicit fixing cutoffs and matches the Rust coupon-program methods (including fixed_to_float and float_margin_steps); WASM binds CashFlowSchedule / CashFlowBuilder as classes, and the spec types cross as plain objects whose constructors and methods are free functions (see the [parity] ledger)."
 public = [
     "AmortizationSpec", "CashFlowBuilder", "CashFlowMeta", "CashFlowSchedule", "CouponType",
@@ -400,7 +396,7 @@ status = "exists"
 # public boundary only). Its shared defaults struct is `ConvenienceDefaults`:
 # it feeds both host bindings and the Rust convenience pricers.
 [crates.margin.modules]
-calculators = { python = "finstack_quant.margin", status = "flattened", note = "VmCalculator (calculate, generate_margin_calls -> DataFrame of MarginCall rows, margin_call_dates -> list[date]), VmResult, and ImResult exposed flat on finstack_quant.margin. SimmCalculator.from_finstack_config and ScheduleImCalculator.from_finstack_config bind the Rust FinstackConfig registry-overlay constructors. SimmCalculator.calculate_from_sensitivities is the Rust method of the same name (typed ImResult, validates the container); the tuple-returning Rust calculate_from_sensitivities_parts is Rust-only. Every as_of parameter accepts datetime.date | pandas.Timestamp | ISO str. Rust-only, uncontracted-by-design: the CCP IM engine (ClearingHouseImCalculator, CcpMethodology), ExternalImSource, the ImCalculator trait, and SimmVersion (hosts pass version strings; the Python default derives from Rust SimmVersion::default())." }
+calculators = { python = "finstack_quant.margin", status = "flattened", note = "VmCalculator (calculate, generate_margin_calls -> DataFrame of MarginCall rows, margin_call_dates -> list[date]), VmResult, and ImResult exposed flat on finstack_quant.margin. SimmCalculator.from_finstack_config and ScheduleImCalculator.from_finstack_config bind the Rust FinstackConfig registry-overlay constructors. SimmCalculator.calculate_from_sensitivities is the Rust method of the same name (typed ImResult, validates the container). Every as_of parameter accepts datetime.date | pandas.Timestamp | ISO str. Rust-only, uncontracted-by-design: the CCP IM engine (ClearingHouseImCalculator, CcpMethodology), the ImCalculator trait, and SimmVersion (hosts pass version strings; the Python default derives from Rust SimmVersion::default())." }
 constants   = { python = "finstack_quant.margin", status = "flattened", note = "CONSTANTS dict exposed flat on finstack_quant.margin: every finstack_quant_margin::constants item (tenor_buckets nested as a dict) plus BCBS_IOSCO_SCHEDULE_ID, HAIRCUT_MPOR_DAYS, SIMM_TENORS (valid SIMM tenor labels) and SIMM_COMMODITY_BUCKET_COUNT." }
 metrics     = { python = "finstack_quant.margin", status = "flattened", note = "MarginUtilization, ExcessCollateral, MarginFundingCost, and Haircut01 exposed flat on finstack_quant.margin. Host idiom: the Rust factories (MarginUtilization::new, ExcessCollateral::new, MarginFundingCost::calculate, Haircut01::calculate) are the Python class constructors; all four carry to_json/from_json/pickle and to_arrow/to_pandas/to_polars/to_pyarrow." }
 regulatory  = { python = "finstack_quant.margin", status = "flattened", note = "FRTB and SA-CCR regulatory classes/functions exposed flat on finstack_quant.margin, including the typed results FrtbSbaResult and EadResult. FrtbSensitivities binds every Rust add_* adder 1:1, including equity repo delta and explicit CSR/commodity basis keys (add_csr_nonsec_delta, not add_csr_delta) plus from_dataframe (Python-only bulk ingest of the long table from to_pandas/to_arrow, DRC rows included, decoded by Rust FrtbSensitivities::from_rows); DrcPosition exposes validated typed authoring and passes directly to add_drc_position(position) and RraoPosition through add_rrao_position. SaCcrTrade has a keyword constructor, from_dataframe (Python-only, returns list[SaCcrTrade]) and to_arrow/to_pandas/to_polars/to_pyarrow. SaCcrNettingSetConfig.unmargined/margined take a NettingSetId (bilateral or cleared) and a date-like as_of. saccr_ead(trades, config, alpha=None) and frtb_sba_charge(sensitivities, correlation_scenario=None) are Python-only thin wrappers over SaCcrEngine.calculate_ead / FrtbSbaEngine.calculate. The SA-CCR engine takes (trades, config) in Rust, Python and WASM. Rust-only, uncontracted-by-design leaves: FRTB parameter tables; calculation leaves are private engine stages, SaCcrOptionType/SaCcrAssetClass/SaCcrSupervisoryCategory/FrtbRiskClass/CorrelationScenario/DrcSector/DrcSeniority enums (hosts pass the lower-case wire labels), SA-CCR calculation leaves, PFE and add-on assembly are private engine stages." }
@@ -2761,17 +2757,26 @@ renames = { is_cash_settlement = { js = "core.cfKindIsCashSettlement", reason = 
 [parity.members."finstack_quant.core.cashflow.CashFlow"]
 renames = { get_balance_date = { js = "core.cashFlowGetBalanceDate", reason = "WASM CashFlow values are plain objects; the Rust CashFlow::get_balance_date function is a free function over the wire value" }, validate = { js = "core.cashFlowValidate", reason = "WASM CashFlow values are plain objects; the Rust CashFlow::validate function is a free function over the wire value" }, with_accrual = { js = "core.cashFlowWithAccrual", reason = "WASM CashFlow values are plain objects; the Rust CashFlow::with_accrual validated update is a free function over the wire value" }, with_principal = { js = "core.cashFlowWithPrincipal", reason = "WASM CashFlow values are plain objects; the Rust CashFlow::with_principal validated update is a free function over the wire value" } }
 
-[parity.members."finstack_quant.covenants.Covenant"]
-renames = { with_consequence = { js = "covenants.covenantWithConsequence", reason = "WASM Covenant values are plain objects; the Rust Covenant::with_consequence function is a free function over the wire value" }, with_cure_period = { js = "covenants.covenantWithCurePeriod", reason = "WASM Covenant values are plain objects; the Rust Covenant::with_cure_period function is a free function over the wire value" }, with_scope = { js = "covenants.covenantWithScope", reason = "WASM Covenant values are plain objects; the Rust Covenant::with_scope function is a free function over the wire value" }, with_springing_condition = { js = "covenants.covenantWithSpringingCondition", reason = "WASM Covenant values are plain objects; the Rust Covenant::with_springing_condition function is a free function over the wire value" } }
+[parity.members."finstack_quant.covenants.Covenant".excluded]
+with_consequence = "literal"
+with_cure_period = "literal"
+with_scope = "literal"
+with_springing_condition = "literal"
 
-[parity.members."finstack_quant.covenants.CovenantConsequence"]
-renames = { accelerate_maturity = { js = "covenants.covenantConsequenceAccelerateMaturity", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::AccelerateMaturity variant is built by a free function returning the wire value" }, block_distributions = { js = "covenants.covenantConsequenceBlockDistributions", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::BlockDistributions variant is built by a free function returning the wire value" }, cash_sweep = { js = "covenants.covenantConsequenceCashSweep", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::CashSweep variant is built by a free function returning the wire value" }, default = { js = "covenants.covenantConsequenceDefault", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::Default variant is built by a free function returning the wire value" }, rate_increase = { js = "covenants.covenantConsequenceRateIncrease", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::RateIncrease variant is built by a free function returning the wire value" }, require_collateral = { js = "covenants.covenantConsequenceRequireCollateral", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::RequireCollateral variant is built by a free function returning the wire value" } }
+[parity.members."finstack_quant.covenants.CovenantConsequence".excluded]
+accelerate_maturity = "literal"
+block_distributions = "literal"
+cash_sweep = "literal"
+default = "literal"
+rate_increase = "literal"
+require_collateral = "literal"
 
-[parity.members."finstack_quant.covenants.CovenantForecastConfig"]
-renames = { with_scope = { js = "covenants.covenantForecastConfigWithScope", reason = "WASM CovenantForecastConfig values are plain objects; the Rust CovenantForecastConfig::with_scope function is a free function over the wire value" } }
+[parity.members."finstack_quant.covenants.CovenantForecastConfig".excluded]
+with_scope = "literal"
 
-[parity.members."finstack_quant.covenants.CovenantSpec"]
-renames = { with_denominator_metric = { js = "covenants.covenantSpecWithDenominatorMetric", reason = "WASM CovenantSpec values are plain objects; the Rust CovenantSpec::with_denominator_metric function is a free function over the wire value" }, with_threshold_schedule = { js = "covenants.covenantSpecWithThresholdSchedule", reason = "WASM CovenantSpec values are plain objects; the Rust CovenantSpec::with_threshold_schedule function is a free function over the wire value" } }
+[parity.members."finstack_quant.covenants.CovenantSpec".excluded]
+with_denominator_metric = "literal"
+with_threshold_schedule = "literal"
 
 [parity.members."finstack_quant.covenants.CovenantTemplate".excluded]
 cov_lite = "literal"
@@ -2779,8 +2784,21 @@ lbo_standard = "literal"
 project_finance = "literal"
 real_estate = "literal"
 
-[parity.members."finstack_quant.covenants.CovenantType"]
-renames = { affirmative = { js = "covenants.covenantTypeAffirmative", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::Affirmative variant is built by a free function returning the wire value" }, basket = { js = "covenants.covenantTypeBasket", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::Basket variant is built by a free function returning the wire value" }, custom = { js = "covenants.covenantTypeCustom", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::Custom variant is built by a free function returning the wire value" }, max_capex = { js = "covenants.covenantTypeMaxCapex", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxCapex variant is built by a free function returning the wire value" }, max_debt_to_ebitda = { js = "covenants.covenantTypeMaxDebtToEbitda", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxDebtToEbitda variant is built by a free function returning the wire value" }, max_net_debt_to_ebitda = { js = "covenants.covenantTypeMaxNetDebtToEbitda", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxNetDebtToEbitda variant is built by a free function returning the wire value" }, max_senior_leverage = { js = "covenants.covenantTypeMaxSeniorLeverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxSeniorLeverage variant is built by a free function returning the wire value" }, max_total_leverage = { js = "covenants.covenantTypeMaxTotalLeverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxTotalLeverage variant is built by a free function returning the wire value" }, min_asset_coverage = { js = "covenants.covenantTypeMinAssetCoverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinAssetCoverage variant is built by a free function returning the wire value" }, min_dscr = { js = "covenants.covenantTypeMinDscr", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinDscr variant is built by a free function returning the wire value" }, min_fixed_charge_coverage = { js = "covenants.covenantTypeMinFixedChargeCoverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinFixedChargeCoverage variant is built by a free function returning the wire value" }, min_interest_coverage = { js = "covenants.covenantTypeMinInterestCoverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinInterestCoverage variant is built by a free function returning the wire value" }, min_liquidity = { js = "covenants.covenantTypeMinLiquidity", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinLiquidity variant is built by a free function returning the wire value" }, negative = { js = "covenants.covenantTypeNegative", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::Negative variant is built by a free function returning the wire value" } }
+[parity.members."finstack_quant.covenants.CovenantType".excluded]
+affirmative = "literal"
+basket = "literal"
+custom = "literal"
+max_capex = "literal"
+max_debt_to_ebitda = "literal"
+max_net_debt_to_ebitda = "literal"
+max_senior_leverage = "literal"
+max_total_leverage = "literal"
+min_asset_coverage = "literal"
+min_dscr = "literal"
+min_fixed_charge_coverage = "literal"
+min_interest_coverage = "literal"
+min_liquidity = "literal"
+negative = "literal"
 
 [parity.members."finstack_quant.covenants.ThresholdSchedule"]
 renames = { threshold_for = { js = "covenants.thresholdScheduleThresholdFor", reason = "WASM ThresholdSchedule values are plain objects; the Rust ThresholdSchedule::threshold_for function is a free function over the wire value" } }
@@ -3159,12 +3177,11 @@ excluded = { dependency_json = "literal" }
 excluded = { notional_weight = "literal", unit_scaling = "literal", value_weight = "literal" }
 
 [parity.members."finstack_quant.margin.ClearingStatus"]
-excluded = { bilateral = "literal" }
-renames = { cleared = { js = "margin.clearingStatusCleared", reason = "WASM ClearingStatus values are plain serde values typed by the generated TypeScript; the Rust ClearingStatus variant behind the Python factory is a free function returning that value" } }
+excluded = { bilateral = "literal", cleared = "literal" }
 
 [parity.members."finstack_quant.margin.CollateralAssetClass"]
-excluded = { agency_bonds = "literal", cash = "literal", corporate_bonds = "literal", covered_bonds = "literal", equity = "literal", gold = "literal", government_bonds = "literal", mutual_funds = "literal" }
-renames = { from_str = { js = "margin.collateralAssetClassFromStr", reason = "WASM CollateralAssetClass values are plain wire labels; Rust CollateralAssetClass::from_str is a free function returning the canonical label" }, fx_addon = { js = "margin.collateralAssetClassFxAddon", reason = "WASM CollateralAssetClass values are plain objects; the Rust CollateralAssetClass::fx_addon method is a free function taking the object" }, standard_haircut = { js = "margin.collateralAssetClassStandardHaircut", reason = "WASM CollateralAssetClass values are plain objects; the Rust CollateralAssetClass::standard_haircut method is a free function taking the object" } }
+excluded = { agency_bonds = "literal", cash = "literal", corporate_bonds = "literal", covered_bonds = "literal", equity = "literal", from_str = "literal", gold = "literal", government_bonds = "literal", mutual_funds = "literal" }
+renames = { fx_addon = { js = "margin.collateralAssetClassFxAddon", reason = "WASM CollateralAssetClass values are plain objects; the Rust CollateralAssetClass::fx_addon method is a free function taking the object" }, standard_haircut = { js = "margin.collateralAssetClassStandardHaircut", reason = "WASM CollateralAssetClass values are plain objects; the Rust CollateralAssetClass::standard_haircut method is a free function taking the object" } }
 
 [parity.members."finstack_quant.margin.CsaSpec"]
 renames = { builder = { js = "margin.csaSpecBuilder", reason = "CsaSpec is a plain value in WASM and its builder starts through a free function" }, to_builder = { js = "margin.csaSpecToBuilder", reason = "WASM CsaSpec values are plain objects which the free function copies into a builder" }, apply_im_terms = { js = "margin.csaSpecApplyImTerms", reason = "WASM CsaSpec values are plain objects; the Rust CsaSpec::apply_im_terms method is a free function taking the object" }, eur_regulatory = { js = "margin.csaSpecEurRegulatory", reason = "WASM CsaSpec values are plain objects; the Rust CsaSpec::eur_regulatory constructor is a free function returning the object" }, regulatory = { js = "margin.csaSpecRegulatory", reason = "WASM CsaSpec values are plain objects; the Rust CsaSpec::regulatory_for_currency constructor is a free function returning the object" }, regulatory_from_config = { js = "margin.csaSpecRegulatoryFromConfig", reason = "WASM CsaSpec values are plain objects; the Rust CsaSpec::regulatory_from_config constructor is a free function taking a FinstackConfig handle and returning the object" }, usd_regulatory = { js = "margin.csaSpecUsdRegulatory", reason = "WASM CsaSpec values are plain objects; the Rust CsaSpec::usd_regulatory constructor is a free function returning the object" }, validate = { js = "margin.csaSpecValidate", reason = "WASM CsaSpec values are plain objects; the Rust CsaSpec::validate method is a free function taking the object" }, with_im = { js = "margin.csaSpecWithIm", reason = "WASM CsaSpec values are plain objects; the Rust CsaSpec::with_im method is a free function taking the object" }, with_vm_threshold = { js = "margin.csaSpecWithVmThreshold", reason = "WASM CsaSpec values are plain objects; the Rust CsaSpec::with_vm_threshold method is a free function taking the object" } }
@@ -3189,8 +3206,7 @@ excluded = { constant = "literal" }
 renames = { factor = { js = "margin.imDecayProfileFactor", reason = "WASM ImDecayProfile values are plain objects; the Rust ImDecayProfile::factor method is a free function taking the object" }, linear_to_maturity = { js = "margin.imDecayProfileLinearToMaturity", reason = "WASM ImDecayProfile values are plain objects; the Rust ImDecayProfile::linear_to_maturity constructor is a free function returning the object" }, sqrt_time = { js = "margin.imDecayProfileSqrtTime", reason = "WASM ImDecayProfile values are plain objects; the Rust ImDecayProfile::sqrt_time constructor is a free function returning the object" } }
 
 [parity.members."finstack_quant.margin.ImMethodology"]
-excluded = { clearing_house = "literal", haircut = "literal", internal_model = "literal", schedule = "literal", simm = "literal" }
-renames = { from_str = { js = "margin.imMethodologyFromStr", reason = "WASM ImMethodology values are plain wire labels; Rust ImMethodology::from_str is a free function returning the canonical label" } }
+excluded = { clearing_house = "literal", from_str = "literal", haircut = "literal", internal_model = "literal", schedule = "literal", simm = "literal" }
 
 [parity.members."finstack_quant.margin.ImProfile"]
 renames = { validate = { js = "margin.imProfileValidate", reason = "WASM ImProfile values are plain objects; the Rust ImProfile::validate method is a free function taking the object" } }
@@ -3212,21 +3228,19 @@ excluded = { to_breakdown_table = "arrow", to_scenario_table = "arrow" }
 excluded = { to_add_on_table = "arrow" }
 
 [parity.members."finstack_quant.margin.MarginCallType"]
-excluded = { initial_margin = "literal", substitution = "literal", top_up = "literal", variation_margin_collect = "literal", variation_margin_post = "literal" }
-renames = { from_str = { js = "margin.marginCallTypeFromStr", reason = "WASM MarginCallType values are plain wire labels; Rust MarginCallType::from_str is a free function returning the canonical label" } }
+excluded = { from_str = "literal", initial_margin = "literal", substitution = "literal", top_up = "literal", variation_margin_collect = "literal", variation_margin_post = "literal" }
 
 [parity.members."finstack_quant.margin.MarginFundingCost"]
 renames = { cost_for_period = { js = "margin.marginFundingCostCostForPeriod", reason = "WASM MarginFundingCost values are plain objects; the Rust MarginFundingCost::cost_for_period method is a free function taking the object" }, spread_rate = { js = "margin.marginFundingCostSpreadRate", reason = "WASM MarginFundingCost is a plain value; the decimal-rate accessor takes it as an argument" }, spread_bp = { js = "margin.marginFundingCostSpreadBp", reason = "WASM MarginFundingCost is a plain value; the basis-point accessor takes it as an argument" } }
 
 [parity.members."finstack_quant.margin.MarginTenor"]
-excluded = { daily = "literal", monthly = "literal", on_demand = "literal", weekly = "literal" }
-renames = { from_str = { js = "margin.marginTenorFromStr", reason = "WASM MarginTenor values are plain wire labels; Rust MarginTenor::from_str is a free function returning the canonical label" } }
+excluded = { daily = "literal", from_str = "literal", monthly = "literal", on_demand = "literal", weekly = "literal" }
 
 [parity.members."finstack_quant.margin.MarginUtilization"]
 renames = { is_adequate = { js = "margin.marginUtilizationIsAdequate", reason = "WASM MarginUtilization values are plain objects; the Rust MarginUtilization::is_adequate method is a free function taking the object" }, shortfall = { js = "margin.marginUtilizationShortfall", reason = "WASM MarginUtilization values are plain objects; the Rust MarginUtilization::shortfall method is a free function taking the object" } }
 
 [parity.members."finstack_quant.margin.NettingSetId"]
-renames = { bilateral = { js = "margin.nettingSetIdBilateral", reason = "WASM NettingSetId values are plain objects; the Rust NettingSetId::bilateral constructor is a free function returning the object" }, cleared = { js = "margin.nettingSetIdCleared", reason = "WASM NettingSetId values are plain objects; the Rust NettingSetId::cleared constructor is a free function returning the object" } }
+excluded = { bilateral = "literal", cleared = "literal" }
 
 [parity.members."finstack_quant.margin.SaCcrNettingSetConfig"]
 renames = { margined = { js = "margin.saCcrNettingSetConfigMargined", reason = "WASM SaCcrNettingSetConfig values are plain objects; the Rust SaCcrNettingSetConfig::margined constructor is a free function returning the object" }, unmargined = { js = "margin.saCcrNettingSetConfigUnmargined", reason = "WASM SaCcrNettingSetConfig values are plain objects; the Rust SaCcrNettingSetConfig::unmargined constructor is a free function returning the object" }, validate = { js = "margin.saCcrNettingSetConfigValidate", reason = "WASM SaCcrNettingSetConfig values are plain objects; the Rust SaCcrNettingSetConfig::validate method is a free function taking the object" } }
@@ -3277,11 +3291,13 @@ renames = { with_contracts = { js = "valuations.instruments.listedFutureTermsWit
 [parity.members."finstack_quant.valuations.instruments.FutureOptionTerms"]
 renames = { example = { js = "valuations.instruments.futureOptionTermsExample", reason = "Native example returns a plain terms object in WASM" } }
 
+[parity.members."finstack_quant.margin.OtcMarginSpec"]
+excluded = { with_simm_credit_classification = "literal" }
+
 [parity.members."finstack_quant.margin.OtcMarginSpec".renames]
 bilateral_simm = { js = "margin.otcMarginSpecBilateralSimm", reason = "WASM returns a plain native OTC margin specification" }
 bilateral_schedule = { js = "margin.otcMarginSpecBilateralSchedule", reason = "WASM returns a plain native OTC margin specification" }
 cleared = { js = "margin.otcMarginSpecCleared", reason = "WASM returns plain cleared margin terms" }
-with_simm_credit_classification = { js = "margin.otcMarginSpecWithSimmCreditClassification", reason = "Rust replaces the classification on a plain WASM margin spec" }
 
 [parity.members."finstack_quant.margin.SimmCreditClassification"]
 excluded = { qualifying = "literal", non_qualifying = "literal" }

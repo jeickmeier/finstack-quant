@@ -20,7 +20,7 @@
 ///
 /// - BCBS 279 SA-CCR: `docs/REFERENCES.md#bcbs-279-saccr`
 #[must_use]
-pub fn maturity_factor_unmargined(remaining_maturity_years: f64) -> f64 {
+pub(super) fn maturity_factor_unmargined(remaining_maturity_years: f64) -> f64 {
     let m = f64::max(remaining_maturity_years, 10.0 / 250.0); // 10 business days floor
     f64::min(m, 1.0).sqrt()
 }
@@ -42,7 +42,7 @@ pub fn maturity_factor_unmargined(remaining_maturity_years: f64) -> f64 {
 ///
 /// - BCBS 279 SA-CCR: `docs/REFERENCES.md#bcbs-279-saccr`
 #[must_use]
-pub fn maturity_factor_margined(mpor_days: u32) -> f64 {
+pub(super) fn maturity_factor_margined(mpor_days: u32) -> f64 {
     let mpor_years = f64::from(mpor_days) / 250.0;
     1.5 * mpor_years.sqrt()
 }

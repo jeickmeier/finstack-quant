@@ -30,7 +30,7 @@
       "description": "Calculated initial margin amount"
     },
     "approximation": {
-      "description": "Whether the amount is an approximation rather than\nan exact computation under the named methodology.\n\nApproximations need not be conservative. Historical SIMM sets this flag\nbecause its input dimensions and some aggregation stages are simplified.\nAlso set by the clearing-house and internal-model calculators when\nthey fall back to `|exposure_base| x conservative_rate` because no\n[`ExternalImSource`](crate::calculators::im::ExternalImSource) supplied\na real margin amount. Portfolio-level consumers should surface this\nflag: an approximated IM is suitable for indicative funding/capacity\nanalysis, not for reconciling actual CCP margin calls.",
+      "description": "Whether the amount is an approximation rather than\nan exact computation under the named methodology.\n\nApproximations need not be conservative. Historical SIMM sets this flag\nbecause its input dimensions and some aggregation stages are simplified.\nAlso set by the clearing-house calculator when it computes a conservative\n`|exposure_base| x conservative_rate` proxy. Portfolio-level consumers\nshould surface this flag: an approximated IM is suitable for indicative\nfunding/capacity analysis, not for reconciling actual CCP margin calls.",
       "type": "boolean"
     },
     "as_of": {

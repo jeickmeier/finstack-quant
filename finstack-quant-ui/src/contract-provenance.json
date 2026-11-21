@@ -945,7 +945,7 @@
           "uri": "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json",
           "pointer": "#",
           "source": "finstack-quant/covenants/schemas/covenants/1/covenant_engine.schema.json",
-          "sha256": "d231fcc6eea1d787197269c77956b94d1a6d6e3c31c6ec09e17b1bc256a45343",
+          "sha256": "778598d2545110415040cb52762c741f18131cc00e907e7ec612e12797559d9a",
           "description": "Covenant engine for evaluation and consequence application."
         }
       ]
@@ -2734,7 +2734,7 @@
           "uri": "https://finstack_quant.dev/schemas/margin/1/im_result.schema.json",
           "pointer": "#",
           "source": "finstack-quant/margin/schemas/margin/1/im_result.schema.json",
-          "sha256": "f0410484c739549626e047c0fb4950cee2470b28f59e1eb683d7da65a0609c17",
+          "sha256": "a7b29bccedd984e22753a44859f8e7db1861a8a7c1e11658ad38d536f18b866c",
           "description": "Initial margin calculation result."
         }
       ]

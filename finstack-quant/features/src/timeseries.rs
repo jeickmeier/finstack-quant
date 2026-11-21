@@ -3,14 +3,14 @@
 mod advanced;
 
 use crate::types::{
-    f64_param, finite, mean, op_from_str, quantile_cont, reject_unknown_params, required_f64_param,
-    sample_std, scaled_centered, usize_param, validate_lengths, validate_output, window_params,
+    f64_param, finite, impl_op_enum, mean, quantile_cont, reject_unknown_params,
+    required_f64_param, sample_std, scaled_centered, usize_param, validate_lengths,
+    validate_output, window_params,
 };
 use advanced::{drawdown, exponential_decay_weights};
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::str::FromStr;
 
 /// Supported backward-looking time-series transform operation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize)]
@@ -69,54 +69,37 @@ pub enum TimeSeriesOp {
     EwmaZscore,
 }
 
-impl FromStr for TimeSeriesOp {
-    type Err = Error;
-
-    fn from_str(op: &str) -> Result<Self> {
-        op_from_str(op, "time-series", &Self::names())
-    }
-}
+impl_op_enum!(
+    TimeSeriesOp,
+    "time-series",
+    [
+        Returns,
+        LogReturns,
+        Diff,
+        Lag,
+        RollingMean,
+        RollingSum,
+        RollingStd,
+        RollingMin,
+        RollingMax,
+        RollingZscore,
+        RollingRank,
+        RollingQuantile,
+        RollingSkew,
+        RollingKurtosis,
+        RollingSlope,
+        RollingSharpe,
+        RollingWinsorize,
+        Drawdown,
+        HampelFilter,
+        ExponentialDecayWeights,
+        EwmaMean,
+        EwmaVol,
+        EwmaZscore,
+    ]
+);
 
 impl TimeSeriesOp {
-    /// Every operation, in declaration order.
-    pub const ALL: &'static [Self] = &[
-        Self::Returns,
-        Self::LogReturns,
-        Self::Diff,
-        Self::Lag,
-        Self::RollingMean,
-        Self::RollingSum,
-        Self::RollingStd,
-        Self::RollingMin,
-        Self::RollingMax,
-        Self::RollingZscore,
-        Self::RollingRank,
-        Self::RollingQuantile,
-        Self::RollingSkew,
-        Self::RollingKurtosis,
-        Self::RollingSlope,
-        Self::RollingSharpe,
-        Self::RollingWinsorize,
-        Self::Drawdown,
-        Self::HampelFilter,
-        Self::ExponentialDecayWeights,
-        Self::EwmaMean,
-        Self::EwmaVol,
-        Self::EwmaZscore,
-    ];
-
-    /// Canonical snake_case name used by JSON and host-language APIs.
-    #[must_use]
-    pub fn name(self) -> String {
-        crate::types::op_name(&self)
-    }
-
-    /// Canonical names of every operation, in [`Self::ALL`] order.
-    #[must_use]
-    pub fn names() -> Vec<String> {
-        Self::ALL.iter().map(|op| op.name()).collect()
-    }
-
     /// JSON parameter keys this operation reads; any other key is rejected.
     #[must_use]
     pub fn param_keys(self) -> &'static [&'static str] {
@@ -292,18 +275,34 @@ fn transform_entity(
     output: &mut [Option<f64>],
 ) -> Result<()> {
     match op {
-        PreparedOp::Returns(periods) => shifted_ratio(values, indices, periods, output, false),
-        PreparedOp::LogReturns(periods) => shifted_ratio(values, indices, periods, output, true),
-        PreparedOp::Diff(periods) => diff(values, indices, periods, output),
-        PreparedOp::Lag(periods) => lag(values, indices, periods, output),
+        PreparedOp::Returns(periods) => {
+            shifted_ratio(values, indices, periods, output, false);
+            Ok(())
+        }
+        PreparedOp::LogReturns(periods) => {
+            shifted_ratio(values, indices, periods, output, true);
+            Ok(())
+        }
+        PreparedOp::Diff(periods) => {
+            diff(values, indices, periods, output);
+            Ok(())
+        }
+        PreparedOp::Lag(periods) => {
+            lag(values, indices, periods, output);
+            Ok(())
+        }
         PreparedOp::Rolling {
             op,
             window,
             min_periods,
         } => rolling(values, indices, window, min_periods, output, op),
-        PreparedOp::Drawdown => drawdown(values, indices, output),
+        PreparedOp::Drawdown => {
+            drawdown(values, indices, output);
+            Ok(())
+        }
         PreparedOp::Decay { window, decay } => {
-            exponential_decay_weights(values, indices, window, decay, output)
+            exponential_decay_weights(values, indices, window, decay, output);
+            Ok(())
         }
         PreparedOp::EwmaMean(alpha) => {
             ewma_scan(values, indices, alpha, output, |state, _| Some(state.mean))
@@ -350,7 +349,7 @@ fn shifted_ratio(
     periods: usize,
     output: &mut [Option<f64>],
     log_return: bool,
-) -> Result<()> {
+) {
     for_each_finite_lag(values, indices, periods, |idx, current, previous| {
         output[idx] = match (current, previous) {
             (Some(current), Some(previous)) if previous.abs() > 0.0 => {
@@ -372,34 +371,21 @@ fn shifted_ratio(
             _ => None,
         };
     });
-    Ok(())
 }
 
-fn lag(
-    values: &[Option<f64>],
-    indices: &[usize],
-    periods: usize,
-    output: &mut [Option<f64>],
-) -> Result<()> {
+fn lag(values: &[Option<f64>], indices: &[usize], periods: usize, output: &mut [Option<f64>]) {
     for_each_finite_lag(values, indices, periods, |idx, current, previous| {
         output[idx] = current.and(previous);
     });
-    Ok(())
 }
 
-fn diff(
-    values: &[Option<f64>],
-    indices: &[usize],
-    periods: usize,
-    output: &mut [Option<f64>],
-) -> Result<()> {
+fn diff(values: &[Option<f64>], indices: &[usize], periods: usize, output: &mut [Option<f64>]) {
     for_each_finite_lag(values, indices, periods, |idx, current, previous| {
         output[idx] = match (current, previous) {
             (Some(current), Some(previous)) => Some(current - previous),
             _ => None,
         };
     });
-    Ok(())
 }
 
 #[derive(Clone, Copy)]
@@ -453,14 +439,11 @@ fn rolling(
             RollingOp::Max => finite_values.into_iter().reduce(f64::max),
             RollingOp::Zscore => {
                 let current = finite(values[idx]);
-                let (scale, centered) = scaled_centered(&finite_values)?;
-                let center = mean(&finite_values)?.unwrap_or(0.0);
+                let (_, centered) = scaled_centered(&finite_values)?;
                 let std = sample_std(&centered)?;
-                match (current, std) {
-                    (Some(current), Some(std)) if std > 0.0 => {
-                        Some((current / scale - center / scale) / std)
-                    }
-                    (Some(_), Some(_)) => Some(0.0),
+                match (current, centered.last(), std) {
+                    (Some(_), Some(&diff), Some(std)) if std > 0.0 => Some(diff / std),
+                    (Some(_), _, Some(_)) => Some(0.0),
                     _ => None,
                 }
             }

@@ -4,9 +4,9 @@ use super::types::{PyCsaSpec, PyImMethodology};
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::json_bridge::serde_to_py;
-use crate::bindings::macros::tabular_methods;
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
 use crate::bindings::table_builders::{TableBuilder, serde_rows_to_arrow_table};
-use crate::errors::{core_to_py, display_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_margin as fm;
@@ -28,27 +28,42 @@ pub struct PyVmResult {
     pub(super) inner: fm::calculators::VmResult,
 }
 
+wire_methods!(PyVmResult, fm::calculators::VmResult, "VmResult");
+py_getters!(PyVmResult |s| {
+    /// Gross mark-to-market exposure (positive = counterparty owes us).
+    gross_exposure -> f64 = s.inner.gross_exposure.amount();
+    /// Net exposure after threshold and independent amount.
+    net_exposure -> f64 = s.inner.net_exposure.amount();
+    /// Delivery amount (positive = we post margin).
+    post_amount -> f64 = s.inner.post_amount.amount();
+    /// Return amount (positive = we receive margin back).
+    collect_amount -> f64 = s.inner.collect_amount.amount();
+    /// Net desk cash outflow (post minus collect).
+    net_margin -> f64 = s.inner.net_margin().amount();
+    /// CSA threshold applied symmetrically to ``|gross_exposure|``.
+    threshold -> f64 = s.inner.threshold.amount();
+    /// CSA independent amount added to the threshold-adjusted exposure.
+    independent_amount -> f64 = s.inner.independent_amount.amount();
+    /// Signed collateral balance netted against ``net_exposure`` (positive =
+    /// held by us, negative = posted by us).
+    collateral_balance -> f64 = s.inner.collateral_balance.amount();
+    /// Signed call before the MTA test and rounding:
+    /// ``net_exposure - collateral_balance`` (positive = collect).
+    unrounded_call -> f64 = s.inner.unrounded_call.amount();
+    /// CSA minimum transfer amount; no transfer when
+    /// ``abs(unrounded_call) < mta``.
+    mta -> f64 = s.inner.mta.amount();
+    /// CSA rounding increment applied to a transfer that passes the MTA test
+    /// (up for a delivery, down for a return; zero disables rounding).
+    rounding_increment -> f64 = s.inner.rounding_increment.amount();
+    /// CSA base currency of every amount.
+    currency -> String = s.inner.gross_exposure.currency().to_string();
+    /// Whether a margin call is required.
+    requires_call -> bool = s.inner.requires_call();
+});
+
 #[pymethods]
 impl PyVmResult {
-    /// Deserialize a VM result from canonical JSON; raises ``ValueError`` on
-    /// malformed input.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this result to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Calculation date as ``datetime.date``.
     #[getter]
     fn date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -60,88 +75,6 @@ impl PyVmResult {
     #[getter]
     fn settlement_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.settlement_date)
-    }
-
-    /// Gross mark-to-market exposure (positive = counterparty owes us).
-    #[getter]
-    fn gross_exposure(&self) -> f64 {
-        self.inner.gross_exposure.amount()
-    }
-
-    /// Net exposure after threshold and independent amount.
-    #[getter]
-    fn net_exposure(&self) -> f64 {
-        self.inner.net_exposure.amount()
-    }
-
-    /// Delivery amount (positive = we post margin).
-    #[getter]
-    fn post_amount(&self) -> f64 {
-        self.inner.post_amount.amount()
-    }
-
-    /// Return amount (positive = we receive margin back).
-    #[getter]
-    fn collect_amount(&self) -> f64 {
-        self.inner.collect_amount.amount()
-    }
-
-    /// Net desk cash outflow (post minus collect).
-    #[getter]
-    fn net_margin(&self) -> f64 {
-        self.inner.net_margin().amount()
-    }
-
-    /// CSA threshold applied symmetrically to ``|gross_exposure|``.
-    #[getter]
-    fn threshold(&self) -> f64 {
-        self.inner.threshold.amount()
-    }
-
-    /// CSA independent amount added to the threshold-adjusted exposure.
-    #[getter]
-    fn independent_amount(&self) -> f64 {
-        self.inner.independent_amount.amount()
-    }
-
-    /// Signed collateral balance netted against ``net_exposure`` (positive =
-    /// held by us, negative = posted by us).
-    #[getter]
-    fn collateral_balance(&self) -> f64 {
-        self.inner.collateral_balance.amount()
-    }
-
-    /// Signed call before the MTA test and rounding:
-    /// ``net_exposure - collateral_balance`` (positive = collect).
-    #[getter]
-    fn unrounded_call(&self) -> f64 {
-        self.inner.unrounded_call.amount()
-    }
-
-    /// CSA minimum transfer amount; no transfer when
-    /// ``abs(unrounded_call) < mta``.
-    #[getter]
-    fn mta(&self) -> f64 {
-        self.inner.mta.amount()
-    }
-
-    /// CSA rounding increment applied to a transfer that passes the MTA test
-    /// (up for a delivery, down for a return; zero disables rounding).
-    #[getter]
-    fn rounding_increment(&self) -> f64 {
-        self.inner.rounding_increment.amount()
-    }
-
-    /// CSA base currency of every amount.
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.gross_exposure.currency().to_string()
-    }
-
-    /// Whether a margin call is required.
-    #[getter]
-    fn requires_call(&self) -> bool {
-        self.inner.requires_call()
     }
 
     fn __repr__(&self) -> String {
@@ -222,47 +155,16 @@ fn extract_dated_exposures(
     obj: &Bound<'_, PyAny>,
     currency: Currency,
 ) -> PyResult<Vec<(finstack_quant_core::dates::Date, Money)>> {
-    use crate::bindings::dataframe_utils::{
-        extract_f64_vec, is_dataframe_like, is_polars_dataframe, table_column_names,
-        table_column_to_pylist,
-    };
-    let items: Vec<(Bound<'_, PyAny>, f64)> = if obj.hasattr("items")? && obj.hasattr("index")? {
-        obj.call_method0("items")?
-            .try_iter()?
-            .map(|item| item?.extract::<(Bound<'_, PyAny>, f64)>())
-            .collect::<PyResult<_>>()?
-    } else if is_dataframe_like(obj)? {
-        let cols = table_column_names(obj)?;
-        if cols.len() != 2 {
-            return Err(crate::errors::value_error(format!(
-                "exposures DataFrame must have 2 columns (date, exposure), got {}",
-                cols.len()
-            )));
-        }
-        let dates_py = table_column_to_pylist(obj, &cols[0])?.unwrap_or_default();
-        let vals = if is_polars_dataframe(obj)? {
-            extract_f64_vec(&obj.get_item(&cols[1])?, &cols[1])?
-        } else {
-            let vals_py = table_column_to_pylist(obj, &cols[1])?.unwrap_or_default();
-            vals_py
-                .into_iter()
-                .map(|v| v.extract::<f64>())
-                .collect::<PyResult<Vec<_>>>()?
-        };
-        dates_py.into_iter().zip(vals).collect()
-    } else {
-        obj.extract()?
-    };
-    items
-        .iter()
-        .map(|(date, amount)| {
-            Ok((
-                py_to_date(date)?,
-                Money::new(*amount, currency).map_err(core_to_py)?,
-            ))
-        })
+    super::frame::dated_pairs_from_series_or_list(obj)?
+        .into_iter()
+        .map(|(date, amount)| Ok((date, Money::new(amount, currency).map_err(core_to_py)?)))
         .collect()
 }
+
+py_getters!(PyVmCalculator |s| {
+    /// CSA specification this calculator applies.
+    csa -> PyCsaSpec = PyCsaSpec { inner: s.inner.get_csa().clone() };
+});
 
 #[pymethods]
 impl PyVmCalculator {
@@ -271,14 +173,6 @@ impl PyVmCalculator {
     fn new(csa: &PyCsaSpec) -> Self {
         Self {
             inner: fm::calculators::VmCalculator::new(csa.inner.clone()),
-        }
-    }
-
-    /// CSA specification this calculator applies.
-    #[getter]
-    fn csa(&self) -> PyCsaSpec {
-        PyCsaSpec {
-            inner: self.inner.get_csa().clone(),
         }
     }
 
@@ -451,60 +345,23 @@ impl PyImResult {
     }
 }
 
-#[pymethods]
-impl PyImResult {
-    /// Deserialize an IM result from canonical JSON; raises ``ValueError``
-    /// on malformed input.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this result to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
+wire_methods!(PyImResult, fm::calculators::ImResult, "ImResult");
+py_getters!(PyImResult |s| {
     /// Calculated initial margin amount.
-    #[getter]
-    fn amount(&self) -> f64 {
-        self.inner.amount.amount()
-    }
-
+    amount -> f64 = s.inner.amount.amount();
     /// Currency of the IM amount.
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.amount.currency().to_string()
-    }
-
+    currency -> String = s.inner.amount.currency().to_string();
     /// Methodology used for calculation.
-    #[getter]
-    fn methodology(&self) -> PyImMethodology {
-        PyImMethodology {
-            inner: self.inner.methodology,
-        }
-    }
-
+    methodology -> PyImMethodology = PyImMethodology { inner: s.inner.methodology };
     /// Margin period of risk in business days.
-    #[getter]
-    fn mpor_days(&self) -> u32 {
-        self.inner.mpor_days
-    }
-
+    mpor_days -> u32 = s.inner.mpor_days;
     /// Whether the amount is a conservative approximation (proxy) rather than
     /// an exact computation under the named methodology.
-    #[getter]
-    fn approximation(&self) -> bool {
-        self.inner.approximation
-    }
+    approximation -> bool = s.inner.approximation;
+});
 
+#[pymethods]
+impl PyImResult {
     /// Calculation date as ``datetime.date``.
     #[getter]
     fn as_of<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {

@@ -7,9 +7,8 @@ use crate::aggregation::{
 };
 use crate::drawdown::{DrawdownEpisode, drawdown_details, to_drawdown_series};
 use crate::returns::{comp_sum, comp_total, excess_returns, finite_result, validate_cash};
-use finstack_quant_core::dates::{Date, DateExt, FiscalConfig, PeriodKind};
+use finstack_quant_core::dates::{Date, FiscalConfig, PeriodKind};
 use finstack_quant_core::math::summation::NeumaierAccumulator;
-use time::Month;
 
 impl Performance {
     /// Per-period simple returns for each ticker over the active window.
@@ -37,9 +36,7 @@ impl Performance {
 
     /// Cumulative compounded returns for each ticker.
     pub fn cumulative_returns(&self) -> finstack_quant_core::Result<Vec<Vec<f64>>> {
-        (0..self.ticker_names.len())
-            .map(|i| comp_sum(self.active_returns(i)))
-            .collect()
+        self.try_map_tickers(|i| comp_sum(self.active_returns(i)))
     }
 
     /// Drawdown series for each ticker.
@@ -183,16 +180,14 @@ impl Performance {
         for &cash in rf {
             validate_cash(cash)?;
         }
-        (0..self.ticker_names.len())
-            .map(|i| {
-                let span = self.active_span_for_ticker(i);
-                let returns = self.active_returns(i);
-                let offset = span.start.saturating_sub(self.start_idx);
-                let rf_aligned =
-                    &rf[offset.min(rf.len())..offset.saturating_add(returns.len()).min(rf.len())];
-                excess_returns(returns, rf_aligned, ann)
-            })
-            .collect()
+        self.try_map_tickers(|i| {
+            let span = self.active_span_for_ticker(i);
+            let returns = self.active_returns(i);
+            let offset = span.start.saturating_sub(self.start_idx);
+            let rf_aligned =
+                &rf[offset.min(rf.len())..offset.saturating_add(returns.len()).min(rf.len())];
+            excess_returns(returns, rf_aligned, ann)
+        })
     }
 
     /// Compounded returns for each lookback period (MTD, QTD, YTD, FYTD) at `ref_date`.
@@ -234,15 +229,9 @@ impl Performance {
             })?,
         };
         let fiscal_config = fiscal_config.unwrap_or_else(FiscalConfig::calendar_year);
-        let month_start = |month: Month| {
-            Date::from_calendar_date(ref_date.year(), month, 1)
-                .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))
-        };
         // Construct every requested boundary before inspecting sample availability.
-        let mtd_start = month_start(ref_date.month())?;
-        let qtd_start = month_start(Month::January.nth_next((ref_date.quarter() - 1) * 3))?;
-        let ytd_start = month_start(Month::January)?;
-        let fytd_start = fiscal_config.year_start(ref_date.fiscal_year(fiscal_config))?;
+        let [mtd_start, qtd_start, ytd_start, fytd_start] =
+            super::lookback_starts(ref_date, fiscal_config)?;
         let compute =
             |period_start: Date| -> finstack_quant_core::Result<(Vec<f64>, Vec<LookbackSample>)> {
                 let mut values = Vec::with_capacity(self.ticker_names.len());
@@ -350,16 +339,14 @@ impl Performance {
         &self,
         frequency: PeriodKind,
     ) -> finstack_quant_core::Result<Vec<Vec<PeriodicReturn>>> {
-        (0..self.get_ticker_names().len())
-            .map(|i| {
-                group_period_buckets(
-                    self.active_dates_for_ticker_unchecked(i),
-                    self.active_returns(i),
-                    frequency,
-                    None,
-                )
-            })
-            .collect()
+        self.try_map_tickers(|i| {
+            group_period_buckets(
+                self.active_dates_for_ticker_unchecked(i),
+                self.active_returns(i),
+                frequency,
+                None,
+            )
+        })
     }
 }
 

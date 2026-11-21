@@ -23,7 +23,7 @@ const UPDATE = process.env.UPDATE_PARITY_GOLDEN === '1';
 
 const QUARTERLY = { count: 3, unit: 'months' };
 const leverage = () =>
-  covenants.covenantNew(covenants.covenantTypeMaxDebtToEbitda(4.5), QUARTERLY, 'max_leverage');
+  covenants.covenantNew({ max_debt_to_ebitda: { threshold: 4.5 } }, QUARTERLY, 'max_leverage');
 const leverageSpec = () => covenants.covenantSpecWithMetric(leverage(), 'debt_to_ebitda');
 const series = [
   { date: '2026-06-30', metrics: { debt_to_ebitda: 4.8, ebitda: 100 } },
@@ -42,48 +42,51 @@ function withEngine(specs, body) {
 
 const cases = {
   covenant_types: () => [
-    covenants.covenantTypeMaxDebtToEbitda(4.5),
-    covenants.covenantTypeMinInterestCoverage(2.0),
-    covenants.covenantTypeMinFixedChargeCoverage(1.2),
-    covenants.covenantTypeMaxTotalLeverage(6.0),
-    covenants.covenantTypeMaxSeniorLeverage(4.0),
-    covenants.covenantTypeMinAssetCoverage(1.5),
-    covenants.covenantTypeNegative('no additional senior debt'),
-    covenants.covenantTypeAffirmative('deliver audited financials within 90 days'),
-    covenants.covenantTypeCustom('net_working_capital', 'minimum', 25.0),
-    covenants.covenantTypeCustom('capex_to_sales', 'maximum', 0.08),
-    covenants.covenantTypeBasket('restricted_payments', 5_000_000),
-    covenants.covenantTypeMinDscr(1.25),
-    covenants.covenantTypeMaxNetDebtToEbitda(3.5),
-    covenants.covenantTypeMaxCapex(10_000_000),
-    covenants.covenantTypeMinLiquidity(2_500_000),
+    { max_debt_to_ebitda: { threshold: 4.5 } },
+    { min_interest_coverage: { threshold: 2.0 } },
+    { min_fixed_charge_coverage: { threshold: 1.2 } },
+    { max_total_leverage: { threshold: 6.0 } },
+    { max_senior_leverage: { threshold: 4.0 } },
+    { min_asset_coverage: { threshold: 1.5 } },
+    { negative: { restriction: 'no additional senior debt' } },
+    { affirmative: { requirement: 'deliver audited financials within 90 days' } },
+    { custom: { metric: 'net_working_capital', test: { minimum: 25.0 } } },
+    { custom: { metric: 'capex_to_sales', test: { maximum: 0.08 } } },
+    { basket: { name: 'restricted_payments', limit: 5_000_000 } },
+    { min_dscr: { threshold: 1.25 } },
+    { max_net_debt_to_ebitda: { threshold: 3.5 } },
+    { max_capex: { threshold: 10_000_000 } },
+    { min_liquidity: { threshold: 2_500_000 } },
   ],
   consequences: () => [
-    covenants.covenantConsequenceDefault(),
-    covenants.covenantConsequenceRateIncrease(200),
-    covenants.covenantConsequenceCashSweep(0.5),
-    covenants.covenantConsequenceBlockDistributions(),
-    covenants.covenantConsequenceRequireCollateral('first lien on receivables'),
-    covenants.covenantConsequenceAccelerateMaturity('2027-12-31'),
+    'default',
+    { rate_increase: { bp_increase: 200 } },
+    { cash_sweep: { sweep_percentage: 0.5 } },
+    'block_distributions',
+    { require_collateral: { description: 'first lien on receivables' } },
+    { accelerate_maturity: { new_maturity: '2027-12-31' } },
   ],
   covenant_modifiers: () => {
     const base = leverage();
     return [
       base,
-      covenants.covenantWithCurePeriod(base, 30),
-      covenants.covenantWithCurePeriod(covenants.covenantWithCurePeriod(base, 30)),
-      covenants.covenantWithConsequence(base, covenants.covenantConsequenceRateIncrease(200)),
-      covenants.covenantWithScope(base, 'incurrence'),
-      covenants.covenantWithSpringingCondition(base, {
-        metric_id: 'revolver_utilization',
-        test: { minimum: 0.35 },
-      }),
+      { ...base, cure_period_days: 30 },
+      { ...base, cure_period_days: null },
+      { ...base, consequences: [{ rate_increase: { bp_increase: 200 } }] },
+      { ...base, scope: 'incurrence' },
+      {
+        ...base,
+        springing_condition: {
+          metric_id: 'revolver_utilization',
+          test: { minimum: 0.35 },
+        },
+      },
     ];
   },
   spec_modifiers: () => {
     const netLeverage = covenants.covenantSpecWithMetric(
       covenants.covenantNew(
-        covenants.covenantTypeMaxNetDebtToEbitda(3.5),
+        { max_net_debt_to_ebitda: { threshold: 3.5 } },
         QUARTERLY,
         'max_net_leverage'
       ),
@@ -96,20 +99,14 @@ const cases = {
     return {
       new: covenants.covenantSpecNew(
         covenants.covenantNew(
-          covenants.covenantTypeMaxNetDebtToEbitda(3.5),
+          { max_net_debt_to_ebitda: { threshold: 3.5 } },
           QUARTERLY,
           'max_net_leverage'
         )
       ),
       with_metric: [leverageSpec(), netLeverage],
-      with_denominator_metric: covenants.covenantSpecWithDenominatorMetric(
-        netLeverage,
-        'adjusted_ebitda'
-      ),
-      with_threshold_schedule: covenants.covenantSpecWithThresholdSchedule(
-        leverageSpec(),
-        schedule
-      ),
+      with_denominator_metric: { ...netLeverage, denominator_metric_id: 'adjusted_ebitda' },
+      with_threshold_schedule: { ...leverageSpec(), threshold_schedule: schedule },
       threshold_for: ['2025-12-31', '2026-01-01', '2026-06-30', '2026-07-01'].map(
         (date) => covenants.thresholdScheduleThresholdFor(schedule, date) ?? null
       ),
@@ -156,10 +153,7 @@ const cases = {
     const engine = new covenants.CovenantEngine();
     try {
       engine.addSpec(
-        covenants.covenantSpecWithMetric(
-          covenants.covenantWithCurePeriod(leverage(), 30),
-          'debt_to_ebitda'
-        )
+        covenants.covenantSpecWithMetric({ ...leverage(), cure_period_days: 30 }, 'debt_to_ebitda')
       );
       engine.validate();
       const breached = engine.evaluateAndTrack(
@@ -218,10 +212,15 @@ const cases = {
         breach_probability_threshold: 0.2,
       })
     ),
-    with_scope: covenants.covenantForecastConfigWithScope(
-      { stochastic: true, volatility: 0.2 },
-      'incurrence'
-    ),
+    with_scope: {
+      scope: 'incurrence',
+      stochastic: true,
+      num_paths: 0,
+      volatility: 0.2,
+      random_seed: null,
+      antithetic: false,
+      breach_probability_threshold: 0.05,
+    },
   }),
 };
 
@@ -294,23 +293,18 @@ test('covenant errors are structured and Rust-owned', () => {
     kind('validation', /unknown variant/)
   );
   assert.throws(
-    () => covenants.covenantTypeCustom('m', 'between', 1),
-    kind('validation', /test must be "maximum" or "minimum", got "between"/)
-  );
-  assert.throws(
-    () => covenants.covenantWithScope(leverage(), 'sometimes'),
-    kind('validation', /scope: unknown variant/)
-  );
-  assert.throws(
-    () => covenants.covenantWithCurePeriod(leverage(), 1.5),
-    kind('invalid_type', /^days: /)
+    () => covenants.covenantSpecNew({ ...leverage(), scope: 'sometimes' }),
+    kind('validation', /covenant: unknown variant/)
   );
   assert.throws(
     () =>
-      covenants.covenantSpecWithThresholdSchedule(leverageSpec(), [
-        ['2026-01-01', 4.5],
-        ['2026-01-01', 4.0],
-      ]),
+      covenants.thresholdScheduleThresholdFor(
+        [
+          ['2026-01-01', 4.5],
+          ['2026-01-01', 4.0],
+        ],
+        '2026-01-01'
+      ),
     kind('validation', /schedule: .*duplicate date 2026-01-01/)
   );
   assert.throws(

@@ -539,7 +539,7 @@ impl CashFlowSchedule {
     /// violated.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         self.validate_structure()?;
-        self.validate_principal_balance()?;
+        let _ = self.replay_balances()?;
         self.validate_dates()
     }
 
@@ -584,14 +584,9 @@ impl CashFlowSchedule {
     fn validate_native_cash(&self) -> finstack_quant_core::Result<()> {
         self.validate_structure()?;
         if !self.has_multiple_principal_currencies() {
-            self.validate_principal_balance()?;
+            let _ = self.replay_balances()?;
         }
         self.validate_dates()
-    }
-
-    fn validate_principal_balance(&self) -> finstack_quant_core::Result<()> {
-        let _ = self.replay_balances()?;
-        Ok(())
     }
 
     fn validate_dates(&self) -> finstack_quant_core::Result<()> {
@@ -800,13 +795,7 @@ impl CashFlowSchedule {
                 cf.get_principal_delta()
                     .zip(cf.get_balance_date())
                     .map(|(delta, date)| (date, delta.checked_neg()))
-                    .ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(format!(
-                            "{} row on {} has no principal_delta or principal_date",
-                            cf.get_kind(),
-                            cf.get_date()
-                        ))
-                    })
+                    .ok_or_else(|| crate::aggregation::missing_principal_delta(cf))
             })
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
         weighted_average_life_from_principal(repayments, as_of)
@@ -940,6 +929,29 @@ impl CashFlowSchedule {
         Ok(balances)
     }
 
+    fn validate_closing_balances(
+        initial: Money,
+        closing: &mut [(Date, Money)],
+        max_scale: f64,
+    ) -> finstack_quant_core::Result<()> {
+        if initial.amount_decimal() >= rust_decimal::Decimal::ZERO {
+            let ccy = initial.currency();
+            let tol = (1e-12 * max_scale).max(1e-9);
+            for (date, balance) in closing {
+                if balance.amount() < -tol {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "principal repayments exceed outstanding on {date}: {}",
+                        balance.amount()
+                    )));
+                }
+                if balance.amount() < 0.0 {
+                    *balance = Money::zero(ccy);
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Closing balance after each balance date, in replay order.
     fn replay_balances(&self) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
         let order = self.balance_replay_order(|_| true);
@@ -956,21 +968,7 @@ impl CashFlowSchedule {
                 _ => closing.push((date, outstanding)),
             }
         }
-        if self.notional.initial.amount_decimal() >= rust_decimal::Decimal::ZERO {
-            let ccy = self.notional.initial.currency();
-            let tol = (1e-12 * max_scale).max(1e-9);
-            for (date, balance) in &mut closing {
-                if balance.amount() < -tol {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "principal repayments exceed outstanding on {date}: {}",
-                        balance.amount()
-                    )));
-                }
-                if balance.amount() < 0.0 {
-                    *balance = Money::zero(ccy);
-                }
-            }
-        }
+        Self::validate_closing_balances(self.notional.initial, &mut closing, max_scale)?;
         Ok(closing)
     }
 
@@ -998,19 +996,28 @@ impl CashFlowSchedule {
     /// negative for a non-negative initial notional, and propagates currency
     /// mismatches or decimal overflow from balance replay.
     pub fn balances_by_flow(&self) -> finstack_quant_core::Result<Vec<(Money, Money)>> {
-        let _ = self.replay_balances()?;
         let mut outstanding = self.notional.initial;
+        let mut max_scale = outstanding.amount().abs().max(1.0);
         let mut balances = vec![(outstanding, outstanding); self.flows.len()];
         let mut path: Vec<(Date, Money)> = Vec::new();
+        let mut closing: Vec<(Date, Money)> = Vec::new();
         for (index, balance_date) in self.balance_replay_order(|_| true) {
             let flow = &self.flows[index];
             let before = outstanding;
             apply_flow_to_outstanding(&mut outstanding, flow)?;
+            max_scale = max_scale.max(outstanding.amount().abs());
             balances[index] = (before, outstanding);
             if outstanding != before {
                 path.push((balance_date, outstanding));
             }
+            match closing.last_mut() {
+                Some((last_date, last_balance)) if *last_date == balance_date => {
+                    *last_balance = outstanding;
+                }
+                _ => closing.push((balance_date, outstanding)),
+            }
         }
+        Self::validate_closing_balances(self.notional.initial, &mut closing, max_scale)?;
         for (flow, balance) in self.flows.iter().zip(&mut balances) {
             if let (Some(accrual), true) = (&flow.get_accrual(), balance.0 == balance.1) {
                 let moved = path.partition_point(|(date, _)| *date < accrual.get_end());

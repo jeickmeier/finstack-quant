@@ -27,6 +27,22 @@ use rust_decimal::Decimal;
 use std::sync::Arc;
 use tracing::debug;
 
+pub(super) struct CompiledCashFlowPlan {
+    pub(super) notional: Notional,
+    pub(super) issue: Date,
+    pub(super) maturity: Date,
+    pub(super) fixed_schedules: Vec<FixedSchedule>,
+    pub(super) float_schedules: Vec<FloatSchedule>,
+    pub(super) periodic_fees: Vec<PeriodicFee>,
+    pub(super) fixed_fees: Vec<(Date, Money)>,
+    pub(super) principal_events: Vec<PrincipalEventSpec>,
+    pub(super) dates: Vec<Date>,
+    pub(super) amort_setup: AmortizationSetup,
+    pub(super) redemption_date: Date,
+    pub(super) redemption_effective_date: Date,
+    pub(super) principal_exchange: PrincipalExchange,
+}
+
 impl CompiledCashFlowPlan {
     /// Every fixed, floating and periodic-fee period, in schedule order.
     fn all_periods(&self) -> impl Iterator<Item = &CompiledPeriod> {
@@ -166,9 +182,7 @@ impl CompiledCashFlowPlan {
 
         Ok(())
     }
-}
 
-impl CompiledCashFlowPlan {
     /// Every date the build loop visits, sorted and deduplicated.
     pub(super) fn collect_all_dates(&self) -> finstack_quant_core::Result<Vec<Date>> {
         let estimated_periods: usize = self
@@ -208,25 +222,7 @@ impl CompiledCashFlowPlan {
         }
         Ok(dates)
     }
-}
 
-pub(super) struct CompiledCashFlowPlan {
-    pub(super) notional: Notional,
-    pub(super) issue: Date,
-    pub(super) maturity: Date,
-    pub(super) fixed_schedules: Vec<FixedSchedule>,
-    pub(super) float_schedules: Vec<FloatSchedule>,
-    pub(super) periodic_fees: Vec<PeriodicFee>,
-    pub(super) fixed_fees: Vec<(Date, Money)>,
-    pub(super) principal_events: Vec<PrincipalEventSpec>,
-    pub(super) dates: Vec<Date>,
-    pub(super) amort_setup: AmortizationSetup,
-    pub(super) redemption_date: Date,
-    pub(super) redemption_effective_date: Date,
-    pub(super) principal_exchange: PrincipalExchange,
-}
-
-impl CompiledCashFlowPlan {
     pub(super) fn project(
         &self,
         curves: Option<&finstack_quant_core::market_data::context::MarketContext>,
@@ -249,15 +245,7 @@ impl CompiledCashFlowPlan {
         // them by date, so they need no entries in the date grid.
         for (fee_date, amount) in &self.fixed_fees {
             state.flows.push(
-                CashFlowParams::new(
-                    *fee_date,
-                    None,
-                    Money::from_decimal(amount.amount_decimal(), amount.currency()),
-                    CFKind::Fee,
-                    0.0,
-                    None,
-                )
-                .build()?,
+                CashFlowParams::new(*fee_date, None, *amount, CFKind::Fee, 0.0, None).build()?,
             );
         }
 

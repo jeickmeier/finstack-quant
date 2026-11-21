@@ -196,19 +196,8 @@ fn derive_amortization_setup(
             PreparedAmortization::CustomPrincipal(map)
         }
         AmortizationSpec::LinearTo { final_notional } => {
-            if final_notional.currency() != notional.initial.currency() {
-                return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected: notional.initial.currency(),
-                    actual: final_notional.currency(),
-                });
-            }
             let initial = notional.initial.amount_decimal();
             let final_notional = final_notional.amount_decimal();
-            if final_notional < Decimal::ZERO || final_notional > initial {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "LinearTo final_notional {final_notional} must satisfy 0 <= final_notional <= initial ({initial})"
-                )));
-            }
             let installment =
                 (initial - final_notional) / Decimal::from(payment_dates.len() as u64);
             PreparedAmortization::LinearTo {
@@ -488,7 +477,7 @@ impl CashFlowBuilder {
         &self,
         curves: Option<&finstack_quant_core::market_data::context::MarketContext>,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        self.compile_plan()?.project(curves, None)
+        self.build_with_cutoff(curves, None)
     }
 
     /// Build cashflows using the valuation date to distinguish historical fixings
@@ -506,7 +495,7 @@ impl CashFlowBuilder {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        self.compile_plan()?.project(Some(curves), Some(as_of))
+        self.build_with_cutoff(Some(curves), Some(as_of))
     }
 
     pub(crate) fn build_with_cutoff(

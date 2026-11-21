@@ -283,7 +283,7 @@ fn forecast_covenant_impl<MTS: ModelTimeSeries>(
     validate_config(&config)?;
     covenant.validate()?;
 
-    let id = covenant.covenant.instance_key();
+    let id = covenant.covenant.label.clone();
     let description = covenant.covenant.description();
     tracing::debug!(
         covenant = %id,
@@ -354,7 +354,7 @@ fn forecast_covenant_impl<MTS: ModelTimeSeries>(
         .iter()
         .zip(thresholds.iter())
         .map(|(&v, &t)| {
-            let raw = headroom_for(covenant.covenant.covenant_type.bound_kind(), v, t);
+            let raw = headroom_for(Some(bound_kind), v, t);
             raw.is_finite().then_some(raw)
         })
         .collect();
@@ -362,32 +362,30 @@ fn forecast_covenant_impl<MTS: ModelTimeSeries>(
     let headroom_raw = values
         .iter()
         .zip(&thresholds)
-        .map(|(&value, &threshold)| {
-            headroom_raw_for(
-                covenant.covenant.covenant_type.bound_kind(),
-                value,
-                threshold,
-            )
-        })
+        .map(|(&value, &threshold)| headroom_raw_for(Some(bound_kind), value, threshold))
         .collect();
 
-    let mut deterministic_breach_prob: Vec<f64> = values
+    let deterministic_breaches: Vec<bool> = values
         .iter()
         .zip(thresholds.iter())
-        .map(|(&v, &t)| {
-            let breached = is_covenant_breached(&covenant.covenant.covenant_type, v, t);
-            breached as u8 as f64
+        .zip(activation_flags.iter())
+        .map(|((&v, &t), &active)| {
+            active && is_covenant_breached(&covenant.covenant.covenant_type, v, t)
         })
         .collect();
 
     for (i, active) in activation_flags.iter().enumerate() {
         if !active {
             headroom[i] = None;
-            deterministic_breach_prob[i] = 0.0;
         }
     }
 
-    let mut breach_probability = deterministic_breach_prob.clone();
+    let deterministic_breach_prob: Vec<f64> = deterministic_breaches
+        .iter()
+        .map(|&breached| if breached { 1.0 } else { 0.0 })
+        .collect();
+
+    let mut breach_probability = deterministic_breach_prob;
     let mut breach_probability_stderr = vec![0.0_f64; values.len()];
 
     if config.stochastic {
@@ -402,17 +400,7 @@ fn forecast_covenant_impl<MTS: ModelTimeSeries>(
             "starting stochastic breach probability calculation"
         );
 
-        let ref_date = match config.reference_date {
-            Some(date) => date,
-            None => model
-                .period_start_date(&periods[0])?
-                .previous_day()
-                .ok_or_else(|| {
-                    Error::Validation(
-                        "forecast reference date precedes supported date range".into(),
-                    )
-                })?,
-        };
+        let ref_date = resolve_reference_date(model, &periods[0], config.reference_date)?;
 
         let mut eligible: Vec<usize> = Vec::new();
         let mut horizons: Vec<f64> = Vec::new();
@@ -483,24 +471,15 @@ fn forecast_covenant_impl<MTS: ModelTimeSeries>(
     let min_headroom_date = min_idx.map(|i| test_dates[i]);
     let min_headroom_value = min_idx.and_then(|i| headroom[i]);
 
-    let first_breach_date = (0..values.len()).find_map(|i| {
-        let v = values[i];
-        let t = thresholds[i];
-        if !activation_flags[i] {
-            return None;
-        }
-        let breached = is_covenant_breached(&covenant.covenant.covenant_type, v, t);
-        breached.then_some(test_dates[i])
-    });
+    let first_breach_date = deterministic_breaches
+        .iter()
+        .enumerate()
+        .find_map(|(i, &breached)| breached.then_some(test_dates[i]));
 
     let comparator = bound_kind;
 
     let projected_values = values.iter().map(|v| v.is_finite().then_some(*v)).collect();
 
-    let deterministic_breaches = deterministic_breach_prob
-        .iter()
-        .map(|&p| p >= 1.0)
-        .collect();
     Ok((
         CovenantForecast {
             covenant_id: id,
@@ -577,18 +556,11 @@ pub fn forecast_breaches_generic<MTS: ModelTimeSeries>(
         }
     }
     let mut config = config;
-    if config.reference_date.is_none() {
-        config.reference_date = Some(
-            model
-                .period_start_date(&periods[0])?
-                .previous_day()
-                .ok_or_else(|| {
-                    Error::Validation(
-                        "forecast reference date precedes supported date range".into(),
-                    )
-                })?,
-        );
-    }
+    config.reference_date = Some(resolve_reference_date(
+        model,
+        &periods[0],
+        config.reference_date,
+    )?);
     let mut breaches = Vec::new();
     for (spec, dates) in groups {
         let (forecast, deterministic, active) =
@@ -693,11 +665,7 @@ fn validate_config(config: &CovenantForecastConfig) -> Result<()> {
                     .to_string(),
             ));
         }
-        let independent_samples = if config.antithetic {
-            config.num_paths.div_ceil(2)
-        } else {
-            config.num_paths
-        };
+        let independent_samples = mc_sample_units(config);
         if config.num_paths > 0 && independent_samples < 2 {
             return Err(Error::Validation(
                 "Monte Carlo requires at least two independent samples (two antithetic pairs)"
@@ -713,6 +681,30 @@ fn validate_config(config: &CovenantForecastConfig) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn resolve_reference_date<MTS: ModelTimeSeries>(
+    model: &MTS,
+    first_period: &PeriodId,
+    configured: Option<Date>,
+) -> Result<Date> {
+    match configured {
+        Some(date) => Ok(date),
+        None => model
+            .period_start_date(first_period)?
+            .previous_day()
+            .ok_or_else(|| {
+                Error::Validation("forecast reference date precedes supported date range".into())
+            }),
+    }
+}
+
+fn mc_sample_units(config: &CovenantForecastConfig) -> usize {
+    if config.antithetic {
+        config.num_paths.div_ceil(2)
+    } else {
+        config.num_paths
+    }
 }
 
 fn lognormal_breach_probability(
@@ -765,11 +757,7 @@ fn mc_breach_probabilities(
 ) -> Result<(Vec<f64>, Vec<f64>)> {
     let n_dates = bases.len();
     let seed = config.random_seed.unwrap_or(DEFAULT_MC_SEED);
-    let n_units = if config.antithetic {
-        config.num_paths.div_ceil(2)
-    } else {
-        config.num_paths
-    };
+    let n_units = mc_sample_units(config);
 
     let mut sum = vec![0.0_f64; n_dates];
     let mut sum_sq = vec![0.0_f64; n_dates];

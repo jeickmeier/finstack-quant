@@ -223,7 +223,6 @@ in this directory. They live as `pub const` tables in
 | `params/equity.rs` | Equity |
 | `params/commodity.rs` | Commodity |
 | `params/fx.rs` | Foreign exchange |
-| `params/correlation_scenarios.rs` | The three MAR21.6 correlation scenarios |
 
 **Source.** Basel Committee on Banking Supervision, *Minimum capital
 requirements for market risk* (BCBS **d457**), published 14 January 2019,

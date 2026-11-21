@@ -6,7 +6,8 @@
 
 use std::collections::HashSet;
 
-use finstack_quant_core::dates::{Date, PeriodKind};
+use finstack_quant_core::dates::{Date, DateExt, FiscalConfig, PeriodKind};
+use time::Month;
 
 use super::drawdown::to_drawdown_series;
 use super::returns::pairwise_returns;
@@ -20,6 +21,23 @@ mod panel;
 mod rolling;
 mod scalar;
 mod serialization;
+
+/// Calendar MTD, QTD, YTD, and fiscal-YTD window start dates for `ref_date`.
+pub(super) fn lookback_starts(
+    ref_date: Date,
+    fiscal_config: FiscalConfig,
+) -> finstack_quant_core::Result<[Date; 4]> {
+    let month_start = |month: Month| {
+        Date::from_calendar_date(ref_date.year(), month, 1)
+            .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))
+    };
+    Ok([
+        month_start(ref_date.month())?,
+        month_start(Month::January.nth_next((ref_date.quarter() - 1) * 3))?,
+        month_start(Month::January)?,
+        fiscal_config.year_start(ref_date.fiscal_year(fiscal_config))?,
+    ])
+}
 
 /// A price panel from the five values a test supplies.
 #[cfg(test)]
@@ -704,22 +722,6 @@ impl Performance {
         ticker_index(&self.ticker_names, ticker)
     }
 
-    /// Reject a tail `confidence` outside the open interval `(0.5, 1)`.
-    ///
-    /// Tail metrics (`value_at_risk`, `expected_shortfall`, `tail_ratio`,
-    /// `cdar`, `parametric_var`, `cornish_fisher_var`, `modified_sharpe`)
-    /// route through this guard so a confidence such as `95.0` or `1.0`
-    /// surfaces as an explicit error rather than a `NaN` column.
-    fn ensure_confidence(confidence: f64) -> finstack_quant_core::Result<()> {
-        if confidence.is_finite() && confidence > 0.5 && confidence < 1.0 {
-            Ok(())
-        } else {
-            Err(finstack_quant_core::Error::Validation(format!(
-                "confidence must lie in the open interval (0.5, 1); got {confidence}"
-            )))
-        }
-    }
-
     /// Reject a zero rolling `window`.
     ///
     /// A window longer than the active series still yields an empty
@@ -873,13 +875,19 @@ impl Performance {
     }
 
     /// Map a per-ticker closure over all tickers in column order.
-    ///
-    /// Centralises the `(0..n_tickers).map(..).collect()` idiom used
-    /// throughout the scalar-metric API.
     #[inline]
     fn map_tickers<T, F>(&self, f: F) -> Vec<T>
     where
         F: FnMut(usize) -> T,
+    {
+        (0..self.ticker_names.len()).map(f).collect()
+    }
+
+    /// Fallibly map a per-ticker closure over all tickers in column order.
+    #[inline]
+    fn try_map_tickers<T, F>(&self, f: F) -> finstack_quant_core::Result<Vec<T>>
+    where
+        F: FnMut(usize) -> finstack_quant_core::Result<T>,
     {
         (0..self.ticker_names.len()).map(f).collect()
     }

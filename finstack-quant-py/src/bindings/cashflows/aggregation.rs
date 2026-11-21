@@ -15,7 +15,7 @@ use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::py_to_date;
-use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
 use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
 
@@ -70,14 +70,13 @@ wire_methods!(
     module = "finstack_quant.cashflows.aggregation"
 );
 
+py_getters! { PyPeriodAggregation |s| {
+    #[doc = pydoc!("finstack_quant.cashflows.aggregation", "PeriodAggregation.periods")]
+    periods -> Vec<String> = s.inner.keys().map(ToString::to_string).collect();
+}}
+
 #[pymethods]
 impl PyPeriodAggregation {
-    #[doc = pydoc!("finstack_quant.cashflows.aggregation", "PeriodAggregation.periods")]
-    #[getter]
-    fn periods(&self) -> Vec<String> {
-        self.inner.keys().map(ToString::to_string).collect()
-    }
-
     #[doc = pydoc!("finstack_quant.cashflows.aggregation", "PeriodAggregation.get_period")]
     #[pyo3(text_signature = "(self, period)")]
     fn get_period<'py>(

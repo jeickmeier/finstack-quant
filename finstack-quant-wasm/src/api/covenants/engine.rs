@@ -77,29 +77,6 @@ impl JsCovenantEngine {
         Ok(JsCovenantEngine { inner })
     }
 
-    /// Parse an engine from its canonical JSON.
-    ///
-    /// @param json - `CovenantEngine` JSON string or plain object; only `specs` is required and unknown fields are rejected.
-    /// @returns The parsed `CovenantEngine`; it is validated when evaluated.
-    /// @throws If `json` is neither a string nor a plain object (kind `invalid_type`) or does not match the engine schema (kind `validation`).
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
-    ) -> Result<JsCovenantEngine, JsValue> {
-        serde_json::from_str(&json_text(&json, "json")?)
-            .map(|inner| JsCovenantEngine { inner })
-            .map_err(to_js_err)
-    }
-
-    /// Serialize the engine, including its breach history, to canonical JSON.
-    ///
-    /// @returns `CovenantEngine` JSON accepted by `fromJson` and by `evaluateEngine`.
-    /// @throws If the engine cannot be serialized.
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
     /// Add a covenant specification in place.
     ///
     /// @param spec - `CovenantSpec` wire object. Its covenant label is the report key and must be unique among specifications applicable on a test date.
@@ -229,6 +206,8 @@ impl JsCovenantEngine {
         to_js_value(&self.inner.breach_history)
     }
 }
+
+json_round_trip!(JsCovenantEngine, CovenantEngine);
 
 /// Build the covenant specs of one standard package.
 ///

@@ -7,14 +7,9 @@ use finstack_quant_core::dates::parse_iso_date;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-fn roundtrip_json<T>(json: &str) -> Result<String>
-where
-    T: DeserializeOwned + Serialize,
-{
-    let value: T = serde_json::from_str(json).map_err(|e| {
-        finstack_quant_core::Error::Validation(format!("Invalid covenant JSON: {e}"))
-    })?;
-    canonical_json(&value)
+fn parse_json<T: DeserializeOwned>(json: &str, context: &str) -> Result<T> {
+    serde_json::from_str(json)
+        .map_err(|e| finstack_quant_core::Error::Validation(format!("{context}: {e}")))
 }
 
 fn canonical_json<T: Serialize>(value: &T) -> Result<String> {
@@ -47,9 +42,7 @@ fn canonical_json<T: Serialize>(value: &T) -> Result<String> {
 /// (for example, an invalid threshold or frequency), or cannot be serialized
 /// back to JSON.
 pub fn validate_covenant_spec_json(json: &str) -> Result<String> {
-    let value: CovenantSpec = serde_json::from_str(json).map_err(|e| {
-        finstack_quant_core::Error::Validation(format!("Invalid covenant JSON: {e}"))
-    })?;
+    let value: CovenantSpec = parse_json(json, "Invalid covenant JSON")?;
     value.validate()?;
     canonical_json(&value)
 }
@@ -73,7 +66,8 @@ pub fn validate_covenant_spec_json(json: &str) -> Result<String> {
 /// Returns [`finstack_quant_core::Error::Validation`] if `json` is malformed,
 /// does not match the report schema, or cannot be serialized after decoding.
 pub fn validate_covenant_report_json(json: &str) -> Result<String> {
-    roundtrip_json::<CovenantReport>(json)
+    let value: CovenantReport = parse_json(json, "Invalid covenant JSON")?;
+    canonical_json(&value)
 }
 
 /// Validate and canonicalize a [`CovenantEngine`] encoded as JSON.
@@ -95,10 +89,7 @@ pub fn validate_covenant_report_json(json: &str) -> Result<String> {
 /// cannot be decoded as an engine, contains an invalid covenant package, or
 /// cannot be serialized back to JSON.
 pub fn validate_covenant_engine_json(json: &str) -> Result<String> {
-    let value: CovenantEngine = serde_json::from_str(json).map_err(|e| {
-        finstack_quant_core::Error::Validation(format!("Invalid covenant JSON: {e}"))
-    })?;
-    value.validate()?;
+    let value = parse_engine(json, "Invalid covenant JSON")?;
     canonical_json(&value)
 }
 
@@ -138,10 +129,9 @@ pub fn evaluate_engine(
     metrics_json: &str,
     as_of: &str,
 ) -> Result<indexmap::IndexMap<String, CovenantReport>> {
-    let engine = parse_engine(engine_json)?;
+    let engine = parse_engine(engine_json, "Invalid covenant engine JSON")?;
     let source = HashMapMetricSource::from_json(metrics_json)?;
-    let test_date = parse_iso_date(as_of)?;
-    engine.evaluate_specs(&engine.applicable_specs(test_date), &source, test_date)
+    evaluate_parsed_engine(&engine, &source, as_of)
 }
 
 /// Evaluate a covenant engine document against an already-built metric source.
@@ -174,13 +164,21 @@ pub fn evaluate_engine_with_source(
     source: &HashMapMetricSource,
     as_of: &str,
 ) -> Result<indexmap::IndexMap<String, CovenantReport>> {
-    parse_engine(engine_json)?.evaluate(source, parse_iso_date(as_of)?)
+    let engine = parse_engine(engine_json, "Invalid covenant engine JSON")?;
+    evaluate_parsed_engine(&engine, source, as_of)
 }
 
-fn parse_engine(engine_json: &str) -> Result<CovenantEngine> {
-    let engine: CovenantEngine = serde_json::from_str(engine_json).map_err(|e| {
-        finstack_quant_core::Error::Validation(format!("Invalid covenant engine JSON: {e}"))
-    })?;
+fn evaluate_parsed_engine(
+    engine: &CovenantEngine,
+    source: &HashMapMetricSource,
+    as_of: &str,
+) -> Result<indexmap::IndexMap<String, CovenantReport>> {
+    let test_date = parse_iso_date(as_of)?;
+    engine.evaluate_specs(&engine.applicable_specs(test_date), source, test_date)
+}
+
+fn parse_engine(engine_json: &str, context: &str) -> Result<CovenantEngine> {
+    let engine: CovenantEngine = parse_json(engine_json, context)?;
     engine.validate()?;
     Ok(engine)
 }

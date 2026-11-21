@@ -176,9 +176,12 @@ fn test_simm_calculator_exists() {
 
     // Test IR delta calculation with empty sensitivities (edge case)
     let empty = finstack_quant_margin::types::SimmSensitivities::new(Currency::USD);
-    let (ir_margin, _) = simm
-        .calculate_from_sensitivities_parts(&empty, Currency::USD)
-        .expect("empty sensitivities");
+    let as_of = Date::from_calendar_date(2025, time::Month::January, 15).expect("valid date");
+    let ir_margin = simm
+        .calculate_from_sensitivities(&empty, Currency::USD, as_of)
+        .expect("empty sensitivities")
+        .amount
+        .amount();
 
     // Empty sensitivities should produce zero margin
     assert_eq!(

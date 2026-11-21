@@ -37,18 +37,10 @@ macro_rules! wire_methods {
 
     ($py_type:ident, $rust_type:ty, $name:literal, module = $module:literal, to_dict) => {
         $crate::bindings::macros::wire_methods!($py_type, $rust_type, $name, module = $module);
-
-        #[::pyo3::pymethods]
-        impl $py_type {
-            #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_dict"))]
-            #[pyo3(text_signature = "($self)")]
-            fn to_dict<'py>(
-                &self,
-                py: ::pyo3::Python<'py>,
-            ) -> ::pyo3::PyResult<::pyo3::Bound<'py, ::pyo3::PyAny>> {
-                $crate::bindings::json_bridge::serde_to_py(py, &self.inner)
-            }
-        }
+        $crate::bindings::macros::wire_methods!(
+            @documented_to_dict $py_type,
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_dict"))
+        );
     };
 
     ($py_type:ident, $rust_type:ty, $name:literal) => {
@@ -57,23 +49,7 @@ macro_rules! wire_methods {
     };
     ($py_type:ident, $rust_type:ty, $name:literal, to_dict) => {
         $crate::bindings::macros::wire_methods!($py_type, $rust_type, $name);
-
-        #[::pyo3::pymethods]
-        impl $py_type {
-            /// Return every field as a plain ``dict`` (canonical serde shape).
-            ///
-            /// Raises
-            /// ------
-            /// ValueError
-            ///     If the value cannot be serialized.
-            #[pyo3(text_signature = "($self)")]
-            fn to_dict<'py>(
-                &self,
-                py: ::pyo3::Python<'py>,
-            ) -> ::pyo3::PyResult<::pyo3::Bound<'py, ::pyo3::PyAny>> {
-                $crate::bindings::json_bridge::serde_to_py(py, &self.inner)
-            }
-        }
+        $crate::bindings::macros::wire_methods!(@to_dict $py_type);
     };
     ($py_type:ident, $rust_type:ty, $name:literal, module = $module:literal, validate) => {
         $crate::bindings::macros::wire_methods!(@documented_json $py_type, $rust_type, $name, [], |inner| {
@@ -84,12 +60,51 @@ macro_rules! wire_methods {
             $crate::bindings::pydoc::pydoc!($module, concat!($name, ".from_json")));
         $crate::bindings::macros::wire_methods!(@reduce $py_type, $crate::bindings::pydoc::pydoc!($module, concat!($name, ".__reduce__")));
     };
+    ($py_type:ident, $rust_type:ty, $name:literal, module = $module:literal, validate, to_dict) => {
+        $crate::bindings::macros::wire_methods!(
+            $py_type,
+            $rust_type,
+            $name,
+            module = $module,
+            validate
+        );
+        $crate::bindings::macros::wire_methods!(
+            @documented_to_dict $py_type,
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_dict"))
+        );
+    };
     ($py_type:ident, $rust_type:ty, $name:literal, validate) => {
         $crate::bindings::macros::wire_methods!(@json $py_type, $rust_type, $name, [], |inner| {
             inner.validate().map_err($crate::errors::core_to_py)?;
             inner
         });
         $crate::bindings::macros::wire_methods!(@reduce $py_type);
+    };
+    ($py_type:ident, $rust_type:ty, $name:literal, validate, to_dict) => {
+        $crate::bindings::macros::wire_methods!($py_type, $rust_type, $name, validate);
+        $crate::bindings::macros::wire_methods!(@to_dict $py_type);
+    };
+    (@to_dict $py_type:ident) => {
+        $crate::bindings::macros::wire_methods!(
+            @documented_to_dict $py_type,
+            concat!(
+                "Return every field as a plain ``dict`` (canonical serde shape).\n\n",
+                "Raises\n------\nValueError\n    If the value cannot be serialized."
+            )
+        );
+    };
+    (@documented_to_dict $py_type:ident, $doc:expr_2021) => {
+        #[::pyo3::pymethods]
+        impl $py_type {
+            #[doc = $doc]
+            #[pyo3(text_signature = "($self)")]
+            fn to_dict<'py>(
+                &self,
+                py: ::pyo3::Python<'py>,
+            ) -> ::pyo3::PyResult<::pyo3::Bound<'py, ::pyo3::PyAny>> {
+                $crate::bindings::json_bridge::serde_to_py(py, &self.inner)
+            }
+        }
     };
     ($py_type:ident, $rust_type:ty, $name:literal, module = $module:literal, arc) => {
         $crate::bindings::macros::wire_methods!(@documented_json $py_type, $rust_type, $name, [*], |inner| {

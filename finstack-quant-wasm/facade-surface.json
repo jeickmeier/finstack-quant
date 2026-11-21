@@ -1833,37 +1833,10 @@
     "kind": "namespace",
     "keys": [
       "CovenantEngine",
-      "covenantConsequenceAccelerateMaturity",
-      "covenantConsequenceBlockDistributions",
-      "covenantConsequenceCashSweep",
-      "covenantConsequenceDefault",
-      "covenantConsequenceRateIncrease",
-      "covenantConsequenceRequireCollateral",
-      "covenantForecastConfigWithScope",
       "covenantNew",
       "covenantSpecNew",
-      "covenantSpecWithDenominatorMetric",
       "covenantSpecWithMetric",
-      "covenantSpecWithThresholdSchedule",
       "covenantTemplate",
-      "covenantTypeAffirmative",
-      "covenantTypeBasket",
-      "covenantTypeCustom",
-      "covenantTypeMaxCapex",
-      "covenantTypeMaxDebtToEbitda",
-      "covenantTypeMaxNetDebtToEbitda",
-      "covenantTypeMaxSeniorLeverage",
-      "covenantTypeMaxTotalLeverage",
-      "covenantTypeMinAssetCoverage",
-      "covenantTypeMinDscr",
-      "covenantTypeMinFixedChargeCoverage",
-      "covenantTypeMinInterestCoverage",
-      "covenantTypeMinLiquidity",
-      "covenantTypeNegative",
-      "covenantWithConsequence",
-      "covenantWithCurePeriod",
-      "covenantWithScope",
-      "covenantWithSpringingCondition",
       "evaluateEngine",
       "forecastBreaches",
       "forecastCovenant",
@@ -1889,97 +1862,16 @@
     ],
     "getters": ["breachHistory", "specs", "waivers"]
   },
-  "covenants.covenantConsequenceAccelerateMaturity": {
-    "kind": "function"
-  },
-  "covenants.covenantConsequenceBlockDistributions": {
-    "kind": "function"
-  },
-  "covenants.covenantConsequenceCashSweep": {
-    "kind": "function"
-  },
-  "covenants.covenantConsequenceDefault": {
-    "kind": "function"
-  },
-  "covenants.covenantConsequenceRateIncrease": {
-    "kind": "function"
-  },
-  "covenants.covenantConsequenceRequireCollateral": {
-    "kind": "function"
-  },
-  "covenants.covenantForecastConfigWithScope": {
-    "kind": "function"
-  },
   "covenants.covenantNew": {
     "kind": "function"
   },
   "covenants.covenantSpecNew": {
     "kind": "function"
   },
-  "covenants.covenantSpecWithDenominatorMetric": {
-    "kind": "function"
-  },
   "covenants.covenantSpecWithMetric": {
     "kind": "function"
   },
-  "covenants.covenantSpecWithThresholdSchedule": {
-    "kind": "function"
-  },
   "covenants.covenantTemplate": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeAffirmative": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeBasket": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeCustom": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMaxCapex": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMaxDebtToEbitda": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMaxNetDebtToEbitda": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMaxSeniorLeverage": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMaxTotalLeverage": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMinAssetCoverage": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMinDscr": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMinFixedChargeCoverage": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMinInterestCoverage": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeMinLiquidity": {
-    "kind": "function"
-  },
-  "covenants.covenantTypeNegative": {
-    "kind": "function"
-  },
-  "covenants.covenantWithConsequence": {
-    "kind": "function"
-  },
-  "covenants.covenantWithCurePeriod": {
-    "kind": "function"
-  },
-  "covenants.covenantWithScope": {
-    "kind": "function"
-  },
-  "covenants.covenantWithSpringingCondition": {
     "kind": "function"
   },
   "covenants.evaluateEngine": {
@@ -2092,8 +1984,6 @@
       "SimmCalculator",
       "SimmSensitivities",
       "VmCalculator",
-      "clearingStatusCleared",
-      "collateralAssetClassFromStr",
       "collateralAssetClassFxAddon",
       "collateralAssetClassStandardHaircut",
       "computeBilateralXva",
@@ -2130,27 +2020,21 @@
       "imDecayProfileFactor",
       "imDecayProfileLinearToMaturity",
       "imDecayProfileSqrtTime",
-      "imMethodologyFromStr",
       "imProfileFromSimm",
       "imProfileValidate",
       "imResultBreakdownAmount",
       "imResultBreakdownKeys",
-      "marginCallTypeFromStr",
       "marginFundingCost",
       "marginFundingCostCostForPeriod",
       "marginFundingCostSpreadBp",
       "marginFundingCostSpreadRate",
-      "marginTenorFromStr",
       "marginUtilization",
       "marginUtilizationIsAdequate",
       "marginUtilizationRatio",
       "marginUtilizationShortfall",
-      "nettingSetIdBilateral",
-      "nettingSetIdCleared",
       "otcMarginSpecBilateralSchedule",
       "otcMarginSpecBilateralSimm",
       "otcMarginSpecCleared",
-      "otcMarginSpecWithSimmCreditClassification",
       "saCcrNettingSetConfigMargined",
       "saCcrNettingSetConfigUnmargined",
       "saCcrNettingSetConfigValidate",
@@ -2170,9 +2054,6 @@
     "kind": "function"
   },
   "margin.otcMarginSpecCleared": {
-    "kind": "function"
-  },
-  "margin.otcMarginSpecWithSimmCreditClassification": {
     "kind": "function"
   },
   "margin.computeBilateralXva": {
@@ -2293,12 +2174,6 @@
   "margin.computeMva": {
     "kind": "function"
   },
-  "margin.clearingStatusCleared": {
-    "kind": "function"
-  },
-  "margin.collateralAssetClassFromStr": {
-    "kind": "function"
-  },
   "margin.collateralAssetClassFxAddon": {
     "kind": "function"
   },
@@ -2412,9 +2287,6 @@
   "margin.imDecayProfileSqrtTime": {
     "kind": "function"
   },
-  "margin.imMethodologyFromStr": {
-    "kind": "function"
-  },
   "margin.imProfileFromSimm": {
     "kind": "function"
   },
@@ -2425,9 +2297,6 @@
     "kind": "function"
   },
   "margin.imResultBreakdownKeys": {
-    "kind": "function"
-  },
-  "margin.marginCallTypeFromStr": {
     "kind": "function"
   },
   "margin.marginFundingCost": {
@@ -2442,9 +2311,6 @@
   "margin.marginFundingCostSpreadRate": {
     "kind": "function"
   },
-  "margin.marginTenorFromStr": {
-    "kind": "function"
-  },
   "margin.marginUtilization": {
     "kind": "function"
   },
@@ -2455,12 +2321,6 @@
     "kind": "function"
   },
   "margin.marginUtilizationShortfall": {
-    "kind": "function"
-  },
-  "margin.nettingSetIdBilateral": {
-    "kind": "function"
-  },
-  "margin.nettingSetIdCleared": {
     "kind": "function"
   },
   "margin.saCcrNettingSetConfigMargined": {

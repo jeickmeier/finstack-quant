@@ -27,15 +27,6 @@ wasm.CashFlowBuilder.prototype.build = function build(market = undefined) {
     : rawBuildWithMarket.call(this, market);
 };
 
-// wasm-bindgen cannot borrow an array of handles either: a list of schedules
-// crosses as canonical JSON, which Rust parses back into `CashFlowSchedule`s.
-const scheduleJsonList = (schedules) =>
-  Array.isArray(schedules)
-    ? schedules.map((schedule) =>
-        schedule instanceof wasm.CashFlowSchedule ? schedule.toJson() : schedule
-      )
-    : schedules;
-
 chain(wasm.CashFlowBuilder, [
   'principal',
   'principalExchange',
@@ -132,42 +123,8 @@ export const cashflows = {
   floatingRateSpecSofr: wasm.floatingRateSpecSofr,
   floatingRateSpecSonia: wasm.floatingRateSpecSonia,
   floatingRateSpecValidate: wasm.floatingRateSpecValidate,
-  // wasm-bindgen cannot borrow an array of handles: `scheduleJsonList` sends canonical JSON.
-  /**
-   * Materialize the reset observations crossed by a realized-forward market roll.
-   *
-   * Every projected fixing recorded in the schedules' metadata with a date in
-   * `[oldDate, newDate]` is written into a copy of the market as an observed
-   * fixing; existing observations take precedence and are kept unchanged.
-   *
-   * @param market - `MarketContext` handle of the pre-roll market; it is not modified.
-   * @param schedules - Schedules projected on `market` at `oldDate`: `CashFlowSchedule` handles (the facade passes them as JSON), canonical JSON strings or plain objects.
-   * @param oldDate - ISO-8601 inclusive start of the fixing window: same-day projections become observed.
-   * @param newDate - ISO-8601 inclusive end of the window; must be on or after `oldDate`.
-   * @returns A new `MarketContext` handle with the crossed fixings materialized; release it with free().
-   * @throws If the window runs backward, a fixing-series identifier is malformed, a crossed projection is unavailable or non-finite, or two schedules project the same index and date differently (kind `validation`).
-   *
-   * @facadeType (market: MarketContext, schedules: readonly (CashFlowSchedule | JsonInput)[], oldDate: string, newDate: string) => MarketContext
-   */
-  materializeFixings: (market, schedules, oldDate, newDate) =>
-    wasm.materializeFixings(market, scheduleJsonList(schedules), oldDate, newDate),
-  // wasm-bindgen cannot borrow an array of handles: `scheduleJsonList` sends canonical JSON.
-  /**
-   * Merge several schedules into one under a new notional and day count.
-   *
-   * Flows are concatenated and put into canonical order; calendar ids and
-   * projected fixings are merged.
-   *
-   * @param schedules - Schedules to merge: `CashFlowSchedule` handles (the facade passes them as JSON), canonical JSON strings or plain objects.
-   * @param notional - `Notional` wire object of the merged schedule.
-   * @param dayCount - `DayCount` wire string of the merged schedule.
-   * @returns The merged `CashFlowSchedule` handle.
-   * @throws If `schedules` is not an array (kind `invalid_type`) or an argument does not match its wire type (kind `validation`).
-   *
-   * @facadeType (schedules: readonly (CashFlowSchedule | JsonInput)[], notional: generated.cashflows.Notional, dayCount: generated.core.DayCount) => CashFlowSchedule
-   */
-  mergeCashflowSchedules: (schedules, notional, dayCount) =>
-    wasm.mergeCashflowSchedules(scheduleJsonList(schedules), notional, dayCount),
+  materializeFixings: wasm.materializeFixings,
+  mergeCashflowSchedules: wasm.mergeCashflowSchedules,
   monthlyToAnnual: wasm.monthlyToAnnual,
   notionalPar: wasm.notionalPar,
   notionalValidate: wasm.notionalValidate,

@@ -8,112 +8,12 @@
 //! plain value. A payload-free enum variant (`"simm"`, `"daily"`, `"cash"`)
 //! has no function; its twin is the TypeScript string literal.
 
-use super::{base_money, js_currency};
+use super::{base_money, js_currency, parse_label};
 use crate::api::core::config::JsFinstackConfig;
 use crate::utils::input::{from_js_json, js_f64, js_opt_bool, js_opt_f64, js_string, js_uint};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_margin as fm;
 use wasm_bindgen::prelude::*;
-
-/// Parse a lower-case wire label into one of the margin label enums.
-fn parse_label<T>(value: &JsValue, label: &str) -> Result<T, JsValue>
-where
-    T: std::str::FromStr<Err = String>,
-{
-    js_string(value, label)?.parse::<T>().map_err(to_js_err)
-}
-
-// ---------------------------------------------------------------------------
-// ImMethodology
-// ---------------------------------------------------------------------------
-
-/// Parse an initial margin methodology from its lower-case wire label.
-/// @param s - One of `"haircut"`, `"simm"`, `"schedule"`, `"internal_model"`, `"clearing_house"`.
-/// @returns The canonical `ImMethodology` wire label.
-///
-/// # Errors
-///
-/// Throws a validation error for any other spelling, including `"SIMM"`.
-#[wasm_bindgen(js_name = imMethodologyFromStr, unchecked_return_type = "ImMethodology")]
-pub fn im_methodology_from_str(
-    #[wasm_bindgen(unchecked_param_type = "string")] s: JsValue,
-) -> Result<String, JsValue> {
-    Ok(parse_label::<fm::types::ImMethodology>(&s, "s")?.to_string())
-}
-
-// ---------------------------------------------------------------------------
-// MarginTenor
-// ---------------------------------------------------------------------------
-
-/// Parse a margin call frequency from its lower-case wire label.
-/// @param s - One of `"daily"`, `"weekly"`, `"monthly"`, `"on_demand"`.
-/// @returns The canonical `MarginTenor` wire label.
-///
-/// # Errors
-///
-/// Throws a validation error for any other spelling.
-#[wasm_bindgen(js_name = marginTenorFromStr, unchecked_return_type = "MarginTenor")]
-pub fn margin_tenor_from_str(
-    #[wasm_bindgen(unchecked_param_type = "string")] s: JsValue,
-) -> Result<String, JsValue> {
-    Ok(parse_label::<fm::types::MarginTenor>(&s, "s")?.to_string())
-}
-
-// ---------------------------------------------------------------------------
-// MarginCallType
-// ---------------------------------------------------------------------------
-
-/// Parse a margin call type from its lower-case wire label.
-/// @param s - One of `"initial_margin"`, `"variation_margin_post"`, `"variation_margin_collect"`, `"top_up"`, `"substitution"`.
-/// @returns The canonical `MarginCallType` wire label.
-///
-/// # Errors
-///
-/// Throws a validation error for any other spelling.
-#[wasm_bindgen(js_name = marginCallTypeFromStr, unchecked_return_type = "MarginCallType")]
-pub fn margin_call_type_from_str(
-    #[wasm_bindgen(unchecked_param_type = "string")] s: JsValue,
-) -> Result<String, JsValue> {
-    Ok(parse_label::<fm::types::MarginCallType>(&s, "s")?.to_string())
-}
-
-// ---------------------------------------------------------------------------
-// ClearingStatus
-// ---------------------------------------------------------------------------
-
-/// Cleared status through a named central counterparty.
-/// @param ccp - CCP identifier, for example `"LCH"`, `"CME"`, `"ICE"` or `"JSCC"`.
-/// @returns The `ClearingStatus` value `{ cleared: { ccp } }`.
-///
-/// # Errors
-///
-/// Throws a `TypeError` when `ccp` is not a string.
-#[wasm_bindgen(js_name = clearingStatusCleared, unchecked_return_type = "ClearingStatus")]
-pub fn clearing_status_cleared(
-    #[wasm_bindgen(unchecked_param_type = "string")] ccp: JsValue,
-) -> Result<JsValue, JsValue> {
-    let ccp = js_string(&ccp, "ccp")?;
-    to_js_value(&fm::types::ClearingStatus::Cleared { ccp })
-}
-
-// ---------------------------------------------------------------------------
-// CollateralAssetClass
-// ---------------------------------------------------------------------------
-
-/// Parse a collateral asset class from its lower-case wire label.
-/// @param s - One of `"cash"`, `"government_bonds"`, `"agency_bonds"`, `"covered_bonds"`, `"corporate_bonds"`, `"equity"`, `"gold"`, `"mutual_funds"`.
-/// @returns The canonical `CollateralAssetClass` wire label.
-///
-/// # Errors
-///
-/// Throws a validation error for any other spelling.
-#[wasm_bindgen(js_name = collateralAssetClassFromStr, unchecked_return_type = "CollateralAssetClass")]
-pub fn collateral_asset_class_from_str(
-    #[wasm_bindgen(unchecked_param_type = "string")] s: JsValue,
-) -> Result<String, JsValue> {
-    Ok(parse_label::<fm::types::CollateralAssetClass>(&s, "s")?.to_string())
-}
-
 /// BCBS-IOSCO standard haircut for a collateral asset class.
 /// @param assetClass - `CollateralAssetClass` wire label such as `"government_bonds"`.
 /// @returns The haircut as a decimal fraction of collateral value (0.02 is 2%).
@@ -148,44 +48,6 @@ pub fn collateral_asset_class_fx_addon(
     parse_label::<fm::types::CollateralAssetClass>(&asset_class, "assetClass")?
         .fx_addon()
         .map_err(to_js_err)
-}
-
-// ---------------------------------------------------------------------------
-// NettingSetId
-// ---------------------------------------------------------------------------
-
-/// Netting set identifier for a bilateral CSA relationship.
-/// @param counterpartyId - Counterparty identifier.
-/// @param csaId - CSA agreement identifier.
-/// @returns The `NettingSetId` value `{ kind: "bilateral", counterparty_id, csa_id }`.
-///
-/// # Errors
-///
-/// Throws a `TypeError` when an argument is not a string.
-#[wasm_bindgen(js_name = nettingSetIdBilateral, unchecked_return_type = "NettingSetId")]
-pub fn netting_set_id_bilateral(
-    #[wasm_bindgen(js_name = "counterpartyId", unchecked_param_type = "string")]
-    counterparty_id: JsValue,
-    #[wasm_bindgen(js_name = "csaId", unchecked_param_type = "string")] csa_id: JsValue,
-) -> Result<JsValue, JsValue> {
-    let counterparty_id = js_string(&counterparty_id, "counterpartyId")?;
-    let csa_id = js_string(&csa_id, "csaId")?;
-    to_js_value(&fm::types::NettingSetId::bilateral(counterparty_id, csa_id))
-}
-
-/// Netting set identifier for trades cleared through one CCP.
-/// @param ccpId - CCP identifier; also used as the counterparty id.
-/// @returns The `NettingSetId` value `{ kind: "cleared", ccp_id }`.
-///
-/// # Errors
-///
-/// Throws a `TypeError` when `ccp_id` is not a string.
-#[wasm_bindgen(js_name = nettingSetIdCleared, unchecked_return_type = "NettingSetId")]
-pub fn netting_set_id_cleared(
-    #[wasm_bindgen(js_name = "ccpId", unchecked_param_type = "string")] ccp_id: JsValue,
-) -> Result<JsValue, JsValue> {
-    let ccp_id = js_string(&ccp_id, "ccpId")?;
-    to_js_value(&fm::types::NettingSetId::cleared(ccp_id))
 }
 
 // ---------------------------------------------------------------------------
@@ -561,13 +423,6 @@ pub fn csa_spec_validate(
 // EligibleCollateralSchedule
 // ---------------------------------------------------------------------------
 
-fn parse_schedule(
-    schedule: &JsValue,
-    label: &str,
-) -> Result<fm::types::EligibleCollateralSchedule, JsValue> {
-    from_js_json(schedule, label)
-}
-
 /// Eligible-collateral schedule that accepts cash only.
 /// @returns The `EligibleCollateralSchedule` as a plain object.
 ///
@@ -635,7 +490,7 @@ pub fn eligible_collateral_schedule_is_eligible(
     #[wasm_bindgen(js_name = "assetClass", unchecked_param_type = "CollateralAssetClass")]
     asset_class: JsValue,
 ) -> Result<bool, JsValue> {
-    let schedule = parse_schedule(&schedule, "schedule")?;
+    let schedule: fm::types::EligibleCollateralSchedule = from_js_json(&schedule, "schedule")?;
     let asset_class = parse_label::<fm::types::CollateralAssetClass>(&asset_class, "assetClass")?;
     Ok(schedule.is_eligible(&asset_class))
 }
@@ -654,7 +509,7 @@ pub fn eligible_collateral_schedule_haircut_for(
     #[wasm_bindgen(js_name = "assetClass", unchecked_param_type = "CollateralAssetClass")]
     asset_class: JsValue,
 ) -> Result<Option<f64>, JsValue> {
-    let schedule = parse_schedule(&schedule, "schedule")?;
+    let schedule: fm::types::EligibleCollateralSchedule = from_js_json(&schedule, "schedule")?;
     let asset_class = parse_label::<fm::types::CollateralAssetClass>(&asset_class, "assetClass")?;
     Ok(schedule.haircut_for(&asset_class))
 }
@@ -676,7 +531,7 @@ pub fn eligible_collateral_schedule_haircut_for_maturity(
     #[wasm_bindgen(js_name = "remainingYears", unchecked_param_type = "number")]
     remaining_years: JsValue,
 ) -> Result<Option<f64>, JsValue> {
-    let schedule = parse_schedule(&schedule, "schedule")?;
+    let schedule: fm::types::EligibleCollateralSchedule = from_js_json(&schedule, "schedule")?;
     let asset_class = parse_label::<fm::types::CollateralAssetClass>(&asset_class, "assetClass")?;
     let remaining_years = js_f64(&remaining_years, "remainingYears")?;
     Ok(schedule.haircut_for_maturity(&asset_class, remaining_years))
@@ -699,7 +554,7 @@ pub fn eligible_collateral_schedule_check_concentration_limits(
     )]
     allocations: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let schedule = parse_schedule(&schedule, "schedule")?;
+    let schedule: fm::types::EligibleCollateralSchedule = from_js_json(&schedule, "schedule")?;
     let allocations = from_js_json::<Vec<(String, f64)>>(&allocations, "allocations")?
         .into_iter()
         .map(|(asset_class, amount)| {
@@ -769,20 +624,4 @@ pub fn otc_margin_spec_cleared(
     let ccp = js_string(&ccp, "ccp")?;
     let currency = js_currency(&currency, "currency")?;
     to_js_value(&fm::types::OtcMarginSpec::cleared(ccp, currency).map_err(to_js_err)?)
-}
-
-/// Add an explicit credit classification to an independent OTC margin specification.
-/// @param spec - Native OTC terms holding clearing and CSA settings.
-/// @param classification - Qualifying sector or non-qualifying class on the selected risk basis.
-/// @returns Native margin specification with that classification.
-/// @throws FinstackError if either native document cannot be decoded.
-#[wasm_bindgen(js_name = otcMarginSpecWithSimmCreditClassification, unchecked_return_type = "generated.margin.OtcMarginSpec")]
-pub fn otc_margin_spec_with_simm_credit_classification(
-    #[wasm_bindgen(unchecked_param_type = "generated.margin.OtcMarginSpec")] spec: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "generated.margin.SimmCreditClassification")]
-    classification: JsValue,
-) -> Result<JsValue, JsValue> {
-    let spec: fm::types::OtcMarginSpec = from_js_json(&spec, "spec")?;
-    let classification = from_js_json(&classification, "classification")?;
-    to_js_value(&spec.with_simm_credit_classification(classification))
 }

@@ -149,18 +149,12 @@ pub const CSR_SEC_NONCTP_RISK_WEIGHTS: &[(u8, f64)] = &[
     (25, 3.5),
 ];
 
-use std::sync::LazyLock;
-
-use finstack_quant_core::FxHashMap;
-
-// Index the fixed `pub const` slices into hashmaps so per-trade lookups
-// are O(1). Built once on first use.
-static CSR_NONSEC_BY_BUCKET: LazyLock<FxHashMap<u8, f64>> =
-    LazyLock::new(|| CSR_NONSEC_RISK_WEIGHTS.iter().copied().collect());
-static CSR_SEC_CTP_BY_BUCKET: LazyLock<FxHashMap<u8, f64>> =
-    LazyLock::new(|| CSR_SEC_CTP_RISK_WEIGHTS.iter().copied().collect());
-static CSR_SEC_NONCTP_BY_BUCKET: LazyLock<FxHashMap<u8, f64>> =
-    LazyLock::new(|| CSR_SEC_NONCTP_RISK_WEIGHTS.iter().copied().collect());
+fn bucket_weight(weights: &[(u8, f64)], bucket: u8) -> f64 {
+    weights
+        .iter()
+        .find(|(b, _)| *b == bucket)
+        .map_or(f64::NAN, |(_, w)| *w)
+}
 
 /// Look up a CSR non-sec delta risk weight by bucket (MAR21.53, Table 4).
 ///
@@ -169,10 +163,7 @@ static CSR_SEC_NONCTP_BY_BUCKET: LazyLock<FxHashMap<u8, f64>> =
 /// * `bucket` - Validated FRTB CSR non-securitisation bucket; unknown buckets return NaN.
 #[must_use]
 pub fn csr_nonsec_risk_weight(bucket: u8) -> f64 {
-    CSR_NONSEC_BY_BUCKET
-        .get(&bucket)
-        .copied()
-        .unwrap_or(f64::NAN)
+    bucket_weight(CSR_NONSEC_RISK_WEIGHTS, bucket)
 }
 
 /// Look up a CSR sec CTP delta risk weight by bucket (MAR21.59, Table 6).
@@ -182,10 +173,7 @@ pub fn csr_nonsec_risk_weight(bucket: u8) -> f64 {
 /// * `bucket` - Validated FRTB CSR correlation-trading-portfolio bucket; unknown buckets return NaN.
 #[must_use]
 pub fn csr_sec_ctp_risk_weight(bucket: u8) -> f64 {
-    CSR_SEC_CTP_BY_BUCKET
-        .get(&bucket)
-        .copied()
-        .unwrap_or(f64::NAN)
+    bucket_weight(CSR_SEC_CTP_RISK_WEIGHTS, bucket)
 }
 
 /// Look up a CSR sec non-CTP delta risk weight by bucket.
@@ -195,8 +183,5 @@ pub fn csr_sec_ctp_risk_weight(bucket: u8) -> f64 {
 /// * `bucket` - Validated FRTB CSR non-CTP securitisation bucket; unknown buckets return NaN.
 #[must_use]
 pub fn csr_sec_nonctp_risk_weight(bucket: u8) -> f64 {
-    CSR_SEC_NONCTP_BY_BUCKET
-        .get(&bucket)
-        .copied()
-        .unwrap_or(f64::NAN)
+    bucket_weight(CSR_SEC_NONCTP_RISK_WEIGHTS, bucket)
 }

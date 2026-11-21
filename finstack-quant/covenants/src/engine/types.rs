@@ -49,7 +49,7 @@ pub struct Covenant {
     pub scope: CovenantScope,
     /// Optional activation condition for springing covenants.
     pub springing_condition: Option<SpringingCondition>,
-    /// Optional instance label disambiguating covenants of the same type.
+    /// Required instance label disambiguating covenants of the same type.
     ///
     /// [`CovenantType::covenant_id`] is discriminant-only, so two covenants of
     /// the same type (e.g. a senior and a total leverage test, or two baskets)
@@ -111,11 +111,6 @@ impl Covenant {
     /// Get human-readable description of the covenant
     pub fn description(&self) -> String {
         self.covenant_type.to_string()
-    }
-
-    /// Stable identity key for reports, breaches, and waivers.
-    pub fn instance_key(&self) -> String {
-        self.label.clone()
     }
 
     pub(crate) fn validate(&self) -> finstack_quant_core::Result<()> {
@@ -533,7 +528,7 @@ impl CovenantConsequence {
 #[serde(deny_unknown_fields)]
 pub struct CovenantWaiver {
     /// Stable instance identifier of the waived covenant
-    /// (from [`Covenant::instance_key`]).
+    /// (from [`Covenant::label`]).
     pub covenant_id: String,
     /// Start date of the waiver period.
     #[cfg_attr(
@@ -709,7 +704,7 @@ pub struct CovenantWindow {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CovenantBreach {
-    /// Stable identifier matching [`Covenant::instance_key`].
+    /// Stable identifier matching [`Covenant::label`].
     #[serde(default)]
     pub covenant_id: String,
     /// Human-readable description (from `Display`).

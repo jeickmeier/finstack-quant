@@ -59,58 +59,124 @@ use finstack_quant_core::math::summation::NeumaierAccumulator;
 use super::mva;
 use super::types::{CreditXvaRow, ExposureProfile, FundingConfig, FundingXvaRow, XvaResult};
 
-fn compute_cva_internal(
-    exposure_profile: &ExposureProfile,
-    counterparty_hazard_curve: &HazardCurve,
-    discount_curve: &DiscountCurve,
-    recovery_rate: f64,
-    own_survival_curve: Option<&HazardCurve>,
-) -> finstack_quant_core::Result<XvaResult> {
-    exposure_profile.validate()?;
-    let n = exposure_profile.times.len();
+struct SampledCurves {
+    discount: Vec<f64>,
+    counterparty_survival: Vec<f64>,
+    own_survival: Vec<f64>,
+}
 
-    if !(0.0..=1.0).contains(&recovery_rate) {
+impl SampledCurves {
+    fn new(
+        profile: &ExposureProfile,
+        discount_curve: &DiscountCurve,
+        counterparty_hazard: Option<&HazardCurve>,
+        own_hazard: Option<&HazardCurve>,
+    ) -> finstack_quant_core::Result<Self> {
+        Ok(Self {
+            counterparty_survival: super::dated::survival_factors(
+                profile.as_of,
+                profile.currency,
+                &profile.dates,
+                counterparty_hazard,
+            )?,
+            own_survival: super::dated::survival_factors(
+                profile.as_of,
+                profile.currency,
+                &profile.dates,
+                own_hazard,
+            )?,
+            discount: super::dated::discount_factors(
+                profile.as_of,
+                profile.currency,
+                &profile.dates,
+                discount_curve,
+            )?,
+        })
+    }
+}
+
+fn validate_recovery_rate(label: &str, field: &str, rate: f64) -> finstack_quant_core::Result<()> {
+    if !(0.0..=1.0).contains(&rate) {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "CVA: recovery_rate {recovery_rate} must be in [0, 1]"
+            "{label}: {field} {rate} must be in [0, 1]"
         )));
     }
+    Ok(())
+}
 
-    let counterparty = super::dated::survival_factors(
-        exposure_profile.as_of,
-        exposure_profile.currency,
-        &exposure_profile.dates,
-        Some(counterparty_hazard_curve),
-    )?;
-    let own_survival = super::dated::survival_factors(
-        exposure_profile.as_of,
-        exposure_profile.currency,
-        &exposure_profile.dates,
-        own_survival_curve,
-    )?;
-    let discount = super::dated::discount_factors(
-        exposure_profile.as_of,
-        exposure_profile.currency,
-        &exposure_profile.dates,
-        discount_curve,
+fn integrate_credit_leg(
+    times: &[f64],
+    exposure: &[f64],
+    lgd: f64,
+    df: &[f64],
+    s_default: &[f64],
+    s_other: &[f64],
+) -> finstack_quant_core::Result<(f64, Vec<CreditXvaRow>)> {
+    let n = times.len();
+    let mut total = NeumaierAccumulator::new();
+    let mut rows = Vec::with_capacity(n);
+    let mut prev_survival = 1.0;
+    let mut prev_other = 1.0;
+    let mut prev_exp = exposure[0];
+    let mut prev_df: f64 = 1.0;
+
+    for i in 0..n {
+        let t = times[i];
+        let exp_t = exposure[i];
+        let survival_t = s_default[i];
+        let other_t = s_other[i];
+        let df_t = df[i];
+
+        let marginal_pd = prev_survival - survival_t;
+        let exp_mid = 0.5 * prev_exp + 0.5 * exp_t;
+        let df_mid = 0.5 * prev_df + 0.5 * df_t;
+        let other_mid = 0.5 * prev_other + 0.5 * other_t;
+
+        let contribution = lgd * exp_mid * marginal_pd * df_mid * other_mid;
+        total.add(contribution)?;
+        rows.push(CreditXvaRow {
+            time: t,
+            discount_factor: df_t,
+            survival_probability: survival_t,
+            marginal_default_probability: marginal_pd,
+            exposure_mid: exp_mid,
+            discount_factor_mid: df_mid,
+            survival_weight: other_mid,
+            loss_given_default: lgd,
+            contribution,
+        });
+
+        prev_survival = survival_t;
+        prev_other = other_t;
+        prev_exp = exp_t;
+        prev_df = df_t;
+    }
+
+    Ok((total.get_total()?, rows))
+}
+
+fn compute_cva_from_sampled(
+    exposure_profile: &ExposureProfile,
+    sampled: &SampledCurves,
+    recovery_rate: f64,
+) -> finstack_quant_core::Result<XvaResult> {
+    let n = exposure_profile.times.len();
+    let (cva, cva_rows) = integrate_credit_leg(
+        &exposure_profile.times,
+        &exposure_profile.epe,
+        1.0 - recovery_rate,
+        &sampled.discount,
+        &sampled.counterparty_survival,
+        &sampled.own_survival,
     )?;
 
-    let lgd = 1.0 - recovery_rate;
-
-    let mut cva = NeumaierAccumulator::new();
-    let mut cva_rows = Vec::with_capacity(n);
     let mut epe_profile = Vec::with_capacity(n);
     let mut ene_profile = Vec::with_capacity(n);
     let mut effective_epe_profile = Vec::with_capacity(n);
     let mut max_epe: f64 = 0.0;
     let mut effective_epe_running: f64 = 0.0;
     let mut eff_epe_time_integral: f64 = 0.0;
-    let maturity = exposure_profile.times[n - 1];
-    let effective_epe_horizon = maturity.min(1.0);
-
-    let mut prev_survival = 1.0;
-    let mut prev_own_survival = 1.0;
-    let mut prev_epe = exposure_profile.epe[0];
-    let mut prev_df: f64 = 1.0;
+    let effective_epe_horizon = exposure_profile.times[n - 1].min(1.0);
     let mut prev_t: f64 = 0.0;
 
     for i in 0..n {
@@ -118,57 +184,25 @@ fn compute_cva_internal(
         let epe_t = exposure_profile.epe[i];
         let ene_t = exposure_profile.ene[i];
 
-        let survival_t = counterparty[i];
-        let own_survival_t = own_survival[i];
-        let df_t = discount[i];
-
-        let marginal_pd = prev_survival - survival_t;
-        let epe_mid = 0.5 * prev_epe + 0.5 * epe_t;
-        let df_mid = 0.5 * prev_df + 0.5 * df_t;
-        let own_survival_mid = 0.5 * prev_own_survival + 0.5 * own_survival_t;
-
-        let contribution = lgd * epe_mid * marginal_pd * df_mid * own_survival_mid;
-        cva.add(contribution)?;
-        cva_rows.push(CreditXvaRow {
-            time: t,
-            discount_factor: df_t,
-            survival_probability: survival_t,
-            marginal_default_probability: marginal_pd,
-            exposure_mid: epe_mid,
-            discount_factor_mid: df_mid,
-            survival_weight: own_survival_mid,
-            loss_given_default: lgd,
-            contribution,
-        });
-
         effective_epe_running = effective_epe_running.max(epe_t);
-
         if prev_t < effective_epe_horizon {
             let dt = (t.min(effective_epe_horizon) - prev_t).max(0.0);
             eff_epe_time_integral += effective_epe_running * dt;
         }
-
         max_epe = max_epe.max(epe_t);
 
         epe_profile.push((t, epe_t));
         ene_profile.push((t, ene_t));
         effective_epe_profile.push((t, effective_epe_running));
-
-        prev_survival = survival_t;
-        prev_own_survival = own_survival_t;
-        prev_epe = epe_t;
-        prev_df = df_t;
         prev_t = t;
     }
 
-    let normalization = effective_epe_horizon;
-    let effective_epe = if normalization > 0.0 {
-        eff_epe_time_integral / normalization
+    let effective_epe = if effective_epe_horizon > 0.0 {
+        eff_epe_time_integral / effective_epe_horizon
     } else {
         effective_epe_running
     };
 
-    let cva = cva.get_total()?;
     Ok(XvaResult {
         cva,
         dva: None,
@@ -190,116 +224,13 @@ fn compute_cva_internal(
     })
 }
 
-fn compute_dva_internal(
+fn compute_fva_from_sampled(
     exposure_profile: &ExposureProfile,
-    own_hazard_curve: &HazardCurve,
-    discount_curve: &DiscountCurve,
-    own_recovery_rate: f64,
-    counterparty_survival_curve: Option<&HazardCurve>,
-) -> finstack_quant_core::Result<(f64, Vec<CreditXvaRow>)> {
-    exposure_profile.validate()?;
-    let n = exposure_profile.times.len();
-
-    if !(0.0..=1.0).contains(&own_recovery_rate) {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "DVA: own_recovery_rate {own_recovery_rate} must be in [0, 1]"
-        )));
-    }
-
-    let own_survival = super::dated::survival_factors(
-        exposure_profile.as_of,
-        exposure_profile.currency,
-        &exposure_profile.dates,
-        Some(own_hazard_curve),
-    )?;
-    let counterparty_survival = super::dated::survival_factors(
-        exposure_profile.as_of,
-        exposure_profile.currency,
-        &exposure_profile.dates,
-        counterparty_survival_curve,
-    )?;
-    let discount = super::dated::discount_factors(
-        exposure_profile.as_of,
-        exposure_profile.currency,
-        &exposure_profile.dates,
-        discount_curve,
-    )?;
-
-    let lgd_own = 1.0 - own_recovery_rate;
-    let mut dva = NeumaierAccumulator::new();
-    let mut rows = Vec::with_capacity(n);
-    let mut prev_survival = 1.0;
-    let mut prev_counterparty_survival = 1.0;
-    let mut prev_ene = exposure_profile.ene[0];
-    let mut prev_df: f64 = 1.0;
-
-    for i in 0..n {
-        let t = exposure_profile.times[i];
-        let ene_t = exposure_profile.ene[i];
-
-        let survival_t = own_survival[i];
-        let counterparty_survival_t = counterparty_survival[i];
-        let df_t = discount[i];
-
-        let marginal_pd = prev_survival - survival_t;
-        let ene_mid = 0.5 * prev_ene + 0.5 * ene_t;
-        let df_mid = 0.5 * prev_df + 0.5 * df_t;
-        let counterparty_survival_mid =
-            0.5 * prev_counterparty_survival + 0.5 * counterparty_survival_t;
-
-        let contribution = lgd_own * ene_mid * marginal_pd * df_mid * counterparty_survival_mid;
-        dva.add(contribution)?;
-        rows.push(CreditXvaRow {
-            time: t,
-            discount_factor: df_t,
-            survival_probability: survival_t,
-            marginal_default_probability: marginal_pd,
-            exposure_mid: ene_mid,
-            discount_factor_mid: df_mid,
-            survival_weight: counterparty_survival_mid,
-            loss_given_default: lgd_own,
-            contribution,
-        });
-
-        prev_survival = survival_t;
-        prev_counterparty_survival = counterparty_survival_t;
-        prev_ene = ene_t;
-        prev_df = df_t;
-    }
-
-    Ok((dva.get_total()?, rows))
-}
-
-fn compute_fva_internal(
-    exposure_profile: &ExposureProfile,
-    discount_curve: &DiscountCurve,
+    sampled: &SampledCurves,
     funding_spread_bp: f64,
     funding_benefit_bp: f64,
-    counterparty_hazard_curve: Option<&HazardCurve>,
-    own_hazard_curve: Option<&HazardCurve>,
 ) -> finstack_quant_core::Result<(f64, Vec<FundingXvaRow>)> {
-    exposure_profile.validate()?;
     let n = exposure_profile.times.len();
-
-    let counterparty_survival = super::dated::survival_factors(
-        exposure_profile.as_of,
-        exposure_profile.currency,
-        &exposure_profile.dates,
-        counterparty_hazard_curve,
-    )?;
-    let own_survival = super::dated::survival_factors(
-        exposure_profile.as_of,
-        exposure_profile.currency,
-        &exposure_profile.dates,
-        own_hazard_curve,
-    )?;
-    let discount = super::dated::discount_factors(
-        exposure_profile.as_of,
-        exposure_profile.currency,
-        &exposure_profile.dates,
-        discount_curve,
-    )?;
-
     let spread_cost = funding_spread_bp / 10_000.0;
     let spread_benefit = funding_benefit_bp / 10_000.0;
 
@@ -317,9 +248,9 @@ fn compute_fva_internal(
         let epe_t = exposure_profile.epe[i];
         let ene_t = exposure_profile.ene[i];
 
-        let counterparty_survival_t = counterparty_survival[i];
-        let own_survival_t = own_survival[i];
-        let df_t = discount[i];
+        let counterparty_survival_t = sampled.counterparty_survival[i];
+        let own_survival_t = sampled.own_survival[i];
+        let df_t = sampled.discount[i];
 
         let dt = t - prev_t;
         let epe_mid = 0.5 * prev_epe + 0.5 * epe_t;
@@ -404,8 +335,8 @@ fn compute_fva_internal(
 /// ```
 /// use finstack_quant_margin::xva::cva::compute_cva;
 /// use finstack_quant_margin::xva::types::ExposureProfile;
-/// use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 /// use finstack_quant_core::dates::DayCount;
+/// use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 /// use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 /// use time::macros::date;
 ///
@@ -456,13 +387,15 @@ pub fn compute_cva(
     discount_curve: &DiscountCurve,
     recovery_rate: f64,
 ) -> finstack_quant_core::Result<XvaResult> {
-    compute_cva_internal(
+    exposure_profile.validate()?;
+    validate_recovery_rate("CVA", "recovery_rate", recovery_rate)?;
+    let sampled = SampledCurves::new(
         exposure_profile,
-        counterparty_hazard_curve,
         discount_curve,
-        recovery_rate,
+        Some(counterparty_hazard_curve),
         None,
-    )
+    )?;
+    compute_cva_from_sampled(exposure_profile, &sampled, recovery_rate)
 }
 
 /// Compute **unilateral** Debit Valuation Adjustment (DVA).
@@ -512,14 +445,23 @@ pub fn compute_dva(
     discount_curve: &DiscountCurve,
     own_recovery_rate: f64,
 ) -> finstack_quant_core::Result<f64> {
-    compute_dva_internal(
+    exposure_profile.validate()?;
+    validate_recovery_rate("DVA", "own_recovery_rate", own_recovery_rate)?;
+    let sampled = SampledCurves::new(
         exposure_profile,
-        own_hazard_curve,
         discount_curve,
-        own_recovery_rate,
         None,
-    )
-    .map(|(dva, _)| dva)
+        Some(own_hazard_curve),
+    )?;
+    let (dva, _) = integrate_credit_leg(
+        &exposure_profile.times,
+        &exposure_profile.ene,
+        1.0 - own_recovery_rate,
+        &sampled.discount,
+        &sampled.own_survival,
+        &sampled.counterparty_survival,
+    )?;
+    Ok(dva)
 }
 
 /// Compute Funding Valuation Adjustment (FVA).
@@ -575,16 +517,15 @@ pub fn compute_fva(
         ..Default::default()
     }
     .validate()?;
-
-    compute_fva_internal(
+    exposure_profile.validate()?;
+    let sampled = SampledCurves::new(exposure_profile, discount_curve, None, None)?;
+    let (fva, _) = compute_fva_from_sampled(
         exposure_profile,
-        discount_curve,
+        &sampled,
         funding_spread_bp,
         funding_benefit_bp,
-        None,
-        None,
-    )
-    .map(|(fva, _)| fva)
+    )?;
+    Ok(fva)
 }
 
 /// Compute bilateral XVA: CVA, DVA, FVA, MVA, and the all-in adjustment.
@@ -647,14 +588,17 @@ pub fn compute_bilateral_xva(
     if let Some(fc) = funding {
         fc.validate()?;
     }
-
-    let mut result = compute_cva_internal(
+    exposure_profile.validate()?;
+    validate_recovery_rate("CVA", "recovery_rate", counterparty_recovery_rate)?;
+    let sampled = SampledCurves::new(
         exposure_profile,
-        counterparty_hazard_curve,
         discount_curve,
-        counterparty_recovery_rate,
+        Some(counterparty_hazard_curve),
         Some(own_hazard_curve),
     )?;
+
+    let mut result =
+        compute_cva_from_sampled(exposure_profile, &sampled, counterparty_recovery_rate)?;
 
     if let Some(im_profile) = funding.and_then(|fc| fc.im_profile.as_ref())
         && (im_profile.as_of != exposure_profile.as_of
@@ -666,24 +610,24 @@ pub fn compute_bilateral_xva(
         ));
     }
 
-    let (dva, dva_rows) = compute_dva_internal(
-        exposure_profile,
-        own_hazard_curve,
-        discount_curve,
-        own_recovery_rate,
-        Some(counterparty_hazard_curve),
+    validate_recovery_rate("DVA", "own_recovery_rate", own_recovery_rate)?;
+    let (dva, dva_rows) = integrate_credit_leg(
+        &exposure_profile.times,
+        &exposure_profile.ene,
+        1.0 - own_recovery_rate,
+        &sampled.discount,
+        &sampled.own_survival,
+        &sampled.counterparty_survival,
     )?;
     result.dva = Some(dva);
     result.dva_rows = Some(dva_rows);
 
     let fva = if let Some(fc) = funding {
-        let (fva_val, fva_rows) = compute_fva_internal(
+        let (fva_val, fva_rows) = compute_fva_from_sampled(
             exposure_profile,
-            discount_curve,
+            &sampled,
             fc.funding_spread_bp,
             fc.effective_benefit_bp(),
-            Some(counterparty_hazard_curve),
-            Some(own_hazard_curve),
         )?;
         result.fva = Some(fva_val);
         result.fva_rows = Some(fva_rows);

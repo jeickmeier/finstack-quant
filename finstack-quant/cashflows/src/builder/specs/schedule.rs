@@ -143,7 +143,7 @@ impl ScheduleParams {
     ///
     /// This is short-front, independently of the general-purpose
     /// `StubKind::default()` value (`None`).
-    pub const DEFAULT_STUB: StubKind = StubKind::ShortFront;
+    pub(crate) const DEFAULT_STUB: StubKind = StubKind::ShortFront;
 
     fn preset(
         frequency: Tenor,

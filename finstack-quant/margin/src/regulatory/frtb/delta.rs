@@ -42,18 +42,38 @@ use std::collections::BTreeMap;
 ///
 /// - BCBS FRTB Minimum Capital Requirements: `docs/REFERENCES.md#bcbs-frtb-minimum-capital-requirements`
 ///
-pub fn delta_charge(
+pub(super) fn delta_charge(
     risk_class: FrtbRiskClass,
     sensitivities: &FrtbSensitivities,
     scenario: CorrelationScenario,
 ) -> f64 {
     match risk_class {
         FrtbRiskClass::Girr => girr_delta(sensitivities, scenario),
-        FrtbRiskClass::CsrNonSec => csr_nonsec_delta(sensitivities, scenario),
-        FrtbRiskClass::CsrSecCtp => csr_sec_ctp_delta(sensitivities, scenario),
-        FrtbRiskClass::CsrSecNonCtp => csr_sec_nonctp_delta(sensitivities, scenario),
+        FrtbRiskClass::CsrNonSec => csr_bucketed_delta(
+            &sensitivities.csr_nonsec_delta,
+            csr::csr_nonsec_risk_weight,
+            FrtbRiskClass::CsrNonSec,
+            scenario,
+        ),
+        FrtbRiskClass::CsrSecCtp => csr_bucketed_delta(
+            &sensitivities.csr_sec_ctp_delta,
+            csr::csr_sec_ctp_risk_weight,
+            FrtbRiskClass::CsrSecCtp,
+            scenario,
+        ),
+        FrtbRiskClass::CsrSecNonCtp => csr_bucketed_delta(
+            &sensitivities.csr_sec_nonctp_delta,
+            csr::csr_sec_nonctp_risk_weight,
+            FrtbRiskClass::CsrSecNonCtp,
+            scenario,
+        ),
         FrtbRiskClass::Equity => equity_delta(sensitivities, scenario),
-        FrtbRiskClass::Commodity => commodity_delta(sensitivities, scenario),
+        FrtbRiskClass::Commodity => csr_bucketed_delta(
+            &sensitivities.commodity_delta,
+            commodity::commodity_risk_weight,
+            FrtbRiskClass::Commodity,
+            scenario,
+        ),
         FrtbRiskClass::Fx => fx_delta(sensitivities, scenario),
     }
 }
@@ -154,35 +174,6 @@ fn intra_girr_correlation(
     scenario.scale_correlation(base_rho)
 }
 
-// CSR Non-Sec delta
-
-fn csr_nonsec_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    csr_bucketed_delta(
-        &sens.csr_nonsec_delta,
-        csr::csr_nonsec_risk_weight,
-        FrtbRiskClass::CsrNonSec,
-        scenario,
-    )
-}
-
-fn csr_sec_ctp_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    csr_bucketed_delta(
-        &sens.csr_sec_ctp_delta,
-        csr::csr_sec_ctp_risk_weight,
-        FrtbRiskClass::CsrSecCtp,
-        scenario,
-    )
-}
-
-fn csr_sec_nonctp_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    csr_bucketed_delta(
-        &sens.csr_sec_nonctp_delta,
-        csr::csr_sec_nonctp_risk_weight,
-        FrtbRiskClass::CsrSecNonCtp,
-        scenario,
-    )
-}
-
 // Equity delta
 
 fn equity_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
@@ -226,17 +217,6 @@ fn equity_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 
     })
 }
 
-// Commodity delta
-
-fn commodity_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    csr_bucketed_delta(
-        &sens.commodity_delta,
-        commodity::commodity_risk_weight,
-        FrtbRiskClass::Commodity,
-        scenario,
-    )
-}
-
 // FX delta
 
 fn fx_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
@@ -263,10 +243,10 @@ fn fx_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
 ///
 /// Unknown labels return NaN; engine validation rejects them first.
 fn girr_risk_weight(tenor: &str) -> f64 {
-    static GIRR_RW_BY_TENOR: std::sync::LazyLock<
-        finstack_quant_core::FxHashMap<&'static str, f64>,
-    > = std::sync::LazyLock::new(|| girr::GIRR_DELTA_RISK_WEIGHTS.iter().copied().collect());
-    GIRR_RW_BY_TENOR.get(tenor).copied().unwrap_or(f64::NAN)
+    girr::GIRR_DELTA_RISK_WEIGHTS
+        .iter()
+        .find(|(label, _)| *label == tenor)
+        .map_or(f64::NAN, |(_, weight)| *weight)
 }
 
 /// CSR-specific delta aggregation with intra-bucket
