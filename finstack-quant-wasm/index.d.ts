@@ -4331,14 +4331,6 @@ export interface ModelsCorrelationNamespace {
    * semi-definiteness. Returns nothing on success; raises a descriptive error
    * (including the failing dimension or constraint) otherwise.
    *
-   * # Arguments
-   *
-   * * `matrix` - Flat row-major `n * n` correlation coefficients; unit
-   *   diagonal, off-diagonals in `[-1, 1]`.
-   * * `n` - Finite non-negative integer square-matrix dimension no greater
-   *   than `4294967295`; `matrix` must contain exactly `n * n` entries, and
-   *   an empty matrix uses zero.
-   *
    * # Errors
    *
    * Throws a JavaScript exception if `n` is non-finite, fractional, negative,
@@ -4357,17 +4349,6 @@ export interface ModelsCorrelationNamespace {
    * matrix but fails Cholesky by a small margin, returns the nearest valid
    * correlation matrix (symmetric, unit diagonal, PSD) in Frobenius norm.
    * Gross input violations raise rather than being silently reshaped.
-   *
-   * # Arguments
-   *
-   * * `matrix` - Flat row-major `n * n` near-correlation matrix to project
-   *   onto the correlation set.
-   * * `n` - Non-negative integer square-matrix dimension; `matrix` must
-   *   contain exactly `n * n` entries, and an empty matrix uses zero.
-   * * `max_iter` - Optional non-negative integer limit on Higham projection
-   *   iterations; omitted uses Rust `NearestCorrelationOpts::default()` (200).
-   * * `tol` - Optional positive convergence tolerance for the projection;
-   *   omitted uses Rust `NearestCorrelationOpts::default()` (`1e-10`).
    *
    * # Errors
    *

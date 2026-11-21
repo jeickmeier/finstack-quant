@@ -221,6 +221,15 @@ pub struct JsEuropeanPricer {
     inner: EuropeanPricer,
 }
 
+wasm_getters!(JsEuropeanPricer, EuropeanPricer |s| {
+    /// Number of Monte Carlo paths.
+    num_paths as numPaths -> usize = s.inner.num_paths();
+    /// Seed of the path-indexed random streams.
+    seed -> u64 = s.inner.seed();
+    /// Whether paths run on the thread pool on native targets.
+    use_parallel as useParallel -> bool = s.inner.use_parallel();
+});
+
 #[wasm_bindgen(js_class = EuropeanPricer)]
 impl JsEuropeanPricer {
     /// Pricer whose omitted settings come from the Rust Monte Carlo registry.
@@ -246,24 +255,6 @@ impl JsEuropeanPricer {
         )
         .map(|inner| Self { inner })
         .map_err(to_js_err)
-    }
-
-    /// Number of Monte Carlo paths.
-    #[wasm_bindgen(getter, js_name = numPaths)]
-    pub fn num_paths(&self) -> usize {
-        self.inner.num_paths()
-    }
-
-    /// Seed of the path-indexed random streams.
-    #[wasm_bindgen(getter)]
-    pub fn seed(&self) -> u64 {
-        self.inner.seed()
-    }
-
-    /// Whether paths run on the thread pool on native targets.
-    #[wasm_bindgen(getter, js_name = useParallel)]
-    pub fn use_parallel(&self) -> bool {
-        self.inner.use_parallel()
     }
 
     /// Price a European option under GBM.
@@ -315,6 +306,21 @@ pub struct JsPathDependentPricer {
     inner: PathDependentPricer,
 }
 
+wasm_getters!(JsPathDependentPricer, PathDependentPricer |s| {
+    /// Number of Monte Carlo paths.
+    num_paths as numPaths -> usize = s.inner.config().num_paths;
+    /// Seed of the random streams.
+    seed -> u64 = s.inner.config().seed;
+    /// Whether paths run on the thread pool on native targets.
+    use_parallel as useParallel -> bool = s.inner.config().use_parallel;
+    /// Whether antithetic variates are used.
+    antithetic -> bool = s.inner.config().antithetic;
+    /// Whether Sobol quasi-random numbers are used.
+    use_sobol as useSobol -> bool = s.inner.config().use_sobol;
+    /// Whether paths are built by Brownian bridge.
+    use_brownian_bridge as useBrownianBridge -> bool = s.inner.config().use_brownian_bridge;
+});
+
 #[wasm_bindgen(js_class = PathDependentPricer)]
 impl JsPathDependentPricer {
     /// Pricer whose omitted settings come from the Rust Monte Carlo registry.
@@ -356,53 +362,7 @@ impl JsPathDependentPricer {
         .map_err(to_js_err)
     }
 
-    /// Number of Monte Carlo paths.
-    #[wasm_bindgen(getter, js_name = numPaths)]
-    pub fn num_paths(&self) -> usize {
-        self.inner.config().num_paths
-    }
-
-    /// Seed of the random streams.
-    #[wasm_bindgen(getter)]
-    pub fn seed(&self) -> u64 {
-        self.inner.config().seed
-    }
-
-    /// Whether paths run on the thread pool on native targets.
-    #[wasm_bindgen(getter, js_name = useParallel)]
-    pub fn use_parallel(&self) -> bool {
-        self.inner.config().use_parallel
-    }
-
-    /// Whether antithetic variates are used.
-    #[wasm_bindgen(getter)]
-    pub fn antithetic(&self) -> bool {
-        self.inner.config().antithetic
-    }
-
-    /// Whether Sobol quasi-random numbers are used.
-    #[wasm_bindgen(getter, js_name = useSobol)]
-    pub fn use_sobol(&self) -> bool {
-        self.inner.config().use_sobol
-    }
-
-    /// Whether paths are built by Brownian bridge.
-    #[wasm_bindgen(getter, js_name = useBrownianBridge)]
-    pub fn use_brownian_bridge(&self) -> bool {
-        self.inner.config().use_brownian_bridge
-    }
-
     /// Price an arithmetic-average Asian option under GBM.
-    ///
-    /// # Arguments
-    ///
-    /// * `market` - `OptionMarketParams` object or JSON text, every key required: `spot` (spot level at time 0), `strike` (same units as `spot`), `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield, decimal), `volatility` (annualized GBM volatility, decimal), `time_to_expiry` (years) and `option_type` (`"call"` or `"put"`).
-    /// * `num_steps` - Optional number of averaging steps; omitted uses the registry default.
-    /// * `currency` - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
-    ///
-    /// # Returns
-    ///
-    /// The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
     ///
     /// # Errors
     ///
@@ -500,6 +460,21 @@ pub struct JsLsmcPricer {
     inner: LsmcPricer,
 }
 
+wasm_getters!(JsLsmcPricer, LsmcPricer |s| {
+    /// Number of Monte Carlo paths.
+    num_paths as numPaths -> usize = s.inner.pricer().config().num_paths;
+    /// Seed of the random streams.
+    seed -> u64 = s.inner.pricer().config().seed;
+    /// Whether paths run on the thread pool on native targets.
+    use_parallel as useParallel -> bool = s.inner.pricer().config().use_parallel;
+    /// Whether antithetic variates are used.
+    antithetic -> bool = s.inner.pricer().config().antithetic;
+    /// Default regression basis name.
+    basis -> String = s.inner.basis().as_str().to_owned();
+    /// Default highest polynomial degree of the regression basis.
+    basis_degree as basisDegree -> usize = s.inner.basis_degree();
+});
+
 #[wasm_bindgen(js_class = LsmcPricer)]
 impl JsLsmcPricer {
     /// Pricer whose omitted settings come from the Rust Monte Carlo registry.
@@ -543,55 +518,7 @@ impl JsLsmcPricer {
         .map_err(to_js_err)
     }
 
-    /// Number of Monte Carlo paths.
-    #[wasm_bindgen(getter, js_name = numPaths)]
-    pub fn num_paths(&self) -> usize {
-        self.inner.pricer().config().num_paths
-    }
-
-    /// Seed of the random streams.
-    #[wasm_bindgen(getter)]
-    pub fn seed(&self) -> u64 {
-        self.inner.pricer().config().seed
-    }
-
-    /// Whether paths run on the thread pool on native targets.
-    #[wasm_bindgen(getter, js_name = useParallel)]
-    pub fn use_parallel(&self) -> bool {
-        self.inner.pricer().config().use_parallel
-    }
-
-    /// Whether antithetic variates are used.
-    #[wasm_bindgen(getter)]
-    pub fn antithetic(&self) -> bool {
-        self.inner.pricer().config().antithetic
-    }
-
-    /// Default regression basis name.
-    #[wasm_bindgen(getter)]
-    pub fn basis(&self) -> String {
-        self.inner.basis().as_str().to_owned()
-    }
-
-    /// Default highest polynomial degree of the regression basis.
-    #[wasm_bindgen(getter, js_name = basisDegree)]
-    pub fn basis_degree(&self) -> usize {
-        self.inner.basis_degree()
-    }
-
     /// Price an American option by Longstaff-Schwartz regression (in-sample exercise policy).
-    ///
-    /// # Arguments
-    ///
-    /// * `market` - `OptionMarketParams` object or JSON text, every key required: `spot` (spot level at time 0), `strike` (same units as `spot`), `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield, decimal), `volatility` (annualized GBM volatility, decimal), `time_to_expiry` (years) and `option_type` (`"call"` or `"put"`).
-    /// * `currency` - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
-    /// * `num_steps` - Optional exercise dates for this call; omitted keeps the pricer's value.
-    /// * `basis` - Optional regression basis for this call; omitted keeps the pricer's basis.
-    /// * `basis_degree` - Optional basis degree for this call; omitted keeps the pricer's degree.
-    ///
-    /// # Returns
-    ///
-    /// The `LsmcResult` object with the price estimate and diagnostics of the fitted training policy.
     ///
     /// # Errors
     ///
@@ -629,19 +556,6 @@ impl JsLsmcPricer {
     /// Price an American option with an out-of-sample exercise policy: the
     /// regression is fitted on the pricer's paths and applied to fresh paths
     /// drawn from `pricing_seed`, removing the in-sample high bias.
-    ///
-    /// # Arguments
-    ///
-    /// * `market` - `OptionMarketParams` object or JSON text, every key required: `spot` (spot level at time 0), `strike` (same units as `spot`), `rate` (continuously compounded risk-free rate, decimal), `dividend_yield` (continuous dividend yield, decimal), `volatility` (annualized GBM volatility, decimal), `time_to_expiry` (years) and `option_type` (`"call"` or `"put"`).
-    /// * `pricing_seed` - Seed of the independent pricing paths, as a safe integer or `bigint`; must differ from the pricer's seed.
-    /// * `currency` - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
-    /// * `num_steps` - Optional exercise dates for this call; omitted keeps the pricer's value.
-    /// * `basis` - Optional regression basis for this call; omitted keeps the pricer's basis.
-    /// * `basis_degree` - Optional basis degree for this call; omitted keeps the pricer's degree.
-    ///
-    /// # Returns
-    ///
-    /// The `LsmcResult` object with the price estimate and diagnostics of the fitted training policy.
     ///
     /// # Errors
     ///

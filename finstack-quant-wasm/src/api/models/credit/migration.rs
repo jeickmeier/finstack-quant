@@ -378,26 +378,6 @@ impl JsTransitionMatrix {
         to_js_value(&self.inner.to_rows())
     }
 
-    /// Horizon the probabilities apply to, in years.
-    #[wasm_bindgen(getter)]
-    pub fn horizon(&self) -> f64 {
-        self.inner.horizon()
-    }
-
-    /// Number of states in the scale.
-    #[wasm_bindgen(getter, js_name = nStates)]
-    pub fn n_states(&self) -> usize {
-        self.inner.n_states()
-    }
-
-    /// Rating scale that orders the rows and columns.
-    #[wasm_bindgen(getter)]
-    pub fn scale(&self) -> JsRatingScale {
-        JsRatingScale {
-            inner: self.inner.scale().clone(),
-        }
-    }
-
     /// Default probability of each state over the horizon.
     /// @returns One probability per state in scale order, or `undefined` when the scale has no default state.
     #[wasm_bindgen(js_name = defaultProbabilities)]
@@ -407,6 +387,17 @@ impl JsTransitionMatrix {
             .map(Vec::into_boxed_slice)
     }
 }
+
+wasm_getters!(JsTransitionMatrix, TransitionMatrix |s| {
+    /// Horizon the probabilities apply to, in years.
+    horizon -> f64 = s.inner.horizon();
+    /// Number of states in the scale.
+    n_states as nStates -> usize = s.inner.n_states();
+    /// Rating scale that orders the rows and columns.
+    scale -> JsRatingScale = JsRatingScale {
+        inner: s.inner.scale().clone(),
+    };
+});
 
 /// Continuous-time Markov-chain generator (intensity) matrix; rows sum to zero.
 ///
@@ -520,33 +511,20 @@ impl JsGeneratorMatrix {
     pub fn to_rows(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.to_rows())
     }
-
-    /// Number of states in the scale.
-    #[wasm_bindgen(getter, js_name = nStates)]
-    pub fn n_states(&self) -> usize {
-        self.inner.n_states()
-    }
-
-    /// Rating scale that orders the rows and columns.
-    #[wasm_bindgen(getter)]
-    pub fn scale(&self) -> JsRatingScale {
-        JsRatingScale {
-            inner: self.inner.scale().clone(),
-        }
-    }
-
-    /// L1 size of the regularization applied when the generator was estimated (0 when built directly).
-    #[wasm_bindgen(getter, js_name = regularizationL1)]
-    pub fn regularization_l1(&self) -> f64 {
-        self.inner.regularization_l1()
-    }
-
-    /// Largest absolute round-trip error of the estimated generator (0 when built directly).
-    #[wasm_bindgen(getter, js_name = roundTripError)]
-    pub fn round_trip_error(&self) -> f64 {
-        self.inner.round_trip_error()
-    }
 }
+
+wasm_getters!(JsGeneratorMatrix, GeneratorMatrix |s| {
+    /// Number of states in the scale.
+    n_states as nStates -> usize = s.inner.n_states();
+    /// Rating scale that orders the rows and columns.
+    scale -> JsRatingScale = JsRatingScale {
+        inner: s.inner.scale().clone(),
+    };
+    /// L1 size of the regularization applied when the generator was estimated (0 when built directly).
+    regularization_l1 as regularizationL1 -> f64 = s.inner.regularization_l1();
+    /// Largest absolute round-trip error of the estimated generator (0 when built directly).
+    round_trip_error as roundTripError -> f64 = s.inner.round_trip_error();
+});
 
 /// One simulated rating trajectory: piecewise-constant, right-continuous.
 ///
@@ -630,21 +608,16 @@ impl JsRatingPath {
     pub fn transitions(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.transitions())
     }
-
-    /// Simulation horizon in years.
-    #[wasm_bindgen(getter)]
-    pub fn horizon(&self) -> f64 {
-        self.inner.horizon()
-    }
-
-    /// Rating scale the state indices refer to.
-    #[wasm_bindgen(getter)]
-    pub fn scale(&self) -> JsRatingScale {
-        JsRatingScale {
-            inner: self.inner.scale().clone(),
-        }
-    }
 }
+
+wasm_getters!(JsRatingPath, RatingPath |s| {
+    /// Simulation horizon in years.
+    horizon -> f64 = s.inner.horizon();
+    /// Rating scale the state indices refer to.
+    scale -> JsRatingScale = JsRatingScale {
+        inner: s.inner.scale().clone(),
+    };
+});
 
 /// A batch of simulated rating paths from `MigrationSimulator.simulate`.
 ///
@@ -665,30 +638,19 @@ pub struct JsRatingPaths {
 
 json_round_trip!(JsRatingPaths, RatingPaths);
 
-#[wasm_bindgen(js_class = RatingPaths)]
-impl JsRatingPaths {
+wasm_getters!(JsRatingPaths, RatingPaths |s| {
     /// The simulated paths, in simulation order.
-    #[wasm_bindgen(getter)]
-    pub fn paths(&self) -> Vec<JsRatingPath> {
-        self.inner
-            .iter()
-            .cloned()
-            .map(|inner| JsRatingPath { inner })
-            .collect()
-    }
-
+    paths -> Vec<JsRatingPath> = s
+        .inner
+        .iter()
+        .cloned()
+        .map(|inner| JsRatingPath { inner })
+        .collect();
     /// Fraction of paths that ended in default (0 for an empty batch).
-    #[wasm_bindgen(getter, js_name = defaultRate)]
-    pub fn default_rate(&self) -> f64 {
-        migration::default_rate(&self.inner)
-    }
-
+    default_rate as defaultRate -> f64 = migration::default_rate(&s.inner);
     /// Number of paths in the batch (twin of Python `len(paths)`).
-    #[wasm_bindgen(getter)]
-    pub fn length(&self) -> usize {
-        self.inner.len()
-    }
-}
+    length -> usize = s.inner.len();
+});
 
 /// Gillespie simulator of rating migration under a generator matrix.
 ///
@@ -708,6 +670,15 @@ pub struct JsMigrationSimulator {
 }
 
 json_round_trip!(JsMigrationSimulator, MigrationSimulator);
+
+wasm_getters!(JsMigrationSimulator, MigrationSimulator |s| {
+    /// Simulation horizon in years.
+    horizon -> f64 = s.inner.horizon();
+    /// Generator matrix driving the simulation.
+    generator -> JsGeneratorMatrix = JsGeneratorMatrix {
+        inner: s.inner.generator().clone(),
+    };
+});
 
 #[wasm_bindgen(js_class = MigrationSimulator)]
 impl JsMigrationSimulator {
@@ -776,20 +747,6 @@ impl JsMigrationSimulator {
             )
             .map(|inner| JsTransitionMatrix { inner })
             .map_err(to_js_err)
-    }
-
-    /// Simulation horizon in years.
-    #[wasm_bindgen(getter)]
-    pub fn horizon(&self) -> f64 {
-        self.inner.horizon()
-    }
-
-    /// Generator matrix driving the simulation.
-    #[wasm_bindgen(getter)]
-    pub fn generator(&self) -> JsGeneratorMatrix {
-        JsGeneratorMatrix {
-            inner: self.inner.generator().clone(),
-        }
     }
 }
 
