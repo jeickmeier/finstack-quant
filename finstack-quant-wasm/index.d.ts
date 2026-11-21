@@ -9229,24 +9229,6 @@ export interface ValuationsNamespace {
    * @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
    */
   readonly valuationResultMetricUnits: typeof wasm.valuationResultMetricUnits;
-  /**
-   * Whether every covenant in a valuation result passed.
-   *
-   * Twin of Python `ValuationResult.all_covenants_passed` (Rust `ValuationResult::all_covenants_passed`).
-   * @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
-   * @returns `true` when all covenants passed or the result carries no covenant reports.
-   * @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
-   */
-  readonly valuationResultAllCovenantsPassed: typeof wasm.valuationResultAllCovenantsPassed;
-  /**
-   * Identifiers of the covenants that failed in a valuation result.
-   *
-   * Twin of Python `ValuationResult.failed_covenants` (Rust `ValuationResult::failed_covenants`).
-   * @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
-   * @returns Covenant identifiers whose report did not pass; empty when none failed.
-   * @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
-   */
-  readonly valuationResultFailedCovenants: typeof wasm.valuationResultFailedCovenants;
 }
 
 /**

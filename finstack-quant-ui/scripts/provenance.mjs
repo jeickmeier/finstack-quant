@@ -78,9 +78,9 @@ const displays = [
   },
   {
     id: "covenant-report",
-    schema: result,
-    pointer: "#/properties/covenants",
-    api: price,
+    schema: `${base}covenants/1/covenant_report.schema.json`,
+    pointer: "#",
+    api: "covenants.CovenantEngine#evaluate",
     route: "typed",
     convention:
       "Returned CovenantReport fields keyed by covenant instance key, in the order supplied: test description, actual, threshold and headroom in the metric's own units, the passed verdict and details; unset fields shown as a dash, complete reports kept as JSON. No verdict, headroom or threshold is computed.",

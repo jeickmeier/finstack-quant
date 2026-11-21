@@ -3811,12 +3811,6 @@ export type FundingLegSpec =
       type: "floating";
     };
 /**
- * Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
- *
- * There is no default mode: every financial rounding names one explicitly.
- */
-export type RoundingMode = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
-/**
  * Model-specific typed valuation details.
  *
  * These details are for rich structured outputs that do not fit the scalar
@@ -3977,6 +3971,12 @@ export type TraceEntry =
        */
       name: string;
     };
+/**
+ * Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
+ *
+ * There is no default mode: every financial rounding names one explicitly.
+ */
+export type RoundingMode = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
 /**
  * Numeric schema revision for contracts whose sole supported revision is v1.
  */
@@ -18598,15 +18598,6 @@ export interface ValuationResult {
    */
   as_of: DateWire;
   /**
-   * Covenant compliance results for structured products.
-   *
-   * Present only for instruments with covenants (loans, structured credit).
-   * Each covenant is keyed by its identifier with pass/fail status and details.
-   */
-  covenants?: {
-    [k: string]: CovenantReport;
-  } | null;
-  /**
    * Optional rich model-specific pricing detail.
    */
   details?: ValuationDetails | null;
@@ -18678,135 +18669,6 @@ export interface ValuationResult {
    * the base calculation currency.
    */
   value: Money;
-}
-/**
- * Covenant check result.
- */
-export interface CovenantReport {
-  /**
-   * Actual value of the metric
-   */
-  actual_value?: number | null;
-  /**
-   * Stable machine-readable covenant instance identifier.
-   */
-  covenant_id?: string | null;
-  /**
-   * Type of covenant being checked
-   */
-  covenant_type: string;
-  /**
-   * Details or explanation
-   */
-  details?: string | null;
-  /**
-   * Cushion relative to threshold (positive => passing buffer)
-   */
-  headroom?: number | null;
-  /**
-   * Signed cushion in the covenant metric's own units when numerically meaningful.
-   */
-  headroom_raw?: number | null;
-  /**
-   * Audit stamp: numeric mode, rounding context, and FX policy in force.
-   */
-  meta?: ResultsMeta;
-  /**
-   * Whether the covenant passed
-   */
-  passed: boolean;
-  /**
-   * Required threshold
-   */
-  threshold?: number | null;
-}
-/**
- * Metadata bundle that accompanies valuation outputs.
- *
- * The metadata is intentionally small so it can be attached to reports and
- * downstream data stores for reproducibility and audit trails.
- */
-export interface ResultsMeta {
-  /**
-   * Optional FX policy applied by the computing layer (human-readable key).
-   */
-  fx_policy_applied?: string | null;
-  /**
-   * Numeric engine mode used to produce the results.
-   *
-   * Always [`NUMERIC_MODE_F64`] today; a plain string so result
-   * envelopes stay wire-compatible across host languages.
-   */
-  numeric_mode: string;
-  /**
-   * Whether the producing computation ran in parallel.
-   *
-   * Serial results omit the field entirely so existing payloads and golden
-   * files stay byte-identical.
-   */
-  parallel?: boolean;
-  /**
-   * Rounding context snapshot applied to IO boundaries.
-   */
-  rounding: RoundingContext;
-  /**
-   * Timestamp when result was computed (ISO 8601 format).
-   * Useful for audit trails and reproducibility.
-   */
-  timestamp?: string | null;
-  /**
-   * Finstack Quant library version used to produce the result.
-   */
-  version?: string | null;
-  [k: string]: unknown;
-}
-/**
- * Snapshot of active rounding settings used for result stamping.
- *
- * Instances are produced from a [`FinstackConfig`] via `RoundingContext::from` and persisted
- * alongside valuation results.
- */
-export interface RoundingContext {
-  /**
-   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
-   */
-  ingest_scale_by_currency: {
-    [k: string]: number;
-  };
-  /**
-   * Explicitly selected rounding mode; absent when none was selected.
-   */
-  mode?: RoundingMode | null;
-  /**
-   * Validated output scale snapshot by currency code, with values in `0..=28`.
-   */
-  output_scale_by_currency: {
-    [k: string]: number;
-  };
-  /**
-   * Tolerance settings snapshot for floating-point comparisons.
-   */
-  tolerances?: ToleranceConfig;
-  /**
-   * Schema version for forward compatibility.
-   */
-  version: number;
-  [k: string]: unknown;
-}
-/**
- * Numerical tolerance configuration for floating-point comparisons.
- *
- * Provides the configurable epsilon for generic floating-point zero-checks.
- * The default is chosen to balance numerical stability with practical
- * precision requirements.
- */
-export interface ToleranceConfig {
-  /**
-   * Epsilon for generic floating-point comparisons (default: 1e-10).
-   *
-   * Used for general numerical comparisons where higher tolerance is acceptable.
-   */
-  generic_epsilon?: PositiveF64Wire;
 }
 /**
  * Rich structured details attached to composite valuation results.
@@ -19166,6 +19028,94 @@ export interface ExplanationTrace {
    */
   type: string;
   [k: string]: unknown;
+}
+/**
+ * Metadata bundle that accompanies valuation outputs.
+ *
+ * The metadata is intentionally small so it can be attached to reports and
+ * downstream data stores for reproducibility and audit trails.
+ */
+export interface ResultsMeta {
+  /**
+   * Optional FX policy applied by the computing layer (human-readable key).
+   */
+  fx_policy_applied?: string | null;
+  /**
+   * Numeric engine mode used to produce the results.
+   *
+   * Always [`NUMERIC_MODE_F64`] today; a plain string so result
+   * envelopes stay wire-compatible across host languages.
+   */
+  numeric_mode: string;
+  /**
+   * Whether the producing computation ran in parallel.
+   *
+   * Serial results omit the field entirely so existing payloads and golden
+   * files stay byte-identical.
+   */
+  parallel?: boolean;
+  /**
+   * Rounding context snapshot applied to IO boundaries.
+   */
+  rounding: RoundingContext;
+  /**
+   * Timestamp when result was computed (ISO 8601 format).
+   * Useful for audit trails and reproducibility.
+   */
+  timestamp?: string | null;
+  /**
+   * Finstack Quant library version used to produce the result.
+   */
+  version?: string | null;
+  [k: string]: unknown;
+}
+/**
+ * Snapshot of active rounding settings used for result stamping.
+ *
+ * Instances are produced from a [`FinstackConfig`] via `RoundingContext::from` and persisted
+ * alongside valuation results.
+ */
+export interface RoundingContext {
+  /**
+   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
+   */
+  ingest_scale_by_currency: {
+    [k: string]: number;
+  };
+  /**
+   * Explicitly selected rounding mode; absent when none was selected.
+   */
+  mode?: RoundingMode | null;
+  /**
+   * Validated output scale snapshot by currency code, with values in `0..=28`.
+   */
+  output_scale_by_currency: {
+    [k: string]: number;
+  };
+  /**
+   * Tolerance settings snapshot for floating-point comparisons.
+   */
+  tolerances?: ToleranceConfig;
+  /**
+   * Schema version for forward compatibility.
+   */
+  version: number;
+  [k: string]: unknown;
+}
+/**
+ * Numerical tolerance configuration for floating-point comparisons.
+ *
+ * Provides the configurable epsilon for generic floating-point zero-checks.
+ * The default is chosen to balance numerical stability with practical
+ * precision requirements.
+ */
+export interface ToleranceConfig {
+  /**
+   * Epsilon for generic floating-point comparisons (default: 1e-10).
+   *
+   * Used for general numerical comparisons where higher tolerance is acceptable.
+   */
+  generic_epsilon?: PositiveF64Wire;
 }
 /**
  * How a valuation result was produced.

@@ -175,9 +175,7 @@ def test_valuation_result_dict_access_and_money_value() -> None:
         result["DV01"]
     assert "dv01" in str(excinfo.value)
 
-    assert result.covenants is None
     assert result.explanation is None
-    assert result.all_covenants_passed()
 
     units = result.metric_units()
     assert units["ytm"] == "decimal"

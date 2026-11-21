@@ -316,8 +316,6 @@ def build_cases() -> dict[str, Any]:
         "result_json": _pinned_timestamp(swap_result.to_json()),
         "get_metric": swap_result.get_metric("dv01"),
         "metric_units": swap_result.metric_units(),
-        "all_covenants_passed": swap_result.all_covenants_passed(),
-        "failed_covenants": swap_result.failed_covenants(),
         "from_conventions": conventions_swap.to_json(),
         "swaption_forward_swap_rate": swaption.forward_swap_rate(rates_market, "2024-01-15"),
         "swaption_strike": swaption.get_strike(),

@@ -191,7 +191,6 @@
                 "fx_policy_applied": null,
                 "version": "0.11.0"
               },
-              "covenants": null,
               "provenance": {
                 "model": "discounting",
                 "requested_as_of": "2025-01-15",
@@ -253,7 +252,6 @@
                 "fx_policy_applied": null,
                 "version": "0.11.0"
               },
-              "covenants": null,
               "provenance": {
                 "model": "discounting",
                 "requested_as_of": "2025-01-15",

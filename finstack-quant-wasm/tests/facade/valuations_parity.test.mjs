@@ -239,8 +239,6 @@ test('interest-rate swap pricing and ValuationResult functions match Python', ()
   close(valuations.valuationResultGetMetric(canonical, 'dv01'), rates.get_metric, TIGHT, 'metric');
   assert.equal(valuations.valuationResultGetMetric(canonical, 'not_a_metric'), undefined);
   assert.deepEqual(valuations.valuationResultMetricUnits(canonical), rates.metric_units);
-  assert.equal(valuations.valuationResultAllCovenantsPassed(result), rates.all_covenants_passed);
-  assert.deepEqual(valuations.valuationResultFailedCovenants(result), rates.failed_covenants);
 
   const conventional = instruments.InterestRateSwap.fromConventions({
     id: 'IRS-CONV',

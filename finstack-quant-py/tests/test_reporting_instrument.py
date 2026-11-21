@@ -55,12 +55,6 @@ class _FakeResult:
             if key.startswith(prefix)
         ]
 
-    def all_covenants_passed(self) -> bool:
-        return not self._p.get("covenants")
-
-    def failed_covenants(self) -> list[str]:
-        return []
-
     def to_json(self) -> str:
         return json.dumps(self._p)
 

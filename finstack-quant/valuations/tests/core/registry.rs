@@ -196,17 +196,6 @@ impl Pricer for RichBondPricer {
             finstack_quant_valuations::metrics::MetricId::custom("model_measure"),
             2.0,
         );
-        let covenant = finstack_quant_covenants::CovenantReport {
-            covenant_type: "test".to_string(),
-            covenant_id: Some("rich-result".to_string()),
-            passed: true,
-            actual_value: Some(1.5),
-            threshold: Some(1.0),
-            details: Some("preserved".to_string()),
-            headroom: Some(0.5),
-            headroom_raw: Some(0.5),
-            meta: finstack_quant_core::config::ResultsMeta::default(),
-        };
         let mut result = finstack_quant_valuations::results::ValuationResult::stamped(
             instrument.id(),
             result_as_of,
@@ -224,11 +213,6 @@ impl Pricer for RichBondPricer {
         .with_explanation(finstack_quant_core::explain::ExplanationTrace::new(
             "rich-pricer",
         ));
-        result.covenants = Some(
-            [("rich-result".to_string(), covenant)]
-                .into_iter()
-                .collect(),
-        );
         result.meta.fx_policy_applied = Some("pricer-fx-policy".to_string());
         result.meta.timestamp = Some(time::OffsetDateTime::UNIX_EPOCH);
         result.meta.version = Some("model-version".to_string());
@@ -276,12 +260,6 @@ fn metric_attachment_preserves_the_model_result_envelope() {
             }
         ))
     ));
-    assert!(
-        result
-            .covenants
-            .as_ref()
-            .is_some_and(|reports| reports.contains_key("rich-result"))
-    );
     assert_eq!(
         result
             .explanation

@@ -5,7 +5,6 @@
   "examples": [
     {
       "as_of": "2024-01-15",
-      "covenants": null,
       "instrument_id": "US912828XG33",
       "measures": {},
       "meta": {
@@ -32,16 +31,6 @@
     "as_of": {
       "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
       "description": "Valuation date (T+0) for the calculation."
-    },
-    "covenants": {
-      "additionalProperties": {
-        "$ref": "#/$defs/d_276e49563c6406102455"
-      },
-      "description": "Covenant compliance results for structured products.\n\nPresent only for instruments with covenants (loans, structured credit).\nEach covenant is keyed by its identifier with pass/fail status and details.",
-      "type": [
-        "object",
-        "null"
-      ]
     },
     "details": {
       "anyOf": [
@@ -332,88 +321,6 @@
       "required": [
         "type",
         "entries"
-      ],
-      "type": "object"
-    },
-    "d_276e49563c6406102455": {
-      "additionalProperties": false,
-      "description": "Covenant check result.",
-      "properties": {
-        "actual_value": {
-          "description": "Actual value of the metric",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "covenant_id": {
-          "description": "Stable machine-readable covenant instance identifier.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "covenant_type": {
-          "description": "Type of covenant being checked",
-          "type": "string"
-        },
-        "details": {
-          "description": "Details or explanation",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "headroom": {
-          "description": "Cushion relative to threshold (positive => passing buffer)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "headroom_raw": {
-          "description": "Signed cushion in the covenant metric's own units when numerically meaningful.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "meta": {
-          "$ref": "#/$defs/d_bbbaabd9311c14f65e9b",
-          "default": {
-            "fx_policy_applied": null,
-            "numeric_mode": "f64",
-            "rounding": {
-              "ingest_scale_by_currency": {},
-              "output_scale_by_currency": {},
-              "tolerances": {
-                "generic_epsilon": 1e-10
-              },
-              "version": 1
-            },
-            "version": "0.11.0"
-          },
-          "description": "Audit stamp: numeric mode, rounding context, and FX policy in force."
-        },
-        "passed": {
-          "description": "Whether the covenant passed",
-          "type": "boolean"
-        },
-        "threshold": {
-          "description": "Required threshold",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "covenant_type",
-        "passed"
       ],
       "type": "object"
     },

@@ -4572,8 +4572,6 @@
       "instruments",
       "market",
       "schema",
-      "valuationResultAllCovenantsPassed",
-      "valuationResultFailedCovenants",
       "valuationResultGetMetric",
       "valuationResultMetricSeries",
       "valuationResultMetricUnits",
@@ -9614,12 +9612,6 @@
     "kind": "function"
   },
   "valuations.valuationResultMetricUnits": {
-    "kind": "function"
-  },
-  "valuations.valuationResultAllCovenantsPassed": {
-    "kind": "function"
-  },
-  "valuations.valuationResultFailedCovenants": {
     "kind": "function"
   }
 }

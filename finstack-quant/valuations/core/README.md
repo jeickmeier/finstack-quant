@@ -12,7 +12,6 @@ closed world the bindings and the portfolio layer use.
 Depends on [`finstack-quant-core`](../../core/README.md) (money, dates,
 market data), [`finstack-quant-cashflows`](../../cashflows/README.md) (the
 `CashflowProvider` supertrait of `Instrument`),
-[`finstack-quant-covenants`](../../covenants/README.md),
 [`finstack-quant-margin`](../../margin/README.md) (the `Marginable` bridge)
 and [`finstack-quant-models`](../../models/README.md) (model kernels), plus the
 `FinancialBuilder` derive in [`macros/`](../macros). Nothing in this crate
@@ -25,7 +24,7 @@ names a concrete instrument type.
 | `src/instruments/` | The `Instrument` trait and its hooks, `PricingOptions`, parameter and override types, the generic pricer, shared pricing kernels (`common_impl`), the per-flow cashflow exporter |
 | `src/pricer/` | `InstrumentType`/`ModelKey`/`PricerKey`, `Pricer`, `PricerRegistry`, `PricingDispatch`, `Family` (the registration unit), metric enrichment, product defaults |
 | `src/metrics/` | `MetricId`, `MetricCalculator`, `MetricContext`, `MetricRegistry`, the universal calculators, generic sensitivities, historical VaR |
-| `src/market/` | Market quotes, convention registries, listed-product catalog |
+| `src/market/` | Convention registries and option-volatility lookup policy |
 | `src/results/` | `ValuationResult`, `ValuationDetails`, provenance, row export, the composite and structured-credit result DTOs |
 | `src/margin.rs` | Marginability bridge (`Marginable` dispatch) |
 | `src/recalibration.rs` | Recalibration contract implemented by the calibration crate |

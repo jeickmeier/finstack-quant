@@ -23,6 +23,4 @@ export const valuations = {
   valuationResultMetricSeries: wasm.valuationResultMetricSeries,
   valuationResultGetMetric: wasm.valuationResultGetMetric,
   valuationResultMetricUnits: wasm.valuationResultMetricUnits,
-  valuationResultAllCovenantsPassed: wasm.valuationResultAllCovenantsPassed,
-  valuationResultFailedCovenants: wasm.valuationResultFailedCovenants,
 };

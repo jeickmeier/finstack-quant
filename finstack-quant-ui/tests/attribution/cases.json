@@ -7,11 +7,11 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "1b1c97c1e978f6ddf018b5f38e16b7b0c407aac254f7443f76908d9c27a07162"
+      "sha256": "e89718cd1df50c3044ca2288ed0ebb0e918507f0c5df830a929178eef9e30518"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",
-      "sha256": "f4a98c198e10133fea3a1a961ac26581d8f5088d6e659f34076fb108582262d8"
+      "sha256": "4ddde4c750457dc71b8447fd993760552481f9d90303090b94a6d564b905c912"
     }
   ],
   "cases": [

@@ -653,16 +653,14 @@ type HostValuationResult = import('../types/valuation-result.js').ValuationResul
  * `seed` is a lossless `bigint` and path counts are plain numbers, so serialize
  * stochastic results with `valuations.valuationResultToJson` rather than
  * `JSON.stringify`. The emitted-field presence is stricter than the schema's
- * input view: `covenants` is always present (`null` when the instrument has
- * none), while `details`, `explanation` and `provenance` are omitted rather
+ * input view: `details`, `explanation` and `provenance` are omitted rather
  * than `null` when absent.
  * `provenance` is stamped on every priced result.
  */
 export type ValuationResult = Omit<
   HostValuationResult,
-  'covenants' | 'details' | 'explanation' | 'provenance'
+  'details' | 'explanation' | 'provenance'
 > & {
-  covenants: NonNullable<HostValuationResult['covenants']> | null;
   details?: NonNullable<HostValuationResult['details']>;
   explanation?: NonNullable<HostValuationResult['explanation']>;
   provenance?: NonNullable<HostValuationResult['provenance']>;

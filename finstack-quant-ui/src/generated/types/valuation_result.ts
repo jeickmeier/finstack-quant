@@ -6,22 +6,6 @@
  */
 export type Date = string;
 /**
- * Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
- *
- * There is no default mode: every financial rounding names one explicitly.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::{FinstackConfig, RoundingMode};
- *
- * let mut cfg = FinstackConfig::default();
- * assert_eq!(cfg.rounding.mode, None);
- * cfg.rounding.mode = Some(RoundingMode::TowardZero);
- * assert_eq!(cfg.rounding.mode, Some(RoundingMode::TowardZero));
- * ```
- */
-export type DD59860C6D29E319A5B5C = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
-/**
  * Model-specific typed valuation details.
  *
  * These details are for rich structured outputs that do not fit the scalar
@@ -296,6 +280,22 @@ export type D_35C446142142801Cbb82 =
  * Cashflow payment date (ISO8601)
  */
 export type Date1 = string;
+/**
+ * Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
+ *
+ * There is no default mode: every financial rounding names one explicitly.
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::config::{FinstackConfig, RoundingMode};
+ *
+ * let mut cfg = FinstackConfig::default();
+ * assert_eq!(cfg.rounding.mode, None);
+ * cfg.rounding.mode = Some(RoundingMode::TowardZero);
+ * assert_eq!(cfg.rounding.mode, Some(RoundingMode::TowardZero));
+ * ```
+ */
+export type DD59860C6D29E319A5B5C = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
 /**
  * Opaque string identifier.
  */
@@ -822,15 +822,6 @@ export type Date3 = string;
 export interface ValuationResultWire {
   as_of: Date;
   /**
-   * Covenant compliance results for structured products.
-   *
-   * Present only for instruments with covenants (loans, structured credit).
-   * Each covenant is keyed by its identifier with pass/fail status and details.
-   */
-  covenants?: {
-    [k: string]: D_276E49563C6406102455;
-  } | null;
-  /**
    * Optional rich model-specific pricing detail.
    */
   details?: D_979A918A504Fe5C6F8F7 | null;
@@ -870,7 +861,7 @@ export interface ValuationResultWire {
   measures: {
     [k: string]: number;
   };
-  meta: DBbbaabd9311C14F65E9B1;
+  meta: DBbbaabd9311C14F65E9B;
   /**
    * How the result was produced: model, requested date, declared market
    * dependencies, scenario adjustment and sensitivity bump sizes.
@@ -883,116 +874,6 @@ export interface ValuationResultWire {
    */
   schema_version: number;
   value: Money5;
-}
-/**
- * Covenant check result.
- */
-export interface D_276E49563C6406102455 {
-  /**
-   * Actual value of the metric
-   */
-  actual_value?: number | null;
-  /**
-   * Stable machine-readable covenant instance identifier.
-   */
-  covenant_id?: string | null;
-  /**
-   * Type of covenant being checked
-   */
-  covenant_type: string;
-  /**
-   * Details or explanation
-   */
-  details?: string | null;
-  /**
-   * Cushion relative to threshold (positive => passing buffer)
-   */
-  headroom?: number | null;
-  /**
-   * Signed cushion in the covenant metric's own units when numerically meaningful.
-   */
-  headroom_raw?: number | null;
-  meta?: DBbbaabd9311C14F65E9B;
-  /**
-   * Whether the covenant passed
-   */
-  passed: boolean;
-  /**
-   * Required threshold
-   */
-  threshold?: number | null;
-}
-/**
- * Audit stamp: numeric mode, rounding context, and FX policy in force.
- */
-export interface DBbbaabd9311C14F65E9B {
-  /**
-   * Optional FX policy applied by the computing layer (human-readable key).
-   */
-  fx_policy_applied?: string | null;
-  /**
-   * Numeric engine mode used to produce the results.
-   *
-   * Always [`NUMERIC_MODE_F64`] today; a plain string so result
-   * envelopes stay wire-compatible across host languages.
-   */
-  numeric_mode: string;
-  /**
-   * Whether the producing computation ran in parallel.
-   *
-   * Serial results omit the field entirely so existing payloads and golden
-   * files stay byte-identical.
-   */
-  parallel?: boolean;
-  rounding: D_55Fd8D302833A65D16F6;
-  /**
-   * Timestamp when result was computed (ISO 8601 format).
-   * Useful for audit trails and reproducibility.
-   */
-  timestamp?: string | null;
-  /**
-   * Finstack Quant library version used to produce the result.
-   */
-  version?: string | null;
-  [k: string]: unknown;
-}
-/**
- * Rounding context snapshot applied to IO boundaries.
- */
-export interface D_55Fd8D302833A65D16F6 {
-  /**
-   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
-   */
-  ingest_scale_by_currency: {
-    [k: string]: number;
-  };
-  /**
-   * Explicitly selected rounding mode; absent when none was selected.
-   */
-  mode?: DD59860C6D29E319A5B5C | null;
-  /**
-   * Validated output scale snapshot by currency code, with values in `0..=28`.
-   */
-  output_scale_by_currency: {
-    [k: string]: number;
-  };
-  tolerances?: D_719F3377340F012E0Eb2;
-  /**
-   * Schema version for forward compatibility.
-   */
-  version: number;
-  [k: string]: unknown;
-}
-/**
- * Tolerance settings snapshot for floating-point comparisons.
- */
-export interface D_719F3377340F012E0Eb2 {
-  /**
-   * Epsilon for generic floating-point comparisons (default: 1e-10).
-   *
-   * Used for general numerical comparisons where higher tolerance is acceptable.
-   */
-  generic_epsilon?: number;
 }
 /**
  * Rich structured details attached to composite valuation results.
@@ -1991,15 +1872,6 @@ export interface Money4 {
 export interface ValuationResultWire1 {
   as_of: Date;
   /**
-   * Covenant compliance results for structured products.
-   *
-   * Present only for instruments with covenants (loans, structured credit).
-   * Each covenant is keyed by its identifier with pass/fail status and details.
-   */
-  covenants?: {
-    [k: string]: D_276E49563C6406102455;
-  } | null;
-  /**
    * Optional rich model-specific pricing detail.
    */
   details?: D_979A918A504Fe5C6F8F7 | null;
@@ -2039,7 +1911,7 @@ export interface ValuationResultWire1 {
   measures: {
     [k: string]: number;
   };
-  meta: DBbbaabd9311C14F65E9B1;
+  meta: DBbbaabd9311C14F65E9B;
   /**
    * How the result was produced: model, requested date, declared market
    * dependencies, scenario adjustment and sensitivity bump sizes.
@@ -2088,7 +1960,7 @@ export interface D_20E530Ddb3C6B466Caf1 {
  * - FX policy for cross-currency calculations
  * - Calculation timing information
  */
-export interface DBbbaabd9311C14F65E9B1 {
+export interface DBbbaabd9311C14F65E9B {
   /**
    * Optional FX policy applied by the computing layer (human-readable key).
    */
@@ -2118,6 +1990,44 @@ export interface DBbbaabd9311C14F65E9B1 {
    */
   version?: string | null;
   [k: string]: unknown;
+}
+/**
+ * Rounding context snapshot applied to IO boundaries.
+ */
+export interface D_55Fd8D302833A65D16F6 {
+  /**
+   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
+   */
+  ingest_scale_by_currency: {
+    [k: string]: number;
+  };
+  /**
+   * Explicitly selected rounding mode; absent when none was selected.
+   */
+  mode?: DD59860C6D29E319A5B5C | null;
+  /**
+   * Validated output scale snapshot by currency code, with values in `0..=28`.
+   */
+  output_scale_by_currency: {
+    [k: string]: number;
+  };
+  tolerances?: D_719F3377340F012E0Eb2;
+  /**
+   * Schema version for forward compatibility.
+   */
+  version: number;
+  [k: string]: unknown;
+}
+/**
+ * Tolerance settings snapshot for floating-point comparisons.
+ */
+export interface D_719F3377340F012E0Eb2 {
+  /**
+   * Epsilon for generic floating-point comparisons (default: 1e-10).
+   *
+   * Used for general numerical comparisons where higher tolerance is acceptable.
+   */
+  generic_epsilon?: number;
 }
 /**
  * How a valuation result was produced.

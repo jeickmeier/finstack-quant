@@ -47,36 +47,6 @@ pub fn valuation_result_metric_units(
     to_js_value(&units)
 }
 
-/// Whether every covenant in a valuation result passed.
-///
-/// Twin of Python `ValuationResult.all_covenants_passed` (Rust `ValuationResult::all_covenants_passed`).
-/// @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
-/// @returns `true` when all covenants passed or the result carries no covenant reports.
-/// @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
-#[wasm_bindgen(js_name = valuationResultAllCovenantsPassed)]
-pub fn valuation_result_all_covenants_passed(
-    #[wasm_bindgen(unchecked_param_type = "ValuationResult | string")] result: JsValue,
-) -> Result<bool, JsValue> {
-    Ok(parse(&result)?.all_covenants_passed())
-}
-
-/// Identifiers of the covenants that failed in a valuation result.
-///
-/// Twin of Python `ValuationResult.failed_covenants` (Rust `ValuationResult::failed_covenants`).
-/// @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
-/// @returns Covenant identifiers whose report did not pass; empty when none failed.
-/// @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
-#[wasm_bindgen(js_name = valuationResultFailedCovenants)]
-pub fn valuation_result_failed_covenants(
-    #[wasm_bindgen(unchecked_param_type = "ValuationResult | string")] result: JsValue,
-) -> Result<Vec<String>, JsValue> {
-    Ok(parse(&result)?
-        .failed_covenants()
-        .into_iter()
-        .map(String::from)
-        .collect())
-}
-
 pub(super) fn valuation_result_json(result: ValuationResult) -> Result<String, JsValue> {
     serde_json::to_string(&result).map_err(to_js_err)
 }

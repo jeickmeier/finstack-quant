@@ -130,7 +130,7 @@
       "type": "registry:component",
       "title": "Covenant report",
       "description": "Displays native covenant reports: test, actual, threshold, headroom, verdict and details per covenant, with the complete JSON.",
-      "docs": "Present native CovenantReport values keyed by covenant instance key (CovenantEngine#evaluate, one DatedCovenantReports row, or a valuation result's covenants) as a typed table in the order supplied: Rust's test description, actual value, threshold and headroom with every supplied digit (a host may inject formatValue), the passed verdict as Passed or Failed, and details; a field Rust leaves unset shows as a dash. The complete reports stay available as JSON in a Covenants disclosure. No verdict, headroom or threshold is computed. No worker is required.",
+      "docs": "Present native CovenantReport values keyed by covenant instance key (CovenantEngine#evaluate or one DatedCovenantReports row) as a typed table in the order supplied: Rust's test description, actual value, threshold and headroom with every supplied digit (a host may inject formatValue), the passed verdict as Passed or Failed, and details; a field Rust leaves unset shows as a dash. The complete reports stay available as JSON in a Covenants disclosure. No verdict, headroom or threshold is computed. No worker is required.",
       "files": [
         {
           "path": "components/covenant-report/covenant-report.tsx",

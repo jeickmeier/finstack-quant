@@ -1,18 +1,6 @@
 // Generated from the Rust facade host schema by scripts/generate-contract-types.mjs. Do not edit.
 
 /**
- * Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
- *
- * There is no default mode: every financial rounding names one explicitly.
- *
- * This interface was referenced by `ValuationResult1`'s JSON-Schema
- * via the `definition` "RoundingMode".
- *
- * This interface was referenced by `ValuationResult`'s JSON-Schema
- * via the `definition` "RoundingMode".
- */
-export type RoundingMode = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
-/**
  * Model-specific typed valuation details.
  *
  * These details are for rich structured outputs that do not fit the scalar
@@ -118,6 +106,18 @@ export type TraceEntry =
        */
       name: string;
     };
+/**
+ * Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
+ *
+ * There is no default mode: every financial rounding names one explicitly.
+ *
+ * This interface was referenced by `ValuationResult1`'s JSON-Schema
+ * via the `definition` "RoundingMode".
+ *
+ * This interface was referenced by `ValuationResult`'s JSON-Schema
+ * via the `definition` "RoundingMode".
+ */
+export type RoundingMode = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -458,15 +458,6 @@ export interface ValuationResult {
    */
   as_of: string;
   /**
-   * Covenant compliance results for structured products.
-   *
-   * Present only for instruments with covenants (loans, structured credit).
-   * Each covenant is keyed by its identifier with pass/fail status and details.
-   */
-  covenants?: {
-    [k: string]: CovenantReport;
-  } | null;
-  /**
    * Optional rich model-specific pricing detail.
    */
   details?: ValuationDetails | null;
@@ -506,7 +497,7 @@ export interface ValuationResult {
   measures: {
     [k: string]: number;
   };
-  meta: ResultsMeta1;
+  meta: ResultsMeta;
   /**
    * How the result was produced: model, requested date, declared market
    * dependencies, scenario adjustment and sensitivity bump sizes.
@@ -519,122 +510,6 @@ export interface ValuationResult {
    */
   schema_version: number;
   value: Money5;
-}
-/**
- * Covenant check result.
- *
- * This interface was referenced by `ValuationResult1`'s JSON-Schema
- * via the `definition` "CovenantReport".
- *
- * This interface was referenced by `ValuationResult`'s JSON-Schema
- * via the `definition` "CovenantReport".
- */
-export interface CovenantReport {
-  /**
-   * Actual value of the metric
-   */
-  actual_value?: number | null;
-  /**
-   * Stable machine-readable covenant instance identifier.
-   */
-  covenant_id?: string | null;
-  /**
-   * Type of covenant being checked
-   */
-  covenant_type: string;
-  /**
-   * Details or explanation
-   */
-  details?: string | null;
-  /**
-   * Cushion relative to threshold (positive => passing buffer)
-   */
-  headroom?: number | null;
-  /**
-   * Signed cushion in the covenant metric's own units when numerically meaningful.
-   */
-  headroom_raw?: number | null;
-  meta?: ResultsMeta;
-  /**
-   * Whether the covenant passed
-   */
-  passed: boolean;
-  /**
-   * Required threshold
-   */
-  threshold?: number | null;
-}
-/**
- * Audit stamp: numeric mode, rounding context, and FX policy in force.
- */
-export interface ResultsMeta {
-  /**
-   * Optional FX policy applied by the computing layer (human-readable key).
-   */
-  fx_policy_applied?: string | null;
-  /**
-   * Numeric engine mode used to produce the results.
-   *
-   * Always [`NUMERIC_MODE_F64`] today; a plain string so result
-   * envelopes stay wire-compatible across host languages.
-   */
-  numeric_mode: string;
-  /**
-   * Whether the producing computation ran in parallel.
-   *
-   * Serial results omit the field entirely so existing payloads and golden
-   * files stay byte-identical.
-   */
-  parallel?: boolean;
-  rounding: RoundingContext;
-  /**
-   * Timestamp when result was computed (ISO 8601 format).
-   * Useful for audit trails and reproducibility.
-   */
-  timestamp?: string | null;
-  /**
-   * Finstack Quant library version used to produce the result.
-   */
-  version?: string | null;
-  [k: string]: unknown;
-}
-/**
- * Rounding context snapshot applied to IO boundaries.
- */
-export interface RoundingContext {
-  /**
-   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
-   */
-  ingest_scale_by_currency: {
-    [k: string]: number;
-  };
-  /**
-   * Explicitly selected rounding mode; absent when none was selected.
-   */
-  mode?: RoundingMode | null;
-  /**
-   * Validated output scale snapshot by currency code, with values in `0..=28`.
-   */
-  output_scale_by_currency: {
-    [k: string]: number;
-  };
-  tolerances?: ToleranceConfig;
-  /**
-   * Schema version for forward compatibility.
-   */
-  version: number;
-  [k: string]: unknown;
-}
-/**
- * Tolerance settings snapshot for floating-point comparisons.
- */
-export interface ToleranceConfig {
-  /**
-   * Epsilon for generic floating-point comparisons (default: 1e-10).
-   *
-   * Used for general numerical comparisons where higher tolerance is acceptable.
-   */
-  generic_epsilon?: number;
 }
 /**
  * Rich structured details attached to composite valuation results.
@@ -1994,15 +1869,6 @@ export interface ValuationResult1 {
    */
   as_of: string;
   /**
-   * Covenant compliance results for structured products.
-   *
-   * Present only for instruments with covenants (loans, structured credit).
-   * Each covenant is keyed by its identifier with pass/fail status and details.
-   */
-  covenants?: {
-    [k: string]: CovenantReport;
-  } | null;
-  /**
    * Optional rich model-specific pricing detail.
    */
   details?: ValuationDetails | null;
@@ -2042,7 +1908,7 @@ export interface ValuationResult1 {
   measures: {
     [k: string]: number;
   };
-  meta: ResultsMeta1;
+  meta: ResultsMeta;
   /**
    * How the result was produced: model, requested date, declared market
    * dependencies, scenario adjustment and sensitivity bump sizes.
@@ -2097,7 +1963,7 @@ export interface ExplanationTrace {
  * - FX policy for cross-currency calculations
  * - Calculation timing information
  */
-export interface ResultsMeta1 {
+export interface ResultsMeta {
   /**
    * Optional FX policy applied by the computing layer (human-readable key).
    */
@@ -2127,6 +1993,44 @@ export interface ResultsMeta1 {
    */
   version?: string | null;
   [k: string]: unknown;
+}
+/**
+ * Rounding context snapshot applied to IO boundaries.
+ */
+export interface RoundingContext {
+  /**
+   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
+   */
+  ingest_scale_by_currency: {
+    [k: string]: number;
+  };
+  /**
+   * Explicitly selected rounding mode; absent when none was selected.
+   */
+  mode?: RoundingMode | null;
+  /**
+   * Validated output scale snapshot by currency code, with values in `0..=28`.
+   */
+  output_scale_by_currency: {
+    [k: string]: number;
+  };
+  tolerances?: ToleranceConfig;
+  /**
+   * Schema version for forward compatibility.
+   */
+  version: number;
+  [k: string]: unknown;
+}
+/**
+ * Tolerance settings snapshot for floating-point comparisons.
+ */
+export interface ToleranceConfig {
+  /**
+   * Epsilon for generic floating-point comparisons (default: 1e-10).
+   *
+   * Used for general numerical comparisons where higher tolerance is acceptable.
+   */
+  generic_epsilon?: number;
 }
 /**
  * How a valuation result was produced.
@@ -3520,7 +3424,7 @@ export interface ResolvedCompositeLeg {
  * This interface was referenced by `ValuationResult`'s JSON-Schema
  * via the `definition` "ResultsMeta".
  */
-export interface ResultsMeta2 {
+export interface ResultsMeta1 {
   /**
    * Optional FX policy applied by the computing layer (human-readable key).
    */

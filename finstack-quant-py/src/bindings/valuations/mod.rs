@@ -233,32 +233,6 @@ impl PyValuationResult {
         Ok(dict)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult.all_covenants_passed")]
-    #[pyo3(text_signature = "($self)")]
-    fn all_covenants_passed(&self) -> bool {
-        self.inner.all_covenants_passed()
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult.failed_covenants")]
-    #[pyo3(text_signature = "($self)")]
-    fn failed_covenants(&self) -> Vec<String> {
-        self.inner
-            .failed_covenants()
-            .into_iter()
-            .map(String::from)
-            .collect()
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult.covenants")]
-    #[getter]
-    fn covenants<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.inner
-            .covenants
-            .as_ref()
-            .map(|covenants| serde_to_py(py, covenants))
-            .transpose()
-    }
-
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult.provenance")]
     #[getter]
     fn provenance<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {

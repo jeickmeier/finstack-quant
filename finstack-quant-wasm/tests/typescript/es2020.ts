@@ -180,18 +180,13 @@ features.neutralizeAndZscore([1, 0, 0], ['d', 'd', 'd'], [[1, 2, 3]], { fit_inte
 declare const valuation: ValuationResult;
 const roundingMode: import('../../types/valuation-result.js').ValuationResult['meta']['rounding']['mode'] =
   valuation.meta.rounding.mode;
-const covenantReports: NonNullable<
-  import('../../types/valuation-result.js').ValuationResult['covenants']
-> | null = valuation.covenants;
 const explanation: import('../../types/valuation-result.js').ExplanationTrace | undefined =
   valuation.explanation;
 // @ts-expect-error Native absence is omitted, never null.
 valuation.explanation = null;
-// @ts-expect-error Native covenant field is always emitted.
-valuation.covenants = undefined;
 // @ts-expect-error Metadata is a complete canonical structure.
 valuation.meta = {};
-void [roundingMode, covenantReports, explanation];
+void [roundingMode, explanation];
 
 const scenarioSpec = scenarios.parseScenarioSpec({ id: 'metadata', operations: [] });
 const scenarioName: string | null | undefined = scenarioSpec.name;

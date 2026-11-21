@@ -7,7 +7,6 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::explain::ExplanationTrace;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::wire::SchemaVersion;
-use finstack_quant_covenants::CovenantReport;
 
 use indexmap::IndexMap;
 
@@ -123,7 +122,7 @@ pub struct MonteCarloValuationDetails {
 ///
 /// This is the primary output structure returned by pricing operations.
 /// It contains the instrument's present value, computed risk metrics,
-/// calculation metadata, and optional covenant checks or explainability traces.
+/// calculation metadata, and optional explainability traces.
 ///
 /// # Interpretation Contract
 ///
@@ -143,7 +142,6 @@ pub struct MonteCarloValuationDetails {
 /// - **Value**: Present value in the instrument's native currency
 /// - **Measures**: Risk metrics as key-value pairs (e.g., "dv01" → 500.0)
 /// - **Metadata**: Calculation context (rounding, numeric mode, timing)
-/// - **Covenants**: Optional covenant compliance results
 /// - **Explanation**: Optional computation trace for debugging
 ///
 /// # See Also
@@ -208,41 +206,6 @@ pub struct MonteCarloValuationDetails {
 ///
 /// assert_eq!(result.metric_str("ytm"), Some(0.0475));
 /// assert_eq!(result.metric_str("dv01"), Some(425.0));
-/// # Ok(())
-/// # }
-/// ```
-///
-/// ## With Covenants
-///
-/// ```rust
-/// use finstack_quant_valuations_core::results::ValuationResult;
-/// use finstack_quant_covenants::CovenantReport;
-/// use finstack_quant_core::currency::Currency;
-/// use finstack_quant_core::money::Money;
-/// use finstack_quant_core::dates::create_date;
-/// use time::Month;
-///
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let as_of = create_date(2025, Month::January, 15)?;
-/// let pv = Money::from((1_000_000_i64, Currency::USD));
-///
-/// let covenant = CovenantReport {
-///     covenant_type: "dscr".to_string(),
-///     covenant_id: None,
-///     passed: true,
-///     actual_value: Some(1.5),
-///     threshold: Some(1.25),
-///     details: Some("DSCR: 1.50x >= 1.25x".to_string()),
-///     headroom: Some(0.25),
-///     headroom_raw: None,
-///     meta: Default::default(),
-/// };
-///
-/// let mut result = ValuationResult::stamped("LOAN-001", as_of, pv);
-/// result.covenants = Some([("dscr_test".to_string(), covenant)].into_iter().collect());
-///
-/// assert!(result.all_covenants_passed());
-/// assert_eq!(result.failed_covenants().len(), 0);
 /// # Ok(())
 /// # }
 /// ```
@@ -325,12 +288,6 @@ pub struct ValuationResult {
     /// - Calculation timing information
     pub meta: ResultsMeta,
 
-    /// Covenant compliance results for structured products.
-    ///
-    /// Present only for instruments with covenants (loans, structured credit).
-    /// Each covenant is keyed by its identifier with pass/fail status and details.
-    pub covenants: Option<IndexMap<String, CovenantReport>>,
-
     /// Optional computation explanation trace.
     ///
     /// Requested with `PricingOptions::with_explain`. For discounting and
@@ -368,7 +325,7 @@ impl ValuationResult {
     ///
     /// # Returns
     ///
-    /// `ValuationResult` with NPV and default metadata (no metrics or covenants)
+    /// `ValuationResult` with NPV and default metadata (no metrics)
     ///
     /// # Examples
     ///
@@ -453,7 +410,6 @@ impl ValuationResult {
             measures: IndexMap::new(),
             details: None,
             meta,
-            covenants: None,
             explanation: None,
             provenance: None,
             metric_seed: None,
@@ -641,107 +597,6 @@ impl ValuationResult {
             .map(|key| (key.to_string(), key.unit()))
             .collect()
     }
-
-    /// Check if all covenants passed their compliance tests.
-    ///
-    /// Returns `true` if there are no covenants or if all covenants passed.
-    /// Use [`failed_covenants()`](Self::failed_covenants) to get specific failures.
-    ///
-    /// # Returns
-    ///
-    /// `true` if all covenants passed or no covenants present, `false` otherwise
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_valuations_core::results::ValuationResult;
-    /// use finstack_quant_covenants::CovenantReport;
-    /// # use finstack_quant_core::currency::Currency;
-    /// # use finstack_quant_core::money::Money;
-    /// # use finstack_quant_core::dates::create_date;
-    /// # use time::Month;
-    ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let as_of = create_date(2025, Month::January, 15)?;
-    /// # let pv = Money::from((1_000_000_i64, Currency::USD));
-    /// let mut result = ValuationResult::stamped("LOAN-001", as_of, pv);
-    /// let dscr = CovenantReport {
-    ///     covenant_type: "dscr".to_string(),
-    ///     covenant_id: None,
-    ///     passed: true,
-    ///     actual_value: Some(1.5),
-    ///     threshold: Some(1.25),
-    ///     details: None,
-    ///     headroom: Some(0.25),
-    ///     headroom_raw: None,
-    ///     meta: Default::default(),
-    /// };
-    /// result.covenants = Some([("dscr".to_string(), dscr)].into_iter().collect());
-    ///
-    /// assert!(result.all_covenants_passed());
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn all_covenants_passed(&self) -> bool {
-        self.covenants
-            .as_ref()
-            .map(|c| c.values().all(|r| r.passed))
-            .unwrap_or(true)
-    }
-
-    /// Get list of failed covenant identifiers.
-    ///
-    /// Returns identifiers of covenants that did not pass their compliance
-    /// tests. Empty vector if all covenants passed or no covenants present.
-    ///
-    /// # Returns
-    ///
-    /// Vector of covenant identifiers that failed
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_valuations_core::results::ValuationResult;
-    /// use finstack_quant_covenants::CovenantReport;
-    /// # use finstack_quant_core::currency::Currency;
-    /// # use finstack_quant_core::money::Money;
-    /// # use finstack_quant_core::dates::create_date;
-    /// # use time::Month;
-    ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let as_of = create_date(2025, Month::January, 15)?;
-    /// # let pv = Money::from((1_000_000_i64, Currency::USD));
-    /// let mut result = ValuationResult::stamped("LOAN-001", as_of, pv);
-    /// let dscr = CovenantReport {
-    ///     covenant_type: "dscr".to_string(),
-    ///     covenant_id: None,
-    ///     passed: false,
-    ///     actual_value: Some(1.1),
-    ///     threshold: Some(1.25),
-    ///     details: Some("DSCR below threshold".to_string()),
-    ///     headroom: Some(-0.15),
-    ///     headroom_raw: None,
-    ///     meta: Default::default(),
-    /// };
-    /// result.covenants = Some([("dscr".to_string(), dscr)].into_iter().collect());
-    ///
-    /// let failed = result.failed_covenants();
-    /// assert_eq!(failed.len(), 1);
-    /// assert_eq!(failed[0], "dscr");
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn failed_covenants(&self) -> Vec<&str> {
-        self.covenants
-            .as_ref()
-            .map(|c| {
-                c.iter()
-                    .filter(|(_, r)| !r.passed)
-                    .map(|(k, _)| k.as_str())
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
 }
 
 #[cfg(test)]
@@ -896,34 +751,17 @@ mod tests {
     }
 
     #[test]
-    fn serde_roundtrip_keeps_covenant_and_explanation() {
+    fn serde_roundtrip_keeps_explanation() {
         let as_of = date!(2025 - 02 - 01);
         let pv = Money::from((10_i64, Currency::EUR));
-        let mut covenants = IndexMap::new();
-        covenants.insert(
-            "dscr".to_string(),
-            CovenantReport {
-                covenant_type: "dscr".to_string(),
-                covenant_id: None,
-                passed: false,
-                actual_value: Some(1.0),
-                threshold: Some(1.2),
-                details: None,
-                headroom: None,
-                headroom_raw: None,
-                meta: finstack_quant_core::config::ResultsMeta::default(),
-            },
-        );
         let trace = ExplanationTrace::new("unit");
-        let mut original = ValuationResult::stamped("TR", as_of, pv).with_explanation(trace);
-        original.covenants = Some(covenants);
+        let original = ValuationResult::stamped("TR", as_of, pv).with_explanation(trace);
         let json = serde_json::to_string(&original);
         assert!(json.is_ok(), "valuation result should serialize");
         if let Ok(json) = json {
             let back = serde_json::from_str::<ValuationResult>(&json);
             assert!(back.is_ok(), "valuation result should deserialize");
             if let Ok(back) = back {
-                assert_eq!(back.failed_covenants(), vec!["dscr"]);
                 assert!(back.explanation.is_some());
             }
         }

@@ -7,7 +7,6 @@ export default [
     "examples": [
       {
         "as_of": "2024-01-15",
-        "covenants": null,
         "instrument_id": "US912828XG33",
         "measures": {},
         "meta": {
@@ -263,75 +262,6 @@ export default [
     "path": "#/$defs/d_20e530ddb3c6b466caf1/properties/type",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ExplanationTrace/properties/type",
     "description": "Type of trace (e.g., \"calibration\", \"pricing\", \"waterfall\")"
-  },
-  {
-    "path": "#/$defs/d_276e49563c6406102455",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/CovenantReport",
-    "description": "Covenant check result."
-  },
-  {
-    "path": "#/$defs/d_276e49563c6406102455/properties/actual_value",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/CovenantReport/properties/actual_value",
-    "description": "Actual value of the metric",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_276e49563c6406102455/properties/covenant_id",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/CovenantReport/properties/covenant_id",
-    "description": "Stable machine-readable covenant instance identifier."
-  },
-  {
-    "path": "#/$defs/d_276e49563c6406102455/properties/covenant_type",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/CovenantReport/properties/covenant_type",
-    "description": "Type of covenant being checked"
-  },
-  {
-    "path": "#/$defs/d_276e49563c6406102455/properties/details",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/CovenantReport/properties/details",
-    "description": "Details or explanation"
-  },
-  {
-    "path": "#/$defs/d_276e49563c6406102455/properties/headroom",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/CovenantReport/properties/headroom",
-    "description": "Cushion relative to threshold (positive => passing buffer)",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_276e49563c6406102455/properties/headroom_raw",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/CovenantReport/properties/headroom_raw",
-    "description": "Signed cushion in the covenant metric's own units when numerically meaningful.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_276e49563c6406102455/properties/meta",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/CovenantReport/properties/meta",
-    "default": {
-      "fx_policy_applied": null,
-      "numeric_mode": "f64",
-      "rounding": {
-        "ingest_scale_by_currency": {},
-        "output_scale_by_currency": {},
-        "tolerances": {
-          "generic_epsilon": 1e-10
-        },
-        "version": 1
-      },
-      "version": "0.11.0"
-    },
-    "description": "Audit stamp: numeric mode, rounding context, and FX policy in force.",
-    "ref": "#/$defs/ResultsMeta",
-    "resolvedRef": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ResultsMeta"
-  },
-  {
-    "path": "#/$defs/d_276e49563c6406102455/properties/passed",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/CovenantReport/properties/passed",
-    "description": "Whether the covenant passed"
-  },
-  {
-    "path": "#/$defs/d_276e49563c6406102455/properties/threshold",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/CovenantReport/properties/threshold",
-    "description": "Required threshold",
-    "format": "double"
   },
   {
     "path": "#/$defs/d_35c446142142801cbb82",
@@ -3553,17 +3483,6 @@ export default [
     "description": "Valuation date (T+0) for the calculation.",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/properties/covenants",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/properties/covenants",
-    "description": "Covenant compliance results for structured products.\n\nPresent only for instruments with covenants (loans, structured credit).\nEach covenant is keyed by its identifier with pass/fail status and details."
-  },
-  {
-    "path": "#/properties/covenants/additionalProperties",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/properties/covenants/additionalProperties",
-    "ref": "#/$defs/CovenantReport",
-    "resolvedRef": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/CovenantReport"
   },
   {
     "path": "#/properties/details",

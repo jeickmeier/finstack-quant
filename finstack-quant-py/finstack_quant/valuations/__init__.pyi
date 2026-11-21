@@ -449,55 +449,6 @@ class ValuationResult:
         """
         ...
 
-    def all_covenants_passed(self) -> bool:
-        """
-        Whether every covenant passed (or none were evaluated).
-
-        Returns
-        -------
-        bool
-            ``True`` if no covenant failures are recorded.
-
-        Notes
-        -----
-        This method does not raise; it returns ``True`` or ``False``.
-        """
-        ...
-
-    def failed_covenants(self) -> list[str]:
-        """
-        Covenant IDs that failed, if any.
-
-        Returns
-        -------
-        list[str]
-            List of failed covenant identifiers.
-
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    @property
-    def covenants(self) -> dict[str, dict[str, Any]] | None:
-        """
-        Per-covenant compliance reports keyed by covenant id, or ``None``.
-
-        Returns
-        -------
-        dict[str, dict[str, Any]] or None
-            Rust ``CovenantReport`` documents (``covenant_type``, ``passed``,
-            ``actual_value``, ``threshold``, ``headroom``, ``details``,
-            ``meta``); ``None`` for instruments without covenants.
-
-        Raises
-        ------
-        ValueError
-            If the reports cannot be serialized to a Python object.
-        """
-        ...
-
     @property
     def provenance(self) -> dict[str, Any] | None:
         """

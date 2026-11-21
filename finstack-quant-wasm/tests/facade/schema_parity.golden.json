@@ -4059,7 +4059,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
             "type_name": "ValuationResult",
             "kind": "output",
-            "bytes": 65274
+            "bytes": 62625
           },
           {
             "path": "schemas/results/1/var_result.schema.json",
@@ -6739,7 +6739,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
             "type_name": "ValuationResult",
             "kind": "output",
-            "bytes": 65274
+            "bytes": 62625
           },
           {
             "domain": "valuations",

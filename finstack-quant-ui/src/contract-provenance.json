@@ -846,53 +846,33 @@
       "route": "typed",
       "convention": "Returned CovenantReport fields keyed by covenant instance key, in the order supplied: test description, actual, threshold and headroom in the metric's own units, the passed verdict and details; unset fields shown as a dash, complete reports kept as JSON. No verdict, headroom or threshold is computed.",
       "api": {
-        "name": "valuations.instruments.priceInstrument",
+        "name": "covenants.CovenantEngine#evaluate",
         "source": "finstack-quant-wasm/pkg/finstack_quant_wasm.d.ts",
-        "owner": "ValuationsInstrumentsNamespace",
-        "member": "priceInstrument",
+        "owner": "CovenantEngine",
+        "member": "evaluate",
         "inputs": [
           {
-            "name": "instrumentJson",
-            "type": "JsonInput",
-            "optional": false
-          },
-          {
-            "name": "marketJson",
-            "type": "JsonInput",
+            "name": "metrics",
+            "type": "Record<string, number> | string",
             "optional": false
           },
           {
             "name": "asOf",
             "type": "string",
             "optional": false
-          },
-          {
-            "name": "model",
-            "type": "string | null",
-            "optional": true
-          },
-          {
-            "name": "metrics",
-            "type": "string[] | null",
-            "optional": true
-          },
-          {
-            "name": "extras",
-            "type": "generated.valuations.PriceExtras | JsonInput | null",
-            "optional": true
           }
         ],
-        "returns": "ValuationResult",
-        "declaration": "/**\n * Price an instrument from its canonical envelope and return a ValuationResult object.\n *\n * Returns a plain JavaScript object (`instrument_id`, `as_of`, `value`,\n * `measures`, `meta`, …) — the same document Python callers reach through\n * `ValuationResult`.\n *\n * Omit `model` (or pass `\"default\"`) to use the instrument-native default\n * model — matching the Python binding's `model=\"default\"` default.\n * For bonds, `\"discounting\"` is non-callable rates-only PV,\n * `\"hazard_rate\"` is non-callable fractional recovery of par, `\"tree\"`\n * values rates-only exercise rights, and `\"rates_credit\"` values joint\n * rates-credit bonds including call, put, and return floors. When stochastic\n * factors are configured under `\"rates_credit\"`, `result.details` is tagged\n * `{ type: \"monte_carlo\", data: ... }` and reports the standard error, path\n * counts, random seed, simulation time grid, and variance-reduction flags.\n * That seed is a lossless JavaScript `BigInt`; serialize stochastic results\n * with `valuationResultToJson`, since `JSON.stringify` throws on `BigInt`.\n * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.\n * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n * @param model - Optional pricing-model identifier; omit for the instrument-native model.\n * @param metrics - Optional canonical metric IDs such as `\"ytm\"`, `\"dv01\"`,\n * `\"hvar\"`, or `\"expected_shortfall\"`. Omit, `null`, or `undefined` for a\n * valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices\n * per 100 current face and include settlement accrued interest. MBS DV01,\n * bucketed DV01 and duration share rate-dependent prepayment assumptions.\n * FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years.\n * Roll specialness is in basis points versus `repo_curve_id` (a discount curve),\n * or the discount curve when omitted; implied financing is an ACT/360 decimal.\n * @param extras - Optional `PriceExtras` (plain object or JSON text); omit,\n * `null`, or `undefined` for none. Keys, each optional:\n * `metric_pricing_overrides` - a `MetricPricingOverrides` JSON object patch\n * applied before validation; only supplied fields replace stored overrides\n * (`{}` preserves them), supplied `bump_config` fields merge into the stored\n * object, and an explicit `null` clears a nullable field to its Rust fallback.\n * Omitted keeps the envelope configuration.\n * `instrument_pricing_overrides` - a patch for instrument-owned market quotes\n * and model parameters. Omitted fields keep their stored values, and an\n * explicit `null` clears a nullable parameter for this pricing request.\n * `market_history` - a `MarketHistory` object (base date, window and daily\n * risk-factor shifts) required by historical risk metrics such as `\"hvar\"` and\n * `\"expected_shortfall\"`. Omitted prices without history.\n * `explain` - boolean, default `false`; `true` attaches a step trace as\n * `result.explanation`. Under `\"discounting\"` and `\"hazard_rate\"` it holds one\n * `cashflow_pv` entry per projected cashflow (date, amount, discount factor,\n * curve, survival probability, present value) summing to the price, capped at\n * 1000 entries; other models get one `computation_step` entry stating that no\n * per-flow decomposition exists.\n * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`,\n * `value`, `measures`, `meta`, `provenance`, …). `provenance` records the\n * model, requested date, declared market dependencies, scenario adjustment and,\n * when metrics are requested, the finite-difference bump sizes.\n *\n * # Errors\n *\n * Throws a JavaScript exception if an instrument, market or `extras` payload is\n * invalid (including an unknown `extras` key); `metrics` is not a string array; `asOf`,\n * `model`, or a metric identifier is invalid; required market data is missing;\n * pricing or a metric calculation fails; or the valuation cannot be converted\n * to a JavaScript value.\n */\nexport function priceInstrument(instrumentJson: JsonInput, marketJson: JsonInput, asOf: string, model?: string | null, metrics?: string[] | null, extras?: generated.valuations.PriceExtras | JsonInput | null): ValuationResult;",
-        "sha256": "f66f9d8ac192d65cad47fb562969ca9ab40d95b9584392b7e6bb13a3b5cef153"
+        "returns": "Record<string, CovenantReport>",
+        "declaration": "/**\n     * Evaluate every applicable covenant on a test date.\n     *\n     * Read-only: the breach history is not updated.\n     *\n     * @param metrics - Metric values keyed by covenant metric identifier (plain object or JSON), in the units the tests expect: ratios in turns (`4.5` means 4.5x), amounts in the reporting currency.\n     * @param asOf - ISO-8601 test date; it selects the active window, waivers, threshold schedule and cure-period state.\n     * @returns Covenant reports keyed by stable covenant instance key, in engine order.\n     * @throws If the engine is invalid, two applicable specifications share an instance key, a metric value is not a number (kind `validation`), or a required metric is missing (kind `not_found`).\n     */\n    evaluate(metrics: Record<string, number> | string, asOf: string): Record<string, CovenantReport>;",
+        "sha256": "2206e5e5c82419135b2076deca508202e2e163c59e6813bd01d0154f0d4f8dc5"
       },
       "schemas": [
         {
-          "uri": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
-          "pointer": "#/properties/covenants",
-          "source": "finstack-quant/valuations/schemas/results/1/valuation_result.schema.json",
-          "sha256": "a373dd46f13b9ff36ffac804b82e2606c4eac841c657980231d61577513bafbc",
-          "description": "Covenant compliance results for structured products.\n\nPresent only for instruments with covenants (loans, structured credit).\nEach covenant is keyed by its identifier with pass/fail status and details."
+          "uri": "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
+          "pointer": "#",
+          "source": "finstack-quant/covenants/schemas/covenants/1/covenant_report.schema.json",
+          "sha256": "620f64629870f33c2ffe116fe0f523c64a5b1e6de579a15f2539f15d4ee71659",
+          "description": "Covenant check result."
         }
       ]
     },
@@ -2817,8 +2797,8 @@
     {
       "name": "ValuationResult",
       "source": "finstack-quant-wasm/pkg/finstack_quant_wasm.d.ts",
-      "declaration": "/**\n * Valuation envelope returned by the `priceInstrument*` entry points (Rust `ValuationResult`).\n *\n * Generated from the host valuation-result schema: the 64-bit Monte Carlo\n * `seed` is a lossless `bigint` and path counts are plain numbers, so serialize\n * stochastic results with `valuations.valuationResultToJson` rather than\n * `JSON.stringify`. The emitted-field presence is stricter than the schema's\n * input view: `covenants` is always present (`null` when the instrument has\n * none), while `details`, `explanation` and `provenance` are omitted rather\n * than `null` when absent.\n * `provenance` is stamped on every priced result.\n */\nexport type ValuationResult = Omit<\nHostValuationResult,\n'covenants' | 'details' | 'explanation' | 'provenance'\n> & {\n    covenants: NonNullable<HostValuationResult['covenants']> | null;\n    details?: NonNullable<HostValuationResult['details']>;\n    explanation?: NonNullable<HostValuationResult['explanation']>;\n    provenance?: NonNullable<HostValuationResult['provenance']>;\n};",
-      "sha256": "3ac20a3ceff7ca224f2ac419cfb7405687728ece56aca85fcfdb263f1dd5899b"
+      "declaration": "/**\n * Valuation envelope returned by the `priceInstrument*` entry points (Rust `ValuationResult`).\n *\n * Generated from the host valuation-result schema: the 64-bit Monte Carlo\n * `seed` is a lossless `bigint` and path counts are plain numbers, so serialize\n * stochastic results with `valuations.valuationResultToJson` rather than\n * `JSON.stringify`. The emitted-field presence is stricter than the schema's\n * input view: `details`, `explanation` and `provenance` are omitted rather\n * than `null` when absent.\n * `provenance` is stamped on every priced result.\n */\nexport type ValuationResult = Omit<\nHostValuationResult,\n'details' | 'explanation' | 'provenance'\n> & {\n    details?: NonNullable<HostValuationResult['details']>;\n    explanation?: NonNullable<HostValuationResult['explanation']>;\n    provenance?: NonNullable<HostValuationResult['provenance']>;\n};",
+      "sha256": "35cc1bf000e6f9f822b4cd287c25dd054354926480a9199471d12d2c0455b6b3"
     },
     {
       "name": "ValuationDetails",
@@ -2859,7 +2839,7 @@
   ],
   "hostContract": {
     "source": "finstack-quant-wasm/schemas/host/1/valuation_result.schema.json",
-    "sha256": "4d5f7e6fee69d34db6f3330300222a5f1d4679913a704da5eda67db988b90d21"
+    "sha256": "8d8b1a0343757cdf6d105a5888987d49b156685fade41507ff37474c26460508"
   },
   "details": [
     {

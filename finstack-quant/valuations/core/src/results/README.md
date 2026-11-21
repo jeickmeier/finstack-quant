@@ -1,7 +1,7 @@
 # Results
 
 `ValuationResult` is the standard pricing output: present value, requested
-measures, policy metadata, optional model detail, optional covenant reports, and
+measures, policy metadata, optional model detail, and
 an optional explanation trace.
 
 ## Types
@@ -18,7 +18,6 @@ an optional explanation trace.
 | `measures` | `IndexMap<MetricId, f64>` | Requested metrics, in request order. Units follow the `MetricId` contract |
 | `details` | `Option<ValuationDetails>` | Model-specific detail for FX, credit derivatives, composite instruments, structured-credit stochastic runs, and Monte Carlo valuations |
 | `meta` | `ResultsMeta` | Re-exported from `finstack_quant_core::config`: numeric mode, rounding context, FX policy, timing |
-| `covenants` | `Option<IndexMap<String, CovenantReport>>` | Present for loans and structured credit |
 | `explanation` | `Option<ExplanationTrace>` | Step trace, enabled via `ExplainOpts` |
 
 `ValuationRow` ([`dataframe.rs`](dataframe.rs)) is the flat export row:
@@ -60,9 +59,8 @@ Constructors and builders:
 | `stamped_with_meta(...)` | Stamp from an explicit config: build `ResultsMeta` once per batch with `finstack_quant_core::config::results_meta(&config)` to avoid re-deriving config per instrument |
 | `with_measures`, `with_details`, `with_explanation` | Attach payloads |
 
-Accessors: `metric(MetricId)`, `metric_str(&str)`, `metric_series(&MetricId)`
-(bucketed series read back as `(labels, value)` pairs), `all_covenants_passed()`,
-and `failed_covenants()`.
+Accessors: `metric(MetricId)`, `metric_str(&str)`, and `metric_series(&MetricId)`
+(bucketed series read back as `(labels, value)` pairs).
 
 `MonteCarloValuationDetails` reports the model key, sampling standard error,
 configured independent exercise-policy paths, configured independent
@@ -92,18 +90,6 @@ Curve stamps are opaque strings set at calibration time or via the curve builder
 (`DiscountCurve::builder(..).fx_policy(..)`). This is how a single-currency
 instrument discounted off a cross-currency curve inherits the policy without the
 pricer restating it.
-
-## Covenants
-
-```rust
-let mut result = ValuationResult::stamped("LOAN-001", as_of, pv);
-result.covenants = Some([("dscr_test".to_string(), dscr_report)].into_iter().collect());
-
-assert!(result.all_covenants_passed());
-assert!(result.failed_covenants().is_empty());
-```
-
-`CovenantReport` comes from [`finstack-quant-covenants`](../../../covenants/README.md).
 
 ## Export
 
