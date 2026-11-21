@@ -49,7 +49,7 @@ pub struct RiskDecomposition {
 /// residual sources used by other decomposers.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ResidualContributionSource {
     /// Residual variance sourced from a `CreditFactorModel`'s idiosyncratic
     /// vol forecast for the named issuer.
@@ -70,6 +70,7 @@ pub enum ResidualContributionSource {
 /// field after summing the relevant subset.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PositionResidualContribution {
     /// Portfolio position identifier.
     pub position_id: String,
@@ -86,6 +87,7 @@ pub struct PositionResidualContribution {
 /// See [`RiskDecomposition`] for the sign convention applied to each field.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct FactorContribution {
     /// Identifier of the factor being reported.
     pub factor_id: FactorId,
@@ -104,6 +106,7 @@ pub struct FactorContribution {
 /// Contribution of a single position to a specific factor bucket.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PositionFactorContribution {
     /// Portfolio position identifier.
     pub position_id: String,

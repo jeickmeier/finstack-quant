@@ -515,7 +515,7 @@ fn validate_rejects_covariance_factor_id_mismatch() {
     model
         .vol_state
         .factors
-        .insert(declared, FactorVolModel::Sample { variance: 400.0 });
+        .insert(declared, VolModel::Sample { variance: 400.0 });
 
     let err = model
         .validate()
@@ -550,7 +550,7 @@ fn validate_rejects_static_correlation_and_vol_state_mismatch() {
     model
         .vol_state
         .factors
-        .insert(declared.clone(), FactorVolModel::Sample { variance: 400.0 });
+        .insert(declared.clone(), VolModel::Sample { variance: 400.0 });
     assert!(
         model.validate().is_err(),
         "static_correlation over a different factor-id set must be rejected"
@@ -561,7 +561,7 @@ fn validate_rejects_static_correlation_and_vol_state_mismatch() {
     model.vol_state.factors.clear();
     model.vol_state.factors.insert(
         FactorId::new("unrelated"),
-        FactorVolModel::Sample { variance: 1.0 },
+        VolModel::Sample { variance: 1.0 },
     );
     assert!(
         model.validate().is_err(),
@@ -573,7 +573,7 @@ fn validate_rejects_static_correlation_and_vol_state_mismatch() {
     model
         .vol_state
         .factors
-        .insert(declared, FactorVolModel::Sample { variance: 400.0 });
+        .insert(declared, VolModel::Sample { variance: 400.0 });
     assert!(model.validate().is_ok(), "aligned model must validate");
 }
 

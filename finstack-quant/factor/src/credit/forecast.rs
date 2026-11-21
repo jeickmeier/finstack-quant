@@ -17,7 +17,7 @@
 //! - The factor universe is taken straight from
 //!   [`CreditFactorModel::config.factors`] in canonical order.
 
-use crate::credit::hierarchy::{CreditFactorModel, IdiosyncraticVolModel};
+use crate::credit::hierarchy::{CreditFactorModel, VolModel};
 use crate::{FactorCovarianceMatrix, FactorModelConfig, RiskMeasure};
 use finstack_quant_core::types::IssuerId;
 use finstack_quant_core::{Error, Result};
@@ -309,8 +309,7 @@ impl<'a> FactorCovarianceForecast<'a> {
         let variance = match model {
             // Both Sample and Ewma use the same horizon scaling
             // (see covariance_at for rationale).
-            IdiosyncraticVolModel::Sample { variance }
-            | IdiosyncraticVolModel::Ewma { variance, .. } => scale * variance,
+            VolModel::Sample { variance } | VolModel::Ewma { variance, .. } => scale * variance,
         };
         if !variance.is_finite() || variance < 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -355,8 +354,8 @@ mod tests {
     use crate::credit::calibration::{BucketWeighting, PanelFrequency, PanelSpace};
     use crate::credit::hierarchy::{
         CreditCalibrationDiagnostics, CreditFactorModelSchema, CreditHierarchySpec, DateRange,
-        FactorCorrelationMatrix, FactorVolModel, GenericFactorSpec, HierarchyDimension,
-        IssuerBetaPolicy, LevelsAtAnchor, VolState,
+        FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaPolicy,
+        LevelsAtAnchor, VolModel, VolState,
     };
     use crate::matching::MatchingConfig;
     use crate::{FactorDefinition, FactorId, FactorType, MarketMapping};
@@ -400,8 +399,8 @@ mod tests {
         )
         .expect("valid covariance fixture");
         let mut factor_vols = BTreeMap::new();
-        factor_vols.insert(rates, FactorVolModel::Sample { variance: 0.04 });
-        factor_vols.insert(credit, FactorVolModel::Sample { variance: 0.04 });
+        factor_vols.insert(rates, VolModel::Sample { variance: 0.04 });
+        factor_vols.insert(credit, VolModel::Sample { variance: 0.04 });
 
         CreditFactorModel {
             schema: CreditFactorModelSchema::CURRENT,
@@ -561,10 +560,10 @@ mod tests {
     fn idiosyncratic_forecast_uses_issuer_state() {
         let mut model = fixture_model();
         let issuer = IssuerId::new("ACME");
-        model.vol_state.idiosyncratic.insert(
-            issuer.clone(),
-            IdiosyncraticVolModel::Sample { variance: 0.09 },
-        );
+        model
+            .vol_state
+            .idiosyncratic
+            .insert(issuer.clone(), VolModel::Sample { variance: 0.09 });
         let forecast = FactorCovarianceForecast::new(&model);
 
         let vol = forecast
@@ -584,10 +583,10 @@ mod tests {
     fn idiosyncratic_forecast_rejects_overflowing_horizon() {
         let mut model = fixture_model();
         let issuer = IssuerId::new("ACME");
-        model.vol_state.idiosyncratic.insert(
-            issuer.clone(),
-            IdiosyncraticVolModel::Sample { variance: 1e308 },
-        );
+        model
+            .vol_state
+            .idiosyncratic
+            .insert(issuer.clone(), VolModel::Sample { variance: 1e308 });
         let forecast = FactorCovarianceForecast::new(&model);
         let error = forecast
             .idiosyncratic_vol(&issuer, VolHorizon::NSteps(10))

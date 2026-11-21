@@ -2665,7 +2665,7 @@
           "uri": "https://finstack_quant.dev/schemas/models/1/position_risk_report.schema.json",
           "pointer": "#",
           "source": "finstack-quant/models/schemas/models/1/position_risk_report.schema.json",
-          "sha256": "171be412f9a040f9d1511894a28fe8a6b002cafbdc3e9c9acb24ded189ebcceb",
+          "sha256": "32c085bb14ec53cd1bd5d9c41cbb053553a7aa8ddd2d733c99547ae258646140",
           "description": "Position VaR/ES decomposition with its optional risk budget and tail stress attribution."
         }
       ]

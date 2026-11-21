@@ -303,14 +303,14 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1285432
+            "bytes": 1283425
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
             "type_name": "AttributionInputs",
             "kind": "input",
-            "bytes": 242171
+            "bytes": 240164
           },
           {
             "path": "schemas/attribution/1/attribution_result.schema.json",
@@ -561,7 +561,6 @@
           "FactorModelConfig",
           "FactorNode",
           "FactorType",
-          "FactorVolModel",
           "FeeStep",
           "FeeTier",
           "FiIndexTotalReturnSwap",
@@ -624,7 +623,6 @@
           "HierarchyNode",
           "HierarchyNodeEntry",
           "Id",
-          "IdiosyncraticVolModel",
           "ImMethodology",
           "ImParameters",
           "IncentiveFeeSpec",
@@ -862,6 +860,7 @@
           "VmParameters",
           "VolCube",
           "VolInterpolationMode",
+          "VolModel",
           "VolQuoteType",
           "VolState",
           "VolSurface",
@@ -946,7 +945,6 @@
           "FactorModelConfig",
           "FactorNode",
           "FactorType",
-          "FactorVolModel",
           "FitQuality",
           "FoldUpRecord",
           "ForwardCurveTransform",
@@ -966,7 +964,6 @@
           "HierarchyNode",
           "HierarchyNodeEntry",
           "Id",
-          "IdiosyncraticVolModel",
           "InflationExpectedRelease",
           "InflationIndex",
           "InflationObservation",
@@ -1019,6 +1016,7 @@
           "UnmatchedPolicy",
           "VolCube",
           "VolInterpolationMode",
+          "VolModel",
           "VolQuoteType",
           "VolState",
           "VolSurface",
@@ -1778,7 +1776,7 @@
             "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_calibration_config.schema.json",
             "type_name": "CreditCalibrationConfig",
             "kind": "component",
-            "bytes": 16923
+            "bytes": 17187
           },
           {
             "path": "schemas/factor_model/1/credit_calibration_inputs.schema.json",
@@ -1792,14 +1790,14 @@
             "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_factor_model.schema.json",
             "type_name": "CreditFactorModel",
             "kind": "input",
-            "bytes": 89910
+            "bytes": 87903
           },
           {
             "path": "schemas/factor_model/1/factor_model_config.schema.json",
             "$id": "https://finstack_quant.dev/schemas/factor_model/1/factor_model_config.schema.json",
             "type_name": "FactorModelConfigEnvelope",
             "kind": "input",
-            "bytes": 59341
+            "bytes": 59701
           }
         ]
       },
@@ -1943,7 +1941,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/credit_vol_report.schema.json",
             "type_name": "CreditVolReport",
             "kind": "output",
-            "bytes": 7684
+            "bytes": 7774
           },
           {
             "path": "schemas/portfolio/1/csr_quote_classification.schema.json",
@@ -2013,7 +2011,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_assignment_report.schema.json",
             "type_name": "FactorAssignmentReport",
             "kind": "output",
-            "bytes": 29700
+            "bytes": 28867
           },
           {
             "path": "schemas/portfolio/1/factor_brinson_input.schema.json",
@@ -2251,7 +2249,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/stress_result.schema.json",
             "type_name": "StressResult",
             "kind": "output",
-            "bytes": 13099
+            "bytes": 13382
           },
           {
             "path": "schemas/portfolio/1/twrr_period.schema.json",
@@ -2279,7 +2277,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/what_if_result.schema.json",
             "type_name": "WhatIfResult",
             "kind": "output",
-            "bytes": 14320
+            "bytes": 14603
           }
         ]
       },
@@ -4336,7 +4334,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1285432
+            "bytes": 1283425
           },
           {
             "domain": "attribution",
@@ -4344,7 +4342,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
             "type_name": "AttributionInputs",
             "kind": "input",
-            "bytes": 242171
+            "bytes": 240164
           },
           {
             "domain": "attribution",
@@ -4680,7 +4678,7 @@
             "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_calibration_config.schema.json",
             "type_name": "CreditCalibrationConfig",
             "kind": "component",
-            "bytes": 16923
+            "bytes": 17187
           },
           {
             "domain": "factor_model",
@@ -4696,7 +4694,7 @@
             "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_factor_model.schema.json",
             "type_name": "CreditFactorModel",
             "kind": "input",
-            "bytes": 89910
+            "bytes": 87903
           },
           {
             "domain": "factor_model",
@@ -4704,7 +4702,7 @@
             "$id": "https://finstack_quant.dev/schemas/factor_model/1/factor_model_config.schema.json",
             "type_name": "FactorModelConfigEnvelope",
             "kind": "input",
-            "bytes": 59341
+            "bytes": 59701
           },
           {
             "domain": "margin",
@@ -4968,7 +4966,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/credit_vol_report.schema.json",
             "type_name": "CreditVolReport",
             "kind": "output",
-            "bytes": 7684
+            "bytes": 7774
           },
           {
             "domain": "portfolio",
@@ -5048,7 +5046,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_assignment_report.schema.json",
             "type_name": "FactorAssignmentReport",
             "kind": "output",
-            "bytes": 29700
+            "bytes": 28867
           },
           {
             "domain": "portfolio",
@@ -5320,7 +5318,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/stress_result.schema.json",
             "type_name": "StressResult",
             "kind": "output",
-            "bytes": 13099
+            "bytes": 13382
           },
           {
             "domain": "portfolio",
@@ -5352,7 +5350,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/what_if_result.schema.json",
             "type_name": "WhatIfResult",
             "kind": "output",
-            "bytes": 14320
+            "bytes": 14603
           },
           {
             "domain": "scenarios",

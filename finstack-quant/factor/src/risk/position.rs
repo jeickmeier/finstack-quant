@@ -51,6 +51,7 @@ pub enum DecompositionMethod {
 /// (typically the portfolio's base currency).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PositionVarContribution {
     /// Position identifier.
     pub position_id: String,
@@ -101,6 +102,7 @@ pub struct PositionVarContribution {
 /// Expected Shortfall decomposition result for a single portfolio position.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PositionEsContribution {
     /// Position identifier.
     pub position_id: String,
@@ -153,6 +155,7 @@ pub struct PositionEsContribution {
 /// - Litterman (1996): Hot Spots and Hedges. `docs/REFERENCES.md#litterman-1996-hotspots`
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PositionRiskDecomposition {
     /// Total portfolio VaR.
     ///

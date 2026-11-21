@@ -13,8 +13,8 @@ use super::statistics::{d_rho_d, ledoit_wolf_cov_and_corr, sample_correlation_fl
 use super::validation::validation_err;
 use crate::credit::hierarchy::{
     CreditCalibrationDiagnostics, CreditHierarchySpec, FactorCorrelationMatrix, FactorHistories,
-    FactorVolModel, FitQuality, FoldUpRecord, IdiosyncraticVolModel, IssuerBetaMode, IssuerBetaRow,
-    IssuerBetas, LevelAnchor, LevelsAtAnchor, VolState,
+    FitQuality, FoldUpRecord, IssuerBetaMode, IssuerBetaRow, IssuerBetas, LevelAnchor,
+    LevelsAtAnchor, VolModel, VolState,
 };
 use crate::matching::MatchingConfig;
 use crate::matching::{CREDIT_GENERIC_FACTOR_ID, CreditHierarchicalConfig};
@@ -281,29 +281,23 @@ pub(super) fn build_vol_state(
     issuer_betas: &[IssuerBetaRow],
     vol_model: VolModelChoice,
 ) -> VolState {
-    let mut factors = BTreeMap::new();
-    for (fid, var) in factor_variances {
-        let model = match vol_model {
-            VolModelChoice::Sample => FactorVolModel::Sample { variance: *var },
-            VolModelChoice::Ewma { lambda } => FactorVolModel::Ewma {
-                lambda,
-                variance: *var,
-            },
-        };
-        factors.insert(fid.clone(), model);
-    }
-    let mut idiosyncratic = BTreeMap::new();
-    for row in issuer_betas {
-        let var = row.adder_vol_annualized.powi(2);
-        let model = match vol_model {
-            VolModelChoice::Sample => IdiosyncraticVolModel::Sample { variance: var },
-            VolModelChoice::Ewma { lambda } => IdiosyncraticVolModel::Ewma {
-                lambda,
-                variance: var,
-            },
-        };
-        idiosyncratic.insert(row.issuer_id.clone(), model);
-    }
+    let make_model = |variance: f64| match vol_model {
+        VolModelChoice::Sample => VolModel::Sample { variance },
+        VolModelChoice::Ewma { lambda } => VolModel::Ewma { lambda, variance },
+    };
+    let factors = factor_variances
+        .iter()
+        .map(|(fid, &var)| (fid.clone(), make_model(var)))
+        .collect();
+    let idiosyncratic = issuer_betas
+        .iter()
+        .map(|row| {
+            (
+                row.issuer_id.clone(),
+                make_model(row.adder_vol_annualized.powi(2)),
+            )
+        })
+        .collect();
     VolState {
         factors,
         idiosyncratic,

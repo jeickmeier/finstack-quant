@@ -29,6 +29,7 @@ pub fn dimension_key(dim: &HierarchyDimension) -> &str {
     }
 }
 
+/// Per-issuer regression behavior override supplied by the user before calibration.
 ///
 /// This is the *input* override; the *resolved* outcome is [`IssuerBetaMode`].
 ///
@@ -69,7 +70,7 @@ pub enum IssuerBetaMode {
 ///   regression is run.  Useful for simpler factor models or data-sparse periods.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[non_exhaustive]
 pub enum IssuerBetaPolicy {
     /// Regression is gated on a minimum history threshold with per-issuer overrides.
@@ -274,7 +275,7 @@ impl IssuerBetas {
 /// Source provenance of an issuer's idiosyncratic vol estimate.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[non_exhaustive]
 pub enum AdderVolSource {
     /// Estimated from the issuer's own residual history.

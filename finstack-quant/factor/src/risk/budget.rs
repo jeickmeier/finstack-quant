@@ -25,6 +25,7 @@ pub const DEFAULT_UTILIZATION_THRESHOLD: f64 = 1.20;
 /// never contribute to [`Self::total_overbudget`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct RiskBudgetResult {
     /// Per-position budget comparison.
     pub positions: Vec<PositionBudgetEntry>,
@@ -39,6 +40,7 @@ pub struct RiskBudgetResult {
 /// Budget comparison for a single position.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PositionBudgetEntry {
     /// Position identifier.
     pub position_id: String,

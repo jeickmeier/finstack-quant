@@ -86,15 +86,6 @@ pub enum MarketDependency {
         /// Curve identifier.
         id: CurveId,
     },
-    /// Composite credit-index market data.
-    ///
-    /// The identifier resolves through `MarketContext::get_credit_index` and
-    /// represents the aggregate hazard curve, base correlation, and optional
-    /// issuer-level curves as one pricing dependency.
-    CreditIndex {
-        /// Credit-index aggregate identifier.
-        id: CurveId,
-    },
     /// Equity or commodity spot.
     Spot {
         /// Spot identifier or ticker.
@@ -133,7 +124,7 @@ impl MarketDependency {
             (Self::Curve { curve_type, .. }, DependencyType::Credit) => {
                 *curve_type == CurveType::Hazard
             }
-            (Self::CreditCurve { .. } | Self::CreditIndex { .. }, DependencyType::Credit)
+            (Self::CreditCurve { .. }, DependencyType::Credit)
             | (Self::Spot { .. }, DependencyType::Spot)
             | (Self::VolSurface { .. }, DependencyType::Vol)
             | (Self::FxPair { .. }, DependencyType::Fx)
@@ -167,7 +158,7 @@ impl MarketDependency {
     #[must_use]
     pub(crate) fn lookup_id(&self) -> std::borrow::Cow<'_, str> {
         match self {
-            Self::Curve { id, .. } | Self::CreditCurve { id } | Self::CreditIndex { id } => {
+            Self::Curve { id, .. } | Self::CreditCurve { id } => {
                 std::borrow::Cow::Borrowed(id.as_ref())
             }
             Self::Spot { id } | Self::VolSurface { id } | Self::Series { id } => {

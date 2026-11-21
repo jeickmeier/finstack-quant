@@ -13,6 +13,7 @@
           "description": "Proxied from the peer-bucket distribution.",
           "properties": {
             "bucket_peer_proxy": {
+              "additionalProperties": false,
               "properties": {
                 "peer_bucket": {
                   "description": "Dotted bucket path used as proxy (e.g. `\"IG.EU.FIN\"`).",
@@ -1309,6 +1310,7 @@
       "type": "object"
     },
     "FactorHistories": {
+      "additionalProperties": false,
       "description": "Embedded time-series of factor **moves in bp**.\n\nThese are the official series for rebuilding vol/correlation and for\nhistorical-simulation factor P&L. Every date is a real observation\n(no `None → 0.0` holes). Under [`PanelSpace::Returns`]\nthe stored values are already period moves; under\n[`PanelSpace::Levels`]\nthey are peeled levels and must be first-differenced before vol or P&L.\n\n`BTreeMap<FactorId, Vec<f64>>` for deterministic serialization. All value\nvectors must have the same length as `dates`.",
       "properties": {
         "dates": {
@@ -1475,65 +1477,6 @@
         }
       ]
     },
-    "FactorVolModel": {
-      "description": "Volatility model for a single factor.\n\nThe `Sample` variant stores a single variance estimate; `Ewma` additionally\npersists the smoothing parameter used at calibration time.",
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "Simple sample-variance estimate.",
-          "properties": {
-            "sample": {
-              "additionalProperties": false,
-              "properties": {
-                "variance": {
-                  "description": "Annualized variance estimate for this factor.",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "variance"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "sample"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "RiskMetrics exponentially weighted moving-average estimate.\n\nPersists both the smoothing parameter and the calibrated annualized\nvariance. `lambda` is retained as calibration provenance: no consumer\nreads it back today (the martingale forecast in\n`FactorCovarianceForecast` matches on the `Ewma { variance, .. }`\nshape and ignores λ, since horizon scaling doesn't depend on it), but\nkeeping it on the wire preserves the option for a future\nterm-structure-aware forecaster to recompute or extend the estimate\nwithout re-reading the calibration config.\n\n# References\n\n- Longerstaey, J., & Spencer, M. (1996). *RiskMetrics — Technical\n  Document* (4th ed.). J.P. Morgan/Reuters. §5.2. `docs/REFERENCES.md#jpmorgan1996RiskMetrics`",
-          "properties": {
-            "ewma": {
-              "additionalProperties": false,
-              "properties": {
-                "lambda": {
-                  "description": "Smoothing parameter λ ∈ (0, 1) used at calibration time.",
-                  "format": "double",
-                  "type": "number"
-                },
-                "variance": {
-                  "description": "Annualized one-step-ahead variance forecast.",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "lambda",
-                "variance"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "ewma"
-          ],
-          "type": "object"
-        }
-      ]
-    },
     "FitQuality": {
       "additionalProperties": false,
       "description": "Regression quality statistics for a single issuer.\n\nOnly present for `IssuerBeta` mode; `None` for `BucketOnly`.",
@@ -1673,63 +1616,6 @@
       "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
       "type": "string"
     },
-    "IdiosyncraticVolModel": {
-      "description": "Volatility model for an issuer's idiosyncratic adder.\n\nMirrors [`FactorVolModel`] in structure; kept separate so per-issuer and\nper-factor models can diverge independently in later PRs.",
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "Simple sample-variance estimate for the idiosyncratic adder.",
-          "properties": {
-            "sample": {
-              "properties": {
-                "variance": {
-                  "description": "Annualized variance of the issuer's idiosyncratic adder.",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "variance"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "sample"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "RiskMetrics exponentially weighted moving-average estimate.\n\nPersists both the smoothing parameter and the calibrated annualized\nvariance. `lambda` is retained as calibration provenance: no consumer\nreads it back today (the martingale forecast in\n`FactorCovarianceForecast` matches on the `Ewma { variance, .. }`\nshape and ignores λ, since horizon scaling doesn't depend on it), but\nkeeping it on the wire preserves the option for a future\nterm-structure-aware forecaster to recompute or extend the estimate\nwithout re-reading the calibration config.\n\n# References\n\n- Longerstaey, J., & Spencer, M. (1996). *RiskMetrics — Technical\n  Document* (4th ed.). J.P. Morgan/Reuters. §5.2. `docs/REFERENCES.md#jpmorgan1996RiskMetrics`",
-          "properties": {
-            "ewma": {
-              "properties": {
-                "lambda": {
-                  "description": "Smoothing parameter λ ∈ (0, 1) used at calibration time.",
-                  "format": "double",
-                  "type": "number"
-                },
-                "variance": {
-                  "description": "Annualized one-step-ahead variance forecast for the idiosyncratic\nadder.",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "lambda",
-                "variance"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "ewma"
-          ],
-          "type": "object"
-        }
-      ]
-    },
     "IssuerBetaMode": {
       "description": "Resolved regression mode stored in the calibrated artifact.\n\nA `BucketOnly` issuer's betas are all 1.0 and carry no fit statistics.",
       "oneOf": [
@@ -1746,7 +1632,7 @@
       ]
     },
     "IssuerBetaOverride": {
-      "description": "This is the *input* override; the *resolved* outcome is [`IssuerBetaMode`].\n\n- `Auto` — let the calibration decide based on `min_history`.\n- `ForceIssuerBeta` — always run per-issuer regression regardless of history.\n- `ForceBucketOnly` — never run per-issuer regression for this issuer.",
+      "description": "Per-issuer regression behavior override supplied by the user before calibration.\n\nThis is the *input* override; the *resolved* outcome is [`IssuerBetaMode`].\n\n- `Auto` — let the calibration decide based on `min_history`.\n- `ForceIssuerBeta` — always run per-issuer regression regardless of history.\n- `ForceBucketOnly` — never run per-issuer regression for this issuer.",
       "oneOf": [
         {
           "const": "auto",
@@ -1773,6 +1659,7 @@
           "description": "Regression is gated on a minimum history threshold with per-issuer overrides.",
           "properties": {
             "dynamic": {
+              "additionalProperties": false,
               "properties": {
                 "min_history": {
                   "description": "Minimum number of monthly return observations needed to attempt OLS.\n\nDefault is 24 months.",
@@ -2001,6 +1888,7 @@
           "description": "Parallel shift to one or more curves.",
           "properties": {
             "curve_parallel": {
+              "additionalProperties": false,
               "properties": {
                 "curve_ids": {
                   "description": "Curves bumped by the factor.",
@@ -2031,6 +1919,7 @@
           "description": "Bucketed curve shift with tenor weights.",
           "properties": {
             "curve_bucketed": {
+              "additionalProperties": false,
               "properties": {
                 "curve_id": {
                   "$ref": "#/$defs/Id",
@@ -2073,6 +1962,7 @@
           "description": "Equity spot move.",
           "properties": {
             "equity_spot": {
+              "additionalProperties": false,
               "properties": {
                 "tickers": {
                   "description": "Tickers moved by the factor.",
@@ -2098,6 +1988,7 @@
           "description": "FX rate move.",
           "properties": {
             "fx_rate": {
+              "additionalProperties": false,
               "properties": {
                 "pair": {
                   "description": "Currency pair moved by the factor.",
@@ -2130,6 +2021,7 @@
           "description": "Volatility shift.",
           "properties": {
             "vol_shift": {
+              "additionalProperties": false,
               "properties": {
                 "units": {
                   "$ref": "#/$defs/BumpUnits",
@@ -2273,6 +2165,7 @@
           "description": "Aggregate exposures using Value at Risk at a fixed one-sided loss confidence level.\n\nThis assumes the downstream aggregation engine is interpreting the factor\nmodel as a parametric, one-period loss distribution rather than a full\nhistorical or Monte Carlo simulation.\n\n# Sign convention\n\nVaR is reported as a **negative** number on the P&L axis: for a long-risk\nportfolio, `total_risk` at 99% is approximately `-sigma * z_{0.99}`.\nFactor contributions carry the same sign as the total. Downstream\naggregators and visualizations rely on this convention.",
           "properties": {
             "var": {
+              "additionalProperties": false,
               "properties": {
                 "confidence": {
                   "description": "Confidence level in the open interval `(0.5, 1)`.",
@@ -2298,6 +2191,7 @@
           "description": "Aggregate exposures using expected shortfall at a fixed one-sided loss confidence level.\n\nAs with [`Self::VaR`], this is intended for parametric factor-model\naggregation rather than full-path simulation, and ES is reported as a\n**negative** number using the P&L sign convention.",
           "properties": {
             "expected_shortfall": {
+              "additionalProperties": false,
               "properties": {
                 "confidence": {
                   "description": "Confidence level in the open interval `(0.5, 1)`.",
@@ -2335,19 +2229,79 @@
         }
       ]
     },
+    "VolModel": {
+      "description": "Volatility model for a systematic factor or an issuer's idiosyncratic adder.\n\nThe `Sample` variant stores a single variance estimate; `Ewma` additionally\npersists the smoothing parameter used at calibration time.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Simple sample-variance estimate.",
+          "properties": {
+            "sample": {
+              "additionalProperties": false,
+              "properties": {
+                "variance": {
+                  "description": "Annualized variance estimate.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "variance"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "sample"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "RiskMetrics exponentially weighted moving-average estimate.\n\nPersists both the smoothing parameter and the calibrated annualized\nvariance. `lambda` is retained as calibration provenance: no consumer\nreads it back today (the martingale forecast in\n`FactorCovarianceForecast` matches on the `Ewma { variance, .. }`\nshape and ignores λ, since horizon scaling doesn't depend on it), but\nkeeping it on the wire preserves the option for a future\nterm-structure-aware forecaster to recompute or extend the estimate\nwithout re-reading the calibration config.\n\n# References\n\n- Longerstaey, J., & Spencer, M. (1996). *RiskMetrics — Technical\n  Document* (4th ed.). J.P. Morgan/Reuters. §5.2. `docs/REFERENCES.md#jpmorgan1996RiskMetrics`",
+          "properties": {
+            "ewma": {
+              "additionalProperties": false,
+              "properties": {
+                "lambda": {
+                  "description": "Smoothing parameter λ ∈ (0, 1) used at calibration time.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "variance": {
+                  "description": "Annualized one-step-ahead variance forecast.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "lambda",
+                "variance"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "ewma"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "VolState": {
+      "additionalProperties": false,
       "description": "Complete vol state for all factors and all issuers at the calibration date.\n\nRecords unregularized per-factor variance estimates and drives per-issuer\nidiosyncratic volatility forecasts. Systematic covariance forecasts scale\nthe calibrated covariance, preserving the selected covariance estimator.",
       "properties": {
         "factors": {
           "additionalProperties": {
-            "$ref": "#/$defs/FactorVolModel"
+            "$ref": "#/$defs/VolModel"
           },
           "description": "EWMA or sample vol model for each systematic factor.\n\nKeys are factor IDs from [`crate::FactorModelConfig`].\n`BTreeMap` for deterministic serialization order.",
           "type": "object"
         },
         "idiosyncratic": {
           "additionalProperties": {
-            "$ref": "#/$defs/IdiosyncraticVolModel"
+            "$ref": "#/$defs/VolModel"
           },
           "description": "Idiosyncratic vol model for each issuer.\n\n`BTreeMap` for deterministic serialization order.",
           "type": "object"

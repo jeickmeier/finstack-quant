@@ -19,7 +19,6 @@ export type AdderVolSource =
          * Dotted bucket path used as proxy (e.g. `"IG.EU.FIN"`).
          */
         peer_bucket: string;
-        [k: string]: unknown;
       };
     }
   | "caller_supplied"
@@ -2280,7 +2279,6 @@ export type MarketMapping =
          * Units used for the bump magnitude.
          */
         units: BumpUnits;
-        [k: string]: unknown;
       };
     }
   | {
@@ -2297,7 +2295,6 @@ export type MarketMapping =
          * shock size while localizing it along the tenor axis.
          */
         tenor_weights: [number, number][];
-        [k: string]: unknown;
       };
     }
   | {
@@ -2306,7 +2303,6 @@ export type MarketMapping =
          * Tickers moved by the factor.
          */
         tickers: string[];
-        [k: string]: unknown;
       };
     }
   | {
@@ -2318,7 +2314,6 @@ export type MarketMapping =
          * @maxItems 2
          */
         pair: [Currency, Currency];
-        [k: string]: unknown;
       };
     }
   | {
@@ -2331,7 +2326,6 @@ export type MarketMapping =
          * Volatility surfaces moved by the factor.
          */
         vol_surface_ids: string[];
-        [k: string]: unknown;
       };
     };
 /**
@@ -2380,7 +2374,6 @@ export type RiskMeasure =
          * Confidence level in the open interval `(0.5, 1)`.
          */
         confidence: number;
-        [k: string]: unknown;
       };
     }
   | {
@@ -2389,7 +2382,6 @@ export type RiskMeasure =
          * Confidence level in the open interval `(0.5, 1)`.
          */
         confidence: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -2431,11 +2423,12 @@ export type IssuerBetaPolicy =
         overrides: {
           [k: string]: IssuerBetaOverride;
         };
-        [k: string]: unknown;
       };
     }
   | "globally_off";
 /**
+ * Per-issuer regression behavior override supplied by the user before calibration.
+ *
  * This is the *input* override; the *resolved* outcome is [`IssuerBetaMode`].
  *
  * - `Auto` — let the calibration decide based on `min_history`.
@@ -2455,16 +2448,16 @@ export type CreditFactorModelSchema = "finstack_quant.credit_factor_model/1";
  */
 export type PanelSpace = "returns" | "levels";
 /**
- * Volatility model for a single factor.
+ * Volatility model for a systematic factor or an issuer's idiosyncratic adder.
  *
  * The `Sample` variant stores a single variance estimate; `Ewma` additionally
  * persists the smoothing parameter used at calibration time.
  */
-export type FactorVolModel =
+export type VolModel =
   | {
       sample: {
         /**
-         * Annualized variance estimate for this factor.
+         * Annualized variance estimate.
          */
         variance: number;
       };
@@ -2479,36 +2472,6 @@ export type FactorVolModel =
          * Annualized one-step-ahead variance forecast.
          */
         variance: number;
-      };
-    };
-/**
- * Volatility model for an issuer's idiosyncratic adder.
- *
- * Mirrors [`FactorVolModel`] in structure; kept separate so per-issuer and
- * per-factor models can diverge independently in later PRs.
- */
-export type IdiosyncraticVolModel =
-  | {
-      sample: {
-        /**
-         * Annualized variance of the issuer's idiosyncratic adder.
-         */
-        variance: number;
-        [k: string]: unknown;
-      };
-    }
-  | {
-      ewma: {
-        /**
-         * Smoothing parameter λ ∈ (0, 1) used at calibration time.
-         */
-        lambda: number;
-        /**
-         * Annualized one-step-ahead variance forecast for the idiosyncratic
-         * adder.
-         */
-        variance: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -10373,7 +10336,6 @@ export interface FactorHistories {
   values: {
     [k: string]: number[];
   };
-  [k: string]: unknown;
 }
 /**
  * Reference to the generic (PC) time series used as the first factor.
@@ -10424,7 +10386,7 @@ export interface VolState {
    * `BTreeMap` for deterministic serialization order.
    */
   factors: {
-    [k: string]: FactorVolModel;
+    [k: string]: VolModel;
   };
   /**
    * Idiosyncratic vol model for each issuer.
@@ -10432,9 +10394,8 @@ export interface VolState {
    * `BTreeMap` for deterministic serialization order.
    */
   idiosyncratic: {
-    [k: string]: IdiosyncraticVolModel;
+    [k: string]: VolModel;
   };
-  [k: string]: unknown;
 }
 /**
  * Convertible bond instrument with embedded equity conversion option.

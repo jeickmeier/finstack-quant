@@ -48,7 +48,7 @@ impl fmt::Display for UnmatchedPolicy {
 /// Risk measure used when aggregating factor exposures.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[derive(Default)]
 #[non_exhaustive]
 pub enum RiskMeasure {
@@ -153,7 +153,7 @@ impl<'de> Deserialize<'de> for RiskMeasure {
         D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        #[serde(rename_all = "snake_case")]
+        #[serde(rename_all = "snake_case", deny_unknown_fields)]
         enum RiskMeasureSerde {
             Variance,
             Volatility,

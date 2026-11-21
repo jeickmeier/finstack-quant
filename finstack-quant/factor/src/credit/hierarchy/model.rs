@@ -90,7 +90,7 @@ pub struct LevelsAtAnchor {
     pub by_level: Vec<LevelAnchor>,
 }
 
-/// Volatility model for a single factor.
+/// Volatility model for a systematic factor or an issuer's idiosyncratic adder.
 ///
 /// The `Sample` variant stores a single variance estimate; `Ewma` additionally
 /// persists the smoothing parameter used at calibration time.
@@ -98,10 +98,10 @@ pub struct LevelsAtAnchor {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[non_exhaustive]
-pub enum FactorVolModel {
+pub enum VolModel {
     /// Simple sample-variance estimate.
     Sample {
-        /// Annualized variance estimate for this factor.
+        /// Annualized variance estimate.
         variance: f64,
     },
     /// RiskMetrics exponentially weighted moving-average estimate.
@@ -127,44 +127,6 @@ pub enum FactorVolModel {
     },
 }
 
-/// Volatility model for an issuer's idiosyncratic adder.
-///
-/// Mirrors [`FactorVolModel`] in structure; kept separate so per-issuer and
-/// per-factor models can diverge independently in later PRs.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum IdiosyncraticVolModel {
-    /// Simple sample-variance estimate for the idiosyncratic adder.
-    Sample {
-        /// Annualized variance of the issuer's idiosyncratic adder.
-        variance: f64,
-    },
-    /// RiskMetrics exponentially weighted moving-average estimate.
-    ///
-    /// Persists both the smoothing parameter and the calibrated annualized
-    /// variance. `lambda` is retained as calibration provenance: no consumer
-    /// reads it back today (the martingale forecast in
-    /// `FactorCovarianceForecast` matches on the `Ewma { variance, .. }`
-    /// shape and ignores λ, since horizon scaling doesn't depend on it), but
-    /// keeping it on the wire preserves the option for a future
-    /// term-structure-aware forecaster to recompute or extend the estimate
-    /// without re-reading the calibration config.
-    ///
-    /// # References
-    ///
-    /// - Longerstaey, J., & Spencer, M. (1996). *RiskMetrics — Technical
-    ///   Document* (4th ed.). J.P. Morgan/Reuters. §5.2. `docs/REFERENCES.md#jpmorgan1996RiskMetrics`
-    Ewma {
-        /// Smoothing parameter λ ∈ (0, 1) used at calibration time.
-        lambda: f64,
-        /// Annualized one-step-ahead variance forecast for the idiosyncratic
-        /// adder.
-        variance: f64,
-    },
-}
-
 /// Complete vol state for all factors and all issuers at the calibration date.
 ///
 /// Records unregularized per-factor variance estimates and drives per-issuer
@@ -172,16 +134,17 @@ pub enum IdiosyncraticVolModel {
 /// the calibrated covariance, preserving the selected covariance estimator.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct VolState {
     /// EWMA or sample vol model for each systematic factor.
     ///
     /// Keys are factor IDs from [`crate::FactorModelConfig`].
     /// `BTreeMap` for deterministic serialization order.
-    pub factors: BTreeMap<FactorId, FactorVolModel>,
+    pub factors: BTreeMap<FactorId, VolModel>,
     /// Idiosyncratic vol model for each issuer.
     ///
     /// `BTreeMap` for deterministic serialization order.
-    pub idiosyncratic: BTreeMap<IssuerId, IdiosyncraticVolModel>,
+    pub idiosyncratic: BTreeMap<IssuerId, VolModel>,
 }
 
 /// Embedded time-series of factor **moves in bp**.
@@ -197,6 +160,7 @@ pub struct VolState {
 /// vectors must have the same length as `dates`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct FactorHistories {
     /// Ordered sequence of observation dates (aligned with value vectors).
     #[cfg_attr(

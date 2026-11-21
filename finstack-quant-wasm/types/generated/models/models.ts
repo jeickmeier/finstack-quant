@@ -11,7 +11,6 @@ export type AdderVolSource =
          * Dotted bucket path used as proxy (e.g. `"IG.EU.FIN"`).
          */
         peer_bucket: string;
-        [k: string]: unknown;
       };
     }
   | "caller_supplied"
@@ -111,7 +110,6 @@ export type BetaShrinkage =
          * Shrinkage weight in `[0, 1]`.
          */
         alpha: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -227,7 +225,6 @@ export type CovarianceStrategy =
          * Ridge regularisation in annualized **bp²**; must be `>= 0`.
          */
         alpha: number;
-        [k: string]: unknown;
       };
     }
   | "full_sample_repaired"
@@ -278,11 +275,12 @@ export type IssuerBetaPolicy =
         overrides: {
           [k: string]: IssuerBetaOverride;
         };
-        [k: string]: unknown;
       };
     }
   | "globally_off";
 /**
+ * Per-issuer regression behavior override supplied by the user before calibration.
+ *
  * This is the *input* override; the *resolved* outcome is [`IssuerBetaMode`].
  *
  * - `Auto` — let the calibration decide based on `min_history`.
@@ -321,7 +319,6 @@ export type VolModelChoice =
          * Smoothing parameter λ ∈ (0, 1) (RiskMetrics daily default 0.94).
          */
         lambda: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -380,7 +377,6 @@ export type MarketMapping =
          * Units used for the bump magnitude.
          */
         units: BumpUnits;
-        [k: string]: unknown;
       };
     }
   | {
@@ -397,7 +393,6 @@ export type MarketMapping =
          * shock size while localizing it along the tenor axis.
          */
         tenor_weights: [number, number][];
-        [k: string]: unknown;
       };
     }
   | {
@@ -406,7 +401,6 @@ export type MarketMapping =
          * Tickers moved by the factor.
          */
         tickers: string[];
-        [k: string]: unknown;
       };
     }
   | {
@@ -418,7 +412,6 @@ export type MarketMapping =
          * @maxItems 2
          */
         pair: [Currency, Currency];
-        [k: string]: unknown;
       };
     }
   | {
@@ -431,7 +424,6 @@ export type MarketMapping =
          * Volatility surfaces moved by the factor.
          */
         vol_surface_ids: string[];
-        [k: string]: unknown;
       };
     };
 /**
@@ -641,7 +633,6 @@ export type RiskMeasure =
          * Confidence level in the open interval `(0.5, 1)`.
          */
         confidence: number;
-        [k: string]: unknown;
       };
     }
   | {
@@ -650,7 +641,6 @@ export type RiskMeasure =
          * Confidence level in the open interval `(0.5, 1)`.
          */
         confidence: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -665,16 +655,16 @@ export type UnmatchedPolicy = "strict" | "warn";
  */
 export type CreditFactorModelSchema = "finstack_quant.credit_factor_model/1";
 /**
- * Volatility model for a single factor.
+ * Volatility model for a systematic factor or an issuer's idiosyncratic adder.
  *
  * The `Sample` variant stores a single variance estimate; `Ewma` additionally
  * persists the smoothing parameter used at calibration time.
  */
-export type FactorVolModel =
+export type VolModel =
   | {
       sample: {
         /**
-         * Annualized variance estimate for this factor.
+         * Annualized variance estimate.
          */
         variance: number;
       };
@@ -689,36 +679,6 @@ export type FactorVolModel =
          * Annualized one-step-ahead variance forecast.
          */
         variance: number;
-      };
-    };
-/**
- * Volatility model for an issuer's idiosyncratic adder.
- *
- * Mirrors [`FactorVolModel`] in structure; kept separate so per-issuer and
- * per-factor models can diverge independently in later PRs.
- */
-export type IdiosyncraticVolModel =
-  | {
-      sample: {
-        /**
-         * Annualized variance of the issuer's idiosyncratic adder.
-         */
-        variance: number;
-        [k: string]: unknown;
-      };
-    }
-  | {
-      ewma: {
-        /**
-         * Smoothing parameter λ ∈ (0, 1) used at calibration time.
-         */
-        lambda: number;
-        /**
-         * Annualized one-step-ahead variance forecast for the idiosyncratic
-         * adder.
-         */
-        variance: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -1073,14 +1033,6 @@ export type MarketDependency =
       credit_curve: {
         /**
          * Curve identifier.
-         */
-        id: Id;
-      };
-    }
-  | {
-      credit_index: {
-        /**
-         * Credit-index aggregate identifier.
          */
         id: Id;
       };
@@ -1715,11 +1667,9 @@ export type ResidualContributionSource =
        */
       issuer_id: string;
       kind: "from_credit_model";
-      [k: string]: unknown;
     }
   | {
       kind: "other";
-      [k: string]: unknown;
     };
 /**
  * Where a position VaR/ES decomposition comes from.
@@ -3401,7 +3351,6 @@ export interface FactorHistories {
   values: {
     [k: string]: number[];
   };
-  [k: string]: unknown;
 }
 /**
  * Static factor correlation matrix `ρ` for the covariance decomposition
@@ -3436,7 +3385,7 @@ export interface VolState {
    * `BTreeMap` for deterministic serialization order.
    */
   factors: {
-    [k: string]: FactorVolModel;
+    [k: string]: VolModel;
   };
   /**
    * Idiosyncratic vol model for each issuer.
@@ -3444,9 +3393,8 @@ export interface VolState {
    * `BTreeMap` for deterministic serialization order.
    */
   idiosyncratic: {
-    [k: string]: IdiosyncraticVolModel;
+    [k: string]: VolModel;
   };
-  [k: string]: unknown;
 }
 /**
  * A scoring model's result and the default master-scale grade of its implied PD.
@@ -3987,7 +3935,6 @@ export interface FactorContribution {
    * denominator cancel).
    */
   relative_risk: number;
-  [k: string]: unknown;
 }
 /**
  * Versioned factor-model configuration with typed factors, covariance, matching, pricing, and risk settings.
@@ -4324,7 +4271,6 @@ export interface LevelValuesAtDate {
   values: {
     [k: string]: number;
   };
-  [k: string]: unknown;
 }
 /**
  * Per-level bucket-value deltas produced by [`decompose_period`].
@@ -4345,7 +4291,6 @@ export interface LevelValuesDelta {
    * Zero-based level index, mirroring [`LevelValuesAtDate::level_index`].
    */
   level_index: number;
-  [k: string]: unknown;
 }
 /**
  * Snapshot of all hierarchy-level factor values at a single date, produced from observed issuer spreads.
@@ -4364,13 +4309,12 @@ export interface LevelsAtDate {
   /**
    * Date the spreads were observed.
    */
-  date: string;
+  date: DateWire;
   /**
    * Generic (PC) factor value at `date`. Equal to the input
    * `observed_generic` and propagated unchanged.
    */
   generic: number;
-  [k: string]: unknown;
 }
 /**
  * Gross-leverage impact of a liability management exercise.
@@ -5412,12 +5356,11 @@ export interface PeriodDecomposition {
   /**
    * Earlier snapshot date.
    */
-  from: string;
+  from: DateWire;
   /**
    * Later snapshot date.
    */
-  to: string;
-  [k: string]: unknown;
+  to: DateWire;
 }
 /**
  * Portfolio credit-loss simulation settings.
@@ -5503,7 +5446,6 @@ export interface PositionBudgetEntry {
    * `±inf` marks a non-zero component against a zero target.
    */
   utilization: NonFiniteF64Wire;
-  [k: string]: unknown;
 }
 /**
  * Expected Shortfall decomposition result for a single portfolio position.
@@ -5539,7 +5481,6 @@ export interface PositionEsContribution {
    * Component ES as a fraction of total portfolio ES.
    */
   relative_es: number;
-  [k: string]: unknown;
 }
 /**
  * Contribution of a single position to a specific factor bucket.
@@ -5557,7 +5498,6 @@ export interface PositionFactorContribution {
    * Risk attributed to this position-factor pair.
    */
   risk_contribution: number;
-  [k: string]: unknown;
 }
 /**
  * Annualized residual variance contributed by a single position.
@@ -5582,7 +5522,6 @@ export interface PositionResidualContribution {
    * Where the residual variance came from.
    */
   source: ResidualContributionSource;
-  [k: string]: unknown;
 }
 /**
  * Target shares of portfolio VaR checked against the decomposition.
@@ -5651,7 +5590,6 @@ export interface PositionRiskDecomposition {
    * Per-position VaR decomposition.
    */
   var_contributions: PositionVarContribution[];
-  [k: string]: unknown;
 }
 /**
  * Risk decomposition result for a single portfolio position.
@@ -5710,7 +5648,6 @@ export interface PositionVarContribution {
    * A negative value indicates the position is a diversifier.
    */
   relative_var: number;
-  [k: string]: unknown;
 }
 /**
  * Position VaR/ES decomposition with its optional risk budget and tail stress attribution.
@@ -5753,7 +5690,6 @@ export interface RiskBudgetResult {
    * Total over-budget amount: sum of positive consuming-side exceedances.
    */
   total_overbudget: number;
-  [k: string]: unknown;
 }
 /**
  * Per-position attribution of portfolio losses in tail scenarios.
@@ -5795,7 +5731,6 @@ export interface StressAttribution {
    * "tail events"). Loss convention: reported as a negative number.
    */
   var_threshold: number;
-  [k: string]: unknown;
 }
 /**
  * Single position's contribution to tail stress.
@@ -5817,7 +5752,6 @@ export interface StressPositionEntry {
    * Worst single-scenario P&L for this position.
    */
   worst_scenario_pnl: number;
-  [k: string]: unknown;
 }
 /**
  * Breakdown of a single tail scenario.
@@ -5837,7 +5771,6 @@ export interface TailScenarioBreakdown {
    * Scenario index in the original history.
    */
   scenario_index: number;
-  [k: string]: unknown;
 }
 /**
  * One position risk report request: position ids, confidence, a parametric or historical source and an optional budget.

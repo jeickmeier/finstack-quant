@@ -72,8 +72,8 @@ mod tests;
 pub use correlation::FactorCorrelationMatrix;
 pub use model::{
     CreditCalibrationDiagnostics, CreditFactorModel, CreditFactorModelSchema, DateRange,
-    FactorHistories, FactorVolModel, FoldUpRecord, GenericFactorSpec, IdiosyncraticVolModel,
-    LevelAnchor, LevelsAtAnchor, VolState,
+    FactorHistories, FoldUpRecord, GenericFactorSpec, LevelAnchor, LevelsAtAnchor, VolModel,
+    VolState,
 };
 pub use spec::{
     AdderVolSource, CreditHierarchySpec, FitQuality, HierarchyDimension, IssuerBetaMode,

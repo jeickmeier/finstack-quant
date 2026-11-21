@@ -1,5 +1,10 @@
 {
   "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
     "HierarchyDimension": {
       "description": "A single level in the credit factor hierarchy.\n\nBuilt-in variants (`Rating`, `Region`, `Sector`) have canonical tag keys.\n`Custom(key)` reads `issuer_tags[key]` for arbitrary user-defined dimensions\nsuch as `\"Currency\"` or `\"AssetType\"`.",
       "oneOf": [
@@ -34,6 +39,7 @@
       ]
     },
     "LevelValuesDelta": {
+      "additionalProperties": false,
       "description": "Per-level bucket-value deltas produced by [`decompose_period`].",
       "properties": {
         "deltas": {
@@ -65,6 +71,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/models/1/period_decomposition.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Difference between two `LevelsAtDate` snapshots.",
   "properties": {
     "by_level": {
@@ -88,12 +95,12 @@
       "type": "number"
     },
     "from": {
-      "description": "Earlier snapshot date.",
-      "type": "string"
+      "$ref": "#/$defs/DateWire",
+      "description": "Earlier snapshot date."
     },
     "to": {
-      "description": "Later snapshot date.",
-      "type": "string"
+      "$ref": "#/$defs/DateWire",
+      "description": "Later snapshot date."
     }
   },
   "required": [

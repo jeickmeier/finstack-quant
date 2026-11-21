@@ -12,9 +12,8 @@ use finstack_quant_factor::credit::calibration::{
     HistoryPanel, IssuerTagPanel, PanelFrequency, PanelSpace, VolModelChoice,
 };
 use finstack_quant_factor::credit::hierarchy::{
-    AdderVolSource, CreditFactorModel, CreditHierarchySpec, FactorVolModel, GenericFactorSpec,
-    HierarchyDimension, IdiosyncraticVolModel, IssuerBetaMode, IssuerBetaOverride,
-    IssuerBetaPolicy, IssuerTags,
+    AdderVolSource, CreditFactorModel, CreditHierarchySpec, GenericFactorSpec, HierarchyDimension,
+    IssuerBetaMode, IssuerBetaOverride, IssuerBetaPolicy, IssuerTags, VolModel,
 };
 use time::Month;
 
@@ -601,7 +600,7 @@ fn ewma_vol_model_calibrates_and_persists_estimator() {
 
     assert!(!model.vol_state.factors.is_empty());
     for (fid, vol_model) in &model.vol_state.factors {
-        let FactorVolModel::Ewma { lambda, variance } = vol_model else {
+        let VolModel::Ewma { lambda, variance } = vol_model else {
             panic!("factor {fid} must persist the EWMA estimator, got {vol_model:?}");
         };
         assert!((lambda - 0.94).abs() < 1e-15);
@@ -630,14 +629,14 @@ fn ewma_vol_model_calibrates_and_persists_estimator() {
             .factors
             .get(fid)
             .unwrap_or_else(|| panic!("round-tripped vol_state missing factor {fid}"));
-        let FactorVolModel::Ewma {
+        let VolModel::Ewma {
             lambda: orig_lambda,
             variance: orig_variance,
         } = orig_vol_model
         else {
             panic!("factor {fid} must persist the EWMA estimator, got {orig_vol_model:?}");
         };
-        let FactorVolModel::Ewma {
+        let VolModel::Ewma {
             lambda: back_lambda,
             variance: back_variance,
         } = back_vol_model
@@ -673,14 +672,14 @@ fn ewma_vol_model_calibrates_and_persists_estimator() {
             .unwrap_or_else(|| {
                 panic!("round-tripped vol_state missing idiosyncratic for issuer {issuer_id}")
             });
-        let IdiosyncraticVolModel::Ewma {
+        let VolModel::Ewma {
             lambda: orig_lambda,
             variance: orig_variance,
         } = orig_vol_model
         else {
             panic!("issuer {issuer_id} must persist the EWMA estimator, got {orig_vol_model:?}");
         };
-        let IdiosyncraticVolModel::Ewma {
+        let VolModel::Ewma {
             lambda: back_lambda,
             variance: back_variance,
         } = back_vol_model
@@ -760,7 +759,7 @@ fn ewma_vol_model_composes_with_ledoit_wolf_covariance() {
 
     assert!(!model.vol_state.factors.is_empty());
     for (fid, vol_model) in &model.vol_state.factors {
-        let FactorVolModel::Ewma { lambda, variance } = vol_model else {
+        let VolModel::Ewma { lambda, variance } = vol_model else {
             panic!("factor {fid} must persist the Ewma variant, got {vol_model:?}");
         };
         assert!((lambda - 0.94).abs() < 1e-15);
@@ -840,11 +839,11 @@ fn ledoit_wolf_covariance_is_independent_of_vol_model() {
 
     let vols_differ = ids.iter().any(|fid| {
         let sample_var = match sample_model.vol_state.factors.get(fid) {
-            Some(FactorVolModel::Sample { variance }) => *variance,
+            Some(VolModel::Sample { variance }) => *variance,
             other => panic!("factor {fid} must persist the Sample variant, got {other:?}"),
         };
         let ewma_var = match ewma_model.vol_state.factors.get(fid) {
-            Some(FactorVolModel::Ewma { variance, .. }) => *variance,
+            Some(VolModel::Ewma { variance, .. }) => *variance,
             other => panic!("factor {fid} must persist the Ewma variant, got {other:?}"),
         };
         (sample_var - ewma_var).abs() > 1e-12

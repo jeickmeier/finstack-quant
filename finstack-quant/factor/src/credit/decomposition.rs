@@ -41,6 +41,7 @@ use finstack_quant_core::types::IssuerId;
 /// matching the convention used elsewhere in the credit hierarchy artifact.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct LevelValuesAtDate {
     /// Zero-based index of this level inside [`crate::credit::hierarchy::CreditHierarchySpec::levels`].
     pub level_index: usize,
@@ -55,9 +56,13 @@ pub struct LevelValuesAtDate {
 /// produced from observed issuer spreads.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct LevelsAtDate {
     /// Date the spreads were observed.
-    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub date: Date,
     /// Generic (PC) factor value at `date`. Equal to the input
     /// `observed_generic` and propagated unchanged.
@@ -71,6 +76,7 @@ pub struct LevelsAtDate {
 /// Per-level bucket-value deltas produced by [`decompose_period`].
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct LevelValuesDelta {
     /// Zero-based level index, mirroring [`LevelValuesAtDate::level_index`].
     pub level_index: usize,
@@ -87,12 +93,19 @@ pub struct LevelValuesDelta {
 /// the linear reconciliation invariant on `ΔS_i` holds for every entry.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PeriodDecomposition {
     /// Earlier snapshot date.
-    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub from: Date,
     /// Later snapshot date.
-    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub to: Date,
     /// `to.generic - from.generic`.
     pub d_generic: f64,

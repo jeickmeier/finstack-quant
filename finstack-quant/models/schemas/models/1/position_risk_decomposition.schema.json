@@ -16,6 +16,7 @@
       ]
     },
     "PositionEsContribution": {
+      "additionalProperties": false,
       "description": "Expected Shortfall decomposition result for a single portfolio position.",
       "properties": {
         "component_es": {
@@ -49,6 +50,7 @@
       "type": "object"
     },
     "PositionVarContribution": {
+      "additionalProperties": false,
       "description": "Risk decomposition result for a single portfolio position.\n\nAll monetary fields are in the same units as the portfolio VaR\n(typically the portfolio's base currency).",
       "properties": {
         "component_var": {
@@ -92,6 +94,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/models/1/position_risk_decomposition.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Complete position-level risk decomposition of a portfolio.",
   "properties": {
     "confidence": {

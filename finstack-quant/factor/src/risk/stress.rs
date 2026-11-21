@@ -10,6 +10,7 @@ use super::{MinTail, PreparedHistoricalScenarios};
 /// positions contributed the most to the portfolio loss.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct StressAttribution {
     /// Portfolio VaR threshold (scenarios with P&L at or below this are
     /// "tail events"). Loss convention: reported as a negative number.
@@ -43,6 +44,7 @@ pub struct StressAttribution {
 /// Single position's contribution to tail stress.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct StressPositionEntry {
     /// Position identifier.
     pub position_id: String,
@@ -60,6 +62,7 @@ pub struct StressPositionEntry {
 /// Breakdown of a single tail scenario.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct TailScenarioBreakdown {
     /// Scenario index in the original history.
     pub scenario_index: usize,

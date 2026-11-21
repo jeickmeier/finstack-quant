@@ -122,7 +122,7 @@ pub enum PanelSpace {
 /// sound in either panel space.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[non_exhaustive]
 pub enum VolModelChoice {
     /// Plain sample variance (unbiased, Bessel-corrected); demeans before
@@ -150,7 +150,7 @@ pub enum VolModelChoice {
 ///
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[non_exhaustive]
 pub enum CovarianceStrategy {
     /// Diagonal Σ = diag(σ²) under identity correlation.
@@ -219,7 +219,7 @@ pub enum BucketWeighting {
 /// OLS β shrinkage rule.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[non_exhaustive]
 pub enum BetaShrinkage {
     /// No shrinkage; use the OLS estimate directly.
