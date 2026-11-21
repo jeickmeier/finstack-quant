@@ -13503,6 +13503,13 @@ export interface CdsIndex {
    */
   upfront?: [DateWire, Money] | null;
   /**
+   * Valuation presentation convention.
+   *
+   * Defaults to Bloomberg CDSW clean. Set `IsdaDirty` only when
+   * reproducing academic ISDA Standard Model literature or dirty cash conservation.
+   */
+  valuation_convention?: CdsValuationConvention;
+  /**
    * Version number within series
    */
   version: number;

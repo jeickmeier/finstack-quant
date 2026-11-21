@@ -21,7 +21,7 @@ use time::macros::date;
 // Reuse CDS components for conventions and legs
 use crate::cds::CreditDefaultSwap;
 use finstack_quant_valuations_core::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
-use finstack_quant_valuations_core::market::conventions::CdsConvention;
+use finstack_quant_valuations_core::market::conventions::{CdsConvention, CdsValuationConvention};
 
 use super::parameters::CdsIndexParams;
 use finstack_quant_valuations_core::impl_instrument_base;
@@ -156,6 +156,13 @@ pub struct CdsIndex {
     )]
     pub scenario_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
+    /// Valuation presentation convention.
+    ///
+    /// Defaults to Bloomberg CDSW clean. Set `IsdaDirty` only when
+    /// reproducing academic ISDA Standard Model literature or dirty cash conservation.
+    #[serde(default)]
+    #[builder(default)]
+    pub valuation_convention: CdsValuationConvention,
     /// Optional OTC margin specification for VM/IM.
     ///
     /// CDS indices are typically cleared through ICE Clear Credit. Use
@@ -232,6 +239,7 @@ impl CdsIndex {
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
+            valuation_convention: CdsValuationConvention::default(),
             margin_spec: None,
             attributes: Attributes::new(),
         })
@@ -345,6 +353,7 @@ impl CdsIndex {
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
+            valuation_convention: CdsValuationConvention::default(),
             margin_spec: None,
             attributes: Attributes::new(),
         })
@@ -424,9 +433,7 @@ impl CdsIndex {
             instrument_pricing_overrides: self.instrument_pricing_overrides.clone(),
             metric_pricing_overrides: self.metric_pricing_overrides.clone(),
             scenario_pricing_overrides: self.scenario_pricing_overrides.clone(),
-            valuation_convention:
-                finstack_quant_valuations_core::market::conventions::CdsValuationConvention::default(
-                ),
+            valuation_convention: self.valuation_convention,
             upfront: None,
             doc_clause: None,
             protection_effective_date: None,

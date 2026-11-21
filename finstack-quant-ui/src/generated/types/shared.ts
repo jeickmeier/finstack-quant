@@ -40103,6 +40103,14 @@ export interface CdsIndex {
    */
   upfront?: [Date, Money6] | null;
   /**
+   * Valuation presentation convention.
+   *
+   * Defaults to Bloomberg CDSW clean. Set `IsdaDirty` only when
+   * reproducing academic ISDA Standard Model literature or dirty cash conservation.
+   */
+  valuation_convention?:
+    "isda_dirty" | "bloomberg_cdsw_clean" | "bloomberg_cdsw_clean_full_premium" | "quant_lib_isda_parity";
+  /**
    * Version number within series
    */
   version: number;

@@ -5108,6 +5108,11 @@
             "null"
           ]
         },
+        "valuation_convention": {
+          "$ref": "#/$defs/CdsValuationConvention",
+          "default": "bloomberg_cdsw_clean",
+          "description": "Valuation presentation convention.\n\nDefaults to Bloomberg CDSW clean. Set `IsdaDirty` only when\nreproducing academic ISDA Standard Model literature or dirty cash conservation."
+        },
         "version": {
           "description": "Version number within series",
           "format": "uint16",

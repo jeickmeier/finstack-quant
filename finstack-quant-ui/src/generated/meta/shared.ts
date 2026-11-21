@@ -4553,6 +4553,14 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
+    "path": "#/$defs/CdsIndex/properties/valuation_convention",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/valuation_convention",
+    "default": "bloomberg_cdsw_clean",
+    "description": "Valuation presentation convention.\n\nDefaults to Bloomberg CDSW clean. Set `IsdaDirty` only when\nreproducing academic ISDA Standard Model literature or dirty cash conservation.",
+    "ref": "#/$defs/CdsValuationConvention",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsValuationConvention"
+  },
+  {
     "path": "#/$defs/CdsIndex/properties/version",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsIndex/properties/version",
     "description": "Version number within series",

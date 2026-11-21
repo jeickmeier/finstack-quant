@@ -265,6 +265,9 @@ getters!(JsCdsIndex, "CdsIndex", |i| {
         /// Number of names in the pool.
         /// @returns The count, or `null` when unset.
         num_constituents as numConstituents: "NonNullable<generated.valuations.CdsIndex['num_constituents']> | null" => json(i.num_constituents),
+        /// Valuation presentation convention (serde name).
+        /// @returns `"bloomberg_cdsw_clean"` (default), `"bloomberg_cdsw_clean_full_premium"`, `"isda_dirty"` or `"quant_lib_isda_parity"`.
+        valuation_convention as valuationConvention: "NonNullable<generated.valuations.CdsIndex['valuation_convention']>" => json(i.valuation_convention),
         /// Contractual upfront payment as `(payment_date, amount)`; positive means the protection buyer pays.
         /// @returns The upfront pair, or `null` when the trade has no upfront.
         upfront as upfront: "[string, Money] | null" => dated_money(i.upfront),
@@ -387,6 +390,11 @@ setters!(JsCdsIndexBuilder, "CdsIndexBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         num_constituents as numConstituents: "number" => js_uint,
+        /// Set the valuation presentation convention.
+        /// @param value - `"bloomberg_cdsw_clean"` (default) reports Bloomberg CDSW clean principal; `"isda_dirty"` the academic ISDA dirty PV; `"quant_lib_isda_parity"` reproduces QuantLib `IsdaCdsEngine`.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        valuation_convention as valuationConvention: "NonNullable<generated.valuations.CdsIndex['valuation_convention']>" => js_wire,
         /// Set the OTC margin (CSA / initial-margin) specification.
         /// @param value - Rust `OtcMarginSpec` in serde form (plain object or JSON string).
         /// @returns The builder, for chaining.

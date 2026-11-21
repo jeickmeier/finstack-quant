@@ -245,8 +245,8 @@ def test_cdx_ig_46_quantlib_forward_and_strike(isda_cash) -> None:
     # Average the two orders so their nonlinear interaction is shared equally.
     forward_effect = ((forward_only - baseline) + (both - strike_only)) / 2
     strike_effect = ((strike_only - baseline) + (both - forward_only)) / 2
-    assert forward_effect == pytest.approx(-2_461.42, abs=0.01, rel=0)
-    assert strike_effect == pytest.approx(850.51, abs=0.01, rel=0)
+    assert forward_effect == pytest.approx(-2_442.25, abs=0.01, rel=0)
+    assert strike_effect == pytest.approx(850.46, abs=0.01, rel=0)
 
     # Invert the screen premium separately for each input, holding the other at
     # its native value. These are alternative explanations of one observation.
@@ -311,8 +311,8 @@ def test_cdx_ig_46_screen_constraints(isda_cash) -> None:
     # Given a reference value for the delivered CDS at breakeven, the option
     # premium determines a cash strike. Solving for the forward then uses only price.
     for label, mark, expected_forward_effect in [
-        ("Finstack breakeven mark", native_be_mark, 400.21),
-        ("QuantLib breakeven mark", ql_be_mark, -444.94),
+        ("Finstack breakeven mark", native_be_mark, 419.33),
+        ("QuantLib breakeven mark", ql_be_mark, -425.77),
     ]:
         cash = mark - target
         cash_strike = p.clean_strike(cash)
@@ -407,7 +407,7 @@ def test_cdx_ig_46_isda_expiry_values() -> None:
             assert premium(sigma, 48) == pytest.approx(value, abs=0.01, rel=0)
     native = p.result(p.market, p.strike, metrics=["vega"])
     assert values[0] - float(native.price) == pytest.approx(103.65, abs=0.01, rel=0)
-    assert values[1] - values[0] == pytest.approx(3369.22, abs=0.01, rel=0)
+    assert values[1] - values[0] == pytest.approx(3369.19, abs=0.01, rel=0)
     print(
         f"ISDA expiry values only: premium {values[0]:.2f} ({values[0] - float(native.price):+.2f}), "
         f"one-point vega {values[1] - values[0]:.2f} ({values[1] - values[0] - native.get_metric('vega'):+.2f})"

@@ -5822,6 +5822,7 @@
       "series",
       "side",
       "upfront",
+      "valuationConvention",
       "version"
     ]
   },
@@ -9100,6 +9101,7 @@
       "series",
       "side",
       "upfront",
+      "valuationConvention",
       "version"
     ],
     "getters": []

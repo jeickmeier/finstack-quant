@@ -689,6 +689,21 @@ class CdsIndex:
         """
         ...
     @property
+    def valuation_convention(self) -> str:
+        """
+        Valuation presentation convention (serde name).
+
+        Returns
+        -------
+        str
+            ``"bloomberg_cdsw_clean"`` (default), ``"bloomberg_cdsw_clean_full_premium"``, ``"isda_dirty"`` or ``"quant_lib_isda_parity"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
     def include_valuation_date_cashflows(self) -> bool:
         """Whether coupons and actual upfront due on the valuation date enter PV.
 
@@ -1088,6 +1103,31 @@ class CdsIndexBuilder:
         ------
         ValueError
             If the builder was already consumed by ``build()``.
+        """
+        ...
+    def valuation_convention(
+        self,
+        value: Literal[
+            "bloomberg_cdsw_clean", "bloomberg_cdsw_clean_full_premium", "isda_dirty", "quant_lib_isda_parity"
+        ],
+    ) -> CdsIndexBuilder:
+        """
+        Set the valuation presentation convention.
+
+        Parameters
+        ----------
+        value : Literal["bloomberg_cdsw_clean", "bloomberg_cdsw_clean_full_premium", "isda_dirty", "quant_lib_isda_parity"]
+            ``"bloomberg_cdsw_clean"`` (default) reports Bloomberg CDSW clean principal; ``"isda_dirty"`` the academic ISDA dirty PV; ``"quant_lib_isda_parity"`` reproduces QuantLib ``IsdaCdsEngine``.
+
+        Returns
+        -------
+        CdsIndexBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` is not a recognized convention.
         """
         ...
     def include_valuation_date_cashflows(self, value: bool) -> CdsIndexBuilder:

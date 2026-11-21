@@ -43,6 +43,7 @@ export default [
             },
             "series": 42,
             "side": "pay",
+            "valuation_convention": "bloomberg_cdsw_clean",
             "version": 1
           },
           "type": "cds_index"
@@ -1037,6 +1038,35 @@ export default [
     "description": "Receive the primary leg (fixed rate in IRS, protection premium in CDS, long variance)"
   },
   {
+    "path": "#/$defs/d_5206b71fe62d3564c6ab",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsValuationConvention",
+    "description": "Valuation presentation and pricing policy for CDS marks.\n\nEach variant bundles a coherent set of choices (premium-leg accrual schedule,\nAct/360 accrual day counting, accrual-on-default bias, clean/dirty NPV,\npar-spread denominator). Mixing those choices via separate boolean\noverrides is intentionally not supported — the variants here are the only\nconventions traded in practice."
+  },
+  {
+    "path": "#/$defs/d_5206b71fe62d3564c6ab/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsValuationConvention/oneOf/0",
+    "const": "isda_dirty",
+    "description": "ISDA-style dirty model PV.\n\nPremium-leg cashflows accrue between unadjusted IMM dates, the final\ncoupon excludes the maturity day, and the reported NPV is the dirty\nmodel PV (no add-back of accrued premium). Par spread uses the risky\nannuity denominator. Use only for direct reproduction of academic ISDA\nStandard Model literature."
+  },
+  {
+    "path": "#/$defs/d_5206b71fe62d3564c6ab/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsValuationConvention/oneOf/1",
+    "const": "bloomberg_cdsw_clean",
+    "description": "Bloomberg CDSW clean principal presentation and premium-leg policy.\n\nThis is the industry-standard convention used by Bloomberg CDSW and\nthe ISDA Standard Upfront Model. It is the default for new\n`CreditDefaultSwap` instances:\n\n- Intermediate premium cashflows accrue between business-day-adjusted\n  dates. Final accrual ends on unadjusted maturity; the final payment\n  follows the business-day convention independently.\n- The final coupon period is inclusive of the maturity date (extra\n  day) per CDSW convention.\n- The reported NPV is the clean principal value (Bloomberg\n  \"Principal\" line). Cash settlement is `Principal + Accrued`.\n- Par spread uses the risky annuity denominator (matches the CDSW\n  screen for investment-grade credits).\n- Hazard rebootstrap inside risk metrics (CS01, recovery01, etc.)\n  inherits the same CDSW pricer convention so sensitivities are\n  self-consistent with the base PV."
+  },
+  {
+    "path": "#/$defs/d_5206b71fe62d3564c6ab/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsValuationConvention/oneOf/2",
+    "const": "bloomberg_cdsw_clean_full_premium",
+    "description": "Bloomberg CDSW clean principal with full premium leg in the par-spread\ndenominator (distressed-credit variant).\n\nIdentical to [`Self::BloombergCdswClean`] except the par spread\ndenominator includes accrual-on-default. The difference vs. risky\nannuity is typically < 1bp for investment grade and 2-5bps for\ndistressed credits (hazard rate > 3%)."
+  },
+  {
+    "path": "#/$defs/d_5206b71fe62d3564c6ab/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsValuationConvention/oneOf/3",
+    "const": "quant_lib_isda_parity",
+    "description": "QuantLib `IsdaCdsEngine` parity convention.\n\nReproduces QuantLib's CDS output: dirty PV (no clean add-back),\nbusiness-day-adjusted premium accrual periods, full premium leg in\nthe par-spread denominator, QuantLib `Actual360(true)` accrual (every\nAct/360 premium period includes its end date) and the `IsdaCdsEngine`\n`HalfDayBias` accrual-on-default adjustment."
+  },
+  {
     "path": "#/$defs/d_572ad1befb7d94914652",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig",
     "description": "Model selection and tree pricing parameters."
@@ -1612,6 +1642,14 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/upfront/prefixItems/1",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/valuation_convention",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsIndex/properties/valuation_convention",
+    "default": "bloomberg_cdsw_clean",
+    "description": "Valuation presentation convention.\n\nDefaults to Bloomberg CDSW clean. Set `IsdaDirty` only when\nreproducing academic ISDA Standard Model literature or dirty cash conservation.",
+    "ref": "#/$defs/CdsValuationConvention",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/CdsValuationConvention"
   },
   {
     "path": "#/$defs/d_765a4643a287f5eb4b9d/properties/version",
