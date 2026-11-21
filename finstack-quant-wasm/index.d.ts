@@ -4899,12 +4899,12 @@ export interface ModelsFactorCreditNamespace {
    * # Arguments
    *
    * * `model` - Calibrated credit factor hierarchy used for the peel.
-   * * `observed_spreads_json` - JSON `{issuer_id: spread}` map in decimal
+   * * `observed_spreads` - JSON or plain `{issuer_id: spread}` map in decimal
    *   (`0.012` = 120 bp). Values that look like bp (e.g. `100.0`) are rejected.
    * * `observed_generic` - Generic (PC) factor value at `as_of`, same decimal
    *   convention as the spreads.
    * * `as_of` - ISO-8601 valuation date for the snapshot.
-   * * `runtime_tags_json` - Optional JSON `{issuer_id: {dim_key: tag}}` for
+   * * `runtime_tags` - Optional JSON or plain `{issuer_id: {dim_key: tag}}` for
    *   issuers not present in the model artifact.
    *
    * # Errors
@@ -4913,10 +4913,10 @@ export interface ModelsFactorCreditNamespace {
    * `runtime_tags` entry, and a `validation` error if `as_of` cannot be parsed
    * or a spread is outside the decimal band.
    * @param model - Calibrated credit factor hierarchy used for the peel.
-   * @param observedSpreadsJson - JSON `{issuer_id: spread}` map in decimal (`0.012` = 120 bp). Values that look like bp (e.g. `100.0`) are rejected.
+   * @param observedSpreads - JSON or plain `{issuer_id: spread}` map in decimal (`0.012` = 120 bp). Values that look like bp (e.g. `100.0`) are rejected.
    * @param observedGeneric - Generic (PC) factor value at `as_of`, same decimal convention as the spreads.
    * @param asOf - ISO-8601 valuation date for the snapshot.
-   * @param runtimeTagsJson - Optional JSON `{issuer_id: {dim_key: tag}}` for issuers not present in the model artifact.
+   * @param runtimeTags - Optional JSON or plain `{issuer_id: {dim_key: tag}}` for issuers not present in the model artifact.
    * @returns Per-level factor values and residual adders at the requested date, in bp.
    */
   readonly decomposeLevels: typeof wasm.decomposeLevels;

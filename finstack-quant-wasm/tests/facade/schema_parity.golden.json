@@ -303,14 +303,14 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1285516
+            "bytes": 1285432
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
             "type_name": "AttributionInputs",
             "kind": "input",
-            "bytes": 242255
+            "bytes": 242171
           },
           {
             "path": "schemas/attribution/1/attribution_result.schema.json",
@@ -1778,7 +1778,7 @@
             "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_calibration_config.schema.json",
             "type_name": "CreditCalibrationConfig",
             "kind": "component",
-            "bytes": 17007
+            "bytes": 16923
           },
           {
             "path": "schemas/factor_model/1/credit_calibration_inputs.schema.json",
@@ -1792,7 +1792,7 @@
             "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_factor_model.schema.json",
             "type_name": "CreditFactorModel",
             "kind": "input",
-            "bytes": 89994
+            "bytes": 89910
           },
           {
             "path": "schemas/factor_model/1/factor_model_config.schema.json",
@@ -4336,7 +4336,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1285516
+            "bytes": 1285432
           },
           {
             "domain": "attribution",
@@ -4344,7 +4344,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
             "type_name": "AttributionInputs",
             "kind": "input",
-            "bytes": 242255
+            "bytes": 242171
           },
           {
             "domain": "attribution",
@@ -4680,7 +4680,7 @@
             "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_calibration_config.schema.json",
             "type_name": "CreditCalibrationConfig",
             "kind": "component",
-            "bytes": 17007
+            "bytes": 16923
           },
           {
             "domain": "factor_model",
@@ -4696,7 +4696,7 @@
             "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_factor_model.schema.json",
             "type_name": "CreditFactorModel",
             "kind": "input",
-            "bytes": 89994
+            "bytes": 89910
           },
           {
             "domain": "factor_model",

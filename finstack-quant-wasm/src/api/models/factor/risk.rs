@@ -50,7 +50,19 @@ pub fn position_risk_report(
     let request: finstack_quant_factor::risk::PositionRiskRequest =
         from_js_json(&request, "request")?;
     let report = finstack_quant_factor::risk::position_risk_report(&request).map_err(to_js_err)?;
-    crate::utils::to_js_value(&report)
+    let js = crate::utils::to_js_value(&report)?;
+    if report.budget.is_some() {
+        let budget = js_sys::Reflect::get(&js, &JsValue::from("budget"))?;
+        restore_budget_non_finite(&budget)?;
+    }
+    Ok(js)
+}
+
+fn restore_budget_non_finite(budget_js: &JsValue) -> Result<(), JsValue> {
+    let positions = js_sys::Reflect::get(budget_js, &JsValue::from("positions"))?;
+    crate::utils::restore_non_finite_rows::<finstack_quant_factor::risk::PositionBudgetEntry>(
+        &positions,
+    )
 }
 
 /// Evaluate a per-position risk budget against actual component VaRs.
@@ -105,10 +117,7 @@ pub fn evaluate_risk_budget(
     let result = eval_risk_budget(ids, &actual_var, &target_var_pct, portfolio_var, threshold)
         .map_err(to_js_err)?;
     let js = crate::utils::to_js_value(&result)?;
-    let positions = js_sys::Reflect::get(&js, &JsValue::from("positions"))?;
-    crate::utils::restore_non_finite_rows::<finstack_quant_factor::risk::PositionBudgetEntry>(
-        &positions,
-    )?;
+    restore_budget_non_finite(&js)?;
     Ok(js)
 }
 
@@ -132,10 +141,7 @@ pub fn evaluate_risk_budget(
 #[wasm_bindgen(js_name = evaluateRiskBudgetFromDecomposition, unchecked_return_type = "RiskBudgetResult")]
 pub fn evaluate_risk_budget_from_decomposition(
     #[wasm_bindgen(unchecked_param_type = "PositionRiskDecomposition | string")] decomp: JsValue,
-    #[wasm_bindgen(
-        js_name = "targetVarPct",
-        unchecked_param_type = "number[] | Float64Array"
-    )]
+    #[wasm_bindgen(js_name = "targetVarPct", unchecked_param_type = "NumericArray")]
     target_var_pct: JsValue,
     #[wasm_bindgen(
         js_name = "utilizationThreshold",
@@ -153,10 +159,7 @@ pub fn evaluate_risk_budget_from_decomposition(
     )
     .map_err(to_js_err)?;
     let js = crate::utils::to_js_value(&result)?;
-    let positions = js_sys::Reflect::get(&js, &JsValue::from("positions"))?;
-    crate::utils::restore_non_finite_rows::<finstack_quant_factor::risk::PositionBudgetEntry>(
-        &positions,
-    )?;
+    restore_budget_non_finite(&js)?;
     Ok(js)
 }
 
@@ -191,7 +194,7 @@ pub fn build_stress_attribution(
     position_ids: JsValue,
     #[wasm_bindgen(js_name = "positionPnls", unchecked_param_type = "NumericArray[]")]
     position_pnls: JsValue,
-    #[wasm_bindgen(unchecked_optional_param_type = "number")] confidence: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "number | null")] confidence: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     use finstack_quant_factor::risk::{build_stress_attribution, flatten_position_pnls};
     let ids = js_string_seq(&position_ids, "positionIds")?;

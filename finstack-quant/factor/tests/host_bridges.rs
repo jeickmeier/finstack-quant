@@ -47,6 +47,10 @@ fn hierarchy_level_names_are_the_serde_dimension_keys() {
         dimension_key(&HierarchyDimension::Custom("Currency".into())),
         "Currency"
     );
+    assert_eq!(
+        serde_json::to_value(HierarchyDimension::Custom("Currency".into())).expect("serialize"),
+        serde_json::json!({"custom": "Currency"})
+    );
 }
 
 #[test]

@@ -1107,6 +1107,11 @@ test('models.factor.risk.positionRiskReport returns the canonical parametric Pos
   assert.equal(explicit.budget.positions.length, 2);
 });
 
+test('models.factor.risk.positionRiskReport decodes non-finite budget utilization as Infinity', () => {
+  const report = parametric({ budget: { targets: [1.0, 0.0] } });
+  assert.equal(report.budget.positions[1].utilization, Number.POSITIVE_INFINITY);
+});
+
 test('models.factor.risk.positionRiskReport returns historical ES rows and stress and takes position-major P&L only', () => {
   // (1 - confidence) * n_scenarios must be at least 1 to resolve the tail, so
   // 0.9 confidence needs >= 10 scenarios per position.

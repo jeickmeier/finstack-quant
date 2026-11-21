@@ -2436,8 +2436,6 @@ export type IssuerBetaPolicy =
     }
   | "globally_off";
 /**
- * Per-issuer regression behavior override supplied by the user before calibration.
- *
  * This is the *input* override; the *resolved* outcome is [`IssuerBetaMode`].
  *
  * - `Auto` — let the calibration decide based on `min_history`.

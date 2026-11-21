@@ -164,7 +164,7 @@
       ]
     },
     "IssuerBetaOverride": {
-      "description": "Per-issuer regression behavior override supplied by the user before calibration.\n\nThis is the *input* override; the *resolved* outcome is [`IssuerBetaMode`].\n\n- `Auto` — let the calibration decide based on `min_history`.\n- `ForceIssuerBeta` — always run per-issuer regression regardless of history.\n- `ForceBucketOnly` — never run per-issuer regression for this issuer.",
+      "description": "This is the *input* override; the *resolved* outcome is [`IssuerBetaMode`].\n\n- `Auto` — let the calibration decide based on `min_history`.\n- `ForceIssuerBeta` — always run per-issuer regression regardless of history.\n- `ForceBucketOnly` — never run per-issuer regression for this issuer.",
       "oneOf": [
         {
           "const": "auto",

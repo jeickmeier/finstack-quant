@@ -283,8 +283,6 @@ export type IssuerBetaPolicy =
     }
   | "globally_off";
 /**
- * Per-issuer regression behavior override supplied by the user before calibration.
- *
  * This is the *input* override; the *resolved* outcome is [`IssuerBetaMode`].
  *
  * - `Auto` — let the calibration decide based on `min_history`.
@@ -5516,7 +5514,7 @@ export interface PositionEsContribution {
    *
    * Parametric: analytical formula using truncated normal moments.
    * ```text
-   * CES_i = w_i * (Sigma * w)_i / sigma_p * phi(z_alpha) / (1 - alpha)
+   * CES_i = -w_i * (Sigma * w)_i / sigma_p * phi(z_alpha) / (1 - alpha)
    * ```
    *
    * Historical: probability-weighted position P&L over the exact loss-tail
