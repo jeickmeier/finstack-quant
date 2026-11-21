@@ -3,12 +3,44 @@
   "fixtures": [
     {
       "path": "pricing/bloomberg/bond/bhccn_10_2032_callable_bloomberg.json",
-      "description": "BHCCN Bloomberg option-free price gap",
+      "description": "BHCCN Bloomberg option-free price and workout-yield DV01 convention gaps",
       "metrics": [
         {
           "metric": "embedded_option_value",
           "reason": "The residual is in the option-free leg, not the call valuation: about half comes from interpolating the S23 curve between its 5Y and 7Y pillars (flat-forward here, linear in yield reproduces Bloomberg's reported spread), the rest is not identified.",
           "evidence": "With the semiannual OAS added to each lattice rate and solved on the settlement dirty price, OAS is 4.7695% versus Bloomberg 4.771% and the option value is -19500.82 versus Bloomberg -19800.00 (1.5%). At Bloomberg's OAS the callable bond prices at 103.392 versus the 103.3975 market, and the option-free bond at 105.341 versus the 105.382 implied by Bloomberg's 8.815% option-free yield."
+        },
+        {
+          "metric": "dv01",
+          "reason": "VALUATIONS-BONDS-15 defines bond dv01 as direct curve-bump DV01 (OAS-pinned BDT tree curve shift for quoted callable bonds) and routes Bloomberg YAS yield-to-workout DV01 to yield_dv01. The Bloomberg YAS target and its tolerance are preserved.",
+          "evidence": "Finstack curve-bump tree dv01 is -382.8785 versus Bloomberg YAS workout DV01 -333.0 (unchanged tolerance USD 0.5), reflecting continuous-zero curve shifting and BDT extension risk beyond the 2030 workout call. Finstack yield_dv01 passes against -333.0 within tolerance."
+        }
+      ]
+    },
+    {
+      "path": "pricing/bloomberg/bond/ibm_eur_2034_callable_bloomberg.json",
+      "description": "IBM EUR 2034 Bloomberg workout-yield DV01 versus curve-bump OAS-tree DV01",
+      "metrics": [
+        {
+          "metric": "dv01",
+          "reason": "VALUATIONS-BONDS-15 defines bond dv01 as direct curve-bump DV01 (OAS-pinned BDT tree curve shift for quoted callable bonds) and routes Bloomberg YAS yield-to-workout DV01 to yield_dv01. The Bloomberg YAS target and its tolerance are preserved.",
+          "evidence": "Finstack curve-bump tree dv01 is -671.8418 versus Bloomberg YAS workout DV01 -650.0 (unchanged tolerance EUR 0.5); continuous-zero shifting scales annual street yield DV01 by (1 + y) = 1.0383 to -674.9 before call dampening. Finstack yield_dv01 passes against -650.0 within tolerance."
+        }
+      ]
+    },
+    {
+      "path": "pricing/bloomberg/cds/cds_5y_par_spread.json",
+      "description": "Bloomberg CDSW clean Principal / Def Exposure versus Finstack dirty economic NPV",
+      "metrics": [
+        {
+          "metric": "npv",
+          "reason": "MODELS-AND-VALUATIONS-CREDIT-12 and CREDIT-13 define CDS economic NPV as dirty PV without adding back settlement accrued premium, whereas Bloomberg CDSW Principal is clean NPV (dirty PV plus accrued). The Bloomberg CDSW target and its tolerance are preserved.",
+          "evidence": "Finstack dirty npv is -194217.1276 versus Bloomberg CDSW Principal -181992.0 (diff -12225.13, unchanged tolerance USD 6). Adding back the 44-day inclusive ACT/360 accrued premium (2026-03-20 to 2026-05-02, 44/360 * 0.01 * 10MM = 12222.2222) gives clean NPV -181994.91, leaving a USD 2.91 residual inside the USD 6 tolerance."
+        },
+        {
+          "metric": "default_exposure",
+          "reason": "DefaultExposure computes signed LGD payout minus economic NPV (MODELS-AND-VALUATIONS-CREDIT-12/-13), so it inherits the exact clean-versus-dirty accrued convention shift relative to Bloomberg CDSW Def Exposure (LGD minus Principal). The Bloomberg target and its tolerance are preserved.",
+          "evidence": "Finstack default_exposure is 6194217.1276 (6000000 - (-194217.1276)) versus Bloomberg CDSW Def Exposure 6181992.0 (diff +12225.13, unchanged tolerance USD 6); subtracting the USD 12222.2222 accrued premium gives 6181994.91, leaving a USD 2.91 residual inside the USD 6 tolerance."
         }
       ]
     },

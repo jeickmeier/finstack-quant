@@ -594,7 +594,9 @@ impl finstack_quant_valuations_core::instruments::Instrument for BermudanSwaptio
     {
         let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.get_discount_curve_id().clone());
-        deps.add_forward_curve(self.get_forward_curve_id().clone());
+        if self.get_forward_curve_id() != self.get_discount_curve_id() {
+            deps.add_forward_curve(self.get_forward_curve_id().clone());
+        }
         deps.add_volatility_dependency(
             finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),

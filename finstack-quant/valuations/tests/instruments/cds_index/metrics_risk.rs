@@ -353,11 +353,24 @@ fn bucketed_cs01_quote_single_curve_uses_each_off_grid_replay_quote_once() {
         ],
     )
     .expect("off-grid index hazard calibration");
+    use finstack_quant_valuations::recalibration::RecalibrationProvider;
+    let replay_buckets =
+        finstack_quant_calibration::recalibration::CachedRecalibrationProvider::default()
+            .hazard_spread_risk_buckets(&hazard)
+            .expect("replayable index hazard buckets");
     let expected_count = hazard
         .hazard_calibration()
         .expect("replayable index hazard")
         .spread_risk_inputs()
         .len();
+    assert_eq!(replay_buckets.len(), expected_count);
+    let four_year_date = as_of + time::Duration::days(4 * 365);
+    let four_year_label = replay_buckets
+        .iter()
+        .find(|bucket| bucket.pillar_date == four_year_date)
+        .expect("off-grid 4 * 365-day index pillar must exist")
+        .get_metric_label(&replay_buckets);
+    assert_eq!(four_year_label, "49m");
     let market = source.try_insert(hazard).expect("insert market curve");
     let index = standard_single_curve_index("CDX-QUOTE-OFFGRID", as_of, end, 10_000_000.0);
 
@@ -382,11 +395,21 @@ fn bucketed_cs01_quote_single_curve_uses_each_off_grid_replay_quote_once() {
         expected_count,
         "each index replay quote must appear once: {buckets:?}"
     );
+    for replay_bucket in &replay_buckets {
+        let expected_key = format!(
+            "bucketed_cs01::HZ-INDEX::{}",
+            replay_bucket.get_metric_label(&replay_buckets)
+        );
+        assert!(
+            buckets.iter().any(|(key, _)| key.as_str() == expected_key),
+            "missing index replay bucket {expected_key}: {buckets:?}"
+        );
+    }
     assert!(
         buckets
             .iter()
-            .any(|(key, _)| key.as_str() == "bucketed_cs01::HZ-INDEX::4y"),
-        "off-grid 4Y index quote must be represented: {buckets:?}"
+            .any(|(key, _)| key.as_str() == "bucketed_cs01::HZ-INDEX::49m"),
+        "off-grid 4 * 365-day (49m Act/360) index quote must be represented: {buckets:?}"
     );
     relative_eq(
         bucket_sum,
@@ -434,11 +457,39 @@ fn bucketed_cs01_quote_constituents_use_each_off_grid_replay_quote_once() {
         ],
     )
     .expect("second off-grid constituent hazard calibration");
+    use finstack_quant_valuations::recalibration::RecalibrationProvider;
+    let provider =
+        finstack_quant_calibration::recalibration::CachedRecalibrationProvider::default();
+    let hz1_replay_buckets = provider
+        .hazard_spread_risk_buckets(&hz1)
+        .expect("first constituent replay buckets");
+    let hz2_replay_buckets = provider
+        .hazard_spread_risk_buckets(&hz2)
+        .expect("second constituent replay buckets");
     let expected_per_curve = hz1
         .hazard_calibration()
         .expect("replayable constituent hazard")
         .spread_risk_inputs()
         .len();
+    assert_eq!(hz1_replay_buckets.len(), expected_per_curve);
+    assert_eq!(hz2_replay_buckets.len(), expected_per_curve);
+    let four_year_date = as_of + time::Duration::days(4 * 365);
+    assert_eq!(
+        hz1_replay_buckets
+            .iter()
+            .find(|bucket| bucket.pillar_date == four_year_date)
+            .expect("HZ1 4 * 365-day replay pillar")
+            .get_metric_label(&hz1_replay_buckets),
+        "49m"
+    );
+    assert_eq!(
+        hz2_replay_buckets
+            .iter()
+            .find(|bucket| bucket.pillar_date == four_year_date)
+            .expect("HZ2 4 * 365-day replay pillar")
+            .get_metric_label(&hz2_replay_buckets),
+        "49m"
+    );
     let market = source
         .try_insert(hz1)
         .expect("insert market curve")
@@ -479,15 +530,39 @@ fn bucketed_cs01_quote_constituents_use_each_off_grid_replay_quote_once() {
 
     assert_eq!(hz1_buckets.len(), expected_per_curve);
     assert_eq!(hz2_buckets.len(), expected_per_curve);
+    for replay_bucket in &hz1_replay_buckets {
+        let expected_key = format!(
+            "bucketed_cs01::HZ1::{}",
+            replay_bucket.get_metric_label(&hz1_replay_buckets)
+        );
+        assert!(
+            hz1_buckets
+                .iter()
+                .any(|(key, _)| key.as_str() == expected_key),
+            "missing HZ1 replay bucket {expected_key}: {hz1_buckets:?}"
+        );
+    }
+    for replay_bucket in &hz2_replay_buckets {
+        let expected_key = format!(
+            "bucketed_cs01::HZ2::{}",
+            replay_bucket.get_metric_label(&hz2_replay_buckets)
+        );
+        assert!(
+            hz2_buckets
+                .iter()
+                .any(|(key, _)| key.as_str() == expected_key),
+            "missing HZ2 replay bucket {expected_key}: {hz2_buckets:?}"
+        );
+    }
     assert!(
         hz1_buckets
             .iter()
-            .any(|(key, _)| key.as_str() == "bucketed_cs01::HZ1::4y")
+            .any(|(key, _)| key.as_str() == "bucketed_cs01::HZ1::49m")
     );
     assert!(
         hz2_buckets
             .iter()
-            .any(|(key, _)| key.as_str() == "bucketed_cs01::HZ2::4y")
+            .any(|(key, _)| key.as_str() == "bucketed_cs01::HZ2::49m")
     );
     relative_eq(
         bucket_sum,
