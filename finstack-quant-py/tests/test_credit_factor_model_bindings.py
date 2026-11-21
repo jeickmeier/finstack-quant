@@ -547,3 +547,31 @@ def test_factor_covariance_dataframe_validates_labels_and_matrix_values() -> Non
     indefinite = pd.DataFrame([[0.04, 0.05], [0.05, 0.01]], index=ids, columns=ids)
     with pytest.raises(ValueError, match="positive semi-definite"):
         FactorCovarianceMatrix.from_dataframe(indefinite)
+
+
+def test_credit_calibrator_repr_names_struct_variants() -> None:
+    cal = CreditCalibrator({
+        "policy": {"dynamic": {"min_history": 12, "overrides": {}}},
+        "hierarchy": {"levels": []},
+        "vol_model": {"ewma": {"lambda": 0.94}},
+        "covariance_strategy": {"ridge": {"alpha": 1.0}},
+        "bucket_weighting": "equal",
+    })
+    rendered = repr(cal)
+    assert 'policy="dynamic"' in rendered
+    assert 'vol_model="ewma"' in rendered
+    assert 'covariance_strategy="ridge"' in rendered
+    assert 'bucket_weighting="equal"' in rendered
+
+
+def test_factor_covariance_from_dataframe_propagates_square_table_errors() -> None:
+    import polars as pl
+    import pyarrow as pa
+
+    bad_polars = pl.DataFrame({"rates": [0.04, 0.0], "credit": ["bad", "data"]})
+    with pytest.raises((ValueError, TypeError)):
+        FactorCovarianceMatrix.from_dataframe(bad_polars)
+
+    bad_arrow = pa.table({"rates": [0.04, 0.0], "credit": ["bad", "data"]})
+    with pytest.raises((ValueError, TypeError)):
+        FactorCovarianceMatrix.from_dataframe(bad_arrow)

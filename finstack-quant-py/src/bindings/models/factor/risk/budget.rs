@@ -1,11 +1,32 @@
 use super::contributions::PyPositionRiskDecomposition;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
+use crate::bindings::pydoc::pydoc;
+use crate::bindings::repr_support::repr_from_serde;
 use crate::bindings::table_builders::TableBuilder;
+use crate::errors::core_to_py;
 use finstack_quant_factor::risk::{self as model_risk, PositionBudgetEntry, RiskBudgetResult};
 use pyo3::prelude::*;
 
-/// Per-position budget comparison entry.
+fn position_budget_entries_table(rows: &[PositionBudgetEntry]) -> PyResult<PyArrowTable> {
+    let position_ids: Vec<String> = rows
+        .iter()
+        .map(|e| e.position_id.as_str().to_owned())
+        .collect();
+    let actual: Vec<f64> = rows.iter().map(|e| e.actual_component_var).collect();
+    let target: Vec<f64> = rows.iter().map(|e| e.target_component_var).collect();
+    let utilization: Vec<f64> = rows.iter().map(|e| e.utilization).collect();
+    let excess: Vec<f64> = rows.iter().map(|e| e.excess).collect();
+    TableBuilder::new()
+        .utf8("position_id", position_ids)?
+        .f64("actual_component_var", actual)?
+        .f64("target_component_var", target)?
+        .f64("utilization", utilization)?
+        .f64("excess", excess)?
+        .build()
+}
+
+#[doc = pydoc!("finstack_quant.models.factor.risk._budget", "PositionBudgetEntry")]
 #[pyclass(
     name = "PositionBudgetEntry",
     module = "finstack_quant.models.factor.risk",
@@ -26,86 +47,44 @@ impl PyPositionBudgetEntry {
 wire_methods!(
     PyPositionBudgetEntry,
     PositionBudgetEntry,
-    "PositionBudgetEntry"
+    "PositionBudgetEntry",
+    module = "finstack_quant.models.factor.risk._budget"
 );
+
+py_getters!(PyPositionBudgetEntry |s| {
+    #[doc = pydoc!("finstack_quant.models.factor.risk._budget", "PositionBudgetEntry.position_id")]
+    position_id -> String = s.inner.position_id.as_str().to_owned();
+    #[doc = pydoc!("finstack_quant.models.factor.risk._budget", "PositionBudgetEntry.actual_component_var")]
+    actual_component_var -> f64 = s.inner.actual_component_var;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._budget", "PositionBudgetEntry.target_component_var")]
+    target_component_var -> f64 = s.inner.target_component_var;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._budget", "PositionBudgetEntry.utilization")]
+    utilization -> f64 = s.inner.utilization;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._budget", "PositionBudgetEntry.excess")]
+    excess -> f64 = s.inner.excess;
+});
 
 #[pymethods]
 impl PyPositionBudgetEntry {
-    /// Portfolio position identifier.
-    #[getter]
-    fn position_id(&self) -> String {
-        self.inner.position_id.as_str().to_owned()
-    }
-
-    /// Realized component VaR for this position, taken from the decomposition
-    /// (portfolio currency, loss convention).
-    #[getter]
-    fn actual_component_var(&self) -> f64 {
-        self.inner.actual_component_var
-    }
-
-    /// Budgeted component VaR for this position, in the same units as
-    /// :attr:`actual_component_var`.
-    #[getter]
-    fn target_component_var(&self) -> f64 {
-        self.inner.target_component_var
-    }
-
-    /// Utilization ratio ``actual / target``.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     A **ratio**, not a percentage: ``1.0`` is exactly on budget, above
-    ///     ``1.0`` uses more risk than budgeted, below ``1.0`` leaves budget
-    ///     unused.
-    #[getter]
-    fn utilization(&self) -> f64 {
-        self.inner.utilization
-    }
-
-    /// Over/under-budget amount ``actual - target``; positive means over budget.
-    #[getter]
-    fn excess(&self) -> f64 {
-        self.inner.excess
-    }
-
+    #[doc = pydoc!("finstack_quant.models.factor.risk._budget", "PositionBudgetEntry.__repr__")]
     fn __repr__(&self) -> String {
-        format!(
-            "PositionBudgetEntry(position_id={:?}, actual={}, target={}, utilization={}, excess={})",
-            self.inner.position_id.as_str(),
-            self.inner.actual_component_var,
-            self.inner.target_component_var,
-            self.inner.utilization,
-            self.inner.excess,
-        )
+        repr_from_serde("PositionBudgetEntry", &self.inner)
     }
 }
 
 impl PyPositionBudgetEntry {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
-        TableBuilder::new()
-            .utf8(
-                "position_id",
-                vec![self.inner.position_id.as_str().to_owned()],
-            )?
-            .f64(
-                "actual_component_var",
-                vec![self.inner.actual_component_var],
-            )?
-            .f64(
-                "target_component_var",
-                vec![self.inner.target_component_var],
-            )?
-            .f64("utilization", vec![self.inner.utilization])?
-            .f64("excess", vec![self.inner.excess])?
-            .build()
+        position_budget_entries_table(std::slice::from_ref(&self.inner))
     }
 }
 
-tabular_methods!(PyPositionBudgetEntry);
+tabular_methods!(
+    PyPositionBudgetEntry,
+    "PositionBudgetEntry",
+    module = "finstack_quant.models.factor.risk._budget"
+);
 
-/// Budget evaluation result across positions.
+#[doc = pydoc!("finstack_quant.models.factor.risk._budget", "RiskBudgetResult")]
 #[pyclass(
     name = "RiskBudgetResult",
     module = "finstack_quant.models.factor.risk",
@@ -123,33 +102,31 @@ impl PyRiskBudgetResult {
     }
 }
 
-wire_methods!(PyRiskBudgetResult, RiskBudgetResult, "RiskBudgetResult");
+wire_methods!(
+    PyRiskBudgetResult,
+    RiskBudgetResult,
+    "RiskBudgetResult",
+    module = "finstack_quant.models.factor.risk._budget"
+);
+
+py_getters!(PyRiskBudgetResult |s| {
+    #[doc = pydoc!("finstack_quant.models.factor.risk._budget", "RiskBudgetResult.total_overbudget")]
+    total_overbudget -> f64 = s.inner.total_overbudget;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._budget", "RiskBudgetResult.has_breach")]
+    has_breach -> bool = s.inner.has_breach;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._budget", "RiskBudgetResult.positions")]
+    positions -> Vec<PyPositionBudgetEntry> = s
+        .inner
+        .positions
+        .iter()
+        .cloned()
+        .map(PyPositionBudgetEntry::from_inner)
+        .collect();
+});
 
 #[pymethods]
 impl PyRiskBudgetResult {
-    /// Total absolute over-budget amount summed across exceeding positions.
-    #[getter]
-    fn total_overbudget(&self) -> f64 {
-        self.inner.total_overbudget
-    }
-
-    /// Whether any position exceeds the configured utilization threshold.
-    #[getter]
-    fn has_breach(&self) -> bool {
-        self.inner.has_breach
-    }
-
-    /// Per-position budget comparison entries.
-    #[getter]
-    fn positions(&self) -> Vec<PyPositionBudgetEntry> {
-        self.inner
-            .positions
-            .iter()
-            .cloned()
-            .map(PyPositionBudgetEntry::from_inner)
-            .collect()
-    }
-
+    #[doc = pydoc!("finstack_quant.models.factor.risk._budget", "RiskBudgetResult.__repr__")]
     fn __repr__(&self) -> String {
         format!(
             "RiskBudgetResult(positions={}, total_overbudget={}, has_breach={})",
@@ -166,51 +143,17 @@ impl PyRiskBudgetResult {
 
 impl PyRiskBudgetResult {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
-        let rows = &self.inner.positions;
-        let position_ids: Vec<String> = rows
-            .iter()
-            .map(|e| e.position_id.as_str().to_owned())
-            .collect();
-        let actual: Vec<f64> = rows.iter().map(|e| e.actual_component_var).collect();
-        let target: Vec<f64> = rows.iter().map(|e| e.target_component_var).collect();
-        let utilization: Vec<f64> = rows.iter().map(|e| e.utilization).collect();
-        let excess: Vec<f64> = rows.iter().map(|e| e.excess).collect();
-        TableBuilder::new()
-            .utf8("position_id", position_ids)?
-            .f64("actual_component_var", actual)?
-            .f64("target_component_var", target)?
-            .f64("utilization", utilization)?
-            .f64("excess", excess)?
-            .build()
+        position_budget_entries_table(&self.inner.positions)
     }
 }
 
-tabular_methods!(PyRiskBudgetResult);
+tabular_methods!(
+    PyRiskBudgetResult,
+    "RiskBudgetResult",
+    module = "finstack_quant.models.factor.risk._budget"
+);
 
-/// Evaluate a per-position risk budget against actual component VaRs,
-/// returning a typed ``RiskBudgetResult``.
-///
-/// Args:
-///     position_ids: Position identifiers aligned with ``actual_var`` and
-///         ``target_var_pct``; duplicates are rejected.
-///     actual_var: Realized component VaR per position (portfolio currency,
-///         loss convention).
-///     target_var_pct: Target share of portfolio VaR per position, as
-///         fractions that sum to one.
-///     portfolio_var: Portfolio VaR whose magnitude scales each target share
-///         into a target component VaR.
-///     utilization_threshold: Ratio ``actual / target`` above which a position
-///         is flagged as breaching; defaults to ``DEFAULT_UTILIZATION_THRESHOLD``
-///         (``1.2``).
-///
-/// Returns:
-///     ``RiskBudgetResult`` with per-position utilization and excess, the
-///     total over-budget amount, and a ``has_breach`` flag.
-///
-/// Raises:
-///     ValueError: If array lengths differ, a position id is duplicated,
-///         non-empty target shares do not sum to one, or a non-zero component
-///         is paired with a zero ``portfolio_var``.
+#[doc = pydoc!("finstack_quant.models.factor.risk._budget", "evaluate_risk_budget")]
 #[pyfunction]
 #[pyo3(signature = (position_ids, actual_var, target_var_pct, portfolio_var, utilization_threshold = finstack_quant_factor::risk::DEFAULT_UTILIZATION_THRESHOLD))]
 pub(super) fn evaluate_risk_budget(
@@ -231,12 +174,12 @@ pub(super) fn evaluate_risk_budget(
                 utilization_threshold,
             )
         })
-        .map_err(crate::errors::core_to_py)?;
+        .map_err(core_to_py)?;
 
     Ok(PyRiskBudgetResult::from_inner(result))
 }
 
-#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.models.factor.risk._budget", "evaluate_risk_budget_from_decomposition")]
+#[doc = pydoc!("finstack_quant.models.factor.risk._budget", "evaluate_risk_budget_from_decomposition")]
 #[pyfunction]
 #[pyo3(signature = (decomp, target_var_pct, utilization_threshold = None))]
 pub(super) fn evaluate_risk_budget_from_decomposition(
@@ -250,7 +193,7 @@ pub(super) fn evaluate_risk_budget_from_decomposition(
         utilization_threshold,
     )
     .map(PyRiskBudgetResult::from_inner)
-    .map_err(crate::errors::core_to_py)
+    .map_err(core_to_py)
 }
 
 // The literal default below must stay equal to the Rust canonical constant so

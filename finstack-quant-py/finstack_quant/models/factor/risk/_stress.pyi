@@ -72,6 +72,21 @@ class StressPositionEntry:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Serialize through canonical JSON for Python pickling.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reducer tuple ``(from_json, (json,))`` used by :mod:`pickle`.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+        ...
+
     @property
     def position_id(self) -> str:
         """
@@ -276,6 +291,21 @@ class TailScenarioBreakdown:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Serialize through canonical JSON for Python pickling.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reducer tuple ``(from_json, (json,))`` used by :mod:`pickle`.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+        ...
+
     @property
     def scenario_index(self) -> int:
         """
@@ -318,7 +348,7 @@ class TailScenarioBreakdown:
         Returns
         -------
         list[float]
-            Per-position P&L for this scenario, index-aligned to
+            Position P&L for this scenario, index-aligned to ``StressAttribution.position_ids``.
 
         Notes
         -----
@@ -526,6 +556,21 @@ class StressAttribution:
         -------
         str
             Canonical JSON representation of this `StressAttribution`, suitable for a matching `from_json` call.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Serialize through canonical JSON for Python pickling.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reducer tuple ``(from_json, (json,))`` used by :mod:`pickle`.
 
         Raises
         ------

@@ -10,7 +10,7 @@ use finstack_quant_factor::{FactorId, FactorModelConfig};
 use finstack_quant_portfolio::factor_model::FactorModel;
 
 use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref};
-use crate::bindings::models::factor::credit::PyFactorModelConfig;
+use crate::bindings::models::factor::config::PyFactorModelConfig;
 use crate::bindings::portfolio::sensitivity::PySensitivityMatrix;
 use crate::errors::{portfolio_to_py, serde_json_to_py};
 

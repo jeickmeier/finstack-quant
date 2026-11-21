@@ -5,7 +5,7 @@ use finstack_quant_factor::{RiskMeasure, risk as model_risk};
 use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, value_error};
 
-use super::super::credit::PyFactorCovarianceMatrix;
+use super::super::config::PyFactorCovarianceMatrix;
 use super::contributions::{PyPositionRiskDecomposition, PyRiskDecomposition};
 use crate::bindings::matrix_input::{PositionPnlMatrix, extract_position_pnls};
 use crate::bindings::module_utils::py_to_serde;
@@ -114,15 +114,7 @@ pub(super) fn extract_pnl_input(
     Ok((ids, matrix))
 }
 
-/// Look up a position by id inside a ``PositionRiskDecomposition`` and
-/// return its component VaR.
-///
-/// Args:
-///     decomp: Decomposition to search.
-///     position_id: Position identifier.
-///
-/// Raises:
-///     KeyError: If ``position_id`` is not in the decomposition.
+#[doc = pydoc!("finstack_quant.models.factor.risk._functions", "position_component_var")]
 #[pyfunction]
 #[pyo3(signature = (decomp, position_id))]
 pub(super) fn position_component_var(
@@ -132,29 +124,7 @@ pub(super) fn position_component_var(
     decomp.inner.component_var(position_id).map_err(core_to_py)
 }
 
-/// Decompose portfolio risk into factor and position contributions.
-///
-/// Uses the parametric (covariance-based) Euler decomposition to attribute
-/// forecasted portfolio risk across factors and individual positions.
-///
-/// Args:
-///     sensitivities: Weighted position x factor ``SensitivityMatrix``, as
-///         returned by ``finstack_quant.portfolio.compute_factor_sensitivities``.
-///     covariance: ``FactorCovarianceMatrix`` or its wire representation. Must use the
-///         same factor IDs and ordering as the sensitivity matrix.
-///     risk_measure: Typed ``RiskMeasure`` or its wire value: ``"variance"``,
-///         ``"volatility"``, ``{"var": {"confidence": 0.99}}`` or
-///         ``{"expected_shortfall": {"confidence": 0.975}}``. ``None`` uses
-///         the Rust default (``"variance"``).
-///
-/// Returns:
-///     ``RiskDecomposition`` with portfolio-level risk and factor and
-///     position detail.
-///
-/// Raises:
-///     ValueError: If the covariance or risk measure is malformed, the factor
-///         axes of the sensitivities and covariance disagree, or the
-///         decomposition produces a non-finite value.
+#[doc = pydoc!("finstack_quant.models.factor.risk._functions", "decompose_factors")]
 #[pyfunction]
 #[pyo3(signature = (sensitivities, covariance, risk_measure=None))]
 pub(super) fn decompose_factors(

@@ -1,8 +1,11 @@
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::json_bridge::serde_to_py;
-use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
+use crate::bindings::pydoc::pydoc;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::bindings::table_builders::TableBuilder;
+use crate::errors::core_to_py;
+use finstack_quant_core::wire::serde_label;
 use finstack_quant_factor::risk::{
     FactorContribution, PositionEsContribution, PositionFactorContribution,
     PositionResidualContribution, PositionRiskDecomposition, PositionVarContribution,
@@ -10,11 +13,6 @@ use finstack_quant_factor::risk::{
 };
 use pyo3::prelude::*;
 use std::collections::HashMap;
-
-/// Python-style rendering of an optional float (`None` or the number).
-fn py_opt(value: Option<f64>) -> String {
-    value.map_or_else(|| "None".to_owned(), |v| v.to_string())
-}
 
 /// Source kind label and issuer id of a residual contribution.
 fn residual_source_parts(source: &ResidualContributionSource) -> (&'static str, Option<&str>) {
@@ -26,7 +24,65 @@ fn residual_source_parts(source: &ResidualContributionSource) -> (&'static str, 
     }
 }
 
-/// Aggregate contribution of a single factor to portfolio risk.
+fn factor_contributions_table(rows: &[FactorContribution]) -> PyResult<PyArrowTable> {
+    let factor_ids: Vec<String> = rows
+        .iter()
+        .map(|c| c.factor_id.as_str().to_owned())
+        .collect();
+    let absolute_risks: Vec<f64> = rows.iter().map(|c| c.absolute_risk).collect();
+    let relative_risks: Vec<f64> = rows.iter().map(|c| c.relative_risk).collect();
+    let marginal_risks: Vec<f64> = rows.iter().map(|c| c.marginal_risk).collect();
+    TableBuilder::new()
+        .utf8("factor_id", factor_ids)?
+        .f64("absolute_risk", absolute_risks)?
+        .f64("relative_risk", relative_risks)?
+        .f64("marginal_risk", marginal_risks)?
+        .build()
+}
+
+fn position_factor_contributions_table(
+    rows: &[PositionFactorContribution],
+) -> PyResult<PyArrowTable> {
+    let position_ids: Vec<String> = rows
+        .iter()
+        .map(|c| c.position_id.as_str().to_owned())
+        .collect();
+    let factor_ids: Vec<String> = rows
+        .iter()
+        .map(|c| c.factor_id.as_str().to_owned())
+        .collect();
+    let risk_contributions: Vec<f64> = rows.iter().map(|c| c.risk_contribution).collect();
+    TableBuilder::new()
+        .utf8("position_id", position_ids)?
+        .utf8("factor_id", factor_ids)?
+        .f64("risk_contribution", risk_contributions)?
+        .build()
+}
+
+fn position_residual_contributions_table(
+    rows: &[PositionResidualContribution],
+) -> PyResult<PyArrowTable> {
+    let position_ids: Vec<String> = rows
+        .iter()
+        .map(|c| c.position_id.as_str().to_owned())
+        .collect();
+    let residual_variances: Vec<f64> = rows.iter().map(|c| c.residual_variance).collect();
+    let (source_kinds, source_issuer_ids): (Vec<String>, Vec<Option<String>>) = rows
+        .iter()
+        .map(|c| {
+            let (kind, issuer) = residual_source_parts(&c.source);
+            (kind.to_owned(), issuer.map(str::to_owned))
+        })
+        .unzip();
+    TableBuilder::new()
+        .utf8("position_id", position_ids)?
+        .f64("residual_variance", residual_variances)?
+        .utf8("source_kind", source_kinds)?
+        .nullable_utf8("source_issuer_id", source_issuer_ids)?
+        .build()
+}
+
+#[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "FactorContribution")]
 #[pyclass(
     name = "FactorContribution",
     module = "finstack_quant.models.factor.risk",
@@ -47,38 +103,24 @@ impl PyFactorContribution {
 wire_methods!(
     PyFactorContribution,
     FactorContribution,
-    "FactorContribution"
+    "FactorContribution",
+    module = "finstack_quant.models.factor.risk._contributions"
 );
+
+py_getters!(PyFactorContribution |s| {
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "FactorContribution.factor_id")]
+    factor_id -> String = s.inner.factor_id.as_str().to_owned();
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "FactorContribution.absolute_risk")]
+    absolute_risk -> f64 = s.inner.absolute_risk;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "FactorContribution.relative_risk")]
+    relative_risk -> f64 = s.inner.relative_risk;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "FactorContribution.marginal_risk")]
+    marginal_risk -> f64 = s.inner.marginal_risk;
+});
 
 #[pymethods]
 impl PyFactorContribution {
-    /// Identifier of the factor being reported.
-    #[getter]
-    fn factor_id(&self) -> String {
-        self.inner.factor_id.as_str().to_owned()
-    }
-
-    /// Absolute contribution of the factor, in the units of the decomposition's
-    /// risk measure. Sign follows the measure's convention.
-    #[getter]
-    fn absolute_risk(&self) -> f64 {
-        self.inner.absolute_risk
-    }
-
-    /// Contribution as a dimensionless **fraction** (not a percentage) of total
-    /// portfolio risk; non-negative for a standard long-risk portfolio.
-    #[getter]
-    fn relative_risk(&self) -> f64 {
-        self.inner.relative_risk
-    }
-
-    /// Marginal sensitivity of portfolio risk to this factor, same sign
-    /// convention as :attr:`absolute_risk`.
-    #[getter]
-    fn marginal_risk(&self) -> f64 {
-        self.inner.marginal_risk
-    }
-
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "FactorContribution.__repr__")]
     fn __repr__(&self) -> String {
         repr_from_serde("FactorContribution", &self.inner)
     }
@@ -86,18 +128,17 @@ impl PyFactorContribution {
 
 impl PyFactorContribution {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
-        TableBuilder::new()
-            .utf8("factor_id", vec![self.inner.factor_id.as_str().to_owned()])?
-            .f64("absolute_risk", vec![self.inner.absolute_risk])?
-            .f64("relative_risk", vec![self.inner.relative_risk])?
-            .f64("marginal_risk", vec![self.inner.marginal_risk])?
-            .build()
+        factor_contributions_table(std::slice::from_ref(&self.inner))
     }
 }
 
-tabular_methods!(PyFactorContribution);
+tabular_methods!(
+    PyFactorContribution,
+    "FactorContribution",
+    module = "finstack_quant.models.factor.risk._contributions"
+);
 
-/// Per-position contribution to a specific factor bucket.
+#[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionFactorContribution")]
 #[pyclass(
     name = "PositionFactorContribution",
     module = "finstack_quant.models.factor.risk",
@@ -118,30 +159,22 @@ impl PyPositionFactorContribution {
 wire_methods!(
     PyPositionFactorContribution,
     PositionFactorContribution,
-    "PositionFactorContribution"
+    "PositionFactorContribution",
+    module = "finstack_quant.models.factor.risk._contributions"
 );
+
+py_getters!(PyPositionFactorContribution |s| {
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionFactorContribution.position_id")]
+    position_id -> String = s.inner.position_id.as_str().to_owned();
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionFactorContribution.factor_id")]
+    factor_id -> String = s.inner.factor_id.as_str().to_owned();
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionFactorContribution.risk_contribution")]
+    risk_contribution -> f64 = s.inner.risk_contribution;
+});
 
 #[pymethods]
 impl PyPositionFactorContribution {
-    /// Portfolio position identifier.
-    #[getter]
-    fn position_id(&self) -> String {
-        self.inner.position_id.as_str().to_owned()
-    }
-
-    /// Identifier of the contributing factor.
-    #[getter]
-    fn factor_id(&self) -> String {
-        self.inner.factor_id.as_str().to_owned()
-    }
-
-    /// Risk attributed to this position-factor pair, in the units of the
-    /// decomposition's risk measure.
-    #[getter]
-    fn risk_contribution(&self) -> f64 {
-        self.inner.risk_contribution
-    }
-
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionFactorContribution.__repr__")]
     fn __repr__(&self) -> String {
         repr_from_serde("PositionFactorContribution", &self.inner)
     }
@@ -149,20 +182,17 @@ impl PyPositionFactorContribution {
 
 impl PyPositionFactorContribution {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
-        TableBuilder::new()
-            .utf8(
-                "position_id",
-                vec![self.inner.position_id.as_str().to_owned()],
-            )?
-            .utf8("factor_id", vec![self.inner.factor_id.as_str().to_owned()])?
-            .f64("risk_contribution", vec![self.inner.risk_contribution])?
-            .build()
+        position_factor_contributions_table(std::slice::from_ref(&self.inner))
     }
 }
 
-tabular_methods!(PyPositionFactorContribution);
+tabular_methods!(
+    PyPositionFactorContribution,
+    "PositionFactorContribution",
+    module = "finstack_quant.models.factor.risk._contributions"
+);
 
-/// Annualized residual variance contributed by a single position.
+#[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionResidualContribution")]
 #[pyclass(
     name = "PositionResidualContribution",
     module = "finstack_quant.models.factor.risk",
@@ -183,68 +213,42 @@ impl PyPositionResidualContribution {
 wire_methods!(
     PyPositionResidualContribution,
     PositionResidualContribution,
-    "PositionResidualContribution"
+    "PositionResidualContribution",
+    module = "finstack_quant.models.factor.risk._contributions"
 );
+
+py_getters!(PyPositionResidualContribution |s| {
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionResidualContribution.position_id")]
+    position_id -> String = s.inner.position_id.as_str().to_owned();
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionResidualContribution.residual_variance")]
+    residual_variance -> f64 = s.inner.residual_variance;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionResidualContribution.source_kind")]
+    source_kind -> &'static str = residual_source_parts(&s.inner.source).0;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionResidualContribution.source_issuer_id")]
+    source_issuer_id -> Option<String> = residual_source_parts(&s.inner.source).1.map(str::to_owned);
+});
 
 #[pymethods]
 impl PyPositionResidualContribution {
-    /// Portfolio position identifier.
-    #[getter]
-    fn position_id(&self) -> String {
-        self.inner.position_id.as_str().to_owned()
-    }
-
-    /// Annualized **variance** (not volatility) contributed by this position's
-    /// idiosyncratic risk. Always non-negative; take the square root only after
-    /// summing the subset of interest.
-    #[getter]
-    fn residual_variance(&self) -> f64 {
-        self.inner.residual_variance
-    }
-
-    /// Source kind: ``"from_credit_model"`` or ``"other"``.
-    #[getter]
-    fn source_kind(&self) -> &'static str {
-        residual_source_parts(&self.inner.source).0
-    }
-
-    /// Issuer ID when ``source_kind == "from_credit_model"``, ``None`` otherwise.
-    #[getter]
-    fn source_issuer_id(&self) -> Option<String> {
-        residual_source_parts(&self.inner.source)
-            .1
-            .map(str::to_owned)
-    }
-
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionResidualContribution.__repr__")]
     fn __repr__(&self) -> String {
-        format!(
-            "PositionResidualContribution(position_id={:?}, residual_variance={}, source_kind={:?}, source_issuer_id={})",
-            self.inner.position_id.as_str(),
-            self.inner.residual_variance,
-            self.source_kind(),
-            self.source_issuer_id()
-                .map_or_else(|| "None".to_owned(), |id| format!("{id:?}")),
-        )
+        repr_from_serde("PositionResidualContribution", &self.inner)
     }
 }
 
 impl PyPositionResidualContribution {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
-        TableBuilder::new()
-            .utf8(
-                "position_id",
-                vec![self.inner.position_id.as_str().to_owned()],
-            )?
-            .f64("residual_variance", vec![self.inner.residual_variance])?
-            .utf8("source_kind", vec![self.source_kind().to_owned()])?
-            .nullable_utf8("source_issuer_id", vec![self.source_issuer_id()])?
-            .build()
+        position_residual_contributions_table(std::slice::from_ref(&self.inner))
     }
 }
 
-tabular_methods!(PyPositionResidualContribution);
+tabular_methods!(
+    PyPositionResidualContribution,
+    "PositionResidualContribution",
+    module = "finstack_quant.models.factor.risk._contributions"
+);
 
-/// Portfolio-level decomposition of total risk across common factors and residuals.
+#[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "RiskDecomposition")]
 #[pyclass(
     name = "RiskDecomposition",
     module = "finstack_quant.models.factor.risk",
@@ -262,154 +266,71 @@ impl PyRiskDecomposition {
     }
 }
 
-wire_methods!(PyRiskDecomposition, RiskDecomposition, "RiskDecomposition");
+wire_methods!(
+    PyRiskDecomposition,
+    RiskDecomposition,
+    "RiskDecomposition",
+    module = "finstack_quant.models.factor.risk._contributions"
+);
+
+py_getters!(PyRiskDecomposition |s| {
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "RiskDecomposition.total_risk")]
+    total_risk -> f64 = s.inner.total_risk;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "RiskDecomposition.residual_risk")]
+    residual_risk -> f64 = s.inner.residual_risk;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "RiskDecomposition.factor_contributions")]
+    factor_contributions -> Vec<PyFactorContribution> = s
+        .inner
+        .factor_contributions
+        .iter()
+        .cloned()
+        .map(PyFactorContribution::from_inner)
+        .collect();
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "RiskDecomposition.position_factor_contributions")]
+    position_factor_contributions -> Vec<PyPositionFactorContribution> = s
+        .inner
+        .position_factor_contributions
+        .iter()
+        .cloned()
+        .map(PyPositionFactorContribution::from_inner)
+        .collect();
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "RiskDecomposition.position_residual_contributions")]
+    position_residual_contributions -> Vec<PyPositionResidualContribution> = s
+        .inner
+        .position_residual_contributions
+        .iter()
+        .cloned()
+        .map(PyPositionResidualContribution::from_inner)
+        .collect();
+});
 
 #[pymethods]
 impl PyRiskDecomposition {
-    /// Total portfolio risk under the selected measure.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Value in the units of :attr:`measure` (variance units for
-    ///     ``"variance"``, return units for ``"volatility"``/VaR/ES). Sign
-    ///     follows the measure's convention.
-    #[getter]
-    fn total_risk(&self) -> f64 {
-        self.inner.total_risk
-    }
-
-    /// Risk measure used for aggregation, as its canonical Python value:
-    /// ``"variance"``, ``"volatility"``, ``{"var": {"confidence": c}}`` or
-    /// ``{"expected_shortfall": {"confidence": c}}`` — the same shape as
-    /// ``FactorModelConfig.risk_measure``.
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "RiskDecomposition.measure")]
     #[getter]
     fn measure<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.measure)
     }
 
-    /// Unattributed (idiosyncratic) risk left after factor aggregation, in the
-    /// same units and sign convention as :attr:`total_risk`.
-    #[getter]
-    fn residual_risk(&self) -> f64 {
-        self.inner.residual_risk
-    }
-
-    /// Aggregate factor-level contributions to portfolio risk.
-    #[getter]
-    fn factor_contributions(&self) -> Vec<PyFactorContribution> {
-        self.inner
-            .factor_contributions
-            .iter()
-            .cloned()
-            .map(PyFactorContribution::from_inner)
-            .collect()
-    }
-
-    /// Per-position, per-factor contributions that roll up into the portfolio view.
-    #[getter]
-    fn position_factor_contributions(&self) -> Vec<PyPositionFactorContribution> {
-        self.inner
-            .position_factor_contributions
-            .iter()
-            .cloned()
-            .map(PyPositionFactorContribution::from_inner)
-            .collect()
-    }
-
-    /// Per-position residual (idiosyncratic) variance contributions.
-    ///
-    /// Returns
-    /// -------
-    /// list[PositionResidualContribution]
-    ///     Empty unless the decomposer had per-issuer idiosyncratic vol
-    ///     estimates (credit-aware position decomposers).
-    #[getter]
-    fn position_residual_contributions(&self) -> Vec<PyPositionResidualContribution> {
-        self.inner
-            .position_residual_contributions
-            .iter()
-            .cloned()
-            .map(PyPositionResidualContribution::from_inner)
-            .collect()
-    }
-
-    /// Export factor contributions as an ``ArrowTable``.
-    ///
-    /// Columns: ``factor_id``, ``absolute_risk``, ``relative_risk``,
-    /// ``marginal_risk``.
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "RiskDecomposition.to_factor_table")]
     #[pyo3(text_signature = "($self)")]
     fn to_factor_table(&self) -> PyResult<PyArrowTable> {
-        let rows = &self.inner.factor_contributions;
-        let factor_ids: Vec<String> = rows
-            .iter()
-            .map(|c| c.factor_id.as_str().to_owned())
-            .collect();
-        let absolute_risks: Vec<f64> = rows.iter().map(|c| c.absolute_risk).collect();
-        let relative_risks: Vec<f64> = rows.iter().map(|c| c.relative_risk).collect();
-        let marginal_risks: Vec<f64> = rows.iter().map(|c| c.marginal_risk).collect();
-        TableBuilder::new()
-            .utf8("factor_id", factor_ids)?
-            .f64("absolute_risk", absolute_risks)?
-            .f64("relative_risk", relative_risks)?
-            .f64("marginal_risk", marginal_risks)?
-            .build()
+        factor_contributions_table(&self.inner.factor_contributions)
     }
 
-    /// Export position × factor contributions as an ``ArrowTable``.
-    ///
-    /// Columns: ``position_id``, ``factor_id``, ``risk_contribution``.
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "RiskDecomposition.to_position_factor_table")]
     #[pyo3(text_signature = "($self)")]
     fn to_position_factor_table(&self) -> PyResult<PyArrowTable> {
-        let rows = &self.inner.position_factor_contributions;
-        let position_ids: Vec<String> = rows
-            .iter()
-            .map(|c| c.position_id.as_str().to_owned())
-            .collect();
-        let factor_ids: Vec<String> = rows
-            .iter()
-            .map(|c| c.factor_id.as_str().to_owned())
-            .collect();
-        let risk_contributions: Vec<f64> = rows.iter().map(|c| c.risk_contribution).collect();
-        TableBuilder::new()
-            .utf8("position_id", position_ids)?
-            .utf8("factor_id", factor_ids)?
-            .f64("risk_contribution", risk_contributions)?
-            .build()
+        position_factor_contributions_table(&self.inner.position_factor_contributions)
     }
 
-    /// Export per-position residual variance contributions as an ``ArrowTable``.
-    ///
-    /// Columns: ``position_id``, ``residual_variance`` (annualized variance,
-    /// non-negative), ``source_kind`` (``"from_credit_model"`` or ``"other"``),
-    /// ``source_issuer_id`` (``None`` unless ``source_kind`` is
-    /// ``"from_credit_model"``).
-    ///
-    /// The table has zero rows — with the columns still present — when the
-    /// decomposer produced no position-level residual allocation.
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "RiskDecomposition.to_position_residual_table")]
     #[pyo3(text_signature = "($self)")]
     fn to_position_residual_table(&self) -> PyResult<PyArrowTable> {
-        let rows = &self.inner.position_residual_contributions;
-        let position_ids: Vec<String> = rows
-            .iter()
-            .map(|c| c.position_id.as_str().to_owned())
-            .collect();
-        let residual_variances: Vec<f64> = rows.iter().map(|c| c.residual_variance).collect();
-        let (source_kinds, source_issuer_ids): (Vec<String>, Vec<Option<String>>) = rows
-            .iter()
-            .map(|c| {
-                let (kind, issuer) = residual_source_parts(&c.source);
-                (kind.to_owned(), issuer.map(str::to_owned))
-            })
-            .unzip();
-        TableBuilder::new()
-            .utf8("position_id", position_ids)?
-            .f64("residual_variance", residual_variances)?
-            .utf8("source_kind", source_kinds)?
-            .nullable_utf8("source_issuer_id", source_issuer_ids)?
-            .build()
+        position_residual_contributions_table(&self.inner.position_residual_contributions)
     }
 
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "RiskDecomposition.__repr__")]
     fn __repr__(&self) -> String {
         format!(
             "RiskDecomposition(total_risk={}, residual_risk={}, factors={}, position_factors={}, position_residuals={})",
@@ -428,9 +349,13 @@ impl PyRiskDecomposition {
     }
 }
 
-tabular_methods!(PyRiskDecomposition);
+tabular_methods!(
+    PyRiskDecomposition,
+    "RiskDecomposition",
+    module = "finstack_quant.models.factor.risk._contributions"
+);
 
-/// Per-position component VaR and marginal VaR.
+#[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionVarContribution")]
 #[pyclass(
     name = "PositionVarContribution",
     module = "finstack_quant.models.factor.risk",
@@ -451,73 +376,28 @@ impl PyPositionVarContribution {
 wire_methods!(
     PyPositionVarContribution,
     PositionVarContribution,
-    "PositionVarContribution"
+    "PositionVarContribution",
+    module = "finstack_quant.models.factor.risk._contributions"
 );
+
+py_getters!(PyPositionVarContribution |s| {
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionVarContribution.position_id")]
+    position_id -> String = s.inner.position_id.as_str().to_owned();
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionVarContribution.component_var")]
+    component_var -> f64 = s.inner.component_var;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionVarContribution.relative_var")]
+    relative_var -> f64 = s.inner.relative_var;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionVarContribution.marginal_var")]
+    marginal_var -> Option<f64> = s.inner.marginal_var;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionVarContribution.incremental_var")]
+    incremental_var -> Option<f64> = s.inner.incremental_var;
+});
 
 #[pymethods]
 impl PyPositionVarContribution {
-    /// Portfolio position identifier.
-    #[getter]
-    fn position_id(&self) -> String {
-        self.inner.position_id.as_str().to_owned()
-    }
-
-    /// Euler-allocated share of portfolio VaR for this position.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Portfolio-currency amount following the workspace loss convention
-    ///     (losses are **negative**). Component VaRs sum to portfolio VaR.
-    #[getter]
-    fn component_var(&self) -> f64 {
-        self.inner.component_var
-    }
-
-    /// Component VaR as a **fraction** (not a percentage) of portfolio VaR.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Sums to 1.0 across positions. A negative value marks a diversifier.
-    #[getter]
-    fn relative_var(&self) -> f64 {
-        self.inner.relative_var
-    }
-
-    /// Per-unit sensitivity of portfolio VaR to this position.
-    ///
-    /// Returns
-    /// -------
-    /// float | None
-    ///     Same loss sign convention as :attr:`component_var`; ``None`` when
-    ///     the engine could not produce a true gradient.
-    #[getter]
-    fn marginal_var(&self) -> Option<f64> {
-        self.inner.marginal_var
-    }
-
-    /// Change in portfolio VaR from removing this position entirely.
-    ///
-    /// Returns
-    /// -------
-    /// float | None
-    ///     ``None`` unless incremental VaR was requested in the decomposition
-    ///     config (it costs one portfolio revaluation per position).
-    #[getter]
-    fn incremental_var(&self) -> Option<f64> {
-        self.inner.incremental_var
-    }
-
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionVarContribution.__repr__")]
     fn __repr__(&self) -> String {
-        format!(
-            "PositionVarContribution(position_id={:?}, component_var={}, relative_var={}, marginal_var={}, incremental_var={})",
-            self.inner.position_id.as_str(),
-            self.inner.component_var,
-            self.inner.relative_var,
-            py_opt(self.inner.marginal_var),
-            py_opt(self.inner.incremental_var),
-        )
+        repr_from_serde("PositionVarContribution", &self.inner)
     }
 }
 
@@ -536,9 +416,13 @@ impl PyPositionVarContribution {
     }
 }
 
-tabular_methods!(PyPositionVarContribution);
+tabular_methods!(
+    PyPositionVarContribution,
+    "PositionVarContribution",
+    module = "finstack_quant.models.factor.risk._contributions"
+);
 
-/// Per-position component ES and marginal ES.
+#[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionEsContribution")]
 #[pyclass(
     name = "PositionEsContribution",
     module = "finstack_quant.models.factor.risk",
@@ -559,45 +443,26 @@ impl PyPositionEsContribution {
 wire_methods!(
     PyPositionEsContribution,
     PositionEsContribution,
-    "PositionEsContribution"
+    "PositionEsContribution",
+    module = "finstack_quant.models.factor.risk._contributions"
 );
+
+py_getters!(PyPositionEsContribution |s| {
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionEsContribution.position_id")]
+    position_id -> String = s.inner.position_id.as_str().to_owned();
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionEsContribution.component_es")]
+    component_es -> f64 = s.inner.component_es;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionEsContribution.relative_es")]
+    relative_es -> f64 = s.inner.relative_es;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionEsContribution.marginal_es")]
+    marginal_es -> Option<f64> = s.inner.marginal_es;
+});
 
 #[pymethods]
 impl PyPositionEsContribution {
-    /// Portfolio position identifier.
-    #[getter]
-    fn position_id(&self) -> String {
-        self.inner.position_id.as_str().to_owned()
-    }
-
-    /// This position's contribution to portfolio Expected Shortfall, in
-    /// portfolio currency and following the loss (negative) convention.
-    #[getter]
-    fn component_es(&self) -> f64 {
-        self.inner.component_es
-    }
-
-    /// Component ES as a **fraction** (not a percentage) of portfolio ES.
-    #[getter]
-    fn relative_es(&self) -> f64 {
-        self.inner.relative_es
-    }
-
-    /// Per-unit sensitivity of portfolio ES to this position; ``None`` when the
-    /// engine cannot produce a true gradient.
-    #[getter]
-    fn marginal_es(&self) -> Option<f64> {
-        self.inner.marginal_es
-    }
-
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionEsContribution.__repr__")]
     fn __repr__(&self) -> String {
-        format!(
-            "PositionEsContribution(position_id={:?}, component_es={}, relative_es={}, marginal_es={})",
-            self.inner.position_id.as_str(),
-            self.inner.component_es,
-            self.inner.relative_es,
-            py_opt(self.inner.marginal_es),
-        )
+        repr_from_serde("PositionEsContribution", &self.inner)
     }
 }
 
@@ -615,9 +480,13 @@ impl PyPositionEsContribution {
     }
 }
 
-tabular_methods!(PyPositionEsContribution);
+tabular_methods!(
+    PyPositionEsContribution,
+    "PositionEsContribution",
+    module = "finstack_quant.models.factor.risk._contributions"
+);
 
-/// Complete position-level risk decomposition.
+#[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionRiskDecomposition")]
 #[pyclass(
     name = "PositionRiskDecomposition",
     module = "finstack_quant.models.factor.risk",
@@ -638,87 +507,48 @@ impl PyPositionRiskDecomposition {
 wire_methods!(
     PyPositionRiskDecomposition,
     PositionRiskDecomposition,
-    "PositionRiskDecomposition"
+    "PositionRiskDecomposition",
+    module = "finstack_quant.models.factor.risk._contributions"
 );
+
+py_getters!(PyPositionRiskDecomposition |s| {
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionRiskDecomposition.portfolio_var")]
+    portfolio_var -> f64 = s.inner.portfolio_var;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionRiskDecomposition.portfolio_es")]
+    portfolio_es -> f64 = s.inner.portfolio_es;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionRiskDecomposition.confidence")]
+    confidence -> f64 = s.inner.confidence;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionRiskDecomposition.n_positions")]
+    n_positions -> usize = s.inner.n_positions;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionRiskDecomposition.euler_residual")]
+    euler_residual -> Option<f64> = s.inner.euler_residual;
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionRiskDecomposition.var_contributions")]
+    var_contributions -> Vec<PyPositionVarContribution> = s
+        .inner
+        .var_contributions
+        .iter()
+        .cloned()
+        .map(PyPositionVarContribution::from_inner)
+        .collect();
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionRiskDecomposition.es_contributions")]
+    es_contributions -> Vec<PyPositionEsContribution> = s
+        .inner
+        .es_contributions
+        .iter()
+        .cloned()
+        .map(PyPositionEsContribution::from_inner)
+        .collect();
+});
 
 #[pymethods]
 impl PyPositionRiskDecomposition {
-    /// Total portfolio Value-at-Risk.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Portfolio-currency amount under the workspace loss convention, so
-    ///     losses are reported as **negative** numbers.
-    #[getter]
-    fn portfolio_var(&self) -> f64 {
-        self.inner.portfolio_var
-    }
-
-    /// Total portfolio Expected Shortfall.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Same loss convention as :attr:`portfolio_var`; ES sits at or beyond
-    ///     VaR in the loss tail (``portfolio_es <= portfolio_var``).
-    #[getter]
-    fn portfolio_es(&self) -> f64 {
-        self.inner.portfolio_es
-    }
-
-    /// Confidence level used for both VaR and ES.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     A **fraction** strictly inside ``(0.5, 1)`` — ``0.99``, not ``99``.
-    #[getter]
-    fn confidence(&self) -> f64 {
-        self.inner.confidence
-    }
-
-    /// Number of positions included in the decomposition.
-    #[getter]
-    fn n_positions(&self) -> usize {
-        self.inner.n_positions
-    }
-
-    /// Decomposition method: ``"parametric"`` or ``"historical"``.
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionRiskDecomposition.method")]
     #[getter]
     fn method(&self) -> PyResult<String> {
-        finstack_quant_core::wire::serde_label(&self.inner.method)
-            .map_err(crate::errors::core_to_py)
+        serde_label(&self.inner.method).map_err(core_to_py)
     }
 
-    /// Parametric-mode numerical residual; ``None`` in historical mode.
-    #[getter]
-    fn euler_residual(&self) -> Option<f64> {
-        self.inner.euler_residual
-    }
-
-    /// Per-position VaR decomposition.
-    #[getter]
-    fn var_contributions(&self) -> Vec<PyPositionVarContribution> {
-        self.inner
-            .var_contributions
-            .iter()
-            .cloned()
-            .map(PyPositionVarContribution::from_inner)
-            .collect()
-    }
-
-    /// Per-position Expected Shortfall decomposition.
-    #[getter]
-    fn es_contributions(&self) -> Vec<PyPositionEsContribution> {
-        self.inner
-            .es_contributions
-            .iter()
-            .cloned()
-            .map(PyPositionEsContribution::from_inner)
-            .collect()
-    }
-
+    #[doc = pydoc!("finstack_quant.models.factor.risk._contributions", "PositionRiskDecomposition.__repr__")]
     fn __repr__(&self) -> String {
         format!(
             "PositionRiskDecomposition(portfolio_var={}, portfolio_es={}, confidence={}, n_positions={}, method={:?}, euler_residual={})",
@@ -726,9 +556,10 @@ impl PyPositionRiskDecomposition {
             self.inner.portfolio_es,
             self.inner.confidence,
             self.inner.n_positions,
-            finstack_quant_core::wire::serde_label(&self.inner.method)
-                .unwrap_or_else(|_| "?".to_string()),
-            py_opt(self.inner.euler_residual),
+            serde_label(&self.inner.method).unwrap_or_else(|_| "?".to_owned()),
+            self.inner
+                .euler_residual
+                .map_or_else(|| "None".to_owned(), |v| v.to_string()),
         )
     }
 }
@@ -775,4 +606,8 @@ impl PyPositionRiskDecomposition {
     }
 }
 
-tabular_methods!(PyPositionRiskDecomposition);
+tabular_methods!(
+    PyPositionRiskDecomposition,
+    "PositionRiskDecomposition",
+    module = "finstack_quant.models.factor.risk._contributions"
+);
