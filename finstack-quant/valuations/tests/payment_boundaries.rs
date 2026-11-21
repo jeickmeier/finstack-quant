@@ -192,7 +192,8 @@ fn cds_and_index_use_the_same_election_for_coupon_and_upfront() {
     for include_today in [false, true] {
         cds.include_valuation_date_cashflows = include_today;
         index.include_valuation_date_cashflows = include_today;
-        for instrument in [&cds as &dyn Instrument, &index] {
+        // The index reports clean principal, so test its cash election rather than raw-cash conservation.
+        for (instrument, clean_npv) in [(&cds as &dyn Instrument, false), (&index, true)] {
             let value = instrument.value(&market, payment).expect("payment-date PV");
             if include_today {
                 assert!(
@@ -206,8 +207,33 @@ fn cds_and_index_use_the_same_election_for_coupon_and_upfront() {
                 instrument.includes_valuation_date_cashflows(),
                 include_today
             );
-            for (start, end) in [(before, payment), (payment, after)] {
-                assert_cash_conservation(instrument, &market, start, end);
+            let before_cash =
+                collect_period_cash(instrument, &market, before, payment, value.currency())
+                    .expect("cash through payment date");
+            let after_cash =
+                collect_period_cash(instrument, &market, payment, after, value.currency())
+                    .expect("cash after payment date");
+            let (included, excluded) = if include_today {
+                (&after_cash, &before_cash)
+            } else {
+                (&before_cash, &after_cash)
+            };
+            assert_ne!(
+                included.total.amount(),
+                0.0,
+                "{} cash must follow the valuation-date election",
+                instrument.key()
+            );
+            assert_eq!(
+                excluded.total.amount(),
+                0.0,
+                "{} cash must not cross the elected payment boundary",
+                instrument.key()
+            );
+            if !clean_npv {
+                for (start, end) in [(before, payment), (payment, after)] {
+                    assert_cash_conservation(instrument, &market, start, end);
+                }
             }
         }
     }
