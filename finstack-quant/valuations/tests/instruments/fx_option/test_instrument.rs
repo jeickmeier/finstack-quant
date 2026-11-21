@@ -22,7 +22,7 @@ use time::macros::date;
 fn test_builder_pattern_creates_valid_option() {
     // Arrange & Act
     let option = FxOption::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_option::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .delivery(
             finstack_quant_valuations::instruments::fx::fx_option::FxOptionDelivery::CashAtExpiry,
         )
@@ -100,7 +100,7 @@ fn test_builder_with_underlying_params() {
 
     // Act
     let option = FxOption::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_option::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .delivery(
             finstack_quant_valuations::instruments::fx::fx_option::FxOptionDelivery::CashAtExpiry,
         )

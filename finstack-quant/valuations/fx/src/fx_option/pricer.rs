@@ -370,7 +370,7 @@ mod delegation_tests {
 
     fn build_option(expiry: Date) -> FxOption {
         FxOption::builder()
-            .spot_basis(crate::fx_option::FxSpotBasis::Cash)
+            .spot_basis(crate::FxSpotBasis::Cash)
             .delivery(crate::fx_option::FxOptionDelivery::CashAtExpiry)
             .id(InstrumentId::new("FX-OPTION-TEST"))
             .base_currency(Currency::EUR)
@@ -465,7 +465,10 @@ mod delegation_tests {
 
     #[test]
     fn deliverable_put_call_parity_and_local_rho_use_booked_dates() {
-        use crate::fx_option::{FxOptionDelivery, FxOptionPosition, FxSpotBasis};
+        use crate::{
+            FxSpotBasis,
+            fx_option::{FxOptionDelivery, FxOptionPosition},
+        };
         use finstack_quant_core::market_data::bumps::BumpSpec;
         use finstack_quant_core::market_data::traits::Discounting;
 

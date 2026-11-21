@@ -60,7 +60,7 @@ fn create_test_market(as_of: Date) -> MarketContext {
 fn forward_settlement_is_live_on_maturity_and_extinguished_afterward() {
     let maturity = Date::from_calendar_date(2024, Month::July, 15).expect("valid date");
     let forward = FxForward::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_forward::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("EURUSD-EVENT-DATE"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
@@ -93,7 +93,7 @@ fn test_fx_forward_pricing_at_market() {
 
     // Create at-market forward (no contract rate specified)
     let forward = FxForward::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_forward::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("EURUSD-ATM"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
@@ -125,7 +125,7 @@ fn test_fx_forward_pricing_favorable_contract_rate() {
     // Create forward with favorable contract rate (we buy EUR cheap)
     // Spot is 1.10, so if we lock in 1.05, we're getting a good deal
     let forward = FxForward::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_forward::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("EURUSD-FAVORABLE"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
@@ -157,7 +157,7 @@ fn test_fx_forward_pricing_unfavorable_contract_rate() {
 
     // Create forward with unfavorable contract rate
     let forward = FxForward::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_forward::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("EURUSD-UNFAVORABLE"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
@@ -183,8 +183,8 @@ fn test_fx_forward_pricing_unfavorable_contract_rate() {
 #[test]
 fn booked_spot_date_sets_delivery_forward_on_each_valuation_date() {
     use finstack_quant_core::dates::{BusinessDayConvention, Tenor};
-    use finstack_quant_valuations::instruments::fx::fx_forward::{
-        FxForwardTradeDateParams, FxSpotBasis,
+    use finstack_quant_valuations::instruments::fx::{
+        FxSpotBasis, fx_forward::FxForwardTradeDateParams,
     };
     use time::macros::date;
 
@@ -233,7 +233,7 @@ fn test_fx_forward_market_forward_rate() {
     let market = create_test_market(as_of);
 
     let forward = FxForward::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_forward::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("EURUSD-FWD"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
@@ -272,7 +272,7 @@ fn test_fx_forward_expired() {
     let market = create_test_market(as_of);
 
     let forward = FxForward::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_forward::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("EURUSD-EXPIRED"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
@@ -295,7 +295,7 @@ fn test_fx_forward_same_day_maturity() {
     let market = create_test_market(as_of);
 
     let forward = FxForward::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_forward::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("EURUSD-SAMEDAY"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
@@ -324,7 +324,7 @@ fn test_fx_forward_with_spot_override() {
 
     // Create forward with spot rate override different from FX matrix
     let forward = FxForward::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_forward::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("EURUSD-OVERRIDE"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
@@ -360,7 +360,7 @@ fn test_fx_forward_with_forward_points() {
     let forward_points = 0.005; // 50 pips
 
     let forward = FxForward::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_forward::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("EURUSD-POINTS"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
@@ -388,7 +388,7 @@ fn test_fx_forward_with_forward_pips() {
     let market = create_test_market(as_of);
 
     let forward = FxForward::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_forward::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("EURUSD-PIPS"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
@@ -421,7 +421,7 @@ fn test_fx_forward_with_forward_pips_inverted_pair_still_prices() {
 
     let inverted = invert_fx_rate(1.10).expect("spot reciprocal");
     let forward = FxForward::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_forward::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("USDEUR-PIPS"))
         .base_currency(Currency::USD)
         .quote_currency(Currency::EUR)
@@ -452,7 +452,7 @@ fn test_fx_forward_registry_pricer() {
     let market = create_test_market(as_of);
 
     let forward = FxForward::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_forward::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .id(InstrumentId::new("EURUSD-REGISTRY"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)

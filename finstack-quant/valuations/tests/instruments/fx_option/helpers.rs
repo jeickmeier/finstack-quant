@@ -148,7 +148,7 @@ pub fn build_market_context(as_of: Date, params: MarketParams) -> MarketContext 
 /// Build a standard European call option.
 pub fn build_call_option(_as_of: Date, expiry: Date, strike: f64, notional: f64) -> FxOption {
     FxOption::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_option::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .delivery(
             finstack_quant_valuations::instruments::fx::fx_option::FxOptionDelivery::CashAtExpiry,
         )
@@ -175,7 +175,7 @@ pub fn build_call_option(_as_of: Date, expiry: Date, strike: f64, notional: f64)
 /// Build a standard European put option.
 pub fn build_put_option(_as_of: Date, expiry: Date, strike: f64, notional: f64) -> FxOption {
     FxOption::builder()
-        .spot_basis(finstack_quant_valuations::instruments::fx::fx_option::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
         .delivery(
             finstack_quant_valuations::instruments::fx::fx_option::FxOptionDelivery::CashAtExpiry,
         )

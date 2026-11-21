@@ -775,7 +775,7 @@ mod validation_tests {
     #[test]
     fn builder_rejects_same_base_and_quote_currency() {
         let result = FxOption::builder()
-            .spot_basis(crate::fx_option::FxSpotBasis::Cash)
+            .spot_basis(crate::FxSpotBasis::Cash)
             .delivery(crate::fx_option::FxOptionDelivery::CashAtExpiry)
             .id(InstrumentId::new("FXOPT-USDUSD"))
             .base_currency(Currency::USD)

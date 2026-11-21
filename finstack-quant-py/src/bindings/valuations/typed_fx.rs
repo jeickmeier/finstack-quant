@@ -202,7 +202,7 @@ impl PyFxForwardBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let spec: finstack_quant_valuations::instruments::fx::fx_option::FxSpotBasis =
+        let spec: finstack_quant_valuations::instruments::fx::FxSpotBasis =
             crate::bindings::module_utils::spec_from_py(value.py(), value, "FxSpotBasis")?;
         builder_set!(
             slf,
@@ -559,7 +559,7 @@ impl PyFxOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let spec: finstack_quant_valuations::instruments::fx::fx_option::FxSpotBasis =
+        let spec: finstack_quant_valuations::instruments::fx::FxSpotBasis =
             crate::bindings::module_utils::spec_from_py(value.py(), value, "FxSpotBasis")?;
         builder_set!(
             slf,
