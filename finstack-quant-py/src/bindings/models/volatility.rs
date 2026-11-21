@@ -22,7 +22,7 @@
 //! `SabrSmile`, `SabrCalibrator`).
 
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
 use std::sync::Arc;
 
 use crate::bindings::core::market_data::curves::{
@@ -70,92 +70,6 @@ impl PySabrParameters {
         Ok(Self { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.equity_default")]
-    #[staticmethod]
-    fn equity_default() -> Self {
-        Self {
-            inner: SabrParameters::equity_default(),
-        }
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.rates_default")]
-    #[staticmethod]
-    fn rates_default() -> Self {
-        Self {
-            inner: SabrParameters::rates_default(),
-        }
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.rates_standard")]
-    #[staticmethod]
-    fn rates_standard(alpha: f64, nu: f64, rho: f64) -> PyResult<Self> {
-        SabrParameters::rates_standard(alpha, nu, rho)
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.normal")]
-    #[staticmethod]
-    fn normal(alpha: f64, nu: f64, rho: f64) -> PyResult<Self> {
-        SabrParameters::normal(alpha, nu, rho)
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.lognormal")]
-    #[staticmethod]
-    fn lognormal(alpha: f64, nu: f64, rho: f64) -> PyResult<Self> {
-        SabrParameters::lognormal(alpha, nu, rho)
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.shifted_normal")]
-    #[staticmethod]
-    fn shifted_normal(alpha: f64, nu: f64, rho: f64, shift: f64) -> PyResult<Self> {
-        SabrParameters::shifted_normal(alpha, nu, rho, shift)
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.shifted_lognormal")]
-    #[staticmethod]
-    fn shifted_lognormal(alpha: f64, nu: f64, rho: f64, shift: f64) -> PyResult<Self> {
-        SabrParameters::shifted_lognormal(alpha, nu, rho, shift)
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.alpha")]
-    #[getter]
-    fn alpha(&self) -> f64 {
-        self.inner.alpha
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.beta")]
-    #[getter]
-    fn beta(&self) -> f64 {
-        self.inner.beta
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.nu")]
-    #[getter]
-    fn nu(&self) -> f64 {
-        self.inner.nu
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.rho")]
-    #[getter]
-    fn rho(&self) -> f64 {
-        self.inner.rho
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.shift")]
-    #[getter]
-    fn shift(&self) -> Option<f64> {
-        self.inner.shift
-    }
-
     #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.is_shifted")]
     fn is_shifted(&self) -> bool {
         self.inner.is_shifted()
@@ -193,6 +107,60 @@ impl PySabrParameters {
     }
 }
 
+macro_rules! sabr_preset {
+    (infallible $($name:ident),+ $(,)?) => {
+        #[pymethods]
+        impl PySabrParameters {
+            $(
+                #[doc = pydoc!("finstack_quant.models.volatility", concat!("SabrParameters.", stringify!($name)))]
+                #[staticmethod]
+                fn $name() -> Self {
+                    Self {
+                        inner: SabrParameters::$name(),
+                    }
+                }
+            )+
+        }
+    };
+    (fallible $($name:ident($($arg:ident),+)),+ $(,)?) => {
+        #[pymethods]
+        impl PySabrParameters {
+            $(
+                #[doc = pydoc!("finstack_quant.models.volatility", concat!("SabrParameters.", stringify!($name)))]
+                #[staticmethod]
+                fn $name($($arg: f64),+) -> PyResult<Self> {
+                    SabrParameters::$name($($arg),+)
+                        .map(|inner| Self { inner })
+                        .map_err(core_to_py)
+                }
+            )+
+        }
+    };
+}
+
+sabr_preset!(infallible equity_default, rates_default);
+sabr_preset!(
+    fallible
+    rates_standard(alpha, nu, rho),
+    normal(alpha, nu, rho),
+    lognormal(alpha, nu, rho),
+    shifted_normal(alpha, nu, rho, shift),
+    shifted_lognormal(alpha, nu, rho, shift),
+);
+
+py_getters!(PySabrParameters |s| {
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.alpha")]
+    alpha -> f64 = s.inner.alpha;
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.beta")]
+    beta -> f64 = s.inner.beta;
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.nu")]
+    nu -> f64 = s.inner.nu;
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.rho")]
+    rho -> f64 = s.inner.rho;
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters.shift")]
+    shift -> Option<f64> = s.inner.shift;
+});
+
 wire_methods!(
     PySabrParameters,
     SabrParameters,
@@ -212,58 +180,24 @@ pub struct PySabrCalibrationOutcome {
     pub(crate) inner: SabrCalibrationOutcome,
 }
 
-#[pymethods]
-impl PySabrCalibrationOutcome {
-    #[getter]
+py_getters!(PySabrCalibrationOutcome |s| {
     #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrationOutcome.parameters")]
-    fn parameters(&self) -> PySabrParameters {
-        PySabrParameters {
-            inner: self.inner.parameters.clone(),
-        }
-    }
-
-    #[getter]
+    parameters -> PySabrParameters = PySabrParameters { inner: s.inner.parameters.clone() };
     #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrationOutcome.total_iterations")]
-    fn total_iterations(&self) -> usize {
-        self.inner.total_iterations
-    }
-
-    #[getter]
+    total_iterations -> usize = s.inner.total_iterations;
     #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrationOutcome.winning_iterations")]
-    fn winning_iterations(&self) -> usize {
-        self.inner.winning_iterations
-    }
-
-    #[getter]
+    winning_iterations -> usize = s.inner.winning_iterations;
     #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrationOutcome.residual_evaluations")]
-    fn residual_evaluations(&self) -> usize {
-        self.inner.residual_evaluations
-    }
-
-    #[getter]
+    residual_evaluations -> usize = s.inner.residual_evaluations;
     #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrationOutcome.winning_start")]
-    fn winning_start(&self) -> [f64; 3] {
-        self.inner.winning_start
-    }
-
-    #[getter]
+    winning_start -> [f64; 3] = s.inner.winning_start;
     #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrationOutcome.quote_errors")]
-    fn quote_errors(&self) -> Vec<f64> {
-        self.inner.quote_errors.clone()
-    }
-
-    #[getter]
+    quote_errors -> Vec<f64> = s.inner.quote_errors.clone();
     #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrationOutcome.max_relative_quote_error")]
-    fn max_relative_quote_error(&self) -> f64 {
-        self.inner.max_relative_quote_error
-    }
-
-    #[getter]
+    max_relative_quote_error -> f64 = s.inner.max_relative_quote_error;
     #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrationOutcome.parameters_at_bounds")]
-    fn parameters_at_bounds(&self) -> Vec<String> {
-        self.inner.parameters_at_bounds.clone()
-    }
-}
+    parameters_at_bounds -> Vec<String> = s.inner.parameters_at_bounds.clone();
+});
 
 #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile")]
 #[pyclass(name = "SabrSmile", module = "finstack_quant.models.volatility")]
@@ -365,18 +299,6 @@ impl PySabrSmile {
         PyArrowTable::to_pyarrow(&table, py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.forward")]
-    #[getter]
-    fn forward(&self) -> f64 {
-        self.inner.forward()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.time_to_expiry")]
-    #[getter]
-    fn time_to_expiry(&self) -> f64 {
-        self.inner.time_to_expiry()
-    }
-
     fn __repr__(&self) -> String {
         let p = self.inner.parameters();
         let shift_repr = match p.shift {
@@ -395,6 +317,13 @@ impl PySabrSmile {
         )
     }
 }
+
+py_getters!(PySabrSmile |s| {
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.forward")]
+    forward -> f64 = s.inner.forward();
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.time_to_expiry")]
+    time_to_expiry -> f64 = s.inner.time_to_expiry();
+});
 
 impl PySabrSmile {
     fn sabr_smile_table(&self, strikes: &[f64]) -> PyResult<PyArrowTable> {
@@ -492,28 +421,10 @@ impl PySabrCalibrator {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.tolerance")]
-    #[getter]
-    fn tolerance(&self) -> f64 {
-        self.inner.tolerance()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.max_iterations")]
-    #[getter]
-    fn max_iterations(&self) -> usize {
-        self.inner.max_iterations()
-    }
-
     #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.shift")]
     #[getter]
     fn shift<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.shift())
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.atm_pinning")]
-    #[getter]
-    fn atm_pinning(&self) -> bool {
-        self.inner.atm_pinning()
     }
 
     fn __repr__(&self) -> String {
@@ -535,6 +446,15 @@ impl PySabrCalibrator {
         )
     }
 }
+
+py_getters!(PySabrCalibrator |s| {
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.tolerance")]
+    tolerance -> f64 = s.inner.tolerance();
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.max_iterations")]
+    max_iterations -> usize = s.inner.max_iterations();
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrCalibrator.atm_pinning")]
+    atm_pinning -> bool = s.inner.atm_pinning();
+});
 
 #[doc = pydoc!("finstack_quant.models.volatility", "implied_vol_bachelier")]
 #[pyfunction]
@@ -748,36 +668,6 @@ impl PySviParams {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.a")]
-    #[getter]
-    fn a(&self) -> f64 {
-        self.inner.a
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.b")]
-    #[getter]
-    fn b(&self) -> f64 {
-        self.inner.b
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.rho")]
-    #[getter]
-    fn rho(&self) -> f64 {
-        self.inner.rho
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.m")]
-    #[getter]
-    fn m(&self) -> f64 {
-        self.inner.m
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.sigma")]
-    #[getter]
-    fn sigma(&self) -> f64 {
-        self.inner.sigma
-    }
-
     #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.total_variance")]
     fn total_variance(&self, k: f64) -> f64 {
         self.inner.total_variance(k)
@@ -797,6 +687,19 @@ impl PySviParams {
         repr_from_serde("SviParams", &self.inner)
     }
 }
+
+py_getters!(PySviParams |s| {
+    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.a")]
+    a -> f64 = s.inner.a;
+    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.b")]
+    b -> f64 = s.inner.b;
+    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.rho")]
+    rho -> f64 = s.inner.rho;
+    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.m")]
+    m -> f64 = s.inner.m;
+    #[doc = pydoc!("finstack_quant.models.volatility", "SviParams.sigma")]
+    sigma -> f64 = s.inner.sigma;
+});
 
 wire_methods!(
     PySviParams,
@@ -856,35 +759,22 @@ impl PyLocalVolSurface {
         self.inner.value(expiry, strike)
     }
 
-    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.expiries")]
-    #[getter]
-    fn expiries(&self) -> Vec<f64> {
-        self.inner.expiries().to_vec()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.strikes")]
-    #[getter]
-    fn strikes(&self) -> Vec<f64> {
-        self.inner.strikes().to_vec()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.local_vols")]
-    #[getter]
-    fn local_vols(&self) -> Vec<f64> {
-        self.inner.local_vols().to_vec()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.grid_shape")]
-    #[getter]
-    fn grid_shape(&self) -> (usize, usize) {
-        self.inner.grid_shape()
-    }
-
     fn __repr__(&self) -> String {
         let (expiries, strikes) = self.inner.grid_shape();
         format!("LocalVolSurface(expiries={expiries}, strikes={strikes})")
     }
 }
+
+py_getters!(PyLocalVolSurface |s| {
+    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.expiries")]
+    expiries -> Vec<f64> = s.inner.expiries().to_vec();
+    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.strikes")]
+    strikes -> Vec<f64> = s.inner.strikes().to_vec();
+    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.local_vols")]
+    local_vols -> Vec<f64> = s.inner.local_vols().to_vec();
+    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.grid_shape")]
+    grid_shape -> (usize, usize) = s.inner.grid_shape();
+});
 
 impl PyLocalVolSurface {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {

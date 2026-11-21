@@ -20,7 +20,7 @@
 //!   `heston_price` takes the option contract and Heston variance dynamics separately.
 
 use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
-use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
 use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::repr_support::repr_from_serde;
@@ -227,42 +227,6 @@ impl PyBsGreeks {
 
 #[pymethods]
 impl PyBsGreeks {
-    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.delta")]
-    #[getter]
-    fn delta(&self) -> f64 {
-        self.inner.delta
-    }
-
-    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.gamma")]
-    #[getter]
-    fn gamma(&self) -> f64 {
-        self.inner.gamma
-    }
-
-    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.vega")]
-    #[getter]
-    fn vega(&self) -> f64 {
-        self.inner.vega
-    }
-
-    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.theta")]
-    #[getter]
-    fn theta(&self) -> f64 {
-        self.inner.theta
-    }
-
-    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.rho_r")]
-    #[getter]
-    fn rho_r(&self) -> f64 {
-        self.inner.rho_r
-    }
-
-    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.rho_q")]
-    #[getter]
-    fn rho_q(&self) -> f64 {
-        self.inner.rho_q
-    }
-
     #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.is_valid")]
     fn is_valid(&self) -> bool {
         self.inner.is_valid()
@@ -278,6 +242,26 @@ impl PyBsGreeks {
         repr_from_serde("BsGreeks", &self.inner)
     }
 }
+
+py_getters!(PyBsGreeks |s| {
+    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.delta")]
+    delta -> f64 = s.inner.delta;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.gamma")]
+    gamma -> f64 = s.inner.gamma;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.vega")]
+    vega -> f64 = s.inner.vega;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.theta")]
+    theta -> f64 = s.inner.theta;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.rho_r")]
+    rho_r -> f64 = s.inner.rho_r;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.rho_q")]
+    rho_q -> f64 = s.inner.rho_q;
+});
 
 tabular_methods!(
     PyBsGreeks,
@@ -334,24 +318,6 @@ pub struct PyForwardGreeks {
 
 #[pymethods]
 impl PyForwardGreeks {
-    #[doc = pydoc!("finstack_quant.models._closed_form", "ForwardGreeks.delta")]
-    #[getter]
-    fn delta(&self) -> f64 {
-        self.inner.delta
-    }
-
-    #[doc = pydoc!("finstack_quant.models._closed_form", "ForwardGreeks.gamma")]
-    #[getter]
-    fn gamma(&self) -> f64 {
-        self.inner.gamma
-    }
-
-    #[doc = pydoc!("finstack_quant.models._closed_form", "ForwardGreeks.vega")]
-    #[getter]
-    fn vega(&self) -> f64 {
-        self.inner.vega
-    }
-
     #[doc = pydoc!("finstack_quant.models._closed_form", "ForwardGreeks.to_series")]
     fn to_series(&self) -> PyResult<PyLabeledSeries> {
         let labels: Vec<String> = FORWARD_GREEK_LABELS
@@ -366,6 +332,17 @@ impl PyForwardGreeks {
         repr_from_serde("ForwardGreeks", &self.inner)
     }
 }
+
+py_getters!(PyForwardGreeks |s| {
+    #[doc = pydoc!("finstack_quant.models._closed_form", "ForwardGreeks.delta")]
+    delta -> f64 = s.inner.delta;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "ForwardGreeks.gamma")]
+    gamma -> f64 = s.inner.gamma;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "ForwardGreeks.vega")]
+    vega -> f64 = s.inner.vega;
+});
 
 impl PyForwardGreeks {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -404,20 +381,16 @@ pub struct PyOptionCalculationResult {
     pub(crate) inner: OptionCalculationResult,
 }
 
-#[pymethods]
-impl PyOptionCalculationResult {
+py_getters!(PyOptionCalculationResult |s| {
     #[doc = pydoc!("finstack_quant.models._closed_form", "OptionCalculationResult.price")]
-    #[getter]
-    fn price(&self) -> f64 {
-        self.inner.price
-    }
+    price -> f64 = s.inner.price;
 
     #[doc = pydoc!("finstack_quant.models._closed_form", "OptionCalculationResult.implied_vol")]
-    #[getter]
-    fn implied_vol(&self) -> f64 {
-        self.inner.implied_vol
-    }
+    implied_vol -> f64 = s.inner.implied_vol;
+});
 
+#[pymethods]
+impl PyOptionCalculationResult {
     #[doc = pydoc!("finstack_quant.models._closed_form", "OptionCalculationResult.greeks")]
     #[getter]
     fn greeks(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -802,36 +775,6 @@ impl PyHestonParams {
         Ok(Self { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.v0")]
-    #[getter]
-    fn v0(&self) -> f64 {
-        self.inner.v0
-    }
-
-    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.kappa")]
-    #[getter]
-    fn kappa(&self) -> f64 {
-        self.inner.kappa
-    }
-
-    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.theta")]
-    #[getter]
-    fn theta(&self) -> f64 {
-        self.inner.theta
-    }
-
-    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.vol_of_vol")]
-    #[getter]
-    fn vol_of_vol(&self) -> f64 {
-        self.inner.vol_of_vol
-    }
-
-    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.rho")]
-    #[getter]
-    fn rho(&self) -> f64 {
-        self.inner.rho
-    }
-
     #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.satisfies_feller")]
     fn satisfies_feller(&self) -> bool {
         self.inner.satisfies_feller()
@@ -841,6 +784,23 @@ impl PyHestonParams {
         repr_from_serde("HestonParams", &self.inner)
     }
 }
+
+py_getters!(PyHestonParams |s| {
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.v0")]
+    v0 -> f64 = s.inner.v0;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.kappa")]
+    kappa -> f64 = s.inner.kappa;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.theta")]
+    theta -> f64 = s.inner.theta;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.vol_of_vol")]
+    vol_of_vol -> f64 = s.inner.vol_of_vol;
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "HestonParams.rho")]
+    rho -> f64 = s.inner.rho;
+});
 
 wire_methods!(
     PyHestonParams,

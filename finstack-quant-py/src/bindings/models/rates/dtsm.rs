@@ -12,7 +12,7 @@
 
 use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::table_builders::TableBuilder;
 use crate::errors::{core_to_py, value_error};
@@ -264,34 +264,10 @@ impl PyYieldPanel {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.tenors")]
-    #[getter]
-    fn tenors(&self) -> Vec<f64> {
-        self.inner.tenors.clone()
-    }
-
     #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.dates")]
     #[getter]
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Option<Vec<Bound<'py, PyAny>>>> {
         dates_to_py(py, self.inner.dates.as_deref())
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.yields")]
-    #[getter]
-    fn yields(&self) -> Vec<Vec<f64>> {
-        rows_of(&self.inner.yields)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.num_dates")]
-    #[getter]
-    fn num_dates(&self) -> usize {
-        self.inner.num_dates()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.num_tenors")]
-    #[getter]
-    fn num_tenors(&self) -> usize {
-        self.inner.num_tenors()
     }
 
     #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.yield_changes")]
@@ -343,6 +319,20 @@ impl PyYieldPanel {
     }
 }
 
+py_getters!(PyYieldPanel |s| {
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.tenors")]
+    tenors -> Vec<f64> = s.inner.tenors.clone();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.yields")]
+    yields -> Vec<Vec<f64>> = rows_of(&s.inner.yields);
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.num_dates")]
+    num_dates -> usize = s.inner.num_dates();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.num_tenors")]
+    num_tenors -> usize = s.inner.num_tenors();
+});
+
 impl PyYieldPanel {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         let mut builder = TableBuilder::new();
@@ -384,6 +374,32 @@ pub struct PyFactorTimeSeries {
     pub(crate) inner: FactorTimeSeries,
 }
 
+py_getters!(PyFactorTimeSeries |s| {
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.level")]
+    level -> Vec<f64> = s.column(0);
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.slope")]
+    slope -> Vec<f64> = s.column(1);
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.curvature")]
+    curvature -> Vec<f64> = s.column(2);
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.factors")]
+    factors -> Vec<Vec<f64>> = rows_of(&s.inner.factors);
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.residuals")]
+    residuals -> Vec<Vec<f64>> = rows_of(&s.inner.residuals);
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.r_squared")]
+    r_squared -> Vec<f64> = s.inner.r_squared.clone();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.r_squared_avg")]
+    r_squared_avg -> f64 = s.inner.r_squared_avg;
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.num_dates")]
+    num_dates -> usize = s.inner.num_dates();
+});
+
 impl PyFactorTimeSeries {
     pub(crate) fn from_inner(inner: FactorTimeSeries) -> Self {
         Self { inner }
@@ -402,54 +418,6 @@ impl PyFactorTimeSeries {
     #[getter]
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Option<Vec<Bound<'py, PyAny>>>> {
         dates_to_py(py, self.inner.dates.as_deref())
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.level")]
-    #[getter]
-    fn level(&self) -> Vec<f64> {
-        self.column(0)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.slope")]
-    #[getter]
-    fn slope(&self) -> Vec<f64> {
-        self.column(1)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.curvature")]
-    #[getter]
-    fn curvature(&self) -> Vec<f64> {
-        self.column(2)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.factors")]
-    #[getter]
-    fn factors(&self) -> Vec<Vec<f64>> {
-        rows_of(&self.inner.factors)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.residuals")]
-    #[getter]
-    fn residuals(&self) -> Vec<Vec<f64>> {
-        rows_of(&self.inner.residuals)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.r_squared")]
-    #[getter]
-    fn r_squared(&self) -> Vec<f64> {
-        self.inner.r_squared.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.r_squared_avg")]
-    #[getter]
-    fn r_squared_avg(&self) -> f64 {
-        self.inner.r_squared_avg
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.num_dates")]
-    #[getter]
-    fn num_dates(&self) -> usize {
-        self.inner.num_dates()
     }
 
     #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.to_pandas")]
@@ -534,45 +502,6 @@ impl PyDieboldLi {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.lambda_")]
-    #[getter]
-    fn lambda_(&self) -> f64 {
-        self.inner.lambda()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.tenors")]
-    #[getter]
-    fn tenors(&self) -> Vec<f64> {
-        self.inner.tenors().to_vec()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.factors")]
-    #[getter]
-    fn factors(&self) -> Option<PyFactorTimeSeries> {
-        self.inner
-            .factors()
-            .cloned()
-            .map(PyFactorTimeSeries::from_inner)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.phi")]
-    #[getter]
-    fn phi(&self) -> Option<Vec<Vec<f64>>> {
-        self.inner.phi().map(rows_of)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.mu")]
-    #[getter]
-    fn mu(&self) -> Option<Vec<f64>> {
-        self.inner.mu().map(vector_values)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.q_cov")]
-    #[getter]
-    fn q_cov(&self) -> Option<Vec<Vec<f64>>> {
-        self.inner.q_cov().map(rows_of)
-    }
-
     #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.loading_matrix")]
     fn loading_matrix(&self) -> Vec<Vec<f64>> {
         rows_of(&self.inner.loading_matrix())
@@ -630,6 +559,30 @@ impl PyDieboldLi {
     }
 }
 
+py_getters!(PyDieboldLi |s| {
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.lambda_")]
+    lambda_ -> f64 = s.inner.lambda();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.tenors")]
+    tenors -> Vec<f64> = s.inner.tenors().to_vec();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.factors")]
+    factors -> Option<PyFactorTimeSeries> = s
+        .inner
+        .factors()
+        .cloned()
+        .map(PyFactorTimeSeries::from_inner);
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.phi")]
+    phi -> Option<Vec<Vec<f64>>> = s.inner.phi().map(rows_of);
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.mu")]
+    mu -> Option<Vec<f64>> = s.inner.mu().map(vector_values);
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "DieboldLi.q_cov")]
+    q_cov -> Option<Vec<Vec<f64>>> = s.inner.q_cov().map(rows_of);
+});
+
 wire_methods!(
     PyDieboldLi,
     DieboldLi,
@@ -657,50 +610,30 @@ impl PyYieldForecast {
 
 #[pymethods]
 impl PyYieldForecast {
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.horizon")]
-    #[getter]
-    fn horizon(&self) -> usize {
-        self.inner.horizon
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.yields")]
-    #[getter]
-    fn yields(&self) -> Vec<f64> {
-        self.inner.yields.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.tenors")]
-    #[getter]
-    fn tenors(&self) -> Vec<f64> {
-        self.inner.tenors.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.factors")]
-    #[getter]
-    fn factors(&self) -> (f64, f64, f64) {
-        (
-            self.inner.factors[0],
-            self.inner.factors[1],
-            self.inner.factors[2],
-        )
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.lower_95")]
-    #[getter]
-    fn lower_95(&self) -> Vec<f64> {
-        self.inner.lower_95.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.upper_95")]
-    #[getter]
-    fn upper_95(&self) -> Vec<f64> {
-        self.inner.upper_95.clone()
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("YieldForecast", &self.inner)
     }
 }
+
+py_getters!(PyYieldForecast |s| {
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.horizon")]
+    horizon -> usize = s.inner.horizon;
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.yields")]
+    yields -> Vec<f64> = s.inner.yields.clone();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.tenors")]
+    tenors -> Vec<f64> = s.inner.tenors.clone();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.factors")]
+    factors -> (f64, f64, f64) = (s.inner.factors[0], s.inner.factors[1], s.inner.factors[2]);
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.lower_95")]
+    lower_95 -> Vec<f64> = s.inner.lower_95.clone();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.upper_95")]
+    upper_95 -> Vec<f64> = s.inner.upper_95.clone();
+});
 
 impl PyYieldForecast {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -767,54 +700,6 @@ impl PyYieldPca {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.num_components")]
-    #[getter]
-    fn num_components(&self) -> usize {
-        self.inner.num_components()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.eigenvalues")]
-    #[getter]
-    fn eigenvalues(&self) -> Vec<f64> {
-        self.inner.eigenvalues().to_vec()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.loadings")]
-    #[getter]
-    fn loadings(&self) -> Vec<Vec<f64>> {
-        rows_of(self.inner.loadings())
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.scores")]
-    #[getter]
-    fn scores(&self) -> Vec<Vec<f64>> {
-        rows_of(self.inner.scores())
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.tenors")]
-    #[getter]
-    fn tenors(&self) -> Vec<f64> {
-        self.inner.tenors().to_vec()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.variance_explained")]
-    #[getter]
-    fn variance_explained(&self) -> Vec<f64> {
-        self.inner.variance_explained().to_vec()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.cumulative_variance")]
-    #[getter]
-    fn cumulative_variance(&self) -> Vec<f64> {
-        self.inner.cumulative_variance().to_vec()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.mean_change")]
-    #[getter]
-    fn mean_change(&self) -> Vec<f64> {
-        vector_values(self.inner.mean_change())
-    }
-
     #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.loading")]
     #[pyo3(text_signature = "(self, k)")]
     fn loading(&self, k: usize) -> PyResult<Vec<f64>> {
@@ -878,6 +763,32 @@ impl PyYieldPca {
     }
 }
 
+py_getters!(PyYieldPca |s| {
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.num_components")]
+    num_components -> usize = s.inner.num_components();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.eigenvalues")]
+    eigenvalues -> Vec<f64> = s.inner.eigenvalues().to_vec();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.loadings")]
+    loadings -> Vec<Vec<f64>> = rows_of(s.inner.loadings());
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.scores")]
+    scores -> Vec<Vec<f64>> = rows_of(s.inner.scores());
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.tenors")]
+    tenors -> Vec<f64> = s.inner.tenors().to_vec();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.variance_explained")]
+    variance_explained -> Vec<f64> = s.inner.variance_explained().to_vec();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.cumulative_variance")]
+    cumulative_variance -> Vec<f64> = s.inner.cumulative_variance().to_vec();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.mean_change")]
+    mean_change -> Vec<f64> = vector_values(s.inner.mean_change());
+});
+
 impl PyYieldPca {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         loadings_table(&rows_of(self.inner.loadings()), self.inner.tenors())
@@ -936,54 +847,6 @@ impl PyYieldPcaView {
 
 #[pymethods]
 impl PyYieldPcaView {
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.loadings")]
-    #[getter]
-    fn loadings(&self) -> Vec<Vec<f64>> {
-        self.inner.loadings.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.scores")]
-    #[getter]
-    fn scores(&self) -> Vec<Vec<f64>> {
-        self.inner.scores.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.eigenvalues")]
-    #[getter]
-    fn eigenvalues(&self) -> Vec<f64> {
-        self.inner.eigenvalues.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.explained_variance_ratio")]
-    #[getter]
-    fn explained_variance_ratio(&self) -> Vec<f64> {
-        self.inner.explained_variance_ratio.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.cumulative_variance")]
-    #[getter]
-    fn cumulative_variance(&self) -> Vec<f64> {
-        self.inner.cumulative_variance.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.mean_change")]
-    #[getter]
-    fn mean_change(&self) -> Vec<f64> {
-        self.inner.mean_change.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.tenors")]
-    #[getter]
-    fn tenors(&self) -> Vec<f64> {
-        self.inner.tenors.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.num_components")]
-    #[getter]
-    fn num_components(&self) -> usize {
-        self.inner.eigenvalues.len()
-    }
-
     #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.to_pandas")]
     #[pyo3(text_signature = "($self)")]
     fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -1011,6 +874,32 @@ impl PyYieldPcaView {
         )
     }
 }
+
+py_getters!(PyYieldPcaView |s| {
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.loadings")]
+    loadings -> Vec<Vec<f64>> = s.inner.loadings.clone();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.scores")]
+    scores -> Vec<Vec<f64>> = s.inner.scores.clone();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.eigenvalues")]
+    eigenvalues -> Vec<f64> = s.inner.eigenvalues.clone();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.explained_variance_ratio")]
+    explained_variance_ratio -> Vec<f64> = s.inner.explained_variance_ratio.clone();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.cumulative_variance")]
+    cumulative_variance -> Vec<f64> = s.inner.cumulative_variance.clone();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.mean_change")]
+    mean_change -> Vec<f64> = s.inner.mean_change.clone();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.tenors")]
+    tenors -> Vec<f64> = s.inner.tenors.clone();
+
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.num_components")]
+    num_components -> usize = s.inner.eigenvalues.len();
+});
 
 impl PyYieldPcaView {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
