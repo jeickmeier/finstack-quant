@@ -1,7 +1,7 @@
 //! Python bindings for `finstack_quant_models::credit::scoring`.
 
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::table_builders::TableBuilder;
 use finstack_quant_models::credit::scoring::{
@@ -171,32 +171,19 @@ impl PyScoringResult {
     }
 }
 
+py_getters!(PyScoringResult |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.scoring", "ScoringResult.score")]
+    score -> f64 = s.inner.score;
+    #[doc = pydoc!("finstack_quant.models.credit.scoring", "ScoringResult.zone")]
+    zone -> PyResult<String> = finstack_quant_core::wire::serde_label(&s.inner.zone).map_err(core_to_py);
+    #[doc = pydoc!("finstack_quant.models.credit.scoring", "ScoringResult.implied_pd")]
+    implied_pd -> Option<f64> = s.inner.implied_pd;
+    #[doc = pydoc!("finstack_quant.models.credit.scoring", "ScoringResult.model")]
+    model -> String = s.inner.model.clone();
+});
+
 #[pymethods]
 impl PyScoringResult {
-    #[doc = pydoc!("finstack_quant.models.credit.scoring", "ScoringResult.score")]
-    #[getter]
-    fn score(&self) -> f64 {
-        self.inner.score
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.scoring", "ScoringResult.zone")]
-    #[getter]
-    fn zone(&self) -> PyResult<String> {
-        finstack_quant_core::wire::serde_label(&self.inner.zone).map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.scoring", "ScoringResult.implied_pd")]
-    #[getter]
-    fn implied_pd(&self) -> Option<f64> {
-        self.inner.implied_pd
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.scoring", "ScoringResult.model")]
-    #[getter]
-    fn model(&self) -> String {
-        self.inner.model.clone()
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.scoring", "ScoringResult.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("ScoringResult", &self.inner)
@@ -241,26 +228,18 @@ pub(crate) struct PyCreditScoreReport {
 
 #[pymethods]
 impl PyCreditScoreReport {
-    #[doc = pydoc!("finstack_quant.models.credit.scoring", "CreditScoreReport.result")]
-    #[getter]
-    fn result(&self) -> PyScoringResult {
-        PyScoringResult::from_inner(self.inner.result.clone())
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.scoring", "CreditScoreReport.grade")]
-    #[getter]
-    fn grade(&self) -> Option<PyMasterScaleResult> {
-        self.inner
-            .grade
-            .clone()
-            .map(PyMasterScaleResult::from_inner)
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.scoring", "CreditScoreReport.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CreditScoreReport", &self.inner)
     }
 }
+
+py_getters!(PyCreditScoreReport |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.scoring", "CreditScoreReport.result")]
+    result -> PyScoringResult = PyScoringResult::from_inner(s.inner.result.clone());
+    #[doc = pydoc!("finstack_quant.models.credit.scoring", "CreditScoreReport.grade")]
+    grade -> Option<PyMasterScaleResult> = s.inner.grade.clone().map(PyMasterScaleResult::from_inner);
+});
 
 wire_methods!(
     PyCreditScoreReport,
@@ -269,59 +248,29 @@ wire_methods!(
     module = "finstack_quant.models.credit.scoring"
 );
 
-#[doc = pydoc!("finstack_quant.models.credit.scoring", "altman_z_score")]
-#[pyfunction]
-#[pyo3(text_signature = "(input)")]
-fn altman_z_score(input: PyAltmanZScoreInput) -> PyResult<PyScoringResult> {
-    core_altman_z_score(&input.inner)
-        .map(PyScoringResult::from_inner)
-        .map_err(kinded_to_py)
+macro_rules! scoring_fn {
+    ($($fn_name:ident => ($core_fn:ident, $input_ty:ty);)+) => {
+        $(
+            #[doc = pydoc!("finstack_quant.models.credit.scoring", stringify!($fn_name))]
+            #[pyfunction]
+            #[pyo3(text_signature = "(input)")]
+            fn $fn_name(input: $input_ty) -> PyResult<PyScoringResult> {
+                $core_fn(&input.inner)
+                    .map(PyScoringResult::from_inner)
+                    .map_err(kinded_to_py)
+            }
+        )+
+    };
 }
 
-#[doc = pydoc!("finstack_quant.models.credit.scoring", "altman_z_prime")]
-#[pyfunction]
-#[pyo3(text_signature = "(input)")]
-fn altman_z_prime(input: PyAltmanZPrimeInput) -> PyResult<PyScoringResult> {
-    core_altman_z_prime(&input.inner)
-        .map(PyScoringResult::from_inner)
-        .map_err(kinded_to_py)
-}
-
-#[doc = pydoc!("finstack_quant.models.credit.scoring", "altman_z_double_prime")]
-#[pyfunction]
-#[pyo3(text_signature = "(input)")]
-fn altman_z_double_prime(input: PyAltmanZDoublePrimeInput) -> PyResult<PyScoringResult> {
-    core_altman_z_double_prime(&input.inner)
-        .map(PyScoringResult::from_inner)
-        .map_err(kinded_to_py)
-}
-
-#[doc = pydoc!("finstack_quant.models.credit.scoring", "altman_em_score")]
-#[pyfunction]
-#[pyo3(text_signature = "(input)")]
-fn altman_em_score(input: PyAltmanZDoublePrimeInput) -> PyResult<PyScoringResult> {
-    core_altman_em_score(&input.inner)
-        .map(PyScoringResult::from_inner)
-        .map_err(kinded_to_py)
-}
-
-#[doc = pydoc!("finstack_quant.models.credit.scoring", "ohlson_o_score")]
-#[pyfunction]
-#[pyo3(text_signature = "(input)")]
-fn ohlson_o_score(input: PyOhlsonOScoreInput) -> PyResult<PyScoringResult> {
-    core_ohlson_o_score(&input.inner)
-        .map(PyScoringResult::from_inner)
-        .map_err(kinded_to_py)
-}
-
-#[doc = pydoc!("finstack_quant.models.credit.scoring", "zmijewski_score")]
-#[pyfunction]
-#[pyo3(text_signature = "(input)")]
-fn zmijewski_score(input: PyZmijewskiInput) -> PyResult<PyScoringResult> {
-    core_zmijewski_score(&input.inner)
-        .map(PyScoringResult::from_inner)
-        .map_err(kinded_to_py)
-}
+scoring_fn!(
+    altman_z_score => (core_altman_z_score, PyAltmanZScoreInput);
+    altman_z_prime => (core_altman_z_prime, PyAltmanZPrimeInput);
+    altman_z_double_prime => (core_altman_z_double_prime, PyAltmanZDoublePrimeInput);
+    altman_em_score => (core_altman_em_score, PyAltmanZDoublePrimeInput);
+    ohlson_o_score => (core_ohlson_o_score, PyOhlsonOScoreInput);
+    zmijewski_score => (core_zmijewski_score, PyZmijewskiInput);
+);
 
 #[doc = pydoc!("finstack_quant.models.credit.scoring", "credit_score_report")]
 #[pyfunction]

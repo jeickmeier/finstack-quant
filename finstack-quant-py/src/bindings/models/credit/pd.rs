@@ -1,7 +1,7 @@
 //! Python bindings for `finstack_quant_models::credit::pd` (calibration subset).
 
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use finstack_quant_models::credit::pd::{
@@ -74,6 +74,15 @@ pub struct PyMasterScaleGrade {
     inner: MasterScaleGrade,
 }
 
+py_getters!(PyMasterScaleGrade |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleGrade.label")]
+    label -> &str = &s.inner.label;
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleGrade.upper_pd")]
+    upper_pd -> f64 = s.inner.upper_pd;
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleGrade.central_pd")]
+    central_pd -> f64 = s.inner.central_pd;
+});
+
 #[pymethods]
 impl PyMasterScaleGrade {
     #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleGrade.__init__")]
@@ -87,24 +96,6 @@ impl PyMasterScaleGrade {
                 central_pd,
             },
         }
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleGrade.label")]
-    #[getter]
-    fn label(&self) -> &str {
-        &self.inner.label
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleGrade.upper_pd")]
-    #[getter]
-    fn upper_pd(&self) -> f64 {
-        self.inner.upper_pd
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleGrade.central_pd")]
-    #[getter]
-    fn central_pd(&self) -> f64 {
-        self.inner.central_pd
     }
 
     #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleGrade.__repr__")]
@@ -139,32 +130,19 @@ impl PyMasterScaleResult {
     }
 }
 
+py_getters!(PyMasterScaleResult |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.grade")]
+    grade -> &str = &s.inner.grade;
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.central_pd")]
+    central_pd -> f64 = s.inner.central_pd;
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.input_pd")]
+    input_pd -> f64 = s.inner.input_pd;
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.grade_index")]
+    grade_index -> usize = s.inner.grade_index;
+});
+
 #[pymethods]
 impl PyMasterScaleResult {
-    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.grade")]
-    #[getter]
-    fn grade(&self) -> &str {
-        &self.inner.grade
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.central_pd")]
-    #[getter]
-    fn central_pd(&self) -> f64 {
-        self.inner.central_pd
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.input_pd")]
-    #[getter]
-    fn input_pd(&self) -> f64 {
-        self.inner.input_pd
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.grade_index")]
-    #[getter]
-    fn grade_index(&self) -> usize {
-        self.inner.grade_index
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("MasterScaleResult", &self.inner)
@@ -254,23 +232,6 @@ impl PyMasterScale {
             .map_err(kinded_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.n_grades")]
-    #[getter]
-    fn n_grades(&self) -> usize {
-        self.inner.n_grades()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.grades")]
-    #[getter]
-    fn grades(&self) -> Vec<PyMasterScaleGrade> {
-        self.inner
-            .grades()
-            .iter()
-            .cloned()
-            .map(|inner| PyMasterScaleGrade { inner })
-            .collect()
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.__len__")]
     fn __len__(&self) -> usize {
         self.inner.n_grades()
@@ -291,6 +252,19 @@ impl PyMasterScale {
         )
     }
 }
+
+py_getters!(PyMasterScale |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.n_grades")]
+    n_grades -> usize = s.inner.n_grades();
+    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.grades")]
+    grades -> Vec<PyMasterScaleGrade> = s
+        .inner
+        .grades()
+        .iter()
+        .cloned()
+        .map(|inner| PyMasterScaleGrade { inner })
+        .collect();
+});
 
 impl PyMasterScale {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
