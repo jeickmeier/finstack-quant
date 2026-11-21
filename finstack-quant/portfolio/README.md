@@ -79,7 +79,7 @@ use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::decimal::f64_to_decimal;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
@@ -95,12 +95,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // "USD" discount curve named by the deposit below.
     let discount_curve = DiscountCurve::builder("USD")
         .base_date(as_of)
+        .day_count(DayCount::Act365F)
         .knots(vec![
             (0.0, 1.0),
             (1.0, (-0.045_f64).exp()),
             (2.0, (-0.09_f64).exp()),
         ])
         .interp(InterpStyle::Linear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .build()?;
     let market = MarketContext::new().try_insert(discount_curve)?;
     let config = FinstackConfig::default();

@@ -107,7 +107,7 @@ class FxBarrierOption:
         --------
         >>> from finstack_quant.valuations.instruments import FxBarrierOption
         >>> contract = FxBarrierOption.example()
-        >>> FxBarrierOption.from_json(future.to_json()).id == future.id != ""
+        >>> FxBarrierOption.from_json(contract.to_json()).id == contract.id != ""
         True
         """
         ...

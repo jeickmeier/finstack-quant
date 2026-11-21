@@ -126,7 +126,7 @@ impl Pcg64Rng {
     /// ```rust
     /// use finstack_quant_core::math::random::Pcg64Rng;
     ///
-    /// let mut rng = Pcg64Rng::new(42);
+    /// let mut rng = Pcg64Rng::new(42, 0);
     /// assert!(rng.index(3) < 3);
     /// ```
     ///

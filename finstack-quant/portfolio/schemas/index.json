@@ -38,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/csr_quote_classification.schema.json",
-      "bytes": 21926,
+      "bytes": 22146,
       "kind": "input",
       "path": "schemas/portfolio/1/csr_quote_classification.schema.json",
       "summary": "Dated issuer identity and approved ordinary CSR risk bucket.",
@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/csr_quote_delta.schema.json",
-      "bytes": 51489,
+      "bytes": 58034,
       "kind": "output",
       "path": "schemas/portfolio/1/csr_quote_delta.schema.json",
       "summary": "Ordinary non-securitisation CSR sensitivities and signed issuer CDS quote reprices.",
@@ -56,7 +56,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/csr_quote_source.schema.json",
-      "bytes": 24861,
+      "bytes": 25749,
       "kind": "input",
       "path": "schemas/portfolio/1/csr_quote_source.schema.json",
       "summary": "Qualified issuer curve and binding for each of five non-securitisation CSR vertices.",
@@ -101,7 +101,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/exposure_cash_vm.schema.json",
-      "bytes": 42285,
+      "bytes": 44800,
       "kind": "input",
       "path": "schemas/portfolio/1/exposure_cash_vm.schema.json",
       "summary": "Cash variation margin terms and signed settled balance at exposure valuation.",
@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/exposure_simulation_config.schema.json",
-      "bytes": 95209,
+      "bytes": 96163,
       "kind": "input",
       "path": "schemas/portfolio/1/exposure_simulation_config.schema.json",
       "summary": "Dated simulated market states, factor mappings, legal scope and optional cash collateral.",
@@ -182,7 +182,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/girr_quote_delta.schema.json",
-      "bytes": 51252,
+      "bytes": 70046,
       "kind": "output",
       "path": "schemas/portfolio/1/girr_quote_delta.schema.json",
       "summary": "Ordinary GIRR regulatory inputs and their signed position-level quote reprices.",
@@ -191,7 +191,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/girr_quote_target.schema.json",
-      "bytes": 24924,
+      "bytes": 25223,
       "kind": "input",
       "path": "schemas/portfolio/1/girr_quote_target.schema.json",
       "summary": "Exact ordinary GIRR quote mapping at one regulatory vertex.",
@@ -254,7 +254,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_frtb_config.schema.json",
-      "bytes": 28868,
+      "bytes": 33291,
       "kind": "input",
       "path": "schemas/portfolio/1/portfolio_frtb_config.schema.json",
       "summary": "Exact sources for ordinary portfolio GIRR yield and single-name CDS CSR delta.",
@@ -263,7 +263,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_frtb_sensitivities_result.schema.json",
-      "bytes": 59172,
+      "bytes": 89052,
       "kind": "output",
       "path": "schemas/portfolio/1/portfolio_frtb_sensitivities_result.schema.json",
       "summary": "Qualified ordinary portfolio delta grids, evidence and position coverage.",

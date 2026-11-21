@@ -119,7 +119,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/im_projection_spec.schema.json",
-      "bytes": 5566,
+      "bytes": 6009,
       "kind": "input",
       "path": "schemas/margin/1/im_projection_spec.schema.json",
       "summary": "Dated admitted SIMM netting scope and deterministic projection election.",
@@ -164,7 +164,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/margin_funding_spread.schema.json",
-      "bytes": 1738,
+      "bytes": 1817,
       "kind": "input",
       "path": "schemas/margin/1/margin_funding_spread.schema.json",
       "summary": "Explicit flat or dated basis-point funding spread for posted IM.",

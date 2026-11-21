@@ -157,8 +157,10 @@ dependency; `dates::create_date` avoids that.
 ```rust
 use finstack_quant_core::cashflow::npv;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::money::Money;
 use time::macros::date;
 
@@ -167,7 +169,10 @@ fn main() -> finstack_quant_core::Result<()> {
 
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(base)
+        .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, 0.952), (5.0, 0.78)])
+        .interp(InterpStyle::Linear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .build()?;
 
     // MarketContext is immutable; `insert` returns a new context.

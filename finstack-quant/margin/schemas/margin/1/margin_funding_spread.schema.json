@@ -2,6 +2,12 @@
   "$id": "https://finstack_quant.dev/schemas/margin/1/margin_funding_spread.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Explicit flat or dated basis-point funding spread for posted IM.",
+  "examples": [
+    {
+      "kind": "flat",
+      "spread_bp": 50.0
+    }
+  ],
   "oneOf": [
     {
       "additionalProperties": false,

@@ -114,8 +114,8 @@ class ForwardRateAgreement:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import ForwardRateAgreement
-        >>> forward rate agreement = ForwardRateAgreement.example()
-        >>> ForwardRateAgreement.from_json(forward rate agreement.to_json()).id == forward rate agreement.id
+        >>> contract = ForwardRateAgreement.example()
+        >>> ForwardRateAgreement.from_json(contract.to_json()).id == contract.id
         True
         """
         ...

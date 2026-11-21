@@ -199,6 +199,20 @@ fn vol_cube_expiry_slice_examples() -> Result<Vec<Value>> {
     example(&slice)
 }
 
+/// Exact fit of y = 1 + 2x on the three predictors -1, 0 and 1.
+fn ols_result_examples() -> Result<Vec<Value>> {
+    example(&OlsResult {
+        coefficients: vec![2.0],
+        intercept: Some(1.0),
+        r_squared: 1.0,
+        adj_r_squared: 1.0,
+        residual_std_error: 0.0,
+        residuals: vec![0.0; 3],
+        n_obs: 3,
+        n_features: 1,
+    })
+}
+
 /// The core crate's schema registry.
 ///
 /// This lives beside the emitter rather than in the generator binary, so the
@@ -211,7 +225,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "ols_result",
         Output,
         "Ordinary least-squares coefficients, residuals and fit diagnostics."
-    ),
+    )
+    .with_examples(ols_result_examples),
     crate::schema_artifact!(
     MarketContextState,
     "market_data",

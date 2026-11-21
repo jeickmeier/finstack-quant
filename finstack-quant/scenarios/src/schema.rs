@@ -43,6 +43,11 @@ fn scenario_spec_examples() -> finstack_quant_core::Result<Vec<serde_json::Value
     finstack_quant_core::schema::example(&example_scenario_spec())
 }
 
+/// Structural diagnostics for the same valid curve shock as the input example.
+fn scenario_validation_report_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
+    finstack_quant_core::schema::example(&crate::validate_scenario_spec(&example_scenario_spec()))
+}
+
 /// The metadata of the built-in 2008 global-financial-crisis template.
 fn template_metadata_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
     let registry = crate::templates::TemplateRegistry::embedded_builtins()?;
@@ -166,7 +171,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "scenario_validation_report",
         Output,
         "Structural validation diagnostics without scenario application."
-    ),
+    )
+    .with_examples(scenario_validation_report_examples),
     finstack_quant_core::schema_artifact!(
         TemplateMetadata,
         "scenarios",

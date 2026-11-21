@@ -28,7 +28,7 @@
 //! }
 //!
 //! // Get optimal beta and statistics for control variate adjustment
-//! let beta = cov.optimal_beta()?;
+//! let beta = cov.get_optimal_beta()?;
 //! let mc_mean = cov.get_mean_x()?;
 //! let control_mean = cov.get_mean_y()?;
 //! # Ok::<(), finstack_quant_core::Error>(())

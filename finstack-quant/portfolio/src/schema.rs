@@ -40,6 +40,7 @@ use finstack_quant_valuations::results::ValuationResult;
 use serde_json::Value;
 
 mod examples;
+mod margin_examples;
 
 const INSTRUMENT_SCHEMA_URI: &str =
     "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json";
@@ -77,7 +78,7 @@ pub fn package_materialization_schema(schema: &mut Value) -> Result<()> {
     externalize_schema_definitions(schema, EXTERNAL_DEFINITIONS)
 }
 
-/// The one-deposit portfolio every portfolio example describes.
+/// The one-deposit fixture used by the portfolio materialization examples.
 fn example_portfolio() -> Result<crate::Portfolio> {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
@@ -415,39 +416,48 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     finstack_quant_core::schema_artifact!(
         ExposureCashVm, "portfolio", "exposure_cash_vm", Input,
         "Cash variation margin terms and signed settled balance at exposure valuation."
-    ),
+    )
+    .with_examples(margin_examples::exposure_cash_vm),
     finstack_quant_core::schema_artifact!(
         ExposureSimulationConfig, "portfolio", "exposure_simulation_config", Input,
         "Dated simulated market states, factor mappings, legal scope and optional cash collateral."
-    ),
+    )
+    .with_examples(margin_examples::exposure_simulation_config),
     finstack_quant_core::schema_artifact!(
         PortfolioFrtbConfig, "portfolio", "portfolio_frtb_config", Input,
         "Exact sources for ordinary portfolio GIRR yield and single-name CDS CSR delta."
-    ),
+    )
+    .with_examples(margin_examples::portfolio_frtb_config),
     finstack_quant_core::schema_artifact!(
         PortfolioFrtbSensitivitiesResult, "portfolio", "portfolio_frtb_sensitivities_result", Output,
         "Qualified ordinary portfolio delta grids, evidence and position coverage."
-    ),
+    )
+    .with_examples(margin_examples::portfolio_frtb_sensitivities_result),
     finstack_quant_core::schema_artifact!(
         CsrQuoteClassification, "portfolio", "csr_quote_classification", Input,
         "Dated issuer identity and approved ordinary CSR risk bucket."
-    ),
+    )
+    .with_examples(margin_examples::csr_quote_classification),
     finstack_quant_core::schema_artifact!(
         CsrQuoteSource, "portfolio", "csr_quote_source", Input,
         "Qualified issuer curve and binding for each of five non-securitisation CSR vertices."
-    ),
+    )
+    .with_examples(margin_examples::csr_quote_source),
     finstack_quant_core::schema_artifact!(
         CsrQuoteDelta, "portfolio", "csr_quote_delta", Output,
         "Ordinary non-securitisation CSR sensitivities and signed issuer CDS quote reprices."
-    ),
+    )
+    .with_examples(margin_examples::csr_quote_delta),
     finstack_quant_core::schema_artifact!(
         GirrQuoteTarget, "portfolio", "girr_quote_target", Input,
         "Exact ordinary GIRR quote mapping at one regulatory vertex."
-    ),
+    )
+    .with_examples(margin_examples::girr_quote_target),
     finstack_quant_core::schema_artifact!(
         GirrQuoteDelta, "portfolio", "girr_quote_delta", Output,
         "Ordinary GIRR regulatory inputs and their signed position-level quote reprices."
-    ),
+    )
+    .with_examples(margin_examples::girr_quote_delta),
     finstack_quant_core::schema_artifact!(
         PortfolioMarginResult,
         "portfolio",

@@ -54,6 +54,37 @@ fn step_params_examples() -> finstack_quant_core::Result<Vec<Value>> {
     }))
 }
 
+/// Bootstrap the first USD discount-curve pillar from a one-month SOFR deposit.
+fn step_with_quotes_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    use crate::api::market_datum::MarketDatum;
+    use crate::api::schema::{CalibrationStep, DiscountCurveParams, StepParams};
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
+
+    let base_date =
+        time::Date::from_calendar_date(2025, time::Month::January, 15).map_err(|error| {
+            finstack_quant_core::Error::Internal(format!("example base date: {error}"))
+        })?;
+    example(&StepWithQuotes {
+        step: CalibrationStep {
+            id: "usd_discount".into(),
+            quote_set: "usd_deposits".into(),
+            params: StepParams::Discount(DiscountCurveParams {
+                curve_id: "USD-OIS".into(),
+                currency: Currency::USD,
+                base_date,
+                method: Default::default(),
+                interpolation: InterpStyle::LogLinear,
+                extrapolation: ExtrapolationPolicy::Extend,
+                pricing_discount_id: None,
+                pricing_forward_id: None,
+                conventions: Default::default(),
+            }),
+        },
+        quotes: vec![MarketDatum::RateQuote(rate_quote_example()?)],
+    })
+}
+
 /// A 5Y-into-5Y ATM swaption at 88 bp normal volatility.
 fn hull_white_swaption_quote_examples() -> finstack_quant_core::Result<Vec<Value>> {
     example(&crate::hull_white::SwaptionQuote::new(
@@ -182,7 +213,8 @@ fn build_artifacts() -> Vec<SchemaArtifact> {
             title = "Step With Quotes"
         )
         .with_packager(finstack_quant_valuations_core::schema::package_valuations_schema)
-        .with_kind(SchemaKind::Input),
+        .with_kind(SchemaKind::Input)
+        .with_examples(step_with_quotes_examples),
         finstack_quant_core::schema_artifact!(
     CalibrationEnvelope,
     "calibration",

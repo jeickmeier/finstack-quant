@@ -841,15 +841,14 @@ fn test_registry_default_prices_with_instrument_hw1f_overrides() {
     assert!(result.value.amount().is_finite());
 }
 
-/// Defaults must replay the original 50,000 RNG streams (100,000 antithetic
-/// paths) exactly as an explicit configuration. The historical PV remains a
-/// separate numerical anchor: pairing observations before Welford aggregation
-/// changes floating-point reduction order, while preserving the sample mean
-/// mathematically. That reduction need not reproduce the former unpaired mean
-/// bit-for-bit; the allowance below is only floating-point rounding, not MC error.
+/// Defaults must replay 50,000 RNG streams (100,000 antithetic paths) exactly
+/// as an explicit configuration, and price the same claim as a refined tree.
+/// A historical Monte Carlo bit pattern is not an independent accuracy
+/// reference: changing the uniform-to-normal transform changes its samples,
+/// even when both transforms have the same standard-normal distribution.
 #[test]
 #[ignore = "slow: two full-default LSMC valuations exceed the 60s CI budget; covered by mise run rust-test --slow"]
-fn lsmc_default_mc_pv_unchanged() {
+fn lsmc_defaults_replay_and_match_tree() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
     let swap_end = Date::from_calendar_date(2030, Month::January, 1).expect("Valid date");
     let first_exercise = Date::from_calendar_date(2027, Month::January, 1).expect("Valid date");
@@ -887,18 +886,38 @@ fn lsmc_default_mc_pv_unchanged() {
     assert_eq!(result.measures["lsmc_num_paths"], 50_000.0);
     assert_eq!(result.measures["lsmc_seed"], 42.0);
 
-    // Numerical anchor, allowing only floating-point reduction-order noise
-    // (32 ULPs is far below USD 0.000001 at this price). It was re-captured
-    // when the θ(t) fit started following the forward jumps of this
-    // log-linear curve: the earlier anchor, 2.82MM on a 10MM notional, was
-    // eleven times the tree price.
-    let legacy_bits = 0x410e27094c608fbd_u64;
-    let rounding_ulps = result.value.amount().to_bits().abs_diff(legacy_bits);
+    // Use the independent tree algorithm with the same market-resolved HW1F
+    // parameters. Require refinement within 0.1 bp of notional, as in the
+    // grid/seed acceptance test below, rather than re-baselining an MC draw.
+    let tree_values = [800, 1600].map(|tree_steps| {
+        BermudanSwaptionPricer::tree_with_config(BermudanSwaptionPricerConfig {
+            tree_steps,
+            ..Default::default()
+        })
+        .price_dyn(&swaption, &market, as_of)
+        .expect("reference tree price")
+        .value
+        .amount()
+    });
+    let tree_refinement = (tree_values[1] - tree_values[0]).abs();
+    let tree_budget = swaption.notional.amount() * 1e-5;
     assert!(
-        rounding_ulps <= 32,
-        "pv={} differs from legacy PV={} by {rounding_ulps} ULPs",
-        result.value.amount(),
-        f64::from_bits(legacy_bits),
+        tree_refinement < tree_budget,
+        "tree refinement {tree_values:?} exceeds {tree_budget}"
+    );
+    let stderr = result.measures["mc_stderr"];
+    // Do not let a broken uncertainty estimate make the accuracy check pass.
+    assert!(stderr.is_finite() && stderr > 0.0);
+    assert!(stderr < swaption.notional.amount() * 1e-4);
+    let error = (result.value.amount() - tree_values[1]).abs();
+    assert!(
+        error < 4.0 * stderr + tree_refinement,
+        "default LSMC={} vs tree={tree_values:?}: error={error}, stderr={stderr}, tree refinement={tree_refinement}",
+        result.value.amount()
+    );
+    eprintln!(
+        "default LSMC={}, stderr={stderr}, tree={tree_values:?}, error={error}",
+        result.value.amount()
     );
 }
 
