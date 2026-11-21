@@ -64,13 +64,32 @@ pub(super) fn adder_vols_from_history(
         {
             continue;
         }
-        let ann_var = match vol_model {
-            VolModelChoice::Sample => sample_variance_annualized(series, annualization_factor),
-            VolModelChoice::Ewma { lambda } => ewma_variance(series, lambda, annualization_factor),
-        };
+        let ann_var = variance_for_choice(series, vol_model, annualization_factor);
         out.insert(issuer.clone(), ann_var.sqrt());
     }
     out
+}
+
+fn variance_for_choice(
+    series: &[Option<f64>],
+    vol_model: VolModelChoice,
+    annualization_factor: f64,
+) -> f64 {
+    match vol_model {
+        VolModelChoice::Sample => sample_variance_annualized(series, annualization_factor),
+        VolModelChoice::Ewma { lambda } => ewma_variance(series, lambda, annualization_factor),
+    }
+}
+
+fn collect_series_refs<'a>(
+    factor_id_order: &[FactorId],
+    factor_returns: &'a BTreeMap<FactorId, Vec<Option<f64>>>,
+    empty: &'a [Option<f64>],
+) -> Vec<&'a [Option<f64>]> {
+    factor_id_order
+        .iter()
+        .map(|fid| factor_returns.get(fid).map(Vec::as_slice).unwrap_or(empty))
+        .collect()
 }
 
 /// Step 6 (part B): build the peer proxy index for the bucket-peer cascade.
@@ -245,18 +264,17 @@ pub(super) fn ewma_variance(series: &[Option<f64>], lambda: f64, annualization_f
 ///   see [`sample_variance_annualized`].
 /// - [`VolModelChoice::Ewma`]: RiskMetrics exponentially weighted variance;
 ///   see [`ewma_variance`].
-pub(crate) fn factor_variances(
+pub(super) fn factor_variances(
     factor_returns: &BTreeMap<FactorId, Vec<Option<f64>>>,
     vol_model: VolModelChoice,
     annualization_factor: f64,
 ) -> BTreeMap<FactorId, f64> {
     let mut out = BTreeMap::new();
     for (fid, series) in factor_returns {
-        let var = match vol_model {
-            VolModelChoice::Sample => sample_variance_annualized(series, annualization_factor),
-            VolModelChoice::Ewma { lambda } => ewma_variance(series, lambda, annualization_factor),
-        };
-        out.insert(fid.clone(), var);
+        out.insert(
+            fid.clone(),
+            variance_for_choice(series, vol_model, annualization_factor),
+        );
     }
     out
 }
@@ -292,11 +310,7 @@ pub(super) fn sample_correlation_flat(
     }
 
     // Materialise each factor's series (missing factors get an empty series).
-    let empty: Vec<Option<f64>> = vec![];
-    let series: Vec<&Vec<Option<f64>>> = factor_id_order
-        .iter()
-        .map(|fid| factor_returns.get(fid).unwrap_or(&empty))
-        .collect();
+    let series = collect_series_refs(factor_id_order, factor_returns, &[]);
 
     // Flat row-major result — diagonal = 1.0, off-diagonal filled below.
     let mut rho = vec![0.0_f64; n * n];
@@ -368,18 +382,15 @@ pub(super) fn ledoit_wolf_cov_and_corr(
     annualization_factor: f64,
 ) -> Result<(Vec<Vec<f64>>, Vec<f64>)> {
     let n = factor_id_order.len();
-    let empty: Vec<Option<f64>> = vec![];
-    let series: Vec<&Vec<Option<f64>>> = factor_id_order
-        .iter()
-        .map(|fid| factor_returns.get(fid).unwrap_or(&empty))
-        .collect();
+    let series = collect_series_refs(factor_id_order, factor_returns, &[]);
     let t_max = series.iter().map(|s| s.len()).max().unwrap_or(0);
 
     // Complete-case rows: dates where every factor is observed.
     let mut rows: Vec<f64> = Vec::new();
+    let mut row = Vec::with_capacity(n);
     let mut t_complete = 0usize;
     for date_idx in 0..t_max {
-        let mut row = Vec::with_capacity(n);
+        row.clear();
         let mut complete = true;
         for s in &series {
             match s.get(date_idx).copied().flatten() {

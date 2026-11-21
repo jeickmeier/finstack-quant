@@ -48,56 +48,26 @@ impl PanelFrequency {
         }
     }
 
-    /// Date `steps` periods after `origin` on this frequency's regular grid.
+    /// Date `steps` periods after `origin` on a monthly or quarterly grid.
     ///
     /// Monthly and quarterly grids are generated from `origin`, not by
     /// walking one step at a time. That keeps a 28th-of-month series on the
     /// 28th even when February is a month-end, and keeps a month-end origin
     /// on month-end (Jan 31 → Feb 28/29 → Mar 31).
-    ///
-    /// # Arguments
-    ///
-    /// * `origin` - First observation on the panel. Daily steps `steps`
-    ///   business days (Monday–Friday, no holiday calendar) and requires a
-    ///   weekday origin; monthly/quarterly use [`DateExt::add_months`] from
-    ///   this origin (`steps * 1` or `steps * 3` months). When `origin` is
-    ///   end-of-month, every later date is also end-of-month.
-    /// * `steps` - Number of periods after `origin`. Must be non-negative.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`finstack_quant_core::Error::Validation`] when a daily step
-    /// overflows the representable date range or a daily `origin` falls on a
-    /// weekend.
-    pub fn date_after(self, origin: Date, steps: i32) -> finstack_quant_core::Result<Date> {
+    pub(super) fn month_grid_date_after(
+        self,
+        origin: Date,
+        steps: i32,
+    ) -> finstack_quant_core::Result<Date> {
         if steps < 0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "CreditCalibrator: panel step count must be >= 0, got {steps}"
             )));
         }
         match self {
-            Self::Daily => {
-                if origin.is_weekend() {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "CreditCalibrator: daily panel origin {origin:?} falls on a weekend; \
-                         business-day grids start on a weekday"
-                    )));
-                }
-                let mut date = origin;
-                for _ in 0..steps {
-                    loop {
-                        date = date.next_day().ok_or_else(|| {
-                            finstack_quant_core::Error::Validation(format!(
-                                "CreditCalibrator: daily panel overflows the date range after {origin:?}"
-                            ))
-                        })?;
-                        if !date.is_weekend() {
-                            break;
-                        }
-                    }
-                }
-                Ok(date)
-            }
+            Self::Daily => Err(finstack_quant_core::Error::Validation(
+                "CreditCalibrator: Daily grids use business-day gap checks, not month steps".into(),
+            )),
             Self::Monthly => step_months_from_origin(origin, steps),
             Self::Quarterly => step_months_from_origin(
                 origin,

@@ -20,8 +20,9 @@
 use crate::credit::hierarchy::{CreditFactorModel, IdiosyncraticVolModel};
 use crate::{FactorCovarianceMatrix, FactorModelConfig, RiskMeasure};
 use finstack_quant_core::types::IssuerId;
+use finstack_quant_core::{Error, Result};
 
-/// Forecast horizon used to scale a calibrated `Sample` vol estimate.
+/// Forecast horizon used to scale a calibrated `Sample` or `Ewma` vol estimate.
 ///
 /// Supports annualized period counts and explicit fractional-year
 /// horizons. The `Custom` variant from the design spec is not
@@ -48,6 +49,27 @@ pub enum VolHorizon {
     Unconditional,
 }
 
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct YearsHorizonSpec {
+    years: f64,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NStepsHorizonSpec {
+    n_steps: u64,
+    #[serde(default)]
+    periods_per_year: Option<f64>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(untagged)]
+enum HorizonObjectSpec {
+    Years(YearsHorizonSpec),
+    NSteps(NStepsHorizonSpec),
+}
+
 impl VolHorizon {
     /// Parse a horizon descriptor string into a [`VolHorizon`].
     ///
@@ -70,49 +92,49 @@ impl VolHorizon {
     ///
     /// # Errors
     ///
-    /// Returns a human-readable error message for an unrecognized descriptor
-    /// or an invalid year fraction, period count, or periods-per-year value.
-    pub fn parse(s: &str) -> Result<VolHorizon, String> {
+    /// Returns [`Error::Validation`] for an unrecognized descriptor, unknown or
+    /// conflicting JSON fields, or an invalid year fraction, period count, or
+    /// periods-per-year value.
+    pub fn parse(s: &str) -> Result<VolHorizon> {
         match s.trim() {
             "one_step" => Ok(VolHorizon::OneStep),
             "unconditional" => Ok(VolHorizon::Unconditional),
             other => {
-                // Try JSON object {"years": Y} or {"n_steps": N}.
-                let v: serde_json::Value = serde_json::from_str(other).map_err(|_| {
-                    format!(
+                let spec: HorizonObjectSpec = serde_json::from_str(other).map_err(|_| {
+                    Error::Validation(format!(
                         "invalid horizon {other:?}: expected \"one_step\", \"unconditional\", \
                          {{\"years\": Y}}, or {{\"n_steps\": N}}"
-                    )
+                    ))
                 })?;
-                if let Some(years) = v.get("years").and_then(serde_json::Value::as_f64) {
-                    if !(years.is_finite() && years >= 0.0) {
-                        return Err(format!(
-                            "invalid horizon object {other:?}: years must be finite and non-negative"
-                        ));
+                match spec {
+                    HorizonObjectSpec::Years(YearsHorizonSpec { years }) => Self::years(years),
+                    HorizonObjectSpec::NSteps(NStepsHorizonSpec {
+                        n_steps,
+                        periods_per_year: Some(periods_per_year),
+                    }) => {
+                        if !(periods_per_year.is_finite() && periods_per_year > 0.0) {
+                            return Err(Error::Validation(format!(
+                                "invalid horizon object {other:?}: periods_per_year must be \
+                                 finite and positive"
+                            )));
+                        }
+                        #[allow(clippy::cast_precision_loss)]
+                        let years = n_steps as f64 / periods_per_year;
+                        Self::years(years)
                     }
-                    return Ok(VolHorizon::Years(years));
-                }
-                let n = v
-                    .get("n_steps")
-                    .and_then(serde_json::Value::as_u64)
-                    .ok_or_else(|| {
-                        format!(
-                            "invalid horizon object {other:?}: expected {{\"years\": Y}} or \
-                             {{\"n_steps\": N}}"
-                        )
-                    })?;
-                if let Some(periods_per_year) = v
-                    .get("periods_per_year")
-                    .and_then(serde_json::Value::as_f64)
-                {
-                    if !(periods_per_year.is_finite() && periods_per_year > 0.0) {
-                        return Err(format!(
-                            "invalid horizon object {other:?}: periods_per_year must be finite and positive"
-                        ));
+                    HorizonObjectSpec::NSteps(NStepsHorizonSpec {
+                        n_steps,
+                        periods_per_year: None,
+                    }) => {
+                        let steps = usize::try_from(n_steps).map_err(|_| {
+                            Error::Validation(format!(
+                                "invalid horizon object {other:?}: n_steps {n_steps} exceeds \
+                                 usize::MAX"
+                            ))
+                        })?;
+                        Ok(VolHorizon::NSteps(steps))
                     }
-                    return Ok(VolHorizon::Years(n as f64 / periods_per_year));
                 }
-                Ok(VolHorizon::NSteps(n as usize))
             }
         }
     }
@@ -127,12 +149,14 @@ impl VolHorizon {
     ///
     /// # Errors
     ///
-    /// Returns a message if `years` is NaN, infinite or negative.
-    pub fn years(years: f64) -> Result<VolHorizon, String> {
+    /// Returns [`Error::Validation`] if `years` is NaN, infinite or negative.
+    pub fn years(years: f64) -> Result<VolHorizon> {
         if years.is_finite() && years >= 0.0 {
             Ok(VolHorizon::Years(years))
         } else {
-            Err("years must be finite and non-negative".to_owned())
+            Err(Error::Validation(
+                "years must be finite and non-negative".to_owned(),
+            ))
         }
     }
 
@@ -579,6 +603,9 @@ mod tests {
             VolHorizon::Years(10.0 / 252.0)
         );
         assert!(VolHorizon::parse(r#"{"years": -0.1}"#).is_err());
+        assert!(VolHorizon::parse(r#"{"years": 1.0, "n_steps": 5}"#).is_err());
+        assert!(VolHorizon::parse(r#"{"n_steps": 5, "periods_per_year": "abc"}"#).is_err());
+        assert!(VolHorizon::parse(r#"{"years": 1.0, "extra": 1}"#).is_err());
         assert!(VolHorizon::parse("unknown").is_err());
     }
 }

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use finstack_quant_core::Result;
@@ -17,7 +18,7 @@ use super::peel_fit::run_peel;
 use super::statistics::{
     adder_vols_from_history, assign_adder_vol, build_peer_proxy_index, factor_variances,
 };
-use super::validation::{validate_calibration_config, validate_calibration_inputs, validation_err};
+use super::validation::{validate_calibration_config, validate_calibration_inputs};
 use crate::credit::hierarchy::{
     CreditFactorModel, CreditFactorModelSchema, DateRange, IssuerBetaMode, IssuerBetaRow,
     IssuerBetas,
@@ -82,43 +83,10 @@ impl CreditCalibrator {
             inputs.history_panel.spreads.keys(),
             &inputs.spread_durations,
             &inputs.as_of_spreads,
-        )
-        .map_err(validation_err)?;
+        )?;
 
-        // -- Structural validation of inputs. -------------------------------
         let dates = &inputs.history_panel.dates;
-        if dates.is_empty() {
-            return Err(validation_err(
-                "CreditCalibrator: history_panel.dates is empty",
-            ));
-        }
-        if inputs.generic_factor.values.len() != dates.len() {
-            return Err(validation_err(format!(
-                "CreditCalibrator: generic_factor.values length {} != dates length {}",
-                inputs.generic_factor.values.len(),
-                dates.len()
-            )));
-        }
-        for (issuer, series) in &inputs.history_panel.spreads {
-            if series.len() != dates.len() {
-                return Err(validation_err(format!(
-                    "CreditCalibrator: spread series for issuer {:?} has length {}, expected {}",
-                    issuer.as_str(),
-                    series.len(),
-                    dates.len()
-                )));
-            }
-        }
-
-        let asof_idx = dates
-            .iter()
-            .position(|d| *d == inputs.as_of)
-            .ok_or_else(|| {
-                validation_err(format!(
-                    "CreditCalibrator: as_of {:?} not present in history_panel.dates",
-                    inputs.as_of
-                ))
-            })?;
+        let asof_idx = dates.len() - 1;
 
         // -- 1. Mode classification. ----------------------------------------
         let mut modes: BTreeMap<IssuerId, IssuerBetaMode> = BTreeMap::new();
@@ -148,15 +116,15 @@ impl CreditCalibrator {
             &self.config.use_returns_or_levels,
             &inputs.history_panel.spreads,
             &inputs.spread_durations,
-        )
-        .map_err(validation_err)?;
+        )?;
 
         // -- 3. Bucket inventory + fold-up. ---------------------------------
-        let inventory =
-            build_bucket_inventory(&self.config.hierarchy, &inputs.issuer_tags.tags, &modes)?;
+        let inventory = build_bucket_inventory(
+            &self.config.hierarchy,
+            &inputs.issuer_tags.tags,
+            inputs.history_panel.spreads.keys(),
+        )?;
         let (folded, fold_ups) = apply_fold_up(&inventory, &self.config.min_bucket_size_per_level);
-        let bucket_sizes_per_level = inventory.bucket_sizes_per_level.clone();
-        let tag_taxonomy = inventory.tag_taxonomy.clone();
 
         // -- 4 + 5. PC peel + per-level peel. -------------------------------
         let peel_outcome = run_peel(
@@ -179,20 +147,24 @@ impl CreditCalibrator {
         // [`crate::FactorCovarianceMatrix`].
         let (stat_factor_returns, stat_adder_series) = match self.config.use_returns_or_levels {
             super::config::PanelSpace::Returns => (
-                peel_outcome.factor_returns.clone(),
-                peel_outcome.adder_series.clone(),
+                Cow::Borrowed(&peel_outcome.factor_returns),
+                Cow::Borrowed(&peel_outcome.adder_series),
             ),
             super::config::PanelSpace::Levels => (
-                peel_outcome
-                    .factor_returns
-                    .iter()
-                    .map(|(fid, series)| (fid.clone(), super::panel::diff_sparse(series)))
-                    .collect(),
-                peel_outcome
-                    .adder_series
-                    .iter()
-                    .map(|(issuer, series)| (issuer.clone(), super::panel::diff_sparse(series)))
-                    .collect(),
+                Cow::Owned(
+                    peel_outcome
+                        .factor_returns
+                        .iter()
+                        .map(|(fid, series)| (fid.clone(), super::panel::diff_sparse(series)))
+                        .collect(),
+                ),
+                Cow::Owned(
+                    peel_outcome
+                        .adder_series
+                        .iter()
+                        .map(|(issuer, series)| (issuer.clone(), super::panel::diff_sparse(series)))
+                        .collect(),
+                ),
             ),
         };
 
@@ -218,12 +190,12 @@ impl CreditCalibrator {
         let anchor = anchor_levels(
             &self.config.hierarchy,
             &inputs.as_of_spreads,
-            &inputs.issuer_tags.tags,
+            &inventory.bucket_paths,
             generic_at_asof,
             &peel_outcome.betas,
             &folded,
             &anchor_weights,
-        )?;
+        );
 
         // -- 8. Per-factor variance forecast (sample or EWMA), over moves. --
         let factor_variances = factor_variances(
@@ -286,8 +258,6 @@ impl CreditCalibrator {
                 spread_duration,
             });
         }
-        // BTreeMap iteration is already sorted by issuer_id, but be defensive.
-        issuer_betas.sort_by(|a, b| a.issuer_id.as_str().cmp(b.issuer_id.as_str()));
 
         // -- 9. Correlation matrix and covariance assembly. -----------------
         let factor_id_order = build_factor_id_order(&peel_outcome.factor_returns);
@@ -306,20 +276,16 @@ impl CreditCalibrator {
         // -- 11. Diagnostics. -----------------------------------------------
         let diagnostics = build_diagnostics(
             &modes,
-            bucket_sizes_per_level,
+            inventory.bucket_sizes_per_level,
             fold_ups,
             &peel_outcome.fit_quality,
-            tag_taxonomy,
+            inventory.tag_taxonomy,
         );
 
         // -- 12. Bundle artifact + final validate(). ------------------------
         let calibration_window = DateRange {
-            start: *dates
-                .first()
-                .ok_or_else(|| validation_err("dates non-empty checked above"))?,
-            end: *dates
-                .last()
-                .ok_or_else(|| validation_err("dates non-empty checked above"))?,
+            start: dates[0],
+            end: dates[asof_idx],
         };
 
         let factor_histories = Some(build_factor_histories(

@@ -43,8 +43,8 @@
 //!
 //! The anchoring step (step 7) implements the same math as
 //! [`decompose_levels`][crate::credit::decomposition::decompose_levels]
-//! but is called via a private helper because we don't yet have a fully
-//! assembled [`CreditFactorModel`][crate::credit::hierarchy::CreditFactorModel]
+//! using the bucket paths already validated in step 3 because we don't yet have
+//! a complete [`CreditFactorModel`][crate::credit::hierarchy::CreditFactorModel]
 //! at that point in the pipeline.
 //!
 //! # Determinism note on OLS

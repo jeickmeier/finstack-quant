@@ -6,6 +6,7 @@ mod filter;
 mod matchers;
 
 pub use config::{HierarchicalConfig, MatchingConfig};
+pub(crate) use credit::bucket_factor_id_from_path;
 pub use credit::{
     CREDIT_GENERIC_FACTOR_ID, CreditHierarchicalConfig, ISSUER_ID_META_KEY, bucket_factor_id,
     parse_bucket_factor_id,

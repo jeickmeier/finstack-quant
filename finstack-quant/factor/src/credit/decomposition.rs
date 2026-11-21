@@ -26,12 +26,12 @@
 //! All keyed maps are [`std::collections::BTreeMap`] so the output is byte-stable for byte-stable
 //! input. The function performs no I/O and reads no global state.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use crate::credit::hierarchy::{
     CreditFactorModel, HierarchyDimension, IssuerBetaRow, IssuerBetas, IssuerTags,
 };
-use crate::credit::units::{decimal_to_bp, validate_decimal_spread};
+use crate::credit::units::{decimal_to_bp, ensure_finite, validate_decimal_spread};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::types::IssuerId;
 
@@ -102,16 +102,6 @@ pub struct PeriodDecomposition {
     /// Per-issuer adder deltas (`to - from`), restricted to issuers present
     /// in both snapshots.
     pub d_adder: BTreeMap<IssuerId, f64>,
-}
-
-fn ensure_finite(label: &str, value: f64) -> finstack_quant_core::Result<()> {
-    if value.is_finite() {
-        Ok(())
-    } else {
-        Err(finstack_quant_core::Error::Validation(format!(
-            "{label} must be finite, got {value}"
-        )))
-    }
 }
 
 /// Deserialize `json` as `T`, naming `type_name` in the validation error.
@@ -202,13 +192,13 @@ impl LevelsAtDate {
         for level in &self.by_level {
             for (bucket, value) in &level.values {
                 ensure_finite(
-                    &format!("by_level[{}].values[{bucket}]", level.level_index),
+                    format!("by_level[{}].values[{bucket}]", level.level_index),
                     *value,
                 )?;
             }
         }
         for (issuer, value) in &self.adder {
-            ensure_finite(&format!("adder[{}]", issuer.as_str()), *value)?;
+            ensure_finite(format!("adder[{}]", issuer.as_str()), *value)?;
         }
         Ok(())
     }
@@ -275,13 +265,13 @@ impl PeriodDecomposition {
         for level in &self.by_level {
             for (bucket, value) in &level.deltas {
                 ensure_finite(
-                    &format!("by_level[{}].deltas[{bucket}]", level.level_index),
+                    format!("by_level[{}].deltas[{bucket}]", level.level_index),
                     *value,
                 )?;
             }
         }
         for (issuer, value) in &self.d_adder {
-            ensure_finite(&format!("d_adder[{}]", issuer.as_str()), *value)?;
+            ensure_finite(format!("d_adder[{}]", issuer.as_str()), *value)?;
         }
         Ok(())
     }
@@ -495,7 +485,7 @@ pub fn decompose_levels(
             });
         }
     }
-    let mut folded_pairs: BTreeSet<(IssuerId, usize)> = BTreeSet::new();
+    let mut folded_owned: BTreeMap<IssuerId, Vec<bool>> = BTreeMap::new();
     for record in &model.diagnostics.fold_ups {
         if record.level_index >= num_levels {
             return Err(DecompositionError::ModelInconsistent {
@@ -506,7 +496,9 @@ pub fn decompose_levels(
                 ),
             });
         }
-        folded_pairs.insert((record.issuer_id.clone(), record.level_index));
+        folded_owned
+            .entry(record.issuer_id.clone())
+            .or_insert_with(|| vec![false; num_levels])[record.level_index] = true;
     }
 
     // Pre-resolve, for every issuer in the input spread map, the
@@ -560,12 +552,6 @@ pub fn decompose_levels(
         .iter()
         .map(|(issuer, resolved)| (*issuer, resolved.betas))
         .collect();
-    let mut folded_owned: BTreeMap<IssuerId, Vec<bool>> = BTreeMap::new();
-    for (issuer, level_index) in folded_pairs {
-        folded_owned
-            .entry(issuer)
-            .or_insert_with(|| vec![false; num_levels])[level_index] = true;
-    }
     let mut durations = BTreeMap::new();
     for issuer in observed_spreads.keys() {
         if let Some(row) = beta_idx.get(issuer) {
@@ -582,7 +568,12 @@ pub fn decompose_levels(
         &durations,
         observed_spreads,
     )
-    .map_err(|reason| DecompositionError::InvalidDtsWeight { reason })?;
+    .map_err(|err| DecompositionError::InvalidDtsWeight {
+        reason: match err {
+            finstack_quant_core::Error::Validation(msg) => msg,
+            other => other.to_string(),
+        },
+    })?;
     let peel = super::peel::peel_single_observation(super::peel::PeelSingleObservation {
         observed_spreads,
         observed_generic,

@@ -7,24 +7,14 @@ use super::config::{
 use super::inputs::CreditCalibrationInputs;
 use crate::credit::hierarchy::dimension_key;
 use crate::credit::peel::dts_spread_duration;
-use crate::credit::units::validate_decimal_spread;
+use crate::credit::units::{ensure_finite, validate_decimal_spread};
 
 pub(super) fn validation_err(msg: impl Into<String>) -> Error {
     Error::Validation(msg.into())
 }
 
-fn validate_finite(label: impl std::fmt::Display, value: f64) -> Result<()> {
-    if value.is_finite() {
-        Ok(())
-    } else {
-        Err(validation_err(format!(
-            "{label} must be finite, got {value}"
-        )))
-    }
-}
-
 fn validate_non_negative_finite(label: impl std::fmt::Display, value: f64) -> Result<()> {
-    validate_finite(&label, value)?;
+    ensure_finite(&label, value)?;
     if value >= 0.0 {
         Ok(())
     } else {
@@ -36,7 +26,7 @@ fn validate_non_negative_finite(label: impl std::fmt::Display, value: f64) -> Re
 
 pub(super) fn validate_calibration_config(config: &CreditCalibrationConfig) -> Result<()> {
     if let BetaShrinkage::TowardOne { alpha } = config.beta_shrinkage {
-        validate_finite("CreditCalibrator: beta_shrinkage alpha", alpha)?;
+        ensure_finite("CreditCalibrator: beta_shrinkage alpha", alpha)?;
         if !(0.0..=1.0).contains(&alpha) {
             return Err(validation_err(format!(
                 "CreditCalibrator: beta_shrinkage alpha must be in [0, 1], got {alpha}"
@@ -49,7 +39,7 @@ pub(super) fn validate_calibration_config(config: &CreditCalibrationConfig) -> R
     }
 
     if let VolModelChoice::Ewma { lambda } = config.vol_model {
-        validate_finite("CreditCalibrator: ewma lambda", lambda)?;
+        ensure_finite("CreditCalibrator: ewma lambda", lambda)?;
         if !(lambda > 0.0 && lambda < 1.0) {
             return Err(validation_err(format!(
                 "CreditCalibrator: ewma lambda must be in the open interval (0, 1), got {lambda}"
@@ -77,10 +67,34 @@ pub(super) fn validate_calibration_inputs(
     inputs: &CreditCalibrationInputs,
     config: &CreditCalibrationConfig,
 ) -> Result<()> {
+    let dates = &inputs.history_panel.dates;
+    if dates.is_empty() {
+        return Err(validation_err(
+            "CreditCalibrator: history_panel.dates is empty",
+        ));
+    }
+    if inputs.generic_factor.values.len() != dates.len() {
+        return Err(validation_err(format!(
+            "CreditCalibrator: generic_factor.values length {} != dates length {}",
+            inputs.generic_factor.values.len(),
+            dates.len()
+        )));
+    }
+    for (issuer, series) in &inputs.history_panel.spreads {
+        if series.len() != dates.len() {
+            return Err(validation_err(format!(
+                "CreditCalibrator: spread series for issuer {:?} has length {}, expected {}",
+                issuer.as_str(),
+                series.len(),
+                dates.len()
+            )));
+        }
+    }
+
     // Date grid must be strictly increasing (sorted, no duplicates): every
     // downstream step (differencing, as_of lookup, history alignment) assumes
     // it, and a shuffled or duplicated grid would silently corrupt returns.
-    for pair in inputs.history_panel.dates.windows(2) {
+    for pair in dates.windows(2) {
         if pair[0] >= pair[1] {
             return Err(validation_err(format!(
                 "CreditCalibrator: history_panel.dates must be strictly increasing; \
@@ -90,7 +104,7 @@ pub(super) fn validate_calibration_inputs(
         }
     }
 
-    validate_regular_grid(&inputs.history_panel.dates, config.panel_frequency)?;
+    validate_regular_grid(dates, config.panel_frequency)?;
 
     // The anchor must be the panel end. An earlier as_of would let
     // post-as_of history leak into betas, vols, and correlations
@@ -197,8 +211,12 @@ pub(super) fn validate_calibration_inputs(
         BucketWeighting::Equal => {}
         BucketWeighting::Dts => {
             for issuer in inputs.history_panel.spreads.keys() {
-                dts_spread_duration(issuer, &inputs.spread_durations)
-                    .map_err(|message| validation_err(format!("CreditCalibrator: {message}")))?;
+                dts_spread_duration(issuer, &inputs.spread_durations).map_err(|err| match err {
+                    Error::Validation(message) => {
+                        validation_err(format!("CreditCalibrator: {message}"))
+                    }
+                    other => other,
+                })?;
             }
             let extra: Vec<&str> = inputs
                 .spread_durations
@@ -266,7 +284,7 @@ fn validate_regular_grid(
         let steps = i32::try_from(idx).map_err(|_| {
             validation_err("CreditCalibrator: history_panel.dates is longer than i32::MAX")
         })?;
-        let expected = frequency.date_after(origin, steps)?;
+        let expected = frequency.month_grid_date_after(origin, steps)?;
         if actual != expected {
             return Err(validation_err(format!(
                 "CreditCalibrator: history_panel.dates is not a regular {frequency:?} \

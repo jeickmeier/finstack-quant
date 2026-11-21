@@ -12,7 +12,7 @@ use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pickle_support::reduce_via_json;
 use crate::bindings::table_builders::{TableBuilder, serde_rows_to_arrow_table};
-use crate::errors::{core_to_py, kinded_to_py, serde_json_to_py, value_error};
+use crate::errors::{core_to_py, kinded_to_py, serde_json_to_py};
 use finstack_quant_core::types::IssuerId;
 use finstack_quant_core::wire::serde_label;
 use finstack_quant_factor::credit::VolHorizon;
@@ -1363,7 +1363,7 @@ pub(crate) fn extract_vol_horizon(obj: &Bound<'_, PyAny>) -> PyResult<VolHorizon
         return Ok(horizon.inner);
     }
     if let Ok(descriptor) = obj.extract::<std::borrow::Cow<'_, str>>() {
-        return VolHorizon::parse(&descriptor).map_err(value_error);
+        return VolHorizon::parse(&descriptor).map_err(core_to_py);
     }
     Err(pyo3::exceptions::PyTypeError::new_err(
         "horizon must be a VolHorizon or a descriptor string such as \"one_step\", \
@@ -1447,7 +1447,7 @@ impl PyVolHorizon {
     fn years(_cls: &Bound<'_, PyType>, years: f64) -> PyResult<Self> {
         VolHorizon::years(years)
             .map(Self::from_inner)
-            .map_err(value_error)
+            .map_err(core_to_py)
     }
 
     /// Parse a horizon descriptor string (matches the Rust ``VolHorizon::parse``).
@@ -1463,7 +1463,7 @@ impl PyVolHorizon {
     fn parse(_cls: &Bound<'_, PyType>, s: &str) -> PyResult<Self> {
         VolHorizon::parse(s)
             .map(Self::from_inner)
-            .map_err(value_error)
+            .map_err(core_to_py)
     }
 
     /// Support pickle through the canonical descriptor string.
