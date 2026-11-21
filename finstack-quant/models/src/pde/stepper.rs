@@ -4,75 +4,10 @@
 //! and Rannacher smoothing (implicit start + CN continuation) to eliminate
 //! spurious oscillations near payoff discontinuities.
 
+use super::error::{PdeError, PdeResult};
 use super::grid::Grid1D;
-use super::operator::{ThomasError, TridiagOperator};
+use super::operator::TridiagOperator;
 use super::problem::PdeProblem1D;
-
-/// Error raised by a time stepper (1D theta scheme or 2D MCS ADI).
-///
-/// Failure modes:
-/// - [`StepperError::CflViolation`] — an explicit / under-damped 1D theta
-///   scheme stepped past its CFL / von-Neumann stability limit.
-/// - [`StepperError::NonPositiveStep`] — a non-positive time step `dt`
-///   (e.g. a non-positive maturity, or `n_steps` so small the step is
-///   degenerate) was requested.
-///
-/// (The former `PecletViolation` variant was removed: convection-dominated
-/// 2D cells are now handled by the monotone per-node upwind switch in the
-/// operator assembly instead of a global rejection.)
-#[derive(Debug, Clone, PartialEq, thiserror::Error)]
-#[non_exhaustive]
-pub enum StepperError {
-    /// An explicit or under-damped (`theta < 0.5`) theta scheme was asked to
-    /// take a time step larger than the CFL / von-Neumann stability limit.
-    ///
-    /// For `theta < 0.5` the theta scheme is only conditionally stable: it
-    /// requires `dt <= min_i(dx_i)^2 / (2 * max_i|a_i|)`, where `a` is the
-    /// local diffusion coefficient and `dx` the local grid spacing. The
-    /// limiting spacing is the *smallest* `dx` on the (possibly non-uniform)
-    /// grid. Violating the bound produces silent NaN / oscillation rather
-    /// than a meaningful solution, so it is reported as an error.
-    #[error(
-        "CFL stability violated: explicit/under-damped theta scheme (theta={theta}) \
-         requires dt <= dx_min^2 / (2*max|a|) = {cfl_max_dt:e}, but dt = {dt:e} \
-         (limiting grid spacing dx_min = {dx_min:e}, max diffusion |a| = {max_diffusion:e}); \
-         use more time steps, a coarser/uniform grid, or an implicit/Crank-Nicolson scheme (theta >= 0.5)"
-    )]
-    CflViolation {
-        /// Theta parameter of the offending scheme (`< 0.5`).
-        theta: f64,
-        /// The time-step size requested by the caller.
-        dt: f64,
-        /// The largest stable time step permitted by the CFL condition.
-        cfl_max_dt: f64,
-        /// Smallest grid spacing on the (possibly non-uniform) grid.
-        dx_min: f64,
-        /// Largest absolute diffusion coefficient over the interior grid.
-        max_diffusion: f64,
-    },
-    /// A non-positive time step `dt` was requested.
-    ///
-    /// The backward time march requires `dt = t_from - t_to > 0`. A
-    /// non-positive `dt` arises from a non-positive maturity, or from a
-    /// degenerate time grid; in release builds it would otherwise propagate
-    /// silently as NaN / inf rather than being caught by the `debug_assert`.
-    #[error(
-        "invalid time step: dt = {dt:e} must be strictly positive (t_from={t_from:e}, t_to={t_to:e})"
-    )]
-    NonPositiveStep {
-        /// The non-positive step size.
-        dt: f64,
-        /// Step start time (closer to maturity).
-        t_from: f64,
-        /// Step end time (closer to t=0).
-        t_to: f64,
-    },
-    /// The tridiagonal Thomas solve underlying the implicit step failed —
-    /// in practice, a degenerate pivot in `(I - theta*dt*A)` from eroded
-    /// diagonal dominance.
-    #[error(transparent)]
-    ThomasFailure(#[from] ThomasError),
-}
 
 /// Theta-scheme time stepper for advancing a 1D PDE solution backward from
 /// maturity, with optional Rannacher start-up.
@@ -126,7 +61,7 @@ impl ThetaStepper {
     }
 
     /// Create a fully explicit stepper (theta = 0.0). Use for debugging only:
-    /// each step is rejected with [`StepperError::CflViolation`] unless it
+    /// each step is rejected with [`PdeError::CflViolation`] unless it
     /// satisfies the CFL stability bound.
     ///
     /// # Arguments
@@ -194,10 +129,10 @@ impl ThetaStepper {
     ///
     /// # Errors
     ///
-    /// Returns [`StepperError::CflViolation`] if an explicit / under-damped
+    /// Returns [`PdeError::CflViolation`] if an explicit / under-damped
     /// (`theta < 0.5`) step would exceed its CFL stability limit,
-    /// [`StepperError::NonPositiveStep`] if `t_from - t_to` is not strictly
-    /// positive, and [`StepperError::ThomasFailure`] if the tridiagonal solve
+    /// [`PdeError::NonPositiveStep`] if `t_from - t_to` is not strictly
+    /// positive, and [`PdeError::DegeneratePivot`] if the tridiagonal solve
     /// is degenerate. Implicit and Crank-Nicolson (`theta >= 0.5`) steps are
     /// unconditionally stable and never fail the CFL check.
     pub fn step(
@@ -208,7 +143,7 @@ impl ThetaStepper {
         t_from: f64,
         t_to: f64,
         step_index: usize,
-    ) -> Result<(), StepperError> {
+    ) -> PdeResult<()> {
         self.step_with_cached_op(problem, grid, u, (t_from, t_to), step_index, None)
     }
 
@@ -220,7 +155,7 @@ impl ThetaStepper {
         (t_from, t_to): (f64, f64),
         step_index: usize,
         cached_op: Option<&mut TridiagOperator>,
-    ) -> Result<(), StepperError> {
+    ) -> PdeResult<()> {
         let theta = if step_index < self.implicit_steps {
             1.0
         } else {
@@ -344,11 +279,11 @@ fn cfl_max_dt(
 /// When `theta < 0.5` (fully explicit or under-damped) the scheme is only
 /// conditionally stable: `dt` must satisfy the CFL / von-Neumann condition
 /// `dt <= dx_min^2 / (2*max|a|)`. If it does not, this function returns
-/// [`StepperError::CflViolation`] rather than producing silent NaN /
+/// [`PdeError::CflViolation`] rather than producing silent NaN /
 /// oscillation. For `theta >= 0.5` (Crank-Nicolson and fully implicit) the
 /// scheme is unconditionally stable and no check is performed.
 ///
-/// Returns [`StepperError::NonPositiveStep`] if `dt = t_from - t_to` is not
+/// Returns [`PdeError::NonPositiveStep`] if `dt = t_from - t_to` is not
 /// strictly positive (a non-positive maturity or a degenerate time grid).
 fn theta_step(
     problem: &dyn PdeProblem1D,
@@ -358,13 +293,13 @@ fn theta_step(
     t_to: f64,
     theta: f64,
     cached_op: Option<&mut TridiagOperator>,
-) -> Result<(), StepperError> {
+) -> PdeResult<()> {
     let dt = t_from - t_to;
     // A non-positive or non-finite dt would otherwise propagate as silent
     // NaN / inf in release builds (the previous `debug_assert` was compiled
     // out). The `is_finite` check also rejects a NaN dt.
     if !dt.is_finite() || dt <= 0.0 || !theta.is_finite() {
-        return Err(StepperError::NonPositiveStep { dt, t_from, t_to });
+        return Err(PdeError::NonPositiveStep { dt, t_from, t_to });
     }
 
     // Explicit / under-damped schemes (theta < 0.5) are only conditionally
@@ -373,7 +308,7 @@ fn theta_step(
     if theta < 0.5 {
         let (cfl_limit, dx_min, max_diffusion) = cfl_max_dt(problem, grid, t_from, t_to);
         if dt > cfl_limit {
-            return Err(StepperError::CflViolation {
+            return Err(PdeError::CflViolation {
                 theta,
                 dt,
                 cfl_max_dt: cfl_limit,
@@ -415,7 +350,7 @@ fn theta_step(
     op_to.add_implicit_corrections(alpha, &mut rhs);
 
     // Solve (I - theta*dt * A_to) * u_new = rhs. A degenerate pivot (eroded
-    // diagonal dominance) surfaces as StepperError::ThomasFailure rather than
+    // diagonal dominance) surfaces as PdeError::DegeneratePivot rather than
     // a silent inf / NaN.
     let u_new = op_to.solve_thomas(alpha, &rhs)?;
     u.copy_from_slice(&u_new);
@@ -525,7 +460,7 @@ mod tests {
     /// An explicit (`theta = 0`) step on a strike-concentrated grid with a
     /// deliberately coarse time grid violates the CFL condition
     /// `dt <= dx_min^2 / (2*max|a|)`. The stepper must reject it with
-    /// [`StepperError::CflViolation`] instead of silently returning NaN /
+    /// [`PdeError::CflViolation`] instead of silently returning NaN /
     /// oscillating garbage.
     ///
     /// On the parent commit `theta_step` performed the update unconditionally:
@@ -571,7 +506,7 @@ mod tests {
         // The very first step must already be rejected.
         let result = stepper.step(&problem, &grid, &mut u, levels[0], levels[1], 0);
         match result {
-            Err(StepperError::CflViolation {
+            Err(PdeError::CflViolation {
                 theta,
                 dt: reported_dt,
                 cfl_max_dt: reported_bound,
@@ -616,7 +551,7 @@ mod tests {
             0,
         );
         assert!(
-            matches!(result, Err(StepperError::CflViolation { .. })),
+            matches!(result, Err(PdeError::CflViolation { .. })),
             "under-damped theta=0.25 with a coarse time grid must be rejected"
         );
     }
@@ -779,7 +714,7 @@ mod tests {
     ///   1. `cfl_max_dt` over the interval returns the midpoint-peak diffusion
     ///      `a = 1.0`, collapsing the bound from ≈ 0.99 to ≈ 0.049.
     ///   2. The explicit stepper rejects the over-large step with
-    ///      [`StepperError::CflViolation`] citing that tighter bound.
+    ///      [`PdeError::CflViolation`] citing that tighter bound.
     #[test]
     fn cfl_bound_uses_max_diffusion_over_step_interval_not_just_t_from() {
         let problem = TentDiffusion;
@@ -826,7 +761,7 @@ mod tests {
             .collect();
         let result = stepper.step(&problem, &grid, &mut u, t_from, t_to, 0);
         match result {
-            Err(StepperError::CflViolation {
+            Err(PdeError::CflViolation {
                 max_diffusion,
                 cfl_max_dt: reported_bound,
                 ..
@@ -845,7 +780,7 @@ mod tests {
     }
 
     /// [P6-6] A non-positive time step must be rejected with
-    /// [`StepperError::NonPositiveStep`] rather than producing silent NaN.
+    /// [`PdeError::NonPositiveStep`] rather than producing silent NaN.
     ///
     /// In release builds the old `debug_assert!(dt > 0.0)` was compiled out,
     /// so a non-positive maturity (here `t_from == t_to`, giving `dt = 0`)
@@ -858,13 +793,13 @@ mod tests {
 
         let zero = ThetaStepper::implicit(1).step(&problem, &grid, &mut u, 0.3, 0.3, 0);
         assert!(
-            matches!(zero, Err(StepperError::NonPositiveStep { dt, .. }) if dt == 0.0),
+            matches!(zero, Err(PdeError::NonPositiveStep { dt, .. }) if dt == 0.0),
             "dt = 0 must be rejected as NonPositiveStep, got {zero:?}"
         );
 
         let neg = ThetaStepper::implicit(1).step(&problem, &grid, &mut u, 0.1, 0.4, 0);
         assert!(
-            matches!(neg, Err(StepperError::NonPositiveStep { dt, .. }) if dt < 0.0),
+            matches!(neg, Err(PdeError::NonPositiveStep { dt, .. }) if dt < 0.0),
             "dt < 0 must be rejected as NonPositiveStep, got {neg:?}"
         );
     }

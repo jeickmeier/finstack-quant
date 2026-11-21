@@ -6,10 +6,11 @@
 //! Greeks (delta, gamma) read directly from the grid.
 
 use super::boundary::BoundaryCondition;
-use super::exercise::{ExerciseError, ExerciseType, PenaltyExercise};
+use super::error::{PdeError, PdeResult};
+use super::exercise::{ExerciseType, PenaltyExercise};
 use super::grid::{Grid1D, find_nearest};
 use super::problem::PdeProblem1D;
-use super::stepper::{StepperError, ThetaStepper};
+use super::stepper::ThetaStepper;
 
 /// Builder for constructing a [`Solver1D`] with a fluent API.
 ///
@@ -80,9 +81,9 @@ impl Solver1DBuilder {
     }
 
     /// Build the solver. Returns an error if grid or stepper is missing.
-    pub fn build(self) -> Result<Solver1D, PdeSolverError> {
-        let grid = self.grid.ok_or(PdeSolverError::MissingGrid)?;
-        let stepper = self.stepper.ok_or(PdeSolverError::MissingStepper)?;
+    pub fn build(self) -> PdeResult<Solver1D> {
+        let grid = self.grid.ok_or(PdeError::MissingGrid)?;
+        let stepper = self.stepper.ok_or(PdeError::MissingStepper)?;
         if let Some(exercise) = &self.exercise {
             exercise.validate(grid.n_interior())?;
         }
@@ -128,32 +129,29 @@ impl Solver1D {
     ///
     /// # Errors
     ///
-    /// - [`PdeSolverError::NonPositiveMaturity`] if `maturity <= 0`.
-    /// - [`PdeSolverError::ZeroTimeSteps`] if the stepper has no time steps
+    /// - [`PdeError::NonPositiveMaturity`] if `maturity <= 0`.
+    /// - [`PdeError::ZeroTimeSteps`] if the stepper has no time steps
     ///   (the backward march would never run, leaving the bare terminal
     ///   payoff as the "solution").
-    /// - [`PdeSolverError::InvalidExerciseTime`] if a Bermudan date is non-finite,
+    /// - [`PdeError::InvalidExerciseTime`] if a Bermudan date is non-finite,
     ///   outside `[0, maturity]`, or absent from the time grid.
-    /// - [`PdeSolverError::Stepper`] if the time stepper fails — in practice,
-    ///   an explicit / under-damped (`theta < 0.5`) scheme whose time step
-    ///   violates the CFL stability condition, or a degenerate tridiagonal
+    /// - [`PdeError::CflViolation`] / [`PdeError::DegeneratePivot`] /
+    ///   [`PdeError::NonPositiveStep`] if the time stepper fails — in
+    ///   practice, an explicit / under-damped (`theta < 0.5`) scheme whose time
+    ///   step violates the CFL stability condition, or a degenerate tridiagonal
     ///   solve. Implicit and Crank-Nicolson schemes are unconditionally
     ///   stable and never trigger the CFL case.
-    pub fn solve(
-        &self,
-        problem: &dyn PdeProblem1D,
-        maturity: f64,
-    ) -> Result<PdeSolution, PdeSolverError> {
+    pub fn solve(&self, problem: &dyn PdeProblem1D, maturity: f64) -> PdeResult<PdeSolution> {
         // Validate maturity / step count up front — a non-positive or
         // non-finite maturity, or zero steps, would otherwise yield a
         // degenerate "solution" (a NaN time grid, or the bare terminal payoff
         // with no time evolution). The `is_finite` check also rejects NaN.
         if !maturity.is_finite() || maturity <= 0.0 {
-            return Err(PdeSolverError::NonPositiveMaturity { maturity });
+            return Err(PdeError::NonPositiveMaturity { maturity });
         }
         let n_steps = self.stepper.n_steps();
         if n_steps == 0 {
-            return Err(PdeSolverError::ZeroTimeSteps);
+            return Err(PdeError::ZeroTimeSteps);
         }
 
         let mut u: Vec<f64> = self.grid.points()[1..self.grid.n() - 1]
@@ -173,7 +171,7 @@ impl Solver1D {
                     || time > maturity
                     || !levels.iter().any(|&level| (level - time).abs() < 1e-10)
                 {
-                    return Err(PdeSolverError::InvalidExerciseTime { time });
+                    return Err(PdeError::InvalidExerciseTime { time });
                 }
             }
         }
@@ -385,43 +383,6 @@ pub(super) fn gamma_1d(pts: &[f64], x: f64, value_at: impl Fn(usize) -> f64) -> 
 
     2.0 * (value_at(i + 1) / h_p - value_at(i) * (1.0 / h_m + 1.0 / h_p) + value_at(i - 1) / h_m)
         / h_sum
-}
-
-/// Errors during solver construction or execution.
-#[derive(Debug, Clone, PartialEq, thiserror::Error)]
-#[non_exhaustive]
-pub enum PdeSolverError {
-    /// No grid was specified in the builder.
-    #[error("PDE solver requires a spatial grid")]
-    MissingGrid,
-    /// No time stepper was specified in the builder.
-    #[error("PDE solver requires a time stepper")]
-    MissingStepper,
-    /// Invalid payoff shape, exercise configuration, or continuation values.
-    #[error(transparent)]
-    Exercise(#[from] ExerciseError),
-    /// The maturity passed to `solve` was not strictly positive.
-    #[error("PDE solve requires a strictly positive maturity, got {maturity:e}")]
-    NonPositiveMaturity {
-        /// The offending maturity.
-        maturity: f64,
-    },
-    /// The stepper was configured with zero time steps, so the backward time
-    /// march never runs and the "solution" would be the bare terminal payoff.
-    #[error("PDE solve requires at least one time step, got n_steps = 0")]
-    ZeroTimeSteps,
-    /// A Bermudan exercise time is invalid or absent from the solver time grid.
-    #[error(
-        "Bermudan exercise time {time} must be finite, within maturity, and aligned with the PDE time grid"
-    )]
-    InvalidExerciseTime {
-        /// Rejected year fraction from valuation.
-        time: f64,
-    },
-    /// Time-stepping error — e.g. an explicit / under-damped scheme whose
-    /// time step violates the CFL stability condition.
-    #[error(transparent)]
-    Stepper(#[from] StepperError),
 }
 
 #[cfg(test)]
@@ -671,10 +632,7 @@ mod tests {
                 .implicit(10)
                 .american(payoff)
                 .build();
-            assert!(matches!(
-                result,
-                Err(PdeSolverError::Exercise(ExerciseError::PayoffLength { .. }))
-            ));
+            assert!(matches!(result, Err(PdeError::PayoffLength { .. })));
         }
         let result = Solver1D::builder()
             .grid(Grid1D::uniform(0.0, 1.0, 5).expect("grid"))
@@ -683,9 +641,7 @@ mod tests {
             .build();
         assert!(matches!(
             result,
-            Err(PdeSolverError::Exercise(
-                ExerciseError::NonFiniteValue { .. }
-            ))
+            Err(PdeError::NonFiniteExerciseValue { .. })
         ));
     }
 
@@ -985,14 +941,14 @@ mod tests {
         assert!(
             matches!(
                 solver.solve(&HeatSin, 0.0),
-                Err(PdeSolverError::NonPositiveMaturity { .. })
+                Err(PdeError::NonPositiveMaturity { .. })
             ),
             "maturity = 0 must be rejected"
         );
         assert!(
             matches!(
                 solver.solve(&HeatSin, -0.5),
-                Err(PdeSolverError::NonPositiveMaturity { .. })
+                Err(PdeError::NonPositiveMaturity { .. })
             ),
             "negative maturity must be rejected"
         );
@@ -1005,7 +961,7 @@ mod tests {
         assert!(
             matches!(
                 zero_step_solver.solve(&HeatSin, 1.0),
-                Err(PdeSolverError::ZeroTimeSteps)
+                Err(PdeError::ZeroTimeSteps)
             ),
             "a zero-step stepper must be rejected"
         );

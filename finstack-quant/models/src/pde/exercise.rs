@@ -5,6 +5,8 @@
 //! is violated. This is simpler than PSOR and works naturally with all theta
 //! schemes without inner iteration tuning.
 
+use super::error::{PdeError, PdeResult};
+
 /// Early exercise constraint enforced via the penalty method.
 ///
 /// At exercise-eligible time steps, nodes where `u_i < payoff_i` get a large
@@ -33,36 +35,6 @@ pub enum ExerciseType {
     Bermudan {
         /// Exercise times (year fractions from valuation date).
         exercise_times: Vec<f64>,
-    },
-}
-
-/// Invalid early-exercise inputs or numerical configuration.
-#[derive(Debug, Clone, PartialEq, thiserror::Error)]
-pub enum ExerciseError {
-    /// Payoffs do not cover exactly the solver's interior spatial nodes.
-    #[error("exercise payoff length {actual} does not match {expected} interior nodes")]
-    PayoffLength {
-        /// Number of interior solution values.
-        expected: usize,
-        /// Number of supplied intrinsic values.
-        actual: usize,
-    },
-    /// A payoff or continuation value is not finite.
-    #[error("non-finite exercise {kind} at interior node {index}")]
-    NonFiniteValue {
-        /// Whether the invalid value is a payoff or continuation value.
-        kind: &'static str,
-        /// Index into the interior-node value vector.
-        index: usize,
-    },
-    /// The penalty factor is not finite and positive, or no iteration is requested.
-    #[error("exercise requires a positive finite penalty factor and at least one iteration")]
-    InvalidPenalty,
-    /// The time-step interval is not finite and strictly positive.
-    #[error("exercise time step must be positive and finite, got {dt}")]
-    InvalidTimeStep {
-        /// Rejected step width in model years.
-        dt: f64,
     },
 }
 
@@ -107,9 +79,9 @@ impl PenaltyExercise {
     }
 
     /// Check the obstacle shape and penalty settings before any state is changed.
-    pub(super) fn validate(&self, interior_nodes: usize) -> Result<(), ExerciseError> {
+    pub(super) fn validate(&self, interior_nodes: usize) -> PdeResult<()> {
         if self.payoff_values.len() != interior_nodes {
-            return Err(ExerciseError::PayoffLength {
+            return Err(PdeError::PayoffLength {
                 expected: interior_nodes,
                 actual: self.payoff_values.len(),
             });
@@ -119,13 +91,13 @@ impl PenaltyExercise {
             .iter()
             .position(|value| !value.is_finite())
         {
-            return Err(ExerciseError::NonFiniteValue {
+            return Err(PdeError::NonFiniteExerciseValue {
                 kind: "payoff",
                 index,
             });
         }
         if !self.penalty_factor.is_finite() || self.penalty_factor <= 0.0 || self.iterations == 0 {
-            return Err(ExerciseError::InvalidPenalty);
+            return Err(PdeError::InvalidPenalty);
         }
         Ok(())
     }
@@ -149,16 +121,16 @@ impl PenaltyExercise {
     ///
     /// # Errors
     ///
-    /// Returns [`ExerciseError`] for a length mismatch, non-finite payoff or
+    /// Returns [`PdeError`] for a length mismatch, non-finite payoff or
     /// continuation value, invalid penalty settings, or invalid `dt`. All
     /// validation occurs before modifying `u`.
-    pub fn apply(&self, u: &mut [f64], dt: f64) -> Result<Vec<usize>, ExerciseError> {
+    pub fn apply(&self, u: &mut [f64], dt: f64) -> PdeResult<Vec<usize>> {
         self.validate(u.len())?;
         if !dt.is_finite() || dt <= 0.0 {
-            return Err(ExerciseError::InvalidTimeStep { dt });
+            return Err(PdeError::InvalidExerciseTimeStep { dt });
         }
         if let Some(index) = u.iter().position(|value| !value.is_finite()) {
-            return Err(ExerciseError::NonFiniteValue {
+            return Err(PdeError::NonFiniteExerciseValue {
                 kind: "continuation",
                 index,
             });
@@ -355,7 +327,7 @@ mod tests {
         let mut values = vec![0.0];
         assert!(matches!(
             exercise.apply(&mut values, 0.1),
-            Err(ExerciseError::PayoffLength {
+            Err(PdeError::PayoffLength {
                 expected: 1,
                 actual: 2
             })
@@ -365,7 +337,7 @@ mod tests {
         let invalid = PenaltyExercise::american(vec![f64::NAN]);
         assert!(matches!(
             invalid.apply(&mut values, 0.1),
-            Err(ExerciseError::NonFiniteValue {
+            Err(PdeError::NonFiniteExerciseValue {
                 kind: "payoff",
                 index: 0
             })
@@ -376,7 +348,7 @@ mod tests {
         for dt in [0.0, -1.0, f64::NAN, f64::INFINITY] {
             assert!(matches!(
                 exercise.apply(&mut values, dt),
-                Err(ExerciseError::InvalidTimeStep { .. })
+                Err(PdeError::InvalidExerciseTimeStep { .. })
             ));
             assert_eq!(values, vec![0.0]);
         }

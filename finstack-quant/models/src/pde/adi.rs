@@ -57,11 +57,11 @@
 //! - Craig, I. J. D. & Sneyd, A. D. (1988). "An alternating-direction implicit
 //!   scheme for parabolic equations with mixed derivatives."
 
+use super::error::{PdeError, PdeResult};
 use super::grid2d::Grid2D;
 use super::operator2d::{Operators2D, apply_cross_derivative};
 use super::problem2d::PdeProblem2D;
 use super::solver::boundary_value;
-use super::stepper::StepperError;
 
 /// Reusable per-step scratch buffers for the Modified Craig-Sneyd ADI stepper.
 ///
@@ -249,7 +249,7 @@ impl McsStepper {
     /// `u_int` is the interior solution of length `nx_int * ny_int` (row-major).
     /// Both are updated in place.
     ///
-    /// Returns a [`StepperError`] if the step cannot be taken reliably — a
+    /// Returns a [`PdeError`] if the step cannot be taken reliably — a
     /// non-positive `dt` or a degenerate tridiagonal solve.
     ///
     /// # Arguments
@@ -270,13 +270,13 @@ impl McsStepper {
         (t_from, t_to): (f64, f64),
         step_index: usize,
         buffers: &mut AdiWorkBuffers,
-    ) -> Result<(), StepperError> {
+    ) -> PdeResult<()> {
         let dt = t_from - t_to;
         // A non-positive or non-finite dt would otherwise propagate as silent
         // NaN / inf in release builds (the previous `debug_assert` was
         // compiled out). The `is_finite` check also rejects a NaN dt.
         if !dt.is_finite() || dt <= 0.0 {
-            return Err(StepperError::NonPositiveStep { dt, t_from, t_to });
+            return Err(PdeError::NonPositiveStep { dt, t_from, t_to });
         }
 
         if step_index < self.implicit_start_steps {
@@ -318,10 +318,10 @@ impl McsStepper {
         (t_from, t_to): (f64, f64),
         damping: bool,
         buffers: &mut AdiWorkBuffers,
-    ) -> Result<(), StepperError> {
+    ) -> PdeResult<()> {
         let dt = t_from - t_to;
         if !dt.is_finite() || dt <= 0.0 {
-            return Err(StepperError::NonPositiveStep { dt, t_from, t_to });
+            return Err(PdeError::NonPositiveStep { dt, t_from, t_to });
         }
 
         // Convection-dominated cells are handled inside the unidirectional
@@ -580,7 +580,7 @@ struct LineScratch<'a> {
 /// the `(nx_int, ny_int)` interior; `line` (each buffer of length `>= nx_int`)
 /// is scratch. Result into `out`.
 ///
-/// Returns [`StepperError::ThomasFailure`] if any per-line tridiagonal solve
+/// Returns [`PdeError::DegeneratePivot`] if any per-line tridiagonal solve
 /// hits a degenerate pivot.
 fn implicit_x_sweep(
     ops: &Operators2D,
@@ -589,7 +589,7 @@ fn implicit_x_sweep(
     (nx_int, ny_int): (usize, usize),
     line: &mut LineScratch<'_>,
     out: &mut [f64],
-) -> Result<(), StepperError> {
+) -> PdeResult<()> {
     let LineScratch {
         rhs: rhs_buf,
         thomas: scratch,
@@ -623,7 +623,7 @@ fn implicit_y_sweep(
     (nx_int, ny_int): (usize, usize),
     line: &mut LineScratch<'_>,
     out: &mut [f64],
-) -> Result<(), StepperError> {
+) -> PdeResult<()> {
     let LineScratch {
         rhs: rhs_buf,
         thomas: scratch,
@@ -972,7 +972,7 @@ mod tests {
     }
 
     /// [P6-6] The 2D MCS stepper must reject a non-positive time step with
-    /// [`StepperError::NonPositiveStep`] rather than producing silent NaN
+    /// [`PdeError::NonPositiveStep`] rather than producing silent NaN
     /// (the old `debug_assert!(dt > 0.0)` was compiled out in release).
     #[test]
     fn mcs_step_rejects_non_positive_dt() {
@@ -998,7 +998,7 @@ mod tests {
             &mut buffers,
         );
         assert!(
-            matches!(zero, Err(StepperError::NonPositiveStep { dt, .. }) if dt == 0.0),
+            matches!(zero, Err(PdeError::NonPositiveStep { dt, .. }) if dt == 0.0),
             "dt = 0 must be rejected as NonPositiveStep, got {zero:?}"
         );
         let neg = stepper.step(
@@ -1010,7 +1010,7 @@ mod tests {
             &mut buffers,
         );
         assert!(
-            matches!(neg, Err(StepperError::NonPositiveStep { dt, .. }) if dt < 0.0),
+            matches!(neg, Err(PdeError::NonPositiveStep { dt, .. }) if dt < 0.0),
             "dt < 0 must be rejected as NonPositiveStep, got {neg:?}"
         );
     }
