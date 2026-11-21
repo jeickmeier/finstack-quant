@@ -9035,7 +9035,7 @@
     },
     "VarConfig": {
       "additionalProperties": false,
-      "description": "Configuration for VaR calculation.\n\nControls statistical properties such as confidence level and pricing method.\nThe historical window/observation count is derived from [`MarketHistory`].",
+      "description": "Configuration for VaR calculation.\n\nControls statistical properties such as confidence level and pricing method.\nThe historical window/observation count is derived from\n[`crate::metrics::risk::MarketHistory`].",
       "properties": {
         "confidence_level": {
           "$ref": "#/$defs/OpenUnitIntervalF64Wire",

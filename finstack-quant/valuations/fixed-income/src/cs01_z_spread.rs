@@ -40,28 +40,28 @@
 //! value when spreads widen, so a long loan reports a **negative** CS01 — the
 //! same convention as every other CS01 calculator in the workspace.
 //!
-//! [canonical]: crate::metrics::sensitivities::cs01
+//! [canonical]: finstack_quant_valuations_core::metrics::sensitivities::cs01
 //! [`z_spread_discount_factor`]: finstack_quant_core::math::z_spread_discount_factor
-
-use finstack_quant_core::market_data::traits::Discounting;
-use std::marker::PhantomData;
-use std::sync::Arc;
 
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::math::z_spread_discount_factor;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-
-use crate::instruments::Instrument;
-use crate::metrics::sensitivities::config as sens_config;
-use crate::metrics::sensitivities::cs01::{GenericBucketedCs01, GenericParallelCs01};
-use crate::metrics::sensitivities::cs01::{
-    sensitivity_central_diff, validate_buckets_strictly_increasing,
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::cs01::{
+    GenericBucketedCs01, GenericParallelCs01,
 };
-use crate::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_valuations_core::metrics::{
+    MetricCalculator, MetricContext, MetricId, format_key_rate_label, sensitivity_central_diff,
+    validate_buckets_strictly_increasing,
+};
+use std::marker::PhantomData;
+use std::sync::Arc;
 
 /// Cashflow inputs an instrument exposes for z-spread CS01.
 ///
@@ -207,6 +207,11 @@ fn anchor_spread<I: ZSpreadCs01>(
 }
 
 /// Resolve the z-spread implied by an instrument's quoted price.
+///
+/// # Arguments
+///
+/// * `instrument` - Instrument implementing [`ZSpreadCs01`].
+/// * `context` - Metric context supplying market curves and valuation date.
 pub fn quoted_z_spread<I>(
     instrument: &I,
     context: &MetricContext,
@@ -327,7 +332,7 @@ where
             let dz = bump_bp * 1e-4;
             let pv_up = price_at_spread(&cached, base_z + dz, inputs.compounding)?;
             let pv_down = price_at_spread(&cached, base_z - dz, inputs.compounding)?;
-            sensitivity_central_diff(pv_up, pv_down, bump_bp)
+            sensitivity_central_diff(pv_up, pv_down, bump_bp)?
         };
 
         context
@@ -421,13 +426,13 @@ where
             Vec::with_capacity(buckets.len());
         let mut total = NeumaierAccumulator::new();
         for (b, group) in groups.iter().enumerate() {
-            let label = crate::metrics::format_bucket_label(buckets[b]);
+            let label = std::borrow::Cow::Owned(format_key_rate_label(buckets[b]));
             let cs01 = if group.is_empty() {
                 0.0
             } else {
                 let difference =
                     bucket_pv_difference(&cached, base_z, group, dz, inputs.compounding)?;
-                sensitivity_central_diff(difference, 0.0, bump_bp)
+                sensitivity_central_diff(difference, 0.0, bump_bp)?
             };
             series.push((label, cs01));
             total.add(cs01)?;

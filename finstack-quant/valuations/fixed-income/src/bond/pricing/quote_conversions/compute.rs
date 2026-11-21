@@ -224,9 +224,6 @@ pub fn compute_quotes(
             .clone()
             .unwrap_or_else(MetricContext::default_config),
     );
-    if let Some(history) = options.market_history.clone() {
-        ctx = ctx.with_market_history(history);
-    }
     ctx.set_recalibration_provider(options.recalibration_provider.clone());
     ctx.set_pricer_dispatch(pricing_dispatch);
     ctx.set_metric_pricing_overrides(bond_for_metrics.get_metric_pricing_overrides().cloned());

@@ -38,22 +38,27 @@ pub fn volatility_override(instrument: &dyn crate::instruments::Instrument) -> O
         .implied_volatility
 }
 
-/// Clone and bump the active scalar quote; absent overrides leave surface risk active.
-pub fn bumped_volatility_override<I: crate::instruments::Instrument + Clone>(
-    instrument: &I,
+fn set_bumped_volatility_override(
+    instrument: &mut dyn crate::instruments::Instrument,
     bump_abs: f64,
-) -> finstack_quant_core::Result<Option<I>> {
+    allow_zero: bool,
+) -> finstack_quant_core::Result<()> {
     let Some(volatility) = volatility_override(instrument) else {
-        return Ok(None);
+        return Ok(());
     };
     let bumped_volatility = volatility + bump_abs;
-    if !bumped_volatility.is_finite() || bumped_volatility <= 0.0 {
+    let valid = bumped_volatility.is_finite()
+        && if allow_zero {
+            bumped_volatility >= 0.0
+        } else {
+            bumped_volatility > 0.0
+        };
+    if !valid {
         return Err(finstack_quant_core::Error::Validation(
             "Bumped implied volatility must be positive and finite".into(),
         ));
     }
-    let mut bumped = instrument.clone();
-    bumped
+    instrument
         .get_instrument_pricing_overrides_mut()
         .ok_or_else(|| {
             finstack_quant_core::Error::Validation(
@@ -62,7 +67,68 @@ pub fn bumped_volatility_override<I: crate::instruments::Instrument + Clone>(
         })?
         .market_quotes
         .implied_volatility = Some(bumped_volatility);
+    Ok(())
+}
+
+/// Clone and bump the active scalar quote; absent overrides leave surface risk active.
+pub fn bumped_volatility_override<I: crate::instruments::Instrument + Clone>(
+    instrument: &I,
+    bump_abs: f64,
+) -> finstack_quant_core::Result<Option<I>> {
+    if volatility_override(instrument).is_none() {
+        return Ok(None);
+    }
+    let mut bumped = instrument.clone();
+    set_bumped_volatility_override(&mut bumped, bump_abs, false)?;
     Ok(Some(bumped))
+}
+
+/// Clone and bump a dynamically dispatched instrument's active scalar quote;
+/// absent overrides leave surface risk active.
+///
+/// # Arguments
+///
+/// * `instrument` - Instrument whose active volatility quote override is copied and shifted.
+/// * `bump_abs` - Absolute volatility shift as a decimal (`0.01` for one volatility point).
+/// * `allow_zero` - When `true`, allows the shifted override to land on `0.0` (used by forward
+///   one-sided differences); otherwise requires strictly positive shifted volatility.
+pub fn bumped_volatility_override_dyn(
+    instrument: &dyn crate::instruments::Instrument,
+    bump_abs: f64,
+    allow_zero: bool,
+) -> finstack_quant_core::Result<Option<Box<dyn crate::instruments::Instrument>>> {
+    if volatility_override(instrument).is_none() {
+        return Ok(None);
+    }
+    let mut bumped = instrument.clone_box();
+    set_bumped_volatility_override(bumped.as_mut(), bump_abs, allow_zero)?;
+    Ok(Some(bumped))
+}
+
+/// Smallest active implied volatility across the instrument's override or surface grid.
+///
+/// # Arguments
+///
+/// * `instrument` - Instrument checked first for a scalar implied-volatility override.
+/// * `market` - Market context queried when no scalar override is present.
+/// * `volatility_surface_ids` - Grid surface identifiers to scan when no override is set.
+pub fn active_minimum_vol(
+    instrument: &dyn crate::instruments::Instrument,
+    market: &finstack_quant_core::market_data::context::MarketContext,
+    volatility_surface_ids: &[finstack_quant_core::types::CurveId],
+) -> finstack_quant_core::Result<Option<f64>> {
+    if let Some(volatility) = volatility_override(instrument) {
+        return Ok(Some(volatility));
+    }
+    let mut minimum: Option<f64> = None;
+    for id in volatility_surface_ids {
+        let surface = market.get_surface(id.as_str())?;
+        let vol = min_grid_vol(&surface)?.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!("volatility grid '{id}' has no values"))
+        })?;
+        minimum = Some(minimum.map_or(vol, |current| current.min(vol)));
+    }
+    Ok(minimum)
 }
 
 /// Prepare one volatility scenario using the same quote source as pricing.
@@ -104,22 +170,23 @@ pub fn bump_active_volatility<I: crate::instruments::Instrument + Clone>(
 /// would leave the positive-volatility domain and fall back to a one-sided
 /// difference.
 ///
-/// Returns `None` for an empty grid.
+/// # Arguments
+///
+/// * `surface` - Volatility surface whose `(expiry, strike)` grid is scanned.
+///
+/// Returns `Ok(None)` for an empty grid, or propagates any surface evaluation error.
 pub fn min_grid_vol(
     surface: &finstack_quant_core::market_data::surfaces::VolSurface,
-) -> Option<f64> {
+) -> finstack_quant_core::Result<Option<f64>> {
     let mut min_vol: Option<f64> = None;
     for &expiry in surface.expiries() {
         for &strike in surface.secondary_values() {
             // Exact grid points evaluate to the stored vol with no interpolation.
-            if let Ok(vol) =
-                finstack_quant_models::volatility::get_surface_vol(surface, expiry, strike)
-            {
-                min_vol = Some(min_vol.map_or(vol, |m: f64| m.min(vol)));
-            }
+            let vol = finstack_quant_models::volatility::get_surface_vol(surface, expiry, strike)?;
+            min_vol = Some(min_vol.map_or(vol, |m: f64| m.min(vol)));
         }
     }
-    min_vol
+    Ok(min_vol)
 }
 
 /// Apply the same absolute parallel bump to each unique volatility surface.
@@ -254,26 +321,24 @@ pub fn central_diff_by_width(
     Ok((pv_up - pv_down) / width)
 }
 
-/// Compute a central difference normalized by a symmetric half-bump.
+/// Compute a central sensitivity per basis point: `(pv_up - pv_down) / (2 * bump_bp)`.
+///
+/// Routes through [`central_diff_by_width`] so non-finite or degenerate bump
+/// widths fail loudly with [`InputError::NonPositiveValue`](finstack_quant_core::InputError::NonPositiveValue)
+/// instead of returning a silent `0.0`.
 ///
 /// # Arguments
 ///
-/// * `pv_up` - Present value at the up-bumped input.
-/// * `pv_down` - Present value at the down-bumped input.
-/// * `half_bump` - Size of each one-sided bump in the input's own unit; the
-///   full width is twice this value.
-///
-/// # Errors
-///
-/// Propagates the degenerate-width error from [`central_diff_by_width`] when
-/// `2 * half_bump` is non-finite or negligibly small.
+/// * `pv_up` - Instrument present value at `+bump_bp`.
+/// * `pv_down` - Instrument present value at `-bump_bp`.
+/// * `bump_bp` - One-sided rate or spread bump in basis points.
 #[inline]
-pub fn central_diff_by_half_bump(
+pub fn sensitivity_central_diff(
     pv_up: f64,
     pv_down: f64,
-    half_bump: f64,
+    bump_bp: f64,
 ) -> finstack_quant_core::Result<f64> {
-    central_diff_by_width(pv_up, pv_down, 2.0 * half_bump)
+    central_diff_by_width(pv_up, pv_down, 2.0 * bump_bp)
 }
 
 /// Compute a scaled central difference using the actual bump width.
@@ -651,7 +716,7 @@ mod tests {
             central_diff_by_width(2.0, 1.0, 0.0).expect_err("zero width must error"),
             central_diff_by_width(2.0, 1.0, 1e-13).expect_err("sub-tolerance width must error"),
             central_diff_by_width(2.0, 1.0, f64::NAN).expect_err("non-finite width must error"),
-            central_diff_by_half_bump(2.0, 1.0, 0.0).expect_err("zero half-bump must error"),
+            sensitivity_central_diff(2.0, 1.0, 0.0).expect_err("zero bump_bp must error"),
             scaled_central_diff_by_width(2.0, 1.0, 0.0, 1e-4).expect_err("zero width must error"),
         ] {
             match err {
@@ -670,7 +735,7 @@ mod tests {
             0.5
         );
         assert_eq!(
-            central_diff_by_half_bump(3.0, 1.0, 0.5).expect("non-degenerate half-bump"),
+            sensitivity_central_diff(3.0, 1.0, 0.5).expect("non-degenerate bump_bp"),
             2.0
         );
         assert_eq!(

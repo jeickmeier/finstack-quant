@@ -10,7 +10,7 @@ use crate::metrics::STANDARD_BUCKETS_YEARS;
 use finstack_quant_core::config::FinstackConfig;
 
 /// Extension section key for sensitivities defaults.
-pub const SENSITIVITIES_CONFIG_KEY_V1: &str = "valuations.sensitivities.v1";
+pub(crate) const SENSITIVITIES_CONFIG_KEY_V1: &str = "valuations.sensitivities.v1";
 
 /// Default relative spot bump: 1% of spot (0.01).
 const DEFAULT_SPOT_BUMP_DECIMAL: f64 = 0.01;
@@ -82,7 +82,7 @@ pub fn resolve(
 /// [`from_finstack_config_or_default`].
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct SensitivitiesOverrides {
+pub(crate) struct SensitivitiesOverrides {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rate_bump_bp: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -119,7 +119,7 @@ fn ensure_bucket_grid(name: &str, buckets: &[f64]) -> finstack_quant_core::Resul
             )));
         }
     }
-    super::cs01::validate_buckets_strictly_increasing(buckets).map_err(|e| {
+    crate::metrics::buckets::validate_buckets_strictly_increasing(buckets).map_err(|e| {
         finstack_quant_core::Error::Validation(format!(
             "Invalid sensitivities config: '{name}' {e}"
         ))
@@ -130,7 +130,7 @@ fn ensure_bucket_grid(name: &str, buckets: &[f64]) -> finstack_quant_core::Resul
 ///
 /// If the extension section `valuations.sensitivities.v1` is present, its fields override
 /// the defaults; otherwise defaults are used.
-pub fn from_finstack_config_or_default(
+pub(crate) fn from_finstack_config_or_default(
     cfg: &FinstackConfig,
 ) -> finstack_quant_core::Result<SensitivitiesConfig> {
     let mut base = SensitivitiesConfig::default();
@@ -186,7 +186,7 @@ pub fn from_context_or_default(
 }
 
 /// Apply per-instrument pricing overrides to a resolved sensitivities config.
-pub fn apply_pricing_overrides(
+pub(crate) fn apply_pricing_overrides(
     mut base: SensitivitiesConfig,
     pricing_overrides: Option<&crate::instruments::pricing_overrides::MetricPricingOverrides>,
 ) -> finstack_quant_core::Result<SensitivitiesConfig> {

@@ -236,7 +236,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-      "bytes": 34184,
+      "bytes": 34207,
       "kind": "component",
       "path": "schemas/common/1/metric_pricing_overrides.schema.json",
       "summary": "Metric-time pricing and finite-difference configuration.",
@@ -281,7 +281,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/price_extras.schema.json",
-      "bytes": 13344,
+      "bytes": 13363,
       "kind": "input",
       "path": "schemas/common/1/price_extras.schema.json",
       "summary": "Metric-pricing override patch, market history and step-trace flag of one price call.",

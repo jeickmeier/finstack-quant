@@ -8,7 +8,7 @@
 //!   rebootstrap moves the PV, so CS01 is reported via the canonical
 //!   [`GenericParallelCs01`] calculator. An analyst-built curve without a
 //!   calibration recipe gets a direct hazard-rate bump instead
-//!   (`metrics::sensitivities::cs01_direct_hazard`).
+//!   (`crate::cs01_direct_hazard`).
 //! - **Without** a credit curve, survival is identically `1.0` and the recovery
 //!   leg vanishes, so the canonical CS01 is zero. Credit-spread risk is then
 //!   reported via the market-standard z-spread bump in
@@ -23,16 +23,16 @@
 //!
 //! [`RevolvingCreditPricer`]: crate::revolving_credit::RevolvingCreditPricer
 //! [`GenericParallelCs01`]: finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericParallelCs01
-//! [`ZSpreadParallelCs01`]: finstack_quant_valuations_core::metrics::ZSpreadParallelCs01
-//! [`ZSpreadBucketedCs01`]: finstack_quant_valuations_core::metrics::ZSpreadBucketedCs01
+//! [`ZSpreadParallelCs01`]: crate::cs01_z_spread::ZSpreadParallelCs01
+//! [`ZSpreadBucketedCs01`]: crate::cs01_z_spread::ZSpreadBucketedCs01
 
+use crate::cs01_z_spread::{ZSpreadCs01, ZSpreadCs01Inputs};
 use crate::revolving_credit::RevolvingCredit;
 use crate::revolving_credit::cashflow_engine::CashflowEngine;
 use crate::revolving_credit::types::DrawRepaySpec;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::metrics::{ZSpreadCs01, ZSpreadCs01Inputs};
 
 impl ZSpreadCs01 for RevolvingCredit {
     fn z_spread_cs01_inputs(

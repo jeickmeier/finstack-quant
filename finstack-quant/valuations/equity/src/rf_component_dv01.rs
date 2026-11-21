@@ -5,23 +5,31 @@
 //! instrument input directly and is therefore registered under `wacc01` or
 //! `discount_rate01`, never under curve `dv01`.
 
-use crate::instruments::Instrument;
-use crate::metrics::sensitivities::config as sens_config;
-use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::{
+    MetricCalculator, MetricContext, sensitivity_central_diff,
+};
 use std::marker::PhantomData;
 
 /// Instruments whose PV is discounted at an instrument-owned appraisal rate.
 pub trait RfComponentPriced: Instrument {
-    /// Present value with the discount rate bumped by `bump_at(t)` (absolute,
-    /// decimal) at each cashflow tenor `t` (in years). `bump_at = |_| 0.0`
-    /// must reproduce the unbumped PV.
+    /// Present value with the appraisal discount rate shifted uniformly by
+    /// `bump` (absolute, decimal). `bump = 0.0` must reproduce the unbumped PV.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market context used for auxiliary financing or FX lookups.
+    /// * `as_of` - Valuation date.
+    /// * `bump` - Uniform absolute shift applied to the appraisal discount rate
+    ///   as a decimal (for example `0.0001` for +1 bp).
     fn pv_with_rf_bump(
         &self,
         market: &MarketContext,
         as_of: Date,
-        bump_at: &dyn Fn(f64) -> f64,
+        bump: f64,
     ) -> finstack_quant_core::Result<f64>;
 }
 
@@ -51,14 +59,13 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
-        let defaults = sens_config::resolve(context)?;
-        let bump_bp = defaults.rate_bump_bp;
+        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
         let delta = bump_bp / 10_000.0;
         let market = context.curves.as_ref();
         let as_of = context.as_of;
 
-        let pv_up = instrument.pv_with_rf_bump(market, as_of, &|_| delta)?;
-        let pv_down = instrument.pv_with_rf_bump(market, as_of, &|_| -delta)?;
-        Ok((pv_up - pv_down) / (2.0 * bump_bp))
+        let pv_up = instrument.pv_with_rf_bump(market, as_of, delta)?;
+        let pv_down = instrument.pv_with_rf_bump(market, as_of, -delta)?;
+        sensitivity_central_diff(pv_up, pv_down, bump_bp)
     }
 }

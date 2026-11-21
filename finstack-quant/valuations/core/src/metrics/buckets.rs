@@ -93,3 +93,52 @@ pub fn parse_key_rate_label(label: &str) -> finstack_quant_core::Result<f64> {
             ))
         })
 }
+
+/// Validate that a key-rate bucket grid is strictly increasing.
+///
+/// Shared by bucketed DV01, CS01, historical key-rate replay, and the
+/// sensitivities config loader: unsorted or duplicate tenors would silently
+/// shock a coordinate twice and double-count bucketed sensitivities.
+///
+/// # Arguments
+///
+/// * `buckets` - Bucket coordinates (in years) to check for strict ascending order.
+pub fn validate_buckets_strictly_increasing(buckets: &[f64]) -> finstack_quant_core::Result<()> {
+    for win in buckets.windows(2) {
+        if win[1].partial_cmp(&win[0]) != Some(std::cmp::Ordering::Greater) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "key-rate buckets must be strictly increasing, got {:?} \
+                 (offending pair: {} -> {})",
+                buckets, win[0], win[1]
+            )));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_buckets_strictly_increasing;
+
+    #[test]
+    fn validate_buckets_rejects_unsorted_and_duplicate_grids() {
+        validate_buckets_strictly_increasing(&[0.25, 0.5, 1.0, 5.0])
+            .expect("sorted grid must validate");
+        validate_buckets_strictly_increasing(&[]).expect("empty grid is vacuously valid");
+        validate_buckets_strictly_increasing(&[1.0]).expect("single-element grid is valid");
+
+        let dup = validate_buckets_strictly_increasing(&[0.25, 1.0, 1.0, 5.0])
+            .expect_err("duplicate tenor must error");
+        assert!(
+            matches!(dup, finstack_quant_core::Error::Validation(_)),
+            "duplicate tenor must surface as Validation, got {dup:?}"
+        );
+
+        let unsorted = validate_buckets_strictly_increasing(&[0.25, 5.0, 1.0])
+            .expect_err("unsorted grid must error");
+        assert!(
+            matches!(unsorted, finstack_quant_core::Error::Validation(_)),
+            "unsorted grid must surface as Validation, got {unsorted:?}"
+        );
+    }
+}

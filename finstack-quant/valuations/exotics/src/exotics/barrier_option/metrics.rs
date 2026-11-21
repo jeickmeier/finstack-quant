@@ -20,14 +20,14 @@ pub(crate) fn register_barrier_option_metrics(
             registry: registry,
             instrument: InstrumentType::BarrierOption,
             metrics: [
-                (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega::<crate::exotics::barrier_option::BarrierOption>::default()),
+                (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega),
                 (Rho, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
                 (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
                 (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-                (Delta, GenericFdDelta::<crate::exotics::barrier_option::BarrierOption>::default()),
-                (Gamma, GenericFdGamma::<crate::exotics::barrier_option::BarrierOption>::default()),
-                (Vanna, GenericFdVanna::<crate::exotics::barrier_option::BarrierOption>::default()),
-                (Volga, GenericFdVolga::<crate::exotics::barrier_option::BarrierOption>::default()),
+                (Delta, GenericFdDelta),
+                (Gamma, GenericFdGamma),
+                (Vanna, GenericFdVanna),
+                (Volga, GenericFdVolga),
             ]
         }
     }

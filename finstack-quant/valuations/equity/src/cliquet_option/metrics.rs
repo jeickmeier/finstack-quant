@@ -52,14 +52,14 @@ pub(crate) fn register_cliquet_option_metrics(
         registry: registry,
         instrument: InstrumentType::CliquetOption,
         metrics: [
-            (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega::<crate::cliquet_option::CliquetOption>::default()),
+            (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega),
             (Rho, RhoCalculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-            (Delta, SpotPinnedFd::<CliquetOption, _>::new(GenericFdDelta::<CliquetOption>::default())),
-            (Gamma, SpotPinnedFd::<CliquetOption, _>::new(GenericFdGamma::<CliquetOption>::default())),
-            (Vanna, SpotPinnedFd::<CliquetOption, _>::new(GenericFdVanna::<CliquetOption>::default())),
-            (Volga, GenericFdVolga::<crate::cliquet_option::CliquetOption>::default()),
+            (Delta, SpotPinnedFd::<CliquetOption, _>::new(GenericFdDelta)),
+            (Gamma, SpotPinnedFd::<CliquetOption, _>::new(GenericFdGamma)),
+            (Vanna, SpotPinnedFd::<CliquetOption, _>::new(GenericFdVanna)),
+            (Volga, GenericFdVolga),
         ]
     }
     Ok(())

@@ -7,219 +7,259 @@
 
 use crate::instruments::FxPair;
 use crate::metrics::finite_difference::{
-    bump_scalar_price, central_mixed, min_grid_vol, volatility_override,
+    active_minimum_vol, bump_scalar_price, bumped_volatility_override_dyn, central_mixed,
+    volatility_override,
 };
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+use finstack_quant_core::market_data::bumps::{
+    BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
+};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::money::fx::FxQuery;
+use finstack_quant_core::money::fx::{FxConversionPolicy, FxQuery};
 use finstack_quant_core::types::CurveId;
 use std::sync::Arc;
 
 const NO_DEPS: &[MetricId] = &[];
 
-pub trait FactorBumper: Send + Sync {
-    fn bump_market(
+/// Concrete risk-factor perturbation used by [`CrossFactorCalculator`].
+#[derive(Clone)]
+pub enum FactorBumper {
+    /// Parallel basis-point shift across one or more yield curves.
+    ParallelCurve {
+        /// Discount and forward curve identifiers bumped in parallel.
+        curve_ids: Vec<CurveId>,
+        /// Parallel shift magnitude in basis points.
+        bump_bp: f64,
+    },
+    /// Quote-space credit spread shift with hazard curve recalibration.
+    CreditQuote {
+        /// Hazard curve identifiers rebuilt under the par-spread bump.
+        curve_ids: Vec<CurveId>,
+        /// Parallel par-spread shock magnitude in basis points.
+        bump_bp: f64,
+        /// Unbumped base market context supplying original quotes.
+        source_market: Arc<MarketContext>,
+        /// Calibration service used to rebuild each hazard curve.
+        provider: Arc<dyn crate::recalibration::RecalibrationProvider>,
+    },
+    /// Parallel additive volatility shift across surfaces, scalar vols, or quote overrides.
+    VolParallel {
+        /// Volatility surface identifiers shifted in parallel.
+        vol_surface_ids: Vec<CurveId>,
+        /// Unitless volatility scalar identifiers shifted additively.
+        vol_scalar_ids: Vec<String>,
+        /// Active instrument-level volatility override, if set.
+        override_volatility: Option<f64>,
+        /// Absolute annualized volatility shift magnitude.
+        bump_abs: f64,
+        /// True at zero volatility where a second-order forward stencil is used.
+        one_sided: bool,
+    },
+    /// Relative bump to an equity or underlying scalar spot quote.
+    Spot {
+        /// Scalar price identifier shifted proportionally.
+        price_id: String,
+        /// Relative shift as a decimal fraction (`0.01` = 1%).
+        bump_pct: f64,
+    },
+    /// Percentage bump to one or more FX pairs.
+    Fx {
+        /// Currency pairs bumped together.
+        pairs: Vec<FxPair>,
+        /// Relative shift as a decimal fraction (`0.01` = 1%).
+        bump_pct: f64,
+    },
+}
+
+type BumperFactoryFn = fn(&MetricContext) -> Result<Option<FactorBumper>>;
+
+impl FactorBumper {
+    /// Produce a market context bumped along `direction` for this risk factor.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market context to copy and perturb.
+    /// * `as_of` - Valuation date used for FX percentage shifts.
+    /// * `direction` - Signed stencil coordinate multiplier (`1.0`, `-1.0`, `2.0`, etc.).
+    pub fn bump_market(
         &self,
         market: &MarketContext,
         as_of: Date,
         direction: f64,
-    ) -> Result<MarketContext>;
-
-    fn bump_size(&self) -> f64;
-
-    /// Normalized first-derivative weights. Volatility at zero uses a
-    /// second-order forward stencil; all interior factors are central.
-    fn stencil(&self) -> &'static [(f64, f64)] {
-        &[(-1.0, -0.5), (1.0, 0.5)]
-    }
-
-    /// Credit quotes must rebuild after every other market shock.
-    fn recalibrates_credit(&self) -> bool {
-        false
-    }
-
-    fn is_applicable(&self, market: &MarketContext, as_of: Date) -> bool;
-
-    /// Clone only when a factor is supplied by the instrument's active quote.
-    fn bump_instrument(
-        &self,
-        _instrument: &dyn crate::instruments::Instrument,
-        _direction: f64,
-    ) -> Result<Option<Box<dyn crate::instruments::Instrument>>> {
-        Ok(None)
-    }
-}
-
-type BumperFactoryFn = fn(&MetricContext) -> Result<Option<Box<dyn FactorBumper>>>;
-
-#[derive(Debug, Clone)]
-struct ParallelCurveBumper {
-    curve_ids: Vec<CurveId>,
-    bump_bp: f64,
-}
-
-impl FactorBumper for ParallelCurveBumper {
-    fn bump_market(
-        &self,
-        market: &MarketContext,
-        _as_of: Date,
-        direction: f64,
     ) -> Result<MarketContext> {
-        let bumps = self
-            .curve_ids
-            .iter()
-            .map(|id| {
-                market
-                    .curve_target(id)
-                    .map(|target| target.into_bump(BumpSpec::parallel_bp(self.bump_bp * direction)))
-            })
-            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
-        market.bump(bumps)
-    }
-
-    fn bump_size(&self) -> f64 {
-        self.bump_bp
-    }
-
-    fn is_applicable(&self, market: &MarketContext, _as_of: Date) -> bool {
-        self.curve_ids.iter().any(|curve_id| {
-            market.get_discount(curve_id.as_str()).is_ok()
-                || market.get_forward(curve_id.as_str()).is_ok()
-        })
-    }
-}
-
-struct CreditQuoteBumper {
-    curve_ids: Vec<CurveId>,
-    bump_bp: f64,
-    source_market: Arc<MarketContext>,
-    provider: Arc<dyn crate::recalibration::RecalibrationProvider>,
-}
-
-impl FactorBumper for CreditQuoteBumper {
-    fn bump_market(
-        &self,
-        market: &MarketContext,
-        _as_of: Date,
-        direction: f64,
-    ) -> Result<MarketContext> {
-        use crate::recalibration::{
-            HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump,
-        };
-        let mut target = market.clone();
-        for id in &self.curve_ids {
-            let hazard = self.source_market.get_hazard(id.as_str())?;
-            let discount_curve_id = self.provider.get_hazard_discount_curve_id(&hazard)?;
-            let rebuilt = self
-                .provider
-                .rebuild_hazard_curve(&HazardRecalibrationRequest {
-                    hazard,
-                    source_market: Arc::clone(&self.source_market),
-                    target_market: Arc::new(target.clone()),
-                    discount_curve_id,
-                    doc_clause: None,
-                    cds_valuation_convention: None,
-                    deal_quote_override: None,
-                    action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(
-                        self.bump_bp * direction,
-                    )),
-                })?;
-            target.try_insert_mut(rebuilt.as_ref().clone())?;
-        }
-        Ok(target)
-    }
-    fn bump_size(&self) -> f64 {
-        self.bump_bp
-    }
-    fn is_applicable(&self, market: &MarketContext, _as_of: Date) -> bool {
-        self.curve_ids
-            .iter()
-            .all(|id| market.get_hazard(id.as_str()).is_ok())
-    }
-    fn recalibrates_credit(&self) -> bool {
-        true
-    }
-}
-
-#[derive(Debug, Clone)]
-struct VolParallelBumper {
-    vol_surface_ids: Vec<CurveId>,
-    vol_scalar_ids: Vec<String>,
-    override_volatility: Option<f64>,
-    bump_abs: f64,
-    one_sided: bool,
-}
-
-impl FactorBumper for VolParallelBumper {
-    fn stencil(&self) -> &'static [(f64, f64)] {
-        if self.one_sided {
-            &[(0.0, -1.5), (1.0, 2.0), (2.0, -0.5)]
-        } else {
-            &[(-1.0, -0.5), (1.0, 0.5)]
-        }
-    }
-
-    fn bump_market(
-        &self,
-        market: &MarketContext,
-        _as_of: Date,
-        direction: f64,
-    ) -> Result<MarketContext> {
-        if self.override_volatility.is_some() {
-            return Ok(market.clone());
-        }
-        let mut bumped =
-            market.bump(
-                self.vol_surface_ids
+        match self {
+            Self::ParallelCurve { curve_ids, bump_bp } => {
+                let bumps = curve_ids
                     .iter()
-                    .cloned()
-                    .map(|id| MarketBump::VolSurface {
+                    .map(|id| {
+                        market.curve_target(id).map(|target| {
+                            target.into_bump(BumpSpec::parallel_bp(bump_bp * direction))
+                        })
+                    })
+                    .collect::<finstack_quant_core::Result<Vec<_>>>()?;
+                market.bump(bumps)
+            }
+            Self::CreditQuote {
+                curve_ids,
+                bump_bp,
+                source_market,
+                provider,
+            } => {
+                use crate::recalibration::{
+                    HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump,
+                };
+                let mut target = market.clone();
+                for id in curve_ids {
+                    let hazard = source_market.get_hazard(id.as_str())?;
+                    let discount_curve_id = provider.get_hazard_discount_curve_id(&hazard)?;
+                    let rebuilt = provider.rebuild_hazard_curve(&HazardRecalibrationRequest {
+                        hazard,
+                        source_market: Arc::clone(source_market),
+                        target_market: Arc::new(target.clone()),
+                        discount_curve_id,
+                        doc_clause: None,
+                        cds_valuation_convention: None,
+                        deal_quote_override: None,
+                        action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(
+                            bump_bp * direction,
+                        )),
+                    })?;
+                    target.try_insert_mut(rebuilt.as_ref().clone())?;
+                }
+                Ok(target)
+            }
+            Self::VolParallel {
+                vol_surface_ids,
+                vol_scalar_ids,
+                override_volatility,
+                bump_abs,
+                ..
+            } => {
+                if override_volatility.is_some() {
+                    return Ok(market.clone());
+                }
+                let mut bumped = market.bump(vol_surface_ids.iter().cloned().map(|id| {
+                    MarketBump::VolSurface {
                         id,
                         spec: BumpSpec {
-                            mode: finstack_quant_core::market_data::bumps::BumpMode::Additive,
-                            units: finstack_quant_core::market_data::bumps::BumpUnits::Fraction,
-                            value: self.bump_abs * direction,
-                            bump_type: finstack_quant_core::market_data::bumps::BumpType::Parallel,
+                            mode: BumpMode::Additive,
+                            units: BumpUnits::Fraction,
+                            value: bump_abs * direction,
+                            bump_type: BumpType::Parallel,
                         },
-                    }),
-            )?;
-        for id in &self.vol_scalar_ids {
-            let Some(volatility) = market.get_price(id)?.get_unitless() else {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "volatility quote '{id}' must be a unitless scalar"
-                )));
-            };
-            let value = volatility + self.bump_abs * direction;
-            if !value.is_finite() || value < 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "bumped volatility quote '{id}' must be finite and nonnegative"
-                )));
+                    }
+                }))?;
+                for id in vol_scalar_ids {
+                    let Some(volatility) = market.get_price(id)?.get_unitless() else {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "volatility quote '{id}' must be a unitless scalar"
+                        )));
+                    };
+                    let value = volatility + bump_abs * direction;
+                    if !value.is_finite() || value < 0.0 {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "bumped volatility quote '{id}' must be finite and nonnegative"
+                        )));
+                    }
+                    bumped.insert_price_mut(id, MarketScalar::unitless(value)?);
+                }
+                Ok(bumped)
             }
-            bumped.insert_price_mut(id, MarketScalar::unitless(value)?);
+            Self::Spot { price_id, bump_pct } => {
+                bump_scalar_price(market, price_id, bump_pct * direction)
+            }
+            Self::Fx { pairs, bump_pct } => {
+                let bumps: Vec<MarketBump> = pairs
+                    .iter()
+                    .map(|pair| MarketBump::FxPct {
+                        base: pair.base,
+                        quote: pair.quote,
+                        pct: bump_pct * direction * 100.0,
+                        as_of,
+                        policy: FxConversionPolicy::CashflowDate,
+                    })
+                    .collect();
+                market.bump(bumps)
+            }
         }
-        Ok(bumped)
     }
 
-    fn bump_size(&self) -> f64 {
-        self.bump_abs * 100.0
+    /// Reporting-unit step size used to normalize the mixed finite difference.
+    pub fn bump_size(&self) -> f64 {
+        match self {
+            Self::ParallelCurve { bump_bp, .. } | Self::CreditQuote { bump_bp, .. } => *bump_bp,
+            Self::VolParallel { bump_abs, .. } => *bump_abs * 100.0,
+            Self::Spot { bump_pct, .. } | Self::Fx { bump_pct, .. } => *bump_pct * 100.0,
+        }
     }
 
-    fn is_applicable(&self, market: &MarketContext, _as_of: Date) -> bool {
-        self.override_volatility.is_some()
-            || (self
-                .vol_surface_ids
+    /// Normalized first-derivative stencil weights.
+    ///
+    /// Volatility at zero uses a second-order forward stencil; all interior factors are central.
+    pub fn stencil(&self) -> &'static [(f64, f64)] {
+        match self {
+            Self::VolParallel {
+                one_sided: true, ..
+            } => &[(0.0, -1.5), (1.0, 2.0), (2.0, -0.5)],
+            _ => &[(-1.0, -0.5), (1.0, 0.5)],
+        }
+    }
+
+    fn recalibrates_credit(&self) -> bool {
+        matches!(self, Self::CreditQuote { .. })
+    }
+
+    /// Return whether `market` supplies every dependency required by this factor.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market context to check for the bumped curves, surfaces, spots, or FX pairs.
+    /// * `as_of` - Valuation date used to probe FX pair availability.
+    pub fn is_applicable(&self, market: &MarketContext, as_of: Date) -> bool {
+        match self {
+            Self::ParallelCurve { curve_ids, .. } => curve_ids.iter().any(|curve_id| {
+                market.get_discount(curve_id.as_str()).is_ok()
+                    || market.get_forward(curve_id.as_str()).is_ok()
+            }),
+            Self::CreditQuote { curve_ids, .. } => curve_ids
                 .iter()
-                .all(|vol_surface_id| market.get_surface(vol_surface_id.as_str()).is_ok())
-                && self.vol_scalar_ids.iter().all(|id| {
-                    market
-                        .get_price(id)
-                        .is_ok_and(|scalar| scalar.is_unitless())
-                }))
+                .all(|id| market.get_hazard(id.as_str()).is_ok()),
+            Self::VolParallel {
+                vol_surface_ids,
+                vol_scalar_ids,
+                override_volatility,
+                ..
+            } => {
+                override_volatility.is_some()
+                    || (vol_surface_ids
+                        .iter()
+                        .all(|vol_surface_id| market.get_surface(vol_surface_id.as_str()).is_ok())
+                        && vol_scalar_ids.iter().all(|id| {
+                            market
+                                .get_price(id)
+                                .is_ok_and(|scalar| scalar.is_unitless())
+                        }))
+            }
+            Self::Spot { price_id, .. } => market.get_price(price_id).is_ok(),
+            Self::Fx { pairs, .. } => pairs.iter().any(|pair| {
+                market
+                    .fx()
+                    .and_then(|fx| {
+                        fx.rate(FxQuery::new(
+                            pair.base,
+                            pair.quote,
+                            as_of,
+                            FxConversionPolicy::CashflowDate,
+                        ))
+                        .ok()
+                    })
+                    .is_some()
+            }),
+        }
     }
 
     fn bump_instrument(
@@ -227,105 +267,23 @@ impl FactorBumper for VolParallelBumper {
         instrument: &dyn crate::instruments::Instrument,
         direction: f64,
     ) -> Result<Option<Box<dyn crate::instruments::Instrument>>> {
-        let Some(volatility) = self.override_volatility else {
-            return Ok(None);
-        };
-        let value = volatility + self.bump_abs * direction;
-        if !value.is_finite() || value < 0.0 {
-            return Err(finstack_quant_core::Error::Validation(
-                "bumped volatility override must be finite and nonnegative".into(),
-            ));
+        match self {
+            Self::VolParallel {
+                override_volatility: Some(_),
+                bump_abs,
+                ..
+            } => bumped_volatility_override_dyn(instrument, bump_abs * direction, true),
+            _ => Ok(None),
         }
-        let mut bumped = instrument.clone_box();
-        bumped
-            .get_instrument_pricing_overrides_mut()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(
-                    "active volatility override is not mutable".into(),
-                )
-            })?
-            .market_quotes
-            .implied_volatility = Some(value);
-        Ok(Some(bumped))
-    }
-}
-
-#[derive(Debug, Clone)]
-struct SpotBumper {
-    price_id: String,
-    bump_pct: f64,
-}
-
-impl FactorBumper for SpotBumper {
-    fn bump_market(
-        &self,
-        market: &MarketContext,
-        _as_of: Date,
-        direction: f64,
-    ) -> Result<MarketContext> {
-        bump_scalar_price(market, &self.price_id, self.bump_pct * direction)
-    }
-
-    fn bump_size(&self) -> f64 {
-        self.bump_pct * 100.0
-    }
-
-    fn is_applicable(&self, market: &MarketContext, _as_of: Date) -> bool {
-        market.get_price(&self.price_id).is_ok()
-    }
-}
-
-#[derive(Debug, Clone)]
-struct FxBumper {
-    pairs: Vec<FxPair>,
-    bump_pct: f64,
-}
-
-impl FactorBumper for FxBumper {
-    fn bump_market(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-        direction: f64,
-    ) -> Result<MarketContext> {
-        let bumps: Vec<MarketBump> = self
-            .pairs
-            .iter()
-            .map(|pair| MarketBump::FxPct {
-                base: pair.base,
-                quote: pair.quote,
-                pct: self.bump_pct * direction * 100.0,
-                as_of,
-                policy: finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
-            })
-            .collect();
-        market.bump(bumps)
-    }
-
-    fn bump_size(&self) -> f64 {
-        self.bump_pct * 100.0
-    }
-
-    fn is_applicable(&self, market: &MarketContext, as_of: Date) -> bool {
-        self.pairs.iter().any(|pair| {
-            market
-                .fx()
-                .and_then(|fx| {
-                    fx.rate(FxQuery::new(
-                        pair.base,
-                        pair.quote,
-                        as_of,
-                        finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
-                    ))
-                    .ok()
-                })
-                .is_some()
-        })
     }
 }
 
 /// Create a rate bumper from runtime instrument dependencies.
-pub fn make_rates_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
+///
+/// # Arguments
+///
+/// * `context` - Metric context whose instrument dependencies and bump config are queried.
+pub fn make_rates_bumper(context: &MetricContext) -> Result<Option<FactorBumper>> {
     let deps = context.instrument.market_dependencies()?;
     let mut curve_ids = Vec::new();
     for curve_id in deps
@@ -343,14 +301,19 @@ pub fn make_rates_bumper(context: &MetricContext) -> Result<Option<Box<dyn Facto
     }
 
     let defaults = sens_config::resolve(context)?;
-    Ok(Some(Box::new(ParallelCurveBumper {
+    Ok(Some(FactorBumper::ParallelCurve {
         curve_ids,
         bump_bp: defaults.rate_bump_bp,
-    })))
+    }))
 }
 
 /// Create a credit bumper from runtime instrument dependencies.
-pub fn make_credit_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
+///
+/// # Arguments
+///
+/// * `context` - Metric context whose instrument dependencies, credit curves, and recalibration
+///   provider are resolved.
+pub fn make_credit_bumper(context: &MetricContext) -> Result<Option<FactorBumper>> {
     let deps = context.instrument.market_dependencies()?;
     if deps.curves.credit_curves.is_empty() {
         return Ok(None);
@@ -363,16 +326,21 @@ pub fn make_credit_bumper(context: &MetricContext) -> Result<Option<Box<dyn Fact
             "credit cross-gamma",
         )?;
     }
-    Ok(Some(Box::new(CreditQuoteBumper {
+    Ok(Some(FactorBumper::CreditQuote {
         curve_ids: deps.curves.credit_curves.to_vec(),
         bump_bp: defaults.credit_spread_bump_bp,
         source_market: Arc::clone(&context.curves),
         provider: context.recalibration_provider("credit_cross_gamma")?,
-    })))
+    }))
 }
 
 /// Create a volatility bumper from runtime instrument dependencies.
-pub fn make_vol_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
+///
+/// # Arguments
+///
+/// * `context` - Metric context whose instrument volatility dependencies, override, and market
+///   surfaces/scalars are resolved.
+pub fn make_vol_bumper(context: &MetricContext) -> Result<Option<FactorBumper>> {
     let deps = context.instrument.market_dependencies()?;
     let override_volatility = volatility_override(context.instrument.as_ref());
     let mut vol_surface_ids = Vec::new();
@@ -403,13 +371,12 @@ pub fn make_vol_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorB
     }
 
     let defaults = sens_config::resolve(context)?;
-    let mut minimum = override_volatility.unwrap_or(f64::INFINITY);
-    for id in &vol_surface_ids {
-        let surface = context.curves.get_surface(id.as_str())?;
-        minimum = minimum.min(min_grid_vol(&surface).ok_or_else(|| {
-            finstack_quant_core::Error::Validation("volatility surface has no finite grid".into())
-        })?);
-    }
+    let mut minimum = active_minimum_vol(
+        context.instrument.as_ref(),
+        &context.curves,
+        &vol_surface_ids,
+    )?
+    .unwrap_or(f64::INFINITY);
     for id in &vol_scalar_ids {
         if let Some(vol) = context.curves.get_price(id)?.get_unitless() {
             minimum = minimum.min(vol);
@@ -426,41 +393,49 @@ pub fn make_vol_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorB
     } else {
         defaults.vol_bump_decimal.min(minimum)
     };
-    Ok(Some(Box::new(VolParallelBumper {
+    Ok(Some(FactorBumper::VolParallel {
         vol_surface_ids,
         vol_scalar_ids,
         override_volatility,
         bump_abs,
         one_sided,
-    })))
+    }))
 }
 
 /// Create a spot bumper from runtime instrument dependencies.
-pub fn make_spot_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
+///
+/// # Arguments
+///
+/// * `context` - Metric context whose spot scalar dependency and bump config are resolved.
+pub fn make_spot_bumper(context: &MetricContext) -> Result<Option<FactorBumper>> {
     let deps = context.instrument.market_dependencies()?;
     let Some(price_id) = deps.market_scalar_ids.first() else {
         return Ok(None);
     };
 
     let defaults = sens_config::resolve(context)?;
-    Ok(Some(Box::new(SpotBumper {
+    Ok(Some(FactorBumper::Spot {
         price_id: price_id.clone(),
         bump_pct: defaults.spot_bump_decimal,
-    })))
+    }))
 }
 
 /// Create an FX bumper from runtime instrument dependencies.
-pub fn make_fx_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
+///
+/// # Arguments
+///
+/// * `context` - Metric context whose FX pair dependencies and bump config are resolved.
+pub fn make_fx_bumper(context: &MetricContext) -> Result<Option<FactorBumper>> {
     let deps = context.instrument.market_dependencies()?;
     if deps.fx_pairs.is_empty() {
         return Ok(None);
     }
 
     let defaults = sens_config::resolve(context)?;
-    Ok(Some(Box::new(FxBumper {
+    Ok(Some(FactorBumper::Fx {
         pairs: deps.fx_pairs,
         bump_pct: defaults.spot_bump_decimal,
-    })))
+    }))
 }
 
 /// Generic cross-factor calculator using runtime bumper factories.
@@ -471,6 +446,11 @@ pub struct CrossFactorCalculator {
 
 impl CrossFactorCalculator {
     /// Creates a reusable cross-factor calculator from two bumper factories.
+    ///
+    /// # Arguments
+    ///
+    /// * `factory_a` - Constructor resolving the first risk-factor perturbation.
+    /// * `factory_b` - Constructor resolving the second risk-factor perturbation.
     pub fn new(factory_a: BumperFactoryFn, factory_b: BumperFactoryFn) -> Self {
         Self {
             factory_a,
@@ -481,15 +461,6 @@ impl CrossFactorCalculator {
 
 impl MetricCalculator for CrossFactorCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        // NOTE: There is deliberately NO short-circuit here that returns a
-        // pre-computed `Vanna` metric in place of `CrossGammaSpotVol`.
-        //
-        // `Vanna` is defined as ∂²V/(∂S_abs × ∂σ) — per unit spot, per vol
-        // point. `CrossGammaSpotVol` (computed below via four-corner FD) is
-        // normalised by percentage-point moves in both factors (per 1 pct-pt spot,
-        // per 1 pct-pt vol), which differs by a factor of S₀ / 100.  Returning
-        // `Vanna` directly would silently mis-scale every cross-gamma attribution
-        // that uses `CrossGammaSpotVol × avg_spot_shift_pct × avg_vol_shift_pct`.
         let Some(bumper_a) = (self.factory_a)(context)? else {
             return Ok(0.0);
         };
@@ -508,10 +479,10 @@ impl MetricCalculator for CrossFactorCalculator {
 
         if bumper_a.stencil().len() == 2 && bumper_b.stencil().len() == 2 {
             return central_mixed(
-                || reprice_corner(context, market, as_of, &*bumper_a, &*bumper_b, 1.0, 1.0),
-                || reprice_corner(context, market, as_of, &*bumper_a, &*bumper_b, 1.0, -1.0),
-                || reprice_corner(context, market, as_of, &*bumper_a, &*bumper_b, -1.0, 1.0),
-                || reprice_corner(context, market, as_of, &*bumper_a, &*bumper_b, -1.0, -1.0),
+                || reprice_corner(context, market, as_of, &bumper_a, &bumper_b, 1.0, 1.0),
+                || reprice_corner(context, market, as_of, &bumper_a, &bumper_b, 1.0, -1.0),
+                || reprice_corner(context, market, as_of, &bumper_a, &bumper_b, -1.0, 1.0),
+                || reprice_corner(context, market, as_of, &bumper_a, &bumper_b, -1.0, -1.0),
                 h_abs,
                 k_abs,
             );
@@ -526,8 +497,8 @@ impl MetricCalculator for CrossFactorCalculator {
                             context,
                             market,
                             as_of,
-                            &*bumper_a,
-                            &*bumper_b,
+                            &bumper_a,
+                            &bumper_b,
                             direction_a,
                             direction_b,
                         )?,
@@ -542,22 +513,12 @@ impl MetricCalculator for CrossFactorCalculator {
     }
 }
 
-/// Reprice after applying two sequential market bumps.
-///
-/// Uses `reprice_raw` (not `reprice_money`) because scenario overrides cancel
-/// in the four-corner finite-difference stencil and avoiding the `Money` wrapper
-/// is consistent with other sensitivity calculators (DV01, CS01).
-///
-/// Keep this copy-returning path until all factor types have reversible
-/// in-place bump tokens. Curves, surfaces, and prices do, but FX currently
-/// goes through `MarketContext::bump`, so a partial scratch abstraction would
-/// add branching without eliminating the clone path for FX cross-gammas.
 fn reprice_corner(
     context: &MetricContext,
     market: &MarketContext,
     as_of: Date,
-    bumper_a: &dyn FactorBumper,
-    bumper_b: &dyn FactorBumper,
+    bumper_a: &FactorBumper,
+    bumper_b: &FactorBumper,
     direction_a: f64,
     direction_b: f64,
 ) -> Result<f64> {
@@ -582,16 +543,13 @@ fn reprice_corner(
 
 #[cfg(test)]
 mod tests {
-    use crate::metrics::MetricId;
+    use super::FactorBumper;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::surfaces::{
         VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
     };
     use finstack_quant_core::types::CurveId;
-
-    use super::{FactorBumper, VolParallelBumper};
-    use crate::metrics::CrossFactorPair;
 
     fn flat_surface(id: &str, vol: f64) -> VolSurface {
         VolSurface::builder(id)
@@ -610,7 +568,7 @@ mod tests {
         let market = MarketContext::new()
             .insert_surface(flat_surface("VOL-A", 0.20))
             .insert_surface(flat_surface("VOL-B", 0.30));
-        let bumper = VolParallelBumper {
+        let bumper = FactorBumper::VolParallel {
             vol_surface_ids: vec![CurveId::new("VOL-A"), CurveId::new("VOL-B")],
             vol_scalar_ids: Vec::new(),
             override_volatility: None,
@@ -630,33 +588,5 @@ mod tests {
             .expect("VOL-B value");
         assert!((bumped_a - 0.21).abs() < 1e-12);
         assert!((bumped_b - 0.31).abs() < 1e-12);
-    }
-
-    #[test]
-    fn cross_factor_pair_metric_id_roundtrip() {
-        let expected = [
-            (
-                CrossFactorPair::RatesCredit,
-                MetricId::CrossGammaRatesCredit,
-            ),
-            (CrossFactorPair::RatesVol, MetricId::CrossGammaRatesVol),
-            (CrossFactorPair::SpotVol, MetricId::CrossGammaSpotVol),
-            (CrossFactorPair::SpotCredit, MetricId::CrossGammaSpotCredit),
-            (CrossFactorPair::FxVol, MetricId::CrossGammaFxVol),
-            (CrossFactorPair::FxRates, MetricId::CrossGammaFxRates),
-            (CrossFactorPair::CreditVol, MetricId::CrossGammaCreditVol),
-        ];
-
-        for (pair, metric_id) in expected {
-            assert_eq!(pair.metric_id(), metric_id);
-            assert!(!pair.metric_id().is_custom());
-        }
-    }
-
-    #[test]
-    fn cross_factor_pair_labels_are_nonempty() {
-        for pair in CrossFactorPair::ALL {
-            assert!(!pair.metric_id().as_str().is_empty());
-        }
     }
 }

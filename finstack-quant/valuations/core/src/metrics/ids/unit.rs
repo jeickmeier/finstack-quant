@@ -130,7 +130,8 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "abs_charge_off"
         | "abs_excess_spread"
         | "abs_ce_level"
-        | "expense_ratio"
+        | "abf_facility_irr"
+        | "abf_residual_irr"
         | "variance_expected"
         | "variance_realized"
         | "ytc"
@@ -184,7 +185,10 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "theta_period_days"
         | "carry_decomposition_degenerate"
         | "index_delta"
-        | "parity" => Dimensionless,
+        | "parity"
+        | "abf_advance_rate_utilization" => Dimensionless,
+        // Percentages.
+        "abs_payment_rate" | "abf_borrowing_base_cushion" => Percent,
         // Calculator-dependent second-order measures and the breakeven shift
         // (whose unit follows the configured target).
         "ir_convexity" | "inflation_convexity" | "breakeven" => Unknown,
@@ -213,7 +217,7 @@ mod tests {
     }
 
     #[test]
-    fn loan_and_convertible_metrics_carry_their_units() {
+    fn loan_asset_backed_and_convertible_metrics_carry_their_units() {
         for (id, unit) in [
             (MetricId::Ytc, MetricUnit::Decimal),
             (MetricId::Yt2y, MetricUnit::Decimal),
@@ -226,6 +230,14 @@ mod tests {
             (MetricId::ConversionPremium, MetricUnit::Decimal),
             (MetricId::ConversionValue, MetricUnit::Currency),
             (MetricId::BondFloor, MetricUnit::Currency),
+            (MetricId::AbsPaymentRate, MetricUnit::Percent),
+            (MetricId::AbfBorrowingBaseCushion, MetricUnit::Percent),
+            (
+                MetricId::AbfAdvanceRateUtilization,
+                MetricUnit::Dimensionless,
+            ),
+            (MetricId::AbfFacilityIrr, MetricUnit::Decimal),
+            (MetricId::AbfResidualIrr, MetricUnit::Decimal),
         ] {
             assert!(!id.is_custom(), "{id}");
             assert_eq!(id.unit(), unit, "{id}");

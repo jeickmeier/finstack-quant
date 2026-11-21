@@ -103,7 +103,10 @@ fn register_standard_metrics(registry: &mut MetricRegistry) -> Result<(), Metric
     }
     crate::instruments::exotics::basket::metrics::register_basket_metrics(registry)?;
     crate::instruments::equity::real_estate::metrics::register_real_estate_metrics(registry)?;
-    crate::instruments::equity::real_estate::metrics::register_levered_real_estate_metrics(registry)
+    crate::instruments::equity::real_estate::metrics::register_levered_real_estate_metrics(
+        registry,
+    )?;
+    crate::metrics::risk::register_risk_metrics(registry)
 }
 
 #[cfg(test)]
@@ -232,10 +235,15 @@ mod tests {
     }
 
     /// Resolving through a family answers exactly as the merged umbrella
-    /// does for every instrument type the family owns: same models, same
-    /// applicable metrics.
+    /// does for every instrument type the family owns: same models, and the
+    /// same applicable metrics aside from the umbrella-level historical VaR
+    /// metrics registered in [`register_standard_metrics`].
     #[test]
     fn family_registries_match_the_umbrella_for_owned_types() {
+        let umbrella_risk_metrics = [
+            crate::metrics::MetricId::ExpectedShortfall,
+            crate::metrics::MetricId::HVar,
+        ];
         let standard_models = STANDARD.pricers().all_models_grouped();
         let standard_metrics = STANDARD.metrics();
         for family in FAMILIES {
@@ -248,9 +256,23 @@ mod tests {
                     "{} models for {instrument_type:?}",
                     family.name()
                 );
+                let standard_for_type = standard_metrics.metrics_for_instrument(*instrument_type);
+                for id in &umbrella_risk_metrics {
+                    assert!(
+                        standard_for_type.contains(id),
+                        "umbrella missing {id} for {instrument_type:?}"
+                    );
+                }
+                let mut expected = family.metrics().metrics_for_instrument(*instrument_type);
+                for id in &umbrella_risk_metrics {
+                    if !expected.contains(id) {
+                        expected.push(id.clone());
+                    }
+                }
+                expected.sort_by(|a, b| a.as_str().cmp(b.as_str()));
                 assert_eq!(
-                    family.metrics().metrics_for_instrument(*instrument_type),
-                    standard_metrics.metrics_for_instrument(*instrument_type),
+                    expected,
+                    standard_for_type,
                     "{} metrics for {instrument_type:?}",
                     family.name()
                 );

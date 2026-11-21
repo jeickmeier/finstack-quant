@@ -18,67 +18,6 @@ use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::Tenor;
 
-/// Hull-White 1F rate delta or gamma, when the request selected that model.
-///
-/// Returns `None` unless the metric request prices with
-/// [`ModelKey::HullWhite1F`](crate::pricer::ModelKey::HullWhite1F), so the
-/// caller falls through to its closed-form greek. Otherwise returns the
-/// central finite-difference derivative of the selected model's raw PV to a
-/// parallel shift of `curve_id`, in PV per unit decimal rate (first order) or
-/// per unit decimal rate squared (second order). HW single-curve products
-/// bump the discount curve; multi-curve caps bump their projection curve while
-/// holding discounting fixed. Parameters are held or recalibrated exactly as
-/// in the selected pricer's normal market-input resolution.
-///
-/// # Arguments
-///
-/// * `context` - Metric context whose pricing dispatch, market and bump
-///   configuration (`rate_bump_bp`, in basis points) drive the repricing.
-/// * `curve_id` - Curve shifted in parallel by ±`rate_bump_bp`.
-/// * `second` - `false` for delta `(PV₊ − PV₋) / 2h`, `true` for gamma
-///   `(PV₊ − 2·PV + PV₋) / h²`, with `h` the bump as a decimal rate.
-///
-/// # Errors
-///
-/// The inner result fails when the bump configuration cannot be resolved,
-/// the curve cannot be bumped, or a repricing fails.
-pub fn hw1f_rate_greek(
-    context: &MetricContext,
-    curve_id: &finstack_quant_core::types::CurveId,
-    second: bool,
-) -> Option<Result<f64>> {
-    if context.pricing_model() != Some(crate::pricer::ModelKey::HullWhite1F) {
-        return None;
-    }
-    Some(rate_greek(context, curve_id, second))
-}
-
-fn rate_greek(
-    context: &MetricContext,
-    curve_id: &finstack_quant_core::types::CurveId,
-    second: bool,
-) -> Result<f64> {
-    use finstack_quant_core::market_data::bumps::BumpSpec;
-    let config = super::config::resolve(context)?;
-    let bump_bp = config.rate_bump_bp;
-    let h = bump_bp * 1e-4;
-    let target = context.curves.curve_target(curve_id)?;
-    let price = |direction: f64| {
-        let market = context.curves.bump([target
-            .clone()
-            .into_bump(BumpSpec::parallel_bp(bump_bp * direction))])?;
-        context.reprice_raw(&market, context.as_of)
-    };
-    let up = price(1.0)?;
-    let down = price(-1.0)?;
-    if second {
-        let base = context.reprice_raw(&context.curves, context.as_of)?;
-        Ok((up - 2.0 * base + down) / (h * h))
-    } else {
-        Ok((up - down) / (2.0 * h))
-    }
-}
-
 pub struct OptionGreekCalculator<I> {
     kind: OptionGreekKind,
     _phantom: PhantomData<I>,

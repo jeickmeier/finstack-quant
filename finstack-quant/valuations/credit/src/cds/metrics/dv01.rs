@@ -17,8 +17,9 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
 use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
-use finstack_quant_valuations_core::metrics::sensitivities::cs01::sensitivity_central_diff;
-use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
+use finstack_quant_valuations_core::metrics::{
+    MetricCalculator, MetricContext, sensitivity_central_diff,
+};
 use finstack_quant_valuations_core::recalibration::{
     DealCdsQuoteOverride, DiscountCurveRecalibrationRequest, HazardRecalibrationAction,
     HazardRecalibrationRequest, QuoteBump,
@@ -56,15 +57,14 @@ fn discount_bumped_market(
             "rate quote replay requires calibration for {discount_id}"
         ))
     })?;
-    let bumped = context.rebuild_discount_curve(
-        DiscountCurveRecalibrationRequest {
+    let bumped = context
+        .recalibration_provider_ref("dv01")?
+        .rebuild_discount_curve(&DiscountCurveRecalibrationRequest {
             curve: Arc::clone(&base_discount),
             recipe: recipe.clone(),
             market: Arc::clone(&context.curves),
             bump,
-        },
-        "dv01",
-    )?;
+        })?;
     context.curves.as_ref().clone().try_insert(bumped)
 }
 
@@ -74,9 +74,10 @@ pub(crate) fn calculate_credit_dv01(
     bucketed: bool,
     mut reprice: impl FnMut(&MetricContext, DiscountShock) -> Result<f64>,
 ) -> Result<f64> {
-    use finstack_quant_valuations_core::metrics::sensitivities::cs01::validate_buckets_strictly_increasing;
     use finstack_quant_valuations_core::metrics::sensitivities::dv01::rate_quote_dv01_series;
-    use finstack_quant_valuations_core::metrics::{MetricId, format_key_rate_label};
+    use finstack_quant_valuations_core::metrics::{
+        MetricId, format_key_rate_label, validate_buckets_strictly_increasing,
+    };
 
     let settings = sens_config::resolve(context)?;
     let bp = settings.rate_bump_bp;
@@ -84,11 +85,11 @@ pub(crate) fn calculate_credit_dv01(
         return Ok(0.0);
     }
     if !bucketed {
-        return Ok(sensitivity_central_diff(
+        return sensitivity_central_diff(
             reprice(context, DiscountShock::ParallelBp(bp))?,
             reprice(context, DiscountShock::ParallelBp(-bp))?,
             bp,
-        ));
+        );
     }
 
     let curve = context.curves.get_discount(discount_id)?;
@@ -113,7 +114,7 @@ pub(crate) fn calculate_credit_dv01(
             let down = reprice(context, shock(-bp))?;
             series.push((
                 format_key_rate_label(target),
-                sensitivity_central_diff(up, down, bp),
+                sensitivity_central_diff(up, down, bp)?,
             ));
         }
         series

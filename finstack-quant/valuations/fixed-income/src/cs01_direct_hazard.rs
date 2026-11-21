@@ -9,44 +9,27 @@
 //! and explicitly switches to a forward difference when a downward intensity
 //! shock would leave the non-negative domain `λ >= 0`.
 
-use std::marker::PhantomData;
 use std::sync::Arc;
 
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
-
-use super::config as sens_config;
-use super::cs01::{cs01_reval, reprice_with_hazard, sensitivity_central_diff};
-use crate::instruments::Instrument;
-use crate::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::cs01::{
+    cs01_reval, reprice_with_hazard, resolve_optional_cs01_curves,
+};
+use finstack_quant_valuations_core::metrics::{
+    MetricCalculator, MetricContext, MetricId, format_key_rate_label, sensitivity_central_diff,
+};
 
 /// Parallel direct hazard-rate intensity sensitivity (`hazard01::<curve>`).
-pub struct DirectHazardParallelHazard01<I> {
-    _phantom: PhantomData<I>,
-}
-
-impl<I> Default for DirectHazardParallelHazard01<I> {
-    fn default() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
-    }
-}
+#[derive(Default)]
+pub struct DirectHazardParallelHazard01;
 
 /// Bucketed direct hazard-rate intensity sensitivity (`bucketed_hazard01::<curve>`):
 /// one bucket per exact positive hazard-curve knot.
-pub struct DirectHazardBucketedHazard01<I> {
-    _phantom: PhantomData<I>,
-}
-
-impl<I> Default for DirectHazardBucketedHazard01<I> {
-    fn default() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
-    }
-}
+#[derive(Default)]
+pub struct DirectHazardBucketedHazard01;
 
 /// Finite-difference sensitivity under direct `bump(±bp)`, selecting forward
 /// difference upfront only when a downward bump would push an affected
@@ -69,19 +52,15 @@ fn hazard_bump_sensitivity(
         } else {
             let down = bump(hazard.as_ref(), -bump_bp)?;
             let pv_down = reprice_with_hazard(scratch, down, hazard, &mut reval)?;
-            Ok(sensitivity_central_diff(pv_up, pv_down, bump_bp))
+            sensitivity_central_diff(pv_up, pv_down, bump_bp)
         }
     })
 }
 
-impl<I> MetricCalculator for DirectHazardParallelHazard01<I>
-where
-    I: Instrument + 'static,
-{
+impl MetricCalculator for DirectHazardParallelHazard01 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let instrument: &I = context.instrument_as()?;
         let Some((hazard_id, _)) =
-            super::cs01::resolve_optional_cs01_curves(instrument, false, "Hazard01")?
+            resolve_optional_cs01_curves(context.instrument.as_ref(), false, "Hazard01")?
         else {
             return Ok(0.0);
         };
@@ -103,14 +82,10 @@ where
     }
 }
 
-impl<I> MetricCalculator for DirectHazardBucketedHazard01<I>
-where
-    I: Instrument + 'static,
-{
+impl MetricCalculator for DirectHazardBucketedHazard01 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let instrument: &I = context.instrument_as()?;
         let Some((hazard_id, _)) =
-            super::cs01::resolve_optional_cs01_curves(instrument, false, "BucketedHazard01")?
+            resolve_optional_cs01_curves(context.instrument.as_ref(), false, "BucketedHazard01")?
         else {
             return Ok(0.0);
         };
@@ -125,7 +100,10 @@ where
                 hazard_bump_sensitivity(context, &hazard, bump_bp, base_lambda, |curve, bp| {
                     curve.with_tenor_hazard_rate_bumps_bp(&[(tenor, bp)])
                 })?;
-            series.push((crate::metrics::format_bucket_label(tenor), hazard01));
+            series.push((
+                std::borrow::Cow::Owned(format_key_rate_label(tenor)),
+                hazard01,
+            ));
             total.add(hazard01)?;
         }
         context.store_bucketed_series(

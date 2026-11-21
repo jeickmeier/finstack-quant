@@ -133,7 +133,9 @@ pub fn calculate_theta_date(
 /// Last economic payment or contractual expiry, whichever is later.
 /// Cashflow dates retain business-day adjustment and payment lag; option
 /// exercise expiry remains unchanged on the instrument itself.
-pub fn theta_termination_date(context: &mut crate::metrics::MetricContext) -> Result<Option<Date>> {
+pub(crate) fn theta_termination_date(
+    context: &mut crate::metrics::MetricContext,
+) -> Result<Option<Date>> {
     context
         .instrument
         .last_payment_date(&context.curves, context.as_of)
@@ -251,9 +253,6 @@ impl crate::metrics::MetricCalculator for GenericThetaAny {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::metrics::period_cash::collect_cashflows_from_flows;
-    use finstack_quant_core::cashflow::CFKind;
-    use finstack_quant_core::currency::Currency;
     use time::Month;
     use time::macros::date;
 
@@ -358,171 +357,5 @@ mod tests {
 
         let theta_date_1w = calculate_theta_date(base, tenor("1W"), Some(expiry)).expect("roll 1W");
         assert_eq!(theta_date_1w, expiry);
-    }
-
-    fn test_flow(day: u8, amount: f64, kind: CFKind) -> finstack_quant_core::cashflow::CashFlow {
-        use finstack_quant_core::money::Money;
-        test_flow_in(
-            day,
-            Money::new(amount, Currency::USD).expect("valid money fixture"),
-            kind,
-        )
-    }
-
-    /// A fixture row; a cash principal row moves the balance by minus its
-    /// cash, and a noncash row (PIK, write-down) carries `amount` as its
-    /// balance change with zero cash.
-    fn test_flow_in(
-        day: u8,
-        amount: finstack_quant_core::money::Money,
-        kind: CFKind,
-    ) -> finstack_quant_core::cashflow::CashFlow {
-        use finstack_quant_core::cashflow::CashFlowParams;
-        use finstack_quant_core::money::Money;
-        let date = Date::from_calendar_date(2025, Month::January, day).expect("flow date");
-        let params = if !kind.is_principal_like() {
-            CashFlowParams::new(date, None, amount, kind, 0.5, None)
-        } else if kind.is_cash_settlement() {
-            CashFlowParams::new(date, None, amount, kind, 0.5, None)
-                .with_principal_delta(amount.checked_neg())
-                .with_principal_date(date)
-        } else {
-            CashFlowParams::new(date, None, Money::zero(amount.currency()), kind, 0.5, None)
-                .with_principal_delta(amount)
-                .with_principal_date(date)
-        };
-        params.build().expect("valid cashflow")
-    }
-
-    #[test]
-    fn period_cash_converts_each_payment_at_its_date() {
-        use finstack_quant_core::money::Money;
-        use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
-        struct DatedFx;
-        impl FxProvider for DatedFx {
-            fn rate(
-                &self,
-                from: Currency,
-                to: Currency,
-                on: Date,
-                _policy: FxConversionPolicy,
-            ) -> Result<f64> {
-                assert_eq!((from, to), (Currency::EUR, Currency::USD));
-                Ok(if on.day() == 2 { 1.1 } else { 1.2 })
-            }
-        }
-        let market = finstack_quant_core::market_data::context::MarketContext::new()
-            .insert_fx(FxMatrix::new(std::sync::Arc::new(DatedFx), None));
-        let euro_receipt = test_flow_in(2, Money::from((100_i64, Currency::EUR)), CFKind::Fixed);
-        let euro_payment = test_flow_in(3, Money::from((-50_i64, Currency::EUR)), CFKind::Fixed);
-        let flows = [
-            euro_receipt,
-            euro_payment,
-            test_flow(4, 10.0, CFKind::Fixed),
-        ];
-        let sum = collect_cashflows_from_flows(
-            &flows,
-            &market,
-            date!(2025 - 01 - 01),
-            date!(2025 - 01 - 10),
-            Currency::USD,
-            None,
-            true,
-        )
-        .unwrap();
-        assert!((sum.total.amount() - 60.0).abs() < 1e-9);
-        let missing_fx = finstack_quant_core::market_data::context::MarketContext::new();
-        assert!(
-            collect_cashflows_from_flows(
-                &flows,
-                &missing_fx,
-                date!(2025 - 01 - 01),
-                date!(2025 - 01 - 10),
-                Currency::USD,
-                None,
-                true
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn period_cash_includes_signed_principal_and_excludes_non_cash() {
-        let start = date!(2025 - 01 - 01);
-        let end = date!(2025 - 01 - 10);
-        let flows = [
-            test_flow(2, 25_000.0, CFKind::Fixed),
-            test_flow(3, -1_000_000.0, CFKind::Notional),
-            test_flow(4, 50_000.0, CFKind::Amortization),
-            test_flow(5, 10_000.0, CFKind::Pik),
-            test_flow(6, -100_000.0, CFKind::DefaultedNotional),
-            test_flow(10, 25_000.0, CFKind::Fixed), // exclusive end
-        ];
-
-        let sum = collect_cashflows_from_flows(
-            &flows,
-            &finstack_quant_core::market_data::context::MarketContext::new(),
-            start,
-            end,
-            Currency::USD,
-            None,
-            true,
-        )
-        .expect("collect");
-        assert_eq!(sum.income.amount(), 25_000.0);
-        // coupon 25k + signed notional -1mm + amort 50k; PIK/default/end-date excluded
-        assert!(
-            (sum.total.amount() - (25_000.0 - 1_000_000.0 + 50_000.0)).abs() < 1e-9,
-            "signed principal must enter period cash, got {sum:?}"
-        );
-    }
-
-    #[test]
-    fn period_cash_skips_bond_issue_draw() {
-        let start = date!(2025 - 01 - 01);
-        let end = date!(2025 - 01 - 10);
-        let issue = date!(2025 - 01 - 02);
-        let flows = [
-            test_flow(2, -100.0, CFKind::Notional),
-            test_flow(3, -50.0, CFKind::Notional),
-        ];
-        let sum = collect_cashflows_from_flows(
-            &flows,
-            &finstack_quant_core::market_data::context::MarketContext::new(),
-            start,
-            end,
-            Currency::USD,
-            Some(issue),
-            true,
-        )
-        .expect("collect");
-        assert!(
-            (sum.total.amount() + 50.0).abs() < 1e-12,
-            "issue-date draw is excluded; later signed notional remains, got {sum:?}"
-        );
-    }
-
-    #[test]
-    fn period_cash_is_half_open_on_payment_date() {
-        let start = date!(2025 - 01 - 05);
-        let end = date!(2025 - 01 - 06);
-        let flows = [
-            test_flow(5, 10.0, CFKind::Fixed),
-            test_flow(6, 20.0, CFKind::Fixed),
-        ];
-        let sum = collect_cashflows_from_flows(
-            &flows,
-            &finstack_quant_core::market_data::context::MarketContext::new(),
-            start,
-            end,
-            Currency::USD,
-            None,
-            true,
-        )
-        .expect("collect");
-        assert!(
-            (sum.total.amount() - 10.0).abs() < 1e-12,
-            "only the payment-date flow in [start, end) is income, got {sum:?}"
-        );
     }
 }

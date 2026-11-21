@@ -3,11 +3,12 @@ use finstack_quant_core::market_data::term_structures::RateCalibrationCurveRole;
 use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_valuations_core::instruments::RatesCurveKind;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
-use finstack_quant_valuations_core::metrics::sensitivities::cs01::sensitivity_central_diff;
 use finstack_quant_valuations_core::metrics::sensitivities::dv01::{
     Dv01CalculatorConfig, UnifiedDv01Calculator, rate_quote_dv01_series,
 };
-use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_valuations_core::metrics::{
+    MetricCalculator, MetricContext, MetricId, sensitivity_central_diff,
+};
 use finstack_quant_valuations_core::recalibration::{QuoteBump, RateMarketRecalibrationRequest};
 use std::sync::Arc;
 
@@ -66,16 +67,17 @@ impl MetricCalculator for RateDv01 {
                     bump,
                 },
             };
-            let bumped = context.rebuild_rate_market(request, metric_name)?;
+            let bumped =
+                crate::rate_recalibration::rebuild_rate_market(context, request, metric_name)?;
             context.reprice_raw(&bumped, context.as_of)
         };
         let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
         if !self.0 {
-            return Ok(sensitivity_central_diff(
+            return sensitivity_central_diff(
                 reprice(QuoteBump::ParallelBp(bump_bp))?,
                 reprice(QuoteBump::ParallelBp(-bump_bp))?,
                 bump_bp,
-            ));
+            );
         }
         let discount_series =
             rate_quote_dv01_series(discount_id, discount_recipe, bump_bp, reprice)?;

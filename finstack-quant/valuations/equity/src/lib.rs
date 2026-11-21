@@ -128,6 +128,8 @@ pub mod pe_fund;
 /// Shared piecewise-constant GBM process and forward-vol/rate bootstrap for the
 /// equity path-dependent MC pricers (cliquet, autocallable).
 pub(crate) mod piecewise_gbm;
+#[doc(hidden)]
+pub mod rf_component_dv01;
 /// Equity spot module - Equity spot positions.
 pub mod spot;
 /// Spot-pinned finite-difference Greeks for products struck at inception spot.
@@ -135,6 +137,8 @@ pub(crate) mod spot_pinned;
 /// Equity underlying asset parameters.
 pub mod underlying;
 pub mod variance_swap;
+#[doc(hidden)]
+pub mod vega;
 /// Volatility index future module.
 pub mod vol_index_future;
 /// Exchange-listed options on volatility-index futures.

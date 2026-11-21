@@ -124,7 +124,7 @@ impl MetricCalculator for VegaCalculator {
         if context.as_of >= swap.final_observation_date()? {
             return Ok(0.0);
         }
-        GenericFdVega::<FxVarianceSwap>::default().calculate(context)
+        GenericFdVega.calculate(context)
     }
 }
 

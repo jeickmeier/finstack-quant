@@ -225,55 +225,60 @@ fn value_position(input: &EvaluationInput<'_>, position: &Position) -> Result<Po
         inapplicable_metrics,
     } = requested_metrics(input, position);
     let metrics_requested = !requested.is_empty();
-    let (valuation_result, risk_metrics_complete, risk_error) =
-        match position.instrument.price_with_metrics(
-            input.market,
-            input.as_of,
-            &requested,
-            input.pricing_options.clone(),
-        ) {
-            Ok(result) => (result, true, None),
-            Err(error) if input.profile.risk_policy == RiskFailurePolicy::Strict => {
-                return Err(Error::ValuationError {
+    let pricing_options = if input.pricing_options.metric_registry.is_some() {
+        input.pricing_options.clone()
+    } else {
+        input
+            .pricing_options
+            .clone()
+            .with_metric_registry(finstack_quant_valuations::pricer::STANDARD.shared_metrics())
+    };
+    let (valuation_result, risk_metrics_complete, risk_error) = match position
+        .instrument
+        .price_with_metrics(input.market, input.as_of, &requested, pricing_options)
+    {
+        Ok(result) => (result, true, None),
+        Err(error) if input.profile.risk_policy == RiskFailurePolicy::Strict => {
+            return Err(Error::ValuationError {
+                position_id: position.position_id.clone(),
+                message: error.to_string(),
+                kind: error.kind(),
+            });
+        }
+        Err(pricing_error) => {
+            let failed_path = if metrics_requested {
+                "metric pricing"
+            } else {
+                "canonical pricing"
+            };
+            let value = position
+                .instrument
+                .value(input.market, input.as_of)
+                .map_err(|error| Error::ValuationError {
                     position_id: position.position_id.clone(),
-                    message: error.to_string(),
-                    kind: error.kind(),
-                });
-            }
-            Err(pricing_error) => {
-                let failed_path = if metrics_requested {
-                    "metric pricing"
-                } else {
-                    "canonical pricing"
-                };
-                let value = position
-                    .instrument
-                    .value(input.market, input.as_of)
-                    .map_err(|error| Error::ValuationError {
-                        position_id: position.position_id.clone(),
-                        message: format!(
-                            "instrument '{}' failed PV-only fallback ({error}) after \
+                    message: format!(
+                        "instrument '{}' failed PV-only fallback ({error}) after \
                          {failed_path} also failed ({pricing_error})",
-                            position.instrument.id()
-                        ),
-                        kind: error.kind(),
-                    })?;
-                // When metrics were requested, the position is degraded: something
-                // risk-related is missing. When none were, nothing risk-related is
-                // missing, but the position did silently switch pricing paths, so
-                // the canonical failure is recorded to keep the switch auditable.
-                (
-                    ValuationResult::stamped_with_meta(
-                        position.instrument.id(),
-                        input.as_of,
-                        value,
-                        finstack_quant_core::config::results_meta(input.config),
+                        position.instrument.id()
                     ),
-                    !metrics_requested,
-                    Some(pricing_error.to_string()),
-                )
-            }
-        };
+                    kind: error.kind(),
+                })?;
+            // When metrics were requested, the position is degraded: something
+            // risk-related is missing. When none were, nothing risk-related is
+            // missing, but the position did silently switch pricing paths, so
+            // the canonical failure is recorded to keep the switch auditable.
+            (
+                ValuationResult::stamped_with_meta(
+                    position.instrument.id(),
+                    input.as_of,
+                    value,
+                    finstack_quant_core::config::results_meta(input.config),
+                ),
+                !metrics_requested,
+                Some(pricing_error.to_string()),
+            )
+        }
+    };
 
     let value_native = position.scale_value(valuation_result.value)?;
     let (value_base, fx) = collapse_to_base(input, value_native)?;

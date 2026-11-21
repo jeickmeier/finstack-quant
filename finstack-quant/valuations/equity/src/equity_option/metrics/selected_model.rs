@@ -41,11 +41,11 @@ pub(crate) fn selected_equity_greek(
         });
     }
     match kind {
-        OptionGreekKind::Delta => GenericFdDelta::<EquityOption>::default().calculate(context),
-        OptionGreekKind::Gamma => GenericFdGamma::<EquityOption>::default().calculate(context),
-        OptionGreekKind::Vega => GenericFdVega::<EquityOption>::default().calculate(context),
-        OptionGreekKind::Vanna => GenericFdVanna::<EquityOption>::default().calculate(context),
-        OptionGreekKind::Volga => GenericFdVolga::<EquityOption>::default().calculate(context),
+        OptionGreekKind::Delta => GenericFdDelta.calculate(context),
+        OptionGreekKind::Gamma => GenericFdGamma.calculate(context),
+        OptionGreekKind::Vega => GenericFdVega.calculate(context),
+        OptionGreekKind::Vanna => GenericFdVanna.calculate(context),
+        OptionGreekKind::Volga => GenericFdVolga.calculate(context),
         OptionGreekKind::Theta => selected_equity_theta(context),
         OptionGreekKind::Rho => finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
             finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_discount_only(),

@@ -56,6 +56,8 @@
 pub mod asset_backed_facility;
 /// CMO module - Collateralized Mortgage Obligations.
 pub mod cmo;
+/// Display field-unit metadata tables for structured-credit reports.
+pub mod field_units;
 /// Structured credit module - ABS, RMBS, CMBS, CLO.
 pub mod structured_credit;
 

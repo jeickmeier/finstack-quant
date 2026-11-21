@@ -10,18 +10,16 @@ Calculators run through `Instrument::price_with_metrics` or directly against a
 metrics/
 ├── ids/                  # MetricId, MetricGroup, MetricUnit, the standard catalogue
 ├── traits.rs             # MetricCalculator, MetricContext
-├── registry.rs           # MetricRegistry: dependency resolution, strict errors
+├── registry/             # MetricRegistry: dependency resolution, strict errors
 ├── registration_macro.rs # register_metrics!
 ├── universal.rs          # calculators every family registry shares
 ├── finite_difference.rs  # curve and scalar bump helpers
-├── aggregation.rs        # additive-metric classification
-├── sensitivities/        # DV01, CS01 (curve and Z-spread), vega, theta, FD Greeks,
+├── sensitivities/        # DV01, CS01 (curve), theta, FD Greeks,
 │                         # FX01, carry decomposition, breakeven, cross-factor
-└── risk/                 # Historical VaR / expected shortfall, market history,
-                          # risk-factor extraction
+└── risk/                 # MarketHistory/Scenario/RiskFactorType wire types and VarConfig/VarMethod
 ```
 
-`ids`, `traits`, `registry`, `universal` and `finite_difference` are private modules; `sensitivities` is public but hidden from the rendered docs (the instrument families in the umbrella crate register its calculators).
+`ids`, `traits`, `registry`, `universal` and `finite_difference` are private modules; `sensitivities` is public but hidden from the rendered docs (the instrument families and umbrella crate register its calculators). Aggregation (`is_additive_metric`) and the full VaR/Expected-Shortfall engine live in `finstack_quant_valuations::metrics`.
 Everything supported is re-exported from `crate::metrics`. `risk` is public.
 
 ## Public surface
@@ -31,15 +29,14 @@ Everything supported is re-exported from `crate::metrics`. `risk` is public.
 | `MetricId` | Strongly typed metric name; also the key type of `ValuationResult::measures` |
 | `MetricGroup` | Ten logical groups covering every standard metric |
 | `MetricCalculator` | `fn calculate(&self, &mut MetricContext) -> Result<f64>` plus `dependencies()` / `dynamic_dependencies()` |
-| `MetricContext` | Instrument, `MarketContext`, `as_of`, base PV, and the `computed` / series / matrix caches |
+| `MetricContext` | Instrument, `MarketContext`, `as_of`, base PV, and the `computed` cache |
 | `MetricRegistry` | Calculator store with dependency resolution and strict, fail-fast errors |
 | `finstack_quant_valuations::pricer::STANDARD.metrics()` | Process-wide metric registry containing every built-in family, exposed by the umbrella crate |
 | `bump_surface_vol_absolute` | Absolute vol-point surface bump helper |
 | `STANDARD_BUCKETS_YEARS`, `STANDARD_BUCKET_LABELS`, `format_bucket_label` | Canonical key-rate bucket grid and labels |
-| `CrossFactorCalculator`, `CrossFactorPair` | Cross-gamma style two-factor sensitivities |
 | `collect_period_cash`, `PeriodCash` | Period economic cash (total and income) for theta carry and attribution |
-| `risk::var_calculator::{calculate_var, VarConfig, VarMethod, VarResult}` | Historical VaR entry point and configuration |
-| `risk::{GenericHVar, GenericExpectedShortfall, MarketHistory, MarketScenario, RiskFactorShift}` | Scenario inputs and estimators |
+| `risk::var_calculator::{VarConfig, VarMethod}` | Historical VaR configuration and method wire types |
+| `risk::{MarketHistory, MarketScenario, RiskFactorShift, UnshiftedHazardPolicy}` | Scenario inputs |
 | `risk::RiskFactorType` | Risk-factor categories historical scenarios shift |
 
 ## MetricId
@@ -91,13 +88,10 @@ will be missing whenever the caller did not request it earlier in the list.
 ## Bucketed metrics
 
 - 1-D: `MetricContext::store_bucketed_series` — key-rate DV01, bucketed CS01.
-  Read back with `get_series`.
-- 2-D: `MetricContext::store_matrix2d` — vega by expiry x strike. Read cells from
-  `computed` using their composite keys; shape mismatches return a `Validation` error.
 
-Both also flatten every cell into `computed` under a stable composite key built
-by `MetricId::composite` — `base::bucket` for a series, `base::row::col` for a
-matrix. Labels are written literally (`bucketed_dv01::USD-OIS::10y`, `pv01::USD-OIS`); only the `::` delimiter, a literal `_x` and the reserved `_empty` spelling are escaped as `_xHH`. The flattened cells
+`store_bucketed_series` flattens every cell into `computed` under a stable composite key built
+by `MetricId::composite` (`base::bucket`); 2-D matrix metrics (such as vega by expiry x strike)
+insert `MetricId::composite(&base, &[row, col])` directly. Labels are written literally (`bucketed_dv01::USD-OIS::10y`, `pv01::USD-OIS`); only the `::` delimiter, a literal `_x` and the reserved `_empty` spelling are escaped as `_xHH`. The flattened cells
 are custom `MetricId`s, so they survive into `ValuationResult::measures`
 alongside the scalar metrics and can be read back with
 `ValuationResult::metric_series`.

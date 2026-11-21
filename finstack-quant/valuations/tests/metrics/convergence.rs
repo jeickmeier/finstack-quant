@@ -361,10 +361,17 @@ fn test_bucketed_dv01_sums_to_parallel() {
         .unwrap();
 
     let total_dv01 = *results.get(&MetricId::Dv01).unwrap();
-    let curve_key = MetricId::custom("bucketed_dv01::USD-OIS");
-    let bucketed_series = context.computed_series.get(&curve_key);
+    let series: Vec<(String, f64)> = context
+        .computed
+        .iter()
+        .filter_map(|(k, v)| {
+            k.as_str()
+                .strip_prefix("bucketed_dv01::USD-OIS::")
+                .map(|label| (label.to_string(), *v))
+        })
+        .collect();
 
-    if let Some(series) = bucketed_series {
+    if !series.is_empty() {
         let sum_bucketed: f64 = series.iter().map(|(_, v)| v).sum();
 
         // Debug output

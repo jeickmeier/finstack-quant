@@ -29,7 +29,7 @@ impl MetricCalculator for BreakevenCalculator {
             })?;
 
         if config.mode == BreakevenMode::Iterative
-            && let Some(message) = iterative_mode_error(context, config.target)
+            && let Some(message) = iterative_mode_error(context, config.target)?
         {
             return Err(finstack_quant_core::Error::Validation(message));
         }
@@ -95,7 +95,7 @@ impl MetricCalculator for BreakevenCalculator {
             return Cow::Borrowed(self.dependencies());
         };
         if config.mode == BreakevenMode::Iterative
-            && iterative_mode_error(context, config.target).is_some()
+            && !matches!(iterative_mode_error(context, config.target), Ok(None))
         {
             return Cow::Borrowed(self.dependencies());
         }
@@ -119,31 +119,35 @@ impl MetricCalculator for BreakevenCalculator {
 /// Rather than silently return a mislabeled number we reject, mirroring the
 /// existing [`BreakevenTarget::BaseCorrelation`] rejection. Use
 /// [`BreakevenMode::Linear`] for credit-curve instruments.
-fn iterative_mode_error(context: &MetricContext, target: BreakevenTarget) -> Option<String> {
+fn iterative_mode_error(
+    context: &MetricContext,
+    target: BreakevenTarget,
+) -> Result<Option<String>> {
     if target == BreakevenTarget::BaseCorrelation {
-        return Some(
+        return Ok(Some(
             "BreakevenMode::Iterative is unsupported for BaseCorrelation because no scalar \
              base-correlation bump API exists"
                 .to_string(),
-        );
+        ));
     }
     if !matches!(target, BreakevenTarget::ZSpread | BreakevenTarget::Oas) {
-        return None;
+        return Ok(None);
     }
-    let has_credit_curve = context
+    let has_credit_curve = !context
         .instrument
-        .market_dependencies()
-        .map(|d| !d.curves.credit_curves.is_empty())
-        .unwrap_or(false);
+        .market_dependencies()?
+        .curves
+        .credit_curves
+        .is_empty();
     if has_credit_curve {
-        return Some(format!(
+        return Ok(Some(format!(
             "BreakevenMode::Iterative is unsupported for {target:?} on an instrument with a \
              credit curve: CS01 is measured as a hazard-curve (par spread) bump while the \
              iterative solve applies a parallel discount-curve shift, so the two modes would \
              report different risk factors under one metric name. Use BreakevenMode::Linear."
-        ));
+        )));
     }
-    None
+    Ok(None)
 }
 
 /// Discount and forward curves a yield breakeven shifts, discount curves
@@ -178,9 +182,11 @@ fn bump_market_for_target(
             // the cached `discount_curve_id` on the context.
             let curve_id = context
                 .instrument
-                .market_dependencies()
-                .ok()
-                .and_then(|d| d.curves.discount_curves.first().cloned())
+                .market_dependencies()?
+                .curves
+                .discount_curves
+                .first()
+                .cloned()
                 .or_else(|| context.discount_curve_id.clone())
                 .ok_or_else(|| finstack_quant_core::InputError::NotFound {
                     id: "iterative_breakeven: no discount curve found for instrument".into(),

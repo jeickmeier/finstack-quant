@@ -24,11 +24,10 @@ use crate::cap_floor::CapFloor;
 use finstack_quant_core::Result;
 use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::bumps::MarketBump;
-use finstack_quant_valuations_core::metrics::MetricCalculator;
-use finstack_quant_valuations_core::metrics::MetricContext;
-use finstack_quant_valuations_core::metrics::MetricRegistry;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
-use finstack_quant_valuations_core::metrics::sensitivities::cs01::sensitivity_central_diff;
+use finstack_quant_valuations_core::metrics::{
+    MetricCalculator, MetricContext, MetricRegistry, sensitivity_central_diff,
+};
 
 /// Register all CapFloor metrics with the registry
 pub(crate) fn register_cap_floor_metrics(
@@ -74,11 +73,7 @@ impl MetricCalculator for DeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let option: &CapFloor = context.instrument_as()?;
         if let Some(greek) =
-            finstack_quant_valuations_core::metrics::sensitivities::option_greeks::hw1f_rate_greek(
-                context,
-                &option.forward_curve_id,
-                false,
-            )
+            crate::rate_recalibration::hw1f_rate_greek(context, &option.forward_curve_id, false)
         {
             return greek;
         }
@@ -124,11 +119,7 @@ impl MetricCalculator for ForwardPv01Calculator {
             }])?;
             context.reprice_raw(&bumped, context.as_of)
         };
-        Ok(sensitivity_central_diff(
-            reprice(bump_bp)?,
-            reprice(-bump_bp)?,
-            bump_bp,
-        ))
+        sensitivity_central_diff(reprice(bump_bp)?, reprice(-bump_bp)?, bump_bp)
     }
 }
 
@@ -144,11 +135,7 @@ impl MetricCalculator for GammaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let option: &CapFloor = context.instrument_as()?;
         if let Some(greek) =
-            finstack_quant_valuations_core::metrics::sensitivities::option_greeks::hw1f_rate_greek(
-                context,
-                &option.forward_curve_id,
-                true,
-            )
+            crate::rate_recalibration::hw1f_rate_greek(context, &option.forward_curve_id, true)
         {
             return greek;
         }

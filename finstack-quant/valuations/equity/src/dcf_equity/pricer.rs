@@ -38,23 +38,23 @@ pub(crate) fn compute_pv(
             dcf.id, dcf.valuation_date, as_of
         )));
     }
-    let equity_value = pv_with_rf_bump(dcf, &|_| 0.0)?;
+    let equity_value = pv_with_rf_bump(dcf, 0.0)?;
     Money::from_model_value(equity_value, dcf.currency)
 }
 
-/// Equity PV with the risk-free component of the WACC bumped by `bump_at(t)`
-/// (absolute, decimal) at each cashflow tenor `t` in years.
+/// Equity PV with the risk-free component of the WACC bumped by `bump`
+/// (parallel, absolute, decimal) at every cashflow tenor.
 ///
 /// The bump applies everywhere the WACC appears: per-flow discounting, the
 /// terminal-value capitalization (Gordon/H-model `1/(wacc − g)`), and the
 /// terminal discounting — which is the analytic `∂PV/∂rf` under the additive
-/// decomposition `wacc = rf + risk_premium`. `bump_at = |_| 0.0` reproduces
+/// decomposition `wacc = rf + risk_premium`. `bump = 0.0` reproduces
 /// the unbumped PV exactly.
 pub(crate) fn pv_with_rf_bump(
     dcf: &DiscountedCashFlow,
-    bump_at: &dyn Fn(f64) -> f64,
+    bump: f64,
 ) -> finstack_quant_core::Result<f64> {
-    let (pv_explicit, pv_terminal) = pv_components_with_rf_bump(dcf, bump_at)?;
+    let (pv_explicit, pv_terminal) = pv_components_with_rf_bump(dcf, bump)?;
     let mut equity = NeumaierAccumulator::new();
     equity.add(enterprise_value(pv_explicit, pv_terminal)?)?;
     equity.add(-dcf.effective_net_debt())?;
@@ -62,25 +62,21 @@ pub(crate) fn pv_with_rf_bump(
 }
 
 /// Enterprise-value components `(pv_explicit, pv_terminal)` at the WACC with
-/// its risk-free component bumped by `bump_at(t)` (absolute, decimal) at each
-/// tenor `t` in years; `bump_at = |_| 0.0` gives the unbumped components.
+/// its risk-free component bumped by `bump` (parallel, absolute, decimal) at
+/// every tenor; `bump = 0.0` gives the unbumped components.
 pub(crate) fn pv_components_with_rf_bump(
     dcf: &DiscountedCashFlow,
-    bump_at: &dyn Fn(f64) -> f64,
+    bump: f64,
 ) -> finstack_quant_core::Result<(f64, f64)> {
     let t_term = dcf.terminal_discount_years()?;
-    let terminal_wacc = dcf.wacc + bump_at(t_term);
+    let terminal_wacc = dcf.wacc + bump;
     let terminal_value = dcf.terminal_value_at_wacc(terminal_wacc)?;
     let pv_terminal = discount_cashflow(terminal_value, terminal_wacc, t_term)?;
 
     let mut explicit = NeumaierAccumulator::new();
     for &(date, amount) in &dcf.flows {
         let years = dcf.explicit_flow_discount_years(date)?;
-        explicit.add(discount_cashflow(
-            amount.amount(),
-            dcf.wacc + bump_at(years),
-            years,
-        )?)?;
+        explicit.add(discount_cashflow(amount.amount(), dcf.wacc + bump, years)?)?;
     }
     Ok((explicit.get_total()?, pv_terminal))
 }

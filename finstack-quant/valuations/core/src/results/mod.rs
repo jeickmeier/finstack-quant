@@ -52,12 +52,7 @@ pub mod structured_credit;
 mod valuation_result;
 
 pub use dataframe::{ValuationLongRow, ValuationRow};
-pub use field_units::{
-    EquityMetricsFieldUnits, MetricFieldUnit, PoolReportFieldUnits, ScenarioTableFieldUnits,
-    SimulationFieldUnits, TrancheSolveFieldUnits, bond_quote_set_field_units,
-    equity_metrics_field_units, pool_report_field_units, scenario_table_field_units,
-    simulation_field_units, tranche_metric_field_units, tranche_solve_field_units,
-};
+pub use field_units::MetricFieldUnit;
 pub use provenance::{SensitivityBumps, ValuationProvenance};
 pub use valuation_result::{
     CreditDerivativeValuationDetails, FxValuationDetails, MonteCarloValuationDetails,

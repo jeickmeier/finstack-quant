@@ -8,10 +8,14 @@ use crate::asset_backed_facility::AssetBackedFacility;
 use crate::structured_credit::calculate_equity_metrics;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_valuations_core::metrics::{
-    MetricCalculator, MetricContext, MetricRegistry, ZSpreadCs01, ZSpreadCs01Inputs,
-};
+use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricRegistry};
 use finstack_quant_valuations_core::pricer::InstrumentType;
+use finstack_quant_valuations_fixed_income::cs01_direct_hazard::{
+    DirectHazardBucketedHazard01, DirectHazardParallelHazard01,
+};
+use finstack_quant_valuations_fixed_income::cs01_z_spread::{
+    ZSpreadBucketedCs01, ZSpreadCs01, ZSpreadCs01Inputs, ZSpreadParallelCs01,
+};
 
 impl ZSpreadCs01 for AssetBackedFacility {
     /// The lender's projected receipts (interest, principal, commitment fees)
@@ -135,10 +139,10 @@ pub(crate) fn register_asset_backed_facility_metrics(
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
                 finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined()
             )),
-            (Cs01, finstack_quant_valuations_core::metrics::ZSpreadParallelCs01::<AssetBackedFacility>::hazard_when_credit_curve()),
-            (BucketedCs01, finstack_quant_valuations_core::metrics::ZSpreadBucketedCs01::<AssetBackedFacility>::hazard_when_credit_curve()),
-            (Hazard01, finstack_quant_valuations_core::metrics::sensitivities::cs01_direct_hazard::DirectHazardParallelHazard01::<AssetBackedFacility>::default()),
-            (BucketedHazard01, finstack_quant_valuations_core::metrics::sensitivities::cs01_direct_hazard::DirectHazardBucketedHazard01::<AssetBackedFacility>::default()),
+            (Cs01, ZSpreadParallelCs01::<AssetBackedFacility>::hazard_when_credit_curve()),
+            (BucketedCs01, ZSpreadBucketedCs01::<AssetBackedFacility>::hazard_when_credit_curve()),
+            (Hazard01, DirectHazardParallelHazard01),
+            (BucketedHazard01, DirectHazardBucketedHazard01),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
                 finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate()
             )),

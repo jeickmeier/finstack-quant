@@ -16,7 +16,7 @@ use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::{
     instruments::Instrument,
     instruments::fixed_income::bond::CashflowSpec,
-    metrics::risk::{MarketScenario, RiskFactorShift, RiskFactorType},
+    metrics::risk::{MarketScenario, RiskFactorShift, RiskFactorType, apply_market_scenario},
 };
 use time::macros::date;
 
@@ -44,8 +44,7 @@ fn production_history_requires_quote_recalibration_for_credit_spreads() {
             shift: 0.001,
         }],
     );
-    let error = scenario
-        .apply(&market, None)
+    let error = apply_market_scenario(&scenario, &market, None)
         .expect_err("par-spread shocks require a provider");
     assert!(
         error.to_string().contains("recalibration provider"),
@@ -149,6 +148,7 @@ fn production_history_reuses_the_pricing_boundary_recalibration_provider() {
             origin,
             &[MetricId::HVar],
             PricingOptions::default()
+                .with_metric_registry(finstack_quant_valuations::pricer::STANDARD.shared_metrics())
                 .with_market_history(Arc::new(history))
                 .with_recalibration_provider(provider),
         )

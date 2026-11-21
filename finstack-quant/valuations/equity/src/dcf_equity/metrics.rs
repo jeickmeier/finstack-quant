@@ -5,21 +5,15 @@
 //! with the unified DV01 framework used across valuations.
 
 use crate::dcf_equity::{DiscountedCashFlow, pricer};
+use crate::rf_component_dv01::{RfComponentDv01Calculator, RfComponentPriced};
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_valuations_core::metrics::{
-    MetricCalculator, MetricContext, MetricRegistry, RfComponentPriced,
-};
+use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricRegistry};
 
 impl RfComponentPriced for DiscountedCashFlow {
-    fn pv_with_rf_bump(
-        &self,
-        _market: &MarketContext,
-        _as_of: Date,
-        bump_at: &dyn Fn(f64) -> f64,
-    ) -> Result<f64> {
-        pricer::pv_with_rf_bump(self, bump_at)
+    fn pv_with_rf_bump(&self, _market: &MarketContext, _as_of: Date, bump: f64) -> Result<f64> {
+        pricer::pv_with_rf_bump(self, bump)
     }
 }
 
@@ -32,7 +26,7 @@ struct EnterpriseValueCalculator;
 impl MetricCalculator for EnterpriseValueCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let dcf: &DiscountedCashFlow = context.instrument_as()?;
-        let (pv_explicit, pv_terminal) = pricer::pv_components_with_rf_bump(dcf, &|_| 0.0)?;
+        let (pv_explicit, pv_terminal) = pricer::pv_components_with_rf_bump(dcf, 0.0)?;
         pricer::enterprise_value(pv_explicit, pv_terminal)
     }
 }
@@ -56,7 +50,7 @@ struct TerminalValuePVCalculator;
 impl MetricCalculator for TerminalValuePVCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let dcf: &DiscountedCashFlow = context.instrument_as()?;
-        Ok(pricer::pv_components_with_rf_bump(dcf, &|_| 0.0)?.1)
+        Ok(pricer::pv_components_with_rf_bump(dcf, 0.0)?.1)
     }
 }
 
@@ -129,7 +123,7 @@ pub(crate) fn register_dcf_metrics(
             (EquityShares, EquitySharesCalculator),
         ],
         custom: [
-            ("dcf::wacc01", finstack_quant_valuations_core::metrics::RfComponentDv01Calculator::<crate::dcf_equity::DiscountedCashFlow>::new()),
+            ("dcf::wacc01", RfComponentDv01Calculator::<crate::dcf_equity::DiscountedCashFlow>::new()),
         ]
     }
     Ok(())

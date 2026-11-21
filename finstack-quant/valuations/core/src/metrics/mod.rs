@@ -53,9 +53,7 @@
 
 // Internal submodules (organized by concern)
 
-mod aggregation;
 mod buckets;
-mod cross_factor_pair;
 pub(crate) mod finite_difference;
 pub(crate) mod ids;
 pub(crate) mod period_cash;
@@ -69,12 +67,10 @@ pub(crate) mod traits;
 pub(crate) mod universal;
 
 // Core surface (supported)
-pub use aggregation::is_additive_metric;
 pub use buckets::{
     STANDARD_BUCKET_LABELS, STANDARD_BUCKETS_YEARS, format_bucket_label, format_key_rate_label,
-    parse_key_rate_label,
+    parse_key_rate_label, validate_buckets_strictly_increasing,
 };
-pub use cross_factor_pair::CrossFactorPair;
 pub use finite_difference::bump_surface_vol_absolute;
 #[doc(hidden)]
 pub use ids::closest_metric_names;
@@ -92,18 +88,15 @@ pub use universal::{PricerPublishedMetric, register_universal_metrics};
 // calculators live at `metrics::sensitivities::<module>`.
 #[doc(hidden)]
 pub use finite_difference::{
-    CORRELATION_BUMP, VOL_POINTS_PER_ABSOLUTE_VOL, bump_active_volatility,
-    bump_discount_curve_parallel, bump_scalar_price, central_diff_by_half_bump,
-    central_diff_by_width, central_diff_scalar_relative, replace_scalar_value,
-    scalar_numeric_value, scaled_central_diff_by_width,
-};
-pub use sensitivities::cs01_z_spread::{
-    ZSpreadBucketedCs01, ZSpreadCs01, ZSpreadCs01Inputs, ZSpreadParallelCs01, quoted_z_spread,
+    CORRELATION_BUMP, VOL_POINTS_PER_ABSOLUTE_VOL, active_minimum_vol,
+    apply_parallel_surface_bumps_in_place, bump_active_volatility, bump_discount_curve_parallel,
+    bump_scalar_price, bumped_volatility_override_dyn, central_diff_by_width,
+    central_diff_scalar_relative, min_grid_vol, replace_scalar_value, revert_scratch_bumps,
+    scalar_numeric_value, scaled_central_diff_by_width, sensitivity_central_diff,
+    volatility_override,
 };
 #[doc(hidden)]
-pub use sensitivities::rf_component_dv01::{RfComponentDv01Calculator, RfComponentPriced};
-#[doc(hidden)]
-pub use sensitivities::vega::KeyRateVega;
+pub use sensitivities::fd_greeks::clone_with_crn_seed_if_supported;
 
 // Error helper functions
 
@@ -131,46 +124,6 @@ pub use sensitivities::vega::KeyRateVega;
 pub fn metric_not_found(metric: MetricId) -> finstack_quant_core::Error {
     finstack_quant_core::InputError::NotFound {
         id: format!("metric:{metric}"),
-    }
-    .into()
-}
-
-/// Create a NotFound error for missing context fields.
-///
-/// Use this when a required field is not present in a context or configuration.
-///
-/// # Examples
-///
-/// ```
-/// use finstack_quant_valuations_core::metrics::context_not_found;
-/// use finstack_quant_core::types::CurveId;
-/// use finstack_quant_core::Result;
-///
-/// struct PricingContext {
-///     discount_curve_id: Option<CurveId>,
-/// }
-///
-/// impl PricingContext {
-///     fn discount_curve_id(&self) -> Option<&CurveId> {
-///         self.discount_curve_id.as_ref()
-///     }
-/// }
-///
-/// fn get_curve_id(context: &PricingContext) -> Result<&CurveId> {
-///     context
-///         .discount_curve_id()
-///         .ok_or_else(|| context_not_found("discount_curve_id"))
-/// }
-/// ```
-///
-/// # Arguments
-///
-/// * `field` - Required context field name that was absent; it is embedded in
-///   the returned `context.`-prefixed not-found identifier.
-#[inline]
-pub fn context_not_found(field: &str) -> finstack_quant_core::Error {
-    finstack_quant_core::InputError::NotFound {
-        id: format!("context.{field}"),
     }
     .into()
 }

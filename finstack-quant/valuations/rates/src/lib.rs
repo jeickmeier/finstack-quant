@@ -153,6 +153,7 @@ pub mod irs;
 pub(crate) mod overnight;
 /// Deposit module - Money market deposits.
 mod rate_bucketed_dv01;
+mod rate_recalibration;
 /// Rate-magnitude checks shared by the rates instruments.
 pub(crate) mod rate_validation;
 /// Repo module - Repurchase agreements.

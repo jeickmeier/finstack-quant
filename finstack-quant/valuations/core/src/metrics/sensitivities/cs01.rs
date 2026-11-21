@@ -59,6 +59,7 @@
 
 use crate::market::conventions::CdsValuationConvention;
 use crate::market::conventions::ids::CdsDocClause;
+use crate::metrics::finite_difference::sensitivity_central_diff;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricContext, MetricId};
 use crate::recalibration::{DealCdsQuoteOverride, QuoteBump};
@@ -70,44 +71,6 @@ use std::sync::Arc;
 
 /// Minimum bump size threshold (in basis points) to avoid division by near-zero.
 const MIN_BUMP_BP_THRESHOLD: f64 = 1e-10;
-
-/// Central-difference sensitivity: `(pv_up - pv_down) / (2 * bump_bp)`.
-///
-/// `bump_bp` comes from config validated with `ensure_finite_positive`, so a
-/// degenerate width is a misconfiguration rather than normal input. A
-/// `debug_assert` flags it loudly in debug/test builds (a silent 0.0 is
-/// indistinguishable from a true zero CS01); release builds fall back to 0.0
-/// rather than divide by ~0 and emit inf/NaN.
-#[inline]
-pub fn sensitivity_central_diff(pv_up: f64, pv_down: f64, bump_bp: f64) -> f64 {
-    debug_assert!(
-        bump_bp.abs() > MIN_BUMP_BP_THRESHOLD,
-        "bump_bp must exceed {MIN_BUMP_BP_THRESHOLD} (got {bump_bp}); validate upstream"
-    );
-    if bump_bp.abs() <= MIN_BUMP_BP_THRESHOLD {
-        return 0.0;
-    }
-    (pv_up - pv_down) / (2.0 * bump_bp)
-}
-
-/// Validate that a key-rate bucket grid is strictly increasing.
-///
-/// Shared by bucketed DV01, CS01 and the sensitivities config loader:
-/// unsorted or duplicate tenors silently produce wrong per-bucket sensitivities
-/// (each duplicate tenor would be shocked twice and double-counted in the
-/// series), so reject them up front with a clear error.
-pub fn validate_buckets_strictly_increasing(buckets: &[f64]) -> finstack_quant_core::Result<()> {
-    for win in buckets.windows(2) {
-        if win[1].partial_cmp(&win[0]) != Some(std::cmp::Ordering::Greater) {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "key-rate buckets must be strictly increasing, got {:?} \
-                 (offending pair: {} -> {})",
-                buckets, win[0], win[1]
-            )));
-        }
-    }
-    Ok(())
-}
 
 /// Require a lossless calibration recipe for quote-space spread risk.
 pub fn require_hazard_replay(
@@ -246,7 +209,7 @@ where
     let bumped_down = rebuild(QuoteBump::ParallelBp(-bump_bp), "down")?;
     let pv_up = revalue_raw(bumped_up)?;
     let pv_down = revalue_raw(bumped_down)?;
-    Ok(sensitivity_central_diff(pv_up, pv_down, bump_bp))
+    sensitivity_central_diff(pv_up, pv_down, bump_bp)
 }
 
 /// Compute parallel CS01 by bumping par spreads and re-calibrating.
@@ -390,7 +353,7 @@ where
             let pv_bumped_down =
                 reprice_with_hazard(scratch, bumped_hazard_down, &hazard, &mut revalue_raw)?;
 
-            let cs01 = sensitivity_central_diff(pv_bumped_up, pv_bumped_down, bump_bp);
+            let cs01 = sensitivity_central_diff(pv_bumped_up, pv_bumped_down, bump_bp)?;
             series.push((label, cs01));
             total_acc.add(cs01)?;
         }
@@ -544,7 +507,6 @@ pub fn cs01_reval(
 
 #[cfg(test)]
 mod tests {
-    use super::validate_buckets_strictly_increasing;
     use finstack_quant_core::math::summation::NeumaierAccumulator;
 
     #[test]
@@ -620,28 +582,6 @@ mod tests {
             "naive summation is expected to lose precision here (got {naive}, \
              exact {n}); the CS01 bucket totals must therefore use \
              NeumaierAccumulator"
-        );
-    }
-
-    #[test]
-    fn validate_buckets_rejects_unsorted_and_duplicate_grids() {
-        validate_buckets_strictly_increasing(&[0.25, 0.5, 1.0, 5.0])
-            .expect("sorted grid must validate");
-        validate_buckets_strictly_increasing(&[]).expect("empty grid is vacuously valid");
-        validate_buckets_strictly_increasing(&[1.0]).expect("single-element grid is valid");
-
-        let dup = validate_buckets_strictly_increasing(&[0.25, 1.0, 1.0, 5.0])
-            .expect_err("duplicate tenor must error");
-        assert!(
-            matches!(dup, finstack_quant_core::Error::Validation(_)),
-            "duplicate tenor must surface as Validation, got {dup:?}"
-        );
-
-        let unsorted = validate_buckets_strictly_increasing(&[0.25, 5.0, 1.0])
-            .expect_err("unsorted grid must error");
-        assert!(
-            matches!(unsorted, finstack_quant_core::Error::Validation(_)),
-            "unsorted grid must surface as Validation, got {unsorted:?}"
         );
     }
 }

@@ -79,51 +79,6 @@ pub trait MetricCalculator: Send + Sync {
     }
 }
 
-/// Generic 2D structured metric container.
-///
-/// Rows and columns are labeled; values are a rectangular matrix of size
-/// `rows.len() x cols.len()`.
-#[derive(Debug, Clone)]
-struct Structured2D {
-    /// Row labels (e.g., expiries, tenors)
-    rows: Vec<String>,
-    /// Column labels (e.g., strikes, bumps)
-    cols: Vec<String>,
-    /// Matrix values; `values[r][c]` corresponds to `rows[r]`, `cols[c]`
-    values: Vec<Vec<f64>>,
-}
-
-impl Structured2D {
-    /// Describes why the matrix shape is invalid.
-    fn shape_error(&self) -> Option<String> {
-        if self.rows.is_empty() || self.cols.is_empty() {
-            return Some(format!(
-                "2D structured metric must have non-empty rows and columns (rows={}, cols={})",
-                self.rows.len(),
-                self.cols.len()
-            ));
-        }
-        if self.values.len() != self.rows.len() {
-            return Some(format!(
-                "2D structured metric row count mismatch: rows={}, value_rows={}",
-                self.rows.len(),
-                self.values.len()
-            ));
-        }
-        let expected_cols = self.cols.len();
-        for (idx, row) in self.values.iter().enumerate() {
-            if row.len() != expected_cols {
-                return Some(format!(
-                    "2D structured metric column count mismatch at row {idx}: cols={}, value_cols={}",
-                    expected_cols,
-                    row.len()
-                ));
-            }
-        }
-        None
-    }
-}
-
 /// Immutable inputs shared by every calculator in one metric request.
 ///
 /// Not re-exported from [`crate::metrics`]; the registry → metric boundary
@@ -193,11 +148,6 @@ pub struct MetricContext {
 
     /// Previously computed metrics (by ID).
     pub computed: finstack_quant_core::FxHashMap<MetricId, f64>,
-
-    /// Previously computed 1D bucketed metrics (by ID).
-    ///
-    /// Example: `MetricId::BucketedDv01` -> [("1m", v1), ("3m", v2), ...]
-    pub computed_series: finstack_quant_core::FxHashMap<MetricId, Vec<(String, f64)>>,
 
     /// Cached cashflows for the instrument.
     pub cashflows: Option<Vec<(Date, Money)>>,
@@ -283,7 +233,6 @@ impl MetricContext {
             market_scratch: None,
             recalibration_provider: None,
             computed: finstack_quant_core::FxHashMap::default(),
-            computed_series: finstack_quant_core::FxHashMap::default(),
             cashflows: None,
             tagged_cashflows: None,
             internal_schedule: None,
@@ -376,9 +325,12 @@ impl MetricContext {
     /// [`Self::cashflows`].
     #[inline]
     pub fn require_cashflows(&self) -> finstack_quant_core::Result<&[(Date, Money)]> {
-        self.cashflows
-            .as_deref()
-            .ok_or_else(|| crate::metrics::context_not_found("cashflows"))
+        self.cashflows.as_deref().ok_or_else(|| {
+            finstack_quant_core::InputError::NotFound {
+                id: "context.cashflows".into(),
+            }
+            .into()
+        })
     }
 
     /// Borrow the discount curve identifier the pricer recorded for this request.
@@ -418,62 +370,6 @@ impl MetricContext {
         self.recalibration_provider = provider;
     }
 
-    /// Recalibrate linked discount and forward curves for a parallel quote bump.
-    pub fn bump_rate_market_cached(
-        &self,
-        discount_curve_id: &CurveId,
-        forward_curve_id: &CurveId,
-        bump_bp: f64,
-    ) -> finstack_quant_core::Result<Arc<MarketContext>> {
-        self.rebuild_rate_market(
-            crate::recalibration::RateMarketRecalibrationRequest::LinkedDiscountForward {
-                market: Arc::clone(&self.curves),
-                discount_curve_id: discount_curve_id.clone(),
-                forward_curve_id: forward_curve_id.clone(),
-                bump: crate::recalibration::QuoteBump::ParallelBp(bump_bp),
-            },
-            "dv01",
-        )
-    }
-
-    /// Recalibrate a single OIS curve for a parallel quote bump.
-    pub fn bump_single_ois_rate_market_cached(
-        &self,
-        curve_id: &CurveId,
-        bump_bp: f64,
-    ) -> finstack_quant_core::Result<Arc<MarketContext>> {
-        self.rebuild_rate_market(
-            crate::recalibration::RateMarketRecalibrationRequest::SingleOis {
-                market: Arc::clone(&self.curves),
-                curve_id: curve_id.clone(),
-                bump: crate::recalibration::QuoteBump::ParallelBp(bump_bp),
-            },
-            "dv01",
-        )
-    }
-
-    /// Execute one rate-market replay through the injected provider.
-    pub fn rebuild_rate_market(
-        &self,
-        request: crate::recalibration::RateMarketRecalibrationRequest,
-        operation: &str,
-    ) -> finstack_quant_core::Result<Arc<MarketContext>> {
-        self.recalibration_provider_ref(operation)?
-            .rebuild_rate_market(&request)
-    }
-
-    /// Execute one discount-curve replay through the injected provider.
-    pub fn rebuild_discount_curve(
-        &self,
-        request: crate::recalibration::DiscountCurveRecalibrationRequest,
-        operation: &str,
-    ) -> finstack_quant_core::Result<
-        Arc<finstack_quant_core::market_data::term_structures::DiscountCurve>,
-    > {
-        self.recalibration_provider_ref(operation)?
-            .rebuild_discount_curve(&request)
-    }
-
     /// Return exact ordered quote bindings for bucketed spread risk.
     pub fn hazard_spread_risk_buckets(
         &self,
@@ -495,7 +391,9 @@ impl MetricContext {
             .rebuild_hazard_curve(&request)
     }
 
-    fn recalibration_provider_ref(
+    /// Borrow the injected quote-recalibration provider if present.
+    #[doc(hidden)]
+    pub fn recalibration_provider_ref(
         &self,
         operation: &str,
     ) -> finstack_quant_core::Result<&dyn crate::recalibration::RecalibrationProvider> {
@@ -739,59 +637,18 @@ impl MetricContext {
         })
     }
 
-    /// Store a 1D bucketed series under `base_metric_id` and flatten into
-    /// `computed` using a stable composite key per bucket.
+    /// Store a 1D bucketed series under `base_metric_id` in `computed` using
+    /// a stable composite key per bucket (`base::label`).
     pub fn store_bucketed_series<I, K>(&mut self, base_metric_id: MetricId, series: I)
     where
         I: IntoIterator<Item = (K, f64)>,
         K: Into<String>,
     {
-        let collected: Vec<(String, f64)> =
-            series.into_iter().map(|(k, v)| (k.into(), v)).collect();
-
-        for (label, value) in &collected {
+        for (label, value) in series {
+            let label = label.into();
             let key = MetricId::composite(&base_metric_id, &[label.as_str()]);
-            self.computed.insert(key, *value);
+            self.computed.insert(key, value);
         }
-
-        self.computed_series.insert(base_metric_id, collected);
-    }
-
-    /// Store a 2D structured metric (rows x cols) under `base_metric_id` and
-    /// flatten each cell into `computed` using stable composite keys
-    /// `base::row::col`.
-    pub fn store_matrix2d<I, J, RS, CS>(
-        &mut self,
-        base_metric_id: MetricId,
-        rows: I,
-        cols: J,
-        values: Vec<Vec<f64>>,
-    ) -> finstack_quant_core::Result<()>
-    where
-        I: IntoIterator<Item = RS>,
-        J: IntoIterator<Item = CS>,
-        RS: Into<String>,
-        CS: Into<String>,
-    {
-        let rows: Vec<String> = rows.into_iter().map(Into::into).collect();
-        let cols: Vec<String> = cols.into_iter().map(Into::into).collect();
-        let matrix = Structured2D { rows, cols, values };
-        if let Some(reason) = matrix.shape_error() {
-            return Err(finstack_quant_core::Error::Validation(reason));
-        }
-        for (r_idx, r_label) in matrix.rows.iter().enumerate() {
-            for (c_idx, c_label) in matrix.cols.iter().enumerate() {
-                let key =
-                    MetricId::composite(&base_metric_id, &[r_label.as_str(), c_label.as_str()]);
-                self.computed.insert(key, matrix.values[r_idx][c_idx]);
-            }
-        }
-        Ok(())
-    }
-
-    /// Retrieves a previously stored 1D bucketed series.
-    pub fn get_series(&self, id: &MetricId) -> Option<&[(String, f64)]> {
-        self.computed_series.get(id).map(|v| v.as_slice())
     }
 }
 

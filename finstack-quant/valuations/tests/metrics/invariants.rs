@@ -146,9 +146,17 @@ proptest! {
         let results = registry.compute(&metrics, &mut context).expect("Metrics should compute");
 
         let parallel_dv01 = results.get(&MetricId::Dv01).copied().unwrap_or(0.0);
-        let bucketed_series = context.computed_series.get(&MetricId::BucketedDv01);
+        let series: Vec<(String, f64)> = context
+            .computed
+            .iter()
+            .filter_map(|(k, v)| {
+                k.as_str()
+                    .strip_prefix("bucketed_dv01::")
+                    .map(|label| (label.to_string(), *v))
+            })
+            .collect();
 
-        if let Some(series) = bucketed_series {
+        if !series.is_empty() {
             let sum_bucketed: f64 = series.iter().map(|(_, v)| v).sum();
             let diff = (sum_bucketed - parallel_dv01).abs();
 
@@ -932,7 +940,17 @@ mod additional_invariants {
                 .expect("Metrics should compute");
             let parallel_dv01 = results.get(&MetricId::Dv01).copied().unwrap_or(0.0);
 
-            if let Some(series) = context.computed_series.get(&MetricId::BucketedDv01) {
+            let series: Vec<(String, f64)> = context
+                .computed
+                .iter()
+                .filter_map(|(k, v)| {
+                    k.as_str()
+                        .strip_prefix("bucketed_dv01::")
+                        .map(|label| (label.to_string(), *v))
+                })
+                .collect();
+
+            if !series.is_empty() {
                 let sum_bucketed: f64 = series.iter().map(|(_, v)| v).sum();
 
                 let diff_pct = ((sum_bucketed - parallel_dv01) / parallel_dv01).abs();

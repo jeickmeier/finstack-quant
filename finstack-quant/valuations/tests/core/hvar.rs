@@ -12,9 +12,9 @@ use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::metrics::risk::var_calculator::{VarConfig, calculate_var};
 use finstack_quant_valuations::metrics::risk::{
-    MarketHistory, MarketScenario, RiskFactorShift, RiskFactorType,
+    MarketHistory, MarketScenario, RiskFactorShift, RiskFactorType, apply_market_scenario,
 };
-use finstack_quant_valuations::pricer::PricingDispatch;
+use finstack_quant_valuations::pricer::{PricingDispatch, STANDARD};
 use std::sync::Arc;
 use time::Duration;
 use time::macros::date;
@@ -112,7 +112,9 @@ fn test_hvar_via_metrics_framework() -> Result<()> {
 
     // Calculate VaR + ES via metrics framework
     use finstack_quant_valuations::instruments::PricingOptions;
-    let opts = PricingOptions::default().with_market_history(history);
+    let opts = PricingOptions::default()
+        .with_metric_registry(STANDARD.shared_metrics())
+        .with_market_history(history);
     let result_ordered = bond.price_with_metrics(
         market.as_ref(),
         as_of,
@@ -151,7 +153,9 @@ fn test_hvar_via_metrics_framework() -> Result<()> {
 
     // Also verify reversed ordering doesn't break ES vs VaR wiring.
     let history2 = Arc::new(history_from_rate_shifts(as_of, &shifts));
-    let opts2 = PricingOptions::default().with_market_history(history2);
+    let opts2 = PricingOptions::default()
+        .with_metric_registry(STANDARD.shared_metrics())
+        .with_market_history(history2);
     let result_reversed = bond.price_with_metrics(
         market.as_ref(),
         as_of,
@@ -211,6 +215,7 @@ fn request_config_applies_to_both_historical_risk_metrics_in_either_order() -> R
             as_of,
             &metrics,
             finstack_quant_valuations::instruments::PricingOptions::default()
+                .with_metric_registry(STANDARD.shared_metrics())
                 .with_market_history(Arc::clone(&history)),
         )?;
         assert!((result.measures["hvar"] - expected.var).abs() < 1e-10);
@@ -234,14 +239,13 @@ fn historical_discount_shock_requires_a_policy_for_unchanged_credit_quotes() -> 
     let provider = options.recalibration_provider.as_deref();
     let mut scenario = usd_ois_rate_scenario(as_of, 0.01);
 
-    let error = scenario
-        .apply(&market, provider)
-        .expect_err("missing replay policy");
+    let error =
+        apply_market_scenario(&scenario, &market, provider).expect_err("missing replay policy");
     assert!(error.to_string().contains("explicit hazard replay policy"));
     scenario
         .unshifted_hazard_policies
         .insert("CREDIT".into(), UnshiftedHazardPolicy::FrozenIntensity);
-    let frozen = scenario.apply(&market, provider)?;
+    let frozen = apply_market_scenario(&scenario, &market, provider)?;
     assert_eq!(
         frozen.get_hazard("CREDIT")?.hazard_rates(),
         market.get_hazard("CREDIT")?.hazard_rates()
@@ -249,7 +253,7 @@ fn historical_discount_shock_requires_a_policy_for_unchanged_credit_quotes() -> 
     scenario
         .unshifted_hazard_policies
         .insert("CREDIT".into(), UnshiftedHazardPolicy::RefitOriginalQuotes);
-    let refit = scenario.apply(&market, provider)?;
+    let refit = apply_market_scenario(&scenario, &market, provider)?;
     assert_ne!(
         refit.get_hazard("CREDIT")?.hazard_rates(),
         market.get_hazard("CREDIT")?.hazard_rates()

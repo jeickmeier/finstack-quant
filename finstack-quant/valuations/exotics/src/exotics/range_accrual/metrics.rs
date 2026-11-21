@@ -20,15 +20,15 @@ pub(crate) fn register_range_accrual_metrics(
             registry: registry,
             instrument: InstrumentType::RangeAccrual,
             metrics: [
-                (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega::<crate::exotics::range_accrual::RangeAccrual>::default()),
+                (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega),
                 // Rho: discount-curve-only central bump, repriced with the requested model.
                 (Rho, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_discount_only())),
                 (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
                 (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-                (Delta, GenericFdDelta::<crate::exotics::range_accrual::RangeAccrual>::default()),
-                (Gamma, GenericFdGamma::<crate::exotics::range_accrual::RangeAccrual>::default()),
-                (Vanna, GenericFdVanna::<crate::exotics::range_accrual::RangeAccrual>::default()),
-                (Volga, GenericFdVolga::<crate::exotics::range_accrual::RangeAccrual>::default()),
+                (Delta, GenericFdDelta),
+                (Gamma, GenericFdGamma),
+                (Vanna, GenericFdVanna),
+                (Volga, GenericFdVolga),
             ]
         }
     }

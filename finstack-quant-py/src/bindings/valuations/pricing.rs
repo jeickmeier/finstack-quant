@@ -301,7 +301,8 @@ crate::bindings::macros::py_getters!(PyMarketHistory |s| {
 
 impl PyMarketHistory {
     pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
-        let table = self.inner.to_table().map_err(crate::errors::core_to_py)?;
+        let table = finstack_quant_valuations::metrics::risk::market_history_to_table(&self.inner)
+            .map_err(crate::errors::core_to_py)?;
         PyArrowTable::from_envelope(&table)
     }
 }

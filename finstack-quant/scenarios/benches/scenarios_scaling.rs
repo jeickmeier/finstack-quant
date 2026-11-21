@@ -109,7 +109,7 @@ fn historical_credit_quote_replay(c: &mut Criterion) {
     };
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_valuations::metrics::risk::{
-        MarketScenario, RiskFactorShift, RiskFactorType,
+        MarketScenario, RiskFactorShift, RiskFactorType, apply_market_scenario,
     };
 
     let envelope: CalibrationEnvelope = serde_json::from_str(include_str!(
@@ -134,8 +134,7 @@ fn historical_credit_quote_replay(c: &mut Criterion) {
     c.bench_function("historical_credit_quote_replay_10bp/cached_result", |b| {
         b.iter(|| {
             black_box(
-                scenario
-                    .apply(black_box(&market), Some(&provider))
+                apply_market_scenario(black_box(&scenario), black_box(&market), Some(&provider))
                     .expect("exact quote replay"),
             )
         });
@@ -144,8 +143,7 @@ fn historical_credit_quote_replay(c: &mut Criterion) {
         b.iter(|| {
             let provider = CachedRecalibrationProvider::default();
             black_box(
-                scenario
-                    .apply(black_box(&market), Some(&provider))
+                apply_market_scenario(black_box(&scenario), black_box(&market), Some(&provider))
                     .expect("uncached exact quote replay"),
             )
         });

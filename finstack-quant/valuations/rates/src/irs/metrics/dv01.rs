@@ -15,11 +15,12 @@
 use crate::irs::InterestRateSwap;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
-use finstack_quant_valuations_core::metrics::sensitivities::cs01::sensitivity_central_diff;
 use finstack_quant_valuations_core::metrics::sensitivities::dv01::{
     Dv01CalculatorConfig, UnifiedDv01Calculator,
 };
-use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
+use finstack_quant_valuations_core::metrics::{
+    MetricCalculator, MetricContext, sensitivity_central_diff,
+};
 
 /// IRS DV01 calculator: quote-shock re-bootstrap when the curves carry
 /// calibration metadata, fitted-curve parallel bump otherwise.
@@ -56,13 +57,22 @@ impl MetricCalculator for IrsDv01Calculator {
         let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
         let bumped_market = |bp: f64| {
             if single_curve_ois {
-                context.bump_single_ois_rate_market_cached(&discount_id, bp)
+                crate::rate_recalibration::bump_single_ois_rate_market_cached(
+                    context,
+                    &discount_id,
+                    bp,
+                )
             } else {
-                context.bump_rate_market_cached(&discount_id, &forward_id, bp)
+                crate::rate_recalibration::bump_rate_market_cached(
+                    context,
+                    &discount_id,
+                    &forward_id,
+                    bp,
+                )
             }
         };
         let pv_up = context.reprice_raw(bumped_market(bump_bp)?.as_ref(), context.as_of)?;
         let pv_down = context.reprice_raw(bumped_market(-bump_bp)?.as_ref(), context.as_of)?;
-        Ok(sensitivity_central_diff(pv_up, pv_down, bump_bp))
+        sensitivity_central_diff(pv_up, pv_down, bump_bp)
     }
 }

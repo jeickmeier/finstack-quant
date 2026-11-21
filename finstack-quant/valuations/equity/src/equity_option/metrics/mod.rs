@@ -56,9 +56,7 @@ pub(crate) fn register_equity_option_metrics(
             (Delta, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_option::EquityOption>::delta()),
             (Gamma, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_option::EquityOption>::gamma()),
             (Vega, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_option::EquityOption>::vega()),
-            (BucketedVega, finstack_quant_valuations_core::metrics::KeyRateVega::<
-                crate::equity_option::EquityOption,
-            >::default()),
+            (BucketedVega, crate::vega::KeyRateVega::default()),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             (Theta, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_option::EquityOption>::theta()),

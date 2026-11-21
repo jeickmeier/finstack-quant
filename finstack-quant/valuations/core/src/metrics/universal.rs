@@ -7,7 +7,6 @@ use super::{
     registry::{MetricAggregation, MetricRegistry, MetricRegistryError},
     traits::{MetricCalculator, MetricContext},
 };
-use crate::metrics::risk::{GenericExpectedShortfall, GenericHVar};
 use crate::metrics::sensitivities::breakeven::BreakevenCalculator;
 use crate::metrics::sensitivities::carry_decomposition::CarryDecompositionCalculator;
 use crate::metrics::sensitivities::theta::GenericThetaAny;
@@ -89,8 +88,7 @@ impl MetricCalculator for PricerPublishedMetric {
 /// # Arguments
 ///
 /// * `registry` - Registry receiving the universal calculators (theta and
-///   its decomposition, carry, breakeven, historical VaR and expected
-///   shortfall).
+///   its decomposition, carry, and breakeven).
 pub fn register_universal_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), MetricRegistryError> {
@@ -165,11 +163,5 @@ pub fn register_universal_metrics(
         &[],
     )?;
     registry.register_metric(MetricId::Breakeven, Arc::new(BreakevenCalculator), &[])?;
-    registry.register_metric(MetricId::HVar, Arc::new(GenericHVar), &[])?;
-    registry.register_metric(
-        MetricId::ExpectedShortfall,
-        Arc::new(GenericExpectedShortfall),
-        &[],
-    )?;
     Ok(())
 }

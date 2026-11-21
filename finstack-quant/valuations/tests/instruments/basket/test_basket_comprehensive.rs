@@ -1270,12 +1270,11 @@ fn production_risk_basket_weights_are_currency_per_bp() {
         .metrics()
         .compute(std::slice::from_ref(&metric), &mut context)
         .expect("weight risk");
-    let rows = &context.computed_series[&metric];
-    assert_eq!(rows[0].0, "AAPL");
-    assert_eq!(rows[1].0, "MSFT");
+    let aapl = context.computed[&MetricId::composite(&metric, &["AAPL"])];
+    let msft = context.computed[&MetricId::composite(&metric, &["MSFT"])];
     // Reallocate one bp from the other asset: (150 - 300) * 100 * 1e-4.
-    assert!((rows[0].1 + 1.5).abs() < 1e-9, "{:?}", rows);
-    assert!((rows[1].1 - 1.5).abs() < 1e-9);
+    assert!((aapl + 1.5).abs() < 1e-9, "AAPL={aapl}, MSFT={msft}");
+    assert!((msft - 1.5).abs() < 1e-9, "AAPL={aapl}, MSFT={msft}");
 }
 
 /// `basket_mark_shock` is the basket PV change for a +1% relative move in
@@ -1391,11 +1390,16 @@ fn weight_reallocation_preserves_partial_and_leveraged_budgets() {
             .metrics()
             .compute(&[MetricId::WeightRisk], &mut context)
             .unwrap();
-        for (_, risk) in &context.computed_series[&MetricId::WeightRisk] {
-            assert!(
-                risk.abs() < 1e-10,
-                "equal prices cannot create budget-preserving P&L: {risk}"
-            );
+        let mut count = 0usize;
+        for (id, risk) in &context.computed {
+            if id.as_str().starts_with("weight_risk::") {
+                count += 1;
+                assert!(
+                    risk.abs() < 1e-10,
+                    "equal prices cannot create budget-preserving P&L: {risk}"
+                );
+            }
         }
+        assert!(count > 0, "expected weight_risk::* leaves in computed");
     }
 }

@@ -12,7 +12,7 @@ pub(crate) fn compute_pv(
     if let Some(appraisal) = checked_appraisal(asset)? {
         return Ok(appraisal);
     }
-    Money::from_model_value(unappraised_pv(asset, as_of, &|_| 0.0)?, asset.currency)
+    Money::from_model_value(unappraised_pv(asset, as_of, 0.0)?, asset.currency)
 }
 
 /// Asset value with the risk-free component of the discount rate bumped per
@@ -23,12 +23,12 @@ pub(crate) fn compute_pv(
 pub(crate) fn pv_with_rf_bump(
     asset: &RealEstateAsset,
     as_of: Date,
-    bump_at: &dyn Fn(f64) -> f64,
+    bump: f64,
 ) -> finstack_quant_core::Result<f64> {
     if let Some(appraisal) = checked_appraisal(asset)? {
         return Ok(appraisal.amount());
     }
-    unappraised_pv(asset, as_of, bump_at)
+    unappraised_pv(asset, as_of, bump)
 }
 
 /// The appraisal value, when set, after checking its currency.
@@ -47,28 +47,28 @@ fn checked_appraisal(asset: &RealEstateAsset) -> finstack_quant_core::Result<Opt
 }
 
 /// Value under the configured method (DCF or direct cap), ignoring any
-/// appraisal; only DCF reads `bump_at`.
+/// appraisal; only DCF reads `bump`.
 fn unappraised_pv(
     asset: &RealEstateAsset,
     as_of: Date,
-    bump_at: &dyn Fn(f64) -> f64,
+    bump: f64,
 ) -> finstack_quant_core::Result<f64> {
     match asset.valuation_method {
-        super::RealEstateValuationMethod::Dcf => pv_with_rf_bump_dcf(asset, as_of, bump_at),
+        super::RealEstateValuationMethod::Dcf => pv_with_rf_bump_dcf(asset, as_of, bump),
         super::RealEstateValuationMethod::DirectCap => compute_npv_direct_cap(asset, as_of),
     }
 }
 
 /// DCF NPV with the risk-free component of the discount rate bumped by
-/// `bump_at(t)` (absolute, decimal) at each cashflow tenor `t` in years.
+/// `bump` (parallel, absolute, decimal) at every cashflow tenor.
 ///
-/// `bump_at = |_| 0.0` reproduces the unbumped NPV exactly. The terminal cap
+/// `bump = 0.0` reproduces the unbumped NPV exactly. The terminal cap
 /// rate is *not* bumped; it has its own sensitivity metric
 /// (`real_estate::cap_rate01`).
 pub(crate) fn pv_with_rf_bump_dcf(
     asset: &RealEstateAsset,
     as_of: Date,
-    bump_at: &dyn Fn(f64) -> f64,
+    bump: f64,
 ) -> finstack_quant_core::Result<f64> {
     let rate = asset
         .discount_rate
@@ -96,7 +96,7 @@ pub(crate) fn pv_with_rf_bump_dcf(
         .iter()
         .map(|(date, amount)| {
             let t = year_fraction(asset, as_of, *date)?;
-            Ok(amount / (1.0 + rate + bump_at(t)).powf(t))
+            Ok(amount / (1.0 + rate + bump).powf(t))
         })
         .collect::<finstack_quant_core::Result<Vec<f64>>>()?
         .into_iter()
@@ -105,7 +105,7 @@ pub(crate) fn pv_with_rf_bump_dcf(
     let pv_terminal = match terminal_at_horizon {
         Some((date, amount)) => {
             let t = year_fraction(asset, as_of, date)?;
-            amount / (1.0 + rate + bump_at(t)).powf(t)
+            amount / (1.0 + rate + bump).powf(t)
         }
         None => 0.0,
     };

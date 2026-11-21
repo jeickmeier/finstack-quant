@@ -185,7 +185,8 @@ impl PricingDispatch {
     /// * `as_of` - Valuation date.
     /// * `options` - Pricing options forwarded to the registry path; ignored
     ///   by `InstrumentDefault`, which calls `Instrument::value` directly.
-    pub(crate) fn price_money(
+    #[doc(hidden)]
+    pub fn price_money(
         &self,
         instrument: &dyn Instrument,
         market: &MarketContext,

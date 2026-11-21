@@ -12,18 +12,20 @@ use crate::metrics::MetricRegistry;
 use crate::instruments::equity::real_estate::{
     LeveredRealEstateEquity, RealEstateAsset, levered_pricer, pricer,
 };
-use crate::metrics::RfComponentPriced;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_valuations_equity::rf_component_dv01::{
+    RfComponentDv01Calculator, RfComponentPriced,
+};
 
 impl RfComponentPriced for RealEstateAsset {
     fn pv_with_rf_bump(
         &self,
         _market: &MarketContext,
         as_of: Date,
-        bump_at: &dyn Fn(f64) -> f64,
+        bump: f64,
     ) -> finstack_quant_core::Result<f64> {
-        pricer::pv_with_rf_bump(self, as_of, bump_at)
+        pricer::pv_with_rf_bump(self, as_of, bump)
     }
 }
 
@@ -34,10 +36,10 @@ impl RfComponentPriced for LeveredRealEstateEquity {
         &self,
         market: &MarketContext,
         as_of: Date,
-        bump_at: &dyn Fn(f64) -> f64,
+        bump: f64,
     ) -> finstack_quant_core::Result<f64> {
         levered_pricer::validate_currency(self)?;
-        let asset_pv = pricer::pv_with_rf_bump(&self.asset, as_of, bump_at)?;
+        let asset_pv = pricer::pv_with_rf_bump(&self.asset, as_of, bump)?;
         Ok(asset_pv - levered_pricer::financing_pv(self, market, as_of)?)
     }
 }
@@ -76,7 +78,7 @@ pub(crate) fn register_real_estate_metrics(
         instrument: InstrumentType::RealEstateAsset,
         metrics: [],
         custom: [
-            ("real_estate::discount_rate01", crate::metrics::RfComponentDv01Calculator::<crate::instruments::equity::real_estate::RealEstateAsset>::new()),
+            ("real_estate::discount_rate01", RfComponentDv01Calculator::<crate::instruments::equity::real_estate::RealEstateAsset>::new()),
             // Custom real estate deal-style metrics.
             ("real_estate::going_in_cap_rate", cap_rates::GoingInCapRate),
             ("real_estate::exit_cap_rate", cap_rates::ExitCapRate),
@@ -111,7 +113,7 @@ pub(crate) fn register_levered_real_estate_metrics(
             ("real_estate::dscr_min", levered::DscrMin),
             ("real_estate::dscr_min_interest_only", levered::DscrMinInterestOnly),
             ("real_estate::debt_payoff_at_exit", levered::DebtPayoffAtExit),
-            ("real_estate::discount_rate01", crate::metrics::RfComponentDv01Calculator::<crate::instruments::equity::real_estate::LeveredRealEstateEquity>::new()),
+            ("real_estate::discount_rate01", RfComponentDv01Calculator::<crate::instruments::equity::real_estate::LeveredRealEstateEquity>::new()),
             ("real_estate::cap_rate01", sensitivities::CapRate01Calculator),
         ]
     };

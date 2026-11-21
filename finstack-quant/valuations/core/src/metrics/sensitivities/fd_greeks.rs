@@ -16,12 +16,12 @@
 //!   stable finite differences.
 //! - **Non-positive spot validation**: Returns an error if spot price is non-positive.
 
-use std::marker::PhantomData;
-
 use crate::instruments::Instrument;
 use crate::instruments::MarketDependencies;
 use crate::metrics::finite_difference::{
-    bumped_volatility_override, revert_scratch_bumps, scalar_numeric_value, volatility_override,
+    VOL_POINTS_PER_ABSOLUTE_VOL, active_minimum_vol, apply_parallel_surface_bumps_in_place,
+    bumped_volatility_override_dyn, revert_scratch_bumps, scalar_numeric_value,
+    volatility_override,
 };
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext};
@@ -52,8 +52,6 @@ use finstack_quant_core::types::CurveId;
 /// may need to adjust bump percentages in `FinstackConfig` rather than relying on
 /// this floor.
 pub const MIN_ABSOLUTE_BUMP: f64 = 1e-8;
-
-use crate::metrics::finite_difference::{VOL_POINTS_PER_ABSOLUTE_VOL, min_grid_vol};
 
 /// Common random number seed scenario for MC greek calculations.
 ///
@@ -94,25 +92,6 @@ fn effective_spot_bump(spot: f64, bump_pct: f64) -> SpotBump {
         relative: signed_relative,
         absolute: (spot * signed_relative).abs(),
     }
-}
-
-fn active_minimum_vol(
-    instrument: &dyn Instrument,
-    market: &MarketContext,
-    volatility_surface_ids: &[CurveId],
-) -> Result<Option<f64>> {
-    if let Some(volatility) = volatility_override(instrument) {
-        return Ok(Some(volatility));
-    }
-    let mut minimum: Option<f64> = None;
-    for id in volatility_surface_ids {
-        let surface = market.get_surface(id.as_str())?;
-        let vol = min_grid_vol(&surface).ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!("volatility grid '{id}' has no values"))
-        })?;
-        minimum = Some(minimum.map_or(vol, |current| current.min(vol)));
-    }
-    Ok(minimum)
 }
 
 /// Resolve the active grids when the instrument has no scalar override.
@@ -189,11 +168,8 @@ fn ensure_finite(value: f64, metric_name: &str) -> finstack_quant_core::Result<f
     }
 }
 
-fn clone_with_crn_seed<I>(instrument: &I) -> Result<I>
-where
-    I: Clone + Instrument,
-{
-    let mut seeded = instrument.clone();
+fn clone_with_crn_seed(instrument: &dyn Instrument) -> Result<Box<dyn Instrument>> {
+    let mut seeded = instrument.clone_box();
     let overrides = seeded
         .get_instrument_pricing_overrides_mut()
         .ok_or_else(|| {
@@ -210,56 +186,30 @@ where
 /// Monte Carlo reprices share random draws; any caller-set seed label is
 /// replaced. Instruments without pricing overrides cannot be Monte Carlo
 /// priced and are returned unchanged.
-pub(crate) fn clone_with_crn_seed_if_supported<I>(instrument: &I) -> I
-where
-    I: Clone + Instrument,
-{
-    let mut seeded = instrument.clone();
+///
+/// # Arguments
+///
+/// * `instrument` - Instrument cloned into a boxed trait object and seeded when
+///   pricing overrides are exposed.
+#[doc(hidden)]
+pub fn clone_with_crn_seed_if_supported(instrument: &dyn Instrument) -> Box<dyn Instrument> {
+    let mut seeded = instrument.clone_box();
     if let Some(overrides) = seeded.get_instrument_pricing_overrides_mut() {
         overrides.model_config.mc_seed_scenario = Some(CRN_SEED_SCENARIO.to_string());
     }
     seeded
 }
 
-fn apply_surface_bumps_in_place(
-    context: &mut MarketContext,
-    vol_surface_ids: &[CurveId],
-    bump_abs: f64,
-) -> Result<Vec<finstack_quant_core::market_data::context::ContextScratchBump>> {
-    use finstack_quant_core::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits};
-
-    let spec = BumpSpec {
-        mode: BumpMode::Additive,
-        units: BumpUnits::Fraction,
-        value: bump_abs,
-        bump_type: BumpType::Parallel,
-    };
-    let mut tokens = Vec::with_capacity(vol_surface_ids.len());
-    for vol_surface_id in vol_surface_ids {
-        match context.apply_surface_bump_in_place(vol_surface_id.as_str(), spec) {
-            Ok(token) => tokens.push(token),
-            Err(error) => {
-                revert_scratch_bumps(context, tokens)?;
-                return Err(error);
-            }
-        }
-    }
-    Ok(tokens)
-}
-
-fn eval_raw_with_scratch_bumps<I>(
+fn eval_raw_with_scratch_bumps(
     context: &MetricContext,
     scratch: &mut MarketContext,
-    instrument: &I,
+    instrument: &dyn Instrument,
     as_of: Date,
     spot_bump: Option<(&str, f64)>,
     vol_bump: Option<(&[CurveId], f64)>,
-) -> Result<f64>
-where
-    I: Instrument + Clone,
-{
+) -> Result<f64> {
     let bumped_instrument = match vol_bump {
-        Some((_, bump_abs)) => bumped_volatility_override(instrument, bump_abs)?,
+        Some((_, bump_abs)) => bumped_volatility_override_dyn(instrument, bump_abs, false)?,
         None => None,
     };
     let price_token = if let Some((spot_id, bump_pct)) = spot_bump {
@@ -270,7 +220,7 @@ where
 
     let surface_tokens = match vol_bump.filter(|_| bumped_instrument.is_none()) {
         Some((vol_surface_ids, bump_abs)) => {
-            match apply_surface_bumps_in_place(scratch, vol_surface_ids, bump_abs) {
+            match apply_parallel_surface_bumps_in_place(scratch, vol_surface_ids, bump_abs) {
                 Ok(tokens) => Some(tokens),
                 Err(err) => {
                     if let Some(token) = price_token {
@@ -284,7 +234,7 @@ where
     };
 
     let value = context.reprice_instrument_raw(
-        bumped_instrument.as_ref().unwrap_or(instrument),
+        bumped_instrument.as_deref().unwrap_or(instrument),
         scratch,
         as_of,
     );
@@ -303,8 +253,8 @@ where
 ///
 /// Calculates delta (price sensitivity to underlying spot) using the central
 /// finite difference method. Works with any instrument that implements the
-/// required trait: [`Instrument`]. The instrument must expose its focused metric overrides
-/// through [`Instrument::get_metric_pricing_overrides_mut`].
+/// required trait: [`Instrument`]. The instrument must expose its instrument overrides
+/// through [`Instrument::get_instrument_pricing_overrides_mut`].
 ///
 /// # Mathematical Foundation
 ///
@@ -313,34 +263,17 @@ where
 /// Δ = (PV(S + h) - PV(S - h)) / (2h)
 /// ```
 /// where `S` is the spot price and `h` is the bump size.
-///
-/// # Type Parameters
-///
-/// * `I` - Instrument type that implements all required traits for delta calculation
-pub struct GenericFdDelta<I> {
-    _phantom: PhantomData<I>,
-}
+#[derive(Default)]
+pub struct GenericFdDelta;
 
-impl<I> Default for GenericFdDelta<I> {
-    fn default() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<I> MetricCalculator for GenericFdDelta<I>
-where
-    I: Instrument + Clone + 'static,
-{
+impl MetricCalculator for GenericFdDelta {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let instrument: &I = context.instrument_as()?;
         let as_of = context.as_of;
         let defaults = sens_config::resolve(context)?;
 
-        let dependencies = instrument.market_dependencies()?;
-        let spot_id = spot_id(&dependencies, "delta")?;
-        let current_spot = current_spot(&context.curves, spot_id, "delta")?;
+        let dependencies = context.instrument.market_dependencies()?;
+        let spot_id = spot_id(&dependencies, "delta")?.clone();
+        let current_spot = current_spot(&context.curves, &spot_id, "delta")?;
 
         // Fixed bump size from `FinstackConfig` (user-facing, reproducible).
         let bump_pct = defaults.spot_bump_decimal;
@@ -349,23 +282,23 @@ where
         let bump = effective_spot_bump(current_spot, bump_pct);
 
         // Common Random Numbers: same seed for all scenarios ensures variance reduction.
-        let seeded_instrument = clone_with_crn_seed(instrument)?;
+        let seeded_instrument = clone_with_crn_seed(context.instrument.as_ref())?;
 
         let (pv_up, pv_down) = context.with_market_scratch(|context, scratch| {
             let pv_up = eval_raw_with_scratch_bumps(
                 context,
                 scratch,
-                &seeded_instrument,
+                seeded_instrument.as_ref(),
                 as_of,
-                Some((spot_id, bump.relative)),
+                Some((&spot_id, bump.relative)),
                 None,
             )?;
             let pv_down = eval_raw_with_scratch_bumps(
                 context,
                 scratch,
-                &seeded_instrument,
+                seeded_instrument.as_ref(),
                 as_of,
-                Some((spot_id, -bump.relative)),
+                Some((&spot_id, -bump.relative)),
                 None,
             )?;
             Ok((pv_up, pv_down))
@@ -388,30 +321,17 @@ where
 ///
 /// Computes gamma as the second derivative with respect to spot price:
 /// Gamma = [Delta(spot + bump) - Delta(spot - bump)] / (2 * bump_size)
-pub struct GenericFdGamma<I> {
-    _phantom: PhantomData<I>,
-}
+#[derive(Default)]
+pub struct GenericFdGamma;
 
-impl<I> Default for GenericFdGamma<I> {
-    fn default() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<I> MetricCalculator for GenericFdGamma<I>
-where
-    I: Instrument + Clone + 'static,
-{
+impl MetricCalculator for GenericFdGamma {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let instrument: &I = context.instrument_as()?;
         let as_of = context.as_of;
         let defaults = sens_config::resolve(context)?;
 
-        let dependencies = instrument.market_dependencies()?;
-        let spot_id = spot_id(&dependencies, "gamma")?;
-        let current_spot = current_spot(&context.curves, spot_id, "gamma")?;
+        let dependencies = context.instrument.market_dependencies()?;
+        let spot_id = spot_id(&dependencies, "gamma")?.clone();
+        let current_spot = current_spot(&context.curves, &spot_id, "gamma")?;
 
         // Fixed bump size from `FinstackConfig` (user-facing, reproducible).
         let bump_pct = defaults.spot_bump_decimal;
@@ -427,23 +347,24 @@ where
         // (percentage bumps) and yields exact results for quadratic payoffs.
 
         // Common Random Numbers: same seed for all scenarios ensures variance reduction.
-        let seeded_instrument = clone_with_crn_seed(instrument)?;
+        let seeded_instrument = clone_with_crn_seed(context.instrument.as_ref())?;
         let (base_pv, pv_up, pv_down) = context.with_market_scratch(|context, scratch| {
-            let base_pv = context.reprice_instrument_raw(&seeded_instrument, scratch, as_of)?;
+            let base_pv =
+                context.reprice_instrument_raw(seeded_instrument.as_ref(), scratch, as_of)?;
             let pv_up = eval_raw_with_scratch_bumps(
                 context,
                 scratch,
-                &seeded_instrument,
+                seeded_instrument.as_ref(),
                 as_of,
-                Some((spot_id, bump.relative)),
+                Some((&spot_id, bump.relative)),
                 None,
             )?;
             let pv_down = eval_raw_with_scratch_bumps(
                 context,
                 scratch,
-                &seeded_instrument,
+                seeded_instrument.as_ref(),
                 as_of,
-                Some((spot_id, -bump.relative)),
+                Some((&spot_id, -bump.relative)),
                 None,
             )?;
             Ok((base_pv, pv_up, pv_down))
@@ -458,43 +379,38 @@ where
 /// Generic vega calculator using finite differences on a volatility surface.
 ///
 /// Works with any instrument that has an associated volatility surface.
-pub struct GenericFdVega<I> {
-    _phantom: PhantomData<I>,
-}
+#[derive(Default)]
+pub struct GenericFdVega;
 
-impl<I> Default for GenericFdVega<I> {
-    fn default() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<I> MetricCalculator for GenericFdVega<I>
-where
-    I: Instrument + Clone + 'static,
-{
+impl MetricCalculator for GenericFdVega {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let instrument: &I = context.instrument_as()?;
         let as_of = context.as_of;
         let defaults = sens_config::resolve(context)?;
 
-        let dependencies = instrument.market_dependencies()?;
-        let vol_surface_ids =
-            bumped_vol_surface_ids(instrument, &dependencies, &context.curves, "vega")?;
+        let dependencies = context.instrument.market_dependencies()?;
+        let vol_surface_ids = bumped_vol_surface_ids(
+            context.instrument.as_ref(),
+            &dependencies,
+            &context.curves,
+            "vega",
+        )?;
         // Fixed bump size from `FinstackConfig` (user-facing, reproducible).
         // Interpreted as an **absolute** implied vol bump in decimal units (e.g., 0.01 = +1 vol point).
         let bump_abs = defaults.vol_bump_decimal;
 
-        let seeded_instrument = clone_with_crn_seed(instrument)?;
-        let instrument_id = instrument.id().to_string();
+        let seeded_instrument = clone_with_crn_seed(context.instrument.as_ref())?;
+        let instrument_id = context.instrument.id().to_string();
 
         // The additive down-bump `σ - h` is clamped at zero wherever `σ < h`
         // (VolSurface `Bumpable`). When that clamp triggers, the down-bumped
         // surface does NOT represent a uniform `-h` move, so a central
         // difference divided by the full `2h` is asymmetric and biased.
         //
-        let min_vol = active_minimum_vol(instrument, &context.curves, &vol_surface_ids)?;
+        let min_vol = active_minimum_vol(
+            context.instrument.as_ref(),
+            &context.curves,
+            &vol_surface_ids,
+        )?;
         let clamp_active = min_vol.map(|m| m <= bump_abs).unwrap_or(false);
 
         let vega = if clamp_active {
@@ -509,12 +425,13 @@ where
                 let pv_up = eval_raw_with_scratch_bumps(
                     context,
                     scratch,
-                    &seeded_instrument,
+                    seeded_instrument.as_ref(),
                     as_of,
                     None,
                     Some((&vol_surface_ids, bump_abs)),
                 )?;
-                let pv_base = context.reprice_instrument_raw(&seeded_instrument, scratch, as_of)?;
+                let pv_base =
+                    context.reprice_instrument_raw(seeded_instrument.as_ref(), scratch, as_of)?;
                 // Forward difference: (PV(σ+h) - PV(σ)) / h.
                 crate::metrics::finite_difference::central_diff_by_width(
                     pv_up,
@@ -527,7 +444,7 @@ where
                 let pv_up = eval_raw_with_scratch_bumps(
                     context,
                     scratch,
-                    &seeded_instrument,
+                    seeded_instrument.as_ref(),
                     as_of,
                     None,
                     Some((&vol_surface_ids, bump_abs)),
@@ -535,7 +452,7 @@ where
                 let pv_down = eval_raw_with_scratch_bumps(
                     context,
                     scratch,
-                    &seeded_instrument,
+                    seeded_instrument.as_ref(),
                     as_of,
                     None,
                     Some((&vol_surface_ids, -bump_abs)),
@@ -555,55 +472,47 @@ where
 }
 
 /// Generic volga (∂²V/∂σ²) via central differences on a volatility surface.
-pub struct GenericFdVolga<I> {
-    _phantom: PhantomData<I>,
-}
+#[derive(Default)]
+pub struct GenericFdVolga;
 
-impl<I> Default for GenericFdVolga<I> {
-    fn default() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<I> MetricCalculator for GenericFdVolga<I>
-where
-    I: Instrument + Clone + 'static,
-{
+impl MetricCalculator for GenericFdVolga {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let instrument: &I = context.instrument_as()?;
         let as_of = context.as_of;
         let defaults = sens_config::resolve(context)?;
 
         // If expired, volga is zero — mirror vanna's guard. On an expired
         // option, vega ≈ 0, so volga = (vega(σ+h) - vega(σ-h))/h^2 amplifies
         // near-zero noise into NaN/garbage.
-        if is_expired(instrument, as_of)? {
+        if is_expired(context.instrument.as_ref(), as_of)? {
             return Ok(0.0);
         }
 
-        let dependencies = instrument.market_dependencies()?;
-        let vol_surface_ids =
-            bumped_vol_surface_ids(instrument, &dependencies, &context.curves, "volga")?;
+        let dependencies = context.instrument.market_dependencies()?;
+        let vol_surface_ids = bumped_vol_surface_ids(
+            context.instrument.as_ref(),
+            &dependencies,
+            &context.curves,
+            "volga",
+        )?;
 
         // Common Random Numbers: same seed for all scenarios ensures variance reduction.
-        let seeded_instrument = clone_with_crn_seed(instrument)?;
+        let seeded_instrument = clone_with_crn_seed(context.instrument.as_ref())?;
 
         // Absolute implied vol bump (vol points).
         let bump_abs = symmetric_volatility_step(
-            instrument,
+            context.instrument.as_ref(),
             &context.curves,
             &vol_surface_ids,
             defaults.vol_bump_decimal,
         )?;
 
         let (base_pv, pv_up, pv_down) = context.with_market_scratch(|context, scratch| {
-            let base_pv = context.reprice_instrument_raw(&seeded_instrument, scratch, as_of)?;
+            let base_pv =
+                context.reprice_instrument_raw(seeded_instrument.as_ref(), scratch, as_of)?;
             let pv_up = eval_raw_with_scratch_bumps(
                 context,
                 scratch,
-                &seeded_instrument,
+                seeded_instrument.as_ref(),
                 as_of,
                 None,
                 Some((&vol_surface_ids, bump_abs)),
@@ -611,7 +520,7 @@ where
             let pv_down = eval_raw_with_scratch_bumps(
                 context,
                 scratch,
-                &seeded_instrument,
+                seeded_instrument.as_ref(),
                 as_of,
                 None,
                 Some((&vol_surface_ids, -bump_abs)),
@@ -633,39 +542,30 @@ where
 }
 
 /// Generic vanna (∂²V/∂S∂σ) via central mixed differences on spot and vol.
-pub struct GenericFdVanna<I> {
-    _phantom: PhantomData<I>,
-}
+#[derive(Default)]
+pub struct GenericFdVanna;
 
-impl<I> Default for GenericFdVanna<I> {
-    fn default() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<I> MetricCalculator for GenericFdVanna<I>
-where
-    I: Instrument + Clone + 'static,
-{
+impl MetricCalculator for GenericFdVanna {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let instrument: &I = context.instrument_as()?;
         let as_of = context.as_of;
         let defaults = sens_config::resolve(context)?;
 
         // If expired, vanna is zero (avoid bumping / repricing beyond expiry).
-        if is_expired(instrument, as_of)? {
+        if is_expired(context.instrument.as_ref(), as_of)? {
             return Ok(0.0);
         }
 
-        let dependencies = instrument.market_dependencies()?;
-        let spot_id = spot_id(&dependencies, "vanna")?;
-        let vol_surface_ids =
-            bumped_vol_surface_ids(instrument, &dependencies, &context.curves, "vanna")?;
+        let dependencies = context.instrument.market_dependencies()?;
+        let spot_id = spot_id(&dependencies, "vanna")?.clone();
+        let vol_surface_ids = bumped_vol_surface_ids(
+            context.instrument.as_ref(),
+            &dependencies,
+            &context.curves,
+            "vanna",
+        )?;
 
         // Spot level for bump sizing
-        let current_spot = current_spot(&context.curves, spot_id, "vanna")?;
+        let current_spot = current_spot(&context.curves, &spot_id, "vanna")?;
 
         // Bump sizes with minimum floor for numerical stability
         let (spot_bump_decimal, vol_bump_abs) =
@@ -673,42 +573,46 @@ where
 
         let spot_bump = effective_spot_bump(current_spot, spot_bump_decimal);
         let h_abs = spot_bump.absolute; // absolute spot change
-        let k_abs =
-            symmetric_volatility_step(instrument, &context.curves, &vol_surface_ids, vol_bump_abs)?;
+        let k_abs = symmetric_volatility_step(
+            context.instrument.as_ref(),
+            &context.curves,
+            &vol_surface_ids,
+            vol_bump_abs,
+        )?;
 
-        let seeded_instrument = clone_with_crn_seed(instrument)?;
+        let seeded_instrument = clone_with_crn_seed(context.instrument.as_ref())?;
 
         let (v_pp, v_pm, v_mp, v_mm) = context.with_market_scratch(|context, scratch| {
             let v_pp = eval_raw_with_scratch_bumps(
                 context,
                 scratch,
-                &seeded_instrument,
+                seeded_instrument.as_ref(),
                 as_of,
-                Some((spot_id, spot_bump.relative)),
+                Some((&spot_id, spot_bump.relative)),
                 Some((&vol_surface_ids, k_abs)),
             )?;
             let v_pm = eval_raw_with_scratch_bumps(
                 context,
                 scratch,
-                &seeded_instrument,
+                seeded_instrument.as_ref(),
                 as_of,
-                Some((spot_id, spot_bump.relative)),
+                Some((&spot_id, spot_bump.relative)),
                 Some((&vol_surface_ids, -k_abs)),
             )?;
             let v_mp = eval_raw_with_scratch_bumps(
                 context,
                 scratch,
-                &seeded_instrument,
+                seeded_instrument.as_ref(),
                 as_of,
-                Some((spot_id, -spot_bump.relative)),
+                Some((&spot_id, -spot_bump.relative)),
                 Some((&vol_surface_ids, k_abs)),
             )?;
             let v_mm = eval_raw_with_scratch_bumps(
                 context,
                 scratch,
-                &seeded_instrument,
+                seeded_instrument.as_ref(),
                 as_of,
-                Some((spot_id, -spot_bump.relative)),
+                Some((&spot_id, -spot_bump.relative)),
                 Some((&vol_surface_ids, -k_abs)),
             )?;
             Ok((v_pp, v_pm, v_mp, v_mm))
@@ -728,7 +632,6 @@ where
 // Unit tests (internal)
 
 #[cfg(test)]
-#[allow(dead_code)]
 mod tests {
     use super::*;
 
@@ -745,175 +648,125 @@ mod tests {
     use std::sync::Arc;
     use time::macros::date;
 
-    #[allow(dead_code)]
     #[derive(Clone)]
-    struct TestFdInstrument {
+    enum MockPayoff {
+        QuadraticSpot,
+        LinearSpot(f64),
+        VolLinear {
+            surface_terms: Vec<(String, f64)>,
+            multiply_by_spot: bool,
+        },
+    }
+
+    #[derive(Clone)]
+    struct MockFdInstrument {
         id: String,
         expiry: Date,
         spot_id: PriceId,
+        payoff: MockPayoff,
         overrides: MetricPricingOverrides,
         instrument_overrides: crate::instruments::pricing_overrides::InstrumentPricingOverrides,
         attributes: Attributes,
     }
 
-    impl TestFdInstrument {
-        fn new(id: &str, expiry: Date, spot_id: &str) -> Self {
+    impl MockFdInstrument {
+        fn new_with(id: &str, expiry: Date, spot_id: &str, payoff: MockPayoff) -> Self {
             Self {
                 id: id.to_string(),
                 expiry,
                 spot_id: spot_id.into(),
-                overrides: MetricPricingOverrides::default(),
-                instrument_overrides: Default::default(),
-                attributes: Attributes::new(),
-            }
-        }
-    }
-
-    #[allow(dead_code)]
-    #[derive(Clone)]
-    struct RoundingSensitiveInstrument {
-        id: String,
-        expiry: Date,
-        spot_id: PriceId,
-        overrides: MetricPricingOverrides,
-        instrument_overrides: crate::instruments::pricing_overrides::InstrumentPricingOverrides,
-        attributes: Attributes,
-    }
-
-    crate::impl_empty_cashflow_provider!(
-        TestFdInstrument,
-        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
-    );
-    crate::impl_empty_cashflow_provider!(
-        RoundingSensitiveInstrument,
-        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
-    );
-
-    impl RoundingSensitiveInstrument {
-        fn new(id: &str, expiry: Date, spot_id: &str) -> Self {
-            Self {
-                id: id.to_string(),
-                expiry,
-                spot_id: spot_id.into(),
+                payoff,
                 overrides: MetricPricingOverrides::default(),
                 instrument_overrides: Default::default(),
                 attributes: Attributes::new(),
             }
         }
 
-        fn raw_pv(&self, market: &MarketContext) -> finstack_quant_core::Result<f64> {
-            let spot_scalar = market.get_price(self.spot_id.as_str())?;
-            let spot = crate::metrics::finite_difference::scalar_numeric_value(spot_scalar);
-            Ok(spot * 0.00003)
-        }
-    }
-
-    impl crate::instruments::Instrument for TestFdInstrument {
-        fn includes_valuation_date_cashflows(&self) -> bool {
-            true
-        }
-        fn expiry(&self) -> Option<Date> {
-            Some(self.expiry)
-        }
-        fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
-            let mut dependencies = MarketDependencies::new();
-            dependencies.add_market_scalar_id(self.spot_id.as_str());
-            Ok(dependencies)
+        fn quadratic(id: &str, expiry: Date, spot_id: &str) -> Self {
+            Self::new_with(id, expiry, spot_id, MockPayoff::QuadraticSpot)
         }
 
-        fn id(&self) -> &str {
-            &self.id
+        fn linear_spot(id: &str, expiry: Date, spot_id: &str, slope: f64) -> Self {
+            Self::new_with(id, expiry, spot_id, MockPayoff::LinearSpot(slope))
         }
 
-        fn key(&self) -> InstrumentType {
-            InstrumentType::Equity
-        }
-
-        fn as_any(&self) -> &dyn std::any::Any {
-            self
-        }
-
-        fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-            self
-        }
-
-        fn clone_box(&self) -> Box<dyn crate::instruments::Instrument> {
-            Box::new(self.clone())
-        }
-
-        fn attributes(&self) -> &Attributes {
-            &self.attributes
-        }
-
-        fn attributes_mut(&mut self) -> &mut Attributes {
-            &mut self.attributes
-        }
-
-        fn get_instrument_pricing_overrides(
-            &self,
-        ) -> Option<&crate::instruments::pricing_overrides::InstrumentPricingOverrides> {
-            Some(&self.instrument_overrides)
-        }
-
-        fn get_instrument_pricing_overrides_mut(
-            &mut self,
-        ) -> Option<&mut crate::instruments::pricing_overrides::InstrumentPricingOverrides>
-        {
-            Some(&mut self.instrument_overrides)
-        }
-
-        fn get_metric_pricing_overrides(
-            &self,
-        ) -> Option<&crate::instruments::pricing_overrides::MetricPricingOverrides> {
-            Some(&self.overrides)
-        }
-
-        fn get_metric_pricing_overrides_mut(
-            &mut self,
-        ) -> Option<&mut crate::instruments::pricing_overrides::MetricPricingOverrides> {
-            Some(&mut self.overrides)
-        }
-
-        fn base_value(
-            &self,
-            market: &MarketContext,
-            as_of: Date,
-        ) -> finstack_quant_core::Result<Money> {
-            if as_of >= self.expiry {
-                return Ok(Money::from((0_i64, Currency::USD)));
-            }
-            let spot_scalar = market.get_price(self.spot_id.as_str())?;
-            let spot = crate::metrics::finite_difference::scalar_numeric_value(spot_scalar);
-            // Simple analytic PV = S^2 (currency USD)
-            Ok(Money::new(spot * spot, Currency::USD).expect("valid money fixture"))
-        }
-
-        fn price_with_metrics(
-            &self,
-            market: &MarketContext,
-            as_of: Date,
-            metrics: &[MetricId],
-            options: crate::instruments::PricingOptions,
-        ) -> std::result::Result<crate::results::ValuationResult, crate::pricer::PricingError>
-        {
-            let base_value = self.value(market, as_of)?;
-            Ok(
-                crate::instruments::common_impl::helpers::build_with_metrics_dyn(
-                    Arc::from(self.clone_box()),
-                    Arc::new(market.clone()),
-                    as_of,
-                    base_value,
-                    metrics,
-                    crate::instruments::common_impl::helpers::MetricBuildOptions {
-                        pricing: options,
-                        ..crate::instruments::common_impl::helpers::MetricBuildOptions::default()
-                    },
-                )?,
+        fn vol_linear(
+            id: &str,
+            expiry: Date,
+            spot_id: &str,
+            surface_terms: Vec<(&str, f64)>,
+            multiply_by_spot: bool,
+        ) -> Self {
+            Self::new_with(
+                id,
+                expiry,
+                spot_id,
+                MockPayoff::VolLinear {
+                    surface_terms: surface_terms
+                        .into_iter()
+                        .map(|(vol_surface_id, slope)| (vol_surface_id.to_string(), slope))
+                        .collect(),
+                    multiply_by_spot,
+                },
             )
         }
+
+        fn raw_pv(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+            match &self.payoff {
+                MockPayoff::QuadraticSpot => {
+                    if as_of >= self.expiry {
+                        return Ok(0.0);
+                    }
+                    let spot = crate::metrics::finite_difference::scalar_numeric_value(
+                        market.get_price(self.spot_id.as_str())?,
+                    );
+                    Ok(spot * spot)
+                }
+                MockPayoff::LinearSpot(slope) => {
+                    let spot = crate::metrics::finite_difference::scalar_numeric_value(
+                        market.get_price(self.spot_id.as_str())?,
+                    );
+                    Ok(spot * slope)
+                }
+                MockPayoff::VolLinear {
+                    surface_terms,
+                    multiply_by_spot,
+                } => {
+                    let mut value = 0.0;
+                    for (vol_surface_id, slope) in surface_terms {
+                        let surface = market.get_surface(vol_surface_id)?;
+                        // Sample the surface at its first grid point: an exact grid
+                        // hit so `value_checked` returns the stored vol verbatim.
+                        let expiry = surface.expiries().first().copied().ok_or_else(|| {
+                            finstack_quant_core::Error::Validation("empty expiries".into())
+                        })?;
+                        let strike =
+                            surface.secondary_values().first().copied().ok_or_else(|| {
+                                finstack_quant_core::Error::Validation("empty strikes".into())
+                            })?;
+                        value += slope
+                            * finstack_quant_models::volatility::get_surface_vol(
+                                &surface, expiry, strike,
+                            )?;
+                    }
+                    if *multiply_by_spot {
+                        let spot = crate::metrics::finite_difference::scalar_numeric_value(
+                            market.get_price(self.spot_id.as_str())?,
+                        );
+                        value *= spot;
+                    }
+                    Ok(value)
+                }
+            }
+        }
     }
 
-    impl crate::instruments::Instrument for RoundingSensitiveInstrument {
+    crate::impl_empty_cashflow_provider!(
+        MockFdInstrument,
+        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
+    );
+
+    impl crate::instruments::Instrument for MockFdInstrument {
         fn includes_valuation_date_cashflows(&self) -> bool {
             true
         }
@@ -923,6 +776,15 @@ mod tests {
         fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
             let mut dependencies = MarketDependencies::new();
             dependencies.add_market_scalar_id(self.spot_id.as_str());
+            if let MockPayoff::VolLinear { surface_terms, .. } = &self.payoff {
+                for (vol_surface_id, _) in surface_terms {
+                    dependencies.add_volatility_dependency(VolatilityDependency::new(
+                        vol_surface_id.clone(),
+                        Some(self.spot_id.clone()),
+                        None,
+                    ));
+                }
+            }
             Ok(dependencies)
         }
 
@@ -982,19 +844,20 @@ mod tests {
         fn base_value(
             &self,
             market: &MarketContext,
-            _as_of: Date,
+            as_of: Date,
         ) -> finstack_quant_core::Result<Money> {
-            // This intentionally rounds away most of the PV to exercise the raw path
-            let raw = self.raw_pv(market)?;
-            Ok(Money::new(raw, Currency::USD).expect("valid money fixture"))
+            Ok(
+                Money::new(self.raw_pv(market, as_of)?, Currency::USD)
+                    .expect("valid money fixture"),
+            )
         }
 
         fn base_value_raw(
             &self,
             market: &MarketContext,
-            _as_of: Date,
+            as_of: Date,
         ) -> finstack_quant_core::Result<f64> {
-            self.raw_pv(market)
+            self.raw_pv(market, as_of)
         }
 
         fn price_with_metrics(
@@ -1022,22 +885,19 @@ mod tests {
         }
     }
 
-    fn registry_for_test<I>() -> MetricRegistry
-    where
-        I: crate::instruments::Instrument + Clone + 'static,
-    {
+    fn registry_for_test() -> MetricRegistry {
         let mut registry = MetricRegistry::new();
         registry
             .register_metric(
                 MetricId::Delta,
-                Arc::new(GenericFdDelta::<I>::default()),
+                Arc::new(GenericFdDelta),
                 &[InstrumentType::Equity],
             )
             .expect("unique test metric registration");
         registry
             .register_metric(
                 MetricId::Gamma,
-                Arc::new(GenericFdGamma::<I>::default()),
+                Arc::new(GenericFdGamma),
                 &[InstrumentType::Equity],
             )
             .expect("unique test metric registration");
@@ -1053,7 +913,7 @@ mod tests {
 
     #[test]
     fn seed_scenario_lives_in_model_config() {
-        let instrument = TestFdInstrument::new("FD-SEED", date!(2026 - 01 - 01), "SPOT");
+        let instrument = MockFdInstrument::quadratic("FD-SEED", date!(2026 - 01 - 01), "SPOT");
 
         let seeded = clone_with_crn_seed(&instrument).expect("instrument overrides");
 
@@ -1066,7 +926,8 @@ mod tests {
         );
         assert_eq!(
             seeded
-                .instrument_overrides
+                .get_instrument_pricing_overrides()
+                .expect("seeded overrides")
                 .model_config
                 .mc_seed_scenario
                 .as_deref(),
@@ -1078,11 +939,11 @@ mod tests {
     fn fd_delta_matches_analytic_for_quadratic_pv() {
         let as_of = date!(2025 - 01 - 01);
         let spot = 100.0;
-        let inst = TestFdInstrument::new("FD-TEST", date!(2026 - 01 - 01), "SPOT");
+        let inst = MockFdInstrument::quadratic("FD-TEST", date!(2026 - 01 - 01), "SPOT");
         let market = market_with_spot("SPOT", spot);
 
         let base_value = inst.value(&market, as_of).expect("base pv");
-        let registry = registry_for_test::<TestFdInstrument>();
+        let registry = registry_for_test();
         let mut ctx = MetricContext::new(
             Arc::new(inst),
             Arc::new(market),
@@ -1104,11 +965,11 @@ mod tests {
     fn fd_gamma_matches_analytic_for_quadratic_pv() {
         let as_of = date!(2025 - 01 - 01);
         let spot = 80.0;
-        let inst = TestFdInstrument::new("FD-TEST", date!(2026 - 01 - 01), "SPOT");
+        let inst = MockFdInstrument::quadratic("FD-TEST", date!(2026 - 01 - 01), "SPOT");
         let market = market_with_spot("SPOT", spot);
 
         let base_value = inst.value(&market, as_of).expect("base pv");
-        let registry = registry_for_test::<TestFdInstrument>();
+        let registry = registry_for_test();
         let mut ctx = MetricContext::new(
             Arc::new(inst),
             Arc::new(market),
@@ -1130,7 +991,8 @@ mod tests {
     fn delta_uses_raw_value_when_money_rounds_down() {
         let as_of = date!(2025 - 01 - 01);
         let spot = 100.0;
-        let inst = RoundingSensitiveInstrument::new("ROUNDING", date!(2026 - 01 - 01), "SENS");
+        let inst =
+            MockFdInstrument::linear_spot("ROUNDING", date!(2026 - 01 - 01), "SENS", 0.00003);
         let market = market_with_spot("SENS", spot);
 
         // Rounded Money path remains tiny, while the raw path preserves the
@@ -1141,7 +1003,7 @@ mod tests {
             "rounded Money should remain tiny"
         );
 
-        let registry = registry_for_test::<RoundingSensitiveInstrument>();
+        let registry = registry_for_test();
         let mut ctx = MetricContext::new(
             Arc::new(inst),
             Arc::new(market),
@@ -1166,13 +1028,13 @@ mod tests {
     fn fd_greeks_zero_when_expired() {
         let as_of = date!(2027 - 01 - 02);
         let spot = 50.0;
-        let inst = TestFdInstrument::new("FD-TEST", date!(2027 - 01 - 01), "SPOT");
+        let inst = MockFdInstrument::quadratic("FD-TEST", date!(2027 - 01 - 01), "SPOT");
         let market = market_with_spot("SPOT", spot);
 
         let base_value = inst.value(&market, as_of).expect("base pv");
         assert_eq!(base_value.amount(), 0.0, "expired base pv should be zero");
 
-        let registry = registry_for_test::<TestFdInstrument>();
+        let registry = registry_for_test();
         let mut ctx = MetricContext::new(
             Arc::new(inst),
             Arc::new(market),
@@ -1200,7 +1062,7 @@ mod tests {
     fn option_greeks_use_canonical_expiry_before_market_lookups() {
         let expiry = date!(2027 - 01 - 01);
         for as_of in [expiry, date!(2027 - 01 - 02)] {
-            let inst = TestFdInstrument::new("FD-EXPIRED", expiry, "MISSING-SPOT");
+            let inst = MockFdInstrument::quadratic("FD-EXPIRED", expiry, "MISSING-SPOT");
             let mut ctx = MetricContext::new(
                 Arc::new(inst),
                 Arc::new(MarketContext::new()),
@@ -1209,15 +1071,11 @@ mod tests {
                 MetricContext::default_config(),
             );
             assert_eq!(
-                GenericFdVanna::<TestFdInstrument>::default()
-                    .calculate(&mut ctx)
-                    .expect("expired vanna"),
+                GenericFdVanna.calculate(&mut ctx).expect("expired vanna"),
                 0.0
             );
             assert_eq!(
-                GenericFdVolga::<TestFdInstrument>::default()
-                    .calculate(&mut ctx)
-                    .expect("expired volga"),
+                GenericFdVolga.calculate(&mut ctx).expect("expired volga"),
                 0.0
             );
         }
@@ -1226,11 +1084,11 @@ mod tests {
     #[test]
     fn delta_errors_on_zero_spot() {
         let as_of = date!(2025 - 01 - 01);
-        let inst = TestFdInstrument::new("FD-TEST", date!(2026 - 01 - 01), "SPOT");
+        let inst = MockFdInstrument::quadratic("FD-TEST", date!(2026 - 01 - 01), "SPOT");
         let market = market_with_spot("SPOT", 0.0);
 
         let base_value = Money::from((0_i64, Currency::USD));
-        let registry = registry_for_test::<TestFdInstrument>();
+        let registry = registry_for_test();
         let mut ctx = MetricContext::new(
             Arc::new(inst),
             Arc::new(market),
@@ -1252,11 +1110,11 @@ mod tests {
     #[test]
     fn gamma_errors_on_negative_spot() {
         let as_of = date!(2025 - 01 - 01);
-        let inst = TestFdInstrument::new("FD-TEST", date!(2026 - 01 - 01), "SPOT");
+        let inst = MockFdInstrument::quadratic("FD-TEST", date!(2026 - 01 - 01), "SPOT");
         let market = market_with_spot("SPOT", -10.0);
 
         let base_value = Money::from((0_i64, Currency::USD));
-        let registry = registry_for_test::<TestFdInstrument>();
+        let registry = registry_for_test();
         let mut ctx = MetricContext::new(
             Arc::new(inst),
             Arc::new(market),
@@ -1303,203 +1161,6 @@ mod tests {
         assert!(result.is_ok(), "positive finite spot should be accepted");
     }
 
-    // ── Audit item #4: vega clamp on the down-bump ──────────────────────────
-
-    /// Instrument whose PV is linear in the surface's ATM vol: `PV = K · σ`.
-    /// Vega is therefore the constant `K` (per unit absolute vol).
-    #[allow(dead_code)]
-    #[derive(Clone)]
-    struct VolLinearInstrument {
-        id: String,
-        expiry: Date,
-        spot_id: PriceId,
-        surface_terms: Vec<(String, f64)>,
-        multiply_by_spot: bool,
-        overrides: MetricPricingOverrides,
-        instrument_overrides: crate::instruments::pricing_overrides::InstrumentPricingOverrides,
-        attributes: Attributes,
-    }
-
-    crate::impl_empty_cashflow_provider!(
-        VolLinearInstrument,
-        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
-    );
-
-    impl VolLinearInstrument {
-        fn new(id: &str, expiry: Date, spot_id: &str, vol_surface_id: &str, slope: f64) -> Self {
-            Self {
-                id: id.to_string(),
-                expiry,
-                spot_id: spot_id.into(),
-                surface_terms: vec![(vol_surface_id.to_string(), slope)],
-                multiply_by_spot: false,
-                overrides: MetricPricingOverrides::default(),
-                instrument_overrides: Default::default(),
-                attributes: Attributes::new(),
-            }
-        }
-
-        fn new_multi(
-            id: &str,
-            expiry: Date,
-            spot_id: &str,
-            surface_terms: Vec<(&str, f64)>,
-            multiply_by_spot: bool,
-        ) -> Self {
-            Self {
-                id: id.to_string(),
-                expiry,
-                spot_id: spot_id.into(),
-                surface_terms: surface_terms
-                    .into_iter()
-                    .map(|(vol_surface_id, slope)| (vol_surface_id.to_string(), slope))
-                    .collect(),
-                multiply_by_spot,
-                overrides: MetricPricingOverrides::default(),
-                instrument_overrides: Default::default(),
-                attributes: Attributes::new(),
-            }
-        }
-
-        fn raw_pv(&self, market: &MarketContext) -> finstack_quant_core::Result<f64> {
-            let mut value = 0.0;
-            for (vol_surface_id, slope) in &self.surface_terms {
-                let surface = market.get_surface(vol_surface_id)?;
-                // Sample the surface at its first grid point: an exact grid
-                // hit so `value_checked` returns the stored vol verbatim.
-                let expiry = surface.expiries().first().copied().ok_or_else(|| {
-                    finstack_quant_core::Error::Validation("empty expiries".into())
-                })?;
-                let strike = surface.secondary_values().first().copied().ok_or_else(|| {
-                    finstack_quant_core::Error::Validation("empty strikes".into())
-                })?;
-                value += slope
-                    * finstack_quant_models::volatility::get_surface_vol(&surface, expiry, strike)?;
-            }
-            if self.multiply_by_spot {
-                let spot = crate::metrics::finite_difference::scalar_numeric_value(
-                    market.get_price(self.spot_id.as_str())?,
-                );
-                value *= spot;
-            }
-            Ok(value)
-        }
-    }
-
-    impl crate::instruments::Instrument for VolLinearInstrument {
-        fn includes_valuation_date_cashflows(&self) -> bool {
-            true
-        }
-        fn expiry(&self) -> Option<Date> {
-            Some(self.expiry)
-        }
-        fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
-            let mut dependencies = MarketDependencies::new();
-            dependencies.add_market_scalar_id(self.spot_id.as_str());
-            for (vol_surface_id, _) in &self.surface_terms {
-                dependencies.add_volatility_dependency(VolatilityDependency::new(
-                    vol_surface_id.clone(),
-                    Some(self.spot_id.clone()),
-                    None,
-                ));
-            }
-            Ok(dependencies)
-        }
-
-        fn id(&self) -> &str {
-            &self.id
-        }
-
-        fn key(&self) -> InstrumentType {
-            InstrumentType::Equity
-        }
-
-        fn as_any(&self) -> &dyn std::any::Any {
-            self
-        }
-
-        fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-            self
-        }
-
-        fn clone_box(&self) -> Box<dyn crate::instruments::Instrument> {
-            Box::new(self.clone())
-        }
-
-        fn attributes(&self) -> &Attributes {
-            &self.attributes
-        }
-
-        fn attributes_mut(&mut self) -> &mut Attributes {
-            &mut self.attributes
-        }
-
-        fn get_instrument_pricing_overrides(
-            &self,
-        ) -> Option<&crate::instruments::pricing_overrides::InstrumentPricingOverrides> {
-            Some(&self.instrument_overrides)
-        }
-
-        fn get_instrument_pricing_overrides_mut(
-            &mut self,
-        ) -> Option<&mut crate::instruments::pricing_overrides::InstrumentPricingOverrides>
-        {
-            Some(&mut self.instrument_overrides)
-        }
-
-        fn get_metric_pricing_overrides(
-            &self,
-        ) -> Option<&crate::instruments::pricing_overrides::MetricPricingOverrides> {
-            Some(&self.overrides)
-        }
-
-        fn get_metric_pricing_overrides_mut(
-            &mut self,
-        ) -> Option<&mut crate::instruments::pricing_overrides::MetricPricingOverrides> {
-            Some(&mut self.overrides)
-        }
-
-        fn base_value(
-            &self,
-            market: &MarketContext,
-            _as_of: Date,
-        ) -> finstack_quant_core::Result<Money> {
-            Ok(Money::new(self.raw_pv(market)?, Currency::USD).expect("valid money fixture"))
-        }
-
-        fn base_value_raw(
-            &self,
-            market: &MarketContext,
-            _as_of: Date,
-        ) -> finstack_quant_core::Result<f64> {
-            self.raw_pv(market)
-        }
-
-        fn price_with_metrics(
-            &self,
-            market: &MarketContext,
-            as_of: Date,
-            metrics: &[MetricId],
-            options: crate::instruments::PricingOptions,
-        ) -> std::result::Result<crate::results::ValuationResult, crate::pricer::PricingError>
-        {
-            let base_value = self.value(market, as_of)?;
-            Ok(
-                crate::instruments::common_impl::helpers::build_with_metrics_dyn(
-                    Arc::from(self.clone_box()),
-                    Arc::new(market.clone()),
-                    as_of,
-                    base_value,
-                    metrics,
-                    crate::instruments::common_impl::helpers::MetricBuildOptions {
-                        pricing: options,
-                        ..crate::instruments::common_impl::helpers::MetricBuildOptions::default()
-                    },
-                )?,
-            )
-        }
-    }
-
     /// Flat vol surface at the given (low) vol level.
     fn flat_vol_surface(
         id: &str,
@@ -1528,8 +1189,13 @@ mod tests {
         // difference `(PV(σ+h) − PV(σ)) / h`.
         let as_of = date!(2025 - 01 - 01);
         let slope = 1_000_000.0; // PV = slope · σ.
-        let inst =
-            VolLinearInstrument::new("VEGA-CLAMP", date!(2026 - 01 - 01), "SPOT", "LOWVOL", slope);
+        let inst = MockFdInstrument::vol_linear(
+            "VEGA-CLAMP",
+            date!(2026 - 01 - 01),
+            "SPOT",
+            vec![("LOWVOL", slope)],
+            false,
+        );
         let market =
             market_with_spot("SPOT", 100.0).insert_surface(flat_vol_surface("LOWVOL", 0.005));
 
@@ -1538,7 +1204,7 @@ mod tests {
         registry
             .register_metric(
                 MetricId::Vega,
-                Arc::new(GenericFdVega::<VolLinearInstrument>::default()),
+                Arc::new(GenericFdVega),
                 &[InstrumentType::Equity],
             )
             .expect("unique test metric registration");
@@ -1574,12 +1240,12 @@ mod tests {
         // difference path, still exact for a PV linear in σ.
         let as_of = date!(2025 - 01 - 01);
         let slope = 500_000.0;
-        let inst = VolLinearInstrument::new(
+        let inst = MockFdInstrument::vol_linear(
             "VEGA-NOCLAMP",
             date!(2026 - 01 - 01),
             "SPOT",
-            "HIVOL",
-            slope,
+            vec![("HIVOL", slope)],
+            false,
         );
         let market =
             market_with_spot("SPOT", 100.0).insert_surface(flat_vol_surface("HIVOL", 0.20));
@@ -1589,7 +1255,7 @@ mod tests {
         registry
             .register_metric(
                 MetricId::Vega,
-                Arc::new(GenericFdVega::<VolLinearInstrument>::default()),
+                Arc::new(GenericFdVega),
                 &[InstrumentType::Equity],
             )
             .expect("unique test metric registration");
@@ -1615,7 +1281,7 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
         let first_slope = 1_000.0;
         let second_slope = 2_500.0;
-        let inst = VolLinearInstrument::new_multi(
+        let inst = MockFdInstrument::vol_linear(
             "MULTI-SURFACE",
             date!(2026 - 01 - 01),
             "SPOT",
@@ -1630,14 +1296,14 @@ mod tests {
         registry
             .register_metric(
                 MetricId::Vega,
-                Arc::new(GenericFdVega::<VolLinearInstrument>::default()),
+                Arc::new(GenericFdVega),
                 &[InstrumentType::Equity],
             )
             .expect("unique test metric registration");
         registry
             .register_metric(
                 MetricId::Volga,
-                Arc::new(GenericFdVolga::<VolLinearInstrument>::default()),
+                Arc::new(GenericFdVolga),
                 &[InstrumentType::Equity],
             )
             .expect("unique test metric registration");
@@ -1664,7 +1330,7 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
         let first_slope = 2.0;
         let second_slope = 3.0;
-        let inst = VolLinearInstrument::new_multi(
+        let inst = MockFdInstrument::vol_linear(
             "MULTI-SURFACE-VANNA",
             date!(2026 - 01 - 01),
             "SPOT",
@@ -1679,7 +1345,7 @@ mod tests {
         registry
             .register_metric(
                 MetricId::Vanna,
-                Arc::new(GenericFdVanna::<VolLinearInstrument>::default()),
+                Arc::new(GenericFdVanna),
                 &[InstrumentType::Equity],
             )
             .expect("unique test metric registration");

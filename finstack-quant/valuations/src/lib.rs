@@ -99,11 +99,13 @@ pub use finstack_quant_valuations_core::{
 
 #[doc(hidden)]
 pub use finstack_quant_valuations_core::serde_defaults;
-pub use finstack_quant_valuations_core::{
-    constants, margin, market, metrics, recalibration, results,
-};
+pub use finstack_quant_valuations_core::{constants, margin, market, recalibration};
+/// Metrics framework, registry, aggregation, and Historical VaR.
+pub mod metrics;
 /// Pricing dispatch and registry infrastructure.
 pub mod pricer;
+/// Valuation results, DataFrame export, and display field-unit metadata.
+pub mod results;
 /// JSON Schema generation for API contracts.
 pub mod schema;
 

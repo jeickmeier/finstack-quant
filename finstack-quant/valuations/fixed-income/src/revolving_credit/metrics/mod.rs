@@ -59,18 +59,14 @@ pub(crate) fn register_revolving_credit_metrics(
             // CS01: with a credit curve, requires quote-space replay via its
             // calibration recipe; without one, falls back to z-spread CS01.
             // Hazard01 measures direct intensity bp sensitivity directly.
-            (Cs01, finstack_quant_valuations_core::metrics::ZSpreadParallelCs01::<
+            (Cs01, crate::cs01_z_spread::ZSpreadParallelCs01::<
                 crate::revolving_credit::RevolvingCredit,
             >::hazard_when_credit_curve()),
-            (BucketedCs01, finstack_quant_valuations_core::metrics::ZSpreadBucketedCs01::<
+            (BucketedCs01, crate::cs01_z_spread::ZSpreadBucketedCs01::<
                 crate::revolving_credit::RevolvingCredit,
             >::hazard_when_credit_curve()),
-            (Hazard01, finstack_quant_valuations_core::metrics::sensitivities::cs01_direct_hazard::DirectHazardParallelHazard01::<
-                crate::revolving_credit::RevolvingCredit,
-            >::default()),
-            (BucketedHazard01, finstack_quant_valuations_core::metrics::sensitivities::cs01_direct_hazard::DirectHazardBucketedHazard01::<
-                crate::revolving_credit::RevolvingCredit,
-            >::default()),
+            (Hazard01, crate::cs01_direct_hazard::DirectHazardParallelHazard01),
+            (BucketedHazard01, crate::cs01_direct_hazard::DirectHazardBucketedHazard01),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             (Recovery01, exposure::Recovery01Calculator),
             (JumpToDefault, exposure::JumpToDefaultCalculator),

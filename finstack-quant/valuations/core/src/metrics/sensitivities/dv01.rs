@@ -1,11 +1,9 @@
-//! Unified DV01 calculator supporting parallel and key-rate sensitivities.
+//! Unified DV01 calculator supporting parallel and triangular key-rate
+//! sensitivities.
 //!
-//! This module provides a single, flexible DV01 calculator with two mathematically
-//! correct key-rate methods:
-//!
-//! 1. **Triangular Zero-Rate**: Fast, uses triangular weights on bucket grid
-//!
-//! Both methods ensure: **sum of bucketed DV01 ≈ parallel DV01**
+//! Computes parallel DV01 (combined or per-curve) and triangular key-rate
+//! DV01 across buckets so **sum of bucketed DV01 ≈ parallel DV01**. Quote-level
+//! par-rate key-rate DV01 is computed via [`rate_quote_dv01_series`].
 //!
 //! # Units and Sign Convention
 //!
@@ -19,7 +17,8 @@
 //! - **Type-safe curve discovery**: Uses canonical instrument market dependencies
 //! - **Mathematically correct**: Triangular weights partition unity across bucket grid
 //! - **Multiple curve types**: Handles discount, forward, and credit curves
-//! - **Par-rate option**: Re-bootstrap curve for exact sum-to-parallel behavior
+//! - **Quote-level series**: Supported via [`rate_quote_dv01_series`] for exact
+//!   calibrated-curve attribution
 //!
 //! # Quick Start
 //!
@@ -59,7 +58,7 @@ fn reprice_rate_risk(
 
 /// DV01 calculation mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Dv01ComputationMode {
+pub(crate) enum Dv01ComputationMode {
     /// Single scalar from parallel bump of all curves together.
     ParallelCombined,
     /// Per-curve parallel bumps (stored as series).
@@ -70,7 +69,7 @@ pub enum Dv01ComputationMode {
 
 /// Rate-curve subset to include in a DV01-style bump.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RateCurveSelection {
+pub(crate) enum RateCurveSelection {
     /// Include all rate curves declared by the instrument.
     All,
     /// Include only forward/projection curves.
@@ -86,14 +85,14 @@ pub enum RateCurveSelection {
 /// Configuration for DV01 calculations.
 #[derive(Clone, Debug)]
 pub struct Dv01CalculatorConfig {
-    /// Computation mode (parallel vs bucketed, triangular vs par-rate).
-    pub mode: Dv01ComputationMode,
+    /// Computation mode (parallel vs bucketed, triangular vs per-curve).
+    pub(crate) mode: Dv01ComputationMode,
     /// MetricId under which to store per-curve or per-bucket series.
     /// Defaults to `BucketedDv01`. Set to e.g. `Pv01` when using
     /// `ParallelPerCurve` mode for PV01 so keys read `pv01::USD-OIS`.
-    pub series_id: MetricId,
+    pub(crate) series_id: MetricId,
     /// Subset of rate curves included in the bump.
-    pub curve_selection: RateCurveSelection,
+    pub(crate) curve_selection: RateCurveSelection,
 }
 
 impl Default for Dv01CalculatorConfig {
@@ -195,8 +194,8 @@ impl Dv01CalculatorConfig {
 /// 1. **Triangular Zero-Rate** (`KeyRateTriangular`): Uses triangular weights
 ///    defined by the bucket grid, ensuring sum of bucketed DV01 ≈ parallel DV01.
 ///
-/// 2. **Par-Rate Bumping** (`KeyRateParRate`): Bumps par rates of calibration
-///    instruments and re-bootstraps, ensuring exact sum = parallel.
+/// 2. **Par-Rate Bumping** ([`rate_quote_dv01_series`]): Bumps par rates of
+///    calibration instruments and re-bootstraps, ensuring exact sum = parallel.
 pub struct UnifiedDv01Calculator {
     config: Dv01CalculatorConfig,
 }
@@ -317,7 +316,8 @@ impl UnifiedDv01Calculator {
             Ok((pv_up, pv_down))
         })?;
 
-        let dv01 = super::cs01::sensitivity_central_diff(pv_up, pv_down, bump_bp);
+        let dv01 =
+            crate::metrics::finite_difference::sensitivity_central_diff(pv_up, pv_down, bump_bp)?;
         Ok(dv01)
     }
 
@@ -350,7 +350,9 @@ impl UnifiedDv01Calculator {
                 let pv_down = reprice_rate_risk(context, scratch, as_of)?;
                 scratch.revert_scratch_bump(token_down)?;
 
-                let dv01 = super::cs01::sensitivity_central_diff(pv_up, pv_down, bump_bp);
+                let dv01 = crate::metrics::finite_difference::sensitivity_central_diff(
+                    pv_up, pv_down, bump_bp,
+                )?;
                 series.push((curve_id.as_str().to_string(), dv01));
             }
             Ok(())
@@ -419,7 +421,7 @@ impl UnifiedDv01Calculator {
         // Triangular weight construction below assumes `buckets` is strictly
         // increasing; an unsorted slice produces zero-sum or inverted buckets
         // silently. Validate up-front rather than letting bad input through.
-        super::cs01::validate_buckets_strictly_increasing(buckets)?;
+        crate::metrics::buckets::validate_buckets_strictly_increasing(buckets)?;
 
         let mut series: Vec<(std::borrow::Cow<'static, str>, f64)> =
             Vec::with_capacity(buckets.len());
@@ -451,7 +453,9 @@ impl UnifiedDv01Calculator {
             let pv_down = reprice_rate_risk(context, scratch, as_of)?;
             scratch.revert_scratch_bump(token_down)?;
 
-            let dv01 = super::cs01::sensitivity_central_diff(pv_up, pv_down, bump_bp);
+            let dv01 = crate::metrics::finite_difference::sensitivity_central_diff(
+                pv_up, pv_down, bump_bp,
+            )?;
             series.push((label, dv01));
         }
 
@@ -516,7 +520,7 @@ pub fn rate_quote_dv01_series(
         let down = reprice(shock(-bump_bp))?;
         series.push((
             label,
-            super::cs01::sensitivity_central_diff(up, down, bump_bp),
+            crate::metrics::finite_difference::sensitivity_central_diff(up, down, bump_bp)?,
         ));
     }
     Ok(series)

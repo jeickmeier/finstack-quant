@@ -10,9 +10,10 @@ use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::{
     Cs01Request, compute_key_rate_cs01_series_for_hazard, require_hazard_replay,
-    sensitivity_central_diff,
 };
-use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_valuations_core::metrics::{
+    MetricCalculator, MetricContext, MetricId, sensitivity_central_diff,
+};
 use finstack_quant_valuations_core::recalibration::{
     HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump, RecalibrationProvider,
 };
@@ -179,9 +180,5 @@ fn parallel_cs01(
         }
         revalue(&bumped_market.insert_credit_index(index_id, bumped_index)?)
     };
-    Ok(sensitivity_central_diff(
-        reprice(bump_bp)?,
-        reprice(-bump_bp)?,
-        bump_bp,
-    ))
+    sensitivity_central_diff(reprice(bump_bp)?, reprice(-bump_bp)?, bump_bp)
 }

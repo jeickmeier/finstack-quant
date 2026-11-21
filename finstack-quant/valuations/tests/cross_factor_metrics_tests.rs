@@ -9,7 +9,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-use finstack_quant_valuations::metrics::{CrossFactorPair, MetricId};
+use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
 fn build_discount_curve(id: &str, as_of: Date, rate: f64) -> DiscountCurve {
@@ -78,9 +78,16 @@ fn cross_gamma_credit_rejects_unreplayable_hazard_curve() {
 }
 
 #[test]
-fn cross_factor_pair_covers_all_metric_ids() {
-    for pair in CrossFactorPair::ALL {
-        let id = pair.metric_id();
+fn cross_factor_metric_ids_round_trip_strict_parsing() {
+    for id in [
+        MetricId::CrossGammaRatesCredit,
+        MetricId::CrossGammaRatesVol,
+        MetricId::CrossGammaSpotVol,
+        MetricId::CrossGammaSpotCredit,
+        MetricId::CrossGammaFxVol,
+        MetricId::CrossGammaFxRates,
+        MetricId::CrossGammaCreditVol,
+    ] {
         let parsed = MetricId::parse_strict(id.as_str()).expect("metric id should parse");
         assert_eq!(parsed, id);
     }

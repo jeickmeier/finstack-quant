@@ -67,9 +67,9 @@ fn generic_greeks_follow_the_active_override_without_a_surface() {
         .instrument_pricing_overrides
         .with_implied_volatility(0.2);
     let calculators: Vec<Box<dyn MetricCalculator>> = vec![
-        Box::new(GenericFdVega::<EquityOption>::default()),
-        Box::new(GenericFdVolga::<EquityOption>::default()),
-        Box::new(GenericFdVanna::<EquityOption>::default()),
+        Box::new(GenericFdVega),
+        Box::new(GenericFdVolga),
+        Box::new(GenericFdVanna),
     ];
     for calc in calculators {
         let expected = evaluate(&option, &quoted, calc.as_ref());

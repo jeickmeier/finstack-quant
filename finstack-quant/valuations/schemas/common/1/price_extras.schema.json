@@ -2,7 +2,7 @@
   "$defs": {
     "MarketHistory": {
       "additionalProperties": false,
-      "description": "Historical market data for VaR calculation.\n\nStores a time series of market scenarios representing historical market\nshifts over a lookback window (e.g., last 500 days).",
+      "description": "Collection of historical market scenarios for VaR calculation.\n\nStores a time series of market scenarios representing historical market\nshifts over a lookback window (e.g., last 500 days).",
       "properties": {
         "base_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",

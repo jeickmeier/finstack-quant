@@ -338,7 +338,10 @@ mod tests {
             .calculate(&mut ctx)
             .expect("bucketed CS01");
         let key = MetricId::composite(&MetricId::BucketedCs01, &[bond.id.as_str()]);
-        assert_eq!(ctx.computed_series.get(&key), Some(&expected));
+        for (label, val) in &expected {
+            let bucket_key = MetricId::composite(&key, &[label.as_str()]);
+            assert_eq!(ctx.computed.get(&bucket_key), Some(val));
+        }
         assert_eq!(
             total,
             expected.iter().map(|(_, amount)| amount).sum::<f64>()

@@ -996,13 +996,23 @@ fn test_bond_future_dv01_calculation() {
         dv01
     );
 
-    // Extract bucketed DV01 (now stored under curve-qualified key)
-    let bucketed_dv01 = context
-        .get_series(&MetricId::custom("bucketed_dv01::USD-TREASURY"))
-        .expect("Bucketed DV01 should be computed under curve-qualified key");
+    // Extract bucketed DV01 (stored under curve-qualified composite keys)
+    let bucketed_dv01: Vec<(String, f64)> = context
+        .computed
+        .iter()
+        .filter_map(|(k, v)| {
+            k.as_str()
+                .strip_prefix("bucketed_dv01::USD-TREASURY::")
+                .map(|tenor| (tenor.to_string(), *v))
+        })
+        .collect();
+    assert!(
+        !bucketed_dv01.is_empty(),
+        "Bucketed DV01 should be computed under curve-qualified keys"
+    );
 
     println!("\nBucketed DV01:");
-    for (tenor, value) in bucketed_dv01 {
+    for (tenor, value) in &bucketed_dv01 {
         if value.abs() > 1.0 {
             println!("  {}: ${:.2}", tenor, value);
         }

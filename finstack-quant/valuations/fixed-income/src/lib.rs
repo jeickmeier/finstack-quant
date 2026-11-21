@@ -80,6 +80,10 @@ use crate as fi;
 #[path = "../tests/performance/cashflow_accrual_support.rs"]
 mod cashflow_accrual_support;
 
+#[doc(hidden)]
+pub mod cs01_direct_hazard;
+#[doc(hidden)]
+pub mod cs01_z_spread;
 pub(crate) mod floating_reset_descriptors;
 pub(crate) mod rates_credit;
 

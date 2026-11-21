@@ -10,8 +10,7 @@ impl MetricId {
     /// The running spread that makes the CDS have zero PV under the current
     /// discount and survival curves.
     ///
-    /// Units: decimal spread per annum unless a quoting layer converts it to bp
-    /// for display.
+    /// Units: basis points (`164.7` = 164.7 bp).
     pub const ParSpread: Self = Self(Cow::Borrowed("par_spread"));
 
     /// Risky PV01 for CDS premium-leg valuation.

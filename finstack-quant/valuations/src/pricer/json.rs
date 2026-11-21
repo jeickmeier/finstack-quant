@@ -555,11 +555,12 @@ pub fn price_instrument(
         .registry
         .as_ref()
         .map_or_else(|| STANDARD.shared_pricers(), Arc::clone);
-    let metric_registry = pricing_options.metric_registry.clone();
-    let metric_registry = metric_registry
-        .as_deref()
-        .unwrap_or_else(|| crate::pricer::STANDARD.metrics());
-    let metric_ids = metric_registry.resolve_metric_ids(metrics)?;
+    let shared_metric_registry = pricing_options
+        .metric_registry
+        .clone()
+        .unwrap_or_else(|| STANDARD.shared_metrics());
+    let metric_ids = shared_metric_registry.resolve_metric_ids(metrics)?;
+    let pricing_options = pricing_options.with_metric_registry(shared_metric_registry);
     let pricing_options = match market_history {
         Some(history) => pricing_options.with_market_history(Arc::new(history.clone())),
         None => pricing_options,

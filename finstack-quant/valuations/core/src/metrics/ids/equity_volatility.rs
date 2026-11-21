@@ -283,7 +283,7 @@ impl MetricId {
     /// be interpreted together with the related inflation metric docs.
     pub const InflationConvexity: Self = Self(Cow::Borrowed("inflation_convexity"));
 
-    /// Charm (rho sensitivity to volatility)
+    /// Charm (delta decay with respect to time: ∂Δ/∂t)
     pub const Charm: Self = Self(Cow::Borrowed("charm"));
 
     /// Color (gamma sensitivity to time)

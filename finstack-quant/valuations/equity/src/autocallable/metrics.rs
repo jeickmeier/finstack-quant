@@ -39,14 +39,14 @@ pub(crate) fn register_autocallable_metrics(
         registry: registry,
         instrument: InstrumentType::Autocallable,
         metrics: [
-            (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega::<crate::autocallable::Autocallable>::default()),
+            (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega),
             (Rho, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-            (Delta, SpotPinnedFd::<Autocallable, _>::new(GenericFdDelta::<Autocallable>::default())),
-            (Gamma, SpotPinnedFd::<Autocallable, _>::new(GenericFdGamma::<Autocallable>::default())),
-            (Vanna, SpotPinnedFd::<Autocallable, _>::new(GenericFdVanna::<Autocallable>::default())),
-            (Volga, GenericFdVolga::<crate::autocallable::Autocallable>::default()),
+            (Delta, SpotPinnedFd::<Autocallable, _>::new(GenericFdDelta)),
+            (Gamma, SpotPinnedFd::<Autocallable, _>::new(GenericFdGamma)),
+            (Vanna, SpotPinnedFd::<Autocallable, _>::new(GenericFdVanna)),
+            (Volga, GenericFdVolga),
         ]
     }
     Ok(())

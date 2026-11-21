@@ -19,15 +19,15 @@ pub(crate) fn register_lookback_option_metrics(
             registry: registry,
             instrument: InstrumentType::LookbackOption,
             metrics: [
-                (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega::<crate::exotics::lookback_option::LookbackOption>::default()),
+                (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega),
                 // Rho: discount-curve-only central bump, repriced with the requested model.
                 (Rho, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_discount_only())),
                 (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
                 (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-                (Delta, GenericFdDelta::<crate::exotics::lookback_option::LookbackOption>::default()),
-                (Gamma, GenericFdGamma::<crate::exotics::lookback_option::LookbackOption>::default()),
-                (Vanna, GenericFdVanna::<crate::exotics::lookback_option::LookbackOption>::default()),
-                (Volga, GenericFdVolga::<crate::exotics::lookback_option::LookbackOption>::default()),
+                (Delta, GenericFdDelta),
+                (Gamma, GenericFdGamma),
+                (Vanna, GenericFdVanna),
+                (Volga, GenericFdVolga),
             ]
         }
     }

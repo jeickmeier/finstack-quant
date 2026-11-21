@@ -1160,10 +1160,10 @@ mod tests {
         );
         assert_eq!(dcf.terminal_discount_years().unwrap(), 365.0 / 365.25);
         assert!((dcf.calculate_pv_explicit_flows().unwrap() - 95.879998631628).abs() < 1e-10);
-        let value = crate::dcf_equity::pricer::pv_with_rf_bump(&dcf, &|_| 0.0).unwrap();
+        let value = crate::dcf_equity::pricer::pv_with_rf_bump(&dcf, 0.0).unwrap();
         assert!((value - 1984.868391069042).abs() < 1e-9);
-        let up = crate::dcf_equity::pricer::pv_with_rf_bump(&dcf, &|_| 0.0001).unwrap();
-        let down = crate::dcf_equity::pricer::pv_with_rf_bump(&dcf, &|_| -0.0001).unwrap();
+        let up = crate::dcf_equity::pricer::pv_with_rf_bump(&dcf, 0.0001).unwrap();
+        let down = crate::dcf_equity::pricer::pv_with_rf_bump(&dcf, -0.0001).unwrap();
         assert!(((up - down) / 2.0 + 3.327952064358).abs() < 1e-9);
     }
 

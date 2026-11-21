@@ -47,7 +47,6 @@ pub fn is_additive_metric(metric_id: &MetricId) -> bool {
             | "hazard01"
             | "rho"
             | "pv01"
-            | "ir01"
             | "fx01"
             | "inflation01"
             | "dividend01"
@@ -66,6 +65,7 @@ pub fn is_additive_metric(metric_id: &MetricId) -> bool {
             | "bucketed_dv01"
             | "bucketed_cs01"
             | "bucketed_hazard01"
+            | "accrued"
             | "accrued_interest"
             | "pv_fixed"
             | "pv_float"
@@ -101,5 +101,11 @@ mod tests {
         ] {
             assert!(is_additive_metric(&MetricId::custom(metric)));
         }
+    }
+
+    #[test]
+    fn accrued_is_additive_and_legacy_ir01_is_not() {
+        assert!(is_additive_metric(&MetricId::Accrued));
+        assert!(!is_additive_metric(&MetricId::custom("ir01")));
     }
 }

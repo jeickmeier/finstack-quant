@@ -11,6 +11,7 @@
 mod annuity;
 mod breakeven_ladder;
 mod compute;
+mod field_units;
 mod spread_price;
 mod types;
 mod workout_ladder;
@@ -21,6 +22,7 @@ pub use annuity::{
 };
 pub use breakeven_ladder::{BondBreakevenLadder, BondBreakevenRow, bond_breakeven_ladder};
 pub use compute::compute_quotes;
+pub use field_units::bond_quote_set_field_units;
 pub use spread_price::{price_from_dm, price_from_oas, price_from_z_spread};
 pub use types::{BondQuoteSet, YieldCompounding};
 pub use workout_ladder::{BondWorkoutLadder, BondWorkoutRow, WorkoutExitKind, bond_workout_ladder};

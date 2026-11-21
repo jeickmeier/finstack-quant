@@ -4,9 +4,12 @@
 //! `MetricCalculator` that can be registered and computed alongside other
 //! risk metrics like DV01, Theta, etc.
 
-use crate::metrics::MetricId;
-use crate::metrics::risk::var_calculator::{VarConfig, VarResult, calculate_var};
-use crate::metrics::{MetricCalculator, MetricContext};
+use std::sync::Arc;
+
+use super::var_calculator::{VarConfig, VarResult, calculate_var};
+use crate::metrics::{
+    MetricCalculator, MetricContext, MetricId, MetricRegistry, MetricRegistryError,
+};
 use finstack_quant_core::Result;
 
 fn calculate_var_result(
@@ -48,8 +51,8 @@ fn cache_var_diagnostics(context: &mut MetricContext, result: &VarResult) {
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_valuations_core::metrics::{MetricId, MetricRegistry};
-/// use finstack_quant_valuations_core::metrics::risk::GenericHVar;
+/// use finstack_quant_valuations::metrics::{MetricId, MetricRegistry};
+/// use finstack_quant_valuations::metrics::risk::GenericHVar;
 /// use std::sync::Arc;
 ///
 /// // Configuration comes from PricingOptions metric overrides (95% by default).
@@ -115,4 +118,17 @@ impl MetricCalculator for GenericExpectedShortfall {
 
         Ok(result.expected_shortfall)
     }
+}
+
+/// Register the historical VaR and expected-shortfall calculators into `registry`.
+pub(crate) fn register_risk_metrics(
+    registry: &mut MetricRegistry,
+) -> std::result::Result<(), MetricRegistryError> {
+    registry.register_metric(MetricId::HVar, Arc::new(GenericHVar), &[])?;
+    registry.register_metric(
+        MetricId::ExpectedShortfall,
+        Arc::new(GenericExpectedShortfall),
+        &[],
+    )?;
+    Ok(())
 }
