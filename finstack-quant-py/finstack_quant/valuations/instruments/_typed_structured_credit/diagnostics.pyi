@@ -5,7 +5,9 @@ from __future__ import annotations
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 
 class SimulationDiagnostics:
     """
@@ -72,9 +74,9 @@ class SimulationDiagnostics:
     >>> diagnostics = deal.run_simulation(market, as_of).diagnostics
     >>> diagnostics.unfunded_draws.amount
     0.0
-    >>> list(diagnostics.to_dataframe().columns)[:3]
+    >>> list(diagnostics.to_pandas().columns)[:3]
     ['date', 'pool_balance', 'pool_factor']
-    >>> len(diagnostics.periods) == len(diagnostics.to_dataframe())
+    >>> len(diagnostics.periods) == len(diagnostics.to_pandas())
     True
     """
 
@@ -194,13 +196,37 @@ class SimulationDiagnostics:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        One row per simulated period as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``date`` (ISO 8601 string), ``pool_balance``, ``pool_factor``,
+        ``wac`` (decimal), ``weighted_avg_spread_bp``, ``warf`` (nullable),
+        ``interest_collections``, ``principal_collections``, ``defaults``,
+        ``recoveries``, ``reinvested_par``, ``fees_paid``, ``reserve_balance``,
+        ``reserve_interest``, ``spread_account``, ``funding_account``,
+        ``delinquent_balance``, ``servicer_advances_outstanding`` and
+        ``excess_spread`` (annualized decimal).
+
+        Returns
+        -------
+        ArrowTable
+            The period record.
+
+        Raises
+        ------
+        ValueError
+            If the canonical table cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         One row per simulated period as a pandas ``DataFrame``.
 
         Columns: ``date`` (ISO 8601 string), ``pool_balance``, ``pool_factor``,
-        ``wac`` (decimal), ``weighted_avg_spread_bp``, ``warf`` (each nullable
-        ``Float64``, ``<NA>`` where its population is empty),
+        ``wac`` (decimal), ``weighted_avg_spread_bp``, ``warf`` (nullable
+        float64, ``NaN`` where its population is empty),
         ``interest_collections``, ``principal_collections``, ``defaults``,
         ``recoveries``, ``reinvested_par``, ``fees_paid``, ``reserve_balance``,
         ``reserve_interest``, ``spread_account``, ``funding_account``,
@@ -209,8 +235,8 @@ class SimulationDiagnostics:
         amounts in their stored currency units without FX conversion. Rows keep
         stored period order and duplicate dates. Reserve interest uses the first
         matching date in ``reserve_interest_paid``; missing matches are zero.
-        An empty result retains all nineteen columns with a string date, those
-        three nullable ``Float64`` columns and float64 for the other numeric dtypes.
+        An empty result retains all nineteen columns with a string date and
+        float64 for all numeric columns.
 
         Returns
         -------
@@ -219,23 +245,64 @@ class SimulationDiagnostics:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
             If the canonical table cannot be built or converted.
         """
         ...
 
-    def coverage_tests_dataframe(self) -> pd.DataFrame:
+    def to_polars(self) -> pl.DataFrame:
         """
-        Coverage-test evaluations as a long pandas ``DataFrame``.
+        One row per simulated period as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            The period record with the columns documented on :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the canonical table cannot be built or converted.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        One row per simulated period as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            The period record with the columns documented on :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the canonical table cannot be built or converted.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def coverage_tests_table(self) -> ArrowTable:
+        """
+        Coverage-test evaluations as a long :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``date`` (ISO 8601 string), ``test_id``, ``ratio``,
         ``trigger_level``, ``cushion`` (ratio minus trigger) and ``passing``.
-        ``ratio`` and ``cushion`` are ``NaN`` when the test has no claim
+        ``ratio`` and ``cushion`` are null when the test has no claim
         outstanding: the notes it covers are retired or owe no interest.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per test per period.
 
         Raises

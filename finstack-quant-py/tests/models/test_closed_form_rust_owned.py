@@ -55,8 +55,9 @@ def test_forward_greeks_is_typed_with_pandas_exits() -> None:
     g = black76_greeks(100.0, 100.0, 0.2, 1.0, False)
     assert isinstance(g, ForwardGreeks)
     assert -0.5 < g.delta < -0.4
-    assert g.to_series().index.tolist() == ["delta", "gamma", "vega"]
-    assert list(g.to_dataframe().columns) == ["delta", "gamma", "vega"]
+    assert g.to_series().index == ["delta", "gamma", "vega"]
+    assert list(g.to_pandas().columns) == ["delta", "gamma", "vega"]
+    assert g.to_arrow().column_names() == ["delta", "gamma", "vega"]
     assert ForwardGreeks.from_json(g.to_json()) == g
     assert pickle.loads(pickle.dumps(g)) == g  # noqa: S301
     n = bachelier_greeks(0.03, 0.03, 0.0075, 1.0, True)

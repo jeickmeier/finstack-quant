@@ -7,11 +7,12 @@ use std::sync::Arc;
 use finstack_quant_core::market_data::term_structures::Seniority;
 use pyo3::prelude::*;
 
-use super::helpers::{TimePoint, columns_to_dataframe, extract_time_point};
+use super::helpers::{TimePoint, columns_to_arrow_table, extract_time_point};
 use crate::bindings::core::currency::{PyCurrency, extract_currency};
 use crate::bindings::core::dates::daycount::extract_day_count;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 
@@ -392,21 +393,6 @@ impl PyHazardCurve {
             .map_err(core_to_py)
     }
 
-    /// Export knots as a pandas ``DataFrame`` with columns ``t`` (years) and ``hazard_rate`` (decimal).
-    ///
-    /// Returns
-    /// -------
-    /// pandas.DataFrame
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        columns_to_dataframe(
-            py,
-            &[
-                ("t", self.inner.knots().to_vec()),
-                ("hazard_rate", self.inner.hazard_rates().to_vec()),
-            ],
-        )
-    }
-
     /// Curve identifier string.
     #[getter]
     fn id(&self) -> &str {
@@ -482,7 +468,7 @@ impl PyHazardCurve {
     fn hazard_calibration<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
             .hazard_calibration()
-            .map(|recipe| crate::bindings::pandas_utils::serde_to_py(py, recipe))
+            .map(|recipe| crate::bindings::json_bridge::serde_to_py(py, recipe))
             .transpose()
     }
 
@@ -497,5 +483,14 @@ impl PyHazardCurve {
     }
 }
 
+impl PyHazardCurve {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        columns_to_arrow_table(&[
+            ("t", self.inner.knots().to_vec()),
+            ("hazard_rate", self.inner.hazard_rates().to_vec()),
+        ])
+    }
+}
+
+tabular_methods!(PyHazardCurve);
 wire_methods!(PyHazardCurve, HazardCurve, "HazardCurve", arc);
-impl_repr_html_via_dataframe!(PyHazardCurve);

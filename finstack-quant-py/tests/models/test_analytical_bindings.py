@@ -77,8 +77,9 @@ def test_bs_greeks_is_typed_with_pandas_exits() -> None:
     })
     assert 0.0 < g.delta < 1.0
     assert g.is_valid()
-    assert g.to_series().index.tolist() == ["delta", "gamma", "vega", "theta", "rho_r", "rho_q"]
-    assert list(g.to_dataframe().columns) == ["delta", "gamma", "vega", "theta", "rho_r", "rho_q"]
+    assert g.to_series().index == ["delta", "gamma", "vega", "theta", "rho_r", "rho_q"]
+    assert list(g.to_pandas().columns) == ["delta", "gamma", "vega", "theta", "rho_r", "rho_q"]
+    assert g.to_arrow().column_names() == ["delta", "gamma", "vega", "theta", "rho_r", "rho_q"]
     assert type(g).from_json(g.to_json()) == g
     assert pickle.loads(pickle.dumps(g)) == g  # noqa: S301
     assert "rho_r=" in repr(g)

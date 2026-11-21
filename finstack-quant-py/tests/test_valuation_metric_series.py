@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.portfolio import PortfolioMetrics
 from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.composite import WeightingMethod
@@ -60,16 +61,18 @@ def test_portfolio_metrics_series_preserves_aggregated_metric_payloads() -> None
     assert series == [(["USD-OIS", "10y"], -1.0, {"FUND_Z": -0.25, "FUND_A": -0.75})]
     assert list(series[0][2]) == ["FUND_Z", "FUND_A"]
 
-    buckets = metrics.bucketed_dataframe("bucketed_dv01")
-    assert list(buckets.columns) == ["components", "total", "by_entity"]
-    assert list(buckets.itertuples(index=False, name=None)) == series
-    assert list(buckets.iloc[0]["by_entity"]) == ["FUND_Z", "FUND_A"]
+    buckets = metrics.bucketed_table("bucketed_dv01")
+    assert buckets.column_names() == ["components", "total", "by_entity"]
+    assert [
+        (json.loads(r["components"]), r["total"], json.loads(r["by_entity"])) for r in buckets.to_records()
+    ] == series
+    assert list(json.loads(buckets.to_dict()["by_entity"][0])) == ["FUND_Z", "FUND_A"]
 
-    empty = metrics.bucketed_dataframe("dv01")
-    assert empty.empty
-    assert list(empty.columns) == list(buckets.columns)
+    empty = metrics.bucketed_table("dv01")
+    assert empty.num_rows == 0
+    assert empty.column_names() == buckets.column_names()
     with pytest.raises(ValueError, match="noncanonical"):
-        metrics.bucketed_dataframe("custom_xray")
+        metrics.bucketed_table("custom_xray")
 
 
 @pytest.mark.parametrize("location", ["aggregated", "by_position"])
@@ -131,9 +134,13 @@ def test_valuation_concat_unions_metrics_and_preserves_row_order() -> None:
     first = ValuationResult.from_json(json.dumps(first_wire))
     second = ValuationResult.from_json(json.dumps(second_wire))
     table = ValuationResult.concat([second, first])
-    assert list(table.columns) == ["instrument_id", "as_of_date", "pv", "currency", "cs01", "dv01"]
-    assert table["instrument_id"].tolist() == ["BOND-2", "BOND-1"]
-    assert table["cs01"].iloc[0] == 3.5
-    assert table["dv01"].iloc[1] == 20.0
-    assert table["cs01"].isna().tolist() == [False, True]
-    assert list(ValuationResult.concat([]).columns) == list(table.columns[:4])
+    assert isinstance(table, ArrowTable)
+    assert table.column_names() == ["instrument_id", "as_of_date", "pv", "currency", "cs01", "dv01"]
+    df = table.to_pandas()
+    assert df["instrument_id"].tolist() == ["BOND-2", "BOND-1"]
+    assert df["cs01"].iloc[0] == 3.5
+    assert df["dv01"].iloc[1] == 20.0
+    assert df["cs01"].isna().tolist() == [False, True]
+    pl_df = table.to_polars()
+    assert pl_df["instrument_id"].to_list() == ["BOND-2", "BOND-1"]
+    assert ValuationResult.concat([]).column_names() == table.column_names()[:4]

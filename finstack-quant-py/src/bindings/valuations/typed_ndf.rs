@@ -106,7 +106,7 @@ impl PyNdf {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.quote_convention")]
     #[getter]
     fn quote_convention<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.quote_convention)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.quote_convention)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.foreign_discount_curve_id")]
@@ -127,7 +127,7 @@ impl PyNdf {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.fixing_source")]
     #[getter]
     fn fixing_source<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.fixing_source)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.fixing_source)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_ndf", "Ndf.quoted_spot")]

@@ -43,6 +43,29 @@ fn extract_keys(obj: &Bound<'_, PyAny>, role: &str) -> PyResult<Vec<String>> {
                 keys.push(text);
             }
             _ => {
+                let mut item_obj = item;
+                let type_name = item_obj.get_type().name()?;
+                if type_name == "NaTType" {
+                    return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                        "{role} must not contain NaT"
+                    )));
+                }
+                if type_name == "datetime64" {
+                    if item_obj.str()? == "NaT" {
+                        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                            "{role} must not contain NaT"
+                        )));
+                    }
+                    let py_val = item_obj.call_method0("item")?;
+                    item_obj = if py_val.is_instance_of::<pyo3::types::PyInt>() {
+                        item_obj
+                            .call_method1("astype", ("datetime64[us]",))?
+                            .call_method0("item")?
+                    } else {
+                        py_val
+                    };
+                }
+                let item = item_obj;
                 if item.is_instance(&datetime_type)? {
                     let offset = item.call_method0("utcoffset")?;
                     let aware = !offset.is_none();
@@ -269,6 +292,57 @@ where
     ))
 }
 
+fn extract_opt_f64_vec(obj: &Bound<'_, PyAny>, role: &str) -> PyResult<Vec<Option<f64>>> {
+    crate::bindings::dataframe_utils::extract_opt_f64_vec(obj, role)
+}
+
+fn extract_exposures(obj: &Bound<'_, PyAny>) -> PyResult<Vec<Vec<Option<f64>>>> {
+    use crate::bindings::dataframe_utils::{
+        arrow_to_pyarrow_table, has_arrow_c_stream, is_pandas_dataframe, is_polars_dataframe,
+        table_column_names,
+    };
+    if is_polars_dataframe(obj)? {
+        let cols: Vec<String> = obj.getattr("columns")?.extract()?;
+        return cols
+            .iter()
+            .map(|c| extract_opt_f64_vec(&obj.get_item(c)?, c))
+            .collect();
+    }
+    if is_pandas_dataframe(obj)? {
+        let cols = table_column_names(obj)?;
+        let iloc = obj.getattr("iloc")?;
+        let all_rows = pyo3::types::PySlice::full(obj.py());
+        return (0..cols.len())
+            .map(|i| extract_opt_f64_vec(&iloc.get_item((&all_rows, i))?, &cols[i]))
+            .collect();
+    }
+    if has_arrow_c_stream(obj)? {
+        let tbl = arrow_to_pyarrow_table(obj.py(), obj)?;
+        let cols: Vec<String> = tbl.getattr("column_names")?.extract()?;
+        let mut out = Vec::with_capacity(cols.len());
+        for c in &cols {
+            let py_items: Vec<Bound<'_, PyAny>> = tbl
+                .call_method1("column", (c,))?
+                .call_method0("to_pylist")?
+                .extract()?;
+            let list = pyo3::types::PyList::new(obj.py(), py_items)?;
+            out.push(extract_opt_f64_vec(&list, c)?);
+        }
+        return Ok(out);
+    }
+    let iter = obj.try_iter().map_err(|_| {
+        pyo3::exceptions::PyTypeError::new_err(
+            "exposures must be column-major sequences of optional floats or a DataFrame",
+        )
+    })?;
+    let mut out = Vec::new();
+    for item in iter {
+        let item = item?;
+        out.push(extract_opt_f64_vec(&item, "exposures")?);
+    }
+    Ok(out)
+}
+
 /// Transform a time-series panel column per entity.
 ///
 /// Rows are grouped by ``entity`` and ordered lexicographically by ``order``
@@ -319,12 +393,13 @@ where
 )]
 fn transform_timeseries(
     py: Python<'_>,
-    values: Vec<Option<f64>>,
+    values: &Bound<'_, PyAny>,
     entity: &Bound<'_, PyAny>,
     order: &Bound<'_, PyAny>,
     op: &Bound<'_, PyAny>,
     params: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Vec<Option<f64>>> {
+    let values = extract_opt_f64_vec(values, "values")?;
     let entity = extract_keys(entity, "entity")?;
     let order = extract_keys(order, "order")?;
     let op = extract_op::<PyTimeSeriesOp, TimeSeriesOp>(op, |o| o.inner)?;
@@ -376,11 +451,12 @@ fn transform_timeseries(
 )]
 fn transform_cross_sectional(
     py: Python<'_>,
-    values: Vec<Option<f64>>,
+    values: &Bound<'_, PyAny>,
     time_key: &Bound<'_, PyAny>,
     op: &Bound<'_, PyAny>,
     params: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Vec<Option<f64>>> {
+    let values = extract_opt_f64_vec(values, "values")?;
     let time_key = extract_keys(time_key, "time_key")?;
     let op = extract_op::<PyCrossSectionalOp, CrossSectionalOp>(op, |o| o.inner)?;
     let params = parse_params(py, params, "cross-sectional transform params")?;
@@ -427,12 +503,13 @@ fn transform_cross_sectional(
 )]
 fn transform_cross_sectional_grouped(
     py: Python<'_>,
-    values: Vec<Option<f64>>,
+    values: &Bound<'_, PyAny>,
     time_key: &Bound<'_, PyAny>,
     groups: &Bound<'_, PyAny>,
     op: &Bound<'_, PyAny>,
     params: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Vec<Option<f64>>> {
+    let values = extract_opt_f64_vec(values, "values")?;
     let time_key = extract_keys(time_key, "time_key")?;
     let groups = extract_keys(groups, "groups")?;
     let op = extract_op::<PyCrossSectionalOp, CrossSectionalOp>(op, |o| o.inner)?;
@@ -486,11 +563,13 @@ fn transform_cross_sectional_grouped(
 )]
 fn neutralize(
     py: Python<'_>,
-    values: Vec<Option<f64>>,
+    values: &Bound<'_, PyAny>,
     time_key: &Bound<'_, PyAny>,
-    exposures: Vec<Vec<Option<f64>>>,
+    exposures: &Bound<'_, PyAny>,
     params: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Vec<Option<f64>>> {
+    let values = extract_opt_f64_vec(values, "values")?;
+    let exposures = extract_exposures(exposures)?;
     let time_key = extract_keys(time_key, "time_key")?;
     let params = parse_params(py, params, "neutralize params")?;
     py.detach(move || {
@@ -540,13 +619,15 @@ fn neutralize(
 )]
 fn transform_timeseries_pairwise(
     py: Python<'_>,
-    values: Vec<Option<f64>>,
-    other: Vec<Option<f64>>,
+    values: &Bound<'_, PyAny>,
+    other: &Bound<'_, PyAny>,
     entity: &Bound<'_, PyAny>,
     order: &Bound<'_, PyAny>,
     op: &Bound<'_, PyAny>,
     params: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Vec<Option<f64>>> {
+    let values = extract_opt_f64_vec(values, "values")?;
+    let other = extract_opt_f64_vec(other, "other")?;
     let entity = extract_keys(entity, "entity")?;
     let order = extract_keys(order, "order")?;
     let op = extract_op::<PyPairwiseOp, PairwiseOp>(op, |o| o.inner)?;
@@ -603,12 +684,14 @@ fn transform_timeseries_pairwise(
 )]
 fn rolling_regression_residual(
     py: Python<'_>,
-    values: Vec<Option<f64>>,
-    exposures: Vec<Vec<Option<f64>>>,
+    values: &Bound<'_, PyAny>,
+    exposures: &Bound<'_, PyAny>,
     entity: &Bound<'_, PyAny>,
     order: &Bound<'_, PyAny>,
     params: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Vec<Option<f64>>> {
+    let values = extract_opt_f64_vec(values, "values")?;
+    let exposures = extract_exposures(exposures)?;
     let entity = extract_keys(entity, "entity")?;
     let order = extract_keys(order, "order")?;
     let params = parse_params(py, params, "rolling regression residual params")?;
@@ -659,10 +742,12 @@ fn rolling_regression_residual(
 )]
 fn risk_scaled_weights(
     py: Python<'_>,
-    values: Vec<Option<f64>>,
+    values: &Bound<'_, PyAny>,
     time_key: &Bound<'_, PyAny>,
-    volatility: Vec<Option<f64>>,
+    volatility: &Bound<'_, PyAny>,
 ) -> PyResult<Vec<Option<f64>>> {
+    let values = extract_opt_f64_vec(values, "values")?;
+    let volatility = extract_opt_f64_vec(volatility, "volatility")?;
     let time_key = extract_keys(time_key, "time_key")?;
     py.detach(move || finstack_quant_features::risk_scaled_weights(&values, &time_key, &volatility))
         .map_err(core_to_py)
@@ -696,9 +781,10 @@ fn risk_scaled_weights(
 #[pyo3(signature = (values, time_key), text_signature = "(values, time_key)")]
 fn rank_to_weights(
     py: Python<'_>,
-    values: Vec<Option<f64>>,
+    values: &Bound<'_, PyAny>,
     time_key: &Bound<'_, PyAny>,
 ) -> PyResult<Vec<Option<f64>>> {
+    let values = extract_opt_f64_vec(values, "values")?;
     let time_key = extract_keys(time_key, "time_key")?;
     py.detach(move || finstack_quant_features::rank_to_weights(&values, &time_key))
         .map_err(core_to_py)
@@ -741,10 +827,12 @@ fn rank_to_weights(
 )]
 fn neutralize_and_zscore(
     py: Python<'_>,
-    values: Vec<Option<f64>>,
+    values: &Bound<'_, PyAny>,
     time_key: &Bound<'_, PyAny>,
-    exposures: Vec<Vec<Option<f64>>>,
+    exposures: &Bound<'_, PyAny>,
 ) -> PyResult<Vec<Option<f64>>> {
+    let values = extract_opt_f64_vec(values, "values")?;
+    let exposures = extract_exposures(exposures)?;
     let time_key = extract_keys(time_key, "time_key")?;
     py.detach(move || {
         finstack_quant_features::neutralize_and_zscore(&values, &time_key, &exposures)
@@ -802,12 +890,13 @@ impl PyPanelTransformSpec {
     )]
     fn new(
         py: Python<'_>,
-        values: Vec<Option<f64>>,
+        values: &Bound<'_, PyAny>,
         operations: &Bound<'_, PyAny>,
         entity: Option<&Bound<'_, PyAny>>,
         order: Option<&Bound<'_, PyAny>>,
         time_key: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
+        let values = extract_opt_f64_vec(values, "values")?;
         let ops_json = py_to_json_value(py, operations, "panel transform operations")?;
         let operations = serde_json::from_value(ops_json).map_err(|e| {
             crate::errors::serde_json_to_py(e, "invalid panel transform operations")
@@ -978,16 +1067,26 @@ impl PyPanelTransformResult {
     ///     ``None`` outputs become ``NaN``.
     #[allow(clippy::wrong_self_convention)]
     #[pyo3(signature = (index=None), text_signature = "(self, index=None)")]
-    fn to_dataframe<'py>(
+    fn to_pandas<'py>(
         &self,
         py: Python<'py>,
         index: Option<Bound<'py, PyAny>>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let columns = PyDict::new(py);
-        for column in &self.inner.columns {
-            columns.set_item(&column.name, column.values.clone())?;
+        if self.inner.columns.is_empty()
+            && let Some(idx) = index
+        {
+            let kwargs = PyDict::new(py);
+            kwargs.set_item("index", idx)?;
+            return py
+                .import("pandas")?
+                .call_method("DataFrame", (), Some(&kwargs));
         }
-        crate::bindings::pandas_utils::dict_to_dataframe(py, &columns, index)
+        let table = Bound::new(py, self.to_arrow_table()?)?;
+        let frame = crate::bindings::core::table::PyArrowTable::to_pandas(&table, py)?;
+        if let Some(idx) = index {
+            frame.setattr("index", idx)?;
+        }
+        Ok(frame)
     }
 
     /// Python-style summary.
@@ -999,6 +1098,18 @@ impl PyPanelTransformResult {
         )
     }
 }
+
+impl PyPanelTransformResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<crate::bindings::core::table::PyArrowTable> {
+        let mut builder = crate::bindings::table_builders::TableBuilder::new();
+        for column in &self.inner.columns {
+            builder = builder.nullable_f64(&column.name, column.values.clone())?;
+        }
+        builder.build()
+    }
+}
+
+crate::bindings::macros::tabular_methods!(PyPanelTransformResult, custom_pandas);
 
 /// Apply a named panel transform pipeline (typed twin of ``transform_panel_json``).
 ///
@@ -1014,7 +1125,7 @@ impl PyPanelTransformResult {
 /// Returns
 /// -------
 /// PanelTransformResult
-///     Ordered output columns with ``get_column`` and ``to_dataframe``.
+///     Ordered output columns with ``get_column`` and ``to_pandas`` / ``to_polars`` / ``to_arrow``.
 ///
 /// Raises
 /// ------
@@ -1049,7 +1160,7 @@ fn transform_panel(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyPanelT
                         let json = match key.as_str() {
                             _ if value.is_none() => Value::Null,
                             // Non-finite numbers (NaN marks missing) become JSON null.
-                            "values" => Value::from(value.extract::<Vec<Option<f64>>>()?),
+                            "values" => Value::from(extract_opt_f64_vec(&value, "values")?),
                             "entity" | "order" | "time_key" => {
                                 Value::from(extract_keys(&value, &key)?)
                             }

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 
 class MonteCarloConfig:
     """
@@ -188,7 +190,7 @@ class MonteCarloConfig:
         -------
         bool
             ``True`` when the result includes path-level data, reachable via
-            :meth:`MonteCarloResults.to_paths_dataframe`.
+            :meth:`MonteCarloResults.to_paths_table`.
 
         Notes
         -----
@@ -221,7 +223,7 @@ class MonteCarloResults:
     Examples
     --------
     >>> from finstack_quant.statements import MonteCarloResults
-    >>> payload = '{"percentile_results":{},"n_paths":2,"seed":"7","stream_version":1,"metrics":[],"percentiles":[0.5],"forecast_periods":[]}'
+    >>> payload = '{"provenance":{"model_id":"m","model_content_hash":"0000000000000000000000000000000000000000000000000000000000000000","observation_cutoff":"full_snapshot","run_id":"r1"},"percentile_results":{},"n_paths":2,"seed":"7","stream_version":1,"metrics":[],"percentiles":[0.5],"forecast_periods":[]}'
     >>> MonteCarloResults.from_json(payload).n_paths
     2
 
@@ -251,7 +253,7 @@ class MonteCarloResults:
         Examples
         --------
         >>> from finstack_quant.statements import MonteCarloResults
-        >>> payload = '{"percentile_results":{},"n_paths":2,"seed":"7","stream_version":1,"metrics":[],"percentiles":[0.5],"forecast_periods":[]}'
+        >>> payload = '{"provenance":{"model_id":"m","model_content_hash":"0000000000000000000000000000000000000000000000000000000000000000","observation_cutoff":"full_snapshot","run_id":"r1"},"percentile_results":{},"n_paths":2,"seed":"7","stream_version":1,"metrics":[],"percentiles":[0.5],"forecast_periods":[]}'
         >>> MonteCarloResults.from_json(payload).forecast_periods
         []
 
@@ -492,7 +494,38 @@ class MonteCarloResults:
         """
         ...
 
-    def to_dataframe(self, metric: str) -> pd.DataFrame:
+    def to_arrow(self, metric: str) -> ArrowTable:
+        """
+        Export one metric's percentile fan as an ``ArrowTable``.
+
+        Rows are the metric's forecast periods (column ``period``, in
+        evaluation order); each column holds one configured percentile of the
+        simulated distribution, in the metric's own units (currency amounts for
+        monetary nodes, unitless otherwise).
+
+        Columns: ``period`` followed by one per configured percentile, named
+        ``p<q>`` where ``q`` is the quantile in percent — ``p5``, ``p50``,
+        ``p95`` for the default levels. A cell is null when a period is
+        missing that percentile.
+
+        Parameters
+        ----------
+        metric : str
+            Node identifier whose fan chart to build.
+
+        Returns
+        -------
+        ArrowTable
+            Percentile-by-period Arrow table with ``period`` column.
+
+        Raises
+        ------
+        KeyError
+            If ``metric`` was not simulated.
+        """
+        ...
+
+    def to_pandas(self, metric: str) -> pd.DataFrame:
         """
         Export one metric's percentile fan as a pandas ``DataFrame``.
 
@@ -513,34 +546,81 @@ class MonteCarloResults:
 
         Returns
         -------
-        pd.DataFrame
+        pandas.DataFrame
             Percentile-by-period frame indexed by period identifier.
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         KeyError
             If ``metric`` was not simulated.
-
         """
         ...
 
-    def to_paths_dataframe(self) -> pd.DataFrame:
+    def to_polars(self, metric: str) -> pl.DataFrame:
         """
-        Export the retained per-path values as a long-format ``DataFrame``.
+        Export one metric's percentile fan as a Polars ``DataFrame``.
+
+        Parameters
+        ----------
+        metric : str
+            Node identifier whose fan chart to build.
+
+        Returns
+        -------
+        polars.DataFrame
+            Percentile-by-period Polars frame with ``period`` column.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        KeyError
+            If ``metric`` was not simulated.
+        """
+        ...
+
+    def to_pyarrow(self, metric: str) -> Any:
+        """
+        Export one metric's percentile fan as a ``pyarrow.Table``.
+
+        Parameters
+        ----------
+        metric : str
+            Node identifier whose fan chart to build.
+
+        Returns
+        -------
+        pyarrow.Table
+            Percentile-by-period PyArrow table with ``period`` column.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        KeyError
+            If ``metric`` was not simulated.
+        """
+        ...
+
+    def to_paths_table(self) -> ArrowTable:
+        """
+        Export the retained per-path values as a long-format ``ArrowTable``.
 
         Populated only when the run was configured with
-        ``include_path_data=True``; otherwise the frame is empty but still
-        carries the documented columns. Rows are ordered canonically by
+        ``include_path_data=True``; otherwise the table is empty but still
+        carries the documented schema. Rows are ordered canonically by
         ``(path_id, metric, period)`` so serial and parallel runs match.
 
-        Columns: ``path_id`` (0-based path index), ``period`` (period
+        Columns: ``path_id`` (0-based path index, uint32), ``period`` (period
         identifier string), ``metric`` (node identifier), ``value`` (float64,
         in the metric's own units).
 
         Returns
         -------
-        pd.DataFrame
-            Long-format per-path frame.
+        ArrowTable
+            Long-format per-path Arrow table.
 
         Notes
         -----

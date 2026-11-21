@@ -169,7 +169,7 @@ def test_calculate_on_an_unmargined_portfolio_reports_no_netting_sets() -> None:
         assert isinstance(total, Money)
         assert total.amount == 0.0
 
-    frame = result.to_dataframe()
+    frame = result.to_pandas()
     assert isinstance(frame, pd.DataFrame)
     assert list(frame.columns) == NETTING_SET_COLUMNS
     assert len(frame) == 0
@@ -224,7 +224,7 @@ def test_result_getters_reconcile_with_netting_set_rows() -> None:
     assert result.positions_without_margin == 1
     assert result.degraded_positions == [("POS-X", "no sensitivities")]
 
-    frame = result.to_dataframe()
+    frame = result.to_pandas()
     assert list(frame.columns) == NETTING_SET_COLUMNS
     assert list(frame["netting_set_id"]) == ["BANK_A:CSA_01", "CCP:LCH"]
     assert list(frame["is_cleared"]) == [False, True]
@@ -235,7 +235,7 @@ def test_result_getters_reconcile_with_netting_set_rows() -> None:
     assert frame["total_margin"].sum() == pytest.approx(result.total_margin.amount)
     assert int(frame["position_count"].sum()) == result.total_positions
 
-    breakdown = bilateral.to_dataframe()
+    breakdown = bilateral.to_pandas()
     assert list(breakdown.columns) == ["netting_set_id", "risk_class", "initial_margin", "currency"]
     assert len(breakdown) == 0
 

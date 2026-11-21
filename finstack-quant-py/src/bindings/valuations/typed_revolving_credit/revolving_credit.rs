@@ -9,8 +9,8 @@ use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
+use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
-use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::convert::{
     attributes_from_py, bdc_from_py, day_count_from_py, enum_to_py_string, money_from_py,
     money_repr, money_to_py,

@@ -161,8 +161,8 @@ def test_position_dataframe_is_position_id_plus_the_rust_wide_row() -> None:
         "parallel",
     )
 
-    frame = result.to_position_dataframe()
-    wide = result.by_position["USD-POS-Z"].to_dataframe()
+    frame = result.to_position_table().to_pandas()
+    wide = result.by_position["USD-POS-Z"].to_pandas()
 
     assert list(frame.columns) == ["position_id", *wide.columns]
     assert list(frame["position_id"]) == ["USD-POS-Z", "USD-POS-A"]

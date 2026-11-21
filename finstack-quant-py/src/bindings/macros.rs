@@ -46,7 +46,7 @@ macro_rules! wire_methods {
                 &self,
                 py: ::pyo3::Python<'py>,
             ) -> ::pyo3::PyResult<::pyo3::Bound<'py, ::pyo3::PyAny>> {
-                $crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+                $crate::bindings::json_bridge::serde_to_py(py, &self.inner)
             }
         }
     };
@@ -71,7 +71,7 @@ macro_rules! wire_methods {
                 &self,
                 py: ::pyo3::Python<'py>,
             ) -> ::pyo3::PyResult<::pyo3::Bound<'py, ::pyo3::PyAny>> {
-                $crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+                $crate::bindings::json_bridge::serde_to_py(py, &self.inner)
             }
         }
     };
@@ -354,33 +354,6 @@ macro_rules! typed_or_label {
 }
 pub(crate) use typed_or_label;
 
-/// Generate `_repr_html_` delegating to the wrapper's `to_dataframe`.
-macro_rules! impl_repr_html_via_dataframe {
-    ($py_ty:ident) => {
-        $crate::bindings::macros::impl_repr_html_via_dataframe!(
-            $py_ty,
-            concat!(
-                "Render as an HTML table in Jupyter notebooks.\n\n",
-                "Delegates to the frame from ``to_dataframe``, so pandas' own\n",
-                "row/column truncation applies; returns ``None`` if the frame\n",
-                "cannot be built so IPython falls back to ``__repr__``."
-            )
-        );
-    };
-    ($py_ty:ident, $doc:expr_2021) => {
-        #[::pyo3::pymethods]
-        impl $py_ty {
-            #[doc = $doc]
-            fn _repr_html_(&self, py: ::pyo3::Python<'_>) -> Option<String> {
-                use ::pyo3::types::PyAnyMethods;
-                let frame = self.to_dataframe(py).ok()?;
-                frame.call_method0("_repr_html_").ok()?.extract().ok()
-            }
-        }
-    };
-}
-pub(crate) use impl_repr_html_via_dataframe;
-
 /// Generate read-only `#[getter]`s whose body is one expression.
 ///
 /// `py_getters!(PyType |s| { /// docs \n name -> Ret = expr; ... })` expands
@@ -405,3 +378,203 @@ macro_rules! py_getters {
     };
 }
 pub(crate) use py_getters;
+
+/// Generate shared Arrow / pandas / Polars / PyArrow export methods for a
+/// wrapper that implements `pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable>`.
+///
+/// Emits `to_arrow()`, `to_pandas()` (unless `custom_pandas`), `to_polars()`,
+/// `to_pyarrow()`, `__arrow_c_stream__()`, `__arrow_c_schema__()`, and
+/// `_repr_html_()`.
+///
+/// Forms:
+/// - `tabular_methods!(PyType);`
+/// - `tabular_methods!(PyType, index = "col");`
+/// - `tabular_methods!(PyType, custom_pandas);`
+/// - `tabular_methods!(PyType, "Name", module = "finstack_quant.domain");`
+/// - `tabular_methods!(PyType, "Name", module = "finstack_quant.domain", index = "col");`
+/// - `tabular_methods!(PyType, "Name", module = "finstack_quant.domain", custom_pandas);`
+macro_rules! tabular_methods {
+    ($py_type:ident) => {
+        $crate::bindings::macros::tabular_methods!(@arrow_core $py_type);
+        $crate::bindings::macros::tabular_methods!(@pandas_plain $py_type);
+    };
+
+    ($py_type:ident, index = $col:literal) => {
+        $crate::bindings::macros::tabular_methods!(@arrow_core $py_type);
+        $crate::bindings::macros::tabular_methods!(@pandas_indexed $py_type, $col);
+    };
+
+    ($py_type:ident, custom_pandas) => {
+        $crate::bindings::macros::tabular_methods!(@arrow_core $py_type);
+    };
+
+    ($py_type:ident, $name:literal, module = $module:literal) => {
+        $crate::bindings::macros::tabular_methods!(
+            @arrow_core $py_type,
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_arrow")),
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_polars")),
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_pyarrow"))
+        );
+        $crate::bindings::macros::tabular_methods!(
+            @pandas_plain $py_type,
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_pandas"))
+        );
+    };
+
+    ($py_type:ident, $name:literal, module = $module:literal, index = $col:literal) => {
+        $crate::bindings::macros::tabular_methods!(
+            @arrow_core $py_type,
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_arrow")),
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_polars")),
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_pyarrow"))
+        );
+        $crate::bindings::macros::tabular_methods!(
+            @pandas_indexed $py_type,
+            $col,
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_pandas"))
+        );
+    };
+
+    ($py_type:ident, $name:literal, module = $module:literal, custom_pandas) => {
+        $crate::bindings::macros::tabular_methods!(
+            @arrow_core $py_type,
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_arrow")),
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_polars")),
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_pyarrow"))
+        );
+    };
+
+    (@arrow_core $py_type:ident) => {
+        $crate::bindings::macros::tabular_methods!(
+            @arrow_core $py_type,
+            concat!(
+                "Return an ``ArrowTable`` representation.\n\n",
+                "Returns\n-------\nArrowTable\n    Zero-copy Arrow ``RecordBatch`` wrapper implementing ``__arrow_c_stream__``.\n\n",
+                "Raises\n------\nValueError\n    If the Arrow table cannot be constructed."
+            ),
+            concat!(
+                "Return a ``polars.DataFrame`` representation (lazily imports ``polars``).\n\n",
+                "Returns\n-------\npolars.DataFrame\n    DataFrame constructed via the Arrow PyCapsule interface.\n\n",
+                "Raises\n------\nImportError\n    If ``polars`` is not installed."
+            ),
+            concat!(
+                "Return a ``pyarrow.Table`` representation (lazily imports ``pyarrow``).\n\n",
+                "Returns\n-------\npyarrow.Table\n    Zero-copy table constructed via the Arrow PyCapsule interface.\n\n",
+                "Raises\n------\nImportError\n    If ``pyarrow`` is not installed."
+            )
+        );
+    };
+
+    (@arrow_core $py_type:ident, $to_arrow_doc:expr_2021, $to_polars_doc:expr_2021, $to_pyarrow_doc:expr_2021) => {
+        #[::pyo3::pymethods]
+        impl $py_type {
+            #[doc = $to_arrow_doc]
+            #[pyo3(text_signature = "($self)")]
+            fn to_arrow(
+                &self,
+            ) -> ::pyo3::PyResult<$crate::bindings::core::table::PyArrowTable> {
+                self.to_arrow_table()
+            }
+
+            #[doc = $to_polars_doc]
+            #[pyo3(text_signature = "($self)")]
+            fn to_polars<'py>(
+                &self,
+                py: ::pyo3::Python<'py>,
+            ) -> ::pyo3::PyResult<::pyo3::Bound<'py, ::pyo3::PyAny>> {
+                let table = ::pyo3::Bound::new(py, self.to_arrow_table()?)?;
+                $crate::bindings::core::table::PyArrowTable::to_polars(&table, py)
+            }
+
+            #[doc = $to_pyarrow_doc]
+            #[pyo3(text_signature = "($self)")]
+            fn to_pyarrow<'py>(
+                &self,
+                py: ::pyo3::Python<'py>,
+            ) -> ::pyo3::PyResult<::pyo3::Bound<'py, ::pyo3::PyAny>> {
+                let table = ::pyo3::Bound::new(py, self.to_arrow_table()?)?;
+                $crate::bindings::core::table::PyArrowTable::to_pyarrow(&table, py)
+            }
+
+            /// Export via the Arrow PyCapsule C-stream protocol (`arrow_array_stream`).
+            #[pyo3(signature = (requested_schema = None))]
+            fn __arrow_c_stream__<'py>(
+                &self,
+                py: ::pyo3::Python<'py>,
+                requested_schema: Option<::pyo3::Bound<'py, ::pyo3::PyAny>>,
+            ) -> ::pyo3::PyResult<::pyo3::Bound<'py, ::pyo3::types::PyCapsule>> {
+                let _ = requested_schema;
+                self.to_arrow_table()?.arrow_c_stream(py)
+            }
+
+            /// Export the Arrow schema via the Arrow PyCapsule interface (`arrow_schema`).
+            fn __arrow_c_schema__<'py>(
+                &self,
+                py: ::pyo3::Python<'py>,
+            ) -> ::pyo3::PyResult<::pyo3::Bound<'py, ::pyo3::types::PyCapsule>> {
+                self.to_arrow_table()?.arrow_c_schema(py)
+            }
+
+            /// Render as an HTML table preview in Jupyter notebooks.
+            fn _repr_html_(&self) -> Option<String> {
+                self.to_arrow_table().ok().map(|t| t.render_html())
+            }
+        }
+    };
+
+    (@pandas_plain $py_type:ident) => {
+        $crate::bindings::macros::tabular_methods!(
+            @pandas_plain $py_type,
+            concat!(
+                "Return a ``pandas.DataFrame`` representation (lazily imports ``pandas``).\n\n",
+                "Returns\n-------\npandas.DataFrame\n    DataFrame constructed via PyArrow when installed, or directly from Arrow buffers.\n\n",
+                "Raises\n------\nImportError\n    If ``pandas`` is not installed."
+            )
+        );
+    };
+
+    (@pandas_plain $py_type:ident, $doc:expr_2021) => {
+        #[::pyo3::pymethods]
+        impl $py_type {
+            #[doc = $doc]
+            #[pyo3(text_signature = "($self)")]
+            fn to_pandas<'py>(
+                &self,
+                py: ::pyo3::Python<'py>,
+            ) -> ::pyo3::PyResult<::pyo3::Bound<'py, ::pyo3::PyAny>> {
+                let table = ::pyo3::Bound::new(py, self.to_arrow_table()?)?;
+                $crate::bindings::core::table::PyArrowTable::to_pandas(&table, py)
+            }
+        }
+    };
+
+    (@pandas_indexed $py_type:ident, $col:literal) => {
+        $crate::bindings::macros::tabular_methods!(
+            @pandas_indexed $py_type,
+            $col,
+            concat!(
+                "Return a ``pandas.DataFrame`` indexed by ``", $col, "`` (lazily imports ``pandas``).\n\n",
+                "Returns\n-------\npandas.DataFrame\n    DataFrame indexed by ``", $col, "``.\n\n",
+                "Raises\n------\nImportError\n    If ``pandas`` is not installed."
+            )
+        );
+    };
+
+    (@pandas_indexed $py_type:ident, $col:literal, $doc:expr_2021) => {
+        #[::pyo3::pymethods]
+        impl $py_type {
+            #[doc = $doc]
+            #[pyo3(text_signature = "($self)")]
+            fn to_pandas<'py>(
+                &self,
+                py: ::pyo3::Python<'py>,
+            ) -> ::pyo3::PyResult<::pyo3::Bound<'py, ::pyo3::PyAny>> {
+                use ::pyo3::types::PyAnyMethods;
+                let table = ::pyo3::Bound::new(py, self.to_arrow_table()?)?;
+                let frame = $crate::bindings::core::table::PyArrowTable::to_pandas(&table, py)?;
+                frame.call_method1("set_index", ($col,))
+            }
+        }
+    };
+}
+pub(crate) use tabular_methods;

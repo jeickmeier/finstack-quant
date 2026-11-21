@@ -504,7 +504,7 @@ def test_idiosyncratic_override_is_decimal_spread_per_sqrt_year() -> None:
     inputs = _fixture_inputs()
     inputs["idiosyncratic_overrides"] = {"ISSUER-A": 0.001}
     model = CreditCalibrator(_calibration_config()).calibrate(inputs)
-    row = model.to_dataframe().set_index("issuer_id").loc["ISSUER-A"]
+    row = model.to_pandas().set_index("issuer_id").loc["ISSUER-A"]
     assert row["adder_vol_annualized"] == pytest.approx(10.0)
     assert row["adder_vol_source"] == "caller_supplied"
 
@@ -539,7 +539,7 @@ def test_factor_covariance_dataframe_validates_labels_and_matrix_values() -> Non
     frame = pd.DataFrame([[0.04, -0.005], [-0.005, 0.01]], index=ids, columns=ids)
     matrix = FactorCovarianceMatrix.from_dataframe(frame)
     assert matrix.factor_ids == ids
-    pd.testing.assert_frame_equal(matrix.to_dataframe(), frame)
+    pd.testing.assert_frame_equal(matrix.to_pandas(), frame)
     with pytest.raises(ValueError, match="identifiers must match in order"):
         FactorCovarianceMatrix.from_dataframe(frame.reindex(index=ids[::-1]))
     with pytest.raises(TypeError):

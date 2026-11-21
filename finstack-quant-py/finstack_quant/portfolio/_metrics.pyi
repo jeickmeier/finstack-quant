@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.portfolio._valuation import PortfolioValuation
 
 class PortfolioMetrics:
@@ -279,8 +281,8 @@ class PortfolioMetrics:
         """
         ...
 
-    def bucketed_dataframe(self, base: str) -> pd.DataFrame:
-        """Present the decoded portfolio risk buckets for one metric as a DataFrame.
+    def bucketed_table(self, base: str) -> ArrowTable:
+        """Present the decoded portfolio risk buckets for one metric as an ArrowTable.
 
         Parameters
         ----------
@@ -290,67 +292,115 @@ class PortfolioMetrics:
 
         Returns
         -------
-        pandas.DataFrame
+        ArrowTable
             One row per bucket in aggregation order with columns ``components``
-            (ordered decoded identifiers), ``total`` (in portfolio base currency
-            and the metric's risk units) and ``by_entity`` (entity totals in the
-            same units). When there are no buckets, the frame retains its columns.
+            (JSON-serialized list of ordered identifiers), ``total`` (in portfolio
+            base currency and the metric's risk units) and ``by_entity``
+            (JSON-serialized mapping of entity totals in the same units). When
+            there are no buckets, the table retains its columns.
 
         Raises
         ------
         ValueError
             If the base metric identifier is invalid.
-        ImportError
-            If pandas is unavailable.
         """
-        ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the portfolio-wide aggregated metrics as a pandas DataFrame.
+        Export the portfolio-wide aggregated metrics as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         One row per entry of the ``aggregated`` map, in canonical Rust
         ``IndexMap`` insertion order. Built from the canonical Rust
-        ``aggregated_metrics_to_table`` envelope so the frame cannot drift
+        ``aggregated_metrics_to_table`` envelope so the table cannot drift
         from the Rust table export. The per-entity breakdown is not
         flattened here — reach it through :meth:`metric_series`.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per aggregated metric; columns ``metric_id``, ``total``
             (sum across positions; only summable metrics are aggregated).
 
         Raises
         ------
         ValueError
-            If the frame cannot be built.
+            If the table cannot be built.
         """
         ...
 
-    def to_position_dataframe(self) -> pd.DataFrame:
+    def to_pandas(self) -> pd.DataFrame:
         """
-        Export the raw per-position metric values in long format.
+        Export the portfolio-wide aggregated metrics as a pandas ``DataFrame``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per aggregated metric; columns ``metric_id``, ``total``.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the portfolio-wide aggregated metrics as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per aggregated metric; columns ``metric_id``, ``total``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the portfolio-wide aggregated metrics as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per aggregated metric; columns ``metric_id``, ``total``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_position_table(self) -> ArrowTable:
+        """
+        Export the raw per-position metric values in long format as an
+        :class:`~finstack_quant.core.table.ArrowTable`.
 
         One row per ``(position, metric)`` pair — the row count is the total
         number of metric values across positions, not the number of positions.
-        Pivot with ``df.pivot(index="position_id", columns="metric_id",
-        values="value")`` for a wide view. Built from the canonical Rust
-        ``metrics_to_table`` envelope so the frame cannot drift from the Rust
-        table export.
+        Built from the canonical Rust ``metrics_to_table`` envelope so the
+        table cannot drift from the Rust table export.
 
         Columns: ``metric_id``, ``position_id``, ``currency`` (the position's
         native currency; non-summable metrics are quoted in it), ``value``.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             Long-format per-position metric values.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be serialized into an Arrow table.
         """
         ...
 

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.portfolio._optimization.enums import TradeDirection, TradeType
 
 class OptimizationStatus:
@@ -443,9 +446,9 @@ class TradeSpec:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export this trade as a single-row pandas DataFrame.
+        Export this trade as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``position_id``, ``instrument_id``, ``trade_type``,
         ``current_quantity``, ``target_quantity``, ``delta_quantity``,
@@ -453,18 +456,68 @@ class TradeSpec:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             Exactly one row, with the same schema
-            :meth:`PortfolioOptimizationResult.to_trade_dataframe` emits, so
-            single-trade frames concatenate cleanly onto a full trade list.
+            :meth:`PortfolioOptimizationResult.to_trade_table` emits.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be serialized into an Arrow table.
         """
         ...
 
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export this trade as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pd.DataFrame
+            Exactly one row of trade details.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export this trade as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Exactly one row of trade details.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export this trade as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Exactly one row of trade details.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """Return a concise debug representation.
         Returns

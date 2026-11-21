@@ -32,10 +32,13 @@ def test_aggregation_round_trip_preserves_currency_labels() -> None:
     restored = PeriodAggregation.from_json(totals.to_json())
     assert restored.get_amount("2025Q1", "USD") == Money(100, "USD")
     assert restored.get_amount("2025Q1", "EUR") == Money(200, "EUR")
-    assert restored.to_dataframe().to_dict("records") == [
+    expected_records = [
         {"period": "2025Q1", "currency": "USD", "amount": 100.0},
         {"period": "2025Q1", "currency": "EUR", "amount": 200.0},
     ]
+    assert restored.to_pandas().to_dict("records") == expected_records
+    assert restored.to_arrow().to_records() == expected_records
+    assert restored.to_polars().to_dicts() == expected_records
 
 
 def test_dated_flows_rejects_same_invalid_economics_as_json() -> None:

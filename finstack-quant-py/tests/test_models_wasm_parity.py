@@ -389,7 +389,7 @@ def _merton_cases() -> dict[str, Callable[[], Any]]:
     model = _merton
     return {
         "merton.default_probability": lambda: model().default_probability(1.0),
-        "merton.default_probabilities": lambda: list(model().default_probabilities([1.0, 3.0, 5.0])),
+        "merton.default_probabilities": lambda: model().default_probabilities([1.0, 3.0, 5.0]).values(),
         "merton.distance_to_default": lambda: [
             model().distance_to_default(1.0),
             model().distance_to_default_with_drift(0.08, 1.0),
@@ -529,7 +529,7 @@ def _credit_cases() -> dict[str, Callable[[], Any]]:
         ],
         "pd.master_scale": lambda: [
             _json(_master_scale().map_pd(0.02)),
-            list(_master_scale().map_pds([0.5, 0.001, 0.05])["grade"]),
+            list(_master_scale().map_pds([0.5, 0.001, 0.05]).to_pandas()["grade"]),
             _master_scale().map_score(scoring.zmijewski_score(scoring.ZmijewskiInput(**ZMIJEWSKI))).grade,
             pd_models.MasterScale.default_calibration().n_grades,
             pd_models.MasterScale.from_registry_id("moodys_assumptions").n_grades,

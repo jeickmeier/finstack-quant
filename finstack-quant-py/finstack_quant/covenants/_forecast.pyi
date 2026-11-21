@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import datetime
+from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.covenants import DateLike
 from finstack_quant.covenants._engine import CovenantEngine
 from finstack_quant.covenants._spec import CovenantSpec
@@ -259,8 +262,8 @@ class CovenantForecast:
     >>> forecast = forecast_covenant(spec, frame)
     >>> forecast.first_breach_date.isoformat(), forecast.breach_probability
     ('2026-09-30', [0.0, 0.0, 1.0])
-    >>> list(forecast.to_dataframe().columns)
-    ['test_date', 'projected_value', 'threshold', 'headroom', 'breach_probability', 'breach_probability_stderr']
+    >>> list(forecast.to_pandas().columns)
+    ['test_date', 'projected_value', 'threshold', 'headroom', 'headroom_raw', 'breach_probability', 'breach_probability_stderr']
     """
 
     @staticmethod
@@ -315,24 +318,73 @@ class CovenantForecast:
             If the value cannot be serialized.
         """
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        One row per test date.
+        One row per test date as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``test_date`` (ISO string), ``projected_value``,
+            ``threshold``, ``headroom``, ``headroom_raw``, ``breach_probability``,
+            ``breach_probability_stderr``.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        One row per test date as a ``pandas.DataFrame``.
 
         Returns
         -------
         pd.DataFrame
             Columns ``test_date`` (ISO string), ``projected_value``,
             ``threshold``, ``headroom``, ``headroom_raw``, ``breach_probability``,
-            ``breach_probability_stderr``; ``None`` where a value is not
+            ``breach_probability_stderr``; ``NaN`` where a value is not
             meaningful.
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        One row per test date as a ``polars.DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Polars DataFrame constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+
+    def to_pyarrow(self) -> Any:
+        """
+        One row per test date as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
     @property
     def covenant_id(self) -> str:
         """
@@ -685,27 +737,34 @@ class FutureBreach:
 
 def forecast_covenant(
     spec: CovenantSpec,
-    metrics: pd.DataFrame,
+    metrics: pd.DataFrame | pl.DataFrame | Any,
     config: CovenantForecastConfig | None = None,
+    *,
+    date_col: str | None = None,
 ) -> CovenantForecast:
     """
-    Forecast one numeric covenant across a date-indexed projection frame.
+    Forecast one numeric covenant across a dated projection table.
 
-    Each frame row is a forecast test date. The metric is resolved from the
+    Each row is a forecast test date. The metric is resolved from the
     spec's explicit ``metric_id`` exclusively when present; otherwise it uses
     the covenant type's conventional metric name,
     then a custom covenant's ``metric``. Threshold schedules and springing
-    conditions are honoured (the activation metric must be a frame column).
+    conditions are honoured (the activation metric must be a column).
 
     Parameters
     ----------
     spec : CovenantSpec
         Numeric covenant to forecast.
-    metrics : pd.DataFrame
-        Index holds forecast dates; columns are metric ids; ``NaN`` cells are
-        treated as absent.
+    metrics : pd.DataFrame | pl.DataFrame | Any
+        Pandas ``DataFrame`` (forecast dates in the index or in ``date_col``),
+        Polars ``DataFrame``, or Arrow table whose columns are metric ids;
+        ``NaN`` / ``null`` cells are treated as absent.
     config : CovenantForecastConfig | None
         Forecast policy; ``None`` is deterministic.
+    date_col : str | None, optional
+        Column name holding forecast test dates. Auto-detects a unique
+        Polars/Arrow date or datetime column when ``None``; optional for pandas
+        ``DataFrame`` inputs to read dates from a column instead of the index.
 
     Returns
     -------
@@ -715,12 +774,14 @@ def forecast_covenant(
     Raises
     ------
     KeyError
-        If the covenant's metric is absent on any date.
+        If ``date_col`` or the covenant's metric is absent on any date.
+    TypeError
+        If ``metrics`` is not a pandas/Polars DataFrame or Arrow table.
     ValueError
-        If the frame is empty, the covenant is non-numeric or has a
-        non-finite threshold, or the config is invalid (stochastic without
-        ``volatility`` or ``reference_date``, antithetic without paths,
-        threshold outside ``[0, 1]``).
+        If the frame is empty, has ambiguous dates or duplicate metric columns,
+        the covenant is non-numeric or has a non-finite threshold, or the config
+        is invalid (stochastic without ``volatility`` or ``reference_date``,
+        antithetic without paths, threshold outside ``[0, 1]``).
 
     Examples
     --------
@@ -739,11 +800,14 @@ def forecast_covenant(
     >>> [0.0 < p < 1.0 for p in forecast.breach_probability]
     [True, True]
     """
+    ...
 
 def forecast_breaches(
     engine: CovenantEngine,
-    metrics: pd.DataFrame,
+    metrics: pd.DataFrame | pl.DataFrame | Any,
     config: CovenantForecastConfig | None = None,
+    *,
+    date_col: str | None = None,
 ) -> list[FutureBreach]:
     """
     Forecast every active numeric covenant in an engine and collect the
@@ -757,11 +821,16 @@ def forecast_breaches(
     ----------
     engine : CovenantEngine
         Engine whose effective specifications and amendments are forecast.
-    metrics : pd.DataFrame
-        Index holds forecast dates; columns are metric ids.
+    metrics : pd.DataFrame | pl.DataFrame | Any
+        Pandas ``DataFrame`` (forecast dates in the index or in ``date_col``),
+        Polars ``DataFrame``, or Arrow table whose columns are metric ids.
     config : CovenantForecastConfig | None
         Forecast policy; ``None`` is deterministic with a 5% reporting
         threshold.
+    date_col : str | None, optional
+        Column name holding forecast test dates. Auto-detects a unique
+        Polars/Arrow date or datetime column when ``None``; optional for pandas
+        ``DataFrame`` inputs to read dates from a column instead of the index.
 
     Returns
     -------
@@ -771,11 +840,15 @@ def forecast_breaches(
     Raises
     ------
     KeyError
-        If any active numeric test lacks a required metric at a requested date.
+        If ``date_col`` is unknown or any active numeric test lacks a required
+        metric at a requested date.
+    TypeError
+        If ``metrics`` is not a pandas/Polars DataFrame or Arrow table.
     ValueError
         If the frame is empty, has duplicate metric columns or non-finite required
-        observations, or the engine, date ordering, or configuration is invalid
-        (including a stochastic config without ``reference_date``).
+        observations, ``date_col`` cannot be resolved uniquely, or the engine,
+        date ordering, or configuration is invalid (including a stochastic config
+        without ``reference_date``).
 
     Examples
     --------
@@ -784,7 +857,7 @@ def forecast_breaches(
     ...     CovenantEngine,
     ...     CovenantForecastConfig,
     ...     CovenantTemplate,
-    ...     breaches_to_dataframe,
+    ...     breaches_table,
     ...     covenant_template,
     ...     forecast_breaches,
     ... )
@@ -793,15 +866,15 @@ def forecast_breaches(
     ...     {"total_leverage": [6.0, 7.5], "senior_leverage": [3.0, 5.0]},
     ...     index=pd.to_datetime(["2026-03-31", "2026-06-30"]),
     ... )
-    >>> breaches_to_dataframe(forecast_breaches(engine, frame, CovenantForecastConfig().with_scope("incurrence")))[
+    >>> breaches_table(forecast_breaches(engine, frame, CovenantForecastConfig().with_scope("incurrence"))).to_dict()[
     ...     "covenant_id"
-    ... ].tolist()
+    ... ]
     ['max_senior_leverage', 'max_total_leverage']
     """
 
-def breaches_to_dataframe(breaches: list[FutureBreach]) -> pd.DataFrame:
+def breaches_table(breaches: list[FutureBreach]) -> ArrowTable:
     """
-    Flatten forecast breaches into one frame row per breach.
+    Flatten forecast breaches into an :class:`~finstack_quant.core.table.ArrowTable` with one row per breach.
 
     Parameters
     ----------
@@ -810,7 +883,7 @@ def breaches_to_dataframe(breaches: list[FutureBreach]) -> pd.DataFrame:
 
     Returns
     -------
-    pd.DataFrame
+    ArrowTable
         Columns ``covenant_id``, ``covenant_description``, ``breach_date``
         (ISO string), ``projected_value``, ``threshold``, ``headroom``, ``headroom_raw``,
         ``breach_probability``; typed and empty when there are no breaches.
@@ -822,7 +895,7 @@ def breaches_to_dataframe(breaches: list[FutureBreach]) -> pd.DataFrame:
 
     Examples
     --------
-    >>> from finstack_quant.covenants import breaches_to_dataframe
-    >>> list(breaches_to_dataframe([]).columns)
-    ['covenant_id', 'covenant_description', 'breach_date', 'projected_value', 'threshold', 'headroom', 'breach_probability']
+    >>> from finstack_quant.covenants import breaches_table
+    >>> breaches_table([]).column_names()
+    ['covenant_id', 'covenant_description', 'breach_date', 'projected_value', 'threshold', 'headroom', 'headroom_raw', 'breach_probability']
     """

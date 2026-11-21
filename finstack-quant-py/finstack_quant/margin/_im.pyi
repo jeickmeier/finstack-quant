@@ -5,7 +5,9 @@ from __future__ import annotations
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.config import FinstackConfig
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.margin._calculators import ImResult
 from finstack_quant.margin._im_curvature import SimmCurvatureSensitivity
 from finstack_quant.margin._types import CollateralAssetClass, EligibleCollateralSchedule
@@ -28,8 +30,9 @@ class SimmSensitivities:
     a typo cannot price to zero margin.
 
     Use ``from_json``/``to_json`` for full-fidelity interop with the canonical
-    Rust JSON shape, ``from_dataframe``/``to_dataframe`` for CRIF-style bulk
-    loading, or the ``add_*`` helpers for notebook-style construction.
+    Rust JSON shape, ``from_dataframe`` / ``to_arrow`` / ``to_pandas`` /
+    ``to_polars`` for CRIF-style bulk loading and tabular export, or the
+    ``add_*`` helpers for notebook-style construction.
 
     Examples
     --------
@@ -111,16 +114,17 @@ class SimmSensitivities:
         ...
 
     @staticmethod
-    def from_dataframe(frame: pd.DataFrame, base_currency: str) -> SimmSensitivities:
+    def from_dataframe(frame: pd.DataFrame | pl.DataFrame | Any, base_currency: str) -> SimmSensitivities:
         """
-        Bulk-load sensitivities from the long-format frame ``to_dataframe``
-        emits (CRIF-style).
+        Bulk-load sensitivities from the long-format table ``to_arrow`` /
+        ``to_pandas`` emits (CRIF-style).
 
         Parameters
         ----------
-        frame : pd.DataFrame
-            Columns ``risk_class``, ``kind``, ``issuer``, ``bucket``,
-            ``tenor``, ``amount``, ``expiry_tenor`` with the ``to_dataframe`` encoding:
+        frame : pd.DataFrame | pl.DataFrame | Any
+            Pandas ``DataFrame``, Polars ``DataFrame``, or Arrow table with
+            columns ``risk_class``, ``kind``, ``issuer``, ``bucket``,
+            ``tenor``, ``amount``, ``expiry_tenor`` with the ``to_arrow`` encoding:
             ``issuer`` is the currency for ``interest_rate``/``fx`` delta,
             the ``"CCY1/CCY2"`` pair for FX vega, the issuer for credit and
             the underlier for equity; ``bucket`` is the credit sector or the
@@ -130,7 +134,7 @@ class SimmSensitivities:
             ``bucket`` as the curvature bucket and ``tenor`` as risk tenor.
             Other kinds may omit the expiry column or leave it null.
         base_currency : str
-            Currency in which every ``amount`` is expressed (the frame does
+            Currency in which every ``amount`` is expressed (the table does
             not carry it).
 
         Returns
@@ -138,21 +142,21 @@ class SimmSensitivities:
         SimmSensitivities
             Container with rows of the same key accumulated, decoded by the
             Rust ``SimmSensitivities::from_rows`` (the inverse of
-            ``to_dataframe``).
+            ``to_arrow``).
 
         Raises
         ------
         ValueError
             If a risk class, kind, sector or currency is unknown, a required
             column or value is missing, or a curvature row is invalid.
-        AttributeError
-            If ``frame`` has no ``to_dict`` method (not a ``DataFrame``).
+        TypeError
+            If ``frame`` is not a pandas/Polars DataFrame or Arrow table.
 
         Examples
         --------
         >>> original = SimmSensitivities("USD")
         >>> original.add_ir_delta("USD", "5Y", 1_000.0)
-        >>> restored = SimmSensitivities.from_dataframe(original.to_dataframe(), "USD")
+        >>> restored = SimmSensitivities.from_dataframe(original.to_arrow(), "USD")
         >>> restored.total_ir_delta()
         1000.0
         """
@@ -647,16 +651,16 @@ class SimmSensitivities:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export every populated sensitivity bucket as one long-format pandas
-        ``DataFrame``.
+        Export every populated sensitivity bucket as one long-format
+        :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``risk_class``, ``bucket``, ``tenor``, ``issuer``, ``kind``,
         ``amount``, ``expiry_tenor``. One row per populated bucket; an empty container still
         carries all seven columns. Long format is used deliberately - a column
         per bucket would give a different schema for every portfolio, and it
-        matches ``FrtbSensitivities.to_dataframe``.
+        matches ``FrtbSensitivities.to_arrow``.
 
         ``risk_class`` uses the SIMM labels ``interest_rate``,
         ``credit_qualifying``, ``credit_non_qualifying``, ``equity``,
@@ -674,10 +678,26 @@ class SimmSensitivities:
 
         ``amount`` is a signed currency sensitivity in the container's base
         currency, per 1bp rate/credit or 1% relative equity/FX/commodity move for delta.
-        Vega and curvature use sigma times dPV/dsigma before HVR, VRW or SF. ``from_dataframe`` accepts this frame back.
+        Vega and curvature use sigma times dPV/dsigma before HVR, VRW or SF. ``from_dataframe`` accepts this table back.
 
         Rows are sorted by ``(risk_class, kind, issuer, bucket, tenor, expiry_tenor)`` so
         repeated exports of the same portfolio are identical.
+
+        Returns
+        -------
+        ArrowTable
+            One row per populated sensitivity bucket.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export every populated sensitivity bucket as one long-format pandas ``DataFrame``.
 
         Returns
         -------
@@ -686,10 +706,46 @@ class SimmSensitivities:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export every populated sensitivity bucket as one long-format Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per populated sensitivity bucket.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export every populated sensitivity bucket as one long-format ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per populated sensitivity bucket.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 class SimmCalculator:
     """

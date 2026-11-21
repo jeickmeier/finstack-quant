@@ -18,12 +18,60 @@ use super::assignment::PyFactorAssignmentReport;
 use super::whatif::{PyStressPnl, PyStressResult, PyWhatIfResult, parse_position_changes};
 use crate::bindings::models::factor::risk::PyRiskDecomposition;
 
-/// Convert ``(factor_id, shift)`` pairs into Rust factor stresses.
-fn to_stresses(stresses: Vec<(String, f64)>) -> Vec<(FactorId, f64)> {
-    stresses
+/// Convert ``dict``, ``pandas.Series``, 2-column DataFrame/Arrow table, or
+/// ``(factor_id, shift)`` pairs into Rust factor stresses.
+fn to_stresses(stresses: &Bound<'_, PyAny>) -> PyResult<Vec<(FactorId, f64)>> {
+    use crate::bindings::dataframe_utils::{
+        extract_f64_vec, is_dataframe_like, is_pandas_series, is_polars_dataframe,
+        table_column_names, table_column_to_pylist,
+    };
+    if let Ok(dict) = stresses.cast::<pyo3::types::PyDict>() {
+        return dict
+            .iter()
+            .map(|(k, v)| Ok((FactorId::new(k.extract::<String>()?), v.extract::<f64>()?)))
+            .collect();
+    }
+    if is_pandas_series(stresses)? {
+        let mut out = Vec::new();
+        for item in stresses.call_method0("items")?.try_iter()? {
+            let (k, v): (String, f64) = item?.extract()?;
+            out.push((FactorId::new(k), v));
+        }
+        return Ok(out);
+    }
+    if is_dataframe_like(stresses)? {
+        let cols = table_column_names(stresses)?;
+        if cols.len() != 2 {
+            return Err(crate::errors::value_error(format!(
+                "stresses DataFrame must have 2 columns (factor_id, shift), got {}",
+                cols.len()
+            )));
+        }
+        let ids: Vec<String> = table_column_to_pylist(stresses, &cols[0])?
+            .unwrap_or_default()
+            .into_iter()
+            .map(|obj| obj.extract::<String>())
+            .collect::<PyResult<_>>()?;
+        let vals = if is_polars_dataframe(stresses)? {
+            extract_f64_vec(&stresses.get_item(&cols[1])?, &cols[1])?
+        } else {
+            let vals_list = table_column_to_pylist(stresses, &cols[1])?.unwrap_or_default();
+            vals_list
+                .into_iter()
+                .map(|obj| obj.extract::<f64>())
+                .collect::<PyResult<_>>()?
+        };
+        return Ok(ids
+            .into_iter()
+            .zip(vals)
+            .map(|(factor_id, shift)| (FactorId::new(factor_id), shift))
+            .collect());
+    }
+    let pairs: Vec<(String, f64)> = stresses.extract()?;
+    Ok(pairs
         .into_iter()
         .map(|(factor_id, shift)| (FactorId::new(factor_id), shift))
-        .collect()
+        .collect())
 }
 
 /// Portfolio factor-risk model built once from a ``FactorModelConfig``.
@@ -283,12 +331,12 @@ impl PyFactorModel {
         portfolio: &Bound<'_, PyAny>,
         market: &Bound<'_, PyAny>,
         as_of: &Bound<'_, PyAny>,
-        stresses: Vec<(String, f64)>,
+        stresses: &Bound<'_, PyAny>,
     ) -> PyResult<PyStressResult> {
         let portfolio = extract_portfolio_ref(py, portfolio)?;
         let market = extract_market_ref(py, market)?;
         let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
-        let stresses = to_stresses(stresses);
+        let stresses = to_stresses(stresses)?;
         let (portfolio, market) = (&*portfolio, &*market);
         let inner = &self.inner;
         py.detach(move || inner.factor_stress(portfolio, market, as_of, &stresses))
@@ -329,12 +377,12 @@ impl PyFactorModel {
         portfolio: &Bound<'_, PyAny>,
         market: &Bound<'_, PyAny>,
         as_of: &Bound<'_, PyAny>,
-        stresses: Vec<(String, f64)>,
+        stresses: &Bound<'_, PyAny>,
     ) -> PyResult<PyStressPnl> {
         let portfolio = extract_portfolio_ref(py, portfolio)?;
         let market = extract_market_ref(py, market)?;
         let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
-        let stresses = to_stresses(stresses);
+        let stresses = to_stresses(stresses)?;
         let (portfolio, market) = (&*portfolio, &*market);
         let inner = &self.inner;
         py.detach(move || inner.factor_stress_pnl(portfolio, market, as_of, &stresses))

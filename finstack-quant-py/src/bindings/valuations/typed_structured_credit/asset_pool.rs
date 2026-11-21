@@ -206,7 +206,7 @@ impl PyAssetPool {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.__reduce__")]
@@ -218,7 +218,7 @@ impl PyAssetPool {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.asset_records")]
     #[getter]
     fn asset_records<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.assets)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.assets)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.assets")]
@@ -249,7 +249,7 @@ impl PyAssetPool {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.reserve_interest_destination")]
     #[getter]
     fn reserve_interest_destination<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.reserve_interest_destination)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.reserve_interest_destination)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.instruments")]
@@ -258,7 +258,7 @@ impl PyAssetPool {
         self.inner
             .instruments
             .as_ref()
-            .map(|collateral| crate::bindings::pandas_utils::serde_to_py(py, collateral))
+            .map(|collateral| crate::bindings::json_bridge::serde_to_py(py, collateral))
             .transpose()
     }
 
@@ -268,7 +268,7 @@ impl PyAssetPool {
         self.inner
             .reinvestment_period
             .as_ref()
-            .map(|period| crate::bindings::pandas_utils::serde_to_py(py, period))
+            .map(|period| crate::bindings::json_bridge::serde_to_py(py, period))
             .transpose()
     }
 

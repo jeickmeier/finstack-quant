@@ -18,6 +18,9 @@ from __future__ import annotations
 from typing import Any
 
 import pandas
+import polars as pl
+
+from finstack_quant.core.table import ArrowTable
 
 __all__ = [
     "RecoveryAllocation",
@@ -568,21 +571,83 @@ class RecoveryAllocation:
             If serialization fails.
         """
         ...
-    def to_dataframe(self) -> pandas.DataFrame:
-        """
-        Single-row frame with the allocation columns (``id``, ``seniority``, ``priority``, ``total_claim``, ``collateral_recovery``, ``general_recovery``, ``total_recovery``, ``recovery_rate``, ``deficiency``).
+    def to_arrow(self) -> ArrowTable:
+        """Export this claim allocation as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            Single-row frame with the allocation columns (``id``, ``seniority``, ``priority``, ``total_claim``, ``collateral_recovery``, ``general_recovery``, ``total_recovery``, ``recovery_rate``, ``deficiency``).
+        ArrowTable
+            Single-row table with ``id``, ``seniority``, ``priority``, ``total_claim``,
+            ``collateral_recovery``, ``general_recovery``, ``total_recovery``,
+            ``recovery_rate``, and ``deficiency``.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized into a pandas object.
+            If the value cannot be represented as an Arrow table.
         """
         ...
+
+    def to_pandas(self) -> pandas.DataFrame:
+        """Export this claim allocation as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Single-row frame with ``id``, ``seniority``, ``priority``, ``total_claim``,
+            ``collateral_recovery``, ``general_recovery``, ``total_recovery``,
+            ``recovery_rate``, and ``deficiency``.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the value cannot be represented as a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Export this claim allocation as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Single-row frame with ``id``, ``seniority``, ``priority``, ``total_claim``,
+            ``collateral_recovery``, ``general_recovery``, ``total_recovery``,
+            ``recovery_rate``, and ``deficiency``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the value cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export this claim allocation as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row table with ``id``, ``seniority``, ``priority``, ``total_claim``,
+            ``collateral_recovery``, ``general_recovery``, ``total_recovery``,
+            ``recovery_rate``, and ``deficiency``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the value cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 class RecoveryWaterfallResult:
     """
@@ -669,37 +734,78 @@ class RecoveryWaterfallResult:
         """
         ...
 
-    def to_dataframe(self) -> pandas.DataFrame:
-        """
-        Export the per-claim allocations as a pandas DataFrame.
-
-        Columns: ``id``, ``seniority``, ``priority``, ``total_claim``,
-        ``collateral_recovery``, ``general_recovery``, ``total_recovery``,
-        ``recovery_rate``, ``deficiency``.
-
-        One row per claim — the natural grain of a waterfall. Rows keep the
-        Rust ordering (ascending ``priority``, then original claim order),
-        so repeated exports of the same result are byte-identical. The
-        estate-level fields (:attr:`total_distributed`,
-        :attr:`undistributed_estate`, :attr:`apr_satisfied`) are
-        deliberately not repeated on every row; read them from the result
-        object.
-
-        A waterfall with no claims yields a zero-row frame that still
-        carries the columns above.
+    def to_arrow(self) -> ArrowTable:
+        """Export per-claim allocations as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            One row per claim, in absolute-priority order.
+        ArrowTable
+            Table in absolute-priority order with ``id``, ``seniority``, ``priority``,
+            ``total_claim``, ``collateral_recovery``, ``general_recovery``,
+            ``total_recovery``, ``recovery_rate``, and ``deficiency``. Preserves schema
+            on an empty waterfall.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as an Arrow table.
         """
         ...
 
+    def to_pandas(self) -> pandas.DataFrame:
+        """Export per-claim allocations as a pandas ``DataFrame``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per claim in ascending priority order, preserving schema on empty runs.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the result cannot be represented as a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Export per-claim allocations as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row per claim in ascending priority order, preserving schema on empty runs.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export per-claim allocations as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per claim in ascending priority order, preserving schema on empty runs.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @staticmethod
     def from_json(json: str) -> RecoveryWaterfallResult:
         """Restore a stored waterfall result from its Rust JSON representation.

@@ -131,8 +131,9 @@ or `dict` rather than re-parsing a `ValuationResult`.
   with `width:100%; height:auto`. Do not reach for matplotlib.
 - **pandas is duck-typed.** `pandas` and `numpy` are package-level runtime
   dependencies, but nothing here imports them: modules consume whatever
-  `.to_dataframe()` returned from the compiled bindings via `.index`, `.columns`,
-  `.iloc`, `.tolist()`. Keep it that way — it is what lets `format._dates_of` accept
+  `.to_pandas()` returned from the compiled bindings via `.index`, `.columns`,
+  `.iloc`, `.tolist()` (and `Section.from_dataframe` / `credit_tearsheet` also
+  accept `ArrowTable`, `polars.DataFrame`, or `pyarrow.Table`). Keep it that way — it is what lets `format._dates_of` accept
   both a `DatetimeIndex` and a plain list.
 - **Cross-namespace imports are the exception.** Three modules import from other
   `finstack_quant` namespaces, and each does so to *read* a canonical helper

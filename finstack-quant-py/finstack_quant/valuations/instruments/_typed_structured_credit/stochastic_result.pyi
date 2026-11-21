@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 
 class StochasticPricingResult:
     """
@@ -154,17 +156,40 @@ class StochasticPricingResult:
             If serialization fails.
         """
         ...
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        One row per tranche as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``tranche_id``, ``seniority``, ``npv`` (currency units),
+        ``price_pct`` (percent of the tranche's current balance),
+        ``expected_loss``, ``unexpected_loss``, ``expected_shortfall``
+        (currency units), ``attach_pct``, ``detach_pct`` (percent of the
+        capital structure), ``wal`` (years, over the paths that returned
+        principal), ``paths_with_principal``, ``credit_duration`` and
+        ``draw_option_cost`` (currency units).
+
+        Returns
+        -------
+        ArrowTable
+            The tranche summary.
+
+        Raises
+        ------
+        ValueError
+            If the rows cannot be serialized into an Arrow table.
+        """
+        ...
+    def to_pandas(self) -> pd.DataFrame:
         """
         One row per tranche as a pandas ``DataFrame``.
 
         Columns: ``tranche_id``, ``seniority``, ``npv`` (currency units),
         ``price_pct`` (percent of the tranche's current balance),
         ``expected_loss``, ``unexpected_loss``, ``expected_shortfall``
-        (currency units),
-        ``attach_pct``, ``detach_pct`` (percent of the capital structure), ``wal`` (years, over
-        the paths that returned principal), ``paths_with_principal``,
-        ``credit_duration`` and ``draw_option_cost`` (currency units).
+        (currency units), ``attach_pct``, ``detach_pct`` (percent of the
+        capital structure), ``wal`` (years, over the paths that returned
+        principal), ``paths_with_principal``, ``credit_duration`` and
+        ``draw_option_cost`` (currency units).
 
         Returns
         -------
@@ -173,20 +198,59 @@ class StochasticPricingResult:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
             If the rows cannot be serialized.
         """
         ...
-    def draw_option_cost_dataframe(self) -> pd.DataFrame:
+    def to_polars(self) -> pl.DataFrame:
         """
-        The per-path draw option cost distribution as a pandas ``DataFrame``.
+        One row per tranche as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            The tranche summary with the columns documented on :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the rows cannot be serialized.
+        """
+        ...
+    def to_pyarrow(self) -> Any:
+        """
+        One row per tranche as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            The tranche summary with the columns documented on :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the rows cannot be serialized.
+        """
+        ...
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def draw_option_cost_table(self) -> ArrowTable:
+        """
+        The per-path draw option cost distribution as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``path`` (index in path order) and ``draw_option_cost``
         (currency units). Empty for pools without stochastic revolvers.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per path.
 
         Raises

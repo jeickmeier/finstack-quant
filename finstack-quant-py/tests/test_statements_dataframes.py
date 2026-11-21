@@ -1,7 +1,7 @@
-"""Tests for the ``statements`` DataFrame accessors.
+"""Tests for the ``statements`` tabular accessors.
 
-Covers ``CheckReport.to_dataframe()`` / ``to_findings_dataframe()`` and
-``MonteCarloResults.to_dataframe()`` / ``to_paths_dataframe()``.
+Covers ``CheckReport.to_pandas()`` / ``to_findings_table()`` and
+``MonteCarloResults.to_pandas()`` / ``to_paths_table()``.
 
 ``CheckReport`` objects are built through the public ``from_json`` constructor
 against hand-written payloads so the tests stay self-contained and do not need a
@@ -16,6 +16,7 @@ import json
 import pandas as pd
 import pytest
 
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.statements import (
     CheckReport,
     Evaluator,
@@ -157,7 +158,7 @@ def _monte_carlo_results(*, include_path_data: bool, n_paths: int = 16) -> Monte
 
 def test_check_report_to_dataframe_is_empty_with_schema() -> None:
     """An empty suite still yields the documented columns."""
-    df = _empty_report().to_dataframe()
+    df = _empty_report().to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == CHECK_RESULT_COLUMNS
     assert len(df) == 0
@@ -165,7 +166,9 @@ def test_check_report_to_dataframe_is_empty_with_schema() -> None:
 
 def test_check_report_to_findings_dataframe_is_empty_with_schema() -> None:
     """A report with no findings still yields the documented columns."""
-    df = _empty_report().to_findings_dataframe()
+    table = _empty_report().to_findings_table()
+    assert isinstance(table, ArrowTable)
+    df = table.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == CHECK_FINDING_COLUMNS
     assert len(df) == 0
@@ -174,7 +177,9 @@ def test_check_report_to_findings_dataframe_is_empty_with_schema() -> None:
 def test_check_report_to_dataframe_has_one_row_per_check() -> None:
     """Row count matches the underlying results collection."""
     report = _populated_report()
-    df = report.to_dataframe()
+    df = report.to_pandas()
+    assert report.to_polars().height == 2
+    assert report.to_arrow().num_rows == 2
 
     assert isinstance(df, pd.DataFrame)
     assert set(CHECK_RESULT_COLUMNS) <= set(df.columns)
@@ -191,7 +196,7 @@ def test_check_report_to_dataframe_has_one_row_per_check() -> None:
 def test_check_report_to_findings_dataframe_has_one_row_per_finding() -> None:
     """Row count matches the flattened findings collection."""
     report = _populated_report()
-    df = report.to_findings_dataframe()
+    df = report.to_findings_table().to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert set(CHECK_FINDING_COLUMNS) <= set(df.columns)
@@ -201,7 +206,7 @@ def test_check_report_to_findings_dataframe_has_one_row_per_finding() -> None:
 
 def test_check_report_findings_carry_materiality_and_nodes() -> None:
     """Materiality is flattened to float columns; nodes are comma-joined."""
-    df = _populated_report().to_findings_dataframe()
+    df = _populated_report().to_findings_table().to_pandas()
     error_row = df[df["severity"] == "error"].iloc[0]
 
     assert error_row["check_id"] == "balance_sheet_articulation"
@@ -217,7 +222,7 @@ def test_check_report_findings_carry_materiality_and_nodes() -> None:
 
 def test_check_report_findings_without_materiality_are_null() -> None:
     """Findings with no materiality context leave the four columns null."""
-    df = _populated_report().to_findings_dataframe()
+    df = _populated_report().to_findings_table().to_pandas()
     info_row = df[df["severity"] == "info"].iloc[0]
 
     assert pd.isna(info_row["period"])
@@ -232,7 +237,9 @@ def test_check_report_findings_without_materiality_are_null() -> None:
 def test_monte_carlo_to_dataframe_is_percentile_by_period() -> None:
     """Rows are forecast periods; one column per configured percentile."""
     results = _monte_carlo_results(include_path_data=False)
-    df = results.to_dataframe("revenue")
+    df = results.to_pandas("revenue")
+    assert results.to_arrow("revenue").column_names() == ["period", "p5", "p50", "p95"]
+    assert results.to_polars("revenue").height == 3
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["p5", "p50", "p95"]
@@ -243,7 +250,7 @@ def test_monte_carlo_to_dataframe_is_percentile_by_period() -> None:
 
 def test_monte_carlo_to_dataframe_percentiles_are_ordered() -> None:
     """Each period's percentiles are non-decreasing across the fan."""
-    df = _monte_carlo_results(include_path_data=False).to_dataframe("revenue")
+    df = _monte_carlo_results(include_path_data=False).to_pandas("revenue")
 
     assert (df["p5"] <= df["p50"]).all()
     assert (df["p50"] <= df["p95"]).all()
@@ -252,7 +259,7 @@ def test_monte_carlo_to_dataframe_percentiles_are_ordered() -> None:
 def test_monte_carlo_to_dataframe_matches_get_percentile_series() -> None:
     """The frame reshapes exactly what the scalar accessor returns."""
     results = _monte_carlo_results(include_path_data=False)
-    df = results.to_dataframe("revenue")
+    df = results.to_pandas("revenue")
     series = results.percentile_by_period("revenue", 0.5)
 
     assert series is not None
@@ -268,7 +275,7 @@ def test_monte_carlo_to_dataframe_keeps_missing_percentile_as_nan() -> None:
     first_period = next(iter(values))
     values[first_period] = [pair for pair in values[first_period] if pair[0] != 0.5]
 
-    df = MonteCarloResults.from_json(json.dumps(payload)).to_dataframe("revenue")
+    df = MonteCarloResults.from_json(json.dumps(payload)).to_pandas("revenue")
 
     assert list(df.index) == results.forecast_periods
     assert pd.isna(df.loc[first_period, "p50"])
@@ -278,12 +285,16 @@ def test_monte_carlo_to_dataframe_raises_for_unknown_metric() -> None:
     """An unsimulated metric is a KeyError, not an empty frame."""
     results = _monte_carlo_results(include_path_data=False)
     with pytest.raises(KeyError):
-        results.to_dataframe("not_a_node")
+        results.to_pandas("not_a_node")
+    with pytest.raises(KeyError):
+        results.to_arrow("not_a_node")
 
 
 def test_monte_carlo_to_paths_dataframe_is_empty_without_path_data() -> None:
-    """Without ``include_path_data`` the frame is empty but keeps its schema."""
-    df = _monte_carlo_results(include_path_data=False).to_paths_dataframe()
+    """Without ``include_path_data`` the table is empty but keeps its schema."""
+    table = _monte_carlo_results(include_path_data=False).to_paths_table()
+    assert isinstance(table, ArrowTable)
+    df = table.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == PATH_COLUMNS
@@ -294,7 +305,9 @@ def test_monte_carlo_to_paths_dataframe_has_one_row_per_path_period() -> None:
     """Row count is ``n_paths * metrics * forecast periods``."""
     n_paths = 8
     results = _monte_carlo_results(include_path_data=True, n_paths=n_paths)
-    df = results.to_paths_dataframe()
+    table = results.to_paths_table()
+    assert isinstance(table, ArrowTable)
+    df = table.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert set(PATH_COLUMNS) <= set(df.columns)

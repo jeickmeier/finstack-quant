@@ -1,8 +1,9 @@
 //! `CovenantReport` Python wrapper.
 
-use crate::bindings::pandas_utils::{
-    serde_object_to_single_row_dataframe_with_schema, serde_to_py,
-};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::display_to_py;
 use pyo3::prelude::*;
 
@@ -116,42 +117,6 @@ impl PyCovenantReport {
         serde_to_py(py, &self.inner.meta)
     }
 
-    /// Export the report as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``covenant_type``, ``covenant_id``, ``passed``,
-    /// ``actual_value``, ``threshold``, ``headroom``, ``headroom_raw``, ``details``.
-    ///
-    /// The optional columns are ``None`` for a covenant that was not evaluated
-    /// numerically (inactive, waived, springing condition unmet); pandas then
-    /// infers dtype ``object`` for that column, so coerce with
-    /// ``pd.to_numeric`` before concatenating mixed reports.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let row = serde_json::json!({
-            "covenant_type": self.inner.covenant_type,
-            "covenant_id": self.inner.covenant_id,
-            "passed": self.inner.passed,
-            "actual_value": self.inner.actual_value,
-            "threshold": self.inner.threshold,
-            "headroom": self.inner.headroom,
-            "headroom_raw": self.inner.headroom_raw,
-            "details": self.inner.details,
-        });
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &[
-                "covenant_type",
-                "covenant_id",
-                "passed",
-                "actual_value",
-                "threshold",
-                "headroom",
-                "headroom_raw",
-                "details",
-            ],
-        )
-    }
-
     fn __repr__(&self) -> String {
         fn opt(value: Option<f64>) -> String {
             value.map_or("None".to_string(), |v| v.to_string())
@@ -169,14 +134,21 @@ impl PyCovenantReport {
             opt(self.inner.headroom),
         )
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`. Returns `None` if the frame
-    /// cannot be built, which makes IPython fall back to `__repr__` instead of
-    /// raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyCovenantReport {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .utf8("covenant_type", vec![self.inner.covenant_type.clone()])?
+            .nullable_utf8("covenant_id", vec![self.inner.covenant_id.clone()])?
+            .bool("passed", vec![self.inner.passed])?
+            .nullable_f64("actual_value", vec![self.inner.actual_value])?
+            .nullable_f64("threshold", vec![self.inner.threshold])?
+            .nullable_f64("headroom", vec![self.inner.headroom])?
+            .nullable_f64("headroom_raw", vec![self.inner.headroom_raw])?
+            .nullable_utf8("details", vec![self.inner.details.clone()])?
+            .build()
     }
 }
+
+tabular_methods!(PyCovenantReport);

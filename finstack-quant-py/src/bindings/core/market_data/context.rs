@@ -14,7 +14,8 @@ use pyo3::types::PyModule;
 use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::money::{PyMoney, decimal_to_py, money_from_amount};
 use crate::bindings::date_utils::py_to_date;
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
+use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
 
 use super::curves::{
@@ -626,7 +627,7 @@ impl PyMarketContext {
     ///     ``dividend_schedule_count``, ``fx_delta_vol_surface_count``.
     #[pyo3(text_signature = "(self)")]
     fn stats<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.stats())
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.stats())
     }
 
     /// Condition dated term structures in this context to ``reference_date``.
@@ -849,24 +850,6 @@ impl PyConvertedMoney {
             .map(|inner| PyFxRateResult { inner })
     }
 
-    /// Export as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``amount`` (float), ``currency`` (ISO code), ``rate`` and
-    /// ``triangulated`` (``None`` for a same-currency input).
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let row = serde_json::json!({
-            "amount": self.inner.amount.amount(),
-            "currency": self.inner.amount.currency().to_string(),
-            "rate": self.inner.rate.as_ref().map(|rate| rate.rate),
-            "triangulated": self.inner.rate.as_ref().map(|rate| rate.triangulated),
-        });
-        crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &["amount", "currency", "rate", "triangulated"],
-        )
-    }
-
     fn __repr__(&self) -> String {
         let rate = self.inner.rate.as_ref().map_or_else(
             || "None".to_string(),
@@ -886,8 +869,22 @@ impl PyConvertedMoney {
     }
 }
 
+impl PyConvertedMoney {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<crate::bindings::core::table::PyArrowTable> {
+        TableBuilder::new()
+            .f64("amount", vec![self.inner.amount.amount()])?
+            .utf8("currency", vec![self.inner.amount.currency().to_string()])?
+            .nullable_f64("rate", vec![self.inner.rate.as_ref().map(|r| r.rate)])?
+            .nullable_bool(
+                "triangulated",
+                vec![self.inner.rate.as_ref().map(|r| r.triangulated)],
+            )?
+            .build()
+    }
+}
+
+tabular_methods!(PyConvertedMoney);
 wire_methods!(PyConvertedMoney, ConvertedMoney, "ConvertedMoney");
-impl_repr_html_via_dataframe!(PyConvertedMoney);
 
 /// Strictly load canonical `MarketContext` state JSON through the Rust
 /// contract loader (`from_state_slice` with the default `LoadLimits`),

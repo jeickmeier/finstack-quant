@@ -7,8 +7,10 @@
 //! - Downturn LGD adjustments (stressed approximation, regulatory floor).
 //! - Exposure-at-default for term loans and revolvers.
 
-use crate::bindings::macros::wire_methods;
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::{TableBuilder, serde_rows_to_arrow_table};
 use finstack_quant_models::credit::lgd::{
     self, BetaRecovery, CollateralPiece, CreditConversionFactor, DownturnLgd, EadCalculator,
     WorkoutCollateralType, WorkoutCosts, WorkoutLgd, WorkoutLgdBuilder, WorkoutLgdResult,
@@ -16,9 +18,6 @@ use finstack_quant_models::credit::lgd::{
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
-use crate::bindings::pandas_utils::{
-    serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
-};
 use crate::errors::{core_to_py, value_error};
 
 #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery")]
@@ -99,21 +98,28 @@ impl PyBetaRecovery {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &self.inner,
-            &["mean", "std_dev", "alpha", "beta_param"],
-        )
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("BetaRecovery", &self.inner)
     }
 }
 
+impl PyBetaRecovery {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .f64("mean", vec![self.inner.mean()])?
+            .f64("std_dev", vec![self.inner.std_dev()])?
+            .f64("alpha", vec![self.inner.alpha()])?
+            .f64("beta_param", vec![self.inner.beta_param()])?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyBetaRecovery,
+    "BetaRecovery",
+    module = "finstack_quant.models.credit.lgd"
+);
 wire_methods!(
     PyBetaRecovery,
     BetaRecovery,
@@ -306,21 +312,27 @@ impl PyWorkoutLgdResult {
         self.inner.recovery_rate
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdResult.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &self.inner,
-            &["net_recovery", "lgd", "recovery_rate"],
-        )
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdResult.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("WorkoutLgdResult", &self.inner)
     }
 }
 
+impl PyWorkoutLgdResult {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .f64("net_recovery", vec![self.inner.net_recovery])?
+            .f64("lgd", vec![self.inner.lgd])?
+            .f64("recovery_rate", vec![self.inner.recovery_rate])?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyWorkoutLgdResult,
+    "WorkoutLgdResult",
+    module = "finstack_quant.models.credit.lgd"
+);
 wire_methods!(
     PyWorkoutLgdResult,
     WorkoutLgdResult,
@@ -396,10 +408,15 @@ impl PyWorkoutLgd {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(
-            py,
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.__repr__")]
+    fn __repr__(&self) -> String {
+        crate::bindings::repr_support::repr_from_serde("WorkoutLgd", &self.inner)
+    }
+}
+
+impl PyWorkoutLgd {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(
             self.inner.collateral(),
             &[
                 ("collateral_type", "str"),
@@ -408,13 +425,13 @@ impl PyWorkoutLgd {
             ],
         )
     }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.__repr__")]
-    fn __repr__(&self) -> String {
-        crate::bindings::repr_support::repr_from_serde("WorkoutLgd", &self.inner)
-    }
 }
 
+tabular_methods!(
+    PyWorkoutLgd,
+    "WorkoutLgd",
+    module = "finstack_quant.models.credit.lgd"
+);
 wire_methods!(
     PyWorkoutLgd,
     WorkoutLgd,
@@ -576,7 +593,7 @@ impl PyDownturnLgd {
     #[doc = pydoc!("finstack_quant.models.credit.lgd", "DownturnLgd.params")]
     #[getter]
     fn params<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, self.inner.method())
+        crate::bindings::json_bridge::serde_to_py(py, self.inner.method())
     }
 
     #[doc = pydoc!("finstack_quant.models.credit.lgd", "DownturnLgd.__repr__")]

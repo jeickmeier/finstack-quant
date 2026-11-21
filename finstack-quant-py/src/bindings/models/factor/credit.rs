@@ -5,15 +5,16 @@
 //! [`PyFactorCovarianceForecast`] which wraps the vol-forecast engine from
 //! `finstack-quant-models`.
 
-use crate::bindings::macros::wire_methods;
-use finstack_quant_core::wire::serde_label;
-use std::collections::BTreeMap;
-
-use numpy::{PyArray2, PyArrayMethods};
-use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyTuple, PyType};
-
+use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::module_utils::py_to_json_value;
+use crate::bindings::pickle_support::reduce_via_json;
+use crate::bindings::table_builders::{TableBuilder, serde_rows_to_arrow_table};
+use crate::errors::{core_to_py, kinded_to_py, serde_json_to_py, value_error};
 use finstack_quant_core::types::IssuerId;
+use finstack_quant_core::wire::serde_label;
 use finstack_quant_factor::credit::VolHorizon;
 use finstack_quant_factor::credit::calibration::{
     CreditCalibrationConfig, CreditCalibrationInputs, GenericFactorSeries, HistoryPanel,
@@ -23,19 +24,14 @@ use finstack_quant_factor::credit::hierarchy::{
     CreditFactorModel, GenericFactorSpec, IssuerTags, dimension_key,
 };
 use finstack_quant_factor::{FactorCovarianceMatrix, FactorId, FactorModelConfig};
+use numpy::{PyArray2, PyArrayMethods};
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyTuple, PyType};
+use std::collections::BTreeMap;
 
-use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::module_utils::py_to_json_value;
-use crate::bindings::pandas_utils::{
-    ColumnSchema, dict_to_dataframe, labeled_values_to_series, serde_rows_to_dataframe_with_schema,
-    serde_to_py,
-};
-use crate::bindings::pickle_support::reduce_via_json;
-use crate::errors::{core_to_py, kinded_to_py, serde_json_to_py, value_error};
-
-/// Column schema of `PyLevelsAtDate::to_dataframe`, kept so a level-free
+/// Column schema of `PyLevelsAtDate::to_arrow_table`, kept so a level-free
 /// snapshot still exports the documented columns.
-const LEVEL_VALUE_COLUMNS: &[ColumnSchema<'static>] = &[
+const LEVEL_VALUE_COLUMNS: &[(&str, &str)] = &[
     ("date", "str"),
     ("level_index", "int64"),
     ("dimension", "str"),
@@ -43,9 +39,9 @@ const LEVEL_VALUE_COLUMNS: &[ColumnSchema<'static>] = &[
     ("value", "float64"),
 ];
 
-/// Column schema of `PyPeriodDecomposition::to_level_dataframe`, kept so a
+/// Column schema of `PyPeriodDecomposition::to_level_table`, kept so a
 /// level-free decomposition still exports the documented columns.
-const LEVEL_DELTA_COLUMNS: &[ColumnSchema<'static>] = &[
+const LEVEL_DELTA_COLUMNS: &[(&str, &str)] = &[
     ("from_date", "str"),
     ("to_date", "str"),
     ("level_index", "int64"),
@@ -54,23 +50,23 @@ const LEVEL_DELTA_COLUMNS: &[ColumnSchema<'static>] = &[
     ("delta", "float64"),
 ];
 
-/// Column schema of `PyPeriodDecomposition::to_adder_dataframe`, kept so a
+/// Column schema of `PyPeriodDecomposition::to_adder_table`, kept so a
 /// decomposition with no shared issuers still exports the documented columns.
-const ADDER_DELTA_COLUMNS: &[ColumnSchema<'static>] = &[
+const ADDER_DELTA_COLUMNS: &[(&str, &str)] = &[
     ("from_date", "str"),
     ("to_date", "str"),
     ("issuer_id", "str"),
     ("d_adder", "float64"),
 ];
 
-/// Column schema of `PyCreditFactorModel::to_dataframe`, kept so a model with
+/// Column schema of `PyCreditFactorModel::to_arrow_table`, kept so a model with
 /// no issuer rows still exports the documented columns.
-const ISSUER_ROW_COLUMNS: &[ColumnSchema<'static>] = &[
+const ISSUER_ROW_COLUMNS: &[(&str, &str)] = &[
     ("issuer_id", "str"),
-    ("tags", "object"),
+    ("tags", "str"),
     ("mode", "str"),
     ("beta_pc", "float64"),
-    ("beta_levels", "object"),
+    ("beta_levels", "str"),
     ("adder_at_anchor", "float64"),
     ("adder_vol_annualized", "float64"),
     ("adder_vol_source", "str"),
@@ -249,17 +245,19 @@ impl PyCreditFactorModel {
         self.inner.factor_ids()
     }
 
-    /// Export the per-issuer beta rows as a pandas ``DataFrame``.
-    ///
-    /// One row per issuer, sorted by ``issuer_id``. Columns: ``issuer_id``,
-    /// ``tags`` (dict of dimension key to bucket tag), ``mode``
-    /// (``"issuer_beta"`` / ``"bucket_only"``), ``beta_pc``, ``beta_levels``
-    /// (list aligned with ``level_names()``; ``0.0`` marks a folded level),
-    /// ``adder_at_anchor`` (bp), ``adder_vol_annualized`` (bp per square-root year), ``adder_vol_source``,
-    /// ``r_squared`` and ``n_obs`` (``NaN`` for bucket-only rows), and
-    /// ``spread_duration`` (years).
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn __repr__(&self) -> String {
+        format!(
+            "CreditFactorModel(as_of={:?}, n_levels={}, n_issuers={}, n_factors={})",
+            self.inner.as_of.to_string(),
+            self.inner.hierarchy.levels.len(),
+            self.inner.issuer_betas.len(),
+            self.inner.config.factors.len(),
+        )
+    }
+}
+
+impl PyCreditFactorModel {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         let mut rows: Vec<serde_json::Value> = Vec::with_capacity(self.inner.issuer_betas.len());
         for row in &self.inner.issuer_betas {
             let fit = row.fit_quality.as_ref();
@@ -277,19 +275,11 @@ impl PyCreditFactorModel {
                 "spread_duration": row.spread_duration,
             }));
         }
-        serde_rows_to_dataframe_with_schema(py, &rows, ISSUER_ROW_COLUMNS)
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "CreditFactorModel(as_of={:?}, n_levels={}, n_issuers={}, n_factors={})",
-            self.inner.as_of.to_string(),
-            self.inner.hierarchy.levels.len(),
-            self.inner.issuer_betas.len(),
-            self.inner.config.factors.len(),
-        )
+        serde_rows_to_arrow_table(&rows, ISSUER_ROW_COLUMNS)
     }
 }
+
+tabular_methods!(PyCreditFactorModel);
 
 /// Deterministic calibrator that produces a ``CreditFactorModel``.
 ///
@@ -333,65 +323,130 @@ fn extract_calibration_config(
     }
 }
 
-/// Convert pandas objects into the Rust panel types and hand them to
-/// [`CreditCalibrationInputs::from_panel`], which owns the anchor derivation.
-fn inputs_from_dataframe(
+/// Convert DataFrame/dict tags into an `IssuerId -> IssuerTags` map.
+fn extract_issuer_tags_map(
     py: Python<'_>,
+    tags: &Bound<'_, PyAny>,
+    label: &str,
+) -> PyResult<BTreeMap<IssuerId, IssuerTags>> {
+    use crate::bindings::dataframe_utils::{
+        has_arrow_c_stream, is_polars_dataframe, table_column_names, table_to_py_records,
+    };
+    if is_polars_dataframe(tags)? || has_arrow_c_stream(tags)? {
+        let cols = table_column_names(tags)?;
+        let id_col = cols
+            .iter()
+            .find(|c| c.as_str() == "issuer" || c.as_str() == "issuer_id")
+            .cloned()
+            .or_else(|| cols.first().cloned())
+            .ok_or_else(|| crate::errors::value_error("tags DataFrame cannot be empty"))?;
+        let records = table_to_py_records(py, tags)?
+            .ok_or_else(|| crate::errors::value_error("tags DataFrame has no records"))?;
+        let rows: Vec<Bound<'_, PyDict>> = records.extract()?;
+        let mut out = BTreeMap::new();
+        for row in rows {
+            let copy = row.copy()?;
+            let issuer: String = copy
+                .call_method1("pop", (&id_col,))
+                .map_err(|_| {
+                    crate::errors::value_error(format!(
+                        "tags DataFrame row missing issuer key {id_col:?}"
+                    ))
+                })?
+                .str()?
+                .extract()?;
+            let mut tags_map = BTreeMap::new();
+            for (k, v) in copy.iter() {
+                if !crate::bindings::dataframe_utils::is_missing_cell(&v)? {
+                    tags_map.insert(k.extract::<String>()?, v.str()?.extract::<String>()?);
+                }
+            }
+            out.insert(IssuerId::new(issuer), IssuerTags(tags_map));
+        }
+        return Ok(out);
+    }
+    let obj = if tags.hasattr("to_dict")? && !tags.is_instance_of::<PyDict>() {
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("orient", "index")?;
+        tags.call_method("to_dict", (), Some(&kwargs))?
+    } else {
+        tags.clone()
+    };
+    let value = py_to_json_value(py, &obj, label)?;
+    serde_json::from_value(value).map_err(|e| serde_json_to_py(e, &format!("invalid {label}")))
+}
+
+fn extract_spread_durations(
+    py: Python<'_>,
+    obj: &Bound<'_, PyAny>,
+) -> PyResult<BTreeMap<IssuerId, f64>> {
+    use crate::bindings::dataframe_utils::{
+        extract_f64_vec, is_dataframe_like, is_polars_dataframe, table_column_names,
+        table_column_to_pylist,
+    };
+    if is_dataframe_like(obj)? {
+        let cols = table_column_names(obj)?;
+        if cols.len() != 2 {
+            return Err(crate::errors::value_error(format!(
+                "spread_durations DataFrame must have 2 columns (issuer, duration), got {}",
+                cols.len()
+            )));
+        }
+        let ids: Vec<String> = table_column_to_pylist(obj, &cols[0])?
+            .unwrap_or_default()
+            .into_iter()
+            .map(|item| item.str()?.extract::<String>())
+            .collect::<PyResult<_>>()?;
+        let vals = if is_polars_dataframe(obj)? {
+            extract_f64_vec(&obj.get_item(&cols[1])?, &cols[1])?
+        } else {
+            let vals_py = table_column_to_pylist(obj, &cols[1])?.unwrap_or_default();
+            vals_py
+                .into_iter()
+                .map(|v| v.extract::<f64>())
+                .collect::<PyResult<_>>()?
+        };
+        return Ok(ids
+            .into_iter()
+            .zip(vals)
+            .map(|(k, v)| (IssuerId::new(k), v))
+            .collect());
+    }
+    py_to_serde_any(py, obj, "spread_durations")
+}
+
+/// Convert pandas, Polars, or Arrow objects into the Rust panel types and hand
+/// them to [`CreditCalibrationInputs::from_panel`].
+fn inputs_from_dataframe(
     spreads: &Bound<'_, PyAny>,
     tags: &Bound<'_, PyAny>,
     generic: &Bound<'_, PyAny>,
     generic_spec: &Bound<'_, PyAny>,
     spread_durations: Option<&Bound<'_, PyAny>>,
+    date_col: Option<&str>,
 ) -> PyResult<CreditCalibrationInputs> {
-    let index = spreads.getattr("index")?;
-    let dates = index
-        .try_iter()?
-        .map(|d| py_to_date(&d?))
-        .collect::<PyResult<Vec<_>>>()?;
-    let columns = spreads.getattr("columns")?;
-    let issuers = columns
-        .try_iter()?
-        .map(|c| c?.str()?.extract::<String>())
-        .collect::<PyResult<Vec<_>>>()?;
-
+    let py = spreads.py();
+    let extracted = crate::bindings::dataframe_utils::extract_dataframe_panel(
+        spreads,
+        date_col,
+        "spreads must be a pandas DataFrame, Polars DataFrame, or Arrow table",
+    )?;
+    let dates = extracted.dates;
     let mut panel: BTreeMap<IssuerId, Vec<Option<f64>>> = BTreeMap::new();
-    for issuer in &issuers {
-        let series = spreads.get_item(issuer.as_str())?.call_method0("tolist")?;
-        let values: Vec<Option<f64>> = series
-            .try_iter()?
-            .map(|v| {
-                let v = v?;
-                if v.is_none() {
-                    return Ok(None);
-                }
-                let f: f64 = v.extract()?;
-                Ok(if f.is_nan() { None } else { Some(f) })
-            })
-            .collect::<PyResult<_>>()?;
-        panel.insert(IssuerId::new(issuer.clone()), values);
+    for (issuer, col_vals) in extracted.ticker_names.into_iter().zip(extracted.columns) {
+        let values: Vec<Option<f64>> = col_vals
+            .into_iter()
+            .map(|f| if f.is_nan() { None } else { Some(f) })
+            .collect();
+        panel.insert(IssuerId::new(issuer), values);
     }
 
-    let tag_map: BTreeMap<IssuerId, IssuerTags> = {
-        let obj = if tags.hasattr("to_dict")? && !tags.is_instance_of::<PyDict>() {
-            let kwargs = PyDict::new(py);
-            kwargs.set_item("orient", "index")?;
-            tags.call_method("to_dict", (), Some(&kwargs))?
-        } else {
-            tags.clone()
-        };
-        let value = py_to_json_value(py, &obj, "issuer tags")?;
-        serde_json::from_value(value).map_err(|e| serde_json_to_py(e, "invalid issuer tags"))?
-    };
-
-    let values: Vec<f64> = if generic.hasattr("tolist")? {
-        generic.call_method0("tolist")?.extract()?
-    } else {
-        generic.extract()?
-    };
+    let tag_map = extract_issuer_tags_map(py, tags, "issuer tags")?;
+    let values = crate::bindings::dataframe_utils::extract_f64_vec(generic, "generic")?;
     let spec: GenericFactorSpec = py_to_serde_any(py, generic_spec, "GenericFactorSpec")?;
 
     let spread_durations: BTreeMap<IssuerId, f64> = match spread_durations {
-        Some(obj) if !obj.is_none() => py_to_serde_any(py, obj, "spread_durations")?,
+        Some(obj) if !obj.is_none() => extract_spread_durations(py, obj)?,
         _ => BTreeMap::new(),
     };
 
@@ -491,19 +546,26 @@ impl PyCreditCalibrator {
     ///         ``GenericFactorSpec``, the frames are misaligned, or calibration
     ///         rejects the inputs.
     #[staticmethod]
-    #[pyo3(signature = (spreads, tags, generic, generic_spec, spread_durations = None, config = None))]
+    #[pyo3(signature = (spreads, tags, generic, generic_spec, spread_durations = None, config = None, *, date_col = None))]
     fn from_dataframe(
-        py: Python<'_>,
         spreads: &Bound<'_, PyAny>,
         tags: &Bound<'_, PyAny>,
         generic: &Bound<'_, PyAny>,
         generic_spec: &Bound<'_, PyAny>,
         spread_durations: Option<&Bound<'_, PyAny>>,
         config: Option<&Bound<'_, PyAny>>,
+        date_col: Option<&str>,
     ) -> PyResult<PyCreditFactorModel> {
+        let py = spreads.py();
         let config = extract_calibration_config(py, config)?;
-        let inputs =
-            inputs_from_dataframe(py, spreads, tags, generic, generic_spec, spread_durations)?;
+        let inputs = inputs_from_dataframe(
+            spreads,
+            tags,
+            generic,
+            generic_spec,
+            spread_durations,
+            date_col,
+        )?;
         let calibrator = finstack_quant_factor::credit::calibration::CreditCalibrator::new(config);
         let model = py
             .detach(|| calibrator.calibrate(inputs))
@@ -624,16 +686,33 @@ impl PyLevelsAtDate {
         Ok(d)
     }
 
-    /// Export the per-level bucket values as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``date``, ``level_index``, ``dimension``, ``bucket``,
-    /// ``value``. One row per (level, bucket) pair, ordered by ``level_index``
-    /// then ``bucket``. A snapshot from a hierarchy with no levels yields a
-    /// zero-row frame that still carries the columns. The scalar ``generic``
-    /// factor and the per-issuer residuals are not levels; read them from the
-    /// ``generic`` getter and ``to_series`` respectively.
+    /// Export the per-issuer residual adders as a :class:`~finstack_quant.core.table.LabeledSeries`
+    /// named ``adder`` and indexed by issuer ID (sorted), in basis points.
     #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_series(&self) -> PyResult<PyLabeledSeries> {
+        let labels: Vec<String> = self
+            .inner
+            .adder
+            .keys()
+            .map(|issuer| issuer.as_str().to_owned())
+            .collect();
+        let values: Vec<f64> = self.inner.adder.values().copied().collect();
+        Ok(PyLabeledSeries::from_f64("adder", labels, values)?.with_index_name("issuer_id"))
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "LevelsAtDate(date={:?}, generic={:.4}, n_levels={}, n_issuers={})",
+            self.inner.date.to_string(),
+            self.inner.generic,
+            self.inner.by_level.len(),
+            self.inner.adder.len(),
+        )
+    }
+}
+
+impl PyLevelsAtDate {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         let date = self.inner.date.to_string();
         let mut rows: Vec<serde_json::Value> = Vec::new();
         for level in &self.inner.by_level {
@@ -648,33 +727,11 @@ impl PyLevelsAtDate {
                 }));
             }
         }
-        serde_rows_to_dataframe_with_schema(py, &rows, LEVEL_VALUE_COLUMNS)
-    }
-
-    /// Export the per-issuer residual adders as a pandas ``Series`` named
-    /// ``adder`` and indexed by issuer ID (sorted), in basis points.
-    #[pyo3(text_signature = "($self)")]
-    fn to_series<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let labels: Vec<String> = self
-            .inner
-            .adder
-            .keys()
-            .map(|issuer| issuer.as_str().to_owned())
-            .collect();
-        let values: Vec<f64> = self.inner.adder.values().copied().collect();
-        labeled_values_to_series(py, &labels, values, "adder")
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "LevelsAtDate(date={:?}, generic={:.4}, n_levels={}, n_issuers={})",
-            self.inner.date.to_string(),
-            self.inner.generic,
-            self.inner.by_level.len(),
-            self.inner.adder.len(),
-        )
+        serde_rows_to_arrow_table(&rows, LEVEL_VALUE_COLUMNS)
     }
 }
+
+tabular_methods!(PyLevelsAtDate);
 
 /// Component-wise difference between two ``LevelsAtDate`` snapshots.
 ///
@@ -780,24 +837,14 @@ impl PyPeriodDecomposition {
         Ok(d)
     }
 
-    /// Export the per-level bucket deltas as a pandas ``DataFrame``
-    /// (identical to ``to_level_dataframe``).
-    ///
-    /// Columns: ``from_date``, ``to_date``, ``level_index``, ``dimension``,
-    /// ``bucket``, ``delta``. The per-issuer adder deltas are a separate
-    /// table; see ``to_adder_dataframe``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        self.to_level_dataframe(py)
-    }
-
-    /// Export the per-level bucket deltas as a pandas ``DataFrame``.
+    /// Export the per-level bucket deltas as an ``ArrowTable``.
     ///
     /// Columns: ``from_date``, ``to_date``, ``level_index``, ``dimension``,
     /// ``bucket``, ``delta``. One row per (level, bucket) pair, ordered by
     /// ``level_index`` then ``bucket``; a level-free decomposition yields a
-    /// zero-row frame that still carries the columns.
-    fn to_level_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    /// zero-row table that still carries the columns.
+    #[pyo3(text_signature = "($self)")]
+    fn to_level_table(&self) -> PyResult<PyArrowTable> {
         let from_date = self.inner.from.to_string();
         let to_date = self.inner.to.to_string();
         let mut rows: Vec<serde_json::Value> = Vec::new();
@@ -814,14 +861,15 @@ impl PyPeriodDecomposition {
                 }));
             }
         }
-        serde_rows_to_dataframe_with_schema(py, &rows, LEVEL_DELTA_COLUMNS)
+        serde_rows_to_arrow_table(&rows, LEVEL_DELTA_COLUMNS)
     }
 
-    /// Export the per-issuer adder deltas as a pandas ``DataFrame``.
+    /// Export the per-issuer adder deltas as an ``ArrowTable``.
     ///
     /// Columns: ``from_date``, ``to_date``, ``issuer_id``, ``d_adder``. One
     /// row per issuer, ordered by ``issuer_id``.
-    fn to_adder_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    #[pyo3(text_signature = "($self)")]
+    fn to_adder_table(&self) -> PyResult<PyArrowTable> {
         let from_date = self.inner.from.to_string();
         let to_date = self.inner.to.to_string();
         let rows: Vec<serde_json::Value> = self
@@ -837,7 +885,7 @@ impl PyPeriodDecomposition {
                 })
             })
             .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, ADDER_DELTA_COLUMNS)
+        serde_rows_to_arrow_table(&rows, ADDER_DELTA_COLUMNS)
     }
 
     fn __repr__(&self) -> String {
@@ -850,6 +898,14 @@ impl PyPeriodDecomposition {
         )
     }
 }
+
+impl PyPeriodDecomposition {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        self.to_level_table()
+    }
+}
+
+tabular_methods!(PyPeriodDecomposition);
 
 /// Decompose observed issuer spreads at a point in time into per-level factor
 /// values and per-issuer residual adders.
@@ -902,21 +958,16 @@ fn decompose_levels(
     runtime_tags: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyLevelsAtDate> {
     let observed_spreads: BTreeMap<IssuerId, f64> =
-        py_to_serde_any(py, observed_spreads, "observed_spreads")?;
+        if crate::bindings::dataframe_utils::is_dataframe_like(observed_spreads)? {
+            extract_spread_durations(py, observed_spreads)?
+        } else {
+            py_to_serde_any(py, observed_spreads, "observed_spreads")?
+        };
 
     let date = py_to_date(as_of)?;
 
     let runtime_tags: Option<BTreeMap<IssuerId, IssuerTags>> = match runtime_tags {
-        Some(obj) if !obj.is_none() => {
-            let obj = if obj.hasattr("to_dict")? && !obj.is_instance_of::<PyDict>() {
-                let kwargs = PyDict::new(py);
-                kwargs.set_item("orient", "index")?;
-                obj.call_method("to_dict", (), Some(&kwargs))?
-            } else {
-                obj.clone()
-            };
-            Some(py_to_serde_any(py, &obj, "runtime_tags")?)
-        }
+        Some(obj) if !obj.is_none() => Some(extract_issuer_tags_map(py, obj, "runtime_tags")?),
         _ => None,
     };
 
@@ -987,7 +1038,7 @@ fn decompose_period(
 /// Example:
 ///     >>> from finstack_quant.models.factor import FactorCovarianceMatrix
 ///     >>> matrix = FactorCovarianceMatrix(["a", "b"], [[0.04, 0.0], [0.0, 0.01]])
-///     >>> (matrix.variance("a"), matrix.to_dataframe().loc["b", "b"])
+///     >>> (matrix.variance("a"), matrix.to_pandas().loc["b", "b"])
 ///     (0.04, 0.01)
 #[pyclass(
     name = "FactorCovarianceMatrix",
@@ -1034,10 +1085,63 @@ impl PyFactorCovarianceMatrix {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.models.factor", "FactorCovarianceMatrix.from_dataframe")]
     #[staticmethod]
     fn from_dataframe(df: &Bound<'_, PyAny>) -> PyResult<Self> {
+        use crate::bindings::dataframe_utils::{
+            extract_2d_f64, extract_f64_vec, has_arrow_c_stream, is_polars_dataframe,
+            table_column_names, table_column_to_pylist,
+        };
+        if is_polars_dataframe(df)? || has_arrow_c_stream(df)? {
+            let cols = table_column_names(df)?;
+            if cols.is_empty() {
+                return Self::new(Vec::new(), df);
+            }
+            if let Ok(Some((flat, nrows, ncols))) = extract_2d_f64(df, "data")
+                && nrows == ncols
+            {
+                let ids: Vec<FactorId> = cols.into_iter().map(FactorId::new).collect();
+                let inner = FactorCovarianceMatrix::new(ids, flat).map_err(core_to_py)?;
+                return Ok(Self { inner });
+            }
+            let row_labels: Vec<String> = table_column_to_pylist(df, &cols[0])?
+                .unwrap_or_default()
+                .into_iter()
+                .map(|item| item.str()?.extract::<String>())
+                .collect::<PyResult<_>>()?;
+            let names = cols[1..].to_vec();
+            if row_labels != names {
+                return Err(crate::errors::value_error(
+                    "DataFrame row and column factor identifiers must match in order",
+                ));
+            }
+            let n = names.len();
+            let mut col_data = Vec::with_capacity(n);
+            if is_polars_dataframe(df)? {
+                for col in &names {
+                    col_data.push(extract_f64_vec(&df.get_item(col)?, col)?);
+                }
+            } else {
+                let tbl = crate::bindings::dataframe_utils::arrow_to_pyarrow_table(df.py(), df)?;
+                for col in &names {
+                    let py_col: Vec<f64> = tbl
+                        .call_method1("column", (col,))?
+                        .call_method0("to_pylist")?
+                        .extract()?;
+                    col_data.push(py_col);
+                }
+            }
+            let mut flat = Vec::with_capacity(n * n);
+            for r in 0..n {
+                for col in &col_data {
+                    flat.push(col[r]);
+                }
+            }
+            let ids: Vec<FactorId> = names.into_iter().map(FactorId::new).collect();
+            let inner = FactorCovarianceMatrix::new(ids, flat).map_err(core_to_py)?;
+            return Ok(Self { inner });
+        }
         let pandas = df.py().import("pandas")?;
         if !df.is_instance(&pandas.getattr("DataFrame")?)? {
             return Err(pyo3::exceptions::PyTypeError::new_err(
-                "df must be a pandas DataFrame",
+                "df must be a pandas DataFrame, Polars DataFrame, or Arrow table",
             ));
         }
         let names: Vec<String> = df.getattr("columns")?.call_method0("tolist")?.extract()?;
@@ -1109,16 +1213,12 @@ impl PyFactorCovarianceMatrix {
     /// The matrix as a square pandas ``DataFrame`` indexed and columned by
     /// ``factor_ids``.
     #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let ids = self.factor_ids();
-        let n = ids.len();
-        let data = PyDict::new(py);
-        for (j, id) in ids.iter().enumerate() {
-            let column: Vec<f64> = (0..n).map(|i| self.inner.covariance_at(i, j)).collect();
-            data.set_item(id, column)?;
-        }
-        let index = pyo3::types::PyList::new(py, &ids)?;
-        dict_to_dataframe(py, &data, Some(index.into_any()))
+    fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let bound = Bound::new(py, self.to_arrow_table()?)?;
+        let frame = PyArrowTable::to_pandas(&bound, py)?;
+        frame
+            .call_method1("set_index", ("factor_id",))?
+            .call_method1("rename_axis", (py.None(),))
     }
 
     fn __repr__(&self) -> String {
@@ -1129,6 +1229,21 @@ impl PyFactorCovarianceMatrix {
         )
     }
 }
+
+impl PyFactorCovarianceMatrix {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let ids = self.factor_ids();
+        let n = ids.len();
+        let mut builder = TableBuilder::new().utf8("factor_id", ids.clone())?;
+        for (j, id) in ids.iter().enumerate() {
+            let column: Vec<f64> = (0..n).map(|i| self.inner.covariance_at(i, j)).collect();
+            builder = builder.f64(id, column)?;
+        }
+        builder.build()
+    }
+}
+
+tabular_methods!(PyFactorCovarianceMatrix, custom_pandas);
 
 wire_methods!(
     PyFactorCovarianceMatrix,

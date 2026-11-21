@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.table import ArrowTable, LabeledSeries
 from finstack_quant.scenarios import ApplicationReport, ScenarioSpec
 from finstack_quant.portfolio._container import Portfolio
 from finstack_quant.portfolio._valuation import PortfolioValuation
@@ -203,7 +206,7 @@ class ScenarioPnl:
         dict[str, float]
             Base-currency amounts in the canonical Rust ``IndexMap``
             iteration order (stressed positions first, then base-only
-            positions), matching :meth:`to_dataframe`, :meth:`to_series`,
+            positions), matching :meth:`to_arrow`, :meth:`to_series`,
             and :meth:`to_json`. Sums to :attr:`total`.
 
         Notes
@@ -212,12 +215,28 @@ class ScenarioPnl:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Per-position P&L ladder as a pandas DataFrame.
+        Per-position P&L ladder as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``position_id``, ``pnl``. The schema is pinned, so an empty
         ladder keeps the same dtypes as a populated one.
+
+        Returns
+        -------
+        ArrowTable
+            One row per position, with float ``pnl`` in :attr:`currency`.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Per-position P&L ladder as a pandas ``DataFrame``.
 
         Returns
         -------
@@ -226,24 +245,60 @@ class ScenarioPnl:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
-    def to_series(self) -> pd.Series:
+    def to_polars(self) -> pl.DataFrame:
         """
-        Per-position P&L as a pandas Series indexed by position id.
+        Per-position P&L ladder as a Polars ``DataFrame``.
 
         Returns
         -------
-        pd.Series
+        pl.DataFrame
+            One row per position, with float ``pnl`` in :attr:`currency`.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Per-position P&L ladder as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per position, with float ``pnl`` in :attr:`currency`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_series(self) -> LabeledSeries:
+        """
+        Per-position P&L as a :class:`~finstack_quant.core.table.LabeledSeries`
+        indexed by position id.
+
+        Returns
+        -------
+        LabeledSeries
             Float base-currency amounts named ``pnl``.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the series cannot be constructed.
         """
         ...
 
@@ -376,12 +431,28 @@ class ScenarioPnlBatchItem:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Per-position P&L ladder as a pandas DataFrame.
+        Per-position P&L ladder as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``scenario_id``, ``position_id``, ``pnl``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
+
+        Returns
+        -------
+        ArrowTable
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Per-position P&L ladder as a pandas ``DataFrame``.
 
         Returns
         -------
@@ -390,11 +461,46 @@ class ScenarioPnlBatchItem:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Per-position P&L ladder as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Per-position P&L ladder as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize this result to canonical JSON.

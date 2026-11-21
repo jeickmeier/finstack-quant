@@ -1,11 +1,13 @@
 //! PnlAttribution Python wrapper.
 
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::date_to_py;
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
-    serde_rows_to_dataframe_with_schema, serde_to_py,
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::{
+    serde_object_to_single_row_arrow_table, serde_rows_to_arrow_table,
 };
-use crate::errors::{display_to_py, serde_json_to_py};
+use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
 use finstack_quant_attribution::long_rows::{
     pnl_attribution_carry_rows, pnl_attribution_credit_factor_rows, pnl_attribution_long_rows,
     pnl_attribution_sensitivity_step_rows, pnl_attribution_waterfall_step_rows,
@@ -14,7 +16,7 @@ use finstack_quant_attribution::long_rows::{
 use pyo3::prelude::*;
 
 /// Column schema shared by the long-format detail exports.
-const LONG_DETAIL_COLUMNS: [ColumnSchema<'static>; 7] = [
+const LONG_DETAIL_COLUMNS: [(&str, &str); 7] = [
     ("kind", "str"),
     ("factor", "str"),
     ("sub", "str"),
@@ -25,7 +27,7 @@ const LONG_DETAIL_COLUMNS: [ColumnSchema<'static>; 7] = [
 ];
 
 /// Column schema of the waterfall step export.
-const WATERFALL_STEP_COLUMNS: [ColumnSchema<'static>; 6] = [
+const WATERFALL_STEP_COLUMNS: [(&str, &str); 6] = [
     ("step_index", "int64"),
     ("factor", "str"),
     ("pv_before", "float64"),
@@ -35,7 +37,7 @@ const WATERFALL_STEP_COLUMNS: [ColumnSchema<'static>; 6] = [
 ];
 
 /// Column schema of the sensitivity step export.
-const SENSITIVITY_STEP_COLUMNS: [ColumnSchema<'static>; 10] = [
+const SENSITIVITY_STEP_COLUMNS: [(&str, &str); 10] = [
     ("step_index", "int64"),
     ("factor", "str"),
     ("tenor_years", "float64"),
@@ -48,9 +50,8 @@ const SENSITIVITY_STEP_COLUMNS: [ColumnSchema<'static>; 10] = [
     ("currency", "str"),
 ];
 
-/// Column schema of the wide single-row export (`to_dataframe`) and of the
-/// batch table returned by `attribute_pnl_many`.
-pub(crate) const WIDE_COLUMNS: [ColumnSchema<'static>; 24] = [
+/// Column schema of the wide single-row export and of the batch table returned by `attribute_pnl_many`.
+pub(crate) const WIDE_COLUMNS: [(&str, &str); 24] = [
     ("instrument_id", "str"),
     ("method", "str"),
     ("t0", "str"),
@@ -134,7 +135,7 @@ impl PyPnlAttribution {
 
     /// Export the canonical serde-shaped attribution payload as a Python dict.
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner)
     }
 
     /// Total P&L amount.
@@ -373,7 +374,7 @@ impl PyPnlAttribution {
     /// ``{"amount", "currency"}`` dicts). ``step_pnl == pv_after - pv_before``
     /// and each ``pv_after`` is the next step's ``pv_before``. Empty unless
     /// the waterfall method produced the result. Use
-    /// ``to_waterfall_steps_dataframe`` for float columns.
+    /// ``to_waterfall_steps_table`` for an ``ArrowTable`` with float columns.
     #[getter]
     fn waterfall_steps<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.waterfall_steps)
@@ -386,7 +387,7 @@ impl PyPnlAttribution {
     /// apply, ``move_unit``, ``sensitivity``, ``market_move``, ``buckets``
     /// (``tenor_years``, ``sensitivity``, ``market_move``), ``repriced_pv`` and
     /// ``gamma_pnl``. Empty for the parallel and waterfall methods. Use
-    /// ``to_sensitivity_steps_dataframe`` for float columns.
+    /// ``to_sensitivity_steps_table`` for an ``ArrowTable`` with float columns.
     #[getter]
     fn sensitivity_steps<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.sensitivity_steps)
@@ -559,56 +560,20 @@ impl PyPnlAttribution {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.attribution._pnl_attribution", "PnlAttribution.compare")]
     #[staticmethod]
-    fn compare<'py>(
-        py: Python<'py>,
-        attributions: Vec<PyRef<'py, Self>>,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    fn compare(attributions: Vec<PyRef<'_, Self>>) -> PyResult<PyArrowTable> {
         let rows = attributions
             .iter()
             .map(|attribution| pnl_attribution_wide_row(&attribution.inner))
             .collect::<Result<Vec<_>, _>>()
-            .map_err(crate::errors::core_to_py)?;
-        serde_rows_to_dataframe_with_schema(py, &rows, &WIDE_COLUMNS)
+            .map_err(core_to_py)?;
+        serde_rows_to_arrow_table(&rows, &WIDE_COLUMNS)
     }
 
-    /// Export attribution as a single-row pandas ``DataFrame``.
-    ///
-    /// Raises ``ValueError`` if any headline, factor, residual, detail, or diagnostic amount uses a currency other
-    /// than ``total_pnl``'s. The row carries ONE ``currency`` label beside every
-    /// factor amount, so a mixed-currency attribution would make
-    /// ``df[factor_cols].sum(axis=1)`` add unlike units — this is the same check
-    /// :meth:`validate_currencies` performs, applied before the frame is built.
-    /// The long format (:meth:`to_long_dataframe`) carries currency per row and
-    /// has no such restriction.
-    ///
-    /// Columns: ``instrument_id``, ``method``, ``t0``, ``t1``, ``currency``,
-    /// ``total_pnl``, ``mark_to_market_pnl`` (``None`` when unavailable;
-    /// the column dtype is then ``object``, so coerce with ``pd.to_numeric``
-    /// before concatenating frames with different value availability),
-    /// ``pv_t0`` and ``pv_t1`` (the endpoint present values, ``None`` when the
-    /// result carries no endpoints), ``carry``,
-    /// ``rates_curves_pnl``, ``credit_curves_pnl``, ``inflation_curves_pnl``,
-    /// ``correlations_pnl``, ``fx_pnl``, ``fx_translation_pnl``, ``vol_pnl``,
-    /// ``cross_factor_pnl``,
-    /// ``model_params_pnl``, ``market_scalars_pnl``, ``residual``,
-    /// ``residual_pct``, ``num_repricings``, ``result_invalid``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        // One `currency` column labels every factor amount on this row, so the
-        // frame is only meaningful when the factors agree with `total_pnl`.
-        // Without this, a EUR `fx_pnl` beside a USD total is presented as
-        // comparable and `df[factors].sum(axis=1)` silently adds unlike units.
-        let wide = pnl_attribution_wide_row(&self.inner).map_err(crate::errors::core_to_py)?;
-        let names: Vec<&str> = WIDE_COLUMNS.iter().map(|(name, _)| *name).collect();
-        serde_object_to_single_row_dataframe_with_schema(py, &wide, &names)
-    }
-
-    /// Export every populated detail breakdown as a single long-format DataFrame.
+    /// Export every populated detail breakdown as a single long-format ``ArrowTable``.
     ///
     /// Columns: ``kind``, ``factor``, ``sub``, ``key_a``, ``key_b``,
     /// ``amount``, ``currency``. ``sub`` is ``kind`` with the ``factor.``
-    /// prefix removed (``"by_curve"``, ``"coupon_income.rates"``), so
-    /// ``df.pivot_table(index="factor", columns="sub", values="amount")``
-    /// works without string surgery.
+    /// prefix removed (``"by_curve"``, ``"coupon_income.rates"``).
     ///
     /// ``kind`` is a dotted path identifying the row's origin
     /// (e.g. ``"rates.by_curve"``, ``"rates.by_tenor"``, ``"credit.by_curve"``,
@@ -627,16 +592,14 @@ impl PyPnlAttribution {
     /// pairs, bucket path for credit-factor per-bucket rows); ``None`` when
     /// only one dimension is meaningful.
     ///
-    /// The DataFrame is empty (zero rows, schema columns present) when no
-    /// detail breakdown was populated. Use ``df.query("kind.str.startswith('rates')")``
-    /// or ``df.pivot_table(index="key_a", columns="key_b", values="amount")``
-    /// to slice the desired view.
-    fn to_long_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    /// Returns an empty ``ArrowTable`` (zero rows, schema columns present) when no
+    /// detail breakdown was populated.
+    fn to_long_table(&self) -> PyResult<PyArrowTable> {
         let rows = pnl_attribution_long_rows(&self.inner);
-        serde_rows_to_dataframe_with_schema(py, &rows, &LONG_DETAIL_COLUMNS)
+        serde_rows_to_arrow_table(&rows, &LONG_DETAIL_COLUMNS)
     }
 
-    /// Export the waterfall step chain as a DataFrame, one row per step in
+    /// Export the waterfall step chain as an ``ArrowTable``, one row per step in
     /// the order applied.
     ///
     /// Columns: ``step_index``, ``factor`` (snake-case factor name such as
@@ -647,15 +610,15 @@ impl PyPnlAttribution {
     /// (``total_pnl - mark_to_market_pnl``); every other bucket equals its
     /// row's ``step_pnl``.
     ///
-    /// Returns an empty DataFrame (zero rows, schema columns present) unless
+    /// Returns an empty ``ArrowTable`` (zero rows, schema columns present) unless
     /// the waterfall method produced the result.
-    fn to_waterfall_steps_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_waterfall_steps_table(&self) -> PyResult<PyArrowTable> {
         let rows = pnl_attribution_waterfall_step_rows(&self.inner);
-        serde_rows_to_dataframe_with_schema(py, &rows, &WATERFALL_STEP_COLUMNS)
+        serde_rows_to_arrow_table(&rows, &WATERFALL_STEP_COLUMNS)
     }
 
-    /// Export the working behind each Taylor or metrics-based factor as a
-    /// DataFrame.
+    /// Export the working behind each Taylor or metrics-based factor as an
+    /// ``ArrowTable``.
     ///
     /// Columns: ``step_index``, ``factor``, ``tenor_years``, ``move_unit``
     /// (``"basis_point"``, ``"vol_point"``, ``"percent"``, ``"price_unit"``),
@@ -669,17 +632,17 @@ impl PyPnlAttribution {
     /// ``sensitivity * market_move`` reproduces ``explained_pnl`` on scalar
     /// rows, and summed over a factor's bucket rows on key-rate factors.
     ///
-    /// Returns an empty DataFrame (zero rows, schema columns present) for the
+    /// Returns an empty ``ArrowTable`` (zero rows, schema columns present) for the
     /// parallel and waterfall methods.
-    fn to_sensitivity_steps_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_sensitivity_steps_table(&self) -> PyResult<PyArrowTable> {
         let rows = pnl_attribution_sensitivity_step_rows(&self.inner);
-        serde_rows_to_dataframe_with_schema(py, &rows, &SENSITIVITY_STEP_COLUMNS)
+        serde_rows_to_arrow_table(&rows, &SENSITIVITY_STEP_COLUMNS)
     }
 
-    /// Export the carry decomposition as a long-format DataFrame.
+    /// Export the carry decomposition as a long-format ``ArrowTable``.
     ///
     /// Columns: ``kind``, ``factor``, ``sub``, ``key_a``, ``key_b``,
-    /// ``amount``, ``currency`` as in :meth:`to_long_dataframe`.
+    /// ``amount``, ``currency`` as in :meth:`to_long_table`.
     /// ``kind`` is one of ``carry.total`` / ``carry.theta`` /
     /// ``carry.coupon_income`` / ``carry.coupon_income.rates`` /
     /// ``carry.coupon_income.credit`` / ``carry.pull_to_par`` /
@@ -690,30 +653,30 @@ impl PyPnlAttribution {
     /// when a ``CreditFactorModel`` was supplied to the attribution and the
     /// source line carries a typed split (PR-8b §7.1).
     ///
-    /// Returns an empty DataFrame (zero rows, schema columns present) when
+    /// Returns an empty ``ArrowTable`` (zero rows, schema columns present) when
     /// ``carry_detail`` is not populated.
-    fn to_carry_detail_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_carry_detail_table(&self) -> PyResult<PyArrowTable> {
         let rows = pnl_attribution_carry_rows(&self.inner);
-        serde_rows_to_dataframe_with_schema(py, &rows, &LONG_DETAIL_COLUMNS)
+        serde_rows_to_arrow_table(&rows, &LONG_DETAIL_COLUMNS)
     }
 
     /// Export the credit-factor hierarchy decomposition as a long-format
-    /// DataFrame.
+    /// ``ArrowTable``.
     ///
     /// Columns: ``kind``, ``factor``, ``sub``, ``key_a``, ``key_b``,
-    /// ``amount``, ``currency`` as in :meth:`to_long_dataframe`. ``kind`` is
+    /// ``amount``, ``currency`` as in :meth:`to_long_table`. ``kind`` is
     /// one of ``credit_factor.generic`` / ``credit_factor.level`` /
     /// ``credit_factor.level.by_bucket`` / ``credit_factor.adder`` /
     /// ``credit_factor.curve_shape`` / ``credit_factor.adder_by_issuer``;
     /// ``factor`` is always ``"credit_factor"``, ``key_a`` the level name or
     /// component, ``key_b`` the bucket path / issuer id when applicable.
     ///
-    /// Returns an empty DataFrame (zero rows, schema columns present) when
+    /// Returns an empty ``ArrowTable`` (zero rows, schema columns present) when
     /// ``credit_factor_detail`` is not populated (no ``credit_factor_model``
     /// was supplied, or the instrument has no resolvable issuer).
-    fn to_credit_factor_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_credit_factor_table(&self) -> PyResult<PyArrowTable> {
         let rows = pnl_attribution_credit_factor_rows(&self.inner);
-        serde_rows_to_dataframe_with_schema(py, &rows, &LONG_DETAIL_COLUMNS)
+        serde_rows_to_arrow_table(&rows, &LONG_DETAIL_COLUMNS)
     }
 
     fn __repr__(&self) -> String {
@@ -726,15 +689,13 @@ impl PyPnlAttribution {
             self.inner.meta.residual_pct,
         )
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyPnlAttribution {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let wide = pnl_attribution_wide_row(&self.inner).map_err(core_to_py)?;
+        serde_object_to_single_row_arrow_table(&wide, &WIDE_COLUMNS)
     }
 }
+
+tabular_methods!(PyPnlAttribution);

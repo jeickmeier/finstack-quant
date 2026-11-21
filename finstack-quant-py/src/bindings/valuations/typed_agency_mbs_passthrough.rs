@@ -66,19 +66,19 @@ impl PyAgencyMbsPassthrough {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.pool_id")]
     #[getter]
     fn pool_id<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.pool_id)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.pool_id)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.agency")]
     #[getter]
     fn agency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.agency)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.agency)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.pool_type")]
     #[getter]
     fn pool_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.pool_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.pool_type)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.original_face")]
@@ -153,7 +153,7 @@ impl PyAgencyMbsPassthrough {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.prepayment_spec")]
     #[getter]
     fn prepayment_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.prepayment_spec)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.prepayment_spec)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_mbs_passthrough", "AgencyMbsPassthrough.discount_curve_id")]

@@ -5,8 +5,10 @@ from __future__ import annotations
 import datetime
 from typing import Any, Literal
 import pandas as pd
+import polars as pl
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.valuations.instruments._instruments import Bond
 
 class BondWorkoutRow:
@@ -372,7 +374,27 @@ class BondWorkoutLadder:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        The rows as an :class:`~finstack_quant.core.table.ArrowTable`, in date order.
+
+        Columns: ``date`` (ISO string), ``kind``, ``redemption_price_pct``,
+        ``redemption_amount``, ``currency``, ``make_whole``, ``yield_rate``,
+        ``i_spread`` and ``is_worst``.
+
+        Returns
+        -------
+        ArrowTable
+            One row per exit.
+
+        Raises
+        ------
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         The rows as a pandas ``DataFrame``, in date order.
 
@@ -388,10 +410,51 @@ class BondWorkoutLadder:
         Raises
         ------
         ImportError
-            If ``pyarrow`` is not installed.
+            If ``pandas`` is not installed.
+        ValueError
+            If the table cannot be converted.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        The rows as a Polars ``DataFrame``, in date order.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per exit.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the table cannot be converted.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        The rows as a ``pyarrow.Table``, in date order.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per exit.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the table cannot be converted.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @property
     def instrument_id(self) -> str:
         """

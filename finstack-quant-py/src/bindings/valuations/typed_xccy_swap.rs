@@ -63,19 +63,19 @@ impl PyXccySwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_xccy_swap", "XccySwap.leg1")]
     #[getter]
     fn leg1<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.leg1)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.leg1)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_xccy_swap", "XccySwap.leg2")]
     #[getter]
     fn leg2<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.leg2)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.leg2)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_xccy_swap", "XccySwap.notional_exchange")]
     #[getter]
     fn notional_exchange<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.notional_exchange)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.notional_exchange)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_xccy_swap", "XccySwap.reporting_currency")]

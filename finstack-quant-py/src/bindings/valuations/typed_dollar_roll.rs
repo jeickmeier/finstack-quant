@@ -66,7 +66,7 @@ impl PyDollarRoll {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.agency")]
     #[getter]
     fn agency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.agency)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.agency)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.coupon")]
@@ -78,7 +78,7 @@ impl PyDollarRoll {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.term")]
     #[getter]
     fn term<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.term)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.term)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.notional")]
@@ -114,7 +114,7 @@ impl PyDollarRoll {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.settlement_class")]
     #[getter]
     fn settlement_class<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.settlement_class)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.settlement_class)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.front_settlement_date")]
@@ -159,7 +159,7 @@ impl PyDollarRoll {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.prepayment_spec")]
     #[getter]
     fn prepayment_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.prepayment_spec)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.prepayment_spec)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_dollar_roll", "DollarRoll.discount_curve_id")]

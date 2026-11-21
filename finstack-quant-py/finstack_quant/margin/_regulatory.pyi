@@ -7,6 +7,8 @@ from typing import Literal, NotRequired, TypedDict, Unpack
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.margin._types import NettingSetId
 
 class _DrcPositionFields(TypedDict):
@@ -169,25 +171,26 @@ class FrtbSensitivities:
         ...
 
     @staticmethod
-    def from_dataframe(frame: pd.DataFrame, base_currency: str) -> FrtbSensitivities:
+    def from_dataframe(frame: pd.DataFrame | pl.DataFrame | Any, base_currency: str) -> FrtbSensitivities:
         """
-        Bulk-load sensitivities from the long-format frame ``to_dataframe``
-        emits.
+        Bulk-load sensitivities from the long-format table ``to_arrow`` /
+        ``to_pandas`` emits.
 
         Parameters
         ----------
-        frame : pd.DataFrame
-            Columns ``risk_class``, ``kind``, ``issuer``, ``bucket``,
+        frame : pd.DataFrame | pl.DataFrame | Any
+            Pandas ``DataFrame``, Polars ``DataFrame``, or Arrow table with
+            columns ``risk_class``, ``kind``, ``issuer``, ``bucket``,
             ``tenor``, ``amount`` (plus ``curve_id`` required on ordinary GIRR
             delta, and DRC columns ``sector``, ``seniority``,
             ``maturity_years``, ``pnl_adjustment`` on ``drc``
-            rows) encoded as ``to_dataframe`` documents.
+            rows) encoded as ``to_arrow`` documents.
             ``curvature_up`` / ``curvature_down`` rows are recombined into
             pairs; ``rrao`` rows carry ``exotic_notional`` /
             ``other_notional``; each ``drc`` row is one default-risk
             position (a missing ``pnl_adjustment`` reads as ``0.0``).
         base_currency : str
-            Reporting currency of every ``amount`` (the frame does not
+            Reporting currency of every ``amount`` (the table does not
             carry it).
 
         Returns
@@ -195,15 +198,15 @@ class FrtbSensitivities:
         FrtbSensitivities
             Container with rows of the same key accumulated, decoded by the
             Rust ``FrtbSensitivities::from_rows`` (the inverse of
-            ``to_dataframe``).
+            ``to_arrow``).
 
         Raises
         ------
         ValueError
             If a risk class or kind is unknown, a required column or value
             is missing, or a bucket, currency or DRC label is invalid.
-        AttributeError
-            If ``frame`` has no ``to_dict`` method (not a ``DataFrame``).
+        TypeError
+            If ``frame`` is not a pandas/Polars DataFrame or Arrow table.
 
         Examples
         --------
@@ -218,7 +221,7 @@ class FrtbSensitivities:
         ...     "maturity_years": 1.0,
         ...     "pnl_adjustment": 0.0,
         ... })
-        >>> restored = FrtbSensitivities.from_dataframe(original.to_dataframe(), "USD")
+        >>> restored = FrtbSensitivities.from_dataframe(original.to_arrow(), "USD")
         >>> restored.to_json() == original.to_json()
         True
         """
@@ -918,16 +921,15 @@ class FrtbSensitivities:
         ...
 
     def __repr__(self) -> str: ...
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export every populated sensitivity bucket as one long-format pandas
-        ``DataFrame``.
+        Export every populated sensitivity bucket as one long-format
+        :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``risk_class``, ``bucket``, ``tenor``, ``issuer``, ``kind``,
         ``amount``, the ordinary GIRR ``curve_id``, then the DRC columns ``sector``, ``seniority``,
-        ``maturity_years``, ``pnl_adjustment`` (``None`` /
-        ``NaN`` on non-DRC rows). One row per populated bucket; an empty
-        container still carries all ten columns. Long format is used
+        ``maturity_years``, ``pnl_adjustment`` (null on non-DRC rows). One row per populated bucket; an empty
+        container still carries all columns. Long format is used
         deliberately - a column per bucket would give a different schema for
         every portfolio.
 
@@ -954,7 +956,7 @@ class FrtbSensitivities:
         ``amount`` keeps each bucket's own convention: GIRR deltas are
         base-currency P&L per **1 percentage point** of curve shift (that is,
         ``100 x DV01``), DRC rows are signed JTD notionals before LGD, and
-        RRAO rows are gross notionals. ``from_dataframe`` accepts this frame
+        RRAO rows are gross notionals. ``from_dataframe`` accepts this table
         back, ``drc`` rows included.
 
         Rows are sorted by ``(risk_class, kind, issuer, bucket, tenor)`` and
@@ -963,15 +965,67 @@ class FrtbSensitivities:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per populated sensitivity bucket.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be serialized into an Arrow table.
         """
         ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export every populated sensitivity bucket as one long-format pandas ``DataFrame``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per populated sensitivity bucket.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export every populated sensitivity bucket as one long-format Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per populated sensitivity bucket.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export every populated sensitivity bucket as one long-format ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per populated sensitivity bucket.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 class FrtbSbaEngine:
     """
@@ -1348,13 +1402,13 @@ class FrtbSbaResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the headline charge as a single-row pandas ``DataFrame``.
+        Export the headline charge as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
+        ArrowTable
             Columns ``total``, ``drc``, ``rrao`` (floats) and
             ``binding_scenario`` (string). One row.
 
@@ -1364,17 +1418,69 @@ class FrtbSbaResult:
         """
         ...
 
-    def to_breakdown_dataframe(self) -> pd.DataFrame:
+    def to_pandas(self) -> pd.DataFrame:
         """
-        Export the per-risk-class breakdown as a long-format ``DataFrame``.
+        Export the headline charge as a single-row pandas ``DataFrame``.
 
         Returns
         -------
         pandas.DataFrame
+            Columns ``total``, ``drc``, ``rrao`` (floats) and
+            ``binding_scenario`` (string). One row.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the headline charge as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Columns ``total``, ``drc``, ``rrao`` and ``binding_scenario``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the headline charge as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row describing the headline SBA charge.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_breakdown_table(self) -> ArrowTable:
+        """
+        Export the per-risk-class breakdown as a long-format :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
             Columns ``component`` (``"delta"``/``"vega"``/``"curvature"``),
             ``risk_class`` and ``charge``. Components do not sum to ``total``:
             SBA aggregates them with prescribed correlations, and ``drc`` /
-            ``rrao`` sit outside this frame.
+            ``rrao`` sit outside this table.
 
         Notes
         -----
@@ -1382,13 +1488,13 @@ class FrtbSbaResult:
         """
         ...
 
-    def to_scenario_dataframe(self) -> pd.DataFrame:
+    def to_scenario_table(self) -> ArrowTable:
         """
-        Export the per-scenario SBA charges as a pandas ``DataFrame``.
+        Export the per-scenario SBA charges as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             Columns ``scenario`` (``"low"``, ``"medium"``, ``"high"``),
             ``charge`` (delta+vega+curvature under that scenario, float in
             the portfolio's base currency) and ``binding`` (``True`` on the
@@ -1403,7 +1509,7 @@ class FrtbSbaResult:
         --------
         >>> sens = FrtbSensitivities("USD")
         >>> sens.add_girr_delta("USD", "USD-OIS", "5Y", 100_000.0)
-        >>> frtb_sba_charge(sens).to_scenario_dataframe()["scenario"].tolist()
+        >>> frtb_sba_charge(sens).to_scenario_table().to_dict()["scenario"]
         ['low', 'medium', 'high']
         """
         ...
@@ -1642,13 +1748,13 @@ class EadResult:
         """
         ...
 
-    def to_dataframe(self) -> Any:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the headline exposure as a single-row pandas ``DataFrame``.
+        Export the headline exposure as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
+        ArrowTable
             Columns ``ead``, ``rc``, ``pfe``, ``multiplier``,
             ``add_on_aggregate``, ``alpha``, ``maturity_factor``. One row.
 
@@ -1658,15 +1764,67 @@ class EadResult:
         """
         ...
 
-    def to_add_on_dataframe(self) -> Any:
+    def to_pandas(self) -> pd.DataFrame:
         """
-        Export the per-asset-class add-on as a pandas ``DataFrame``.
+        Export the headline exposure as a single-row pandas ``DataFrame``.
 
         Returns
         -------
         pandas.DataFrame
+            Columns ``ead``, ``rc``, ``pfe``, ``multiplier``,
+            ``add_on_aggregate``, ``alpha``, ``maturity_factor``. One row.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the headline exposure as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row describing the headline SA-CCR exposure.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the headline exposure as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row describing the headline SA-CCR exposure.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_add_on_table(self) -> ArrowTable:
+        """
+        Export the per-asset-class add-on as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
             Columns ``asset_class`` and ``add_on``, one row per asset class
-            present. A netting set with no trades yields a zero-row frame that
+            present. A netting set with no trades yields a zero-row table that
             still carries both columns with their real dtypes.
 
         Notes
@@ -1890,19 +2048,20 @@ class SaCcrTrade:
         ...
 
     @staticmethod
-    def from_dataframe(frame: pd.DataFrame) -> list[SaCcrTrade]:
+    def from_dataframe(frame: pd.DataFrame | pl.DataFrame | Any) -> list[SaCcrTrade]:
         """
         Build one validated trade per row of a trade tape.
 
         Parameters
         ----------
-        frame : pd.DataFrame
-            Columns ``trade_id``, ``asset_class``, ``notional``,
+        frame : pd.DataFrame | pl.DataFrame | Any
+            Pandas ``DataFrame``, Polars ``DataFrame``, or Arrow table with
+            columns ``trade_id``, ``asset_class``, ``notional``,
             ``start_date``, ``end_date``, ``underlier``, ``hedging_set``,
             ``direction``, ``supervisory_delta``, ``mtm``, ``is_option``;
             ``option_type``, ``supervisory_category`` and
-            ``option_maturity_date`` may be null. Dates may be ISO strings or
-            date-like values.
+            ``option_maturity_date`` may be null (``None``, ``NaN``, or
+            ``NaT``). Dates may be ISO strings or date-like values.
 
         Returns
         -------
@@ -1915,7 +2074,7 @@ class SaCcrTrade:
             Naming the first row that is missing a column, has an unknown
             label, or fails the BCBS 279 coherence checks.
         TypeError
-            If ``frame`` is not a pandas ``DataFrame``.
+            If ``frame`` is not a pandas/Polars DataFrame or Arrow table.
 
         Examples
         --------
@@ -1932,18 +2091,52 @@ class SaCcrTrade:
         ...     mtm=0.0,
         ...     is_option=False,
         ... )
-        >>> [t.trade_id for t in SaCcrTrade.from_dataframe(trade.to_dataframe())]
+        >>> [t.trade_id for t in SaCcrTrade.from_dataframe(trade.to_arrow())]
         ['t1']
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the trade as a single-row pandas ``DataFrame``.
+        Export the trade as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns are the constructor fields in order (``trade_id`` ..
         ``option_type``); dates are ISO 8601 strings and ``option_type`` is
-        null for linear trades. ``from_dataframe`` accepts this frame back.
+        null for linear trades. ``from_dataframe`` accepts this table back.
+
+        Returns
+        -------
+        ArrowTable
+            One row describing the trade.
+
+        Raises
+        ------
+        ValueError
+            If the trade cannot be serialized into an Arrow table.
+
+        Examples
+        --------
+        >>> trade = SaCcrTrade(
+        ...     trade_id="t1",
+        ...     asset_class="interest_rate",
+        ...     notional=1_000_000,
+        ...     start_date="2025-01-01",
+        ...     end_date="2030-01-01",
+        ...     underlier="USD-SOFR",
+        ...     hedging_set="rates",
+        ...     direction=1.0,
+        ...     supervisory_delta=1.0,
+        ...     mtm=0.0,
+        ...     is_option=False,
+        ... )
+        >>> trade.to_arrow().to_dict()["end_date"][0]
+        '2030-01-01'
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the trade as a single-row pandas ``DataFrame``.
 
         Returns
         -------
@@ -1952,8 +2145,8 @@ class SaCcrTrade:
 
         Raises
         ------
-        ValueError
-            If the trade cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
 
         Examples
         --------
@@ -1970,11 +2163,46 @@ class SaCcrTrade:
         ...     mtm=0.0,
         ...     is_option=False,
         ... )
-        >>> trade.to_dataframe().iloc[0]["end_date"]
+        >>> trade.to_pandas().iloc[0]["end_date"]
         '2030-01-01'
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the trade as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row describing the trade.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the trade as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row describing the trade.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @staticmethod
     def from_json(json: str) -> SaCcrTrade:
         """

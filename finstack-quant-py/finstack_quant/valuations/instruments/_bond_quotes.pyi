@@ -5,7 +5,9 @@ from __future__ import annotations
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.valuations.instruments._instruments import Bond
 
 class BondQuoteSet:
@@ -115,9 +117,25 @@ class BondQuoteSet:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Return the set as a one-row table, one column per field.
+        Return the set as a one-row :class:`~finstack_quant.core.table.ArrowTable`, one column per field.
+
+        Returns
+        -------
+        ArrowTable
+            Thirteen ``float64`` columns in field order.
+
+        Raises
+        ------
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Return the set as a one-row pandas ``DataFrame``, one column per field.
 
         Returns
         -------
@@ -128,10 +146,51 @@ class BondQuoteSet:
         Raises
         ------
         ImportError
-            If ``pyarrow`` is not installed.
+            If ``pandas`` is not installed.
+        ValueError
+            If the table cannot be converted.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Return the set as a one-row Polars ``DataFrame``, one column per field.
+
+        Returns
+        -------
+        polars.DataFrame
+            Thirteen ``Float64`` columns in field order.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the table cannot be converted.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Return the set as a one-row ``pyarrow.Table``, one column per field.
+
+        Returns
+        -------
+        pyarrow.Table
+            Thirteen ``float64`` columns in field order.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the table cannot be converted.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @property
     def clean_price_currency(self) -> float:
         """

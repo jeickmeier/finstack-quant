@@ -7,25 +7,27 @@ use pyo3::types::{PyAny, PyDict};
 use serde::Serialize;
 
 use crate::bindings::core::money::PyMoney;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref};
+use crate::bindings::macros::tabular_methods;
 use crate::bindings::margin::im::PySimmSensitivities;
 use crate::bindings::margin::types::{PyImCollateralResult, PyImMethodology, PyNettingSetId};
-use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::portfolio_to_py;
 use finstack_quant_portfolio::{margin::NettingSetMargin, margin::PortfolioMarginResult};
 
 use crate::bindings::core::config::PyFinstackConfig;
+use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::margin::PyFrtbSensitivities;
 use crate::bindings::module_utils::{parse_currency, py_to_serde};
-use crate::bindings::pandas_utils::serde_to_py;
 use finstack_quant_portfolio::margin::{
     CsrQuoteClassification, CsrQuoteDelta, CsrQuoteSource, GirrQuoteDelta, GirrQuoteTarget,
     csr_quote_delta as csr_quote_delta_rs, girr_quote_delta as girr_quote_delta_rs,
 };
 
-/// Column schema for [`PyPortfolioMarginResult::to_dataframe`].
-const NETTING_SET_COLUMNS: &[ColumnSchema<'static>] = &[
+/// Column schema for [`PyPortfolioMarginResult::to_arrow_table`].
+const NETTING_SET_COLUMNS: &[(&str, &str)] = &[
     ("netting_set_id", "str"),
     ("csa_id", "str"),
     ("is_cleared", "bool"),
@@ -52,8 +54,8 @@ struct NettingSetRow {
     is_approximate: bool,
 }
 
-/// Column schema for [`PyNettingSetMargin::to_dataframe`].
-const IM_BREAKDOWN_COLUMNS: &[ColumnSchema<'static>] = &[
+/// Column schema for [`PyNettingSetMargin::to_arrow_table`].
+const IM_BREAKDOWN_COLUMNS: &[(&str, &str)] = &[
     ("netting_set_id", "str"),
     ("risk_class", "str"),
     ("initial_margin", "float64"),
@@ -173,13 +175,20 @@ impl PyNettingSetMargin {
         self.inner.is_cleared()
     }
 
-    /// Initial margin by SIMM risk class as a :class:`pandas.DataFrame`.
-    ///
-    /// Columns: ``netting_set_id``, ``risk_class``, ``initial_margin``,
-    /// ``currency``. One row per entry of ``im_breakdown`` (sorted by risk
-    /// class); empty when no breakdown was produced.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn __repr__(&self) -> String {
+        format!(
+            "NettingSetMargin(netting_set_id={:?}, initial_margin={} {ccy}, variation_margin={} {ccy}, positions={})",
+            self.inner.netting_set_id.to_string(),
+            self.inner.initial_margin.amount(),
+            self.inner.variation_margin.amount(),
+            self.inner.position_count,
+            ccy = self.inner.initial_margin.currency(),
+        )
+    }
+}
+
+impl PyNettingSetMargin {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         let mut rows: Vec<ImBreakdownRow<'_>> = self
             .inner
             .im_breakdown
@@ -192,20 +201,11 @@ impl PyNettingSetMargin {
             })
             .collect();
         rows.sort_by(|a, b| a.risk_class.cmp(b.risk_class));
-        serde_rows_to_dataframe_with_schema(py, &rows, IM_BREAKDOWN_COLUMNS)
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "NettingSetMargin(netting_set_id={:?}, initial_margin={} {ccy}, variation_margin={} {ccy}, positions={})",
-            self.inner.netting_set_id.to_string(),
-            self.inner.initial_margin.amount(),
-            self.inner.variation_margin.amount(),
-            self.inner.position_count,
-            ccy = self.inner.initial_margin.currency(),
-        )
+        serde_rows_to_arrow_table(&rows, IM_BREAKDOWN_COLUMNS)
     }
 }
+
+tabular_methods!(PyNettingSetMargin);
 
 /// Portfolio-wide margin results in the portfolio base currency.
 ///
@@ -336,15 +336,21 @@ impl PyPortfolioMarginResult {
             .collect()
     }
 
-    /// Per-netting-set margin as a :class:`pandas.DataFrame`.
-    ///
-    /// Columns: ``netting_set_id``, ``csa_id``, ``is_cleared``,
-    /// ``initial_margin``, ``variation_margin``, ``total_margin``,
-    /// ``currency``, ``position_count``, ``im_methodology``,
-    /// ``is_approximate``. One row per netting set in ascending identifier
-    /// order; amounts are floats in ``currency`` (the base currency).
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn __repr__(&self) -> String {
+        format!(
+            "PortfolioMarginResult(as_of={}, total_initial_margin={} {ccy}, total_variation_margin={} {ccy}, netting_sets={}, degraded={})",
+            self.inner.as_of,
+            self.inner.total_initial_margin.amount(),
+            self.inner.total_variation_margin.amount(),
+            self.inner.by_netting_set.len(),
+            self.inner.degraded_positions.len(),
+            ccy = self.inner.base_currency,
+        )
+    }
+}
+
+impl PyPortfolioMarginResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         let rows: Vec<NettingSetRow> = self
             .inner
             .netting_sets_sorted()
@@ -362,23 +368,11 @@ impl PyPortfolioMarginResult {
                 is_approximate: margin.is_approximate,
             })
             .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, NETTING_SET_COLUMNS)
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "PortfolioMarginResult(as_of={}, total_initial_margin={} {ccy}, total_variation_margin={} {ccy}, netting_sets={}, degraded={})",
-            self.inner.as_of,
-            self.inner.total_initial_margin.amount(),
-            self.inner.total_variation_margin.amount(),
-            self.inner.by_netting_set.len(),
-            self.inner.degraded_positions.len(),
-            ccy = self.inner.base_currency,
-        )
+        serde_rows_to_arrow_table(&rows, NETTING_SET_COLUMNS)
     }
 }
 
-crate::bindings::macros::impl_repr_html_via_dataframe!(PyPortfolioMarginResult);
+tabular_methods!(PyPortfolioMarginResult);
 
 /// Calculate portfolio margin requirements by netting set.
 ///

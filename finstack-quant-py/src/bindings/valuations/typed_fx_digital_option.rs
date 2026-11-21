@@ -107,13 +107,13 @@ impl PyFxDigitalOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.option_type")]
     #[getter]
     fn option_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.option_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.option_type)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.payout_type")]
     #[getter]
     fn payout_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.payout_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.payout_type)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_digital_option", "FxDigitalOption.payout_amount")]

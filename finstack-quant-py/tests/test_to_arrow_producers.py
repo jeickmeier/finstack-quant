@@ -1,7 +1,7 @@
 """Structural tests for the `to_arrow_*` producer methods added in task 6.
 
-Covers `StatementResult.to_arrow_long` / `to_arrow_wide` and
-`PortfolioValuation.to_arrow_positions`. These assert the returned object is
+Covers `StatementResult.to_arrow(orient="long" | "wide")` and
+`PortfolioValuation.to_arrow`. These assert the returned object is
 an `ArrowTable` exposing the same columns/row-count as the corresponding
 `to_table_*` / `positions_to_table` Rust producers (and their existing
 `to_pandas_*` bindings). Behavioral pyarrow/polars round-trip coverage lands
@@ -34,7 +34,7 @@ def _statement_result() -> object:
 
 def test_to_arrow_long_matches_pandas_long_columns() -> None:
     res = _statement_result()
-    at = res.to_arrow_long()
+    at = res.to_arrow("long")
 
     assert isinstance(at, ArrowTable)
     assert at.column_names() == [
@@ -49,13 +49,13 @@ def test_to_arrow_long_matches_pandas_long_columns() -> None:
         "source",
     ]
 
-    df = res.to_dataframe(orient="long")
+    df = res.to_pandas(orient="long")
     assert at.num_rows == len(df)
 
 
 def test_to_arrow_wide_matches_pandas_wide_shape() -> None:
     res = _statement_result()
-    at = res.to_arrow_wide()
+    at = res.to_arrow("wide")
 
     assert isinstance(at, ArrowTable)
     assert set(at.column_names()) == {"period_id", "revenue", "ebitda"}
@@ -100,11 +100,11 @@ def _market() -> MarketContext:
     )
 
 
-def test_to_arrow_positions_matches_positions_to_table_columns() -> None:
+def test_to_arrow_matches_positions_columns() -> None:
     portfolio = Portfolio.from_spec(_portfolio_spec_json())
     valuation = value_portfolio(portfolio, _market())
 
-    at = valuation.to_arrow_positions()
+    at = valuation.to_arrow()
 
     assert isinstance(at, ArrowTable)
     assert at.column_names() == [
@@ -115,6 +115,8 @@ def test_to_arrow_positions_matches_positions_to_table_columns() -> None:
         "currency_native",
         "currency_base",
         "fx_rate",
+        "fx_triangulated",
+        "risk_metrics_complete",
         "risk_error",
     ]
     assert at.num_rows == len(valuation)
@@ -132,8 +134,10 @@ def test_performance_to_arrow_matches_summary_columns_and_rejects_missing_contex
     assert isinstance(at, ArrowTable)
     assert at.num_rows == 2
     assert at.num_columns == 23
-    df = perf.to_dataframe(0.0, 0.0, 0.0, 0.95)
+    df = perf.to_pandas(0.0, 0.0, 0.0, 0.95)
     assert at.column_names() == ["ticker", *df.columns]
+    assert perf.to_polars(0.0, 0.0, 0.0, 0.95).columns == ["ticker", *df.columns]
+    assert perf.to_pyarrow(0.0, 0.0, 0.0, 0.95).column_names == ["ticker", *df.columns]
 
     no_context = analytics.Performance.from_returns(
         pd.DataFrame({"FUND": [0.10, -0.20, 0.05]}, index=dates),

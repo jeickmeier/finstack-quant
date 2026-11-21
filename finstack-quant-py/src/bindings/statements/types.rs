@@ -1,19 +1,19 @@
 //! Python wrappers for statement model types and enums.
 
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::date_to_py;
-use crate::bindings::macros::wire_methods;
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_rows_to_dataframe_with_schema, serde_to_py,
-};
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::{core_to_py, serde_json_to_py, statements_to_py};
 use finstack_quant_statements::types::{NodeSpec, NodeValueType};
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-/// Columns emitted by `FinancialModelSpec.to_dataframe`.
-const NODE_COLUMNS: [ColumnSchema<'static>; 8] = [
+/// Columns emitted by `FinancialModelSpec` tabular exports.
+const NODE_COLUMNS: [(&str, &str); 8] = [
     ("node_id", "str"),
     ("node_type", "str"),
     ("name", "str"),
@@ -1200,9 +1200,19 @@ impl PyFinancialModelSpec {
         self.inner.schema_version.into()
     }
 
-    #[doc = pydoc!("finstack_quant.statements._types", "FinancialModelSpec.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    /// Return the representation with the id, period and node counts.
+    fn __repr__(&self) -> String {
+        format!(
+            "FinancialModelSpec(id={:?}, periods={}, nodes={})",
+            self.inner.id,
+            self.inner.periods.len(),
+            self.inner.nodes.len()
+        )
+    }
+}
+
+impl PyFinancialModelSpec {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         let rows: Vec<serde_json::Value> = self
             .inner
             .nodes
@@ -1227,19 +1237,15 @@ impl PyFinancialModelSpec {
                 }))
             })
             .collect::<PyResult<_>>()?;
-        serde_rows_to_dataframe_with_schema(py, &rows, &NODE_COLUMNS)
-    }
-
-    /// Return the representation with the id, period and node counts.
-    fn __repr__(&self) -> String {
-        format!(
-            "FinancialModelSpec(id={:?}, periods={}, nodes={})",
-            self.inner.id,
-            self.inner.periods.len(),
-            self.inner.nodes.len()
-        )
+        serde_rows_to_arrow_table(&rows, &NODE_COLUMNS)
     }
 }
+
+tabular_methods!(
+    PyFinancialModelSpec,
+    "FinancialModelSpec",
+    module = "finstack_quant.statements._types"
+);
 
 /// Register type classes.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 class PositionAssignment:
     """
@@ -318,9 +321,10 @@ class FactorAssignmentReport:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the matched assignments as a long-format DataFrame.
+        Export the matched assignments as a long-format
+        :class:`~finstack_quant.core.table.ArrowTable`.
 
         One row per ``(dependency, factor_id, beta)`` mapping, so a position
         matched by a hierarchical matcher (e.g. credit) contributes one row
@@ -334,7 +338,7 @@ class FactorAssignmentReport:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per matched mapping.
 
         Raises
@@ -344,17 +348,68 @@ class FactorAssignmentReport:
         """
         ...
 
-    def to_unmatched_dataframe(self) -> pd.DataFrame:
+    def to_pandas(self) -> pd.DataFrame:
         """
-        Export the unmatched dependencies as a pandas DataFrame.
+        Export the matched assignments as a long-format pandas ``DataFrame``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per matched mapping.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the matched assignments as a long-format Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per matched mapping.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the matched assignments as a long-format ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per matched mapping.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_unmatched_table(self) -> ArrowTable:
+        """
+        Export the unmatched dependencies as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``position_id``, ``dependency_json`` (the unmatched
         ``MarketDependency`` as a JSON string).
 
         Returns
         -------
-        pd.DataFrame
-            One row per entry of :attr:`unmatched`; a zero-row frame (columns
+        ArrowTable
+            One row per entry of :attr:`unmatched`; a zero-row table (columns
             still present) means every dependency matched a configured factor.
 
         Raises

@@ -1,16 +1,16 @@
 //! Python wrappers for margin calculators (VM + IM result types).
 
 use super::types::{PyCsaSpec, PyImMethodology};
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::pandas_utils::{
-    ColumnSchema, dict_to_dataframe, serde_rows_to_dataframe_with_schema, serde_to_py,
-};
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::{TableBuilder, serde_rows_to_arrow_table};
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_margin as fm;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 
 /// Variation margin calculation result.
 ///
@@ -144,56 +144,6 @@ impl PyVmResult {
         self.inner.requires_call()
     }
 
-    /// Export the result as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``date``, ``settlement_date`` (ISO 8601 strings),
-    /// ``gross_exposure``, ``threshold``, ``independent_amount``,
-    /// ``net_exposure``, ``collateral_balance``, ``unrounded_call``, ``mta``,
-    /// ``rounding_increment``, ``post_amount``, ``collect_amount``,
-    /// ``net_margin``, ``requires_call``, ``currency``.
-    ///
-    /// All amount columns are floats in the single CSA currency reported by
-    /// ``currency``; positive ``post_amount`` means we post margin and
-    /// positive ``collect_amount`` means we receive margin back. The columns
-    /// from ``gross_exposure`` to ``rounding_increment`` are in calculation
-    /// order: threshold and independent amount turn the gross exposure into
-    /// ``net_exposure``, subtracting ``collateral_balance`` gives
-    /// ``unrounded_call``, and the MTA test and rounding give the transfer.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        data.set_item("date", vec![self.inner.date.to_string()])?;
-        data.set_item(
-            "settlement_date",
-            vec![self.inner.settlement_date.to_string()],
-        )?;
-        data.set_item("gross_exposure", vec![self.inner.gross_exposure.amount()])?;
-        data.set_item("threshold", vec![self.inner.threshold.amount()])?;
-        data.set_item(
-            "independent_amount",
-            vec![self.inner.independent_amount.amount()],
-        )?;
-        data.set_item("net_exposure", vec![self.inner.net_exposure.amount()])?;
-        data.set_item(
-            "collateral_balance",
-            vec![self.inner.collateral_balance.amount()],
-        )?;
-        data.set_item("unrounded_call", vec![self.inner.unrounded_call.amount()])?;
-        data.set_item("mta", vec![self.inner.mta.amount()])?;
-        data.set_item(
-            "rounding_increment",
-            vec![self.inner.rounding_increment.amount()],
-        )?;
-        data.set_item("post_amount", vec![self.inner.post_amount.amount()])?;
-        data.set_item("collect_amount", vec![self.inner.collect_amount.amount()])?;
-        data.set_item("net_margin", vec![self.inner.net_margin().amount()])?;
-        data.set_item("requires_call", vec![self.inner.requires_call()])?;
-        data.set_item(
-            "currency",
-            vec![self.inner.gross_exposure.currency().to_string()],
-        )?;
-        dict_to_dataframe(py, &data, None)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "VmResult(date={}, post={:.2}, collect={:.2}, requires_call={}, settlement_date={})",
@@ -208,18 +158,46 @@ impl PyVmResult {
             self.inner.settlement_date,
         )
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyVmResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .utf8("date", vec![self.inner.date.to_string()])?
+            .utf8(
+                "settlement_date",
+                vec![self.inner.settlement_date.to_string()],
+            )?
+            .f64("gross_exposure", vec![self.inner.gross_exposure.amount()])?
+            .f64("threshold", vec![self.inner.threshold.amount()])?
+            .f64(
+                "independent_amount",
+                vec![self.inner.independent_amount.amount()],
+            )?
+            .f64("net_exposure", vec![self.inner.net_exposure.amount()])?
+            .f64(
+                "collateral_balance",
+                vec![self.inner.collateral_balance.amount()],
+            )?
+            .f64("unrounded_call", vec![self.inner.unrounded_call.amount()])?
+            .f64("mta", vec![self.inner.mta.amount()])?
+            .f64(
+                "rounding_increment",
+                vec![self.inner.rounding_increment.amount()],
+            )?
+            .f64("post_amount", vec![self.inner.post_amount.amount()])?
+            .f64("collect_amount", vec![self.inner.collect_amount.amount()])?
+            .f64("net_margin", vec![self.inner.net_margin().amount()])?
+            .bool("requires_call", vec![self.inner.requires_call()])?
+            .utf8(
+                "currency",
+                vec![self.inner.gross_exposure.currency().to_string()],
+            )?
+            .build()
     }
 }
+
+tabular_methods!(PyVmResult);
 
 /// Variation margin calculator following ISDA CSA rules.
 ///
@@ -238,17 +216,40 @@ pub struct PyVmCalculator {
     inner: fm::calculators::VmCalculator,
 }
 
-/// Convert ``list[tuple[date-like, float]] | pandas.Series`` into dated
+/// Convert ``list[tuple[date-like, float]]``, ``pandas.Series``, or a 2-column DataFrame into dated
 /// exposures in ``currency``.
 fn extract_dated_exposures(
     obj: &Bound<'_, PyAny>,
     currency: Currency,
 ) -> PyResult<Vec<(finstack_quant_core::dates::Date, Money)>> {
+    use crate::bindings::dataframe_utils::{
+        extract_f64_vec, is_dataframe_like, is_polars_dataframe, table_column_names,
+        table_column_to_pylist,
+    };
     let items: Vec<(Bound<'_, PyAny>, f64)> = if obj.hasattr("items")? && obj.hasattr("index")? {
         obj.call_method0("items")?
             .try_iter()?
             .map(|item| item?.extract::<(Bound<'_, PyAny>, f64)>())
             .collect::<PyResult<_>>()?
+    } else if is_dataframe_like(obj)? {
+        let cols = table_column_names(obj)?;
+        if cols.len() != 2 {
+            return Err(crate::errors::value_error(format!(
+                "exposures DataFrame must have 2 columns (date, exposure), got {}",
+                cols.len()
+            )));
+        }
+        let dates_py = table_column_to_pylist(obj, &cols[0])?.unwrap_or_default();
+        let vals = if is_polars_dataframe(obj)? {
+            extract_f64_vec(&obj.get_item(&cols[1])?, &cols[1])?
+        } else {
+            let vals_py = table_column_to_pylist(obj, &cols[1])?.unwrap_or_default();
+            vals_py
+                .into_iter()
+                .map(|v| v.extract::<f64>())
+                .collect::<PyResult<Vec<_>>>()?
+        };
+        dates_py.into_iter().zip(vals).collect()
     } else {
         obj.extract()?
     };
@@ -333,7 +334,7 @@ impl PyVmCalculator {
     /// initial_collateral : float
     ///     Collateral posted before the first date, in the CSA base currency.
     ///
-    /// Returns a pandas ``DataFrame`` with one row per call and columns
+    /// Returns an :class:`~finstack_quant.core.table.ArrowTable` with columns
     /// ``call_date``, ``settlement_date`` (ISO 8601 strings), ``call_type``
     /// (``"variation_margin_post"`` or ``"variation_margin_collect"``),
     /// ``amount``, ``mtm_trigger``, ``threshold``, ``mta_applied`` (floats in
@@ -344,13 +345,12 @@ impl PyVmCalculator {
     /// ValueError
     ///     If an amount is non-finite or a date string is not ISO 8601.
     #[pyo3(signature = (exposures, initial_collateral))]
-    fn generate_margin_calls<'py>(
+    fn generate_margin_calls(
         &self,
-        py: Python<'py>,
-        exposures: &Bound<'py, PyAny>,
+        exposures: &Bound<'_, PyAny>,
         initial_collateral: f64,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        const COLUMNS: &[ColumnSchema<'_>] = &[
+    ) -> PyResult<PyArrowTable> {
+        const COLUMNS: &[(&str, &str)] = &[
             ("call_date", "str"),
             ("settlement_date", "str"),
             ("call_type", "str"),
@@ -382,7 +382,7 @@ impl PyVmCalculator {
                 })
             })
             .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, COLUMNS)
+        serde_rows_to_arrow_table(&rows, COLUMNS)
     }
 
     /// Contractual margin-call dates between ``start`` and ``end``.
@@ -411,7 +411,7 @@ impl PyVmCalculator {
             .inner
             .margin_call_dates(py_to_date(start)?, py_to_date(end)?)
             .map_err(core_to_py)?;
-        crate::bindings::pandas_utils::dates_to_pylist(py, &dates)
+        crate::bindings::date_utils::dates_to_pylist(py, &dates)
     }
 
     fn __repr__(&self) -> String {
@@ -537,40 +537,18 @@ impl PyImResult {
         self.inner.breakdown.get(key).map(|m| m.amount())
     }
 
-    /// Export the headline result as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``amount``, ``currency``, ``methodology``, ``mpor_days``,
-    /// ``as_of``, ``approximation``.
-    ///
-    /// ``amount`` is a float in ``currency``; ``mpor_days`` is the margin
-    /// period of risk in business days; ``as_of`` is an ISO 8601 date string.
-    /// ``approximation`` is ``True`` when the amount is a conservative proxy
-    /// rather than an exact computation under the named methodology — do not
-    /// reconcile an approximated figure against an actual margin call.
-    /// Per-component detail lives in ``to_breakdown_dataframe``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        data.set_item("amount", vec![self.inner.amount.amount()])?;
-        data.set_item("currency", vec![self.inner.amount.currency().to_string()])?;
-        data.set_item("methodology", vec![self.inner.methodology.to_string()])?;
-        data.set_item("mpor_days", vec![self.inner.mpor_days])?;
-        data.set_item("as_of", vec![self.inner.as_of.to_string()])?;
-        data.set_item("approximation", vec![self.inner.approximation])?;
-        dict_to_dataframe(py, &data, None)
-    }
-
-    /// Export the per-component breakdown as a pandas ``DataFrame``.
+    /// Export the per-component breakdown as an :class:`~finstack_quant.core.table.ArrowTable`.
     ///
     /// Columns: ``risk_class``, ``amount``, ``currency``. One row per
     /// component label (SIMM: ``IR_Delta``, ``IR_Vega``, ``FX_Delta``,
     /// ``Curvature``, ...; schedule: the asset class such as
     /// ``interest_rate``), sorted by ``risk_class`` so repeated runs are
     /// byte-identical. Methodologies that publish no breakdown yield a
-    /// zero-row frame that still carries all three columns.
+    /// zero-row table that still carries all three columns.
     ///
     /// Breakdown components do not generally sum to ``amount``: SIMM and
     /// other methodologies aggregate risk classes with correlations.
-    fn to_breakdown_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_breakdown_table(&self) -> PyResult<PyArrowTable> {
         let risk_classes: Vec<String> = self.inner.breakdown.keys().cloned().collect();
         let amounts: Vec<f64> = self
             .inner
@@ -585,11 +563,11 @@ impl PyImResult {
             .map(|money| money.currency().to_string())
             .collect();
 
-        let data = PyDict::new(py);
-        data.set_item("risk_class", risk_classes)?;
-        data.set_item("amount", amounts)?;
-        data.set_item("currency", currencies)?;
-        dict_to_dataframe(py, &data, None)
+        TableBuilder::new()
+            .utf8("risk_class", risk_classes)?
+            .f64("amount", amounts)?
+            .utf8("currency", currencies)?
+            .build()
     }
 
     fn __repr__(&self) -> String {
@@ -607,18 +585,22 @@ impl PyImResult {
             }
         )
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyImResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .f64("amount", vec![self.inner.amount.amount()])?
+            .utf8("currency", vec![self.inner.amount.currency().to_string()])?
+            .utf8("methodology", vec![self.inner.methodology.to_string()])?
+            .i64("mpor_days", vec![i64::from(self.inner.mpor_days)])?
+            .utf8("as_of", vec![self.inner.as_of.to_string()])?
+            .bool("approximation", vec![self.inner.approximation])?
+            .build()
     }
 }
+
+tabular_methods!(PyImResult);
 
 /// Register calculator classes.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {

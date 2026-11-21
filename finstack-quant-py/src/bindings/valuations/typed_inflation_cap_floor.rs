@@ -66,7 +66,7 @@ impl PyInflationCapFloor {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.rate_option_type")]
     #[getter]
     fn rate_option_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.rate_option_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.rate_option_type)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.notional")]
@@ -96,7 +96,7 @@ impl PyInflationCapFloor {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.frequency")]
     #[getter]
     fn frequency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.frequency)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.frequency)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.day_count")]
@@ -108,7 +108,7 @@ impl PyInflationCapFloor {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.stub")]
     #[getter]
     fn stub<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.stub)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.stub)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.business_day_convention")]
@@ -144,19 +144,19 @@ impl PyInflationCapFloor {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.lag")]
     #[getter]
     fn lag<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.lag)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.lag)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.interpolation")]
     #[getter]
     fn interpolation<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.interpolation)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.interpolation)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_cap_floor", "InflationCapFloor.volatility_expiry")]
     #[getter]
     fn volatility_expiry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.volatility_expiry)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.volatility_expiry)
     }
 }
 

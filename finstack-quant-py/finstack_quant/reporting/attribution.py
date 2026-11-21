@@ -154,13 +154,13 @@ def _build_sections(attribution: Any, wanted: list[str], theme: Theme, *, portfo
         return out
     if "carry" in wanted:
         s = _detail_section(
-            attribution.to_carry_detail_dataframe(), "Carry & Roll-Down", "carry.total", attribution.currency
+            attribution.to_carry_detail_table().to_pandas(), "Carry & Roll-Down", "carry.total", attribution.currency
         )
         if s is not None:
             out.append(s)
     if "credit" in wanted and abs(float(attribution.credit_curves_pnl)) > _EPS:
         s = _detail_section(
-            attribution.to_credit_factor_dataframe(),
+            attribution.to_credit_factor_table().to_pandas(),
             "Credit Factor Detail",
             "credit_factor.total",
             attribution.currency,

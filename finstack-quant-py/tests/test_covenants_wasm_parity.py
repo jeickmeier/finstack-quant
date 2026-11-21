@@ -189,7 +189,7 @@ def _engine_evaluate_series() -> Any:
     engine = CovenantEngine.from_specs([leverage_spec()])
     frame = engine.evaluate_series(SERIES)
     rows: list[dict[str, Any]] = []
-    for record in frame.to_dict("records"):
+    for record in frame.to_records():
         if not rows or rows[-1]["as_of"] != record["as_of"]:
             rows.append({"as_of": record["as_of"], "reports": {}})
         rows[-1]["reports"][record["covenant"]] = {

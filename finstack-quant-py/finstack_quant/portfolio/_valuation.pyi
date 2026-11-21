@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.core.table import ArrowTable
@@ -533,58 +534,83 @@ class PortfolioValuation:
         """
         ...
 
-    def to_arrow_positions(self) -> ArrowTable:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export per-position values via Arrow (zero-copy for consumers).
+        Export per-position values as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        One row per entry of ``position_values``.
 
         Columns: ``position_id``, ``entity_id``, ``value_native``,
         ``value_base``, ``currency_native``, ``currency_base``, ``fx_rate``
-        (float64, null for same-currency rows) and ``risk_error`` (string, null
-        unless the position degraded to PV-only) (see
-        ``finstack_quant_portfolio::dataframe::positions_to_table``).
+        (float64: base-currency units per native unit applied to the row, null
+        when the native currency is the base currency), ``fx_triangulated``
+        (bool or null), ``risk_metrics_complete`` (bool), and ``risk_error``
+        (string, null unless the position degraded to PV-only).
 
         Returns
         -------
         ArrowTable
             Arrow table with one row per valued position.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_pandas(self) -> pd.DataFrame:
         """
-        Export per-position values as a pandas DataFrame.
-
-        One row per entry of ``position_values``. Built from the same
-        ``positions_to_table`` envelope that backs :meth:`to_arrow_positions`,
-        plus the two boolean risk diagnostics the Arrow table cannot carry.
-
-        Columns: ``position_id``, ``entity_id``, ``value_native``,
-        ``value_base``, ``currency_native``, ``currency_base``, ``fx_rate``
-        (float64: base-currency units per native unit applied to the row, so
-        ``value_native * fx_rate == value_base`` up to base-currency rounding;
-        ``NaN`` when the native currency is the base currency),
-        ``fx_triangulated`` (``True``/``False`` for a converted row, else
-        ``None``), ``risk_metrics_complete`` (bool) and ``risk_error``
-        (``None`` unless the position degraded to PV-only).
+        Export per-position values as a pandas ``DataFrame``.
 
         Returns
         -------
         pd.DataFrame
-            Values are floats and currency codes are strings. Prefer
-            :meth:`to_arrow_positions` when a zero-copy handoff matters more
-            than pandas ergonomics.
+            One row per valued position; values are floats and currency codes
+            are strings.
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export per-position values as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per valued position.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export per-position values as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per valued position.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __len__(self) -> int:
         """Number of valued positions.
         Returns

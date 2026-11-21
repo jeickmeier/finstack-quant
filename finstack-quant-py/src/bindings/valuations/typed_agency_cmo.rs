@@ -63,13 +63,13 @@ impl PyAgencyCmo {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmo.deal_name")]
     #[getter]
     fn deal_name<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.deal_name)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.deal_name)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmo.agency")]
     #[getter]
     fn agency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.agency)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.agency)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmo.issue_date")]
@@ -81,7 +81,7 @@ impl PyAgencyCmo {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmo.waterfall")]
     #[getter]
     fn waterfall<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.waterfall)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.waterfall)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmo.reference_tranche_id")]
@@ -93,7 +93,7 @@ impl PyAgencyCmo {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmo.collateral")]
     #[getter]
     fn collateral<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.collateral)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.collateral)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_cmo", "AgencyCmo.collateral_wac")]

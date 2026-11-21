@@ -117,7 +117,7 @@ impl PyFxVarianceSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.observation_frequency")]
     #[getter]
     fn observation_frequency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.observation_frequency)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.observation_frequency)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.base_calendar_id")]
@@ -147,7 +147,7 @@ impl PyFxVarianceSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.realized_var_method")]
     #[getter]
     fn realized_var_method<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.realized_var_method)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.realized_var_method)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.trading_days_per_year")]
@@ -192,7 +192,7 @@ impl PyFxVarianceSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.side")]
     #[getter]
     fn side<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.side)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.side)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_variance_swap", "FxVarianceSwap.domestic_discount_curve_id")]

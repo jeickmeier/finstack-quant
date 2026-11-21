@@ -57,9 +57,10 @@ def test_map_pd_rejects_out_of_range_probabilities() -> None:
 def test_map_pds_builds_a_grading_table() -> None:
     scale = pd.MasterScale.default_calibration()
     table = scale.map_pds([0.0005, 0.003, 0.05])
-    assert list(table.columns) == ["grade", "grade_index", "input_pd", "central_pd"]
-    assert list(table["grade"]) == ["AA", "BBB", "B"]
-    assert list(scale.map_pds([]).columns) == ["grade", "grade_index", "input_pd", "central_pd"]
+    assert table.column_names() == ["grade", "grade_index", "input_pd", "central_pd"]
+    df = table.to_pandas()
+    assert list(df["grade"]) == ["AA", "BBB", "B"]
+    assert scale.map_pds([]).column_names() == ["grade", "grade_index", "input_pd", "central_pd"]
 
 
 def test_master_scale_json_pickle_and_frame() -> None:
@@ -68,7 +69,7 @@ def test_master_scale_json_pickle_and_frame() -> None:
     scale = pd.MasterScale.default_calibration()
     assert pd.MasterScale.from_json(scale.to_json()).n_grades == scale.n_grades
     assert pickle.loads(pickle.dumps(scale))  # noqa: S301 - trusted in-process round trip.grades == scale.grades
-    frame = scale.to_dataframe()
+    frame = scale.to_pandas()
     assert list(frame.columns) == ["label", "upper_pd", "central_pd"]
     assert len(frame) == scale.n_grades
     grade = scale.grades[0]

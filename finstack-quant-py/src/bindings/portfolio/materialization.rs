@@ -13,7 +13,9 @@ use pyo3::prelude::*;
 use pyo3::types::{PyByteArray, PyBytes, PyDict, PyModule, PyString};
 
 use super::container::PyPortfolio;
-use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema;
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::serde_object_to_single_row_arrow_table;
 use crate::errors::{diagnostics_to_py, display_to_py, materialization_to_py};
 
 /// Reusable, bounded cache of decoded instrument artifacts.
@@ -200,8 +202,20 @@ impl PyMaterializationReport {
     ///
     /// The ``phase_*`` columns are zero — not measured durations — whenever
     /// ``timing_available`` is ``False``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn __repr__(&self) -> String {
+        format!(
+            "MaterializationReport(unique_instruments={}, positions={}, dependencies={}, cache_hits={}, input_bytes={})",
+            self.inner.unique_instruments,
+            self.inner.positions,
+            self.inner.dependencies,
+            self.inner.cache_hits,
+            self.inner.input_bytes
+        )
+    }
+}
+
+impl PyMaterializationReport {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         let phases = &self.inner.phase_nanos;
         let row = serde_json::json!({
             "unique_instruments": self.inner.unique_instruments,
@@ -217,48 +231,27 @@ impl PyMaterializationReport {
             "phase_build_positions_nanos": phases.build_positions,
             "phase_index_build_nanos": phases.index_build,
         });
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
+        serde_object_to_single_row_arrow_table(
             &row,
             &[
-                "unique_instruments",
-                "positions",
-                "dependencies",
-                "cache_hits",
-                "input_bytes",
-                "truncated",
-                "timing_available",
-                "phase_parse_nanos",
-                "phase_validate_versions_nanos",
-                "phase_decode_instruments_nanos",
-                "phase_build_positions_nanos",
-                "phase_index_build_nanos",
+                ("unique_instruments", "int64"),
+                ("positions", "int64"),
+                ("dependencies", "int64"),
+                ("cache_hits", "int64"),
+                ("input_bytes", "int64"),
+                ("truncated", "bool"),
+                ("timing_available", "bool"),
+                ("phase_parse_nanos", "int64"),
+                ("phase_validate_versions_nanos", "int64"),
+                ("phase_decode_instruments_nanos", "int64"),
+                ("phase_build_positions_nanos", "int64"),
+                ("phase_index_build_nanos", "int64"),
             ],
         )
     }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "MaterializationReport(unique_instruments={}, positions={}, dependencies={}, cache_hits={}, input_bytes={})",
-            self.inner.unique_instruments,
-            self.inner.positions,
-            self.inner.dependencies,
-            self.inner.cache_hits,
-            self.inner.input_bytes
-        )
-    }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+tabular_methods!(PyMaterializationReport);
 
 #[pymethods]
 impl PyPortfolio {
@@ -349,7 +342,7 @@ impl PyPortfolio {
                 .into_any()
                 .unbind()),
             Err(finstack_quant_portfolio::Error::MaterializationFailed(report)) => {
-                Ok(crate::bindings::pandas_utils::serde_to_py(py, &*report)?.unbind())
+                Ok(crate::bindings::json_bridge::serde_to_py(py, &*report)?.unbind())
             }
             Err(error) => Err(materialization_to_py(py, error)),
         }

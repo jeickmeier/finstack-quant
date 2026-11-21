@@ -5,7 +5,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.rating_scales import RatingScaleEntry, RatingScaleRegistry
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.statements import FinancialModelSpec, StatementResult
 
 class ScorecardMetric:
@@ -556,9 +558,9 @@ class ScorecardReport:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the report header as a single-row pandas ``DataFrame``.
+        Export the report header as a single-row ``ArrowTable``.
 
         Columns: ``status``, ``message``, ``rating``, ``rating_scale``,
         ``period``, ``total_score``, ``partial``, ``weight_coverage``,
@@ -568,26 +570,92 @@ class ScorecardReport:
         decimal fraction in ``[0, 1]``: the included metric weight over the
         configured metric weight, so ``0.8`` means a fifth of the configured
         weight was excluded. ``partial`` is ``True`` when any metric was
-        excluded or errored. Fields absent from the report payload are
-        ``None``. Per-metric detail lives in ``to_metric_scores_dataframe``.
+        excluded or errored. Fields absent from the report payload are null.
+        Per-metric detail lives in :meth:`to_metric_scores_table`.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row describing the scorecard run.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as an Arrow table.
         RuntimeError
             If the report status cannot be rendered as its canonical Rust wire label.
         """
         ...
 
-    def to_metric_scores_dataframe(self) -> pd.DataFrame:
+    def to_pandas(self) -> pd.DataFrame:
         """
-        Export the per-metric scores as a pandas ``DataFrame``.
+        Export the report header as a single-row pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`. Fields absent from the report payload
+        are ``None``. Per-metric detail lives in :meth:`to_metric_scores_table`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row describing the scorecard run.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the result cannot be represented as a pandas DataFrame.
+        RuntimeError
+            If the report status cannot be rendered as its canonical Rust wire label.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the report header as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row describing the scorecard run.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be represented as a Polars DataFrame.
+        RuntimeError
+            If the report status cannot be rendered as its canonical Rust wire label.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the report header as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row describing the scorecard run.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be represented as a PyArrow table.
+        RuntimeError
+            If the report status cannot be rendered as its canonical Rust wire label.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_metric_scores_table(self) -> ArrowTable:
+        """
+        Export the per-metric scores as an ``ArrowTable``.
 
         Columns: ``metric``, ``value``, ``score``, ``weight``,
         ``weighted_score``. One row per scored metric, in configured order; a
@@ -600,7 +668,7 @@ class ScorecardReport:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per scored metric.
 
         Notes

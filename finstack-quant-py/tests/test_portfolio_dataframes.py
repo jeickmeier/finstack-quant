@@ -409,7 +409,7 @@ def _moving_attribution() -> tuple[PortfolioAttribution, pd.DataFrame]:
     before = market([(0.0, 1.0), (0.5, 0.98), (1.0, 0.95)], [(0.0, 1.0), (0.5, 0.99), (1.0, 0.97)], 1.10)
     after = market([(0.0, 1.0), (0.5, 0.97), (1.0, 0.93)], [(0.0, 1.0), (0.5, 0.985), (1.0, 0.96)], 1.15)
     result = attribute_portfolio_pnl(portfolio, before, after, "2025-01-15", "2025-02-15", "parallel")
-    return result, result.to_dataframe()
+    return result, result.to_pandas()
 
 
 def test_portfolio_attribution_to_dataframe_is_single_row() -> None:
@@ -480,7 +480,7 @@ def test_portfolio_attribution_of_an_empty_book_is_all_zero() -> None:
         "2025-01-02",
         "parallel",
     )
-    df = result.to_dataframe()
+    df = result.to_pandas()
 
     assert len(df) == 1
     assert list(df.columns) == ATTRIBUTION_COLUMNS
@@ -494,7 +494,7 @@ def test_portfolio_attribution_of_an_empty_book_is_all_zero() -> None:
 
 def test_risk_decomposition_to_factor_dataframe() -> None:
     """One row per factor contribution, with the pinned column order."""
-    df = _risk_decomposition().to_factor_dataframe()
+    df = _risk_decomposition().to_factor_table().to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == [
@@ -516,7 +516,7 @@ def test_risk_decomposition_to_factor_dataframe() -> None:
 
 def test_risk_decomposition_to_position_factor_dataframe() -> None:
     """One row per position x factor pair, with the pinned column order."""
-    df = _risk_decomposition().to_position_factor_dataframe()
+    df = _risk_decomposition().to_position_factor_table().to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["position_id", "factor_id", "risk_contribution"]
@@ -526,7 +526,7 @@ def test_risk_decomposition_to_position_factor_dataframe() -> None:
 
 def test_risk_decomposition_to_position_residual_dataframe() -> None:
     """Residual rows flatten the tagged ``source`` enum into two columns."""
-    df = _risk_decomposition().to_position_residual_dataframe()
+    df = _risk_decomposition().to_position_residual_table().to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == [
@@ -547,7 +547,7 @@ def test_risk_decomposition_residual_dataframe_keeps_schema_when_empty() -> None
     """No residual allocation still yields the documented columns."""
     payload = _risk_decomposition_payload()
     payload["position_residual_contributions"] = []
-    df = RiskDecomposition.from_json(json.dumps(payload)).to_position_residual_dataframe()
+    df = RiskDecomposition.from_json(json.dumps(payload)).to_position_residual_table().to_pandas()
 
     assert len(df) == 0
     assert "residual_variance" in df.columns
@@ -609,7 +609,7 @@ def test_position_var_contribution_to_dataframe_is_single_row() -> None:
             "incremental_var": None,
         })
     )
-    df = item.to_dataframe()
+    df = item.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -632,7 +632,7 @@ def test_position_var_contribution_to_dataframe_is_single_row() -> None:
 def test_position_risk_decomposition_joins_var_and_es() -> None:
     """VaR and ES share a position key space and land on the same row."""
     decomposition = PositionRiskDecomposition.from_json(json.dumps(_position_risk_payload()))
-    df = decomposition.to_dataframe()
+    df = decomposition.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == [
@@ -668,7 +668,7 @@ def test_position_budget_entry_to_dataframe_is_single_row() -> None:
             "excess": 0.2,
         })
     )
-    df = item.to_dataframe()
+    df = item.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -711,7 +711,7 @@ def test_risk_budget_result_to_dataframe() -> None:
             "has_breach": True,
         })
     )
-    df = result.to_dataframe()
+    df = result.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == [
@@ -735,7 +735,7 @@ def test_what_if_result_to_dataframe_covers_delta_only() -> None:
         '{"before":' + risk + ',"after":' + risk + ',"delta":[{"factor_id":"rates::USD","absolute_change":0.1,'
         '"relative_change":0.05}]}'
     )
-    df = result.to_dataframe()
+    df = result.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["factor_id", "absolute_change", "relative_change"]
@@ -752,7 +752,7 @@ def test_stress_result_to_dataframe() -> None:
     result = StressResult.from_json(
         '{"total_pnl":-12.0,"position_pnl":[["P1",-10.0],["P2",-2.0]],"stressed_decomposition":' + risk + "}"
     )
-    df = result.to_dataframe()
+    df = result.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["position_id", "pnl"]
@@ -769,7 +769,7 @@ def test_tail_scenario_breakdown_to_dataframe_takes_parent_ids() -> None:
             "position_pnls": [-10.0, -2.0],
         })
     )
-    df = breakdown.to_dataframe(["A", "B"])
+    df = breakdown.to_pandas(["A", "B"])
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["position_id", "pnl"]
@@ -787,7 +787,7 @@ def test_tail_scenario_breakdown_rejects_id_length_mismatch() -> None:
         })
     )
     with pytest.raises(ValueError, match="position_ids length"):
-        breakdown.to_dataframe(["A"])
+        breakdown.to_pandas(["A"])
 
 
 def _stress_attribution() -> StressAttribution:
@@ -806,7 +806,7 @@ def _stress_attribution() -> StressAttribution:
 def test_stress_attribution_to_dataframe() -> None:
     """One row per position contribution, largest driver first."""
     attribution = _stress_attribution()
-    df = attribution.to_dataframe()
+    df = attribution.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == [
@@ -826,23 +826,24 @@ def test_stress_attribution_to_dataframe() -> None:
 
 
 def test_stress_attribution_to_scenario_dataframe_is_a_matrix() -> None:
-    """Scenario x position matrix: positions as columns, scenario index as index.
+    """Scenario x position matrix: scenario_index followed by position columns.
 
     The matrix keeps the caller's column order even though
-    :meth:`to_dataframe` re-ranks its rows, so the two exports disagree on
+    :meth:`to_pandas` re-ranks its rows, so the two exports disagree on
     order by design; asserting both pins that.
     """
     attribution = _stress_attribution()
-    df = attribution.to_scenario_dataframe()
+    df = attribution.to_scenario_table().to_pandas()
 
     assert isinstance(df, pd.DataFrame)
-    assert list(df.columns) == attribution.position_ids == ["SMALL", "LARGE"]
+    assert list(df.columns) == ["scenario_index", *attribution.position_ids] == ["scenario_index", "SMALL", "LARGE"]
     assert len(df) == len(attribution.tail_scenarios) == 2
-    assert list(df.index) == [s.scenario_index for s in attribution.tail_scenarios]
-    assert df.loc[0, "SMALL"] == pytest.approx(-2.0)
-    assert df.loc[0, "LARGE"] == pytest.approx(-8.0)
-    assert df.loc[1, "SMALL"] == pytest.approx(-4.0)
-    assert df.loc[1, "LARGE"] == pytest.approx(-2.0)
+    assert list(df["scenario_index"]) == [s.scenario_index for s in attribution.tail_scenarios]
+    indexed = df.set_index("scenario_index")
+    assert indexed.loc[0, "SMALL"] == pytest.approx(-2.0)
+    assert indexed.loc[0, "LARGE"] == pytest.approx(-8.0)
+    assert indexed.loc[1, "SMALL"] == pytest.approx(-4.0)
+    assert indexed.loc[1, "LARGE"] == pytest.approx(-2.0)
 
 
 # Factor assignment
@@ -886,7 +887,7 @@ def _assignment_report() -> FactorAssignmentReport:
 def test_factor_assignment_report_to_dataframe_is_long_format() -> None:
     """Row count is total mappings, not the number of positions."""
     report = _assignment_report()
-    df = report.to_dataframe()
+    df = report.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["position_id", "factor_id", "beta", "dependency_json"]
@@ -899,7 +900,7 @@ def test_factor_assignment_report_to_dataframe_is_long_format() -> None:
 
 def test_factor_assignment_report_to_unmatched_dataframe() -> None:
     report = _assignment_report()
-    df = report.to_unmatched_dataframe()
+    df = report.to_unmatched_table().to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["position_id", "dependency_json"]
@@ -913,7 +914,7 @@ def test_factor_assignment_report_to_unmatched_dataframe() -> None:
 def test_credit_vol_report_to_level_dataframe() -> None:
     """One row per hierarchy level; columns built explicitly, not via serde."""
     report = build_credit_vol_report(_credit_vol_decomposition(), _credit_model())
-    df = report.to_level_dataframe()
+    df = report.to_level_table().to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["level_name", "total"]
@@ -923,7 +924,7 @@ def test_credit_vol_report_to_level_dataframe() -> None:
 
 def test_credit_vol_report_to_position_dataframe() -> None:
     report = build_credit_vol_report(_credit_vol_decomposition(), _credit_model(), by_position=True)
-    df = report.to_position_dataframe()
+    df = report.to_position_table().to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["position_id", "factor_total", "idiosyncratic", "total"]
@@ -933,14 +934,9 @@ def test_credit_vol_report_to_position_dataframe() -> None:
 
 
 def test_credit_vol_report_position_dataframe_keeps_schema_when_absent() -> None:
-    """``by_position=None`` must still yield the column schema, not an empty frame.
-
-    ``LevelVolContribution`` / ``PositionVolContribution`` do not derive
-    ``Serialize``, so the binding hand-rolls the zero-row-with-schema case that
-    ``serde_rows_to_dataframe_with_schema`` would otherwise provide.
-    """
+    """``by_position=None`` must still yield the column schema, not an empty frame."""
     report = build_credit_vol_report(_credit_vol_decomposition(), _credit_model(), by_position=False)
-    df = report.to_position_dataframe()
+    df = report.to_position_table().to_pandas()
 
     assert report.by_position is None
     assert isinstance(df, pd.DataFrame)
@@ -965,7 +961,7 @@ def test_trade_spec_to_dataframe_is_single_row() -> None:
             "target_weight": 0.2,
         })
     )
-    df = trade.to_dataframe()
+    df = trade.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -1019,7 +1015,7 @@ def _optimization_result() -> PortfolioOptimizationResult:
 def test_portfolio_optimization_result_to_dataframe_joins_weight_maps() -> None:
     """The four position-keyed maps join into one frame indexed by position."""
     result = _optimization_result()
-    df = result.to_dataframe()
+    df = result.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == [
@@ -1042,7 +1038,7 @@ def test_portfolio_optimization_result_dataframe_cells_track_their_map() -> None
     transposed two columns, or repeated one row, fails here.
     """
     result = _optimization_result()
-    df = result.to_dataframe()
+    df = result.to_pandas()
 
     for column, mapping in (
         ("current_weight", result.current_weights),
@@ -1069,7 +1065,7 @@ def test_portfolio_optimization_result_to_trade_dataframe() -> None:
     """Trade rows mirror ``to_trade_list`` one-for-one, schema always present."""
     result = _optimization_result()
     trades = result.to_trade_list()
-    df = result.to_trade_dataframe()
+    df = result.to_trade_table().to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == TRADE_COLUMNS
@@ -1082,7 +1078,7 @@ def test_portfolio_optimization_result_to_trade_dataframe() -> None:
 
 def test_portfolio_optimization_trade_dataframe_renders_each_trade() -> None:
     """The two trades are a close-out and a top-up, and read back distinctly."""
-    df = _optimization_result().to_trade_dataframe().set_index("position_id")
+    df = _optimization_result().to_trade_table().to_pandas().set_index("position_id")
 
     closed = df.loc["USD-POS-SMALL"]
     assert closed["instrument_id"] == "USD-DEP-SMALL"
@@ -1121,7 +1117,7 @@ def test_portfolio_optimization_trade_dataframe_keeps_schema_when_no_trades() ->
         .with_label("already_optimal")
     )
     result = optimize_portfolio(spec, _market())
-    df = result.to_trade_dataframe()
+    df = result.to_trade_table().to_pandas()
 
     assert result.to_trade_list() == []
     assert len(df) == 0
@@ -1134,7 +1130,7 @@ def test_portfolio_optimization_trade_dataframe_keeps_schema_when_no_trades() ->
 def test_portfolio_valuation_to_dataframe_matches_arrow_columns() -> None:
     """The pandas exit reuses the same table envelope as the Arrow exit."""
     valuation = value_portfolio(Portfolio.from_spec(_portfolio_json()), _market())
-    df = valuation.to_dataframe()
+    df = valuation.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == [
@@ -1193,7 +1189,7 @@ def test_position_value_exports_the_fx_rate_applied() -> None:
     assert position.fx_triangulated is False
     assert position.value_native.amount * position.fx_rate == pytest.approx(position.value_base.amount, abs=0.01)
 
-    row = valuation.to_dataframe().iloc[0]
+    row = valuation.to_pandas().iloc[0]
     assert row["fx_rate"] == pytest.approx(1.10, abs=1e-12)
     assert bool(row["fx_triangulated"]) is False
     assert row["value_native"] * row["fx_rate"] == pytest.approx(row["value_base"], abs=0.01)
@@ -1206,7 +1202,7 @@ def test_position_value_exports_the_fx_rate_applied() -> None:
 def test_portfolio_cashflows_to_dataframe() -> None:
     """One row per dated event, with Money flattened into amount + currency."""
     cashflows = aggregate_full_cashflows(Portfolio.from_spec(_portfolio_json()), _market())
-    df = cashflows.to_dataframe()
+    df = cashflows.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == [
@@ -1244,7 +1240,7 @@ def _portfolio_metrics() -> PortfolioMetrics:
 
 
 def test_portfolio_metrics_to_dataframe_is_aggregated_table() -> None:
-    df = _portfolio_metrics().to_dataframe()
+    df = _portfolio_metrics().to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["metric_id", "total"]
@@ -1254,7 +1250,7 @@ def test_portfolio_metrics_to_dataframe_is_aggregated_table() -> None:
 
 def test_portfolio_metrics_to_position_dataframe_is_long_format() -> None:
     """Row count is (position, metric) pairs, and currency travels with them."""
-    df = _portfolio_metrics().to_position_dataframe()
+    df = _portfolio_metrics().to_position_table().to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["metric_id", "position_id", "currency", "value"]
@@ -1266,7 +1262,7 @@ def test_portfolio_metrics_to_position_dataframe_is_long_format() -> None:
 def test_materialization_report_to_dataframe_is_single_row() -> None:
     """Flat counters plus flattened phase timings on one row."""
     _, report = Portfolio.from_materialization(_materialization_bundle())
-    df = report.to_dataframe()
+    df = report.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1

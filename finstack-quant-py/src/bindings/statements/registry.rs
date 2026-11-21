@@ -1,7 +1,7 @@
 //! Python wrappers for the metric registry (`finstack_quant_statements::registry`).
 
+use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::macros::wire_methods;
-use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::statements_to_py;
 use pyo3::prelude::*;

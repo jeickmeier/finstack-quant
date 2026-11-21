@@ -3,10 +3,10 @@
 //! the same document WASM takes.
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::core::table::envelope_to_pandas;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
-use crate::bindings::macros::wire_methods;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::valuations::convert::enum_to_py_string;
 use crate::errors::statements_to_py;
@@ -155,12 +155,6 @@ wire_methods!(
 
 #[pymethods]
 impl PyCapitalStructureSummary {
-    #[doc = pydoc!("finstack_quant.statements_analytics._capital_structure", "CapitalStructureSummary.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        envelope_to_pandas(py, &self.inner.to_table())
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -171,6 +165,18 @@ impl PyCapitalStructureSummary {
         )
     }
 }
+
+impl PyCapitalStructureSummary {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        PyArrowTable::from_envelope(&self.inner.to_table())
+    }
+}
+
+tabular_methods!(
+    PyCapitalStructureSummary,
+    "CapitalStructureSummary",
+    module = "finstack_quant.statements_analytics._capital_structure"
+);
 
 crate::bindings::macros::py_getters!(PyCapitalStructureSummary |s| {
     #[doc = pydoc!("finstack_quant.statements_analytics._capital_structure", "CapitalStructureSummary.as_of")]

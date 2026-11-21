@@ -9,7 +9,7 @@ use finstack_quant_core::cashflow::{CashFlow, CashFlowParams};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::PyCapsule;
 
 use super::specs::date_money_to_py;
 use crate::bindings::cashflows::aggregation::PyPeriodAggregation;
@@ -18,11 +18,13 @@ use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::parse_label;
 use crate::bindings::macros::wire_methods;
 use crate::bindings::module_utils::spec_from_py;
-use crate::errors::core_to_py;
+use crate::bindings::table_builders::TableBuilder;
+use crate::errors::{core_to_py, display_to_py};
 
 use super::orchestrator::PyCashFlowBuilder;
 use super::specs::PyNotional;
@@ -154,31 +156,16 @@ wire_methods!(
     module = "finstack_quant.cashflows.builder._schedule"
 );
 
-/// Extract one string column of a DataFrame-like object as Python objects.
+/// Extract one string column of a DataFrame or Arrow table as Python objects.
 fn frame_column<'py>(
     frame: &Bound<'py, PyAny>,
     name: &str,
 ) -> PyResult<Option<Vec<Bound<'py, PyAny>>>> {
-    let columns = frame.getattr("columns")?;
-    if !columns.contains(name)? {
-        return Ok(None);
-    }
-    let values = frame.get_item(name)?.call_method0("tolist")?;
-    Ok(Some(values.extract()?))
+    crate::bindings::dataframe_utils::table_column_to_pylist(frame, name)
 }
 
 fn is_missing(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
-    if obj.is_none() {
-        return Ok(true);
-    }
-    if let Ok(value) = obj.extract::<f64>() {
-        return Ok(value.is_nan());
-    }
-    // pandas missing-datetime sentinel (``pd.NaT``) is neither ``None`` nor a float.
-    if obj.get_type().name()? == "NaTType" {
-        return Ok(true);
-    }
-    Ok(false)
+    crate::bindings::dataframe_utils::is_missing_cell(obj)
 }
 
 fn optional_json_field<T: serde::de::DeserializeOwned + Send>(
@@ -200,7 +187,7 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
     if let Ok(flows) = obj.extract::<Vec<PyRef<'_, PyCashFlow>>>() {
         return Ok(flows.iter().map(|f| f.inner.clone()).collect());
     }
-    if obj.hasattr("columns")? {
+    if crate::bindings::dataframe_utils::is_dataframe_like(obj)? || obj.hasattr("columns")? {
         let missing = |name: &str| {
             crate::errors::value_error(format!(
                 "cashflow DataFrame is missing required column '{name}' \
@@ -436,103 +423,64 @@ impl PyCashFlowSchedule {
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.calendar_year_ladder")]
     #[pyo3(text_signature = "(self, pvs)")]
-    fn calendar_year_ladder<'py>(
-        &self,
-        py: Python<'py>,
-        pvs: Vec<f64>,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    fn calendar_year_ladder(&self, pvs: Vec<f64>) -> PyResult<PyArrowTable> {
         let rows = self.inner.calendar_year_ladder(&pvs).map_err(core_to_py)?;
-        let columns = PyDict::new(py);
-        columns.set_item("year", rows.iter().map(|r| r.year).collect::<Vec<_>>())?;
-        columns.set_item(
-            "non_principal",
-            rows.iter().map(|r| r.non_principal).collect::<Vec<_>>(),
-        )?;
-        columns.set_item(
-            "principal",
-            rows.iter().map(|r| r.principal).collect::<Vec<_>>(),
-        )?;
-        columns.set_item("pv", rows.iter().map(|r| r.pv).collect::<Vec<_>>())?;
-        crate::bindings::pandas_utils::dict_to_dataframe(py, &columns, None)
+        TableBuilder::new()
+            .i64("year", rows.iter().map(|r| i64::from(r.year)).collect())?
+            .f64(
+                "non_principal",
+                rows.iter().map(|r| r.non_principal).collect(),
+            )?
+            .f64("principal", rows.iter().map(|r| r.principal).collect())?
+            .f64("pv", rows.iter().map(|r| r.pv).collect())?
+            .build()
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.to_dataframe")]
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.to_arrow")]
     #[allow(clippy::wrong_self_convention)]
     #[pyo3(signature = (outstanding=false), text_signature = "(self, outstanding=False)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>, outstanding: bool) -> PyResult<Bound<'py, PyAny>> {
-        let flows = self.inner.get_flows();
-        let pd = py.import("pandas")?;
-        let dates: Vec<finstack_quant_core::dates::Date> =
-            flows.iter().map(|f| f.get_date()).collect();
-        let reset_dates: Vec<Option<Bound<'py, PyAny>>> = flows
-            .iter()
-            .map(|f| f.get_reset_date().map(|d| date_to_py(py, d)).transpose())
-            .collect::<PyResult<_>>()?;
-        let kinds: Vec<String> = flows.iter().map(|f| f.get_kind().to_string()).collect();
-        let amounts: Vec<f64> = flows.iter().map(|f| f.get_amount().amount()).collect();
-        let currencies: Vec<String> = flows
-            .iter()
-            .map(|f| f.get_amount().currency().to_string())
-            .collect();
-        let factors: Vec<f64> = flows.iter().map(|f| f.get_accrual_factor()).collect();
-        let rates: Vec<Option<f64>> = flows.iter().map(|f| f.get_rate()).collect();
-        let columns = PyDict::new(py);
-        columns.set_item(
-            "date",
-            pd.call_method1(
-                "to_datetime",
-                (crate::bindings::pandas_utils::dates_to_pylist(py, &dates)?,),
-            )?,
-        )?;
-        columns.set_item(
-            "reset_date",
-            pd.call_method1("to_datetime", (reset_dates,))?,
-        )?;
-        columns.set_item("kind", kinds)?;
-        columns.set_item("amount", amounts)?;
-        columns.set_item("currency", currencies)?;
-        columns.set_item("accrual_factor", factors)?;
-        columns.set_item("rate", rates)?;
-        columns.set_item(
-            "accrual",
-            crate::bindings::pandas_utils::serde_to_py(
-                py,
-                &flows.iter().map(|f| f.get_accrual()).collect::<Vec<_>>(),
-            )?,
-        )?;
-        columns.set_item(
-            "principal_delta",
-            crate::bindings::pandas_utils::serde_to_py(
-                py,
-                &flows
-                    .iter()
-                    .map(|f| f.get_principal_delta())
-                    .collect::<Vec<_>>(),
-            )?,
-        )?;
-        let principal_dates: Vec<Option<Bound<'py, PyAny>>> = flows
-            .iter()
-            .map(|flow| {
-                flow.get_balance_date()
-                    .map(|date| date_to_py(py, date))
-                    .transpose()
-            })
-            .collect::<PyResult<_>>()?;
-        columns.set_item(
-            "principal_date",
-            pd.call_method1("to_datetime", (principal_dates,))?,
-        )?;
-        if outstanding {
-            let balances: Vec<f64> = self
-                .inner
-                .outstanding_at_dates(&dates)
-                .map_err(core_to_py)?
-                .into_iter()
-                .map(|balance| balance.amount())
-                .collect();
-            columns.set_item("outstanding", balances)?;
-        }
-        crate::bindings::pandas_utils::dict_to_dataframe(py, &columns, None)
+    fn to_arrow(&self, outstanding: bool) -> PyResult<PyArrowTable> {
+        self.build_arrow_table(outstanding)
+    }
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.to_pandas")]
+    #[allow(clippy::wrong_self_convention)]
+    #[pyo3(signature = (outstanding=false), text_signature = "(self, outstanding=False)")]
+    fn to_pandas<'py>(&self, py: Python<'py>, outstanding: bool) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.build_arrow_table(outstanding)?)?;
+        PyArrowTable::to_pandas(&table, py)
+    }
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.to_polars")]
+    #[allow(clippy::wrong_self_convention)]
+    #[pyo3(signature = (outstanding=false), text_signature = "(self, outstanding=False)")]
+    fn to_polars<'py>(&self, py: Python<'py>, outstanding: bool) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.build_arrow_table(outstanding)?)?;
+        PyArrowTable::to_polars(&table, py)
+    }
+
+    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.to_pyarrow")]
+    #[allow(clippy::wrong_self_convention)]
+    #[pyo3(signature = (outstanding=false), text_signature = "(self, outstanding=False)")]
+    fn to_pyarrow<'py>(&self, py: Python<'py>, outstanding: bool) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.build_arrow_table(outstanding)?)?;
+        PyArrowTable::to_pyarrow(&table, py)
+    }
+
+    /// Export via the Arrow PyCapsule C-stream protocol (`arrow_array_stream`).
+    #[pyo3(signature = (requested_schema = None))]
+    fn __arrow_c_stream__<'py>(
+        &self,
+        py: Python<'py>,
+        requested_schema: Option<Bound<'py, PyAny>>,
+    ) -> PyResult<Bound<'py, PyCapsule>> {
+        let _ = requested_schema;
+        self.build_arrow_table(false)?.arrow_c_stream(py)
+    }
+
+    /// Export the Arrow schema via the Arrow PyCapsule interface (`arrow_schema`).
+    fn __arrow_c_schema__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyCapsule>> {
+        self.build_arrow_table(false)?.arrow_c_schema(py)
     }
 
     /// Python-style summary.
@@ -550,10 +498,76 @@ impl PyCashFlowSchedule {
         )
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule._repr_html_")]
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py, false).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+    /// Render as an HTML table preview in Jupyter notebooks.
+    fn _repr_html_(&self) -> Option<String> {
+        self.build_arrow_table(false)
+            .ok()
+            .map(|table| table.render_html())
+    }
+}
+
+impl PyCashFlowSchedule {
+    fn build_arrow_table(&self, outstanding: bool) -> PyResult<PyArrowTable> {
+        let flows = self.inner.get_flows();
+        let dates: Vec<finstack_quant_core::dates::Date> =
+            flows.iter().map(|f| f.get_date()).collect();
+        let reset_dates: Vec<Option<finstack_quant_core::dates::Date>> =
+            flows.iter().map(|f| f.get_reset_date()).collect();
+        let kinds: Vec<String> = flows.iter().map(|f| f.get_kind().to_string()).collect();
+        let amounts: Vec<f64> = flows.iter().map(|f| f.get_amount().amount()).collect();
+        let currencies: Vec<String> = flows
+            .iter()
+            .map(|f| f.get_amount().currency().to_string())
+            .collect();
+        let factors: Vec<f64> = flows.iter().map(|f| f.get_accrual_factor()).collect();
+        let rates: Vec<Option<f64>> = flows.iter().map(|f| f.get_rate()).collect();
+        let accruals: Vec<Option<String>> = flows
+            .iter()
+            .map(|f| {
+                f.get_accrual()
+                    .as_ref()
+                    .map(serde_json::to_string)
+                    .transpose()
+                    .map_err(display_to_py)
+            })
+            .collect::<PyResult<_>>()?;
+        let principal_deltas: Vec<Option<String>> = flows
+            .iter()
+            .map(|f| {
+                f.get_principal_delta()
+                    .as_ref()
+                    .map(serde_json::to_string)
+                    .transpose()
+                    .map_err(display_to_py)
+            })
+            .collect::<PyResult<_>>()?;
+        let principal_dates: Vec<Option<finstack_quant_core::dates::Date>> =
+            flows.iter().map(|flow| flow.get_balance_date()).collect();
+
+        let mut builder = TableBuilder::new()
+            .date("date", &dates)?
+            .nullable_date("reset_date", &reset_dates)?
+            .utf8("kind", kinds)?
+            .f64("amount", amounts)?
+            .utf8("currency", currencies)?
+            .f64("accrual_factor", factors)?
+            .nullable_f64("rate", rates)?
+            .nullable_utf8("accrual", accruals)?
+            .nullable_utf8("principal_delta", principal_deltas)?
+            .nullable_date("principal_date", &principal_dates)?;
+
+        if outstanding {
+            let balances: Vec<f64> = self
+                .inner
+                .outstanding_at_dates(&dates)
+                .map_err(core_to_py)?
+                .into_iter()
+                .map(|balance| balance.amount())
+                .collect();
+            builder = builder.f64("outstanding", balances)?;
+        }
+
+        builder.build()
     }
 }
 

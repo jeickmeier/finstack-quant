@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.models.factor.risk import RiskDecomposition
 
 # factor_model typed result classes (Slice 8)
@@ -223,16 +226,33 @@ class WhatIfResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the per-factor contribution changes as a pandas DataFrame.
+        Export the per-factor contribution changes as an
+        :class:`~finstack_quant.core.table.ArrowTable`.
 
         One row per entry of :attr:`delta`. The baseline and scenario
         decompositions are not flattened here — reach them through
-        :attr:`before` / :attr:`after` and their own frame accessors.
+        :attr:`before` / :attr:`after` and their own table accessors.
 
         Columns: ``factor_id``, ``absolute_change`` (risk-measure units),
         ``relative_change`` (dimensionless fraction, not a percentage).
+
+        Returns
+        -------
+        ArrowTable
+            One row per changed factor.
+
+        Raises
+        ------
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the per-factor contribution changes as a pandas ``DataFrame``.
 
         Returns
         -------
@@ -241,11 +261,46 @@ class WhatIfResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the per-factor contribution changes as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per changed factor.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the per-factor contribution changes as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per changed factor.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """Return a concise debug representation.
         Returns
@@ -361,9 +416,10 @@ class StressResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the per-position stressed P&L as a pandas DataFrame.
+        Export the per-position stressed P&L as an
+        :class:`~finstack_quant.core.table.ArrowTable`.
 
         One row per entry of :attr:`position_pnl`. The scenario totals stay on
         :attr:`total_pnl` and :attr:`stressed_decomposition`.
@@ -373,16 +429,67 @@ class StressResult:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per position with a stressed P&L contribution.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the table cannot be constructed.
         """
         ...
 
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the per-position stressed P&L as a pandas ``DataFrame``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per position with a stressed P&L contribution.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the per-position stressed P&L as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per position with a stressed P&L contribution.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the per-position stressed P&L as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per position with a stressed P&L contribution.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """Return a concise debug representation.
         Returns
@@ -485,11 +592,28 @@ class StressPnl:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the per-position stressed P&L as a pandas DataFrame.
+        Export the per-position stressed P&L as an
+        :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``position_id``, ``pnl`` (base-currency amount; loss negative).
+
+        Returns
+        -------
+        ArrowTable
+            One row per entry of :attr:`position_pnl`.
+
+        Raises
+        ------
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the per-position stressed P&L as a pandas ``DataFrame``.
 
         Returns
         -------
@@ -503,4 +627,38 @@ class StressPnl:
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the per-position stressed P&L as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per entry of :attr:`position_pnl`.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the per-position stressed P&L as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per entry of :attr:`position_pnl`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
     def _repr_html_(self) -> str | None: ...

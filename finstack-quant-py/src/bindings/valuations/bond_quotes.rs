@@ -35,12 +35,6 @@ crate::bindings::macros::wire_methods!(
 
 #[pymethods]
 impl PyBondQuoteSet {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._bond_quotes", "BondQuoteSet.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::core::table::envelope_to_pandas(py, &self.inner.to_table())
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -49,6 +43,18 @@ impl PyBondQuoteSet {
         )
     }
 }
+
+impl PyBondQuoteSet {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<crate::bindings::core::table::PyArrowTable> {
+        crate::bindings::core::table::PyArrowTable::from_envelope(&self.inner.to_table())
+    }
+}
+
+crate::bindings::macros::tabular_methods!(
+    PyBondQuoteSet,
+    "BondQuoteSet",
+    module = "finstack_quant.valuations.instruments._bond_quotes"
+);
 
 crate::bindings::macros::py_getters!(PyBondQuoteSet |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._bond_quotes", "BondQuoteSet.clean_price_currency")]

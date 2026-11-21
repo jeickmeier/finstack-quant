@@ -36,7 +36,7 @@ def price_panel() -> Performance:
 
 def test_price_panel_matches_the_shared_golden() -> None:
     perf = price_panel()
-    assert list(perf.sharpe(risk_free_rate=0.0)) == pytest.approx(GOLDEN["prices"]["sharpe"], rel=1e-12)
+    assert perf.sharpe(risk_free_rate=0.0).values() == pytest.approx(GOLDEN["prices"]["sharpe"], rel=1e-12)
     prices = GOLDEN["prices"]
     pl_frame = pl.DataFrame({"date": prices["dates"], **dict(zip(NAMES, prices["values"], strict=True))})
     assert (
@@ -65,7 +65,7 @@ def test_return_panel_matches_the_shared_golden() -> None:
         frequency="daily",
         benchmark_ticker=NAMES[0],
     )
-    assert list(panel.volatility(annualize=True)) == pytest.approx(returns["volatility"], rel=1e-12)
+    assert panel.volatility(annualize=True).values() == pytest.approx(returns["volatility"], rel=1e-12)
     pl_frame = pl.DataFrame({"date": returns["dates"][1:], **dict(zip(NAMES, returns["values"], strict=True))})
     assert (
         Performance.from_returns(
@@ -84,6 +84,6 @@ def test_json_round_trip_matches_the_shared_golden() -> None:
     assert json.loads(panel.to_json()) == GOLDEN["prices"]["json"]
     rebuilt = Performance.from_json(panel.to_json())
     assert rebuilt.to_json() == panel.to_json()
-    assert list(rebuilt.sharpe(risk_free_rate=0.0)) == list(panel.sharpe(risk_free_rate=0.0))
+    assert rebuilt.sharpe(risk_free_rate=0.0) == panel.sharpe(risk_free_rate=0.0)
     with pytest.raises(ValueError, match="invalid Performance JSON"):
         Performance.from_json("{ not json")

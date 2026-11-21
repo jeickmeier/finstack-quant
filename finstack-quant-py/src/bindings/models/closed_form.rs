@@ -19,13 +19,12 @@
 //!   serde form of the Rust `OptionMarketParams` as one `market` dict;
 //!   `heston_price` takes the option contract and Heston variance dynamics separately.
 
-use crate::bindings::macros::wire_methods;
+use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
-use crate::bindings::pandas_utils::{
-    labeled_values_to_series, serde_object_to_single_row_dataframe,
-};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::repr_support::repr_from_serde;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
 use finstack_quant_core::wire::serde_parse;
 use finstack_quant_models::closed_form::{
@@ -270,14 +269,9 @@ impl PyBsGreeks {
     }
 
     #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.to_series")]
-    fn to_series<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_series(&self) -> PyResult<PyLabeledSeries> {
         let labels: Vec<String> = BS_GREEK_LABELS.iter().map(|s| (*s).to_string()).collect();
-        labeled_values_to_series(py, &labels, self.values(), "bs_greeks")
-    }
-
-    #[doc = pydoc!("finstack_quant.models._closed_form", "BsGreeks.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe(py, &self.inner)
+        Ok(PyLabeledSeries::from_f64("bs_greeks", labels, self.values())?.with_index_name("greek"))
     }
 
     fn __repr__(&self) -> String {
@@ -285,6 +279,11 @@ impl PyBsGreeks {
     }
 }
 
+tabular_methods!(
+    PyBsGreeks,
+    "BsGreeks",
+    module = "finstack_quant.models._closed_form"
+);
 wire_methods!(
     PyBsGreeks,
     BsGreeks,
@@ -293,6 +292,17 @@ wire_methods!(
 );
 
 impl PyBsGreeks {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .f64("delta", vec![self.inner.delta])?
+            .f64("gamma", vec![self.inner.gamma])?
+            .f64("vega", vec![self.inner.vega])?
+            .f64("theta", vec![self.inner.theta])?
+            .f64("rho_r", vec![self.inner.rho_r])?
+            .f64("rho_q", vec![self.inner.rho_q])?
+            .build()
+    }
+
     fn values(&self) -> Vec<f64> {
         vec![
             self.inner.delta,
@@ -343,18 +353,13 @@ impl PyForwardGreeks {
     }
 
     #[doc = pydoc!("finstack_quant.models._closed_form", "ForwardGreeks.to_series")]
-    fn to_series<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_series(&self) -> PyResult<PyLabeledSeries> {
         let labels: Vec<String> = FORWARD_GREEK_LABELS
             .iter()
             .map(|s| (*s).to_string())
             .collect();
         let values = vec![self.inner.delta, self.inner.gamma, self.inner.vega];
-        labeled_values_to_series(py, &labels, values, "forward_greeks")
-    }
-
-    #[doc = pydoc!("finstack_quant.models._closed_form", "ForwardGreeks.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe(py, &self.inner)
+        Ok(PyLabeledSeries::from_f64("forward_greeks", labels, values)?.with_index_name("greek"))
     }
 
     fn __repr__(&self) -> String {
@@ -362,6 +367,21 @@ impl PyForwardGreeks {
     }
 }
 
+impl PyForwardGreeks {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .f64("delta", vec![self.inner.delta])?
+            .f64("gamma", vec![self.inner.gamma])?
+            .f64("vega", vec![self.inner.vega])?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyForwardGreeks,
+    "ForwardGreeks",
+    module = "finstack_quant.models._closed_form"
+);
 wire_methods!(
     PyForwardGreeks,
     ForwardGreeks,

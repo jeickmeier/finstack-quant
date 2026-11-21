@@ -25,12 +25,12 @@ CovenantWaiver = _covenants.CovenantWaiver
 FutureBreach = _covenants.FutureBreach
 SpringingCondition = _covenants.SpringingCondition
 ThresholdSchedule = _covenants.ThresholdSchedule
-breaches_to_dataframe = _covenants.breaches_to_dataframe
+breaches_table = _covenants.breaches_table
 covenant_template = _covenants.covenant_template
 evaluate_engine = _covenants.evaluate_engine
 forecast_breaches = _covenants.forecast_breaches
 forecast_covenant = _covenants.forecast_covenant
-reports_to_dataframe = _covenants.reports_to_dataframe
+reports_table = _covenants.reports_table
 validate_covenant_engine_json = _covenants.validate_covenant_engine_json
 validate_covenant_report_json = _covenants.validate_covenant_report_json
 validate_covenant_spec_json = _covenants.validate_covenant_spec_json
@@ -50,12 +50,12 @@ __all__ = [
     "FutureBreach",
     "SpringingCondition",
     "ThresholdSchedule",
-    "breaches_to_dataframe",
+    "breaches_table",
     "covenant_template",
     "evaluate_engine",
     "forecast_breaches",
     "forecast_covenant",
-    "reports_to_dataframe",
+    "reports_table",
     "validate_covenant_engine_json",
     "validate_covenant_report_json",
     "validate_covenant_spec_json",

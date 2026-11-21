@@ -5,6 +5,9 @@ from typing import Any, Literal
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import polars as pl
+
+from finstack_quant.core.table import ArrowTable, LabeledSeries
 
 class OptionMarketParams:
     """Immutable market inputs for a vanilla option or option model.
@@ -372,7 +375,7 @@ class BsGreeks:
     >>> g = bs_greeks(market)
     >>> round(g.delta, 4)
     0.6368
-    >>> g.to_series().index.tolist()
+    >>> g.to_series().index
     ['delta', 'gamma', 'vega', 'theta', 'rho_r', 'rho_q']
     """
 
@@ -483,28 +486,96 @@ class BsGreeks:
         """
         ...
 
-    def to_series(self) -> pd.Series:
+    def to_series(self) -> LabeledSeries:
         """
-        Return the Greeks as a float ``pandas.Series`` named ``bs_greeks``.
+        Return the Greeks as a named :class:`~finstack_quant.core.table.LabeledSeries`.
 
         Returns
         -------
-        pandas.Series
-            Index ``delta, gamma, vega, theta, rho_r, rho_q``. Does not raise.
+        LabeledSeries
+            Named ``"bs_greeks"`` with index name ``"greek"`` and labels
+            ``delta, gamma, vega, theta, rho_r, rho_q``.
+
+        Raises
+        ------
+        ValueError
+            If the series cannot be constructed.
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Return the Greeks as a single-row ``pandas.DataFrame``.
+        Return the Greeks as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Single-row table with columns ``delta, gamma, vega, theta, rho_r, rho_q``.
+
+        Raises
+        ------
+        ValueError
+            If the Arrow table cannot be constructed.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Return the Greeks as a single-row ``pandas.DataFrame`` (lazily imports ``pandas``).
 
         Returns
         -------
         pandas.DataFrame
-            Columns ``delta, gamma, vega, theta, rho_r, rho_q``. Does not raise.
+            Single-row frame with columns ``delta, gamma, vega, theta, rho_r, rho_q``.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the DataFrame cannot be constructed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Return the Greeks as a single-row ``polars.DataFrame`` (lazily imports ``polars``).
+
+        Returns
+        -------
+        polars.DataFrame
+            Single-row frame with columns ``delta, gamma, vega, theta, rho_r, rho_q``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the DataFrame cannot be constructed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Return the Greeks as a single-row ``pyarrow.Table`` (lazily imports ``pyarrow``).
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row table with columns ``delta, gamma, vega, theta, rho_r, rho_q``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to compact JSON with the canonical field names.
@@ -586,7 +657,7 @@ class ForwardGreeks:
     >>> g = black76_greeks(100.0, 100.0, 0.2, 1.0, True)
     >>> round(g.delta, 4)
     0.5398
-    >>> g.to_series().index.tolist()
+    >>> g.to_series().index
     ['delta', 'gamma', 'vega']
     """
 
@@ -640,28 +711,96 @@ class ForwardGreeks:
         """
         ...
 
-    def to_series(self) -> pd.Series:
+    def to_series(self) -> LabeledSeries:
         """
-        Return the Greeks as a float ``pandas.Series`` named ``forward_greeks``.
+        Return the Greeks as a named :class:`~finstack_quant.core.table.LabeledSeries`.
 
         Returns
         -------
-        pandas.Series
-            Index ``delta, gamma, vega``. Does not raise.
+        LabeledSeries
+            Named ``"forward_greeks"`` with index name ``"greek"`` and labels
+            ``delta, gamma, vega``.
+
+        Raises
+        ------
+        ValueError
+            If the series cannot be constructed.
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Return the Greeks as a single-row ``pandas.DataFrame``.
+        Return the Greeks as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Single-row table with columns ``delta, gamma, vega``.
+
+        Raises
+        ------
+        ValueError
+            If the Arrow table cannot be constructed.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Return the Greeks as a single-row ``pandas.DataFrame`` (lazily imports ``pandas``).
 
         Returns
         -------
         pandas.DataFrame
-            Columns ``delta, gamma, vega``. Does not raise.
+            Single-row frame with columns ``delta, gamma, vega``.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the DataFrame cannot be constructed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Return the Greeks as a single-row ``polars.DataFrame`` (lazily imports ``polars``).
+
+        Returns
+        -------
+        polars.DataFrame
+            Single-row frame with columns ``delta, gamma, vega``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the DataFrame cannot be constructed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Return the Greeks as a single-row ``pyarrow.Table`` (lazily imports ``pyarrow``).
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row table with columns ``delta, gamma, vega``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to compact JSON with the canonical field names.
@@ -1113,7 +1252,7 @@ def bs_greeks(
     Returns
     -------
     BsGreeks
-        Typed Greeks with ``to_series()`` / ``to_dataframe()`` exits.
+        Typed Greeks with ``to_series()`` / ``to_arrow()`` / ``to_pandas()`` / ``to_polars()`` exits.
 
     Raises
     ------

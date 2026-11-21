@@ -5,8 +5,10 @@ from __future__ import annotations
 import datetime
 from typing import Any, Literal
 import pandas as pd
+import polars as pl
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.portfolio._attribution import PortfolioAttribution
 from finstack_quant.portfolio._container import Portfolio
 from finstack_quant.portfolio._valuation import PortfolioValuation
@@ -511,12 +513,28 @@ class ReplayResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Per-step value and P&L ladder as a pandas DataFrame.
+        Per-step value and P&L ladder as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``date``, ``value``, ``daily_mtm_pnl``, ``cumulative_mtm_pnl``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
+
+        Returns
+        -------
+        ArrowTable
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Per-step value and P&L ladder as a pandas ``DataFrame``.
 
         Returns
         -------
@@ -525,11 +543,46 @@ class ReplayResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Per-step value and P&L ladder as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Per-step value and P&L ladder as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize this result to canonical JSON.
@@ -575,7 +628,8 @@ def replay_portfolio(
     -------
     ReplayResult
         Typed result with ``steps``, ``summary`` and ``skipped_dates``
-        getters plus ``to_dataframe()``; serialize with ``to_json()`` for the
+        getters plus ``to_arrow()`` / ``to_pandas()`` / ``to_polars()`` /
+        ``to_pyarrow()``; serialize with ``to_json()`` for the
         wire string.
 
     Raises

@@ -72,25 +72,25 @@ impl PyFiIndexTotalReturnSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fi_index_total_return_swap", "FiIndexTotalReturnSwap.underlying")]
     #[getter]
     fn underlying<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.underlying)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.underlying)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fi_index_total_return_swap", "FiIndexTotalReturnSwap.financing_leg")]
     #[getter]
     fn financing_leg<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.financing_leg)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.financing_leg)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fi_index_total_return_swap", "FiIndexTotalReturnSwap.schedule")]
     #[getter]
     fn schedule<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.schedule)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.schedule)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fi_index_total_return_swap", "FiIndexTotalReturnSwap.side")]
     #[getter]
     fn side<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.side)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.side)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fi_index_total_return_swap", "FiIndexTotalReturnSwap.initial_level")]
@@ -111,7 +111,7 @@ impl PyFiIndexTotalReturnSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fi_index_total_return_swap", "FiIndexTotalReturnSwap.margin_spec")]
     #[getter]
     fn margin_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.margin_spec)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.margin_spec)
     }
 }
 

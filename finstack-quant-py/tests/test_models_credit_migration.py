@@ -42,11 +42,11 @@ def test_seeded_simulation_is_deterministic() -> None:
     assert isinstance(paths_a, migration.RatingPaths)
     assert len(paths_a) == 8
     assert paths_a[-1].scale == scale
-    frame = paths_a.to_dataframe()
+    frame = paths_a.to_pandas()
     assert list(frame.columns) == ["path", "time", "state", "label"]
     assert frame["path"].nunique() == 8
     assert set(frame["label"]) <= {"AAA", "D"}
-    assert migration.RatingPaths.from_json(paths_a.to_json()).to_dataframe().equals(frame)
+    assert migration.RatingPaths.from_json(paths_a.to_json()).to_pandas().equals(frame)
 
 
 def test_empirical_matrix_shape() -> None:
@@ -72,7 +72,7 @@ def test_matrices_accept_nested_rows_and_export_labelled_frames() -> None:
     assert nested.probability(from_="A", to="D") == pytest.approx(0.1)
     assert nested.scale == scale
 
-    frame = nested.to_dataframe()
+    frame = nested.to_pandas()
     assert list(frame.index) == ["A", "D"] == list(frame.columns)
     assert frame.loc["A", "D"] == pytest.approx(0.1)
     rebuilt = migration.TransitionMatrix.from_dataframe(frame, 1.0)
@@ -88,7 +88,7 @@ def test_matrices_accept_nested_rows_and_export_labelled_frames() -> None:
     gen = migration.GeneratorMatrix(scale, [[-0.1, 0.1], [0.0, 0.0]])
     assert gen.intensity(from_="A", to="D") == pytest.approx(0.1)
     assert gen.scale == scale
-    assert list(gen.to_dataframe().columns) == ["A", "D"]
+    assert list(gen.to_pandas().columns) == ["A", "D"]
     assert pickle.loads(pickle.dumps(gen)).to_rows() == gen.to_rows()  # noqa: S301 - trusted in-process round trip
     tol = migration.GeneratorMatrix.from_transition_matrix(nested, 1e-6)
     assert tol.round_trip_error <= 1e-6

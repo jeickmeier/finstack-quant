@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import Any
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import polars as pl
+
+from finstack_quant.core.table import ArrowTable
 
 class StressPositionEntry:
     """
@@ -131,13 +136,13 @@ class StressPositionEntry:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export this entry as a single-row pandas DataFrame.
+        Export this entry as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row with columns ``position_id``, ``avg_tail_pnl``, ``pct_of_tail_loss``, ``worst_scenario_pnl``.
 
         Raises
@@ -147,6 +152,63 @@ class StressPositionEntry:
         """
         ...
 
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export this entry as a single-row pandas ``DataFrame`` (lazily imports ``pandas``).
+
+        Returns
+        -------
+        pd.DataFrame
+            One row with columns ``position_id``, ``avg_tail_pnl``, ``pct_of_tail_loss``, ``worst_scenario_pnl``.
+
+        Raises
+        ------
+        ImportError
+            If pandas is not installed.
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export this entry as a single-row Polars ``DataFrame`` (lazily imports ``polars``).
+
+        Returns
+        -------
+        polars.DataFrame
+            One row with columns ``position_id``, ``avg_tail_pnl``, ``pct_of_tail_loss``, ``worst_scenario_pnl``.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed.
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export this entry as a single-row ``pyarrow.Table`` (lazily imports ``pyarrow``).
+
+        Returns
+        -------
+        pyarrow.Table
+            One row with columns ``position_id``, ``avg_tail_pnl``, ``pct_of_tail_loss``, ``worst_scenario_pnl``.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed.
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """Return a concise debug representation.
         Returns
@@ -281,16 +343,45 @@ class TailScenarioBreakdown:
         """
         ...
 
-    def to_dataframe(self, position_ids: list[str] | None = None) -> pd.DataFrame:
+    def to_arrow(self, position_ids: list[str] | None = None) -> ArrowTable:
         """
-        Export this scenario's per-position P&L as a pandas DataFrame.
+        Export this scenario's per-position P&L as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``position_id``, ``pnl`` (portfolio-currency amount; a loss
         is negative).
 
         Parameters
         ----------
-        position_ids : list[str] | None
+        position_ids : list[str] | None, default None
+            Position identifiers aligned with :attr:`position_pnls`. Defaults
+            to the ordering inherited from the parent
+            ``StressAttribution.position_ids`` when this breakdown was read
+            from ``tail_scenarios``; required for a breakdown built via
+            :meth:`from_json`.
+
+        Returns
+        -------
+        ArrowTable
+            One row per position.
+
+        Raises
+        ------
+        ValueError
+            If no identifiers are available or their count does not match
+            ``len(position_pnls)``.
+        """
+        ...
+
+    def to_pandas(self, position_ids: list[str] | None = None) -> pd.DataFrame:
+        """
+        Export this scenario's per-position P&L as a pandas ``DataFrame`` (lazily imports ``pandas``).
+
+        Columns: ``position_id``, ``pnl`` (portfolio-currency amount; a loss
+        is negative).
+
+        Parameters
+        ----------
+        position_ids : list[str] | None, default None
             Position identifiers aligned with :attr:`position_pnls`. Defaults
             to the ordering inherited from the parent
             ``StressAttribution.position_ids`` when this breakdown was read
@@ -304,12 +395,79 @@ class TailScenarioBreakdown:
 
         Raises
         ------
+        ImportError
+            If pandas is not installed.
         ValueError
             If no identifiers are available or their count does not match
             ``len(position_pnls)``.
         """
         ...
 
+    def to_polars(self, position_ids: list[str] | None = None) -> pl.DataFrame:
+        """
+        Export this scenario's per-position P&L as a Polars ``DataFrame`` (lazily imports ``polars``).
+
+        Columns: ``position_id``, ``pnl`` (portfolio-currency amount; a loss
+        is negative).
+
+        Parameters
+        ----------
+        position_ids : list[str] | None, default None
+            Position identifiers aligned with :attr:`position_pnls`. Defaults
+            to the ordering inherited from the parent
+            ``StressAttribution.position_ids`` when this breakdown was read
+            from ``tail_scenarios``; required for a breakdown built via
+            :meth:`from_json`.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row per position.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed.
+        ValueError
+            If no identifiers are available or their count does not match
+            ``len(position_pnls)``.
+        """
+        ...
+
+    def to_pyarrow(self, position_ids: list[str] | None = None) -> Any:
+        """
+        Export this scenario's per-position P&L as a ``pyarrow.Table`` (lazily imports ``pyarrow``).
+
+        Columns: ``position_id``, ``pnl`` (portfolio-currency amount; a loss
+        is negative).
+
+        Parameters
+        ----------
+        position_ids : list[str] | None, default None
+            Position identifiers aligned with :attr:`position_pnls`. Defaults
+            to the ordering inherited from the parent
+            ``StressAttribution.position_ids`` when this breakdown was read
+            from ``tail_scenarios``; required for a breakdown built via
+            :meth:`from_json`.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per position.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed.
+        ValueError
+            If no identifiers are available or their count does not match
+            ``len(position_pnls)``.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """Return a concise debug representation.
         Returns
@@ -453,9 +611,9 @@ class StressAttribution:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the per-position tail-loss contributions as a DataFrame.
+        Export the per-position tail-loss contributions as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         One row per entry of :attr:`position_contributions`, in the same
         (largest-driver-first) order.
@@ -467,31 +625,94 @@ class StressAttribution:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per contributing position.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be converted into an Arrow table.
         """
         ...
 
-    def to_scenario_dataframe(self) -> pd.DataFrame:
+    def to_pandas(self) -> pd.DataFrame:
         """
-        Export the tail scenario x position P&L matrix as a DataFrame.
+        Export the per-position tail-loss contributions as a pandas ``DataFrame`` (lazily imports ``pandas``).
 
-        Rows are tail scenarios indexed by
-        ``TailScenarioBreakdown.scenario_index``; columns are the position
-        identifiers from :attr:`position_ids`, in that order. Every cell is a
-        portfolio-currency P&L (a loss is negative).
-
-        Columns: one per entry of :attr:`position_ids`.
+        Columns: ``position_id``, ``avg_tail_pnl``, ``pct_of_tail_loss``,
+        ``worst_scenario_pnl``.
 
         Returns
         -------
         pd.DataFrame
-            One row per tail scenario, indexed by scenario index.
+            One row per contributing position.
+
+        Raises
+        ------
+        ImportError
+            If pandas is not installed.
+        ValueError
+            If the result cannot be serialized into a pandas object.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the per-position tail-loss contributions as a Polars ``DataFrame`` (lazily imports ``polars``).
+
+        Columns match :meth:`to_arrow`.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row per contributing position.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed.
+        ValueError
+            If the result cannot be converted into a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the per-position tail-loss contributions as a ``pyarrow.Table`` (lazily imports ``pyarrow``).
+
+        Columns match :meth:`to_arrow`.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per contributing position.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed.
+        ValueError
+            If the result cannot be converted into a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_scenario_table(self) -> ArrowTable:
+        """
+        Export the tail scenario x position P&L matrix as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Column 0 is the integer scenario index ``scenario_index`` (from
+        ``TailScenarioBreakdown.scenario_index``); remaining columns are the
+        position identifiers from :attr:`position_ids`, in that order. Every
+        cell is a portfolio-currency P&L (a loss is negative).
+
+        Returns
+        -------
+        ArrowTable
+            One row per tail scenario with ``scenario_index`` followed by one
+            column per entry of :attr:`position_ids`.
 
         Raises
         ------
@@ -512,7 +733,7 @@ class StressAttribution:
 
 def build_stress_attribution(
     position_ids: list[str] | None,
-    position_pnls: list[list[float]] | npt.NDArray[np.float64] | pd.DataFrame,
+    position_pnls: Sequence[Sequence[float]] | npt.NDArray[Any] | pd.DataFrame | pl.DataFrame | Any,
     confidence: float | None = None,
 ) -> StressAttribution:
     """
@@ -522,12 +743,14 @@ def build_stress_attribution(
     ----------
     position_ids : list[str] | None
         Position identifiers. May be ``None`` when ``position_pnls`` is a
-        ``pandas.DataFrame`` (its column labels are used).
-    position_pnls : list[list[float]] | numpy.ndarray | pd.DataFrame
-        P&L matrix, losses negative. A ``pandas.DataFrame`` is read as rows =
-        scenarios, columns = positions. A nested list or 2-D array is read as
-        ``n_positions x n_scenarios`` (position-major, one row per position).
-        C-contiguous ``float64`` arrays use the direct buffer path.
+        pandas DataFrame, Polars DataFrame, or Arrow table (its column labels
+        are used).
+    position_pnls : sequence[sequence[float]] | numpy.ndarray | pd.DataFrame | pl.DataFrame | Any
+        P&L matrix, losses negative. A pandas/Polars DataFrame or Arrow table is
+        read as rows = scenarios, columns = positions. A nested list or 2-D
+        numeric array is read as ``n_positions x n_scenarios`` (position-major,
+        one row per position). C-contiguous ``float64`` arrays use the direct
+        buffer path.
     confidence : float | None
         Tail confidence level in ``(0.5, 1)``. The Rust engine selects
         ``floor((1 - confidence) * n_scenarios)`` tail scenarios. ``None``

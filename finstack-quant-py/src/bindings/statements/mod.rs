@@ -47,7 +47,25 @@ pub(crate) fn parse_period_id(s: &str) -> PyResult<PeriodId> {
 pub(crate) fn extract_period_pairs<'py>(
     values: &Bound<'py, PyAny>,
 ) -> PyResult<Vec<(String, Bound<'py, PyAny>)>> {
+    use crate::bindings::dataframe_utils::{
+        is_dataframe_like, table_column_names, table_column_to_pylist,
+    };
     let mut out = Vec::new();
+    if is_dataframe_like(values)? {
+        let cols = table_column_names(values)?;
+        if cols.len() != 2 {
+            return Err(crate::errors::value_error(format!(
+                "period series DataFrame must have 2 columns (period, value), got {}",
+                cols.len()
+            )));
+        }
+        let keys = table_column_to_pylist(values, &cols[0])?.unwrap_or_default();
+        let vals = table_column_to_pylist(values, &cols[1])?.unwrap_or_default();
+        for (k, v) in keys.into_iter().zip(vals) {
+            out.push((k.str()?.to_string(), v));
+        }
+        return Ok(out);
+    }
     if values.hasattr("items")? {
         for item in values.call_method0("items")?.try_iter()? {
             let (key, value): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item?.extract()?;

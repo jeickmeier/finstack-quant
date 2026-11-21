@@ -113,11 +113,12 @@ def test_structural_spec_constructors_and_equality() -> None:
     model = credit.MertonModel(100.0, 0.25, 80.0, 0.05)
     assert model == credit.MertonModel.from_json(model.to_json())
     series = model.default_probabilities([1.0, 2.0])
-    assert list(series.index) == ["1", "2"]
-    assert series.iloc[0] == pytest.approx(model.default_probability(1.0))
+    assert series.index == ["1", "2"]
+    assert series.values()[0] == pytest.approx(model.default_probability(1.0))
+    assert series.to_pandas().iloc[0] == pytest.approx(model.default_probability(1.0))
     paths = model.simulate_paths(3, 4, 1.0, 7, False)
     assert paths.values_per_path == 5
-    frame = paths.to_dataframe()
+    frame = paths.to_pandas()
     assert list(frame.columns) == ["path", "time", "asset_value"]
     assert len(frame) == 15
 

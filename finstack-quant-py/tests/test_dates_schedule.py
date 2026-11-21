@@ -204,10 +204,12 @@ def test_schedule_builder_from_spec_and_dataframe() -> None:
     assert spec["frequency"] == {"count": 3, "unit": "months"}
     assert len(Schedule.from_spec(spec)) == 3
 
-    frame = schedule.to_dataframe()
+    frame = schedule.to_pandas()
     assert list(frame.columns) == ["period_start", "period_end", "payment_date", "fixing_date"]
     assert len(frame) == 2
     assert frame["fixing_date"].isna().all()
+    assert schedule.to_polars().height == 2
+    assert schedule.to_arrow().num_rows == 2
 
 
 def test_schedule_builder_accepts_strings_and_calendar_objects() -> None:
@@ -292,9 +294,11 @@ def test_period_plan_iteration_dataframe_and_ordering() -> None:
 
     plan = build_periods("2024Q1..Q4", "2024Q2")
     assert [str(p.id) for p in plan] == ["2024Q1", "2024Q2", "2024Q3", "2024Q4"]
-    frame = plan.to_dataframe()
+    frame = plan.to_pandas()
     assert list(frame.columns) == ["id", "start", "end", "is_actual"]
     assert frame["is_actual"].tolist() == [True, True, False, False]
+    assert plan.to_polars()["is_actual"].to_list() == [True, True, False, False]
+    assert plan.to_arrow().column_names() == ["id", "start", "end", "is_actual"]
     assert PeriodId.parse("2024Q1") < PeriodId.parse("2024Q2") <= PeriodId.parse("2024Q2")
     assert str(sorted([PeriodId.parse("2025M02"), PeriodId.parse("2024M12")])[0]) == "2024M12"
     with pytest.raises(ValueError, match=r"'2024Q1\.\.2024M06'.*2024Q1\.\.Q4"):
@@ -391,7 +395,7 @@ def test_schedule_restore_validates_shape() -> None:
     schedule = Schedule.from_json(
         '{"dates":["2025-01-15","2025-07-15"],"payment_dates":["2025-07-15"],"fixing_dates":[]}'
     )
-    frame = schedule.to_dataframe()
+    frame = schedule.to_pandas()
     assert len(frame) == 1
     assert list(frame.columns) == ["period_start", "period_end", "payment_date", "fixing_date"]
 

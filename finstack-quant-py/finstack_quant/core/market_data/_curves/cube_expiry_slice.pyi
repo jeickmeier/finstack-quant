@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Optional
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 class VolCubeExpirySlice:
     """Volatility grid at one fixed option expiry, indexed by tenor and strike.
@@ -179,7 +181,23 @@ class VolCubeExpirySlice:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """Export the grid in long form as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``expiry``, ``tenor``, ``strike``, and ``vol`` in tenor-major
+            order. Time coordinates are years and quotes use ``quote_type``.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """Export the grid in long form, retaining the fixed option expiry.
 
         Returns
@@ -195,6 +213,38 @@ class VolCubeExpirySlice:
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """Export the grid in long form as a ``polars.DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Polars DataFrame constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is unavailable.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export the grid in long form as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is unavailable.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
     def to_json(self) -> str:
         """Serialize the validated slice and all convention metadata.
 

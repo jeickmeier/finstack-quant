@@ -665,8 +665,12 @@ def instrument_tearsheet(
     itype = definition.get("type", "") if isinstance(definition, dict) else ""
 
     if hasattr(cashflows, "calendar_year_ladder_by_currency"):
-        cashflows = cashflows.to_dataframe()
+        cashflows = cashflows.to_pandas()
     frame = cashflows[1] if isinstance(cashflows, tuple) and len(cashflows) == 2 else cashflows
+    if frame is not None and not hasattr(frame, "iterrows") and hasattr(frame, "to_pandas"):
+        converted = frame.to_pandas()
+        cashflows = (cashflows[0], converted) if isinstance(cashflows, tuple) and len(cashflows) == 2 else converted
+        frame = converted
     if frame is not None and not hasattr(frame, "iterrows"):
         raise TypeError("cashflows must supply a DataFrame")
 

@@ -1,7 +1,9 @@
 //! Python bindings for `finstack_quant_models::credit::pd` (calibration subset).
 
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use finstack_quant_models::credit::pd::{
     BASEL_IRB_PD_FLOOR, MasterScale, MasterScaleGrade, MasterScaleResult, PdCycleParams,
     apply_basel_irb_pd_floor as core_apply_basel_irb_pd_floor,
@@ -12,15 +14,11 @@ use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
 use super::scoring::PyScoringResult;
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
-    serde_rows_to_dataframe_with_schema,
-};
 use crate::errors::{core_to_py, kinded_to_py};
 
-/// Column schema shared by `MasterScaleResult.to_dataframe` and
+/// Column schema shared by `MasterScaleResult.to_arrow_table` and
 /// `MasterScale.map_pds`.
-const RESULT_COLUMNS: &[ColumnSchema<'static>] = &[
+const RESULT_COLUMNS: &[(&str, &str)] = &[
     ("grade", "str"),
     ("grade_index", "int64"),
     ("input_pd", "float64"),
@@ -167,25 +165,29 @@ impl PyMasterScaleResult {
         self.inner.grade_index
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let columns: Vec<&str> = RESULT_COLUMNS.iter().map(|(name, _)| *name).collect();
-        serde_object_to_single_row_dataframe_with_schema(py, &self.inner, &columns)
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScaleResult.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("MasterScaleResult", &self.inner)
     }
 }
 
+impl PyMasterScaleResult {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(std::slice::from_ref(&self.inner), RESULT_COLUMNS)
+    }
+}
+
+tabular_methods!(
+    PyMasterScaleResult,
+    "MasterScaleResult",
+    module = "finstack_quant.models.credit.pd"
+);
 wire_methods!(
     PyMasterScaleResult,
     MasterScaleResult,
     "MasterScaleResult",
     module = "finstack_quant.models.credit.pd"
 );
-impl_repr_html_via_dataframe!(PyMasterScaleResult);
 
 #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale")]
 #[pyclass(
@@ -238,9 +240,9 @@ impl PyMasterScale {
 
     #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.map_pds")]
     #[pyo3(text_signature = "($self, pds)")]
-    fn map_pds<'py>(&self, py: Python<'py>, pds: Vec<f64>) -> PyResult<Bound<'py, PyAny>> {
+    fn map_pds(&self, pds: Vec<f64>) -> PyResult<PyArrowTable> {
         let rows = self.inner.map_pds(&pds).map_err(kinded_to_py)?;
-        serde_rows_to_dataframe_with_schema(py, &rows, RESULT_COLUMNS)
+        serde_rows_to_arrow_table(&rows, RESULT_COLUMNS)
     }
 
     #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.map_score")]
@@ -269,19 +271,6 @@ impl PyMasterScale {
             .collect()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(
-            py,
-            self.inner.grades(),
-            &[
-                ("label", "str"),
-                ("upper_pd", "float64"),
-                ("central_pd", "float64"),
-            ],
-        )
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.pd", "MasterScale.__len__")]
     fn __len__(&self) -> usize {
         self.inner.n_grades()
@@ -303,6 +292,24 @@ impl PyMasterScale {
     }
 }
 
+impl PyMasterScale {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(
+            self.inner.grades(),
+            &[
+                ("label", "str"),
+                ("upper_pd", "float64"),
+                ("central_pd", "float64"),
+            ],
+        )
+    }
+}
+
+tabular_methods!(
+    PyMasterScale,
+    "MasterScale",
+    module = "finstack_quant.models.credit.pd"
+);
 wire_methods!(
     PyMasterScale,
     MasterScale,

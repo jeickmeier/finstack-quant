@@ -300,8 +300,8 @@ def compute() -> dict[str, Any]:
         "breaches": EligibleCollateralSchedule
         .from_json(json.dumps(LIMITED_SCHEDULE))
         .check_concentration_limits([("equity", 80.0), ("cash", 20.0)])
-        .to_dict("records"),
-        "no_breaches": bcbs.check_concentration_limits([("government_bonds", 80.0), ("cash", 20.0)]).to_dict("records"),
+        .to_records(),
+        "no_breaches": bcbs.check_concentration_limits([("government_bonds", 80.0), ("cash", 20.0)]).to_records(),
     }
 
     utilization = MarginUtilization(8_000_000.0, 10_000_000.0, "USD")
@@ -431,7 +431,7 @@ def compute() -> dict[str, Any]:
         "result": _wire(vm_result),
         "net_margin": vm_result.net_margin,
         "requires_call": vm_result.requires_call,
-        "calls": calls.to_dict("records"),
+        "calls": calls.to_records(),
         "call_dates": [d.isoformat() for d in vm.margin_call_dates("2024-06-17", "2024-06-21")],
     }
 

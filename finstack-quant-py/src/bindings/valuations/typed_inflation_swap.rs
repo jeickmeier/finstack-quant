@@ -108,19 +108,19 @@ impl PyInflationSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.side")]
     #[getter]
     fn side<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.side)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.side)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.lag")]
     #[getter]
     fn lag<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.lag)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.lag)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.interpolation")]
     #[getter]
     fn interpolation<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.interpolation)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.interpolation)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_inflation_swap", "InflationSwap.base_cpi")]

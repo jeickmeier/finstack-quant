@@ -1,11 +1,12 @@
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 
 use finstack_quant_portfolio::factor_model::{
     FactorAssignmentReport, PositionAssignment, UnmatchedEntry,
 };
 
-use crate::bindings::pandas_utils::dict_to_dataframe;
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::display_to_py;
 
 use crate::bindings::json_bridge::serialize_json;
@@ -162,45 +163,10 @@ impl PyFactorAssignmentReport {
 
     /// Export the matched assignments as a long-format pandas ``DataFrame``.
     ///
-    /// One row per ``(dependency, factor_id, beta)`` mapping, so a position
-    /// matched by a hierarchical matcher (e.g. credit) contributes one row per
-    /// level. Row count is the sum of ``n_mappings`` across
-    /// :attr:`assignments`, not the number of positions.
+    /// Export the unmatched dependencies as an
+    /// :class:`~finstack_quant.core.table.ArrowTable`.
     ///
-    /// Columns: ``position_id``, ``factor_id``, ``beta`` (factor loading),
-    /// ``dependency_json`` — the ``MarketDependency`` variant tree is
-    /// deliberately kept as a JSON string rather than exploded into columns,
-    /// matching :meth:`PositionAssignment.mappings_json`.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a market dependency cannot be serialized to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let mut position_ids: Vec<&str> = Vec::new();
-        let mut factor_ids: Vec<&str> = Vec::new();
-        let mut betas: Vec<f64> = Vec::new();
-        let mut dependencies: Vec<String> = Vec::new();
-        for assignment in &self.inner.assignments {
-            for (dependency, factor_id, beta) in &assignment.mappings {
-                position_ids.push(assignment.position_id.as_str());
-                factor_ids.push(factor_id.as_str());
-                betas.push(*beta);
-                dependencies.push(serde_json::to_string(dependency).map_err(display_to_py)?);
-            }
-        }
-        let data = PyDict::new(py);
-        data.set_item("position_id", position_ids)?;
-        data.set_item("factor_id", factor_ids)?;
-        data.set_item("beta", betas)?;
-        data.set_item("dependency_json", dependencies)?;
-        dict_to_dataframe(py, &data, None)
-    }
-
-    /// Export the unmatched dependencies as a pandas ``DataFrame``.
-    ///
-    /// One row per entry of :attr:`unmatched`; a zero-row frame (columns still
+    /// One row per entry of :attr:`unmatched`; a zero-row table (columns still
     /// present) means every dependency matched a configured factor.
     ///
     /// Columns: ``position_id``, ``dependency_json`` (the unmatched
@@ -211,17 +177,20 @@ impl PyFactorAssignmentReport {
     /// ValueError
     ///     If a market dependency cannot be serialized to JSON.
     #[pyo3(text_signature = "(self)")]
-    fn to_unmatched_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_unmatched_table(&self) -> PyResult<PyArrowTable> {
         let rows = &self.inner.unmatched;
-        let position_ids: Vec<&str> = rows.iter().map(|e| e.position_id.as_str()).collect();
+        let position_ids: Vec<String> = rows
+            .iter()
+            .map(|e| e.position_id.as_str().to_owned())
+            .collect();
         let dependencies: Vec<String> = rows
             .iter()
             .map(|e| serde_json::to_string(&e.dependency).map_err(display_to_py))
             .collect::<PyResult<Vec<_>>>()?;
-        let data = PyDict::new(py);
-        data.set_item("position_id", position_ids)?;
-        data.set_item("dependency_json", dependencies)?;
-        dict_to_dataframe(py, &data, None)
+        TableBuilder::new()
+            .utf8("position_id", position_ids)?
+            .utf8("dependency_json", dependencies)?
+            .build()
     }
 
     fn __repr__(&self) -> String {
@@ -237,4 +206,28 @@ crate::bindings::macros::wire_methods!(
     FactorAssignmentReport,
     "FactorAssignmentReport"
 );
-crate::bindings::macros::impl_repr_html_via_dataframe!(PyFactorAssignmentReport);
+
+impl PyFactorAssignmentReport {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let mut position_ids: Vec<String> = Vec::new();
+        let mut factor_ids: Vec<String> = Vec::new();
+        let mut betas: Vec<f64> = Vec::new();
+        let mut dependencies: Vec<String> = Vec::new();
+        for assignment in &self.inner.assignments {
+            for (dependency, factor_id, beta) in &assignment.mappings {
+                position_ids.push(assignment.position_id.as_str().to_owned());
+                factor_ids.push(factor_id.as_str().to_owned());
+                betas.push(*beta);
+                dependencies.push(serde_json::to_string(dependency).map_err(display_to_py)?);
+            }
+        }
+        TableBuilder::new()
+            .utf8("position_id", position_ids)?
+            .utf8("factor_id", factor_ids)?
+            .f64("beta", betas)?
+            .utf8("dependency_json", dependencies)?
+            .build()
+    }
+}
+
+tabular_methods!(PyFactorAssignmentReport);

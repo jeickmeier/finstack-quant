@@ -1,7 +1,9 @@
 //! Python bindings for `finstack_quant_models::credit::scoring`.
 
-use crate::bindings::macros::wire_methods;
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::TableBuilder;
 use finstack_quant_models::credit::scoring::{
     AltmanZDoublePrimeInput, AltmanZPrimeInput, AltmanZScoreInput, CreditScoreReport,
     CreditScoreRequest, OhlsonOScoreInput, ScoringResult, ZmijewskiInput,
@@ -14,7 +16,6 @@ use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
 use super::pd::PyMasterScaleResult;
-use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema;
 use crate::errors::{core_to_py, kinded_to_py};
 
 /// A frozen pyclass over one scoring input struct: a keyword-only constructor
@@ -196,21 +197,28 @@ impl PyScoringResult {
         self.inner.model.clone()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.scoring", "ScoringResult.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &self.inner,
-            &["model", "score", "zone", "implied_pd"],
-        )
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.scoring", "ScoringResult.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("ScoringResult", &self.inner)
     }
 }
 
+impl PyScoringResult {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .utf8("model", vec![self.inner.model.clone()])?
+            .f64("score", vec![self.inner.score])?
+            .utf8("zone", vec![self.zone()?])?
+            .nullable_f64("implied_pd", vec![self.inner.implied_pd])?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyScoringResult,
+    "ScoringResult",
+    module = "finstack_quant.models.credit.scoring"
+);
 wire_methods!(
     PyScoringResult,
     ScoringResult,

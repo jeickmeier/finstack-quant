@@ -3,20 +3,21 @@
 use super::attribution::PyPortfolioAttribution;
 use super::valuation::PyPortfolioValuation;
 use crate::bindings::core::money::PyMoney;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::extract::extract_portfolio_ref;
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_rows_to_dataframe_with_schema, serde_to_py,
-};
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::tabular_methods;
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::{display_to_py, portfolio_to_py};
 use finstack_quant_portfolio::replay::{ReplayConfig, ReplayStep, ReplaySummary};
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 use serde::Serialize;
 
-/// Column schema for [`PyReplayResult::to_dataframe`].
-const REPLAY_STEP_COLUMNS: &[ColumnSchema<'static>] = &[
+/// Column schema for [`PyReplayResult::to_arrow_table`].
+const REPLAY_STEP_COLUMNS: &[(&str, &str)] = &[
     ("date", "str"),
     ("value", "float64"),
     ("daily_mtm_pnl", "float64"),
@@ -293,17 +294,6 @@ impl PyReplayResult {
         serde_to_py(py, &self.inner.skipped_dates)
     }
 
-    /// Per-step value and P&L ladder as a :class:`pandas.DataFrame`.
-    ///
-    /// One row per replay step; ``daily_mtm_pnl`` and ``cumulative_mtm_pnl`` exclude paid cashflows and are
-    /// null at step 0. Full per-step valuations remain available from the
-    /// ``steps`` getter.
-    ///
-    /// Columns: ``date``, ``value``, ``daily_mtm_pnl``, ``cumulative_mtm_pnl``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(py, &self.rows(), REPLAY_STEP_COLUMNS)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "ReplayResult(steps={}, start={}, end={})",
@@ -313,6 +303,14 @@ impl PyReplayResult {
         )
     }
 }
+
+impl PyReplayResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.rows(), REPLAY_STEP_COLUMNS)
+    }
+}
+
+tabular_methods!(PyReplayResult);
 
 /// Parse the replay configuration from ``config`` (JSON string or dict).
 fn extract_replay_config(
@@ -398,7 +396,7 @@ fn extract_replay_timeline(
 /// -------
 /// ReplayResult
 ///     Typed result with ``steps``, ``summary`` and ``skipped_dates``
-///     getters plus ``to_dataframe()``; ``to_json()`` gives the wire form.
+///     getters plus ``to_pandas()`` / ``to_polars()`` / ``to_arrow()``; ``to_json()`` gives the wire form.
 ///
 /// Raises
 /// ------

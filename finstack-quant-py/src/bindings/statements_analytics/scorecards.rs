@@ -10,19 +10,31 @@
 //! Reports and configs are JSON round-trippable via `to_json`/`from_json`.
 
 use crate::bindings::core::rating_scales::{PyRatingScaleEntry, PyRatingScaleRegistry};
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
-    serde_rows_to_dataframe_with_schema,
-};
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::display_to_py;
 use finstack_quant_statements_analytics::extensions as rust_scorecards;
 use pyo3::prelude::*;
 
-/// Column schema for [`PyScorecardReport::to_metric_scores_dataframe`].
-const METRIC_SCORE_COLUMNS: [ColumnSchema<'static>; 5] = [
+/// Column schema for [`PyScorecardReport`] summary tabular exports.
+const SUMMARY_COLUMNS: [(&str, &str); 10] = [
+    ("status", "str"),
+    ("message", "str"),
+    ("rating", "str"),
+    ("rating_scale", "str"),
+    ("period", "str"),
+    ("total_score", "float64"),
+    ("partial", "bool"),
+    ("weight_coverage", "float64"),
+    ("warning_count", "int64"),
+    ("error_count", "int64"),
+];
+
+/// Column schema for [`PyScorecardReport::to_metric_scores_table`].
+const METRIC_SCORE_COLUMNS: [(&str, &str); 5] = [
     ("metric", "str"),
     ("value", "float64"),
     ("score", "float64"),
@@ -291,7 +303,7 @@ impl PyScorecardReport {
     /// ``weight_coverage`` alongside the per-metric scores and rating.
     #[getter]
     fn data<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.data)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.data)
     }
 
     /// Return the structured data payload as a JSON string (the wire form of
@@ -300,39 +312,7 @@ impl PyScorecardReport {
         serde_json::to_string(&self.inner.data).map_err(display_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.statements_analytics._scorecards", "ScorecardReport.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let row = serde_json::json!({
-            "status": self.status()?,
-            "message": self.inner.message,
-            "rating": self.data_field("rating"),
-            "rating_scale": self.data_field("rating_scale"),
-            "period": self.data_field("period"),
-            "total_score": self.data_field("total_score"),
-            "partial": self.data_field("partial"),
-            "weight_coverage": self.data_field("weight_coverage"),
-            "warning_count": self.inner.warnings.len(),
-            "error_count": self.inner.errors.len(),
-        });
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &[
-                "status",
-                "message",
-                "rating",
-                "rating_scale",
-                "period",
-                "total_score",
-                "partial",
-                "weight_coverage",
-                "warning_count",
-                "error_count",
-            ],
-        )
-    }
-
-    /// Export the per-metric scores as a pandas ``DataFrame``.
+    /// Export the per-metric scores as an ``ArrowTable``.
     ///
     /// Columns: ``metric``, ``value``, ``score``, ``weight``,
     /// ``weighted_score``. One row per scored metric, in configured order;
@@ -342,7 +322,7 @@ impl PyScorecardReport {
     /// its mapped rating score, ``weight`` the configured weight, and
     /// ``weighted_score`` is ``score * weight``. Metrics that errored or were
     /// excluded do not appear here — see ``errors`` and ``weight_coverage``.
-    fn to_metric_scores_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_metric_scores_table(&self) -> PyResult<PyArrowTable> {
         let rows = self
             .inner
             .data
@@ -350,7 +330,7 @@ impl PyScorecardReport {
             .and_then(serde_json::Value::as_array)
             .cloned()
             .unwrap_or_default();
-        serde_rows_to_dataframe_with_schema(py, &rows, &METRIC_SCORE_COLUMNS)
+        serde_rows_to_arrow_table(&rows, &METRIC_SCORE_COLUMNS)
     }
 
     fn __repr__(&self) -> PyResult<String> {
@@ -368,13 +348,28 @@ wire_methods!(
     rust_scorecards::ScorecardReport,
     "ScorecardReport"
 );
-impl_repr_html_via_dataframe!(PyScorecardReport);
 
 impl PyScorecardReport {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let row = serde_json::json!({
+            "status": self.status()?,
+            "message": self.inner.message,
+            "rating": self.data_field("rating"),
+            "rating_scale": self.data_field("rating_scale"),
+            "period": self.data_field("period"),
+            "total_score": self.data_field("total_score"),
+            "partial": self.data_field("partial"),
+            "weight_coverage": self.data_field("weight_coverage"),
+            "warning_count": self.inner.warnings.len(),
+            "error_count": self.inner.errors.len(),
+        });
+        serde_rows_to_arrow_table(&[row], &SUMMARY_COLUMNS)
+    }
+
     /// Read one scalar entry out of the structured `data` payload.
     ///
-    /// Returns JSON `null` when the key is absent, which pandas renders as a
-    /// missing value rather than raising.
+    /// Returns JSON `null` when the key is absent, which Arrow/pandas renders
+    /// as a missing value rather than raising.
     fn data_field(&self, key: &str) -> serde_json::Value {
         self.inner
             .data
@@ -383,6 +378,12 @@ impl PyScorecardReport {
             .unwrap_or(serde_json::Value::Null)
     }
 }
+
+tabular_methods!(
+    PyScorecardReport,
+    "ScorecardReport",
+    module = "finstack_quant.statements_analytics._scorecards"
+);
 
 /// Credit scorecard extension for rating assignment and stress testing.
 #[pyclass(

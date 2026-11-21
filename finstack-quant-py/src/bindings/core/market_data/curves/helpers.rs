@@ -7,8 +7,9 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyString};
 
 use crate::bindings::core::dates::daycount::extract_day_count;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::py_to_date;
-use crate::bindings::pandas_utils::dict_to_dataframe;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
 
 /// Shared host fields for a dated curve built from time/value pillars.
@@ -98,14 +99,11 @@ pub(super) fn extract_time_point(obj: &Bound<'_, PyAny>) -> PyResult<TimePoint> 
     Ok(TimePoint::Date(py_to_date(obj)?))
 }
 
-/// Build a pandas `DataFrame` from named float columns, in the given order.
-pub(super) fn columns_to_dataframe<'py>(
-    py: Python<'py>,
-    columns: &[(&str, Vec<f64>)],
-) -> PyResult<Bound<'py, PyAny>> {
-    let data = PyDict::new(py);
+/// Build an Arrow table from named float columns, in the given order.
+pub(super) fn columns_to_arrow_table(columns: &[(&str, Vec<f64>)]) -> PyResult<PyArrowTable> {
+    let mut builder = TableBuilder::new();
     for (name, values) in columns {
-        data.set_item(*name, values.clone())?;
+        builder = builder.f64(name, values.clone())?;
     }
-    dict_to_dataframe(py, &data, None)
+    builder.build()
 }

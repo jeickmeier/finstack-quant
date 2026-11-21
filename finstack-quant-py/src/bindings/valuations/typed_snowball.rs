@@ -64,7 +64,7 @@ impl PySnowball {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.variant")]
     #[getter]
     fn variant<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.variant)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.variant)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.initial_coupon")]
@@ -130,7 +130,7 @@ impl PySnowball {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.index_tenor")]
     #[getter]
     fn index_tenor<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.index_tenor)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.index_tenor)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.discount_curve_id")]
@@ -148,7 +148,7 @@ impl PySnowball {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.call_provision")]
     #[getter]
     fn call_provision<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.call_provision)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.call_provision)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_snowball", "Snowball.day_count")]

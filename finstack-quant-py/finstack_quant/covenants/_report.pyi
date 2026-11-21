@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 class CovenantReport:
     """
@@ -250,7 +252,26 @@ class CovenantReport:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export the report as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``covenant_type``, ``covenant_id``, ``passed``,
+        ``actual_value``, ``threshold``, ``headroom``, ``headroom_raw``, ``details``.
+
+        Returns
+        -------
+        ArrowTable
+            One row describing this covenant evaluation.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export the report as a single-row pandas DataFrame.
 
@@ -264,9 +285,44 @@ class CovenantReport:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the report as a single-row ``polars.DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One-row Polars DataFrame constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the report as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def _repr_html_(self) -> str | None: ...
     def __eq__(self, other: object) -> bool: ...

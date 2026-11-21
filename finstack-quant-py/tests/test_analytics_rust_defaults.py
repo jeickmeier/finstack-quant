@@ -56,7 +56,10 @@ def test_financial_assumptions_cannot_be_omitted(perf: Performance) -> None:
         perf.periodic_returns,
         lambda: perf.period_stats(0),
         lambda: perf.multi_factor_greeks(0, [BENCH]),
-        perf.to_dataframe,
+        perf.to_pandas,
+        perf.to_polars,
+        perf.to_arrow,
+        perf.to_pyarrow,
     ):
         with pytest.raises(TypeError):
             call()
@@ -66,8 +69,8 @@ def test_optional_context_remains_absent_until_required() -> None:
     panel = Performance(pd.DataFrame({"A": [100.0, 101.0, 102.0]}, index=_dates(3)))
     assert panel.get_frequency() is None
     assert panel.get_benchmark_idx() is None
-    assert panel.cagr().equals(panel.cagr("act_365f"))
-    assert math.isfinite(panel.volatility(False).iloc[0])
+    assert panel.cagr() == panel.cagr("act_365f")
+    assert math.isfinite(panel.volatility(False)["A"])
     with pytest.raises(ValueError, match="frequency"):
         panel.volatility(True)
     with pytest.raises(ValueError, match="benchmark"):

@@ -148,7 +148,8 @@ def build_cashflow_schedule(
     Returns
     -------
     CashFlowSchedule
-        Canonical typed schedule with ``to_dataframe()``.
+        Canonical typed schedule supporting ``to_arrow()``, ``to_pandas()``,
+        ``to_polars()``, and ``to_pyarrow()``.
 
     Raises
     ------

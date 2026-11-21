@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 class CreditAssessment:
     """Structured credit assessment: leverage, coverage and free cash flow at a
@@ -85,26 +87,78 @@ class CreditAssessment:
         list[CreditAssessmentPoint]
             Ascending per-period points up to and including ``period``.
         """
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the per-period series as a pandas ``DataFrame``.
+        Export the per-period series as an ``ArrowTable``.
 
         Columns: ``period`` (period-id string), ``leverage_ratio``,
         ``interest_coverage`` (turns), ``free_cash_flow`` (model units);
-        ``NaN`` where a metric is unavailable. One row per period, ascending.
+        null where a metric is unavailable. One row per period, ascending.
+
+        Returns
+        -------
+        ArrowTable
+            Per-period credit assessment series table.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to an Arrow table.
+        """
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the per-period series as a pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow` (with ``NaN`` where a metric is
+        unavailable). One row per period, ascending.
 
         Returns
         -------
         pd.DataFrame
-            Export the per-period series as a pandas ``DataFrame``. Columns: ``period`` (period-id string), ``leverage_ratio``, ``interest_coverage`` (turns), ``free_cash_flow`` (model units); ``NaN`` where a metric is unavailable. One row per period, ascending.
+            Per-period credit assessment series DataFrame.
 
         Raises
         ------
         ImportError
             If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the result cannot be converted to a pandas DataFrame.
         """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the per-period series as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Per-period credit assessment series Polars frame.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export the per-period series as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Per-period credit assessment series PyArrow table.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to canonical JSON.
@@ -211,8 +265,8 @@ class CreditAssessmentPoint:
 class PLSummaryReport:
     """P&L summary of selected line items across periods.
 
-    Built by ``pl_summary_report``; renders to text, an ``ArrowTable`` or a
-    pandas frame from the same Rust implementation.
+    Built by ``pl_summary_report``; renders to text, an ``ArrowTable``, or a
+    pandas / Polars / PyArrow table from the same Rust implementation.
 
     Examples
     --------
@@ -222,7 +276,7 @@ class PLSummaryReport:
     >>> _ = b.periods("2025Q1..Q2", None)
     >>> _ = b.value("revenue", [("2025Q1", 1.0), ("2025Q2", 2.0)])
     >>> report = pl_summary_report(Evaluator().evaluate(b.build()), ["revenue"], ["2025Q1", "2025Q2"])
-    >>> list(report.to_dataframe()["value"])
+    >>> list(report.to_pandas()["value"])
     [1.0, 2.0]
     """
     @property
@@ -260,7 +314,7 @@ class PLSummaryReport:
         str
             Render the box-drawn text table.
         """
-    def to_table(self) -> Any:
+    def to_arrow(self) -> ArrowTable:
         """
         Export the report as a long ``ArrowTable``.
 
@@ -269,17 +323,15 @@ class PLSummaryReport:
 
         Returns
         -------
-        Any
-            Export the report as a long ``ArrowTable``. Columns: ``line_item``, ``period``, ``value`` (nullable; missing line items are null rather than ``0.0``).
+        ArrowTable
+            Long-format P&L summary table.
 
         Raises
         ------
-        ImportError
-            If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the report cannot be represented as an Arrow table.
         """
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export the report as a long pandas ``DataFrame``.
 
@@ -292,15 +344,50 @@ class PLSummaryReport:
         Returns
         -------
         pd.DataFrame
-            Export the report as a long pandas ``DataFrame``. Columns: ``line_item``, ``period`` (period-id string), ``value`` (the node's value in its own units; ``NaN`` where the line item is missing). One row per (line item, period). Pivot with ``df.pivot(index="line_item", columns="period", values="value")`` for the line-items-by-periods layout of the text report.
+            Long-format P&L summary DataFrame.
 
         Raises
         ------
         ImportError
             If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the report cannot be converted to a pandas DataFrame.
         """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the report as a long Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Long-format P&L summary Polars frame.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the report cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export the report as a long ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Long-format P&L summary PyArrow table.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the report cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 def credit_assessment(results: Any, period: str) -> CreditAssessment:
     """Compute a structured credit assessment (leverage, interest coverage, FCF).
@@ -398,7 +485,7 @@ def pl_summary_report(results: Any, line_items: list[str], periods: list[str]) -
     Returns
     -------
     PLSummaryReport
-        Report with ``to_text()``, ``to_table()`` and ``to_dataframe()``.
+        Report with ``to_text()``, ``to_arrow()``, ``to_pandas()``, ``to_polars()``, and ``to_pyarrow()``.
 
     Raises
     ------

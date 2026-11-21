@@ -3,11 +3,12 @@
 use crate::bindings::core::dates::calendar::extract_business_day_convention;
 use crate::bindings::core::dates::tenor::extract_tenor;
 use crate::bindings::date_utils::py_to_date;
-use crate::bindings::macros::{label_enum, typed_or_label, wire_methods};
+use crate::bindings::macros::{label_enum, tabular_methods, typed_or_label, wire_methods};
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::{GridMode, Schedule, ScheduleBuilder, ScheduleSpec, StubKind};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyIterator, PyList, PyModule};
+use pyo3::types::{PyIterator, PyList, PyModule};
 
 /// Stub positioning rule for schedule generation.
 ///
@@ -181,58 +182,19 @@ impl PySchedule {
     /// Unadjusted accrual dates as a list of ``datetime.date``.
     #[getter]
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-        crate::bindings::pandas_utils::dates_to_pylist(py, self.inner.get_dates())
+        crate::bindings::date_utils::dates_to_pylist(py, self.inner.get_dates())
     }
 
     /// Payment date for each accrual period (one per period end).
     #[getter]
     fn payment_dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-        crate::bindings::pandas_utils::dates_to_pylist(py, self.inner.get_payment_dates())
+        crate::bindings::date_utils::dates_to_pylist(py, self.inner.get_payment_dates())
     }
 
     /// Fixing dates for each accrual period. Empty when no fixing lag is set.
     #[getter]
     fn fixing_dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-        crate::bindings::pandas_utils::dates_to_pylist(py, self.inner.get_fixing_dates())
-    }
-
-    /// Accrual periods as a pandas DataFrame with ``datetime64`` columns
-    /// ``period_start``, ``period_end``, ``payment_date`` and ``fixing_date``
-    /// (``NaT`` when no fixing lag is configured); one row per period.
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        // A schedule always has at least two grid dates, so one period.
-        let dates = self.inner.get_dates();
-        let n = dates.len() - 1;
-        let starts = &dates[..n];
-        let ends = &dates[1..];
-        let to_datetime = py.import("pandas")?.getattr("to_datetime")?;
-        let column = |dates: &[finstack_quant_core::dates::Date]| -> PyResult<Bound<'py, PyAny>> {
-            to_datetime.call1((crate::bindings::pandas_utils::dates_to_pylist(py, dates)?,))
-        };
-        let columns = PyDict::new(py);
-        columns.set_item("period_start", column(starts)?)?;
-        columns.set_item("period_end", column(ends)?)?;
-        columns.set_item("payment_date", column(self.inner.get_payment_dates())?)?;
-        if self.inner.get_fixing_dates().is_empty() {
-            let nones: Vec<Option<()>> = vec![None; n];
-            columns.set_item("fixing_date", to_datetime.call1((nones,))?)?;
-        } else {
-            columns.set_item("fixing_date", column(self.inner.get_fixing_dates())?)?;
-        }
-        crate::bindings::pandas_utils::dict_to_dataframe(py, &columns, None)
-    }
-
-    /// Render the first twelve accrual periods as an HTML table for Jupyter.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        self.to_dataframe(py)
-            .ok()?
-            .call_method1("head", (12,))
-            .ok()?
-            .call_method0("_repr_html_")
-            .ok()?
-            .extract()
-            .ok()
+        crate::bindings::date_utils::dates_to_pylist(py, self.inner.get_fixing_dates())
     }
 
     /// Iterate over the unadjusted accrual dates.
@@ -259,6 +221,33 @@ impl PySchedule {
     }
 }
 
+impl PySchedule {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<crate::bindings::core::table::PyArrowTable> {
+        let dates = self.inner.get_dates();
+        let n = dates.len().saturating_sub(1);
+        let starts = &dates[..n];
+        let ends = &dates[1..];
+        let fixing_dates: Vec<Option<finstack_quant_core::dates::Date>> =
+            if self.inner.get_fixing_dates().is_empty() {
+                vec![None; n]
+            } else {
+                self.inner
+                    .get_fixing_dates()
+                    .iter()
+                    .copied()
+                    .map(Some)
+                    .collect()
+            };
+        TableBuilder::new()
+            .date("period_start", starts)?
+            .date("period_end", ends)?
+            .date("payment_date", self.inner.get_payment_dates())?
+            .nullable_date("fixing_date", &fixing_dates)?
+            .build()
+    }
+}
+
+tabular_methods!(PySchedule);
 wire_methods!(PySchedule, Schedule, "Schedule");
 
 /// Registry id for a ``HolidayCalendar`` wrapper or calendar-id string.
@@ -386,7 +375,7 @@ impl PyScheduleBuilder {
     #[pyo3(text_signature = "(self)")]
     fn to_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let spec = self.inner.to_spec().map_err(core_to_py)?;
-        crate::bindings::pandas_utils::serde_to_py(py, &spec)
+        crate::bindings::json_bridge::serde_to_py(py, &spec)
     }
 
     /// Build the schedule.

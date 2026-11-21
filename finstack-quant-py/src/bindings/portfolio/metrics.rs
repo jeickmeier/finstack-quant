@@ -1,9 +1,11 @@
 //! Python bindings for metric aggregation: `aggregate_metrics` and `PortfolioMetrics`.
 
-use crate::bindings::core::table::envelope_to_pandas;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::extract_market_ref;
 use crate::bindings::extract::extract_valuation_ref;
-use crate::bindings::pandas_utils::{dict_to_dataframe, serde_to_py};
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::core_to_py;
 use crate::errors::display_to_py;
 use crate::errors::portfolio_to_py;
@@ -179,7 +181,7 @@ impl PyPortfolioMetrics {
     ///
     /// Despite the ``_series`` suffix (which mirrors the Rust name) this is a
     /// plain ``list`` of tuples, not a :class:`pandas.Series`. Use
-    /// :meth:`to_dataframe` for the tabular view.
+    /// :meth:`to_pandas` / :meth:`to_arrow` for the tabular view.
     ///
     /// Raises
     /// ------
@@ -201,60 +203,53 @@ impl PyPortfolioMetrics {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._metrics", "PortfolioMetrics.bucketed_dataframe")]
-    fn bucketed_dataframe<'py>(&self, py: Python<'py>, base: &str) -> PyResult<Bound<'py, PyAny>> {
-        let entries = self.metric_series(py, base)?;
-        let mut components = Vec::with_capacity(entries.len());
-        let mut totals = Vec::with_capacity(entries.len());
-        let mut by_entity = Vec::with_capacity(entries.len());
-        for (labels, total, entities) in entries {
-            components.push(labels);
-            totals.push(total);
-            by_entity.push(entities);
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._metrics", "PortfolioMetrics.bucketed_table")]
+    fn bucketed_table(&self, base: &str) -> PyResult<PyArrowTable> {
+        #[derive(serde::Serialize)]
+        struct BucketedRow {
+            components: String,
+            total: f64,
+            by_entity: String,
         }
-        let columns = PyDict::new(py);
-        columns.set_item("components", components)?;
-        columns.set_item("total", totals)?;
-        columns.set_item("by_entity", by_entity)?;
-        dict_to_dataframe(py, &columns, None)
+        let base = base.parse().map_err(core_to_py)?;
+        let rows = self
+            .inner
+            .metric_series(&base)
+            .into_iter()
+            .map(|entry| {
+                Ok(BucketedRow {
+                    components: serde_json::to_string(&entry.components).map_err(display_to_py)?,
+                    total: entry.total,
+                    by_entity: serde_json::to_string(&entry.by_entity).map_err(display_to_py)?,
+                })
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        serde_rows_to_arrow_table(
+            &rows,
+            &[
+                ("components", "str"),
+                ("total", "float64"),
+                ("by_entity", "str"),
+            ],
+        )
     }
 
-    /// Export the portfolio-wide aggregated metrics as a pandas ``DataFrame``.
-    ///
-    /// One row per entry of the ``aggregated`` map, in canonical Rust
-    /// ``IndexMap`` insertion order. Built from the canonical
-    /// ``finstack_quant_portfolio::dataframe::aggregated_metrics_to_table`` envelope so
-    /// the frame cannot drift from the Rust table export. The per-entity
-    /// breakdown is not flattened here — reach it through
-    /// :meth:`metric_series`; the per-position long table comes from
-    /// :meth:`to_position_dataframe`.
-    ///
-    /// Columns: ``metric_id``, ``total`` (sum across positions; only summable
-    /// metrics are aggregated).
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let table = finstack_quant_portfolio::dataframe::aggregated_metrics_to_table(&self.inner)
-            .map_err(core_to_py)?;
-        envelope_to_pandas(py, &table)
-    }
-
-    /// Export the raw per-position metric values as a long-format pandas
-    /// ``DataFrame``.
+    /// Export the raw per-position metric values as a long-format
+    /// :class:`~finstack_quant.core.table.ArrowTable`.
     ///
     /// One row per ``(position, metric)`` pair — the row count is the total
     /// number of metric values across positions, not the number of positions.
-    /// Pivot with ``df.pivot(index="position_id", columns="metric_id",
-    /// values="value")`` for a wide view. Built from the canonical
-    /// ``finstack_quant_portfolio::dataframe::metrics_to_table`` envelope so the frame
-    /// cannot drift from the Rust table export.
+    /// Built from the canonical
+    /// ``finstack_quant_portfolio::dataframe::metrics_to_table`` envelope so the
+    /// table cannot drift from the Rust export.
     ///
     /// Columns: ``metric_id``, ``position_id``, ``currency`` (the position's
     /// native currency; non-summable metrics are quoted in it), ``value``.
     #[pyo3(text_signature = "(self)")]
-    fn to_position_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_position_table(&self) -> PyResult<PyArrowTable> {
         let table = finstack_quant_portfolio::dataframe::metrics_to_table(&self.inner)
             .map_err(core_to_py)?;
-        envelope_to_pandas(py, &table)
+        PyArrowTable::from_envelope(&table)
     }
 
     fn __repr__(&self) -> String {
@@ -264,14 +259,17 @@ impl PyPortfolioMetrics {
             self.inner.by_position.len(),
         )
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks (delegates to
-    /// :meth:`to_dataframe`; ``None`` when the frame cannot be built).
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyPortfolioMetrics {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let table = finstack_quant_portfolio::dataframe::aggregated_metrics_to_table(&self.inner)
+            .map_err(core_to_py)?;
+        PyArrowTable::from_envelope(&table)
     }
 }
+
+tabular_methods!(PyPortfolioMetrics);
 
 /// Aggregate portfolio metrics from a valuation.
 ///

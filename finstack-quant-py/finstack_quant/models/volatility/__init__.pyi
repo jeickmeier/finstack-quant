@@ -18,7 +18,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any, Literal
 import pandas as pd
+import polars as pl
 from finstack_quant.core.market_data import FxDeltaVolSurface, VolCube, VolCubeExpirySlice, VolSurface
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.models.volatility._volatility_arbitrage import (
     ArbitrageReport as ArbitrageReport,
     check_butterfly_grid as check_butterfly_grid,
@@ -795,9 +797,32 @@ class SabrSmile:
         """
         ...
 
-    def to_dataframe(self, strikes: list[float]) -> pd.DataFrame:
+    def to_arrow(self, strikes: list[float]) -> ArrowTable:
         """
-        Tabulate the smile on a strike grid.
+        Tabulate the smile on a strike grid as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Parameters
+        ----------
+        strikes : list[float]
+            Strikes at which to evaluate the smile.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``strike``, ``vol`` (decimal Black vol, or absolute normal
+            vol when ``beta == 0``), and ``log_moneyness``.
+
+        Raises
+        ------
+        ValueError
+            If any strike or the stored forward / expiry is outside the model
+            domain.
+        """
+        ...
+
+    def to_pandas(self, strikes: list[float]) -> pd.DataFrame:
+        """
+        Tabulate the smile on a strike grid as a pandas ``DataFrame``.
 
         Parameters
         ----------
@@ -815,6 +840,8 @@ class SabrSmile:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
             If any strike or the stored forward / expiry is outside the model
             domain.
@@ -823,8 +850,56 @@ class SabrSmile:
         --------
         >>> from finstack_quant.models.volatility import SabrParameters, SabrSmile
         >>> smile = SabrSmile(SabrParameters.equity_default(), 100.0, 1.0, "black_lognormal")
-        >>> list(smile.to_dataframe([90.0, 100.0, 110.0]).columns)
+        >>> list(smile.to_pandas([90.0, 100.0, 110.0]).columns)
         ['strike', 'vol', 'log_moneyness']
+        """
+        ...
+
+    def to_polars(self, strikes: list[float]) -> pl.DataFrame:
+        """
+        Tabulate the smile on a strike grid as a Polars ``DataFrame``.
+
+        Parameters
+        ----------
+        strikes : list[float]
+            Strikes at which to evaluate the smile.
+
+        Returns
+        -------
+        polars.DataFrame
+            Columns ``strike``, ``vol``, and ``log_moneyness``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If any strike or the stored forward / expiry is outside the model
+            domain.
+        """
+        ...
+
+    def to_pyarrow(self, strikes: list[float]) -> Any:
+        """
+        Tabulate the smile on a strike grid as a ``pyarrow.Table``.
+
+        Parameters
+        ----------
+        strikes : list[float]
+            Strikes at which to evaluate the smile.
+
+        Returns
+        -------
+        pyarrow.Table
+            Columns ``strike``, ``vol``, and ``log_moneyness``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If any strike or the stored forward / expiry is outside the model
+            domain.
         """
         ...
 
@@ -2298,31 +2373,87 @@ class LocalVolSurface:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Tabulate the grid as a pandas DataFrame.
+        Tabulate the local-volatility grid as a tidy :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Tidy three-column table ``("expiry", "strike", "local_vol")`` ordered
+            by expiry then strike (matching :meth:`~finstack_quant.core.market_data.VolSurface.to_arrow`).
+
+        Raises
+        ------
+        ValueError
+            If the grid dimensions are inconsistent.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Tabulate the local-volatility grid as a tidy pandas ``DataFrame``.
 
         Returns
         -------
         pd.DataFrame
-            One row per expiry (index named ``"expiry"``, in years) and one
-            float64 column per strike: the ``expiry`` x ``strike`` pivot
-            of ``VolSurface.to_dataframe()`` for an implied surface.
+            Columns ``["expiry", "strike", "local_vol"]`` with one row per grid point.
 
         Raises
         ------
         ImportError
-            If pandas is not installed.
+            If ``pandas`` is not installed.
+        ValueError
+            If the grid dimensions are inconsistent.
 
         Examples
         --------
         >>> from finstack_quant.models.volatility import LocalVolSurface
-        >>> frame = LocalVolSurface([1.0, 2.0], [100.0, 200.0], [0.1, 0.2, 0.3, 0.4]).to_dataframe()
-        >>> frame.shape, frame.index.name
-        ((2, 2), 'expiry')
+        >>> frame = LocalVolSurface([1.0, 2.0], [100.0, 200.0], [0.1, 0.2, 0.3, 0.4]).to_pandas()
+        >>> (frame.shape, frame.columns.tolist())
+        ((4, 3), ['expiry', 'strike', 'local_vol'])
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Tabulate the local-volatility grid as a tidy Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Columns ``["expiry", "strike", "local_vol"]`` with one row per grid point.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the grid dimensions are inconsistent.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Tabulate the local-volatility grid as a tidy ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Columns ``["expiry", "strike", "local_vol"]`` with one row per grid point.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the grid dimensions are inconsistent.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Reconstruct this value for ``pickle`` through its canonical JSON form.
 

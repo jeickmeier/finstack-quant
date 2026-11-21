@@ -1,7 +1,7 @@
 //! Native parameter objects used by calibration step authoring.
 
+use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::module_utils::fields_from_py;
-use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::pydoc::pydoc;
 use finstack_quant_calibration::api::schema::{self, StepParams};
 use pyo3::exceptions::PyTypeError;

@@ -5,11 +5,14 @@
 //! JSON, the engine and forecast configuration as the
 //! `finstack_quant.covenants` classes.
 
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::covenants::{
-    PyCovenantEngine, PyCovenantForecastConfig, PyFutureBreach, dated_reports_frame,
+    PyCovenantEngine, PyCovenantForecastConfig, PyFutureBreach, dated_reports_table,
 };
 use crate::bindings::extract::extract_results_ref;
+use crate::bindings::macros::tabular_methods;
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::core_to_py;
 use finstack_quant_covenants::CovenantForecastConfig;
 use pyo3::prelude::*;
@@ -18,12 +21,11 @@ use std::collections::BTreeMap;
 #[doc = pydoc!("finstack_quant.statements_analytics._covenants", "evaluate_covenants")]
 #[pyfunction]
 #[pyo3(signature = (covenants, results, node_mapping=None))]
-fn evaluate_covenants<'py>(
-    py: Python<'py>,
-    covenants: PyRef<'py, PyCovenantEngine>,
-    results: &Bound<'py, PyAny>,
+fn evaluate_covenants(
+    covenants: PyRef<'_, PyCovenantEngine>,
+    results: &Bound<'_, PyAny>,
     node_mapping: Option<BTreeMap<String, String>>,
-) -> PyResult<Bound<'py, PyAny>> {
+) -> PyResult<PyArrowTable> {
     let results = extract_results_ref(results)?;
     let series = finstack_quant_statements_analytics::analysis::evaluate_covenants(
         &covenants.inner,
@@ -31,7 +33,7 @@ fn evaluate_covenants<'py>(
         node_mapping.as_ref(),
     )
     .map_err(core_to_py)?;
-    dated_reports_frame(py, series)
+    dated_reports_table(series)
 }
 
 #[doc = pydoc!("finstack_quant.statements_analytics._covenants", "forecast_breaches")]
@@ -106,13 +108,13 @@ impl PyStatementCovenantAssessment {
     #[getter]
     #[doc = pydoc!("finstack_quant.statements_analytics._covenants", "StatementCovenantAssessment.provenance")]
     fn provenance<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.provenance)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.provenance)
     }
+}
 
-    #[doc = pydoc!("finstack_quant.statements_analytics._covenants", "StatementCovenantAssessment.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
-        const COLUMNS: [ColumnSchema<'static>; 9] = [
+impl PyStatementCovenantAssessment {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: [(&str, &str); 9] = [
             ("period", "str"),
             ("date", "str"),
             ("is_actual", "bool"),
@@ -123,27 +125,35 @@ impl PyStatementCovenantAssessment {
             ("headroom_raw", "float64"),
             ("missing_metric", "str"),
         ];
-        let rows =
-            self.inner
-                .periods
-                .iter()
-                .flat_map(|period| {
-                    period.assessments.iter().map(|test| serde_json::json!({
-                "period": period.period.to_string(),
-                "date": period.date.to_string(),
-                "is_actual": period.is_actual,
-                "covenant_id": test.covenant_id,
-                "state": test.state,
-                "passed": test.report.as_ref().map(|report| report.passed),
-                "threshold": test.effective_threshold,
-                "headroom_raw": test.report.as_ref().and_then(|report| report.headroom_raw),
-                "missing_metric": test.missing_metric,
-            }))
+        let rows = self
+            .inner
+            .periods
+            .iter()
+            .flat_map(|period| {
+                period.assessments.iter().map(|test| {
+                    serde_json::json!({
+                        "period": period.period.to_string(),
+                        "date": period.date.to_string(),
+                        "is_actual": period.is_actual,
+                        "covenant_id": test.covenant_id,
+                        "state": test.state,
+                        "passed": test.report.as_ref().map(|report| report.passed),
+                        "threshold": test.effective_threshold,
+                        "headroom_raw": test.report.as_ref().and_then(|report| report.headroom_raw),
+                        "missing_metric": test.missing_metric,
+                    })
                 })
-                .collect::<Vec<_>>();
-        serde_rows_to_dataframe_with_schema(py, &rows, &COLUMNS)
+            })
+            .collect::<Vec<_>>();
+        serde_rows_to_arrow_table(&rows, &COLUMNS)
     }
 }
+
+tabular_methods!(
+    PyStatementCovenantAssessment,
+    "StatementCovenantAssessment",
+    module = "finstack_quant.statements_analytics._covenants"
+);
 
 crate::bindings::macros::wire_methods!(
     PyStatementCovenantAssessment,

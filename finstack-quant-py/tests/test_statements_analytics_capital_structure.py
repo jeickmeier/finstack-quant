@@ -119,7 +119,10 @@ def test_wire_forms_round_trip() -> None:
 
 def test_dataframe_has_a_row_per_tranche() -> None:
     model, results = _model()
-    frame = capital_structure_summary(results, model, FULL_YEAR).to_dataframe()
+    summary = capital_structure_summary(results, model, FULL_YEAR)
+    frame = summary.to_pandas()
+    assert summary.to_polars().height == 3
+    assert summary.to_arrow().num_rows == 3
     assert list(frame["id"]) == ["SR-A", "SR-B", "SUB"]
     assert list(frame["kind"]) == ["bond", "bond", "bond"]
     assert list(frame["balance"]) == [400_000.0, 100_000.0, 420_000.0]

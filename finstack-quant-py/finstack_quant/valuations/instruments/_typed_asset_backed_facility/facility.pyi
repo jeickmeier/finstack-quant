@@ -6,10 +6,12 @@ from finstack_quant.valuations.instruments._pricing import PriceExtras
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.cashflows.builder import DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.core.types import Attributes, Bps, Rate
 from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments._pricing import MarketHistory, MetricPricingOverrides
@@ -1609,7 +1611,7 @@ class FacilityProjection:
     >>> as_of = facility.closing_date
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_365f"))
     >>> projection = facility.project(market, as_of)
-    >>> list(projection.to_dataframe().columns)
+    >>> list(projection.to_pandas().columns)
     ['date', 'interest', 'principal', 'commitment_fee', 'draw', 'lender_total', 'residual']
     """
 
@@ -1782,7 +1784,27 @@ class FacilityProjection:
         This accessor does not raise; it returns a copy of the stored record.
         """
         ...
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        One row per payment date as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``date`` (ISO 8601 string), ``interest``, ``principal``,
+        ``commitment_fee``, ``draw`` (lender advances), ``lender_total`` and
+        ``residual`` (cash to the residual class), all in currency units.
+
+        Returns
+        -------
+        ArrowTable
+            The projection in date order.
+
+        Raises
+        ------
+        ValueError
+            If any facility, residual, fee or draw amount has a different
+            currency from the facility. Empty results preserve all columns.
+        """
+        ...
+    def to_pandas(self) -> pd.DataFrame:
         """
         One row per payment date as a pandas ``DataFrame``.
 
@@ -1800,8 +1822,49 @@ class FacilityProjection:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
             If any facility, residual, fee or draw amount has a different
             currency from the facility. Empty results preserve all columns.
         """
         ...
+    def to_polars(self) -> pl.DataFrame:
+        """
+        One row per payment date as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            The projection in date order with the columns documented on :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If any facility, residual, fee or draw amount has a different
+            currency from the facility.
+        """
+        ...
+    def to_pyarrow(self) -> Any:
+        """
+        One row per payment date as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            The projection in date order with the columns documented on :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If any facility, residual, fee or draw amount has a different
+            currency from the facility.
+        """
+        ...
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...

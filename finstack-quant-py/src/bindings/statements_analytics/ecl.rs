@@ -14,19 +14,19 @@
 //! PD term structures are passed as ``[(time_years, cumulative_pd), ...]``
 //! knots; a ``(0.0, 0.0)`` anchor is inserted when absent.
 
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
-use crate::bindings::pandas_utils::{
-    ColumnSchema, dict_to_dataframe, serde_rows_to_dataframe_with_schema, serde_to_py,
-};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::statements_analytics::{enum_convert, py_bool, py_opt_str};
+use crate::bindings::table_builders::{TableBuilder, serde_rows_to_arrow_table};
 use crate::errors::core_to_py;
 use finstack_quant_statements_analytics::analysis as rust_ecl;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use serde::{Deserialize, Serialize};
 
-/// Column schema for `EclResult.to_dataframe`.
-const BUCKET_COLUMNS: [ColumnSchema<'static>; 7] = [
+/// Column schema for [`PyEclResult`] tabular exports.
+const BUCKET_COLUMNS: [(&str, &str); 7] = [
     ("t_start", "float64"),
     ("t_end", "float64"),
     ("marginal_pd", "float64"),
@@ -36,8 +36,8 @@ const BUCKET_COLUMNS: [ColumnSchema<'static>; 7] = [
     ("ecl", "float64"),
 ];
 
-/// Column schema for `WeightedEclResult.to_dataframe`.
-const WEIGHTED_BUCKET_COLUMNS: [ColumnSchema<'static>; 9] = [
+/// Column schema for [`PyWeightedEclResult`] tabular exports.
+const WEIGHTED_BUCKET_COLUMNS: [(&str, &str); 9] = [
     ("scenario", "str"),
     ("weight", "str"),
     ("t_start", "float64"),
@@ -791,37 +791,6 @@ impl PyExposure {
         self.inner.segments = segments;
     }
 
-    /// Export the exposure as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``id``, ``ead``, ``undrawn``, ``ccf``, ``lgd``, ``eir``,
-    /// ``remaining_maturity_years``, ``current_pd``, ``origination_pd``, ``days_past_due``,
-    /// ``current_rating``, ``origination_rating``. Amounts are in the
-    /// exposure's base currency; ``ccf``, ``lgd`` and the PDs are decimal
-    /// fractions; ``eir`` is a decimal annual rate; ``remaining_maturity_years`` is
-    /// in years; ``days_past_due`` is whole days.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        data.set_item("id", vec![self.inner.id.clone()])?;
-        data.set_item("ead", vec![self.inner.ead])?;
-        data.set_item("undrawn", vec![self.inner.undrawn])?;
-        data.set_item("ccf", vec![self.inner.ccf])?;
-        data.set_item("lgd", vec![self.inner.lgd])?;
-        data.set_item("eir", vec![self.inner.eir])?;
-        data.set_item(
-            "remaining_maturity_years",
-            vec![self.inner.remaining_maturity_years],
-        )?;
-        data.set_item("current_pd", vec![self.current_pd])?;
-        data.set_item("origination_pd", vec![self.origination_pd])?;
-        data.set_item("days_past_due", vec![self.inner.days_past_due])?;
-        data.set_item("current_rating", vec![self.inner.current_rating.clone()])?;
-        data.set_item(
-            "origination_rating",
-            vec![self.inner.origination_rating.clone()],
-        )?;
-        dict_to_dataframe(py, &data, None)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "Exposure(id='{}', ead={:.2}, undrawn={:.2}, ccf={:.2}, lgd={:.4}, \
@@ -843,7 +812,32 @@ impl PyExposure {
     }
 }
 
-impl_repr_html_via_dataframe!(PyExposure);
+impl PyExposure {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .utf8("id", vec![self.inner.id.clone()])?
+            .f64("ead", vec![self.inner.ead])?
+            .f64("undrawn", vec![self.inner.undrawn])?
+            .f64("ccf", vec![self.inner.ccf])?
+            .f64("lgd", vec![self.inner.lgd])?
+            .f64("eir", vec![self.inner.eir])?
+            .f64(
+                "remaining_maturity_years",
+                vec![self.inner.remaining_maturity_years],
+            )?
+            .f64("current_pd", vec![self.current_pd])?
+            .f64("origination_pd", vec![self.origination_pd])?
+            .i64("days_past_due", vec![i64::from(self.inner.days_past_due)])?
+            .nullable_utf8("current_rating", vec![self.inner.current_rating.clone()])?
+            .nullable_utf8(
+                "origination_rating",
+                vec![self.inner.origination_rating.clone()],
+            )?
+            .build()
+    }
+}
+
+tabular_methods!(PyExposure);
 
 /// One integration bucket of an ECL calculation.
 #[pyclass(
@@ -960,15 +954,6 @@ impl PyEclResult {
         serde_to_py(py, &self.inner.meta)
     }
 
-    /// Export the buckets as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``t_start``, ``t_end`` (years), ``marginal_pd``, ``lgd``
-    /// (decimals), ``ead``, ``ecl`` (base currency), ``discount_factor``.
-    /// One row per bucket in time order.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(py, &self.inner.buckets, &BUCKET_COLUMNS)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "EclResult(exposure_id='{}', stage=Stage.{:?}, ecl={}, horizon={}, buckets={})",
@@ -982,7 +967,14 @@ impl PyEclResult {
 }
 
 wire_methods!(PyEclResult, rust_ecl::EclResult, "EclResult");
-impl_repr_html_via_dataframe!(PyEclResult);
+
+impl PyEclResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.inner.buckets, &BUCKET_COLUMNS)
+    }
+}
+
+tabular_methods!(PyEclResult);
 
 #[pyclass(
     name = "EclScenario",
@@ -1115,7 +1107,7 @@ impl PyEclScenarioOutcome {
 /// >>> result = compute_ecl(exp, [(1.0, 0.02), (3.0, 0.06)], stage="stage2")
 /// >>> result.stage.value
 /// 'stage2'
-/// >>> list(result.to_dataframe().columns)[:2]
+/// >>> list(result.to_pandas().columns)[:2]
 /// ['scenario', 'weight']
 #[pyclass(
     name = "WeightedEclResult",
@@ -1164,13 +1156,25 @@ impl PyWeightedEclResult {
         serde_to_py(py, &self.inner.meta)
     }
 
-    /// Export the scenario x bucket audit trail as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``scenario`` (scenario id), ``weight`` (exact decimal probability text),
-    /// ``t_start``, ``t_end`` (years), ``marginal_pd``, ``lgd`` (decimals),
-    /// ``ead``, ``ecl`` (base currency, unweighted per scenario),
-    /// ``discount_factor``. One row per (scenario, bucket).
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn __repr__(&self) -> String {
+        format!(
+            "WeightedEclResult(exposure_id='{}', stage=Stage.{:?}, ecl={:?}, scenarios={})",
+            self.inner.exposure_id,
+            self.inner.stage,
+            self.inner.ecl,
+            self.inner.scenario_breakdown.len()
+        )
+    }
+}
+
+wire_methods!(
+    PyWeightedEclResult,
+    rust_ecl::WeightedEclResult,
+    "WeightedEclResult"
+);
+
+impl PyWeightedEclResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         let rows: Vec<serde_json::Value> = self
             .inner
             .scenario_breakdown
@@ -1197,26 +1201,11 @@ impl PyWeightedEclResult {
                 })
             })
             .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, &WEIGHTED_BUCKET_COLUMNS)
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "WeightedEclResult(exposure_id='{}', stage=Stage.{:?}, ecl={:?}, scenarios={})",
-            self.inner.exposure_id,
-            self.inner.stage,
-            self.inner.ecl,
-            self.inner.scenario_breakdown.len()
-        )
+        serde_rows_to_arrow_table(&rows, &WEIGHTED_BUCKET_COLUMNS)
     }
 }
 
-wire_methods!(
-    PyWeightedEclResult,
-    rust_ecl::WeightedEclResult,
-    "WeightedEclResult"
-);
-impl_repr_html_via_dataframe!(PyWeightedEclResult);
+tabular_methods!(PyWeightedEclResult);
 
 fn staging_config(config: Option<&PyStagingConfig>) -> rust_ecl::StagingConfig {
     config.map_or_else(rust_ecl::StagingConfig::default, |c| c.inner.clone())
@@ -1309,7 +1298,7 @@ fn classify_stage(
 /// -------
 /// WeightedEclResult
 ///     ``ecl`` in base currency, the ``stage`` used, and a one-scenario
-///     ``scenario_breakdown`` with bucket detail (``to_dataframe()``).
+///     ``scenario_breakdown`` with bucket detail (``to_pandas()`` / ``to_arrow()``).
 ///
 /// Raises
 /// ------

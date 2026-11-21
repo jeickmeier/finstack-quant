@@ -281,7 +281,7 @@ pub(crate) fn diagnostics_to_py(
     py: Python<'_>,
     report: &finstack_quant_core::contract::ValidationReport,
 ) -> PyResult<Py<PyAny>> {
-    crate::bindings::pandas_utils::serde_to_py(py, &report.diagnostics).map(Bound::unbind)
+    crate::bindings::json_bridge::serde_to_py(py, &report.diagnostics).map(Bound::unbind)
 }
 
 /// Convert a `finstack_quant_statements::Error` into a Python exception by its

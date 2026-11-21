@@ -6,8 +6,10 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.portfolio._attribution import ReconciliationReport
 
 class FiAttributionResult:
@@ -212,12 +214,28 @@ class FiAttributionResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Per-sector effects as a pandas DataFrame.
+        Per-sector effects as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``sector``, ``portfolio_weight``, ``benchmark_weight``, ``portfolio_return``, ``benchmark_return``, ``allocation``, ``active_carry``, ``active_treasury``, ``active_spread``, ``residual``, ``total_active``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
+
+        Returns
+        -------
+        ArrowTable
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Per-sector effects as a pandas ``DataFrame``.
 
         Returns
         -------
@@ -226,11 +244,46 @@ class FiAttributionResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Per-sector effects as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Per-sector effects as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def reconciliation_check(self, tolerance: float) -> ReconciliationReport:
         """Compare the displayed active return with the sum of displayed effects.
 
@@ -497,12 +550,28 @@ class FiCarinoLinkedResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Linked per-sector effects as a pandas DataFrame.
+        Linked per-sector effects as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``sector``, ``allocation``, ``active_carry``, ``active_treasury``, ``active_spread``, ``residual``, ``total_active``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
+
+        Returns
+        -------
+        ArrowTable
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Linked per-sector effects as a pandas ``DataFrame``.
 
         Returns
         -------
@@ -511,11 +580,46 @@ class FiCarinoLinkedResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Linked per-sector effects as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Linked per-sector effects as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize this result to canonical JSON.

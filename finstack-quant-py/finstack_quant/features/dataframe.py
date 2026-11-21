@@ -1,21 +1,25 @@
-"""Pandas DataFrame convenience wrappers for feature transforms.
+"""DataFrame convenience wrappers for feature transforms (pandas and Polars).
 
-Each helper accepts a :class:`pandas.DataFrame` plus key selectors, forwards the
-selected columns to the compiled feature transforms, and returns a
-``pandas.Series`` aligned to the input index (or a ``pandas.DataFrame`` for
-:func:`panel`). Numeric value columns may contain ``NaN``/``None`` for missing
-data; key selectors may refer to columns, named index levels, or integer index
-level positions. Key values must be strings or date-like (datetimes follow the
-Rust key policy); integer key columns raise ``TypeError`` and must be
-converted by the caller, e.g. to zero-padded strings.
+Each helper accepts a :class:`pandas.DataFrame` or :class:`polars.DataFrame`
+plus key selectors, forwards the selected columns to the compiled feature
+transforms, and returns a ``Series`` (or ``DataFrame`` for :func:`panel`) in the
+same host library (pandas in -> pandas out; Polars in -> Polars out). Numeric
+value columns may contain ``NaN``/``None``/``null`` for missing data; for pandas
+frames key selectors may refer to columns, named index levels, or integer index
+level positions, whereas Polars frames select key columns by name (with unique
+``Date``/``Datetime`` auto-detection when ``time_key`` or ``order`` is omitted).
+Key values must be strings or date-like (datetimes follow the Rust key policy);
+integer key columns raise ``TypeError`` and must be converted by the caller,
+e.g. to zero-padded strings.
 
-Cross-sectional ``time_key`` and time-series ``order`` may be omitted when the
-DataFrame has a ``DatetimeIndex``. ``MultiIndex`` levels should be selected
-explicitly by level name or integer position; ambiguous column/index key names
-raise :class:`ValueError` instead of guessing.
+Cross-sectional ``time_key`` and time-series ``order`` may be omitted when a
+pandas DataFrame has a ``DatetimeIndex`` or a Polars DataFrame has a unique
+``Date``/``Datetime`` column. ``MultiIndex`` levels should be selected explicitly
+by level name or integer position; ambiguous column/index key names raise
+:class:`ValueError` instead of guessing.
 
-``pandas`` is an optional dependency; importing or calling these helpers without
-it installed raises :class:`ImportError`.
+``pandas`` and ``polars`` are optional dependencies; calling these helpers
+without the required library installed raises :class:`ImportError`.
 
 Examples:
 --------
@@ -28,6 +32,8 @@ Examples:
 
 from collections.abc import Mapping, Sequence
 from importlib import import_module as _import_module
+import math
+import sys
 from typing import Any
 
 from . import (
@@ -72,6 +78,22 @@ def _require_pandas() -> Any:
         ) from exc
 
 
+def _polars_for(df: Any) -> Any | None:
+    pl = sys.modules.get("polars")
+    if pl is not None and isinstance(df, pl.DataFrame):
+        return pl
+    return None
+
+
+def _is_polars_dataframe(df: Any) -> bool:
+    return _polars_for(df) is not None
+
+
+def _polars_date_columns(df: Any, pl: Any) -> list[str]:
+    schema = df.schema
+    return [col for col, dtype in schema.items() if dtype == pl.Date or isinstance(dtype, pl.Datetime)]
+
+
 def _require_columns(df: Any, columns: Sequence[str]) -> None:
     missing = [column for column in columns if column not in df.columns]
     if missing:
@@ -80,6 +102,15 @@ def _require_columns(df: Any, columns: Sequence[str]) -> None:
 
 def _numeric_column(df: Any, column: str) -> list[float | None]:
     _require_columns(df, [column])
+    if (pl := _polars_for(df)) is not None:
+        series = df.get_column(column)
+        dtype = series.dtype
+        if not dtype.is_numeric() and dtype != pl.Null:
+            raise TypeError(f"Column {column!r} has non-numeric Polars dtype {dtype}; expected numeric values")
+        return [
+            None if v is None or (isinstance(v, float) and math.isnan(v)) else v
+            for v in series.cast(pl.Float64).to_list()
+        ]
     pd = _require_pandas()
     return [None if pd.isna(value) else value for value in df[column].tolist()]
 
@@ -104,6 +135,8 @@ def _index_level_values(df: Any, key: KeySelector) -> Any:
 
 
 def _is_datetime_index(df: Any) -> bool:
+    if _is_polars_dataframe(df):
+        return False
     pd = _require_pandas()
     return isinstance(df.index, pd.DatetimeIndex)
 
@@ -121,6 +154,24 @@ def _key_values(
     role: str,
     default_datetime_index: bool = False,
 ) -> Any:
+    if (pl := _polars_for(df)) is not None:
+        if key is None:
+            if not default_datetime_index:
+                raise TypeError(f"{role} is required")
+            matches = _polars_date_columns(df, pl)
+            if len(matches) == 1:
+                return df.get_column(matches[0])
+            if not matches:
+                raise KeyError(f"{role} is required when Polars DataFrame has no Date or Datetime column")
+            raise ValueError(
+                f"ambiguous default {role}: Polars DataFrame has multiple Date/Datetime columns ({', '.join(matches)})"
+            )
+        if isinstance(key, int):
+            raise KeyError(f"Polars DataFrame has no MultiIndex level {key}")
+        if key not in df.columns:
+            raise KeyError(f"DataFrame key {key!r} is not a column")
+        return df.get_column(key)
+
     if key is None:
         if default_datetime_index:
             return _default_datetime_index_values(df, role)
@@ -147,6 +198,8 @@ def _key_column(
         role=role,
         default_datetime_index=default_datetime_index,
     )
+    if _is_polars_dataframe(df):
+        return values.to_list()
     # The binding owns key coercion, including UTC normalization and timestamp
     # precision. Stringifying here would lose those semantics before dispatch.
     return values.tolist()
@@ -158,6 +211,8 @@ def _exposure_columns(df: Any, columns: Sequence[str]) -> list[list[float | None
 
 
 def _series(df: Any, values: list[float | None], name: str | None) -> Any:
+    if (pl := _polars_for(df)) is not None:
+        return pl.Series(name=name or "", values=values, dtype=pl.Float64)
     pd = _require_pandas()
     return pd.Series(values, index=df.index, name=name)
 
@@ -336,8 +391,24 @@ def panel(
     >>> panel(frame, "signal", operations, time_key="date")["rank"].tolist()
     [0.0, 1.0, 0.0, 1.0]
     """
+    if (pl := _polars_for(df)) is not None:
+        spec: dict[str, Any] = {
+            "values": _numeric_column(df, value),
+            "operations": [dict(operation) for operation in operations],
+        }
+        if entity is not None:
+            spec["entity"] = _key_column(df, entity, role="entity")
+        date_cols = _polars_date_columns(df, pl)
+        for role, key in (("order", order), ("time_key", time_key)):
+            if key is not None:
+                spec[role] = _key_column(df, key, role=role)
+            elif len(date_cols) == 1:
+                spec[role] = df.get_column(date_cols[0]).to_list()
+        result = _transform_panel(spec)
+        return result.to_polars()
+
     _require_pandas()
-    spec: dict[str, Any] = {
+    spec = {
         "values": _numeric_column(df, value),
         "operations": [dict(operation) for operation in operations],
     }
@@ -351,7 +422,7 @@ def panel(
         elif _is_datetime_index(df):
             spec[role] = df.index.tolist()
     result = _transform_panel(spec)
-    return result.to_dataframe(index=df.index)
+    return result.to_pandas(index=df.index)
 
 
 def grouped(

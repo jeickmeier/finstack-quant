@@ -354,7 +354,7 @@ def test_factor_model_handle_matches_the_shared_host_parity_fixture() -> None:
         },
     )
     assert StressPnl.from_json(pnl.to_json()).position_pnl == pnl.position_pnl
-    assert list(pnl.to_dataframe().columns) == ["position_id", "pnl"]
+    assert list(pnl.to_pandas().columns) == ["position_id", "pnl"]
 
     report = model.assign_factors(portfolio, market)
     assert isinstance(report, FactorAssignmentReport)

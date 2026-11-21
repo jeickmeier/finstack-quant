@@ -75,7 +75,7 @@ macro_rules! instrument_pricing_methods {
                     &self.inner,
                 )
                 .map_err($crate::errors::core_to_py)?;
-                $crate::bindings::pandas_utils::serde_to_py(py, &deps)
+                $crate::bindings::json_bridge::serde_to_py(py, &deps)
             }
 
             #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".default_model"))]
@@ -96,7 +96,7 @@ macro_rules! instrument_pricing_methods {
             #[doc = $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_dict"))]
             #[pyo3(text_signature = "($self)")]
             fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-                $crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+                $crate::bindings::json_bridge::serde_to_py(py, &self.inner)
             }
         }
     };
@@ -274,7 +274,7 @@ macro_rules! pricing_override_methods {
                 &self,
                 py: pyo3::Python<'py>,
             ) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::PyAny>> {
-                $crate::bindings::pandas_utils::serde_to_py(
+                $crate::bindings::json_bridge::serde_to_py(
                     py,
                     &self.inner.instrument_pricing_overrides,
                 )
@@ -286,7 +286,7 @@ macro_rules! pricing_override_methods {
                 &self,
                 py: pyo3::Python<'py>,
             ) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::PyAny>> {
-                $crate::bindings::pandas_utils::serde_to_py(
+                $crate::bindings::json_bridge::serde_to_py(
                     py,
                     &self.inner.metric_pricing_overrides,
                 )
@@ -298,7 +298,7 @@ macro_rules! pricing_override_methods {
                 &self,
                 py: pyo3::Python<'py>,
             ) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::PyAny>> {
-                $crate::bindings::pandas_utils::serde_to_py(
+                $crate::bindings::json_bridge::serde_to_py(
                     py,
                     &self.inner.scenario_pricing_overrides,
                 )

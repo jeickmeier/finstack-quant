@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import datetime
 from collections.abc import Sequence
-from typing import Literal, TypedDict
+from typing import Any, Literal, TypedDict
 import pandas as pd
+import polars as pl
 from finstack_quant.core.config import FinstackConfig
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.margin import FrtbSensitivities, ImCollateralResult, ImMethodology, NettingSetId, SimmSensitivities
 from finstack_quant.portfolio._container import Portfolio
 
@@ -287,12 +289,29 @@ class NettingSetMargin:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Initial margin by SIMM risk class as a pandas DataFrame.
+        Initial margin by SIMM risk class as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``netting_set_id`` (str), ``risk_class`` (str),
         ``initial_margin`` (float64, in ``currency``), ``currency`` (str).
+
+        Returns
+        -------
+        ArrowTable
+            One row per entry of :attr:`im_breakdown`, sorted by risk class;
+            zero rows with the same columns when there is no breakdown.
+
+        Raises
+        ------
+        ValueError
+            If the rows cannot be converted into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Initial margin by SIMM risk class as a pandas ``DataFrame``.
 
         Returns
         -------
@@ -302,11 +321,46 @@ class NettingSetMargin:
 
         Raises
         ------
-        ValueError
-            If the rows cannot be converted into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Initial margin by SIMM risk class as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per entry of :attr:`im_breakdown`, sorted by risk class.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Initial margin by SIMM risk class as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per entry of :attr:`im_breakdown`, sorted by risk class.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """Return the netting set id, margins and position count."""
         ...
@@ -590,9 +644,9 @@ class PortfolioMarginResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Per-netting-set margin as a pandas DataFrame.
+        Per-netting-set margin as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``netting_set_id`` (str), ``csa_id`` (str or ``None``),
         ``is_cleared`` (bool), ``initial_margin``, ``variation_margin``,
@@ -602,7 +656,7 @@ class PortfolioMarginResult:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per netting set in ascending identifier order; the
             ``initial_margin``, ``variation_margin`` and ``total_margin``
             columns sum to the corresponding portfolio totals. Zero rows with
@@ -611,7 +665,7 @@ class PortfolioMarginResult:
         Raises
         ------
         ValueError
-            If the rows cannot be converted into a pandas object.
+            If the rows cannot be converted into an Arrow table.
 
         Examples
         --------
@@ -619,11 +673,71 @@ class PortfolioMarginResult:
         >>> from finstack_quant.portfolio import Portfolio, portfolio_margin
         >>> book = Portfolio.builder("book", "USD", "2025-01-01").build()
         >>> result = portfolio_margin(book, MarketContext(), "2025-01-01")
-        >>> list(result.to_dataframe().columns)[:4]
+        >>> result.to_arrow().column_names()[:4]
         ['netting_set_id', 'csa_id', 'is_cleared', 'initial_margin']
         """
         ...
 
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Per-netting-set margin as a pandas ``DataFrame``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per netting set in ascending identifier order.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import MarketContext
+        >>> from finstack_quant.portfolio import Portfolio, portfolio_margin
+        >>> book = Portfolio.builder("book", "USD", "2025-01-01").build()
+        >>> result = portfolio_margin(book, MarketContext(), "2025-01-01")
+        >>> list(result.to_pandas().columns)[:4]
+        ['netting_set_id', 'csa_id', 'is_cleared', 'initial_margin']
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Per-netting-set margin as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per netting set in ascending identifier order.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Per-netting-set margin as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per netting set in ascending identifier order.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """Return the as-of date, totals and netting-set count."""
         ...

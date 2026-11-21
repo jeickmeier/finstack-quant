@@ -1,8 +1,8 @@
 //! Python bindings for `finstack_quant_core::math::stats`.
 
+use crate::bindings::dataframe_utils::extract_f64_vec;
 use crate::bindings::extract::parse_label;
 use finstack_quant_core::math::stats::{self, RealizedVarMethod};
-use numpy::PyReadonlyArray1;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
@@ -10,13 +10,7 @@ use crate::errors::core_to_py;
 
 /// Copy a one-dimensional series while holding the GIL, before detached Rust work.
 fn extract_series(data: &Bound<'_, PyAny>) -> PyResult<Vec<f64>> {
-    if let Ok(array) = data.extract::<PyReadonlyArray1<'_, f64>>() {
-        return Ok(match array.as_slice() {
-            Ok(slice) => slice.to_vec(),
-            Err(_) => array.as_array().iter().copied().collect(),
-        });
-    }
-    data.extract()
+    extract_f64_vec(data, "data")
 }
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.core.math.stats", "OlsResult")]

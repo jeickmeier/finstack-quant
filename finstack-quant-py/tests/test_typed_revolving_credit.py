@@ -201,8 +201,9 @@ def test_expected_cashflows_matches_the_json_schedule() -> None:
     facility = RevolvingCredit.example()
     ctx = market()
     schedule = facility.expected_cashflows(ctx, AS_OF)
-    frame = schedule.to_dataframe()
+    frame = schedule.to_pandas()
     assert not frame.empty
+    assert not schedule.to_polars().is_empty()
     via_json = json.loads(instrument_cashflows(facility.to_json(), ctx, AS_OF, "discounting").to_json())
     assert len(json.loads(schedule.to_json())["flows"]) == len(via_json["flows"])
 
@@ -226,10 +227,12 @@ def test_price_with_paths_returns_every_path_and_the_option_cost() -> None:
     assert result.draw_option_cost_ci_95[1].amount <= result.draw_option_cost_ci_95[1].amount
     assert result.pv_ci_95[0].amount <= result.pv.amount <= result.pv_ci_95[1].amount
 
-    frame = result.to_dataframe()
+    frame = result.to_pandas()
     assert list(frame.columns) == ["path", "pv", "draw_option_cost"]
     assert len(frame) == 16
     assert frame["draw_option_cost"].mean() == pytest.approx(sum(result.path_draw_option_costs) / 16)
+    assert result.to_arrow().num_rows == 16
+    assert result.to_polars().height == 16
 
     # JSON, dict and pickle round trips.
     again = EnhancedMonteCarloResult.from_json(result.to_json())

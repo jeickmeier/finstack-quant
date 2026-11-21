@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.margin._types import CsaSpec, ImMethodology
 
 class VmResult:
@@ -424,9 +427,9 @@ class VmResult:
         ...
 
     def __repr__(self) -> str: ...
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the result as a single-row pandas ``DataFrame``.
+        Export the result as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``date``, ``settlement_date`` (ISO 8601 strings),
         ``gross_exposure``, ``threshold``, ``independent_amount``,
@@ -445,15 +448,67 @@ class VmResult:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row describing the variation-margin result.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be serialized into an Arrow table.
         """
         ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the result as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row describing the variation-margin result.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the result as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row describing the variation-margin result.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the result as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row describing the variation-margin result.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 class VmCalculator:
     """
@@ -564,26 +619,28 @@ class VmCalculator:
 
     def generate_margin_calls(
         self,
-        exposures: list[tuple[datetime.date | str, float]] | pd.Series,
+        exposures: Sequence[tuple[datetime.date | str, float]] | pd.Series | pd.DataFrame | pl.DataFrame | Any,
         initial_collateral: float,
-    ) -> pd.DataFrame:
+    ) -> ArrowTable:
         """
         Run an exposure time series into a margin-call schedule.
 
         Parameters
         ----------
-        exposures : list[tuple[datetime.date | str, float]] | pd.Series
+        exposures : Sequence[tuple[datetime.date | str, float]] | pd.Series | pd.DataFrame | pl.DataFrame | Any
             Dated signed exposures in the CSA base currency (positive = the
-            counterparty owes us), processed in the order given. A ``Series``
-            contributes its index as the dates. A date that is not a business
-            day of the CSA calendar is rolled to the next one (Following), so
-            every ``call_date`` is a CSA business day.
+            counterparty owes us), processed in the order given. A ``pandas.Series``
+            contributes its index as the dates; a two-column DataFrame or Arrow
+            table reads dates from the first column and exposures from the
+            second. A date that is not a business day of the CSA calendar is
+            rolled to the next one (Following), so every ``call_date`` is a
+            CSA business day.
         initial_collateral : float
             Collateral posted before the first date, in the CSA base currency.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per call: ``call_date``, ``settlement_date`` (ISO 8601
             strings), ``call_type`` (``"variation_margin_post"`` or
             ``"variation_margin_collect"``), ``amount``, ``mtm_trigger``,
@@ -599,7 +656,7 @@ class VmCalculator:
         --------
         >>> calc = VmCalculator(CsaSpec.usd_regulatory())
         >>> calls = calc.generate_margin_calls([("2024-06-17", 1e6), ("2024-06-18", 4e5)], 0.0)
-        >>> calls["call_type"].tolist()
+        >>> calls.to_dict()["call_type"]
         ['variation_margin_collect', 'variation_margin_post']
         """
         ...
@@ -905,9 +962,9 @@ class ImResult:
         ...
 
     def __repr__(self) -> str: ...
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the headline result as a single-row pandas ``DataFrame``.
+        Export the headline result as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``amount``, ``currency``, ``methodology``, ``mpor_days``,
         ``as_of``, ``approximation``.
@@ -917,7 +974,23 @@ class ImResult:
         ``approximation`` is ``True`` when the amount uses a proxy methodology
         rather than an exact computation under the named methodology - do not
         reconcile an approximated figure against an actual margin call.
-        Per-risk-class detail lives in ``to_breakdown_dataframe``.
+        Per-risk-class detail lives in ``to_breakdown_table``.
+
+        Returns
+        -------
+        ArrowTable
+            One row describing the initial-margin result.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the headline result as a single-row pandas ``DataFrame``.
 
         Returns
         -------
@@ -926,28 +999,63 @@ class ImResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
-    def to_breakdown_dataframe(self) -> pd.DataFrame:
+    def to_polars(self) -> pl.DataFrame:
         """
-        Export the per-component breakdown as a pandas ``DataFrame``.
+        Export the headline result as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row describing the initial-margin result.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the headline result as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row describing the initial-margin result.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_breakdown_table(self) -> ArrowTable:
+        """
+        Export the per-component breakdown as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``risk_class``, ``amount``, ``currency``. One row per
         component label (SIMM: ``IR_Delta``, ``IR_Vega``, ``FX_Delta``,
         ``IR_Curvature``, ``Equity_Curvature``, ...; schedule: the asset class such as
         ``interest_rate``), sorted by ``risk_class`` so repeated runs are
         byte-identical. Methodologies that publish no breakdown yield a
-        zero-row frame that still carries all three columns.
+        zero-row table that still carries all three columns.
 
         Breakdown components do not generally sum to ``amount``: SIMM and
         other methodologies aggregate risk classes with correlations.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per risk class, sorted by ``risk_class``.
 
         Notes

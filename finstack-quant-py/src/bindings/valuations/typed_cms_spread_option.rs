@@ -60,13 +60,13 @@ impl PyCmsSpreadOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.long_cms_tenor")]
     #[getter]
     fn long_cms_tenor<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.long_cms_tenor)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.long_cms_tenor)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.short_cms_tenor")]
     #[getter]
     fn short_cms_tenor<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.short_cms_tenor)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.short_cms_tenor)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.strike")]
@@ -78,7 +78,7 @@ impl PyCmsSpreadOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.option_type")]
     #[getter]
     fn option_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.option_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.option_type)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.notional")]
@@ -162,13 +162,13 @@ impl PyCmsSpreadOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.swap_fixed_frequency")]
     #[getter]
     fn swap_fixed_frequency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.swap_fixed_frequency)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.swap_fixed_frequency)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.swap_float_frequency")]
     #[getter]
     fn swap_float_frequency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.swap_float_frequency)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.swap_float_frequency)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_spread_option", "CmsSpreadOption.swap_fixed_day_count")]

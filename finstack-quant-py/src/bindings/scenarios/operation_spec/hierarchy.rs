@@ -71,7 +71,7 @@ impl PyHierarchyTarget {
         self.inner
             .tag_filter
             .as_ref()
-            .map(|filter| crate::bindings::pandas_utils::serde_to_py(py, filter))
+            .map(|filter| crate::bindings::json_bridge::serde_to_py(py, filter))
             .transpose()
     }
 

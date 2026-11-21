@@ -19,14 +19,11 @@ from dataclasses import dataclass, field
 import datetime as dt
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from . import format as fmt
 from .tables import data_table
 from .theme import Theme
-
-if TYPE_CHECKING:
-    from pandas import DataFrame
 
 __all__ = [
     "KPI",
@@ -113,21 +110,24 @@ class Section:
     def from_dataframe(
         cls,
         title: str,
-        df: DataFrame,
+        df: Any,
         *,
         columns: list[str] | None = None,
         formats: dict[str, Callable[[Any], str]] | None = None,
         neg_columns: set[str] | None = None,
         subtitle: str | None = None,
     ) -> Section:
-        """Render a DataFrame as a report section.
+        """Render a tabular object (DataFrame, Polars DataFrame, ArrowTable, etc.) as a report section.
 
         Parameters
         ----------
         title : str
             Heading displayed above the table.
-        df : pandas.DataFrame
-            Rows to display in their current order. Reset the index to display it.
+        df : pandas.DataFrame | polars.DataFrame | pyarrow.Table | ArrowTable | Any
+            Rows to display in their current order. Accepts ``pandas.DataFrame``,
+            ``polars.DataFrame``, ``pyarrow.Table``, ``ArrowTable``, or any
+            finstack tabular result exposing ``to_pandas()``. Reset the index on a
+            pandas DataFrame to display it.
         columns : list[str] or None
             Column names in display order. Omit to use the frame's column order.
         formats : dict[str, Callable[[Any], str]] or None
@@ -157,6 +157,8 @@ class Section:
         >>> 'class="neg"' in section.body
         True
         """
+        if hasattr(df, "to_pandas") and not hasattr(df, "iterrows"):
+            df = df.to_pandas()
         selected = df if columns is None else df.loc[:, columns]
         if not selected.columns.is_unique:
             raise ValueError("Report table columns must have unique labels")

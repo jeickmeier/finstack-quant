@@ -71,13 +71,13 @@ impl PyLeveredRealEstateEquity {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_levered_real_estate_equity", "LeveredRealEstateEquity.asset")]
     #[getter]
     fn asset<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.asset)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.asset)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_levered_real_estate_equity", "LeveredRealEstateEquity.financing")]
     #[getter]
     fn financing<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.financing)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.financing)
     }
 }
 

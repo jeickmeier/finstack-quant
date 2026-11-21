@@ -5,10 +5,12 @@ from __future__ import annotations
 import datetime
 from typing import Any, Literal
 import pandas as pd
+import polars as pl
 from finstack_quant.core.config import FinstackConfig
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import Tenor
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.composite import CompositeInstrument
 from finstack_quant.valuations.instruments._instruments import Bond, TermLoan
@@ -1117,7 +1119,7 @@ class MarketHistory:
     ...         },
     ...     ],
     ... )
-    >>> (len(history), history.window_days, history.to_dataframe()["shift"].tolist())
+    >>> (len(history), history.window_days, history.to_pandas()["shift"].tolist())
     (2, 2, [0.001, -0.0005])
     """
 
@@ -1255,9 +1257,28 @@ class MarketHistory:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        One row per risk-factor shift as a tidy ``DataFrame``.
+        One row per risk-factor shift as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``date`` (ISO 8601 string), ``type`` (risk-factor tag),
+            ``curve_id``, ``tenor_years``, ``ticker``, ``base``, ``quote``,
+            ``vol_surface_id``, ``expiry_years``, ``strike`` (null where the
+            factor type has no such coordinate) and ``shift``.
+
+        Raises
+        ------
+        ValueError
+            If the rows cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        One row per risk-factor shift as a pandas ``DataFrame``.
 
         Returns
         -------
@@ -1269,11 +1290,56 @@ class MarketHistory:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
-            If the rows cannot be serialized into a pandas object.
+            If the rows cannot be serialized into a table.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        One row per risk-factor shift as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Columns ``date`` (ISO 8601 string), ``type``, ``curve_id``,
+            ``tenor_years``, ``ticker``, ``base``, ``quote``,
+            ``vol_surface_id``, ``expiry_years``, ``strike``, and ``shift``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the rows cannot be serialized into a table.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        One row per risk-factor shift as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Columns ``date`` (ISO 8601 string), ``type``, ``curve_id``,
+            ``tenor_years``, ``ticker``, ``base``, ``quote``,
+            ``vol_surface_id``, ``expiry_years``, ``strike``, and ``shift``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the rows cannot be serialized into a table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @staticmethod
     def from_json(json: str) -> MarketHistory:
         """
@@ -1408,7 +1474,7 @@ def instrument_cashflows(
     ... )
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_365f"))
     >>> envelope = instrument_cashflows(bond, market, as_of, "discounting")
-    >>> (envelope.instrument_id, len(envelope.to_dataframe()))
+    >>> (envelope.instrument_id, len(envelope.to_pandas()))
     ('B', 6)
     """
     ...
@@ -1419,7 +1485,8 @@ class InstrumentCashflowEnvelope:
 
     Typed wrapper of the Rust ``InstrumentCashflowEnvelope`` returned by
     :func:`instrument_cashflows`. ``flows`` holds one dict per cashflow;
-    :meth:`InstrumentCashflowEnvelope.to_dataframe` is the tabular view.
+    :meth:`to_arrow`, :meth:`to_pandas`, and :meth:`to_polars` provide the
+    tabular view.
 
     Examples
     --------
@@ -1429,7 +1496,7 @@ class InstrumentCashflowEnvelope:
     ...     ' "as_of": "2025-01-15", "discount_curve_id": "USD-OIS", "flows": [],'
     ...     ' "total_pv": 0.0, "reconciles_with_base_value": true}'
     ... )
-    >>> (envelope.instrument_id, envelope.currency, len(envelope.to_dataframe()))
+    >>> (envelope.instrument_id, envelope.currency, len(envelope.to_pandas()))
     ('B', 'USD', 0)
     """
 
@@ -1622,7 +1689,26 @@ class InstrumentCashflowEnvelope:
             If an amount or native PV is non-finite.
         """
         ...
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        One row per cashflow as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Date columns (``date``, ``reset_date``, ``accrual_start``,
+        ``accrual_end``, ``principal_date``) are ISO-8601 strings here; use
+        :meth:`to_pandas` if you want them parsed to ``datetime64``.
+
+        Returns
+        -------
+        ArrowTable
+            25-column cashflow table matching the documented row fields.
+
+        Raises
+        ------
+        ValueError
+            If the rows cannot be serialized into an Arrow table.
+        """
+        ...
+    def to_pandas(self) -> pd.DataFrame:
         """
         One row per cashflow as a pandas ``DataFrame``.
 
@@ -1636,26 +1722,69 @@ class InstrumentCashflowEnvelope:
             gearing, caps and floors), ``principal_delta`` and
             ``principal_date`` (a principal row's explicit balance change and
             its balance-effective date; null for rows that move no principal),
-            ``year_fraction``,
-            ``rate``, ``reset_date``, ``discount_factor``,
+            ``year_fraction``, ``rate``, ``reset_date``, ``discount_factor``,
             ``discount_curve_id``, ``survival_probability``,
-            ``conditional_default_prob``, ``inflation_index_ratio``,
-            ``prepayment_smm``, ``beginning_balance``, ``ending_balance``
-            (outstanding principal before and after the row for bonds, term
-            loans and revolving credit, a period's pool balances for agency
-            MBS, null otherwise),
+            ``inflation_index_ratio``, ``prepayment_smm``,
+            ``beginning_balance``, ``ending_balance`` (outstanding principal
+            before and after the row for bonds, term loans and revolving credit,
+            a period's pool balances for agency MBS, null otherwise),
             ``native_pv`` (row currency, before FX and scenario shock),
-            ``fx_rate`` (reporting per row currency) and ``pv``. The four date
-            columns are ``datetime64`` and fields the model does not populate
-            are null. A coupon is ``accrual_notional * rate * accrual_factor``
-            when the balance is constant over its accrual period.
+            ``fx_rate`` (reporting per row currency) and ``pv``. The five date
+            columns (``date``, ``reset_date``, ``accrual_start``,
+            ``accrual_end``, ``principal_date``) are parsed to ``datetime64``
+            and fields the model does not populate are null. A coupon is
+            ``accrual_notional * rate * accrual_factor`` when the balance is
+            constant over its accrual period.
 
         Raises
         ------
         ImportError
-            If pandas is not installed.
+            If ``pandas`` is not installed.
+        ValueError
+            If the rows cannot be serialized into a table.
         """
         ...
+    def to_polars(self) -> pl.DataFrame:
+        """
+        One row per cashflow as a Polars ``DataFrame``.
+
+        Date columns are ISO-8601 strings matching :meth:`to_arrow`.
+
+        Returns
+        -------
+        pl.DataFrame
+            25-column cashflow table matching :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the rows cannot be serialized into a table.
+        """
+        ...
+    def to_pyarrow(self) -> Any:
+        """
+        One row per cashflow as a ``pyarrow.Table``.
+
+        Date columns are ISO-8601 strings matching :meth:`to_arrow`.
+
+        Returns
+        -------
+        pyarrow.Table
+            25-column cashflow table matching :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the rows cannot be serialized into a table.
+        """
+        ...
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @staticmethod
     def from_json(json: str) -> InstrumentCashflowEnvelope:
         """

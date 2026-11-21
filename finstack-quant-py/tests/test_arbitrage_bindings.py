@@ -30,7 +30,7 @@ def test_surface_report_keys_match_stub_contract() -> None:
         "suggested_fix",
     }
     assert all(set(violation) == expected_violation_keys for violation in report.violations)
-    assert report.to_dataframe().empty
+    assert report.to_pandas().empty
     assert type(report).from_json(report.to_json()).passed is True
 
 

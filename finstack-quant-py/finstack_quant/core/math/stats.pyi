@@ -2,11 +2,13 @@
 Statistical functions: mean, variance, correlation, covariance, quantiles,
 standard deviation, median, finite extrema, log returns and realized variance.
 
-Vector parameters accept any ``Sequence[float]`` or a 1-D ``float64``
-NumPy array, including strided or reversed views. Inputs are copied before
-Rust computation releases the GIL; sorting operations do not mutate the
-caller's array. Invalid series types or dimensions raise ``TypeError``, and
-non-finite or invalid inputs raise ``ValueError`` (for exact-finite functions).
+Vector parameters accept any ``Sequence[float]``, numeric 1-D NumPy array,
+``pandas.Series``, or ``polars.Series``; ``ols`` predictors accept nested
+sequences, 2-D numeric NumPy arrays, ``pandas.DataFrame``, ``polars.DataFrame``,
+or Arrow tables. Inputs are copied before Rust computation releases the GIL;
+sorting operations do not mutate the caller's array. Invalid series types or
+dimensions raise ``TypeError``, and non-finite or invalid inputs raise
+``ValueError`` (for exact-finite functions).
 
 Examples
 --------
@@ -19,9 +21,15 @@ Examples
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
+import polars as pl
+
+SeriesInput = Sequence[float] | npt.NDArray[Any] | pd.Series | pl.Series
+MatrixInput = Sequence[Sequence[float]] | npt.NDArray[Any] | pd.DataFrame | pl.DataFrame | Any
 
 __all__ = [
     "OlsResult",
@@ -44,7 +52,7 @@ __all__ = [
     "variance",
 ]
 
-def mean_var(data: Sequence[float] | npt.NDArray[np.float64]) -> tuple[float | None, float | None]:
+def mean_var(data: SeriesInput) -> tuple[float | None, float | None]:
     """
     ``(mean, sample_variance)`` in a single pass.
 
@@ -79,7 +87,7 @@ def mean_var(data: Sequence[float] | npt.NDArray[np.float64]) -> tuple[float | N
     """
     ...
 
-def std_dev(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
+def std_dev(data: SeriesInput) -> float | None:
     """
     Unbiased sample standard deviation (``n - 1`` denominator).
 
@@ -115,7 +123,7 @@ def std_dev(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
     """
     ...
 
-def median(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
+def median(data: SeriesInput) -> float | None:
     """
     Sample median using R-7 / NumPy quantile interpolation at ``q = 0.5``.
 
@@ -148,7 +156,7 @@ def median(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
     """
     ...
 
-def finite_min(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
+def finite_min(data: SeriesInput) -> float | None:
     """
     Minimum over finite values, ignoring ``nan`` and infinities.
 
@@ -177,7 +185,7 @@ def finite_min(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
     """
     ...
 
-def finite_max(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
+def finite_max(data: SeriesInput) -> float | None:
     """
     Maximum over finite values, ignoring ``nan`` and infinities.
 
@@ -206,7 +214,7 @@ def finite_max(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
     """
     ...
 
-def finite_count(data: Sequence[float] | npt.NDArray[np.float64]) -> int:
+def finite_count(data: SeriesInput) -> int:
     """
     Number of finite (non-NaN, non-infinite) values.
 
@@ -235,7 +243,7 @@ def finite_count(data: Sequence[float] | npt.NDArray[np.float64]) -> int:
     """
     ...
 
-def log_returns(prices: Sequence[float] | npt.NDArray[np.float64]) -> list[float]:
+def log_returns(prices: SeriesInput) -> list[float]:
     """
     Log returns ``ln(p_t / p_{t-1})`` of a chronological price series.
 
@@ -269,7 +277,7 @@ def log_returns(prices: Sequence[float] | npt.NDArray[np.float64]) -> list[float
     ...
 
 def realized_variance(
-    prices: Sequence[float] | npt.NDArray[np.float64],
+    prices: SeriesInput,
     annualization_factor: float | None = None,
 ) -> float | None:
     """
@@ -314,10 +322,10 @@ def realized_variance(
     ...
 
 def realized_variance_ohlc(
-    open: Sequence[float] | npt.NDArray[np.float64],
-    high: Sequence[float] | npt.NDArray[np.float64],
-    low: Sequence[float] | npt.NDArray[np.float64],
-    close: Sequence[float] | npt.NDArray[np.float64],
+    open: SeriesInput,
+    high: SeriesInput,
+    low: SeriesInput,
+    close: SeriesInput,
     method: str | None = None,
     annualization_factor: float | None = None,
     previous_close: float | None = None,
@@ -382,7 +390,7 @@ def realized_variance_ohlc(
     """
     ...
 
-def mean(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
+def mean(data: SeriesInput) -> float | None:
     """
     Arithmetic mean of a data series.
 
@@ -416,7 +424,7 @@ def mean(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
     """
     ...
 
-def variance(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
+def variance(data: SeriesInput) -> float | None:
     """
     Sample variance (unbiased, ``n - 1`` denominator).
 
@@ -451,7 +459,7 @@ def variance(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
     """
     ...
 
-def population_variance(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
+def population_variance(data: SeriesInput) -> float | None:
     """
     Population variance (``n`` denominator).
 
@@ -486,9 +494,7 @@ def population_variance(data: Sequence[float] | npt.NDArray[np.float64]) -> floa
     """
     ...
 
-def correlation(
-    x: Sequence[float] | npt.NDArray[np.float64], y: Sequence[float] | npt.NDArray[np.float64]
-) -> float | None:
+def correlation(x: SeriesInput, y: SeriesInput) -> float | None:
     """
     Pearson correlation coefficient between two equal-length series.
 
@@ -526,9 +532,7 @@ def correlation(
     """
     ...
 
-def covariance(
-    x: Sequence[float] | npt.NDArray[np.float64], y: Sequence[float] | npt.NDArray[np.float64]
-) -> float | None:
+def covariance(x: SeriesInput, y: SeriesInput) -> float | None:
     """
     Sample covariance (unbiased, ``n - 1`` denominator).
 
@@ -565,7 +569,7 @@ def covariance(
     """
     ...
 
-def expected_shortfall(data: Sequence[float] | npt.NDArray[np.float64], confidence: float) -> float:
+def expected_shortfall(data: SeriesInput, confidence: float) -> float:
     """Compute the signed mean of the worst fractional tail of a sample.
 
     Parameters
@@ -599,7 +603,7 @@ def expected_shortfall(data: Sequence[float] | npt.NDArray[np.float64], confiden
     """
     ...
 
-def quantile(data: Sequence[float] | npt.NDArray[np.float64], q: float) -> float | None:
+def quantile(data: SeriesInput, q: float) -> float | None:
     """
     Empirical quantile (R-7 / NumPy default) with linear interpolation.
 
@@ -769,8 +773,8 @@ class OlsResult:
         ...
 
 def ols(
-    x: Sequence[Sequence[float]] | npt.NDArray[np.float64],
-    y: Sequence[float] | npt.NDArray[np.float64],
+    x: MatrixInput,
+    y: SeriesInput,
     *,
     add_intercept: bool = True,
 ) -> OlsResult:
@@ -778,10 +782,10 @@ def ols(
 
     Parameters
     ----------
-    x : Sequence[Sequence[float]] | npt.NDArray[np.float64]
+    x : Sequence[Sequence[float]] | numpy.ndarray | pandas.DataFrame | polars.DataFrame | Any
         Rectangular finite predictors with one observation per row and
         one feature per column, in regression column order.
-    y : Sequence[float] | npt.NDArray[np.float64]
+    y : Sequence[float] | numpy.ndarray | pandas.Series | polars.Series
         One finite response per observation, in the same row order.
     add_intercept : bool
         Fit a constant and report centered R². False fits through the

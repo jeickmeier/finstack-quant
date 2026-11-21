@@ -5,7 +5,9 @@ from __future__ import annotations
 import datetime
 from typing import Any, Literal
 import pandas as pd
+import polars as pl
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.valuations.instruments._typed_convertible import ConvertibleBond
 
 class ConvertibleSpotRow:
@@ -396,7 +398,27 @@ class ConvertibleSpotLadder:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        The rows as an :class:`~finstack_quant.core.table.ArrowTable`, in ascending share price.
+
+        Columns: ``spot``, ``is_market_spot``, ``price``, ``delta``, ``hedge_ratio``,
+        ``regime``, ``conversion_value``, ``parity``, ``conversion_premium`` and
+        ``bond_floor``.
+
+        Returns
+        -------
+        ArrowTable
+            One row per share price.
+
+        Raises
+        ------
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         The rows as a pandas ``DataFrame``, in ascending share price.
 
@@ -412,10 +434,51 @@ class ConvertibleSpotLadder:
         Raises
         ------
         ImportError
-            If ``pyarrow`` is not installed.
+            If ``pandas`` is not installed.
+        ValueError
+            If the table cannot be converted.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        The rows as a Polars ``DataFrame``, in ascending share price.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per share price.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the table cannot be converted.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        The rows as a ``pyarrow.Table``, in ascending share price.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per share price.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the table cannot be converted.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @property
     def instrument_id(self) -> str:
         """

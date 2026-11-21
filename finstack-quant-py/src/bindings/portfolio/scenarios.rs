@@ -1,14 +1,14 @@
 //! Python bindings for scenario application and scenario P&L.
 
+use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
 use crate::bindings::extract::extract_market_ref;
 use crate::bindings::extract::extract_portfolio_ref;
 use crate::bindings::extract::extract_scenario_spec;
 use crate::bindings::extract::extract_scenario_specs;
-use crate::bindings::pandas_utils::ColumnSchema;
-use crate::bindings::pandas_utils::labeled_values_to_series;
-use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
+use crate::bindings::macros::tabular_methods;
 use crate::bindings::portfolio::valuation::PyPortfolioValuation;
 use crate::bindings::scenarios::engine::PyApplicationReport;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::portfolio_to_py;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
@@ -275,10 +275,10 @@ fn scenario_pnl_batch(
         .collect())
 }
 
-/// Column schema for [`PyScenarioPnl::to_dataframe`].
+/// Column schema for [`PyScenarioPnl::to_arrow_table`].
 ///
 /// Pinned so an empty ladder keeps the same dtypes as a populated one.
-const PNL_ROW_COLUMNS: &[ColumnSchema<'static>] = &[("position_id", "str"), ("pnl", "f64")];
+const PNL_ROW_COLUMNS: &[(&str, &str)] = &[("position_id", "str"), ("pnl", "float64")];
 
 #[derive(Serialize)]
 struct PnlRow<'a> {
@@ -338,7 +338,7 @@ impl PyScenarioPnl {
     ///
     /// The dict preserves the canonical Rust ``IndexMap`` iteration order
     /// (stressed positions first, then base-only positions), matching
-    /// :meth:`to_dataframe`, :meth:`to_series`, and :meth:`to_json`.
+    /// :meth:`to_arrow`, :meth:`to_series`, and :meth:`to_json`.
     #[getter]
     fn by_position<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let out = PyDict::new(py);
@@ -348,15 +348,9 @@ impl PyScenarioPnl {
         Ok(out)
     }
 
-    /// Per-position P&L ladder as a :class:`pandas.DataFrame`.
-    ///
-    /// Columns: ``position_id``, ``pnl``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(py, &self.rows(), PNL_ROW_COLUMNS)
-    }
-
-    /// Per-position P&L as a :class:`pandas.Series` indexed by position id.
-    fn to_series<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    /// Per-position P&L as a :class:`~finstack_quant.core.table.LabeledSeries`
+    /// indexed by position id.
+    fn to_series(&self) -> PyResult<PyLabeledSeries> {
         let labels: Vec<String> = self
             .inner
             .by_position
@@ -369,24 +363,32 @@ impl PyScenarioPnl {
             .values()
             .map(finstack_quant_core::money::Money::amount)
             .collect();
-        labeled_values_to_series(py, &labels, values, "pnl")
+        PyLabeledSeries::from_f64("pnl", labels, values).map(|s| s.with_index_name("position_id"))
     }
 
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
     /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
+    /// `to_json()` or a table export when the contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("ScenarioPnl", &self.inner)
     }
 }
 
-/// Column schema for [`PyScenarioPnlBatchItem::to_dataframe`].
+impl PyScenarioPnl {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.rows(), PNL_ROW_COLUMNS)
+    }
+}
+
+tabular_methods!(PyScenarioPnl);
+
+/// Column schema for [`PyScenarioPnlBatchItem::to_arrow_table`].
 ///
 /// The per-position ladder columns, prefixed with the owning scenario id so
-/// frames from a batch can be concatenated directly.
-const BATCH_PNL_ROW_COLUMNS: &[ColumnSchema<'static>] = &[
+/// tables from a batch can be concatenated directly.
+const BATCH_PNL_ROW_COLUMNS: &[(&str, &str)] = &[
     ("scenario_id", "str"),
     ("position_id", "str"),
     ("pnl", "float64"),
@@ -459,13 +461,6 @@ impl PyScenarioPnlBatchItem {
         }
     }
 
-    /// Per-position P&L ladder as a :class:`pandas.DataFrame`.
-    ///
-    /// Columns: ``scenario_id``, ``position_id``, ``pnl``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(py, &self.rows(), BATCH_PNL_ROW_COLUMNS)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "ScenarioPnlBatchItem(scenario_id={:?}, positions={})",
@@ -474,6 +469,14 @@ impl PyScenarioPnlBatchItem {
         )
     }
 }
+
+impl PyScenarioPnlBatchItem {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.rows(), BATCH_PNL_ROW_COLUMNS)
+    }
+}
+
+tabular_methods!(PyScenarioPnlBatchItem);
 
 /// Register the scenarios bindings on the portfolio submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {

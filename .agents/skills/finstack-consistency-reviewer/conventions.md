@@ -130,9 +130,10 @@ languages implement; deviations from it are findings, not style choices.
 | Typed field access | `#[getter]` per headline field | getters on `Js*` handles | A wrapper whose only accessor is `to_json` is a JSON string with extra steps |
 | JSON out | `to_json() -> String` (compact) | `toJson(): string` | Never `to_string_pretty` |
 | JSON in | `#[staticmethod] from_json(json)` | `fromJson(json)` | `#[staticmethod]`, never `#[classmethod]` |
-| Pickle | `__reduce__` via `pickle_support::reduce_via_json` | n/a | 49 of 51 `to_json` files already do this |
-| pandas frame | `to_dataframe()` | n/a | Primary table; built via `pandas_utils` helpers |
-| pandas series | `to_series()` | n/a | **Only** for 1-D labeled vectors |
+| Pickle | `__reduce__` via `pickle_support::reduce_via_json` | n/a | Every `to_json` wrapper pickles via `from_json` |
+| Tabular exports | `to_pandas()`, `to_polars()`, `to_arrow()`, `to_pyarrow()` | n/a | Generated via `tabular_methods!` over `to_arrow_table() -> ArrowTable`; also emits `__arrow_c_stream__`, `__arrow_c_schema__`, `_repr_html_()` |
+| Secondary tables | `to_<thing>_table() -> ArrowTable` | n/a | Direct `ArrowTable` returning methods share `.to_pandas()` / `.to_polars()` / `.to_pyarrow()` / Arrow PyCapsule on the returned object |
+| 1-D labeled vectors | `LabeledSeries` | n/a | Shared `finstack_quant.core.table.LabeledSeries` supporting dict-like indexing, `.to_pandas()`, `.to_polars()`, `.to_numpy()`, `.to_dict()`, `.to_arrow()`, Arrow PyCapsule, `_repr_html_()` |
 
 ### Naming rules
 
@@ -140,10 +141,9 @@ languages implement; deviations from it are findings, not style choices.
 |------|---------|-------|
 | `_json` / `*Json` suffix means *returns* a JSON string | `allocate_weights_json` | `accrued_interest_json` returning `f64` |
 | Non-JSON text returns say so | `plSummaryReportText` | `plSummaryReport` returning prose |
-| One primary frame per class | `to_dataframe()` | `to_pandas_long` / `to_pandas_wide` |
-| Multi-table classes may add secondaries | `to_dataframe()` + `to_returns_dataframe()` | secondaries with no plain `to_dataframe()` |
-| Secondary frames read `to_<thing>_dataframe` | `to_trade_dataframe`, `to_returns_dataframe` | `<thing>_to_dataframe` (sorts away from `to_dataframe`) |
-| Orientation is a parameter, not a method | `to_dataframe(orient="wide")` | `to_pandas_wide()` |
+| Unified tabular exit set per result wrapper | `to_pandas()` + `to_polars()` + `to_arrow()` + `to_pyarrow()` | separate `to_dataframe()` / per-crate pandas builders |
+| Multi-table classes add secondary `ArrowTable` exits | `to_<thing>_table() -> ArrowTable` | secondary `to_<thing>_dataframe()` methods |
+| Orientation is a parameter, not a method | `to_arrow(orient="wide")` / `to_pandas(orient="wide")` | `to_pandas_long` / `to_pandas_wide` |
 
 ### Type suffix policy
 

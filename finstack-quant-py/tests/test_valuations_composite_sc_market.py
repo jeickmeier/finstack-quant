@@ -88,7 +88,7 @@ def test_execution_trades_typed_and_dataframe() -> None:
     resolved = _fixed_spec().initialize(MarketContext(), dt.date(2025, 1, 1)).instrument
     typed = resolved.execution_trades()
     assert [t["quantity_delta"] for t in typed] == [1.0, -1.0]
-    frame = resolved.execution_trades_dataframe()
+    frame = resolved.execution_trades_table().to_pandas()
     assert isinstance(frame, pd.DataFrame)
     assert list(frame.columns) == ["instrument_id", "instrument_type", "quantity_delta"]
     assert list(frame["quantity_delta"]) == [1.0, -1.0]
@@ -97,7 +97,9 @@ def test_execution_trades_typed_and_dataframe() -> None:
 def test_rebalance_result_exposes_typed_trades() -> None:
     result = _fixed_spec().initialize(MarketContext(), dt.date(2025, 1, 1))
     assert result.trades == json.loads(result.to_json())["trades"]
-    assert list(result.to_dataframe()["instrument_id"]) == ["A", "B"]
+    assert list(result.to_pandas()["instrument_id"]) == ["A", "B"]
+    assert result.to_arrow().num_rows == 2
+    assert result.to_polars().height == 2
 
 
 def test_rebalance_rule_accepts_date_objects_and_strings() -> None:
@@ -121,7 +123,8 @@ def test_history_engine_accepts_observation_lists() -> None:
     via_json = history_from_spec(_fixed_spec(), json.dumps(observations))
     assert via_list.to_json() == via_json.to_json()
     assert via_list.dates == ["2025-01-01", "2025-01-02"]
-    assert list(via_list.to_dataframe()["return_index"]) == [100.0, 100.0]
+    assert list(via_list.to_pandas()["return_index"]) == [100.0, 100.0]
+    assert via_list.to_arrow().num_rows == 2
     resolved = _fixed_spec().initialize(MarketContext(), dt.date(2025, 1, 1)).instrument
     assert len(history(resolved, observations)) == 2
 
@@ -332,7 +335,7 @@ def test_unknown_tranche_raises_key_error_and_grid_accepts_dict() -> None:
         instrument=deal, tranche_id=tranche_id, market=_market(), as_of="2024-01-01", grid=json.dumps(grid)
     )
     assert via_dict.to_json() == via_json.to_json()
-    assert via_dict._repr_html_() == via_dict.to_dataframe()._repr_html_()
+    assert via_dict._repr_html_() == via_dict.to_arrow()._repr_html_()
 
 
 # --------------------------------------------------------------------------- market conventions

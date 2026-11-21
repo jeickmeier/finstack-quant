@@ -1,8 +1,11 @@
 //! Python bindings for horizon total return analysis.
 
 use crate::bindings::attribution::PyPnlAttribution;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::{extract_instrument, extract_market};
-use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::{core_to_py, display_to_py, scenarios_to_py};
 use pyo3::prelude::*;
 
@@ -144,20 +147,6 @@ pub(crate) struct PyHorizonResult {
     inner: finstack_quant_scenarios::HorizonResult,
 }
 
-const HORIZON_COLUMNS: [&str; 11] = [
-    "initial_value",
-    "terminal_value",
-    "currency",
-    "total_pnl",
-    "total_return",
-    "annualized_return",
-    "horizon_days",
-    "user_operations",
-    "expanded_operations",
-    "operations_applied",
-    "warning_count",
-];
-
 #[pymethods]
 impl PyHorizonResult {
     /// Full P&L attribution breakdown.
@@ -261,37 +250,6 @@ impl PyHorizonResult {
         Ok(Self { inner })
     }
 
-    /// Export the horizon summary as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``initial_value``, ``terminal_value``, ``currency``,
-    /// ``total_pnl``, ``total_return``, ``annualized_return``,
-    /// ``horizon_days``, ``user_operations``, ``expanded_operations``,
-    /// ``operations_applied``, ``warning_count``. ``total_return`` and
-    /// ``annualized_return`` are decimal fractions.
-    ///
-    /// For the factor-level breakdown use
-    /// ``result.attribution.to_dataframe()``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let row = serde_json::json!({
-            "initial_value": self.inner.initial_value.amount(),
-            "terminal_value": self.inner.terminal_value.amount(),
-            "currency": self.inner.initial_value.currency().to_string(),
-            "total_pnl": self.inner.attribution.total_pnl.amount(),
-            "total_return": self.inner.total_return(),
-            "annualized_return": self.inner.annualized_return(),
-            "horizon_days": self.inner.horizon_days,
-            "user_operations": self.inner.scenario_report.user_operations,
-            "expanded_operations": self.inner.scenario_report.expanded_operations,
-            "operations_applied": self.inner.scenario_report.operations_applied,
-            "warning_count": self.inner.scenario_report.warnings.len(),
-        });
-        crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &HORIZON_COLUMNS,
-        )
-    }
-
     /// Human-readable multi-line summary (total and annualized return,
     /// horizon, values, and the carry / rates / credit / residual legs).
     fn explain(&self) -> String {
@@ -307,16 +265,43 @@ impl PyHorizonResult {
                 .map_or_else(|| "None".to_string(), |d| d.to_string()),
         )
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from ``to_dataframe``. Returns ``None`` if the
-    /// frame cannot be built, which makes IPython fall back to ``__repr__``.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyHorizonResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let report = &self.inner.scenario_report;
+        TableBuilder::new()
+            .f64("initial_value", vec![self.inner.initial_value.amount()])?
+            .f64("terminal_value", vec![self.inner.terminal_value.amount()])?
+            .utf8(
+                "currency",
+                vec![self.inner.initial_value.currency().to_string()],
+            )?
+            .f64("total_pnl", vec![self.inner.attribution.total_pnl.amount()])?
+            .f64("total_return", vec![self.inner.total_return()])?
+            .nullable_f64("annualized_return", vec![self.inner.annualized_return()])?
+            .nullable_i64("horizon_days", vec![self.inner.horizon_days])?
+            .i64(
+                "user_operations",
+                vec![i64::try_from(report.user_operations).unwrap_or(i64::MAX)],
+            )?
+            .i64(
+                "expanded_operations",
+                vec![i64::try_from(report.expanded_operations).unwrap_or(i64::MAX)],
+            )?
+            .i64(
+                "operations_applied",
+                vec![i64::try_from(report.operations_applied).unwrap_or(i64::MAX)],
+            )?
+            .i64(
+                "warning_count",
+                vec![i64::try_from(report.warnings.len()).unwrap_or(i64::MAX)],
+            )?
+            .build()
     }
 }
+
+tabular_methods!(PyHorizonResult);
 
 /// Register horizon functions on the scenarios submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {

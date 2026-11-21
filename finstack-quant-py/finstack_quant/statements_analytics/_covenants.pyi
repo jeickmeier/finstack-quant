@@ -7,6 +7,8 @@ from datetime import date
 from typing import Any, Literal, TypedDict
 
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.covenants import CovenantEngine, CovenantForecastConfig, FutureBreach
 from finstack_quant.statements import FinancialModelSpec, StatementResult
 
@@ -27,7 +29,7 @@ def evaluate_covenants(
     covenants: CovenantEngine,
     results: StatementResult | str,
     node_mapping: dict[str, str] | None = None,
-) -> pd.DataFrame:
+) -> ArrowTable:
     """
     Evaluate covenant compliance at the end of every statement result period.
 
@@ -56,8 +58,8 @@ def evaluate_covenants(
 
     Returns
     -------
-    pd.DataFrame
-        Long frame with one row per (test date, applicable covenant), dates in
+    ArrowTable
+        Long Arrow table with one row per (test date, applicable covenant), dates in
         timeline order and covenants in engine order, with the columns
         of ``CovenantEngine.evaluate_series``: ``as_of`` (ISO string),
         ``covenant`` (instance key), ``covenant_type``, ``passed``,
@@ -83,7 +85,7 @@ def evaluate_covenants(
     >>> _ = builder.value("senior_leverage", [("2025Q1", 3.0), ("2025Q2", 3.5)])
     >>> model = builder.build()
     >>> engine = CovenantEngine.from_template(CovenantTemplate.cov_lite(7.0, 4.5))
-    >>> frame = evaluate_covenants(engine, Evaluator().evaluate(model))
+    >>> frame = evaluate_covenants(engine, Evaluator().evaluate(model)).to_pandas()
     >>> frame.loc[frame["covenant"] == "max_total_leverage", ["as_of", "passed"]].values.tolist()
     [['2025-03-31', True], ['2025-06-30', False]]
 
@@ -227,7 +229,7 @@ class StatementCovenantAssessment:
     ...     bindings={"total_leverage": {"node": "ratio", "unit": {"kind": "ratio"}}},
     ... )
     >>> assessment = assess_statement_covenants(engine, model, results, spec)
-    >>> assessment.to_dataframe()["passed"].tolist()
+    >>> assessment.to_pandas()["passed"].tolist()
     [True, False]
     """
 
@@ -247,7 +249,22 @@ class StatementCovenantAssessment:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """Return a row per period and covenant as an ``ArrowTable``.
+
+        Returns
+        -------
+        ArrowTable
+            One row per period and selected covenant, including availability and raw headroom.
+
+        Raises
+        ------
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """Return a row per period and covenant, with nullable pass and raw headroom.
 
         Returns
@@ -258,10 +275,49 @@ class StatementCovenantAssessment:
         Raises
         ------
         ImportError
-            If pandas is unavailable.
+            If ``pandas`` is unavailable.
+        ValueError
+            If the table cannot be constructed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """Return a row per period and covenant as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row per period and selected covenant, including availability and raw headroom.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is unavailable.
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Return a row per period and covenant as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per period and selected covenant, including availability and raw headroom.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is unavailable.
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """Return evidence and assessment states as JSON.
 
@@ -440,7 +496,7 @@ def assess_statement_covenants(
     ...     bindings={"total_leverage": {"node": "ratio", "unit": {"kind": "ratio"}}},
     ... )
     >>> assessment = assess_statement_covenants(engine, model, results, spec)
-    >>> assessment.to_dataframe()["passed"].tolist()
+    >>> assessment.to_pandas()["passed"].tolist()
     [True, False]
     """
     ...

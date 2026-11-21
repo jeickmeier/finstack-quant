@@ -22,7 +22,7 @@ use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::types::PyAttributes;
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::extract::extract_rate_decimal;
-use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::json_bridge::serde_to_py;
 use crate::errors::{core_to_py, serde_json_to_py, value_error};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};

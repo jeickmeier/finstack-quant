@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Optional, Sequence, Union
 import pandas as pd
+import polars as pl
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import DateLike
+from finstack_quant.core.table import ArrowTable
 
 # FX
 
@@ -155,7 +157,23 @@ class FxRateResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``rate`` and ``triangulated``.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export as a single-row pandas DataFrame.
 
@@ -166,11 +184,45 @@ class FxRateResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export as a single-row ``polars.DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Single-row Polars DataFrame constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
     def __float__(self) -> float: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
@@ -356,7 +408,7 @@ class FxMatrix:
     >>> matrix = FxMatrix.from_dict({"EURUSD": 1.1, "GBP/USD": 1.25}, "USD")
     >>> round(matrix.rate("EUR", "GBP", datetime.date(2025, 1, 1), "cashflow_date").rate, 4)
     0.88
-    >>> list(matrix.quotes()["base"])
+    >>> matrix.quotes().to_dict()["base"]
     ['EUR', 'GBP']
 
     """
@@ -552,9 +604,9 @@ class FxMatrix:
         """
         ...
 
-    def quotes(self) -> pd.DataFrame:
+    def quotes(self) -> ArrowTable:
         """
-        Explicit pair-global quotes as a pandas ``DataFrame``.
+        Explicit pair-global quotes as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Pair-global quotes outrank provider observations (see
         :meth:`provider_quotes`) while ranking below date-and-policy fixings set
@@ -563,20 +615,20 @@ class FxMatrix:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             Columns ``base``, ``quote`` (ISO codes) and ``rate``, in Rust snapshot order.
 
         Raises
         ------
         ValueError
-            If the frame cannot be built, concurrent quote updates prevent a
+            If the table cannot be built, concurrent quote updates prevent a
             coherent snapshot, or the provider cannot version its snapshot quotes.
         """
         ...
 
-    def provider_quotes(self) -> pd.DataFrame:
+    def provider_quotes(self) -> ArrowTable:
         """
-        Cached provider-observed quotes as a pandas ``DataFrame``.
+        Cached provider-observed quotes as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns are ``base`` (``str``), ``quote`` (``str``) and ``rate``
         (``float``). Provider observations rank below explicit pair-global
@@ -585,8 +637,8 @@ class FxMatrix:
 
         Returns
         -------
-        pd.DataFrame
-            DataFrame with ``base``, ``quote``, and ``rate`` columns.
+        ArrowTable
+            Table with ``base``, ``quote``, and ``rate`` columns.
 
         Raises
         ------
@@ -596,25 +648,25 @@ class FxMatrix:
         Examples
         --------
         >>> from finstack_quant.core.market_data import FxMatrix
-        >>> FxMatrix(None).provider_quotes().columns.tolist()
+        >>> FxMatrix(None).provider_quotes().column_names()
         ['base', 'quote', 'rate']
         """
         ...
 
-    def pinned_quotes(self) -> pd.DataFrame:
+    def pinned_quotes(self) -> ArrowTable:
         """
-        Explicit date-and-policy pinned fixings (``set_quote_on``) as a ``DataFrame``.
+        Explicit date-and-policy pinned fixings (``set_quote_on``) as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns are ``base`` (``str``), ``quote`` (``str``), ``date``
-        (``datetime.date``), ``policy`` (``str``), and ``rate`` (``float``).
+        (Arrow ``Date32``), ``policy`` (``str``), and ``rate`` (``float``).
         For their ``(date, policy)``, pinned quotes take highest authority,
         outranking both pair-global quotes (``set_quotes``) and provider
         observations.
 
         Returns
         -------
-        pd.DataFrame
-            DataFrame with ``base``, ``quote``, ``date``, ``policy``, and ``rate``.
+        ArrowTable
+            Table with ``base``, ``quote``, ``date``, ``policy``, and ``rate``.
 
         Raises
         ------
@@ -627,25 +679,25 @@ class FxMatrix:
         >>> from finstack_quant.core.market_data import FxConversionPolicy, FxMatrix
         >>> fx = FxMatrix(None)
         >>> fx.set_quote_on("EUR", "USD", date(2025, 1, 15), FxConversionPolicy.CASHFLOW_DATE, 1.12)
-        >>> df = fx.pinned_quotes()
-        >>> df["policy"].tolist()
+        >>> tbl = fx.pinned_quotes()
+        >>> tbl.to_dict()["policy"]
         ['cashflow_date']
         """
         ...
 
-    def provider_pinned_quotes(self) -> pd.DataFrame:
+    def provider_pinned_quotes(self) -> ArrowTable:
         """
-        Cached provider-observed date-and-policy quotes as a pandas ``DataFrame``.
+        Cached provider-observed date-and-policy quotes as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns are ``base`` (``str``), ``quote`` (``str``), ``date``
-        (``datetime.date``), ``policy`` (``str``), and ``rate`` (``float``).
+        (Arrow ``Date32``), ``policy`` (``str``), and ``rate`` (``float``).
         These rank below both pinned fixings (``set_quote_on``) and explicit
         pair-global quotes (``set_quotes``).
 
         Returns
         -------
-        pd.DataFrame
-            DataFrame with ``base``, ``quote``, ``date``, ``policy``, and ``rate``.
+        ArrowTable
+            Table with ``base``, ``quote``, ``date``, ``policy``, and ``rate``.
 
         Raises
         ------
@@ -655,7 +707,7 @@ class FxMatrix:
         Examples
         --------
         >>> from finstack_quant.core.market_data import FxMatrix
-        >>> FxMatrix(None).provider_pinned_quotes().columns.tolist()
+        >>> FxMatrix(None).provider_pinned_quotes().column_names()
         ['base', 'quote', 'date', 'policy', 'rate']
         """
         ...

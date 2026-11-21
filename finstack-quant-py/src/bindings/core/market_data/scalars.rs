@@ -12,23 +12,29 @@ use pyo3::types::{PyDict, PyModule};
 
 use crate::bindings::core::currency::{PyCurrency, extract_currency};
 use crate::bindings::core::money::is_python_decimal;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
-use crate::bindings::pandas_utils::{dates_to_datetime_index, dict_to_dataframe};
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
 
-fn observations_to_dataframe<'py>(
+fn to_datetime_indexed_pandas<'py>(
     py: Python<'py>,
-    observations: Vec<(finstack_quant_core::dates::Date, f64)>,
+    table: PyArrowTable,
+    date_cols: &[&str],
+    index_col: &str,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let dates: Vec<finstack_quant_core::dates::Date> =
-        observations.iter().map(|(date, _)| *date).collect();
-    let values: Vec<f64> = observations.iter().map(|(_, value)| *value).collect();
-    let data = PyDict::new(py);
-    data.set_item("value", values)?;
-    let index = dates_to_datetime_index(py, &dates)?;
-    dict_to_dataframe(py, &data, Some(index))
+    let pd = py.import("pandas")?;
+    let table_py = Bound::new(py, table)?;
+    let frame = PyArrowTable::to_pandas(&table_py, py)?;
+    let updates = PyDict::new(py);
+    for &col in date_cols {
+        let dt_col = pd.call_method1("to_datetime", (frame.get_item(col)?,))?;
+        updates.set_item(col, dt_col)?;
+    }
+    let frame = frame.call_method("assign", (), Some(&updates))?;
+    frame.call_method1("set_index", (index_col,))
 }
 
 /// Extract an `f64` observation from a `float`, `int` or `decimal.Decimal`
@@ -93,6 +99,17 @@ impl PyScalarTimeSeries {
     /// Build from an existing Rust series.
     pub(crate) fn from_inner(inner: ScalarTimeSeries) -> Self {
         Self { inner }
+    }
+
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let observations = self.inner.observations();
+        let dates: Vec<finstack_quant_core::dates::Date> =
+            observations.iter().map(|(date, _)| *date).collect();
+        let values: Vec<f64> = observations.iter().map(|(_, value)| *value).collect();
+        TableBuilder::new()
+            .date("date", &dates)?
+            .f64("value", values)?
+            .build()
     }
 }
 
@@ -259,12 +276,8 @@ impl PyScalarTimeSeries {
     /// Only the stored observations appear; nothing is interpolated. Use
     /// :meth:`get_value` for values between observation dates — the
     /// interpolation policy stays owned by Rust.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        // `ScalarTimeSeries` derives Serialize, but the wire format nests the
-        // id/currency/interpolation metadata alongside the observations, so
-        // the columns are built explicitly to keep the frame purely the
-        // date-indexed series it represents.
-        observations_to_dataframe(py, self.inner.observations())
+    fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        to_datetime_indexed_pandas(py, self.to_arrow_table()?, &["date"], "date")
     }
 
     fn __len__(&self) -> usize {
@@ -280,9 +293,8 @@ impl PyScalarTimeSeries {
     }
 }
 
+tabular_methods!(PyScalarTimeSeries, custom_pandas);
 wire_methods!(PyScalarTimeSeries, ScalarTimeSeries, "ScalarTimeSeries");
-
-impl_repr_html_via_dataframe!(PyScalarTimeSeries);
 
 #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationObservation")]
 #[pyclass(
@@ -521,16 +533,14 @@ impl PyInflationIndex {
             .collect()
     }
 
-    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationIndex.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let observations = self.inner.observations();
-        let months: Vec<_> = observations.iter().map(|obs| obs.reference_month).collect();
-        let values: Vec<_> = observations.iter().map(|obs| obs.value).collect();
-        let available: Vec<_> = observations.iter().map(|obs| obs.available_on).collect();
-        let data = PyDict::new(py);
-        data.set_item("value", values)?;
-        data.set_item("available_on", dates_to_datetime_index(py, &available)?)?;
-        dict_to_dataframe(py, &data, Some(dates_to_datetime_index(py, &months)?))
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationIndex.to_pandas")]
+    fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        to_datetime_indexed_pandas(
+            py,
+            self.to_arrow_table()?,
+            &["reference_month", "available_on"],
+            "reference_month",
+        )
     }
 
     fn __len__(&self) -> usize {
@@ -546,6 +556,27 @@ impl PyInflationIndex {
     }
 }
 
+impl PyInflationIndex {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let observations = self.inner.observations();
+        let months: Vec<_> = observations.iter().map(|obs| obs.reference_month).collect();
+        let values: Vec<_> = observations.iter().map(|obs| obs.value).collect();
+        let available: Vec<_> = observations.iter().map(|obs| obs.available_on).collect();
+        TableBuilder::new()
+            .date("reference_month", &months)?
+            .f64("value", values)?
+            .date("available_on", &available)?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyInflationIndex,
+    "InflationIndex",
+    module = "finstack_quant.core.market_data._scalars",
+    custom_pandas
+);
+
 wire_methods!(
     PyInflationIndex,
     InflationIndex,
@@ -553,8 +584,6 @@ wire_methods!(
     module = "finstack_quant.core.market_data._scalars",
     arc
 );
-
-impl_repr_html_via_dataframe!(PyInflationIndex);
 
 pub(super) const EXPORTS: &[&str] = &[
     "InflationIndex",

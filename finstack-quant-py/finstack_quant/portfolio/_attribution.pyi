@@ -5,9 +5,11 @@ from __future__ import annotations
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.attribution import PnlAttribution
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.portfolio._container import Portfolio
 
 class ReconciliationReport:
@@ -77,11 +79,27 @@ class ReconciliationReport:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Single-row DataFrame view of the report.
+        Single-row :class:`~finstack_quant.core.table.ArrowTable` view of the report.
 
         Columns: ``total_residual``, ``is_reconciled``, ``tolerance``.
+
+        Returns
+        -------
+        ArrowTable
+            One row with the pinned column schema.
+
+        Raises
+        ------
+        ValueError
+            If the report cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Single-row pandas ``DataFrame`` view of the report.
 
         Returns
         -------
@@ -90,11 +108,46 @@ class ReconciliationReport:
 
         Raises
         ------
-        ValueError
-            If the report cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Single-row Polars ``DataFrame`` view of the report.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row with the pinned column schema.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Single-row ``pyarrow.Table`` view of the report.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row with the pinned column schema.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to a compact JSON string.
@@ -261,17 +314,17 @@ class PortfolioAttribution:
         """
         ...
 
-    def to_position_dataframe(self) -> pd.DataFrame:
+    def to_position_table(self) -> ArrowTable:
         """
         Export per-position native-currency attributions, one row per position.
 
         Each row is ``position_id`` followed by the canonical Rust wide row of
         that position's attribution, the same columns as
-        :meth:`finstack_quant.attribution.PnlAttribution.to_dataframe`.
+        :meth:`finstack_quant.attribution.PnlAttribution.to_arrow`.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             Columns ``position_id``, ``instrument_id``, ``method``, ``t0``,
             ``t1``, ``currency`` (native), ``total_pnl``,
             ``mark_to_market_pnl``, ``pv_t0``, ``pv_t1``, ``carry``,
@@ -281,7 +334,7 @@ class PortfolioAttribution:
             ``model_params_pnl``, ``market_scalars_pnl``, ``residual``,
             ``residual_pct``, ``num_repricings`` (int64) and
             ``result_invalid`` (bool). Amounts are float64; optional
-            amounts are ``NaN`` when the method did not record them.
+            amounts are null when the method did not record them.
 
         Raises
         ------
@@ -330,9 +383,10 @@ class PortfolioAttribution:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the portfolio-level factor totals as a single-row DataFrame.
+        Export the portfolio-level factor totals as a single-row
+        :class:`~finstack_quant.core.table.ArrowTable`.
 
         Every ``Money`` aggregate is flattened to a float column plus one
         shared ``currency`` column; the per-position nested breakdown stays on
@@ -346,17 +400,68 @@ class PortfolioAttribution:
 
         Returns
         -------
+        ArrowTable
+            Exactly one row.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the portfolio-level factor totals as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
         pd.DataFrame
             Exactly one row; concatenate rows across attribution runs to build
             a P&L time series.
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the portfolio-level factor totals as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Exactly one row of portfolio-level attribution totals.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the portfolio-level factor totals as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Exactly one row of portfolio-level attribution totals.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @property
     def total_pnl(self) -> Money:
         """

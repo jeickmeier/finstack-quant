@@ -1,9 +1,11 @@
 //! Dated credit context inputs, result evidence and tabular presentation.
 
 use crate::bindings::core::money::PyMoney;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::extract_results_ref;
+use crate::bindings::macros::tabular_methods;
 use crate::bindings::module_utils::fields_from_py;
-use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::statements_to_py;
 use finstack_quant_statements_analytics::analysis as native;
 use pyo3::prelude::*;
@@ -91,9 +93,23 @@ impl PyCreditContextReport {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._credit_context", "CreditContextReport.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        const COLUMNS: [ColumnSchema<'static>; 6] = [
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._credit_context", "CreditContextReport.coverage_to_table")]
+    fn coverage_to_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: [(&str, &str); 6] = [
+            ("measure", "str"),
+            ("measured", "int64"),
+            ("inapplicable", "int64"),
+            ("unavailable", "int64"),
+            ("observed_minimum", "float64"),
+            ("full_path_minimum", "float64"),
+        ];
+        serde_rows_to_arrow_table(&self.inner.coverage, &COLUMNS)
+    }
+}
+
+impl PyCreditContextReport {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: [(&str, &str); 6] = [
             ("period", "str"),
             ("measure", "str"),
             ("status", "str"),
@@ -121,22 +137,15 @@ impl PyCreditContextReport {
                 })
             })
             .collect::<Vec<_>>();
-        serde_rows_to_dataframe_with_schema(py, &rows, &COLUMNS)
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._credit_context", "CreditContextReport.coverage_to_dataframe")]
-    fn coverage_to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        const COLUMNS: [ColumnSchema<'static>; 6] = [
-            ("measure", "str"),
-            ("measured", "int64"),
-            ("inapplicable", "int64"),
-            ("unavailable", "int64"),
-            ("observed_minimum", "float64"),
-            ("full_path_minimum", "float64"),
-        ];
-        serde_rows_to_dataframe_with_schema(py, &self.inner.coverage, &COLUMNS)
+        serde_rows_to_arrow_table(&rows, &COLUMNS)
     }
 }
+
+tabular_methods!(
+    PyCreditContextReport,
+    "CreditContextReport",
+    module = "finstack_quant.statements_analytics._credit_context"
+);
 
 #[pymethods]
 impl PyCreditMeasureRow {
@@ -149,7 +158,7 @@ impl PyCreditMeasureRow {
     #[getter]
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._credit_context", "CreditMeasureRow.measure")]
     fn measure<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.measure)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.measure)
     }
 
     #[getter]
@@ -290,10 +299,11 @@ impl PyCreditContextMetrics {
             .map(ToString::to_string)
             .collect()
     }
+}
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._credit_context", "CreditContextMetrics.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        const COLUMNS: [ColumnSchema<'static>; 6] = [
+impl PyCreditContextMetrics {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: [(&str, &str); 6] = [
             ("period", "str"),
             ("dscr", "float64"),
             ("dscr_total", "float64"),
@@ -310,9 +320,15 @@ impl PyCreditContextMetrics {
                 })
             })
             .collect::<Vec<_>>();
-        serde_rows_to_dataframe_with_schema(py, &rows, &COLUMNS)
+        serde_rows_to_arrow_table(&rows, &COLUMNS)
     }
 }
+
+tabular_methods!(
+    PyCreditContextMetrics,
+    "CreditContextMetrics",
+    module = "finstack_quant.statements_analytics._credit_context"
+);
 
 pub(super) fn observations(
     metrics: &native::CreditContextMetrics,

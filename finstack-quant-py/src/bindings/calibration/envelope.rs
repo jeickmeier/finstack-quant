@@ -7,9 +7,9 @@
 use super::config::extract_config;
 use super::quotes::extract_market_datum;
 use super::step_params;
+use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::macros::wire_methods;
 use crate::bindings::module_utils::{py_to_json_value, spec_from_py};
-use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::pickle_support::reduce_via_json;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, serde_json_to_py};

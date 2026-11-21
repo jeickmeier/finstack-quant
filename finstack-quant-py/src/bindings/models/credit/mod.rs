@@ -8,17 +8,15 @@ mod recovery_waterfall;
 mod scoring;
 pub(crate) use scoring::PyScoringResult;
 
-use crate::bindings::macros::wire_methods;
-use crate::bindings::pydoc::pydoc;
-use std::sync::Arc;
-
 use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::core::market_data::curves::PyHazardCurve;
+use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
 use crate::bindings::core::types::extract_credit_rating;
 use crate::bindings::date_utils::py_to_date;
-use crate::bindings::pandas_utils::{
-    dict_to_dataframe, serde_object_to_single_row_dataframe, serde_to_py, values_to_series,
-};
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::{TableBuilder, serde_object_to_single_row_arrow_table};
 use crate::errors::core_to_py;
 use finstack_quant_core::wire::serde_parse;
 use finstack_quant_models::credit::{
@@ -28,7 +26,8 @@ use finstack_quant_models::credit::{
     moodys_warf_factor as rust_moodys_warf_factor,
 };
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyModule};
+use pyo3::types::{PyList, PyModule};
+use std::sync::Arc;
 
 #[doc = pydoc!("finstack_quant.models.credit", "moodys_warf_factor")]
 #[pyfunction]
@@ -420,11 +419,6 @@ impl PyMertonModel {
         PyAssetDynamics::from_inner(*self.inner.dynamics())
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe(py, &self.inner)
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.distance_to_default")]
     fn distance_to_default(&self, horizon: f64) -> f64 {
         self.inner.distance_to_default(horizon)
@@ -444,17 +438,16 @@ impl PyMertonModel {
 
     #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.default_probabilities")]
     #[pyo3(text_signature = "($self, horizons)")]
-    fn default_probabilities<'py>(
-        &self,
-        py: Python<'py>,
-        horizons: Vec<f64>,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    fn default_probabilities(&self, horizons: Vec<f64>) -> PyResult<PyLabeledSeries> {
         let labels: Vec<String> = horizons.iter().map(|h| h.to_string()).collect();
         let values = self
             .inner
             .default_probabilities(&horizons)
             .map_err(core_to_py)?;
-        values_to_series(py, values, &labels, "default_probability")
+        Ok(
+            PyLabeledSeries::from_f64("default_probability", labels, values)?
+                .with_index_name("horizon"),
+        )
     }
 
     #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.default_probability_with_drift")]
@@ -529,6 +522,28 @@ impl PyMertonModel {
     }
 }
 
+impl PyMertonModel {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_object_to_single_row_arrow_table(
+            &self.inner,
+            &[
+                ("asset_value", "float64"),
+                ("asset_vol", "float64"),
+                ("debt_barrier", "float64"),
+                ("risk_free_rate", "float64"),
+                ("payout_rate", "float64"),
+                ("barrier_type", "str"),
+                ("dynamics", "str"),
+            ],
+        )
+    }
+}
+
+tabular_methods!(
+    PyMertonModel,
+    "MertonModel",
+    module = "finstack_quant.models.credit"
+);
 wire_methods!(
     PyMertonModel,
     MertonModel,
@@ -641,51 +656,50 @@ impl PyMertonReport {
             .collect()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let per_horizon = |measure: &Option<Vec<f64>>| -> Vec<Option<f64>> {
-            match measure {
-                Some(values) => values.iter().copied().map(Some).collect(),
-                None => vec![None; self.inner.horizons.len()],
-            }
-        };
-        let columns = PyDict::new(py);
-        columns.set_item("horizon", self.inner.horizons.clone())?;
-        columns.set_item(
-            "default_probability",
-            self.inner.default_probabilities.clone(),
-        )?;
-        columns.set_item(
-            "distance_to_default",
-            self.inner.distance_to_default.clone(),
-        )?;
-        columns.set_item("implied_spread", per_horizon(&self.inner.implied_spread))?;
-        columns.set_item("debt_spread", per_horizon(&self.inner.debt_spread))?;
-        columns.set_item(
-            "grade",
-            self.inner
-                .grades
-                .iter()
-                .map(|row| row.grade.clone())
-                .collect::<Vec<_>>(),
-        )?;
-        columns.set_item(
-            "central_pd",
-            self.inner
-                .grades
-                .iter()
-                .map(|row| row.central_pd)
-                .collect::<Vec<_>>(),
-        )?;
-        dict_to_dataframe(py, &columns, None)
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("MertonReport", &self.inner)
     }
 }
 
+impl PyMertonReport {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let per_horizon = |measure: &Option<Vec<f64>>| -> Vec<Option<f64>> {
+            match measure {
+                Some(values) => values.iter().copied().map(Some).collect(),
+                None => vec![None; self.inner.horizons.len()],
+            }
+        };
+        let grades: Vec<String> = self
+            .inner
+            .grades
+            .iter()
+            .map(|row| row.grade.clone())
+            .collect();
+        let central_pds: Vec<f64> = self.inner.grades.iter().map(|row| row.central_pd).collect();
+        TableBuilder::new()
+            .f64("horizon", self.inner.horizons.clone())?
+            .f64(
+                "default_probability",
+                self.inner.default_probabilities.clone(),
+            )?
+            .f64(
+                "distance_to_default",
+                self.inner.distance_to_default.clone(),
+            )?
+            .nullable_f64("implied_spread", per_horizon(&self.inner.implied_spread))?
+            .nullable_f64("debt_spread", per_horizon(&self.inner.debt_spread))?
+            .utf8("grade", grades)?
+            .f64("central_pd", central_pds)?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyMertonReport,
+    "MertonReport",
+    module = "finstack_quant.models.credit"
+);
 wire_methods!(
     PyMertonReport,
     MertonReport,
@@ -772,25 +786,6 @@ impl PySimulatedPaths {
         numpy::PyArray1::from_vec(py, values)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let per_path = self.inner.values_per_path();
-        let n = self.inner.num_paths * per_path;
-        let mut path_col = Vec::with_capacity(n);
-        let mut time_col = Vec::with_capacity(n);
-        for p in 0..self.inner.num_paths {
-            for &time in &self.inner.times {
-                path_col.push(p as u64);
-                time_col.push(time);
-            }
-        }
-        let columns = PyDict::new(py);
-        columns.set_item("path", path_col)?;
-        columns.set_item("time", time_col)?;
-        columns.set_item("asset_value", self.inner.asset_values.clone())?;
-        dict_to_dataframe(py, &columns, None)
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.get")]
     fn get(&self, path_idx: usize, time_idx: usize) -> Option<f64> {
         self.inner.get(path_idx, time_idx)
@@ -811,6 +806,33 @@ impl PySimulatedPaths {
     }
 }
 
+impl PySimulatedPaths {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let per_path = self.inner.values_per_path();
+        let n = self.inner.num_paths * per_path;
+        let mut path_col = Vec::with_capacity(n);
+        let mut time_col = Vec::with_capacity(n);
+        for p in 0..self.inner.num_paths {
+            let p_i64 = i64::try_from(p)
+                .map_err(|e| crate::errors::value_error(format!("path index overflow: {e}")))?;
+            for &time in &self.inner.times {
+                path_col.push(p_i64);
+                time_col.push(time);
+            }
+        }
+        TableBuilder::new()
+            .i64("path", path_col)?
+            .f64("time", time_col)?
+            .f64("asset_value", self.inner.asset_values.clone())?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PySimulatedPaths,
+    "SimulatedPaths",
+    module = "finstack_quant.models.credit"
+);
 wire_methods!(
     PySimulatedPaths,
     SimulatedPaths,
@@ -922,16 +944,29 @@ impl PyDynamicRecoverySpec {
         serde_to_py(py, self.inner.model())
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe(py, &self.inner)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("DynamicRecoverySpec", &self.inner)
     }
 }
 
+impl PyDynamicRecoverySpec {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_object_to_single_row_arrow_table(
+            &self.inner,
+            &[
+                ("base_recovery", "float64"),
+                ("base_notional", "float64"),
+                ("model", "str"),
+            ],
+        )
+    }
+}
+
+tabular_methods!(
+    PyDynamicRecoverySpec,
+    "DynamicRecoverySpec",
+    module = "finstack_quant.models.credit"
+);
 wire_methods!(
     PyDynamicRecoverySpec,
     DynamicRecoverySpec,
@@ -1021,16 +1056,29 @@ impl PyEndogenousHazardSpec {
         serde_to_py(py, self.inner.leverage_hazard_map())
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe(py, &self.inner)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("EndogenousHazardSpec", &self.inner)
     }
 }
 
+impl PyEndogenousHazardSpec {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_object_to_single_row_arrow_table(
+            &self.inner,
+            &[
+                ("base_hazard_rate", "float64"),
+                ("base_leverage", "float64"),
+                ("leverage_hazard_map", "str"),
+            ],
+        )
+    }
+}
+
+tabular_methods!(
+    PyEndogenousHazardSpec,
+    "EndogenousHazardSpec",
+    module = "finstack_quant.models.credit"
+);
 wire_methods!(
     PyEndogenousHazardSpec,
     EndogenousHazardSpec,
@@ -1114,16 +1162,29 @@ impl PyCreditState {
         self.inner.asset_value
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe(py, &self.inner)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CreditState", &self.inner)
     }
 }
 
+impl PyCreditState {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .f64("hazard_rate", vec![self.inner.hazard_rate])?
+            .nullable_f64("distance_to_default", vec![self.inner.distance_to_default])?
+            .f64("leverage", vec![self.inner.leverage])?
+            .f64("accreted_notional", vec![self.inner.accreted_notional])?
+            .f64("coupon_due", vec![self.inner.coupon_due])?
+            .nullable_f64("asset_value", vec![self.inner.asset_value])?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyCreditState,
+    "CreditState",
+    module = "finstack_quant.models.credit"
+);
 wire_methods!(
     PyCreditState,
     CreditState,

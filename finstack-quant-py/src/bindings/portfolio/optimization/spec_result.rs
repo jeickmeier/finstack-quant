@@ -2,16 +2,16 @@ use indexmap::{IndexMap, IndexSet};
 use pyo3::prelude::*;
 
 use crate::errors::core_to_py;
-use pyo3::types::{PyDict, PyList, PyType};
+use pyo3::types::{PyDict, PyType};
 
 use finstack_quant_portfolio::optimization::{
     CandidatePosition, PortfolioOptimizationResult, PortfolioOptimizationSpec, TradeUniverse,
 };
 use finstack_quant_portfolio::types::PositionId;
 
-use crate::bindings::pandas_utils::{
-    ColumnSchema, dict_to_dataframe, serde_rows_to_dataframe_with_schema,
-};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::{TableBuilder, serde_rows_to_arrow_table};
 
 use super::enums::{PyMissingMetricPolicy, PyWeightingScheme};
 use super::expressions::{PyConstraint, PyObjective, PyPositionFilter};
@@ -143,7 +143,7 @@ impl PyCandidatePosition {
     /// Candidate attributes as a ``dict[str, str | float]``.
     #[getter]
     fn attributes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.attributes)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.attributes)
     }
 
     fn __repr__(&self) -> String {
@@ -463,7 +463,7 @@ impl PyPortfolioOptimizationSpec {
 ///
 /// Pinned so a solution with no trades still yields a frame carrying every
 /// documented column instead of a schema-less empty frame.
-const TRADE_COLUMNS: [ColumnSchema<'static>; 9] = [
+const TRADE_COLUMNS: &[(&str, &str)] = &[
     ("position_id", "str"),
     ("instrument_id", "str"),
     ("trade_type", "str"),
@@ -496,7 +496,7 @@ impl PyPortfolioOptimizationResult {
     /// Configuration and numerical provenance stamped by the Rust solver.
     #[getter]
     fn meta<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.meta)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.meta)
     }
 
     /// Serialize to the canonical JSON wire format.
@@ -657,50 +657,12 @@ impl PyPortfolioOptimizationResult {
 
     /// Export the per-position weight and quantity solution as a pandas
     /// ``DataFrame`` indexed by position id.
-    ///
-    /// ``current_weights``, ``optimal_weights``, ``weight_deltas`` and
-    /// ``implied_quantities`` share one position key space, so they are joined
-    /// into a single frame. The row axis is the union of their keys, ordered by
-    /// first appearance (``current_weights`` first); a value missing from one
-    /// map becomes ``None`` in that column — this is how candidate positions
-    /// with no current weight show up.
-    ///
-    /// Columns: ``current_weight``, ``optimal_weight``, ``weight_delta`` (all
-    /// fractions of the portfolio, not percentages), ``implied_quantity``
-    /// (units / face / notional per the weighting scheme). The index holds the
-    /// position ids.
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let mut positions: IndexSet<&PositionId> = IndexSet::new();
-        for map in [
-            &self.inner.current_weights,
-            &self.inner.optimal_weights,
-            &self.inner.weight_deltas,
-            &self.inner.implied_quantities,
-        ] {
-            positions.extend(map.keys());
-        }
-        let column = |source: &indexmap::IndexMap<PositionId, f64>| -> Vec<Option<f64>> {
-            positions
-                .iter()
-                .map(|id| source.get(*id).copied())
-                .collect()
-        };
-        let data = PyDict::new(py);
-        data.set_item("current_weight", column(&self.inner.current_weights))?;
-        data.set_item("optimal_weight", column(&self.inner.optimal_weights))?;
-        data.set_item("weight_delta", column(&self.inner.weight_deltas))?;
-        data.set_item("implied_quantity", column(&self.inner.implied_quantities))?;
-        let index: Vec<&str> = positions.iter().map(|id| id.as_str()).collect();
-        let index = PyList::new(py, index)?;
-        dict_to_dataframe(py, &data, Some(index.into_any()))
-    }
-
-    /// Export :meth:`to_trade_list` as a pandas ``DataFrame``.
+    /// Export :meth:`to_trade_list` as an
+    /// :class:`~finstack_quant.core.table.ArrowTable`.
     ///
     /// One row per trade, in the same order as :meth:`to_trade_list` (sorted by
     /// absolute quantity delta, largest first). A solution that requires no
-    /// trades yields a zero-row frame that still carries the column schema.
+    /// trades yields a zero-row table that still carries the column schema.
     ///
     /// Columns: ``position_id``, ``instrument_id``, ``trade_type``
     /// (``"existing"``, ``"new_position"``, ``"close_out"``),
@@ -708,9 +670,9 @@ impl PyPortfolioOptimizationResult {
     /// ``direction`` (``"buy"``, ``"sell"``, ``"hold"``), ``current_weight``,
     /// ``target_weight`` (weights are fractions, not percentages).
     #[pyo3(text_signature = "(self)")]
-    fn to_trade_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_trade_table(&self) -> PyResult<PyArrowTable> {
         let trades = self.inner.trades.clone();
-        serde_rows_to_dataframe_with_schema(py, &trades, &TRADE_COLUMNS)
+        serde_rows_to_arrow_table(&trades, TRADE_COLUMNS)
     }
 
     /// Binding constraint labels and their slack values.
@@ -731,15 +693,34 @@ impl PyPortfolioOptimizationResult {
             self.inner.turnover,
         ))
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyPortfolioOptimizationResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let mut positions: IndexSet<&PositionId> = IndexSet::new();
+        for map in [
+            &self.inner.current_weights,
+            &self.inner.optimal_weights,
+            &self.inner.weight_deltas,
+            &self.inner.implied_quantities,
+        ] {
+            positions.extend(map.keys());
+        }
+        let column = |source: &indexmap::IndexMap<PositionId, f64>| -> Vec<Option<f64>> {
+            positions
+                .iter()
+                .map(|id| source.get(*id).copied())
+                .collect()
+        };
+        let position_ids: Vec<String> = positions.iter().map(|id| id.as_str().to_owned()).collect();
+        TableBuilder::new()
+            .utf8("position_id", position_ids)?
+            .nullable_f64("current_weight", column(&self.inner.current_weights))?
+            .nullable_f64("optimal_weight", column(&self.inner.optimal_weights))?
+            .nullable_f64("weight_delta", column(&self.inner.weight_deltas))?
+            .nullable_f64("implied_quantity", column(&self.inner.implied_quantities))?
+            .build()
     }
 }
+
+tabular_methods!(PyPortfolioOptimizationResult, index = "position_id");

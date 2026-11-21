@@ -7,7 +7,9 @@ from finstack_quant.models.factor import FactorDefinition
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.portfolio._container import Portfolio
 
 # Factor Sensitivity
@@ -248,22 +250,74 @@ class SensitivityMatrix:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export as a pandas DataFrame with positions as rows and factors as columns.
+        Export as an :class:`~finstack_quant.core.table.ArrowTable` with ``position_id``
+        and factor sensitivity columns.
 
         Returns
         -------
-        pd.DataFrame
-            DataFrame indexed by position IDs with factor IDs as column names.
+        ArrowTable
+            One row per position; columns ``position_id`` plus factor IDs.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be serialized into an Arrow table.
         """
         ...
 
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export as a pandas ``DataFrame`` indexed by ``position_id`` with factors as columns.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame indexed by ``position_id`` with factor IDs as column names.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export as a Polars ``DataFrame`` with ``position_id`` and factor columns.
+
+        Returns
+        -------
+        pl.DataFrame
+            DataFrame with ``position_id`` and factor ID columns.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export as a ``pyarrow.Table`` with ``position_id`` and factor columns.
+
+        Returns
+        -------
+        pyarrow.Table
+            Table with ``position_id`` and factor ID columns.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """Return a concise debug representation.
         Returns
@@ -287,7 +341,7 @@ class FactorPnlProfile:
     >>> profile = FactorPnlProfile.from_json(
     ...     '{"base_currency":"USD","factor_id":"USD_10Y","position_ids":["P1"],"shifts":[-1.0,0.0,1.0],"position_pnls":[[-1.0],[0.0],[1.0]]}'
     ... )
-    >>> profile.to_dataframe()["P1"].tolist()
+    >>> profile.to_pandas()["P1"].tolist()
     [-1.0, 0.0, 1.0]
     """
 
@@ -377,7 +431,7 @@ class FactorPnlProfile:
         Returns
         -------
         list[str]
-            Column labels used by :meth:`to_dataframe`.
+            Column labels used by :meth:`to_arrow`, :meth:`to_pandas`, :meth:`to_polars`, and :meth:`to_pyarrow`.
 
         Notes
         -----
@@ -417,22 +471,74 @@ class FactorPnlProfile:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export as a pandas DataFrame with shifts as rows and positions as columns.
+        Export as an :class:`~finstack_quant.core.table.ArrowTable` with ``shift``
+        and position columns.
 
         Returns
         -------
-        pd.DataFrame
-            Indexed by shift value; one column per entry of ``position_ids``.
+        ArrowTable
+            Columns ``shift`` and one column per entry of ``position_ids``.
 
         Raises
         ------
         ValueError
-            If the frame cannot be built.
+            If the table cannot be built.
         """
         ...
 
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export as a pandas ``DataFrame`` indexed by ``shift`` with positions as columns.
+
+        Returns
+        -------
+        pd.DataFrame
+            Indexed by ``shift`` value; one column per entry of ``position_ids``.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export as a Polars ``DataFrame`` with ``shift`` and position columns.
+
+        Returns
+        -------
+        pl.DataFrame
+            DataFrame with ``shift`` and one column per entry of ``position_ids``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export as a ``pyarrow.Table`` with ``shift`` and position columns.
+
+        Returns
+        -------
+        pyarrow.Table
+            Table with ``shift`` and one column per entry of ``position_ids``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """Return a concise debug representation.
         Returns
@@ -498,7 +604,7 @@ def compute_factor_sensitivities(
     >>> from finstack_quant.portfolio import Portfolio, compute_factor_sensitivities
     >>> book = Portfolio.builder("book", "USD", "2025-01-15").build()
     >>> matrix = compute_factor_sensitivities(book, "[]", MarketContext(), "2025-01-15")
-    >>> matrix.to_dataframe().shape
+    >>> matrix.to_pandas().shape
     (0, 0)
     """
     ...

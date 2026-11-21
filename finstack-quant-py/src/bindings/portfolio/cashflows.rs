@@ -2,12 +2,14 @@
 //! `net_in_currency_by_date` and `PortfolioCashflows`.
 
 use crate::bindings::core::currency::extract_currency;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::extract::extract_cashflows_ref;
 use crate::bindings::extract::extract_market_ref;
 use crate::bindings::extract::extract_portfolio_ref;
-use crate::bindings::pandas_utils::dict_to_dataframe;
-use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
 use crate::errors::display_to_py;
 use crate::errors::portfolio_to_py;
@@ -219,75 +221,32 @@ impl PyPortfolioCashflows {
             .map_err(display_to_py)
     }
 
-    /// Export the flat ``events`` ladder as a pandas ``DataFrame``.
-    ///
-    /// One row per dated cashflow event, in the ladder's canonical
-    /// payment-date order. ``amount`` is flattened to a float column plus a
-    /// ``currency`` column rather than a nested dict, so a multi-currency
-    /// ladder stays currency-safe: group by ``currency`` before summing.
-    ///
-    /// Columns: ``position_id``, ``instrument_id``, ``instrument_type``,
-    /// ``date`` (ISO 8601 string), ``amount`` (position-scaled), ``currency``,
-    /// ``kind`` (``"fixed"``, ``"floating"``, ``"notional"``, ...),
-    /// ``reset_date`` (ISO 8601 string, ``None`` outside floating coupons),
-    /// ``accrual_factor``, ``rate`` (``None`` when the event carries no rate).
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let events = &self.inner.events;
-        let position_ids: Vec<&str> = events.iter().map(|e| e.position_id.as_str()).collect();
-        let instrument_ids: Vec<&str> = events.iter().map(|e| e.instrument_id.as_str()).collect();
-        let instrument_types: Vec<String> = events
-            .iter()
-            .map(|e| e.instrument_type.to_string())
-            .collect();
-        let dates: Vec<String> = events.iter().map(|e| e.date.to_string()).collect();
-        let amounts: Vec<f64> = events.iter().map(|e| e.amount.amount()).collect();
-        let currencies: Vec<String> = events
-            .iter()
-            .map(|e| e.amount.currency().to_string())
-            .collect();
-        let kinds: Vec<String> = events.iter().map(|e| e.kind.to_string()).collect();
-        let reset_dates: Vec<Option<String>> = events
-            .iter()
-            .map(|e| e.reset_date.map(|d| d.to_string()))
-            .collect();
-        let accrual_factors: Vec<f64> = events.iter().map(|e| e.accrual_factor).collect();
-        let rates: Vec<Option<f64>> = events.iter().map(|e| e.rate).collect();
-
-        let data = PyDict::new(py);
-        data.set_item("position_id", position_ids)?;
-        data.set_item("instrument_id", instrument_ids)?;
-        data.set_item("instrument_type", instrument_types)?;
-        data.set_item("date", dates)?;
-        data.set_item("amount", amounts)?;
-        data.set_item("currency", currencies)?;
-        data.set_item("kind", kinds)?;
-        data.set_item("reset_date", reset_dates)?;
-        data.set_item("accrual_factor", accrual_factors)?;
-        data.set_item("rate", rates)?;
-        dict_to_dataframe(py, &data, None)
-    }
-
-    /// Export the extraction ``issues`` as a pandas ``DataFrame``.
+    /// Export the extraction ``issues`` as an :class:`~finstack_quant.core.table.ArrowTable`.
     ///
     /// Columns: ``position_id``, ``instrument_id``, ``instrument_type``,
     /// ``message`` (why the schedule could not be built).
     #[pyo3(text_signature = "(self)")]
-    fn to_issues_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_issues_table(&self) -> PyResult<PyArrowTable> {
         let issues = &self.inner.issues;
-        let position_ids: Vec<&str> = issues.iter().map(|i| i.position_id.as_str()).collect();
-        let instrument_ids: Vec<&str> = issues.iter().map(|i| i.instrument_id.as_str()).collect();
+        let position_ids: Vec<String> = issues
+            .iter()
+            .map(|i| i.position_id.as_str().to_owned())
+            .collect();
+        let instrument_ids: Vec<String> = issues
+            .iter()
+            .map(|i| i.instrument_id.as_str().to_owned())
+            .collect();
         let instrument_types: Vec<String> = issues
             .iter()
             .map(|i| i.instrument_type.to_string())
             .collect();
-        let messages: Vec<&str> = issues.iter().map(|i| i.message.as_str()).collect();
-        let data = PyDict::new(py);
-        data.set_item("position_id", position_ids)?;
-        data.set_item("instrument_id", instrument_ids)?;
-        data.set_item("instrument_type", instrument_types)?;
-        data.set_item("message", messages)?;
-        dict_to_dataframe(py, &data, None)
+        let messages: Vec<String> = issues.iter().map(|i| i.message.clone()).collect();
+        TableBuilder::new()
+            .utf8("position_id", position_ids)?
+            .utf8("instrument_id", instrument_ids)?
+            .utf8("instrument_type", instrument_types)?
+            .utf8("message", messages)?
+            .build()
     }
 
     /// JSON for the ``issues`` vector only.
@@ -325,7 +284,8 @@ impl PyPortfolioCashflows {
     }
 
     /// Collapse multi-currency flows into a single base-currency ladder
-    /// bucketed by ``(date, kind)`` and return it as a pandas ``DataFrame``.
+    /// bucketed by ``(date, kind)`` and return it as an
+    /// :class:`~finstack_quant.core.table.ArrowTable`.
     ///
     /// Payments on or before ``as_of`` use spot FX at ``as_of``. Later
     /// payments use the CIP forward ``F(T) = S × DF_from(T) / DF_base(T)``.
@@ -345,7 +305,7 @@ impl PyPortfolioCashflows {
     ///
     /// Returns
     /// -------
-    /// pandas.DataFrame
+    /// ArrowTable
     ///     Columns ``date`` (ISO 8601 string), ``kind``, ``amount`` (float in
     ///     ``base_currency``), ``currency``; one row per ``(date, kind)``.
     ///     Use :meth:`collapse_to_base_by_date_kind_json` for the nested wire
@@ -367,7 +327,7 @@ impl PyPortfolioCashflows {
         base_currency: &Bound<'py, PyAny>,
         as_of: &Bound<'py, PyAny>,
         discount_curves: Option<&Bound<'py, PyDict>>,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    ) -> PyResult<PyArrowTable> {
         let collapsed = self.collapse(py, market, base_currency, as_of, discount_curves)?;
         let mut dates = Vec::new();
         let mut kinds = Vec::new();
@@ -381,12 +341,12 @@ impl PyPortfolioCashflows {
                 currencies.push(money.currency().to_string());
             }
         }
-        let data = PyDict::new(py);
-        data.set_item("date", dates)?;
-        data.set_item("kind", kinds)?;
-        data.set_item("amount", amounts)?;
-        data.set_item("currency", currencies)?;
-        dict_to_dataframe(py, &data, None)
+        TableBuilder::new()
+            .utf8("date", dates)?
+            .utf8("kind", kinds)?
+            .f64("amount", amounts)?
+            .utf8("currency", currencies)?
+            .build()
     }
 
     /// Wire twin of :meth:`collapse_to_base_by_date_kind`: same inputs, the
@@ -416,18 +376,53 @@ impl PyPortfolioCashflows {
             self.inner.issues.len(),
         )
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyPortfolioCashflows {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let events = &self.inner.events;
+        let position_ids: Vec<String> = events
+            .iter()
+            .map(|e| e.position_id.as_str().to_owned())
+            .collect();
+        let instrument_ids: Vec<String> = events
+            .iter()
+            .map(|e| e.instrument_id.as_str().to_owned())
+            .collect();
+        let instrument_types: Vec<String> = events
+            .iter()
+            .map(|e| e.instrument_type.to_string())
+            .collect();
+        let dates: Vec<String> = events.iter().map(|e| e.date.to_string()).collect();
+        let amounts: Vec<f64> = events.iter().map(|e| e.amount.amount()).collect();
+        let currencies: Vec<String> = events
+            .iter()
+            .map(|e| e.amount.currency().to_string())
+            .collect();
+        let kinds: Vec<String> = events.iter().map(|e| e.kind.to_string()).collect();
+        let reset_dates: Vec<Option<String>> = events
+            .iter()
+            .map(|e| e.reset_date.map(|d| d.to_string()))
+            .collect();
+        let accrual_factors: Vec<f64> = events.iter().map(|e| e.accrual_factor).collect();
+        let rates: Vec<Option<f64>> = events.iter().map(|e| e.rate).collect();
+
+        TableBuilder::new()
+            .utf8("position_id", position_ids)?
+            .utf8("instrument_id", instrument_ids)?
+            .utf8("instrument_type", instrument_types)?
+            .utf8("date", dates)?
+            .f64("amount", amounts)?
+            .utf8("currency", currencies)?
+            .utf8("kind", kinds)?
+            .nullable_utf8("reset_date", reset_dates)?
+            .f64("accrual_factor", accrual_factors)?
+            .nullable_f64("rate", rates)?
+            .build()
     }
 }
+
+tabular_methods!(PyPortfolioCashflows);
 
 fn extract_discount_curve_map(
     discount_curves: Option<&Bound<'_, PyDict>>,

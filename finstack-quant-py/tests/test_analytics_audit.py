@@ -36,13 +36,13 @@ def panel(values: list[float], frequency: str = "daily") -> Performance:
 def test_empirical_tail_mass_is_preserved_in_metrics_and_summary() -> None:
     values = [-0.2] + [0.0] * 99
     perf = panel(values)
-    assert perf.expected_shortfall(0.95).iloc[0] == pytest.approx(-0.04)
-    assert perf.to_dataframe(risk_free_rate=0.0, mar=0.0, omega_threshold=0.0, confidence=0.95).loc[
+    assert perf.expected_shortfall(0.95)["A"] == pytest.approx(-0.04)
+    assert perf.to_pandas(risk_free_rate=0.0, mar=0.0, omega_threshold=0.0, confidence=0.95).loc[
         "A", "expected_shortfall"
     ] == pytest.approx(-0.04)
     values[1] = 0.25
-    assert panel(values).cdar(0.95).iloc[0] == pytest.approx(-0.04)
-    assert panel([-0.2, -0.1, 0.1, 0.2]).expected_shortfall(0.625).iloc[0] == pytest.approx(-0.25 / 1.5)
+    assert panel(values).cdar(0.95)["A"] == pytest.approx(-0.04)
+    assert panel([-0.2, -0.1, 0.1, 0.2]).expected_shortfall(0.625)["A"] == pytest.approx(-0.25 / 1.5)
 
 
 @pytest.mark.parametrize("invalid", [math.nan, math.inf, -math.inf])
@@ -60,14 +60,14 @@ def test_invalid_scalar_inputs_raise_validation_errors(invalid: float) -> None:
 def test_singleton_sharpe_agrees_with_panel_and_rolling() -> None:
     assert math.isnan(sharpe([0.01], 0.0, 252.0))
     assert math.isnan(sortino([0.01], 0.0, 252.0))
-    assert math.isnan(panel([0.01]).sharpe(risk_free_rate=0.0).iloc[0])
+    assert math.isnan(panel([0.01]).sharpe(risk_free_rate=0.0)["A"])
     assert all(math.isnan(v) for v in panel([0.01, 0.02]).rolling_sharpe(0, window=1, risk_free_rate=0.0).values)
 
 
 def test_zero_drawdown_ratios_distinguish_undefined_and_infinite() -> None:
     for metric, args in (("calmar", ()), ("martin_ratio", (0.0,))):
-        assert math.isnan(getattr(panel([0.0, 0.0, 0.0]), metric)(*args).iloc[0])
-        ratio = getattr(panel([0.01, 0.01, 0.01]), metric)(*args).iloc[0]
+        assert math.isnan(getattr(panel([0.0, 0.0, 0.0]), metric)(*args)["A"])
+        ratio = getattr(panel([0.01, 0.01, 0.01]), metric)(*args)["A"]
         assert ratio == math.inf
 
 
@@ -95,7 +95,7 @@ def test_extreme_wealth_preserves_annualized_growth_and_relative_drawdowns() -> 
             frequency="annual",
             benchmark_ticker="A",
         )
-        result = perf.cagr().iloc[0]
+        result = perf.cagr()["A"]
         assert math.isfinite(result)
         assert result == pytest.approx(expected, rel=1e-12)
 
@@ -111,11 +111,11 @@ def test_extreme_wealth_preserves_annualized_growth_and_relative_drawdowns() -> 
 
     perf = panel([1e300, 1e300, -0.5, 0.0])
     assert perf.get_drawdown_series()[0] == pytest.approx([0.0, 0.0, -0.5, -0.5])
-    assert perf.max_drawdown().iloc[0] == pytest.approx(-0.5)
+    assert perf.max_drawdown()["A"] == pytest.approx(-0.5)
     assert perf.drawdown_details(0, n=5)[0].max_drawdown == pytest.approx(-0.5)
     assert panel([1e-18, 1e-18]).cumulative_returns()[0][-1] == pytest.approx(2e-18, rel=1e-12, abs=0.0)
     near_wipeout = -0.9999999999999999
-    mean = panel([near_wipeout] + [0.0] * 7).geometric_mean().iloc[0]
+    mean = panel([near_wipeout] + [0.0] * 7).geometric_mean()["A"]
     assert mean > -1.0
     assert mean == pytest.approx((1.0 + near_wipeout) ** (1 / 8) - 1, abs=1e-12)
 
@@ -196,9 +196,9 @@ def test_restoration_validates_state_and_rebuilds_caches() -> None:
         with pytest.raises(ValueError, match="invalid Performance JSON"):
             Performance.from_json(json.dumps(changed))
     state["returns"][0][0] = -0.3
-    assert Performance.from_json(json.dumps(state)).max_drawdown().iloc[0] == pytest.approx(-0.3)
+    assert Performance.from_json(json.dumps(state)).max_drawdown()["A"] == pytest.approx(-0.3)
     restored = pickle.loads(pickle.dumps(perf))  # noqa: S301 - trusted in-process round trip
-    assert restored.max_drawdown().iloc[0] == pytest.approx(-0.2)
+    assert restored.max_drawdown()["A"] == pytest.approx(-0.2)
 
 
 def test_initial_drawdown_and_performance_conventions() -> None:
@@ -211,7 +211,7 @@ def test_initial_drawdown_and_performance_conventions() -> None:
     assert episode.start == dates(3)[0]
     assert episode.duration_days == 2
     assert not hasattr(episode, "truncated_at_start")
-    assert panel([0.01, -0.02, 0.03, 0.01], "monthly").m_squared(0.12).iloc[0] == pytest.approx(0.09)
+    assert panel([0.01, -0.02, 0.03, 0.01], "monthly").m_squared(0.12)["A"] == pytest.approx(0.09)
     assert panel([0.02, 0.02, -0.01, 0.0]).period_stats(0, "daily").kelly_risk_fraction == pytest.approx(0.5)
 
 

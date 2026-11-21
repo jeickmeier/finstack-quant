@@ -10,10 +10,11 @@
 //! The free functions are thin twins over the same Rust entry points for
 //! callers holding plain nested lists.
 
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::macros::wire_methods;
-use crate::bindings::pandas_utils::{dates_to_datetime_index, dict_to_dataframe};
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::{core_to_py, value_error};
 use finstack_quant_core::dates::Tenor;
 use finstack_quant_core::math::linalg::rows_of;
@@ -74,6 +75,68 @@ impl PyYieldPanel {
     }
 }
 
+fn parse_tenor_labels(py: Python<'_>, columns: &[Bound<'_, PyAny>]) -> PyResult<Vec<f64>> {
+    let float = py.import("builtins")?.getattr("float")?;
+    columns
+        .iter()
+        .map(|label| {
+            if let Ok(value) = float.call1((label,)) {
+                return value.extract::<f64>();
+            }
+            let label = label.extract::<&str>().map_err(|_| {
+                value_error(format!(
+                    "YieldPanel.from_dataframe: invalid tenor column {label}"
+                ))
+            })?;
+            Tenor::parse(label)
+                .map(|tenor| tenor.to_years_approx())
+                .map_err(core_to_py)
+        })
+        .collect()
+}
+
+fn parse_tenor_strings(columns: &[String]) -> PyResult<Vec<f64>> {
+    columns
+        .iter()
+        .map(|label| {
+            if let Ok(value) = label.parse::<f64>() {
+                return Ok(value);
+            }
+            Tenor::parse(label)
+                .map(|tenor| tenor.to_years_approx())
+                .map_err(core_to_py)
+        })
+        .collect()
+}
+
+fn panel_to_yield_panel(
+    panel: crate::bindings::dataframe_utils::DataFramePanel,
+) -> PyResult<PyYieldPanel> {
+    let tenors = parse_tenor_strings(&panel.ticker_names)?;
+    let ncols = panel.columns.len();
+    let nrows = panel.dates.len();
+    let yields: Vec<Vec<f64>> = (0..nrows)
+        .map(|r| (0..ncols).map(|c| panel.columns[c][r]).collect())
+        .collect();
+    YieldPanel::from_rows(tenors, yields, Some(panel.dates))
+        .map(PyYieldPanel::from_inner)
+        .map_err(core_to_py)
+}
+
+fn undated_frame_to_yield_panel(cols: &[String], df: &Bound<'_, PyAny>) -> PyResult<PyYieldPanel> {
+    let tenors = parse_tenor_strings(cols)?;
+    let (flat, _nrows, ncols) =
+        crate::bindings::dataframe_utils::extract_2d_f64(df, "yields")?.unwrap_or_default();
+    let yields = if ncols == 0 {
+        Vec::new()
+    } else {
+        flat.chunks_exact(ncols).map(<[f64]>::to_vec).collect()
+    };
+    YieldPanel::from_rows(tenors, yields, None)
+        .map(PyYieldPanel::from_inner)
+        .map_err(core_to_py)
+}
+
 #[pymethods]
 impl PyYieldPanel {
     #[new]
@@ -91,35 +154,95 @@ impl PyYieldPanel {
     }
 
     #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.from_dataframe")]
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, df)")]
-    fn from_dataframe(_cls: &Bound<'_, PyType>, df: &Bound<'_, PyAny>) -> PyResult<Self> {
+    #[staticmethod]
+    #[pyo3(signature = (df, *, date_col = None))]
+    #[pyo3(text_signature = "(df, *, date_col=None)")]
+    fn from_dataframe(df: &Bound<'_, PyAny>, date_col: Option<&str>) -> PyResult<Self> {
+        use crate::bindings::dataframe_utils::{
+            arrow_to_pyarrow_table, extract_dataframe_panel, has_arrow_c_stream,
+            is_polars_dataframe, is_polars_date_dtype, pandas_column_names, require_polars_module,
+            resolve_arrow_date_col, resolve_pandas_date_col_idx, resolve_polars_date_col,
+            table_column_names,
+        };
         let py = df.py();
+        if is_polars_dataframe(df)? {
+            let pl = require_polars_module(py)?;
+            let cols: Vec<String> = df.getattr("columns")?.extract()?;
+            let mut has_auto_date = date_col.is_some();
+            if !has_auto_date {
+                let mut date_matches = 0usize;
+                for col in &cols {
+                    let dtype = df.get_item(col)?.getattr("dtype")?;
+                    if is_polars_date_dtype(&pl, &dtype)? {
+                        date_matches += 1;
+                    }
+                }
+                if date_matches > 1 {
+                    let _ = resolve_polars_date_col(&pl, df, &cols, None)?;
+                }
+                has_auto_date = date_matches == 1;
+            }
+            if has_auto_date {
+                let panel = extract_dataframe_panel(
+                    df,
+                    date_col,
+                    "YieldPanel.from_dataframe expects a DataFrame with tenor columns",
+                )?;
+                return panel_to_yield_panel(panel);
+            }
+            return undated_frame_to_yield_panel(&cols, df);
+        }
+        if has_arrow_c_stream(df)? {
+            let tbl = arrow_to_pyarrow_table(py, df)?;
+            let pa_types = py.import("pyarrow")?.getattr("types")?;
+            let cols = table_column_names(df)?;
+            let mut has_date = date_col.is_some();
+            if !has_date {
+                let mut date_matches = 0usize;
+                for col in &cols {
+                    let dtype = tbl.call_method1("column", (col,))?.getattr("type")?;
+                    let is_d: bool = pa_types.call_method1("is_date", (&dtype,))?.extract()?;
+                    let is_ts: bool = pa_types
+                        .call_method1("is_timestamp", (&dtype,))?
+                        .extract()?;
+                    if is_d || is_ts {
+                        date_matches += 1;
+                    }
+                }
+                if date_matches > 1 {
+                    let _ = resolve_arrow_date_col(&pa_types, &tbl, &cols, None)?;
+                }
+                has_date = date_matches == 1;
+            }
+            if has_date {
+                let panel = extract_dataframe_panel(
+                    df,
+                    date_col,
+                    "YieldPanel.from_dataframe expects a DataFrame with tenor columns",
+                )?;
+                return panel_to_yield_panel(panel);
+            }
+            return undated_frame_to_yield_panel(&cols, df);
+        }
         let df_type = py.import("pandas")?.getattr("DataFrame")?;
         if !df.is_instance(&df_type)? {
             return Err(pyo3::exceptions::PyTypeError::new_err(
-                "YieldPanel.from_dataframe expects a pandas DataFrame with tenor columns",
+                "YieldPanel.from_dataframe expects a pandas DataFrame, Polars DataFrame, or Arrow table with tenor columns",
             ));
+        }
+        if let Some(date_name) = date_col {
+            let names = pandas_column_names(df)?;
+            let _ = resolve_pandas_date_col_idx(&names, date_name)?;
+            let panel = extract_dataframe_panel(
+                df,
+                Some(date_name),
+                "YieldPanel.from_dataframe expects a DataFrame with tenor columns",
+            )?;
+            return panel_to_yield_panel(panel);
         }
         let columns: Vec<Bound<'_, PyAny>> =
             df.getattr("columns")?.call_method0("tolist")?.extract()?;
-        let float = py.import("builtins")?.getattr("float")?;
-        let tenors = columns
-            .iter()
-            .map(|label| {
-                if let Ok(value) = float.call1((label,)) {
-                    return value.extract::<f64>();
-                }
-                let label = label.extract::<&str>().map_err(|_| {
-                    value_error(format!(
-                        "YieldPanel.from_dataframe: invalid tenor column {label}"
-                    ))
-                })?;
-                Tenor::parse(label)
-                    .map(|tenor| tenor.to_years_approx())
-                    .map_err(core_to_py)
-            })
-            .collect::<PyResult<Vec<f64>>>()?;
+        let tenors = parse_tenor_labels(py, &columns)?;
         let index = df.getattr("index")?;
         let dates = if index.is_instance(&py.import("pandas")?.getattr("RangeIndex")?)? {
             None
@@ -182,8 +305,9 @@ impl PyYieldPanel {
         Array2::from_shape_fn(yields.shape(), |index| yields[index]).into_pyarray(py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPanel.to_pandas")]
+    #[pyo3(text_signature = "($self)")]
+    fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         for (j, tenor) in self.inner.tenors.iter().enumerate() {
             let column: Vec<f64> = (0..self.inner.num_dates())
@@ -191,11 +315,17 @@ impl PyYieldPanel {
                 .collect();
             data.set_item(*tenor, column)?;
         }
-        let index = match &self.inner.dates {
-            Some(dates) => Some(dates_to_datetime_index(py, dates)?),
-            None => None,
-        };
-        dict_to_dataframe(py, &data, index)
+        let pd = py.import("pandas")?;
+        let kwargs = PyDict::new(py);
+        if let Some(dates) = &self.inner.dates {
+            let py_dates = dates
+                .iter()
+                .map(|&d| date_to_py(py, d))
+                .collect::<PyResult<Vec<_>>>()?;
+            let index = pd.getattr("DatetimeIndex")?.call1((py_dates,))?;
+            kwargs.set_item("index", index)?;
+        }
+        pd.getattr("DataFrame")?.call((data,), Some(&kwargs))
     }
 
     fn __repr__(&self) -> String {
@@ -213,6 +343,28 @@ impl PyYieldPanel {
     }
 }
 
+impl PyYieldPanel {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let mut builder = TableBuilder::new();
+        if let Some(dates) = &self.inner.dates {
+            builder = builder.date("date", dates)?;
+        }
+        for (j, tenor) in self.inner.tenors.iter().enumerate() {
+            let column: Vec<f64> = (0..self.inner.num_dates())
+                .map(|i| self.inner.yields[(i, j)])
+                .collect();
+            builder = builder.f64(&tenor.to_string(), column)?;
+        }
+        builder.build()
+    }
+}
+
+tabular_methods!(
+    PyYieldPanel,
+    "YieldPanel",
+    module = "finstack_quant.models.rates.dtsm",
+    custom_pandas
+);
 wire_methods!(
     PyYieldPanel,
     YieldPanel,
@@ -300,17 +452,20 @@ impl PyFactorTimeSeries {
         self.inner.num_dates()
     }
 
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        data.set_item("level", self.column(0))?;
-        data.set_item("slope", self.column(1))?;
-        data.set_item("curvature", self.column(2))?;
-        let index = match &self.inner.dates {
-            Some(dates) => Some(dates_to_datetime_index(py, dates)?),
-            None => None,
-        };
-        dict_to_dataframe(py, &data, index)
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "FactorTimeSeries.to_pandas")]
+    #[pyo3(text_signature = "($self)")]
+    fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let bound = Bound::new(py, self.to_arrow_table()?)?;
+        let frame = PyArrowTable::to_pandas(&bound, py)?;
+        if self.inner.dates.is_some() {
+            let dates_col = frame.call_method1("pop", ("date",))?;
+            let index = py
+                .import("pandas")?
+                .getattr("DatetimeIndex")?
+                .call1((dates_col,))?;
+            frame.setattr("index", index)?;
+        }
+        Ok(frame)
     }
 
     fn __repr__(&self) -> String {
@@ -323,6 +478,26 @@ impl PyFactorTimeSeries {
     }
 }
 
+impl PyFactorTimeSeries {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let mut builder = TableBuilder::new();
+        if let Some(dates) = &self.inner.dates {
+            builder = builder.date("date", dates)?;
+        }
+        builder
+            .f64("level", self.column(0))?
+            .f64("slope", self.column(1))?
+            .f64("curvature", self.column(2))?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyFactorTimeSeries,
+    "FactorTimeSeries",
+    module = "finstack_quant.models.rates.dtsm",
+    custom_pandas
+);
 wire_methods!(
     PyFactorTimeSeries,
     FactorTimeSeries,
@@ -522,21 +697,27 @@ impl PyYieldForecast {
         self.inner.upper_95.clone()
     }
 
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldForecast.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        data.set_item("tenor", self.inner.tenors.clone())?;
-        data.set_item("yield", self.inner.yields.clone())?;
-        data.set_item("lower_95", self.inner.lower_95.clone())?;
-        data.set_item("upper_95", self.inner.upper_95.clone())?;
-        dict_to_dataframe(py, &data, None)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("YieldForecast", &self.inner)
     }
 }
 
+impl PyYieldForecast {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .f64("tenor", self.inner.tenors.clone())?
+            .f64("yield", self.inner.yields.clone())?
+            .f64("lower_95", self.inner.lower_95.clone())?
+            .f64("upper_95", self.inner.upper_95.clone())?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyYieldForecast,
+    "YieldForecast",
+    module = "finstack_quant.models.rates.dtsm"
+);
 wire_methods!(
     PyYieldForecast,
     YieldForecast,
@@ -681,9 +862,10 @@ impl PyYieldPca {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        loadings_dataframe(py, &rows_of(self.inner.loadings()), self.inner.tenors())
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPca.to_pandas")]
+    #[pyo3(text_signature = "($self)")]
+    fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        loadings_pandas(py, self.to_arrow_table()?)
     }
 
     fn __repr__(&self) -> String {
@@ -696,6 +878,18 @@ impl PyYieldPca {
     }
 }
 
+impl PyYieldPca {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        loadings_table(&rows_of(self.inner.loadings()), self.inner.tenors())
+    }
+}
+
+tabular_methods!(
+    PyYieldPca,
+    "YieldPca",
+    module = "finstack_quant.models.rates.dtsm",
+    custom_pandas
+);
 wire_methods!(
     PyYieldPca,
     YieldPca,
@@ -703,19 +897,22 @@ wire_methods!(
     module = "finstack_quant.models.rates.dtsm"
 );
 
-fn loadings_dataframe<'py>(
-    py: Python<'py>,
-    loadings: &[Vec<f64>],
-    tenors: &[f64],
-) -> PyResult<Bound<'py, PyAny>> {
+fn loadings_table(loadings: &[Vec<f64>], tenors: &[f64]) -> PyResult<PyArrowTable> {
     let n_components = loadings.first().map_or(0, Vec::len);
-    let data = PyDict::new(py);
+    let mut builder = TableBuilder::new().f64("tenor", tenors.to_vec())?;
     for (k, label) in component_labels(n_components).iter().enumerate() {
         let column: Vec<f64> = loadings.iter().map(|row| row[k]).collect();
-        data.set_item(label, column)?;
+        builder = builder.f64(label, column)?;
     }
-    let index = PyList::new(py, tenors)?;
-    dict_to_dataframe(py, &data, Some(index.into_any()))
+    builder.build()
+}
+
+fn loadings_pandas<'py>(py: Python<'py>, table: PyArrowTable) -> PyResult<Bound<'py, PyAny>> {
+    let bound = Bound::new(py, table)?;
+    let frame = PyArrowTable::to_pandas(&bound, py)?;
+    frame
+        .call_method1("set_index", ("tenor",))?
+        .call_method1("rename_axis", (py.None(),))
 }
 
 #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView")]
@@ -787,20 +984,22 @@ impl PyYieldPcaView {
         self.inner.eigenvalues.len()
     }
 
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        loadings_dataframe(py, &self.inner.loadings, &self.inner.tenors)
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.to_pandas")]
+    #[pyo3(text_signature = "($self)")]
+    fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        loadings_pandas(py, self.to_arrow_table()?)
     }
 
-    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.to_scores_dataframe")]
-    fn to_scores_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    #[doc = pydoc!("finstack_quant.models.rates.dtsm", "YieldPcaView.to_scores_table")]
+    #[pyo3(text_signature = "($self)")]
+    fn to_scores_table(&self) -> PyResult<PyArrowTable> {
         let n_components = self.inner.eigenvalues.len();
-        let data = PyDict::new(py);
+        let mut builder = TableBuilder::new();
         for (k, label) in component_labels(n_components).iter().enumerate() {
             let column: Vec<f64> = self.inner.scores.iter().map(|row| row[k]).collect();
-            data.set_item(label, column)?;
+            builder = builder.f64(label, column)?;
         }
-        dict_to_dataframe(py, &data, None)
+        builder.build()
     }
 
     fn __repr__(&self) -> String {
@@ -813,6 +1012,18 @@ impl PyYieldPcaView {
     }
 }
 
+impl PyYieldPcaView {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        loadings_table(&self.inner.loadings, &self.inner.tenors)
+    }
+}
+
+tabular_methods!(
+    PyYieldPcaView,
+    "YieldPcaView",
+    module = "finstack_quant.models.rates.dtsm",
+    custom_pandas
+);
 wire_methods!(
     PyYieldPcaView,
     YieldPcaView,

@@ -21,7 +21,9 @@ globs:
   plain JS object), not JSON strings; only `_json`/`*Json`-suffixed wire
   surfaces return JSON, and each must have a public typed twin. Every result
   wrapper carries typed getters + `to_json` + `from_json` (`#[staticmethod]`),
-  plus `to_dataframe()` in Python (and `to_series()` for 1-D labeled vectors).
+  plus unified Arrow/tabular exits (`to_arrow()`, `to_pandas()`, `to_polars()`,
+  `to_pyarrow()`) in Python (and `to_series()` returning `LabeledSeries` for
+  1-D labeled vectors).
 - In WASM, never call `serde_wasm_bindgen::to_value` directly — always
   `crate::utils::to_js_value`. The raw serializer emits ES `Map`s that
   `JSON.stringify` drops silently.

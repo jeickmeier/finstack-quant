@@ -3,7 +3,7 @@
 Series inputs (``returns``, ``volumes``) accept any sequence of floats,
 including numpy arrays and pandas Series. Results are typed wrappers
 (:class:`LvarBangiaScalar`, :class:`ImpactEstimate`,
-:class:`ExecutionTrajectory`) with ``to_series()`` / ``to_dataframe()``,
+:class:`ExecutionTrajectory`) with ``to_series()`` / ``to_arrow()`` / ``to_pandas()`` / ``to_polars()`` / ``to_pyarrow()``,
 ``to_json()`` / ``from_json()`` and pickle support.
 
 Examples
@@ -18,6 +18,9 @@ from __future__ import annotations
 from typing import Any, Sequence
 
 import pandas as pd
+import polars as pl
+
+from finstack_quant.core.table import ArrowTable, LabeledSeries
 
 __all__ = [
     "AlmgrenChrissModel",
@@ -745,32 +748,52 @@ class ImpactEstimate:
         """
         ...
 
-    def to_series(self) -> pd.Series:
-        """Return the five cost fields as a float Series named ``impact``.
+    def to_series(self) -> LabeledSeries:
+        """Return the five cost fields as a named :class:`~finstack_quant.core.table.LabeledSeries`.
 
         Returns
         -------
-        pandas.Series
-            Index ``permanent_impact``, ``temporary_impact``, ``total_cost``,
+        LabeledSeries
+            Named ``"impact"`` with index name ``"metric"`` and labels
+            ``permanent_impact``, ``temporary_impact``, ``total_cost``,
             ``cost_bp``, ``execution_risk``.
 
         Raises
         ------
         ValueError
-            If the result cannot be converted to the tabular form.
-        ImportError
-            If pandas is not installed in the environment.
+            If the result cannot be converted to the series form.
 
         Examples
         --------
         >>> from finstack_quant.models.liquidity import almgren_chriss_impact
-        >>> almgren_chriss_impact(100_000, 1_000_000, 0.20, 5.0, 0.10, 0.20).to_series().index.tolist()
+        >>> almgren_chriss_impact(100_000, 1_000_000, 0.20, 5.0, 0.10, 0.20).to_series().index
         ['permanent_impact', 'temporary_impact', 'total_cost', 'cost_bp', 'execution_risk']
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
-        """Return a single-row DataFrame with the five cost columns.
+    def to_arrow(self) -> ArrowTable:
+        """Return a single-row :class:`~finstack_quant.core.table.ArrowTable` with the five cost columns.
+
+        Returns
+        -------
+        ArrowTable
+            One row; columns in the order listed on :meth:`to_series`.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to the Arrow table form.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.liquidity import almgren_chriss_impact
+        >>> almgren_chriss_impact(100_000, 1_000_000, 0.20, 5.0, 0.10, 0.20).to_arrow().num_rows
+        1
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """Return a single-row ``pandas.DataFrame`` with the five cost columns (lazily imports ``pandas``).
 
         Returns
         -------
@@ -787,11 +810,48 @@ class ImpactEstimate:
         Examples
         --------
         >>> from finstack_quant.models.liquidity import almgren_chriss_impact
-        >>> almgren_chriss_impact(100_000, 1_000_000, 0.20, 5.0, 0.10, 0.20).to_dataframe().shape
+        >>> almgren_chriss_impact(100_000, 1_000_000, 0.20, 5.0, 0.10, 0.20).to_pandas().shape
         (1, 5)
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """Return a single-row ``polars.DataFrame`` with the five cost columns (lazily imports ``polars``).
+
+        Returns
+        -------
+        polars.DataFrame
+            One row; columns in the order listed on :meth:`to_series`.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to the tabular form.
+        ImportError
+            If polars is not installed in the environment.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Return a single-row ``pyarrow.Table`` with the five cost columns (lazily imports ``pyarrow``).
+
+        Returns
+        -------
+        pyarrow.Table
+            One row; columns in the order listed on :meth:`to_series`.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to the tabular form.
+        ImportError
+            If pyarrow is not installed in the environment.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """Serialize to the canonical JSON wire format.
 
@@ -965,8 +1025,40 @@ class ExecutionTrajectory:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
-        """Return the schedule as a DataFrame with ``t``, ``holdings``, ``trade`` columns.
+    def to_arrow(self) -> ArrowTable:
+        """Return the schedule as an :class:`~finstack_quant.core.table.ArrowTable` with ``t``, ``holdings``, ``trade`` columns.
+
+        Returns
+        -------
+        ArrowTable
+            One row per bucket boundary; ``trade`` is the quantity executed in
+            the bucket ending at ``t`` (``0.0`` on the first row).
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to the Arrow table form.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.liquidity import KyleLambdaModel, LiquidityProfile, TradeParams
+        >>> profile = LiquidityProfile(
+        ...     instrument_id="ACME",
+        ...     mid=100.0,
+        ...     bid=99.95,
+        ...     ask=100.05,
+        ...     avg_daily_volume=1e6,
+        ...     avg_trade_size=500.0,
+        ...     spread_volatility=0.0,
+        ... )
+        >>> traj = KyleLambdaModel(0.001).optimal_trajectory(TradeParams(1_000.0, 2.0, 0.02, profile), 4)
+        >>> traj.to_arrow().column_names()
+        ['t', 'holdings', 'trade']
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """Return the schedule as a ``pandas.DataFrame`` with ``t``, ``holdings``, ``trade`` columns (lazily imports ``pandas``).
 
         Returns
         -------
@@ -994,11 +1086,50 @@ class ExecutionTrajectory:
         ...     spread_volatility=0.0,
         ... )
         >>> traj = KyleLambdaModel(0.001).optimal_trajectory(TradeParams(1_000.0, 2.0, 0.02, profile), 4)
-        >>> traj.to_dataframe().columns.tolist()
+        >>> traj.to_pandas().columns.tolist()
         ['t', 'holdings', 'trade']
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """Return the schedule as a ``polars.DataFrame`` with ``t``, ``holdings``, ``trade`` columns (lazily imports ``polars``).
+
+        Returns
+        -------
+        polars.DataFrame
+            One row per bucket boundary; ``trade`` is the quantity executed in
+            the bucket ending at ``t`` (``0.0`` on the first row).
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to the tabular form.
+        ImportError
+            If polars is not installed in the environment.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Return the schedule as a ``pyarrow.Table`` with ``t``, ``holdings``, ``trade`` columns (lazily imports ``pyarrow``).
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per bucket boundary; ``trade`` is the quantity executed in
+            the bucket ending at ``t`` (``0.0`` on the first row).
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to the tabular form.
+        ImportError
+            If pyarrow is not installed in the environment.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """Serialize to the canonical JSON wire format.
 
@@ -1160,31 +1291,51 @@ class LvarBangiaScalar:
         """
         ...
 
-    def to_series(self) -> pd.Series:
-        """Return the four fields as a float Series named ``lvar``.
+    def to_series(self) -> LabeledSeries:
+        """Return the four fields as a named :class:`~finstack_quant.core.table.LabeledSeries`.
 
         Returns
         -------
-        pandas.Series
-            Index ``var``, ``spread_cost``, ``lvar``, ``lvar_ratio``.
+        LabeledSeries
+            Named ``"lvar"`` with index name ``"metric"`` and labels
+            ``var``, ``spread_cost``, ``lvar``, ``lvar_ratio``.
 
         Raises
         ------
         ValueError
-            If the result cannot be converted to the tabular form.
-        ImportError
-            If pandas is not installed in the environment.
+            If the result cannot be converted to the series form.
 
         Examples
         --------
         >>> from finstack_quant.models.liquidity import lvar_bangia
-        >>> lvar_bangia(-100.0, 0.01, 0.005, 0.99, 1_000_000).to_series().index.tolist()
+        >>> lvar_bangia(-100.0, 0.01, 0.005, 0.99, 1_000_000).to_series().index
         ['var', 'spread_cost', 'lvar', 'lvar_ratio']
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
-        """Return a single-row DataFrame with the four columns.
+    def to_arrow(self) -> ArrowTable:
+        """Return a single-row :class:`~finstack_quant.core.table.ArrowTable` with the four columns.
+
+        Returns
+        -------
+        ArrowTable
+            One row with columns ``var``, ``spread_cost``, ``lvar``, ``lvar_ratio``.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to the Arrow table form.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.liquidity import lvar_bangia
+        >>> lvar_bangia(-100.0, 0.01, 0.005, 0.99, 1_000_000).to_arrow().num_rows
+        1
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """Return a single-row ``pandas.DataFrame`` with the four columns (lazily imports ``pandas``).
 
         Read the VaR column as ``df["var"]``; attribute access resolves to
         ``DataFrame.var`` (the variance method).
@@ -1204,11 +1355,48 @@ class LvarBangiaScalar:
         Examples
         --------
         >>> from finstack_quant.models.liquidity import lvar_bangia
-        >>> lvar_bangia(-100.0, 0.01, 0.005, 0.99, 1_000_000).to_dataframe().shape
+        >>> lvar_bangia(-100.0, 0.01, 0.005, 0.99, 1_000_000).to_pandas().shape
         (1, 4)
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """Return a single-row ``polars.DataFrame`` with the four columns (lazily imports ``polars``).
+
+        Returns
+        -------
+        polars.DataFrame
+            One row with columns ``var``, ``spread_cost``, ``lvar``, ``lvar_ratio``.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to the tabular form.
+        ImportError
+            If polars is not installed in the environment.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Return a single-row ``pyarrow.Table`` with the four columns (lazily imports ``pyarrow``).
+
+        Returns
+        -------
+        pyarrow.Table
+            One row with columns ``var``, ``spread_cost``, ``lvar``, ``lvar_ratio``.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to the tabular form.
+        ImportError
+            If pyarrow is not installed in the environment.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """Serialize to the canonical JSON wire format.
 
@@ -1898,7 +2086,7 @@ def lvar_bangia(
     -------
     LvarBangiaScalar
         ``var``, non-negative ``spread_cost``, adjusted ``lvar`` and
-        ``lvar_ratio`` with ``to_series()`` / ``to_dataframe()`` exits.
+        ``lvar_ratio`` with ``to_series()`` / ``to_arrow()`` / ``to_pandas()`` / ``to_polars()`` exits.
 
     Raises
     ------
@@ -1955,7 +2143,7 @@ def almgren_chriss_impact(
     ImpactEstimate
         ``permanent_impact``, ``temporary_impact``, ``total_cost``,
         ``cost_bp`` and ``execution_risk`` with ``to_series()`` /
-        ``to_dataframe()`` exits.
+        ``to_arrow()`` / ``to_pandas()`` / ``to_polars()`` exits.
 
     Raises
     ------

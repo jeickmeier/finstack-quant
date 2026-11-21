@@ -43,9 +43,11 @@ def test_rows_and_frame_carry_each_exit() -> None:
         ("maturity", 100.0),
     ]
     assert ladder.clean_price_pct == 108.0
-    frame = ladder.to_dataframe()
+    frame = ladder.to_pandas()
     assert list(frame["kind"]) == ["call", "call", "call", "maturity"]
     assert frame["is_worst"].sum() == 1
+    assert ladder.to_arrow().num_rows == len(frame)
+    assert ladder.to_polars().height == len(frame)
 
 
 def test_missing_quote_is_a_key_error_as_the_metric_needs_one() -> None:

@@ -232,13 +232,13 @@ def test_empty_detail_dataframes_keep_schema_columns() -> None:
         },
     )
     expected_columns = ["kind", "factor", "sub", "key_a", "key_b", "amount", "currency"]
-    for df in (
-        attr.to_credit_factor_dataframe(),
-        attr.to_carry_detail_dataframe(),
-        attr.to_long_dataframe(),
+    for table in (
+        attr.to_credit_factor_table(),
+        attr.to_carry_detail_table(),
+        attr.to_long_table(),
     ):
-        assert list(df.columns) == expected_columns or len(df) > 0, (
-            f"empty detail frame must carry schema columns, got {list(df.columns)}"
+        assert table.column_names() == expected_columns or table.num_rows > 0, (
+            f"empty detail frame must carry schema columns, got {table.column_names()}"
         )
 
 
@@ -258,9 +258,9 @@ def test_attribute_pnl_typed_inputs_many_and_bridge() -> None:
     )
     assert attr.t0 == date.fromisoformat(AS_OF_T0)
     assert attr.required_metrics() == []
-    assert "sub" in attr.to_long_dataframe().columns
+    assert "sub" in attr.to_long_table().column_names()
 
-    table = attribute_pnl_many(
+    table_arrow = attribute_pnl_many(
         {
             "market_t0": market_t0,
             "market_t1": market_t1,
@@ -270,8 +270,10 @@ def test_attribute_pnl_typed_inputs_many_and_bridge() -> None:
         },
         [_bond_json(), _bond_json()],
     )
-    assert len(table) == 2
+    assert table_arrow.num_rows == 2
+    table = table_arrow.to_pandas()
     assert table["total_pnl"].iloc[0] == pytest.approx(attr.total_pnl)
+    assert table_arrow.to_polars().height == 2
 
     bridge = pnl_bridge(_bond_json(), market_t0, market_t1, AS_OF_T0, AS_OF_T1, "USD")
     assert str(bridge.currency) == "USD"
@@ -279,6 +281,8 @@ def test_attribute_pnl_typed_inputs_many_and_bridge() -> None:
 
 
 def test_attribute_return_contribution_json_entrypoint() -> None:
+    from finstack_quant.core.table import LabeledSeries
+
     spec = {
         "as_of": "2026-01-02",
         "weighting": "gross",
@@ -306,9 +310,15 @@ def test_attribute_return_contribution_json_entrypoint() -> None:
     validate_return_contribution_json(json.dumps(spec))
     result = attribute_return_contribution(json.dumps(spec))
     assert attribute_return_contribution(spec).portfolio_return == pytest.approx(result.portfolio_return)
-    assert list(result.to_dataframe().columns) == ["id", "weight", "return", "contribution", "active_contribution"]
-    assert set(result.to_group_dataframe()["dimension"]) == {"sector", "strategy"}
-    assert list(result.to_factor_dataframe()["factor"]) == ["value"]
+    assert list(result.to_pandas().columns) == ["id", "weight", "return", "contribution", "active_contribution"]
+    assert result.to_polars().columns == ["id", "weight", "return", "contribution", "active_contribution"]
+    assert result.to_arrow().column_names() == ["id", "weight", "return", "contribution", "active_contribution"]
+    assert set(result.to_group_table().to_dict()["dimension"]) == {"sector", "strategy"}
+    assert result.to_factor_table().to_dict()["factor"] == ["value"]
+    series = result.to_series()
+    assert isinstance(series, LabeledSeries)
+    assert list(series.to_pandas().index) == ["AAPL.XNAS", "XOM.XNYS"]
+    assert series.to_polars().height == 2
 
     assert isinstance(result, ReturnContributionResult)
     assert result.portfolio_return == pytest.approx(0.0104)
@@ -546,7 +556,7 @@ def test_waterfall_steps_chain_from_pv_t0_and_rebuild_buckets() -> None:
     assert attr.pv_t1 - attr.pv_t0 == pytest.approx(attr.mark_to_market_pnl, abs=1e-8)
     cash = attr.total_pnl - attr.mark_to_market_pnl
 
-    steps = attr.to_waterfall_steps_dataframe()
+    steps = attr.to_waterfall_steps_table().to_pandas()
     assert list(steps.columns) == ["step_index", "factor", "pv_before", "pv_after", "step_pnl", "currency"]
     assert list(steps["factor"]) == ["carry", "rates_curves"]
     assert list(steps["step_index"]) == [0, 1]
@@ -561,9 +571,9 @@ def test_waterfall_steps_chain_from_pv_t0_and_rebuild_buckets() -> None:
     assert [step["factor"] for step in raw] == ["carry", "rates_curves"]
     assert float(raw[1]["step_pnl"]["amount"]) == pytest.approx(attr.rates_curves_pnl, abs=1e-8)
     assert attr.sensitivity_steps == []
-    assert attr.to_sensitivity_steps_dataframe().empty
+    assert attr.to_sensitivity_steps_table().num_rows == 0
 
-    wide = attr.to_dataframe()
+    wide = attr.to_pandas()
     assert wide["pv_t0"].iloc[0] == pytest.approx(attr.pv_t0)
     assert wide["pv_t1"].iloc[0] == pytest.approx(attr.pv_t1)
 
@@ -585,9 +595,9 @@ def test_taylor_sensitivity_steps_rebuild_rates_bucket() -> None:
         },
     )
     assert attr.waterfall_steps == []
-    assert attr.to_waterfall_steps_dataframe().empty
+    assert attr.to_waterfall_steps_table().num_rows == 0
 
-    frame = attr.to_sensitivity_steps_dataframe()
+    frame = attr.to_sensitivity_steps_table().to_pandas()
     assert list(frame.columns) == [
         "step_index",
         "factor",
@@ -639,6 +649,10 @@ def test_typed_attribution_reuses_snapshots_in_single_and_batch_calls() -> None:
     inputs = AttributionInputs(opening, closing, date.fromisoformat(AS_OF_T0), AS_OF_T1, wire["method"])
     expected = attribute_pnl(instrument, wire)
     assert attribute_pnl(instrument, inputs).to_json() == expected.to_json()
-    pd.testing.assert_frame_equal(attribute_pnl_many(inputs, [instrument]), attribute_pnl_many(wire, [instrument]))
+    assert attribute_pnl_many(inputs, [instrument]).to_records() == attribute_pnl_many(wire, [instrument]).to_records()
+    pd.testing.assert_frame_equal(
+        attribute_pnl_many(inputs, [instrument]).to_pandas(),
+        attribute_pnl_many(wire, [instrument]).to_pandas(),
+    )
     closing.insert(DiscountCurve.flat("USD-OIS", AS_OF_T1, 0.08, "act_365f"))
     assert attribute_pnl(instrument, inputs).to_json() == expected.to_json()

@@ -309,24 +309,21 @@ impl PyMertonMcResult {
     pub(crate) fn from_inner(inner: MertonMcResult) -> Self {
         Self { inner }
     }
+
+    pub(crate) fn to_arrow_table(&self) -> PyResult<crate::bindings::core::table::PyArrowTable> {
+        let table = self.inner.to_table().map_err(crate::errors::core_to_py)?;
+        crate::bindings::core::table::PyArrowTable::from_envelope(&table)
+    }
 }
+
+crate::bindings::macros::tabular_methods!(
+    PyMertonMcResult,
+    "MertonMcResult",
+    module = "finstack_quant.valuations.instruments._merton_mc"
+);
 
 #[pymethods]
 impl PyMertonMcResult {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcResult.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::core::table::envelope_to_pandas(
-            py,
-            &self.inner.to_table().map_err(crate::errors::core_to_py)?,
-        )
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcResult._repr_html_")]
-    fn _repr_html_<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        self.to_dataframe(py)?.call_method0("_repr_html_")
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// The inner type is not `Serialize`, so the headline results are
@@ -424,7 +421,7 @@ impl PyMertonMcCalibrationSpec {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcCalibrationSpec.target")]
     #[getter]
     fn target<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.target)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.target)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcCalibrationSpec.from_json")]
@@ -445,7 +442,7 @@ impl PyMertonMcCalibrationSpec {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcCalibrationSpec.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcCalibrationSpec.__reduce__")]
@@ -583,7 +580,7 @@ impl PyMertonMcConfig {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcConfig.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._merton_mc", "MertonMcConfig.from_json")]

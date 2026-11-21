@@ -72,13 +72,13 @@ impl PyPrivateMarketsFund {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_private_markets_fund", "PrivateMarketsFund.waterfall_spec")]
     #[getter]
     fn waterfall_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.waterfall_spec)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.waterfall_spec)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_private_markets_fund", "PrivateMarketsFund.events")]
     #[getter]
     fn events<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.events)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.events)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_private_markets_fund", "PrivateMarketsFund.discount_curve_id")]

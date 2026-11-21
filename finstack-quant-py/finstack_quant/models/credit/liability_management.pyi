@@ -19,6 +19,9 @@ from __future__ import annotations
 from typing import Any
 
 import pandas
+import polars as pl
+
+from finstack_quant.core.table import ArrowTable
 
 __all__ = [
     "ExchangeOffer",
@@ -612,30 +615,83 @@ class ExchangeOfferAnalysis:
         """
         ...
 
-    def to_dataframe(self) -> pandas.DataFrame:
-        """
-        Export as a single-row pandas DataFrame.
-
-        Columns: ``exchange_type``, ``old_npv``, ``new_npv``,
-        ``consent_fee``, ``equity_sweetener_value``, ``tender_total``,
-        ``delta_npv``, ``breakeven_recovery``, ``tender_recommended``.
-
-        One offer is one flat record, so a one-row frame is the right
-        shape: ``pd.concat`` over several candidate offers gives a
-        hold-versus-tender comparison table directly.
+    def to_arrow(self) -> ArrowTable:
+        """Export hold-versus-tender economics as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            Single-row frame of the offer's hold-versus-tender economics.
+        ArrowTable
+            Single-row table with ``exchange_type``, ``old_npv``, ``new_npv``,
+            ``consent_fee``, ``equity_sweetener_value``, ``tender_total``,
+            ``delta_npv``, ``breakeven_recovery``, and ``tender_recommended``.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as an Arrow table.
         """
         ...
 
+    def to_pandas(self) -> pandas.DataFrame:
+        """Export hold-versus-tender economics as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Single-row frame with ``exchange_type``, ``old_npv``, ``new_npv``,
+            ``consent_fee``, ``equity_sweetener_value``, ``tender_total``,
+            ``delta_npv``, ``breakeven_recovery``, and ``tender_recommended``.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the result cannot be represented as a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Export hold-versus-tender economics as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Single-row frame with ``exchange_type``, ``old_npv``, ``new_npv``,
+            ``consent_fee``, ``equity_sweetener_value``, ``tender_total``,
+            ``delta_npv``, ``breakeven_recovery``, and ``tender_recommended``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export hold-versus-tender economics as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row table with ``exchange_type``, ``old_npv``, ``new_npv``,
+            ``consent_fee``, ``equity_sweetener_value``, ``tender_total``,
+            ``delta_npv``, ``breakeven_recovery``, and ``tender_recommended``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @staticmethod
     def from_json(json: str) -> ExchangeOfferAnalysis:
         """
@@ -872,21 +928,79 @@ class LeverageImpact:
             If serialization fails.
         """
         ...
-    def to_dataframe(self) -> pandas.DataFrame:
-        """
-        Single-row frame with ``pre_total_debt``, ``post_total_debt``, ``pre_leverage``, ``post_leverage``, ``leverage_reduction``.
+    def to_arrow(self) -> ArrowTable:
+        """Export leverage impact as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            Single-row frame with ``pre_total_debt``, ``post_total_debt``, ``pre_leverage``, ``post_leverage``, ``leverage_reduction``.
+        ArrowTable
+            Single-row table with ``pre_total_debt``, ``post_total_debt``,
+            ``pre_leverage``, ``post_leverage``, and ``leverage_reduction``.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized into a pandas object.
+            If the value cannot be represented as an Arrow table.
         """
         ...
+
+    def to_pandas(self) -> pandas.DataFrame:
+        """Export leverage impact as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Single-row frame with ``pre_total_debt``, ``post_total_debt``,
+            ``pre_leverage``, ``post_leverage``, and ``leverage_reduction``.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the value cannot be represented as a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Export leverage impact as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Single-row frame with ``pre_total_debt``, ``post_total_debt``,
+            ``pre_leverage``, ``post_leverage``, and ``leverage_reduction``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the value cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export leverage impact as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row table with ``pre_total_debt``, ``post_total_debt``,
+            ``pre_leverage``, ``post_leverage``, and ``leverage_reduction``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the value cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 class LmeAnalysis:
     """
@@ -1018,38 +1132,84 @@ class LmeAnalysis:
         """
         ...
 
-    def to_dataframe(self) -> pandas.DataFrame:
-        """
-        Export as a single-row pandas DataFrame.
-
-        Columns: ``lme_type``, ``cost``, ``notional_reduction``,
-        ``discount_capture``, ``discount_capture_pct``,
-        ``remaining_holder_impact_pct``, ``pre_total_debt``,
-        ``post_total_debt``, ``pre_leverage``, ``post_leverage``,
-        ``leverage_reduction``.
-
-        One exercise is one flat record, so a one-row frame is the right
-        shape: ``pd.concat`` over several structures gives a
-        discount-capture comparison table directly.
-
-        The five leverage columns come from :attr:`leverage_impact` and are
-        flattened onto the same row rather than nested. They are ``None``
-        (and therefore ``object`` dtype) when no positive EBITDA was
-        supplied; coerce with ``pd.to_numeric`` before aggregating a mixed
-        set.
+    def to_arrow(self) -> ArrowTable:
+        """Export issuer-side LME economics as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            Single-row frame of the exercise's issuer-side economics.
+        ArrowTable
+            Single-row table with ``lme_type``, ``cost``, ``notional_reduction``,
+            ``discount_capture``, ``discount_capture_pct``, ``remaining_holder_impact_pct``,
+            ``pre_total_debt``, ``post_total_debt``, ``pre_leverage``, ``post_leverage``,
+            and ``leverage_reduction`` (null float64 values when EBITDA is omitted).
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as an Arrow table.
         """
         ...
 
+    def to_pandas(self) -> pandas.DataFrame:
+        """Export issuer-side LME economics as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Single-row frame with ``lme_type``, ``cost``, ``notional_reduction``,
+            ``discount_capture``, ``discount_capture_pct``, ``remaining_holder_impact_pct``,
+            and flattened nullable float64 leverage columns.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the result cannot be represented as a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Export issuer-side LME economics as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Single-row frame with ``lme_type``, ``cost``, ``notional_reduction``,
+            ``discount_capture``, ``discount_capture_pct``, ``remaining_holder_impact_pct``,
+            and flattened nullable leverage columns.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export issuer-side LME economics as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row table with ``lme_type``, ``cost``, ``notional_reduction``,
+            ``discount_capture``, ``discount_capture_pct``, ``remaining_holder_impact_pct``,
+            and flattened nullable leverage columns.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @staticmethod
     def from_json(json: str) -> LmeAnalysis:
         """

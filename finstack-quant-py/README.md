@@ -161,7 +161,7 @@ market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_
 
 result = price_instrument(bond, market, as_of, metrics=["dv01"])
 print(result.instrument_id, round(result.price, 2), result.currency)  # B 1017.07 USD
-frame = result.to_dataframe()
+frame = result.to_pandas()
 ```
 
 ## Result-return contract
@@ -173,8 +173,8 @@ contract, pinned by `tests/parity/test_return_shapes.py` and mirrored by
 | Shape | Meaning |
 |-------|---------|
 | `wrapper` | A typed `Py*` class (`ValuationResult`, `PeriodStats`, …) |
-| `frame` | `pandas.DataFrame` |
-| `series` | `pandas.Series` |
+| `frame` | `pandas.DataFrame` / `polars.DataFrame` / `ArrowTable` |
+| `series` | `LabeledSeries` |
 | `json` | A JSON `str` — legal **only** on a `*_json`-suffixed wire surface, and every such surface must have a typed twin |
 | `scalar` / `list` / `dict` | Plain Python values |
 
@@ -185,8 +185,10 @@ Every result wrapper carries:
 - `to_json()` and `from_json(...)`, where `from_json` is a `@staticmethod`,
 - `__reduce__` via that same JSON path, so results pickle and therefore survive
   `multiprocessing` / `joblib` / `dask` fan-out,
-- `to_dataframe()` where the result is tabular, and `to_series()` for 1-D
-  labeled vectors. Orientation is a parameter (`to_dataframe(orient=...)`),
+- `to_arrow()`, `to_pandas()`, `to_polars()`, and `to_pyarrow()` where the result
+  is tabular (backed by Apache Arrow and implementing `__arrow_c_stream__` /
+  `__arrow_c_schema__`), plus `to_series()` returning a `LabeledSeries` for
+  1-D labeled vectors. Orientation is a parameter (`to_pandas(orient=...)`),
   not a separate method name.
 
 Non-finite metrics (`+inf` profit factor, `NaN` placeholders) round-trip
@@ -342,7 +344,7 @@ primary IntelliSense surface; `py.typed` marks the package as typed. Runtime
 | Config | `core.config` | `FinstackConfig`, `RoundingMode`, `ToleranceConfig` |
 | Curves / context | `core.market_data` | `DiscountCurve`, `ForwardCurve`, `HazardCurve`, `FxMatrix`, `ScalarTimeSeries`, `MarketContext` |
 | Credit models | `models.credit` | Structural-credit models, `moodys_warf_factor`, and nested `scoring`, `pd`, `lgd`, `migration`, `recovery_waterfall`, and `liability_management` modules |
-| Arrow interchange | `core.table` | `ArrowTable` (the module's only export). Instances come from result wrappers elsewhere — `StatementResult.to_arrow_long` / `.to_arrow_wide`, `PortfolioValuation.to_arrow_positions`, `Performance.to_arrow`; consume with `pyarrow.table(...)`, `polars.DataFrame(...)` via the `__arrow_c_stream__` PyCapsule protocol |
+| Arrow interchange | `core.table` | `ArrowTable` and `LabeledSeries`. Instances come from result wrappers elsewhere — `StatementResult.to_arrow(orient=...)`, `PortfolioValuation.to_arrow()`, `Performance.to_arrow()`; consume via `.to_pandas()`, `.to_polars()`, `.to_pyarrow()`, or the `__arrow_c_stream__` PyCapsule protocol |
 | Cashflow schedules | `cashflows.builder` | `CashFlowBuilder`, `ScheduleParams`, `FixedCouponSpec`, `FloatingCouponSpec`, `AmortizationSpec`, … |
 | Pricing | `valuations.instruments` | `price_instrument`, `Bond`, `TermLoan`, `InterestRateSwap`, `Swaption`, `CapFloor`, `CreditDefaultSwap`, `FxForward`, `FxOption`, `EquityOption`, `StructuredCredit`, … |
 | Valuation envelope | `valuations` | `ValuationResult`, `CalibrationEnvelope`, `calibrate` |

@@ -10,10 +10,11 @@ use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::math::interp::InterpStyle;
 use pyo3::prelude::*;
 
-use super::helpers::{TimePoint, columns_to_dataframe, extract_time_point};
+use super::helpers::{TimePoint, columns_to_arrow_table, extract_time_point};
 use crate::bindings::core::dates::daycount::extract_day_count;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::errors::core_to_py;
 
 /// Discount factor curve for present-value calculations.
@@ -426,22 +427,6 @@ impl PyDiscountCurve {
         self.inner.forward(t1, t2).map_err(core_to_py)
     }
 
-    /// Export knots as a pandas ``DataFrame`` with columns ``t`` (years) and ``df``.
-    ///
-    /// Returns
-    /// -------
-    /// pandas.DataFrame
-    ///     One row per knot, in ascending time order.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        columns_to_dataframe(
-            py,
-            &[
-                ("t", self.inner.knots().to_vec()),
-                ("df", self.inner.dfs().to_vec()),
-            ],
-        )
-    }
-
     /// Curve identifier string.
     #[getter]
     fn id(&self) -> &str {
@@ -507,7 +492,7 @@ impl PyDiscountCurve {
     fn rate_calibration<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
             .rate_calibration()
-            .map(|recipe| crate::bindings::pandas_utils::serde_to_py(py, recipe))
+            .map(|recipe| crate::bindings::json_bridge::serde_to_py(py, recipe))
             .transpose()
     }
 
@@ -522,5 +507,14 @@ impl PyDiscountCurve {
     }
 }
 
+impl PyDiscountCurve {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        columns_to_arrow_table(&[
+            ("t", self.inner.knots().to_vec()),
+            ("df", self.inner.dfs().to_vec()),
+        ])
+    }
+}
+
+tabular_methods!(PyDiscountCurve);
 wire_methods!(PyDiscountCurve, DiscountCurve, "DiscountCurve", arc);
-impl_repr_html_via_dataframe!(PyDiscountCurve);

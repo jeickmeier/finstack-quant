@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 class GridAttributionResult:
     """
@@ -152,15 +155,31 @@ class GridAttributionResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Per-cell curve effects as a pandas DataFrame.
+        Per-cell curve effects as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``cell``, ``portfolio_weight``, ``benchmark_weight``, ``benchmark_cell_return``, ``curve_effect``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
-        The primary frame is the duration-cell axis; the two (cell,
-        sector) tables come from :meth:`to_sector_effects_dataframe` and
-        the ``selection_effect`` column of :meth:`to_sector_effects_dataframe`.
+        The primary table is the duration-cell axis; the two (cell,
+        sector) tables come from :meth:`to_sector_effects_table` and
+        the ``selection_effect`` column of :meth:`to_sector_effects_table`.
+
+        Returns
+        -------
+        ArrowTable
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Per-cell curve effects as a pandas ``DataFrame``.
 
         Returns
         -------
@@ -169,27 +188,62 @@ class GridAttributionResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
-    def to_sector_effects_dataframe(self) -> pd.DataFrame:
+    def to_polars(self) -> pl.DataFrame:
         """
-        Per-(cell, sector) allocation effects as a pandas DataFrame.
+        Per-cell curve effects as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Per-cell curve effects as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_sector_effects_table(self) -> ArrowTable:
+        """
+        Per-(cell, sector) allocation effects as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``cell``, ``sector``, ``allocation_effect``, ``selection_effect``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per entry, with the pinned column schema above.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be serialized into an Arrow table.
         """
         ...
 
@@ -356,12 +410,28 @@ class GridCarinoLinkedResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Single-row pandas DataFrame view of the linked totals.
+        Single-row :class:`~finstack_quant.core.table.ArrowTable` view of the linked totals.
 
         Columns: ``portfolio_return_compounded``, ``benchmark_return_compounded``, ``linked_curve``, ``linked_sector``, ``linked_selection``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
+
+        Returns
+        -------
+        ArrowTable
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Single-row pandas ``DataFrame`` view of the linked totals.
 
         Returns
         -------
@@ -370,11 +440,46 @@ class GridCarinoLinkedResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Single-row Polars ``DataFrame`` view of the linked totals.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Single-row ``pyarrow.Table`` view of the linked totals.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize this result to canonical JSON.
@@ -424,8 +529,8 @@ class GridCarinoLinkedResult:
         ...
 
 def grid_attribution(
-    portfolio: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    benchmark: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    portfolio: str | dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
+    benchmark: str | dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
 ) -> GridAttributionResult:
     """
     Compute a single-period hierarchical duration-cell x sector grid attribution.
@@ -437,13 +542,15 @@ def grid_attribution(
 
     Parameters
     ----------
-    portfolio : str | dict | list | pandas.DataFrame
-        JSON array of ``GridPosition`` objects (``cell``, ``sector``,
-        ``weight``, ``total_return``) for the portfolio side; weights must
-        sum to ``1.0`` within ``1e-6``.
-    benchmark : str | dict | list | pandas.DataFrame
-        JSON array of ``GridPosition`` objects for the benchmark side; same
-        weight-sum requirement.
+    portfolio : str | dict | list | pandas.DataFrame | polars.DataFrame | Any
+        Sequence/JSON array of ``GridPosition`` records or a pandas/Polars
+        DataFrame or Arrow table with ``cell``, ``sector``, ``weight``, and
+        ``total_return`` columns for the portfolio side; weights must sum to
+        ``1.0`` within ``1e-6``.
+    benchmark : str | dict | list | pandas.DataFrame | polars.DataFrame | Any
+        Sequence/JSON array of ``GridPosition`` records or a pandas/Polars
+        DataFrame or Arrow table for the benchmark side; same weight-sum
+        requirement.
 
     Returns
     -------
@@ -484,7 +591,14 @@ def grid_attribution(
     """
     ...
 
-def grid_carino_link(periods: str | dict[str, Any] | list[Any] | pd.DataFrame) -> GridCarinoLinkedResult:
+def grid_carino_link(
+    periods: str
+    | dict[str, Any]
+    | Sequence[GridAttributionResult | dict[str, Any]]
+    | pd.DataFrame
+    | pl.DataFrame
+    | Any,
+) -> GridCarinoLinkedResult:
     """
     Carino-link multi-period hierarchical grid attribution results.
 
@@ -498,8 +612,8 @@ def grid_carino_link(periods: str | dict[str, Any] | list[Any] | pd.DataFrame) -
 
     Parameters
     ----------
-    periods : str | dict | list | pandas.DataFrame
-        Chronological list of typed ``GridAttributionResult`` objects (as
+    periods : str | dict | sequence | pandas.DataFrame | polars.DataFrame | Any
+        Chronological sequence of typed ``GridAttributionResult`` objects (as
         returned by :func:`grid_attribution`) or their JSON form, each the
         wire output of :func:`grid_attribution` (or
         ``GridAttributionResult.to_json()``).

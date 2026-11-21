@@ -2,8 +2,8 @@
 
 Covers the newly added exports across five namespaces:
 
-- ``analytics``: ``BetaResult.to_dataframe``, ``GreeksResult.to_dataframe``,
-  ``MultiFactorResult.to_dataframe``.
+- ``analytics``: ``BetaResult.to_pandas``, ``GreeksResult.to_pandas``,
+  ``MultiFactorResult.to_pandas`` (and Arrow / Polars exports).
 - ``models.credit``: ``pd.MasterScaleResult.to_dataframe``,
   ``recovery_waterfall.RecoveryWaterfallResult.to_dataframe``,
   ``liability_management.ExchangeOfferAnalysis.to_dataframe`` and
@@ -26,6 +26,8 @@ import json
 import math
 
 import pandas as pd
+import polars as pl
+import pyarrow as pa
 import pytest
 
 from finstack_quant.analytics import MultiFactorResult, Performance
@@ -64,7 +66,7 @@ def _benchmarked_performance() -> Performance:
 
 def test_beta_result_to_dataframe_is_one_row() -> None:
     result = _benchmarked_performance().beta()[0]
-    df = result.to_dataframe()
+    df = result.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
     assert list(df.columns) == [
@@ -89,11 +91,14 @@ def test_beta_result_to_dataframe_is_one_row() -> None:
     assert len({row["beta"], row["std_err"], row["ci_lower"], row["ci_upper"]}) == 4
     assert row["ci_lower"] < row["beta"] < row["ci_upper"]
     assert row["std_err"] > 0.0
+    assert result.to_polars().equals(pl.DataFrame(result))
+    assert result.to_pyarrow().equals(pa.table(result))
+    assert result.to_arrow().num_rows == 1
 
 
 def test_greeks_result_to_dataframe_is_one_row() -> None:
     result = _benchmarked_performance().greeks(risk_free_rate=0.0)[0]
-    df = result.to_dataframe()
+    df = result.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
     assert list(df.columns) == ["alpha", "beta", "r_squared", "adjusted_r_squared", "n_obs"]
@@ -108,6 +113,9 @@ def test_greeks_result_to_dataframe_is_one_row() -> None:
     # An imperfect fit: adjusted R^2 is strictly penalised below R^2.
     assert row["adjusted_r_squared"] < row["r_squared"] < 1.0
     assert row["alpha"] != 0.0
+    assert result.to_polars().equals(pl.DataFrame(result))
+    assert result.to_pyarrow().equals(pa.table(result))
+    assert result.to_arrow().num_rows == 1
 
 
 _FACTOR_A = [-0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.015, -0.005]
@@ -130,7 +138,7 @@ def _multi_factor_result(swap_factors: bool = False) -> MultiFactorResult:
 
 def test_multi_factor_result_to_dataframe_is_one_row_per_factor() -> None:
     result = _multi_factor_result()
-    df = result.to_dataframe()
+    df = result.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == len(result.betas)
     assert list(df.columns) == [
@@ -151,12 +159,16 @@ def test_multi_factor_result_to_dataframe_is_one_row_per_factor() -> None:
     # Regression-level statistics repeat on every row.
     assert list(df["r_squared"]) == pytest.approx([result.r_squared] * len(df))
     assert list(df["alpha"]) == pytest.approx([result.alpha] * len(df))
+    assert result.to_polars().equals(pl.DataFrame(result))
+    assert result.to_pyarrow().equals(pa.table(result))
 
 
 def test_multi_factor_result_to_dataframe_accepts_factor_names() -> None:
     result = _multi_factor_result()
-    df = result.to_dataframe(["value", "momentum"])
+    df = result.to_pandas(["value", "momentum"])
     assert list(df["factor"]) == ["value", "momentum"]
+    assert result.to_polars(["value", "momentum"])["factor"].to_list() == ["value", "momentum"]
+    assert result.to_arrow(["value", "momentum"]).to_dict()["factor"] == ["value", "momentum"]
 
 
 def test_multi_factor_constant_response_frame_preserves_nan() -> None:
@@ -168,7 +180,7 @@ def test_multi_factor_constant_response_frame_preserves_nan() -> None:
         benchmark_ticker="FUND",
     )
     result = perf.multi_factor_greeks(0, [[-0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.015, -0.005]], risk_free_rate=0.0)
-    frame = result.to_dataframe(["market"])
+    frame = result.to_pandas(["market"])
     for column in ("r_squared", "adjusted_r_squared"):
         assert math.isnan(frame[column].iloc[0])
         assert frame[column].dtype == "float64"
@@ -177,7 +189,11 @@ def test_multi_factor_constant_response_frame_preserves_nan() -> None:
 def test_multi_factor_result_to_dataframe_rejects_mismatched_names() -> None:
     result = _multi_factor_result()
     with pytest.raises(ValueError, match="factor_names"):
-        result.to_dataframe(["only_one"])
+        result.to_pandas(["only_one"])
+    with pytest.raises(ValueError, match="factor_names"):
+        result.to_polars(["only_one"])
+    with pytest.raises(ValueError, match="factor_names"):
+        result.to_arrow(["only_one"])
 
 
 def test_multi_factor_result_rows_follow_the_supplied_factor_order() -> None:
@@ -189,8 +205,8 @@ def test_multi_factor_result_rows_follow_the_supplied_factor_order() -> None:
     rows permute and the loadings follow, rather than the frame silently
     re-sorting or pinning the label to the wrong row.
     """
-    forward = _multi_factor_result().to_dataframe()
-    swapped = _multi_factor_result(swap_factors=True).to_dataframe()
+    forward = _multi_factor_result().to_pandas()
+    swapped = _multi_factor_result(swap_factors=True).to_pandas()
 
     assert list(forward["factor"]) == list(swapped["factor"]) == ["factor_0", "factor_1"]
     assert list(forward["beta"]) == pytest.approx([2.0, 0.5])
@@ -205,7 +221,7 @@ def test_multi_factor_result_rows_follow_the_supplied_factor_order() -> None:
 
 def test_master_scale_result_to_dataframe_is_one_row() -> None:
     result = credit_pd.MasterScale.default_calibration().map_pd(0.003)
-    df = result.to_dataframe()
+    df = result.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
     assert list(df.columns) == ["grade", "grade_index", "input_pd", "central_pd"]
@@ -218,7 +234,7 @@ def test_master_scale_result_to_dataframe_is_one_row() -> None:
 def test_master_scale_results_concat_into_a_grading_table() -> None:
     scale = credit_pd.MasterScale.default_calibration()
     pds = [0.0005, 0.003, 0.05]
-    table = pd.concat([scale.map_pd(value).to_dataframe() for value in pds], ignore_index=True)
+    table = pd.concat([scale.map_pd(value).to_pandas() for value in pds], ignore_index=True)
     assert len(table) == len(pds)
     assert list(table["input_pd"]) == pytest.approx(pds)
 
@@ -277,14 +293,14 @@ def _waterfall() -> recovery_waterfall.RecoveryWaterfallResult:
 
 def test_recovery_waterfall_to_dataframe_is_one_row_per_claim() -> None:
     result = _waterfall()
-    df = result.to_dataframe()
+    df = result.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == len(result.allocations) == 3
     assert set(_ALLOCATION_COLUMNS) <= set(df.columns)
 
 
 def test_recovery_waterfall_to_dataframe_is_ordered_by_priority() -> None:
-    df = _waterfall().to_dataframe()
+    df = _waterfall().to_pandas()
     assert list(df["priority"]) == sorted(df["priority"]) == [1, 2, 3]
     assert list(df["id"]) == ["SEN", "MEZZ", "SUB"]
     # 120 of value against 250 of claims: senior is made whole, mezz takes the
@@ -297,7 +313,7 @@ def test_recovery_waterfall_to_dataframe_is_ordered_by_priority() -> None:
 
 def test_recovery_waterfall_to_dataframe_keeps_schema_when_empty() -> None:
     result = recovery_waterfall.allocate_recovery(100.0, [])
-    df = result.to_dataframe()
+    df = result.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 0
     assert list(df.columns) == _ALLOCATION_COLUMNS
@@ -310,8 +326,8 @@ def test_recovery_waterfall_ordering_ignores_the_input_order() -> None:
     result twice, which is what this test used to do, can only fail on
     intra-process nondeterminism.
     """
-    forward = recovery_waterfall.allocate_recovery(120.0, _claims()).to_dataframe()
-    reversed_input = recovery_waterfall.allocate_recovery(120.0, list(reversed(_claims()))).to_dataframe()
+    forward = recovery_waterfall.allocate_recovery(120.0, _claims()).to_pandas()
+    reversed_input = recovery_waterfall.allocate_recovery(120.0, list(reversed(_claims()))).to_pandas()
     pd.testing.assert_frame_equal(forward, reversed_input)
     assert list(forward["id"]) == ["SEN", "MEZZ", "SUB"]
 
@@ -325,7 +341,7 @@ def test_exchange_offer_analysis_to_dataframe_is_one_row() -> None:
             old_pv=60.0, new_pv=75.0, consent_fee=2.0, equity_sweetener_value=0.0, exchange_type="par_for_par"
         )
     )
-    df = analysis.to_dataframe()
+    df = analysis.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
     assert list(df.columns) == [
@@ -375,7 +391,7 @@ def test_lme_analysis_to_dataframe_flattens_leverage_impact() -> None:
             ebitda=12.5,
         )
     )
-    df = analysis.to_dataframe()
+    df = analysis.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
     assert list(df.columns) == _LME_COLUMNS
@@ -392,7 +408,7 @@ def test_lme_analysis_to_dataframe_nulls_leverage_without_ebitda() -> None:
             lme_type="open_market_repurchase", notional=100.0, repurchase_price_pct=0.70, opt_acceptance_pct=0.50
         )
     )
-    df = analysis.to_dataframe()
+    df = analysis.to_pandas()
     assert len(df) == 1
     assert list(df.columns) == _LME_COLUMNS
     assert analysis.leverage_impact is None
@@ -404,34 +420,44 @@ def test_lme_analysis_to_dataframe_nulls_leverage_without_ebitda() -> None:
 
 
 def test_fx_rate_result_to_dataframe_is_one_row() -> None:
+    pl = pytest.importorskip("polars")
+
     matrix = FxMatrix(None)
     matrix.set_quotes([("EUR", "USD", 1.1)])
     result = matrix.rate("EUR", "USD", datetime.date(2025, 1, 1), "cashflow_date")
-    df = result.to_dataframe()
+    df = result.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
     assert list(df.columns) == ["rate", "triangulated"]
     assert df["rate"].iloc[0] == pytest.approx(result.rate)
     assert bool(df["triangulated"].iloc[0]) is result.triangulated
+    assert isinstance(result.to_polars(), pl.DataFrame)
+    assert result.to_arrow().num_rows == 1
 
 
 # core.market_data.scalars
 
 
 def test_scalar_time_series_to_dataframe_is_date_indexed() -> None:
+    pl = pytest.importorskip("polars")
+
     observations = [
         (datetime.date(2025, 1, 1), 0.03),
         (datetime.date(2025, 1, 2), 0.035),
         (datetime.date(2025, 1, 3), 0.04),
     ]
     series = ScalarTimeSeries("SOFR", observations, "step", "flat")
-    df = series.to_dataframe()
+    df = series.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["value"]
     assert len(df) == len(series.observations)
     assert isinstance(df.index, pd.DatetimeIndex)
     assert list(df.index) == [pd.Timestamp(d) for d, _ in observations]
     assert list(df["value"]) == pytest.approx([0.03, 0.035, 0.04])
+    pl_df = series.to_polars()
+    assert isinstance(pl_df, pl.DataFrame)
+    assert pl_df.columns == ["date", "value"]
+    assert series.to_arrow().column_names() == ["date", "value"]
 
 
 def test_scalar_time_series_rejects_unsorted_observations_and_supports_empty_dataframe() -> None:
@@ -442,12 +468,13 @@ def test_scalar_time_series_rejects_unsorted_observations_and_supports_empty_dat
     ]
     with pytest.raises(ValueError, match="strictly increasing"):
         ScalarTimeSeries("SOFR", list(reversed(observations)), "step", "flat")
-    empty_df = ScalarTimeSeries("SOFR-EMPTY", [], "step", "error").to_dataframe()
+    empty_df = ScalarTimeSeries("SOFR-EMPTY", [], "step", "error").to_pandas()
     assert len(empty_df) == 0
     assert list(empty_df.columns) == ["value"]
 
 
 def test_inflation_index_to_dataframe_is_date_indexed() -> None:
+    pl = pytest.importorskip("polars")
     from finstack_quant.core.market_data import InflationObservation
 
     observations = [
@@ -456,13 +483,15 @@ def test_inflation_index_to_dataframe_is_date_indexed() -> None:
         InflationObservation("2025-03-01", 303.0, "2025-04-10"),
     ]
     index = InflationIndex("US-CPI", observations, "USD", "2025-05-01")
-    df = index.to_dataframe()
+    df = index.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["value", "available_on"]
     assert isinstance(df.index, pd.DatetimeIndex)
     assert list(df.index) == [pd.Timestamp(obs.reference_month) for obs in observations]
     assert list(df["available_on"]) == [pd.Timestamp(obs.available_on) for obs in observations]
     assert list(df["value"]) == pytest.approx([300.0, 301.5, 303.0])
+    assert isinstance(index.to_polars(), pl.DataFrame)
+    assert index.to_arrow().column_names() == ["reference_month", "value", "available_on"]
     assert index._repr_html_() is not None
     with pytest.raises(ValueError, match="strictly increasing"):
         InflationIndex("US-CPI", list(reversed(observations)), "USD", "2025-05-01")
@@ -611,7 +640,7 @@ def _flat_period_decomposition(issuers: tuple[str, str] = ("ZEBRA", "ALPHA")) ->
 
 def test_period_decomposition_level_dataframe_is_long_and_sorted() -> None:
     period = _hierarchy_period_decomposition()
-    df = period.to_level_dataframe()
+    df = period.to_level_table().to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert set(_LEVEL_DELTA_COLUMNS) <= set(df.columns)
 
@@ -646,7 +675,7 @@ def test_period_decomposition_level_dataframe_is_long_and_sorted() -> None:
 def test_period_decomposition_level_dataframe_keeps_schema_when_no_levels() -> None:
     period = _flat_period_decomposition()
     assert period.n_levels == 0
-    df = period.to_level_dataframe()
+    df = period.to_level_table().to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 0
     assert list(df.columns) == _LEVEL_DELTA_COLUMNS
@@ -655,7 +684,7 @@ def test_period_decomposition_level_dataframe_keeps_schema_when_no_levels() -> N
 def test_period_decomposition_adder_dataframe_is_sorted_by_issuer() -> None:
     period = _flat_period_decomposition()
     adders = period.d_adder()
-    df = period.to_adder_dataframe()
+    df = period.to_adder_table().to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert set(_ADDER_DELTA_COLUMNS) <= set(df.columns)
     assert len(df) == len(adders) == 2
@@ -675,7 +704,7 @@ def test_period_decomposition_adder_order_ignores_the_declaration_order() -> Non
     twice — the previous assertion — could only fail on intra-process
     nondeterminism.
     """
-    zebra_first = _flat_period_decomposition(("ZEBRA", "ALPHA")).to_adder_dataframe()
-    alpha_first = _flat_period_decomposition(("ALPHA", "ZEBRA")).to_adder_dataframe()
+    zebra_first = _flat_period_decomposition(("ZEBRA", "ALPHA")).to_adder_table().to_pandas()
+    alpha_first = _flat_period_decomposition(("ALPHA", "ZEBRA")).to_adder_table().to_pandas()
     pd.testing.assert_frame_equal(zebra_first, alpha_first)
     assert list(zebra_first["issuer_id"]) == ["ALPHA", "ZEBRA"]

@@ -107,13 +107,13 @@ impl PyFxTouchOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.touch_type")]
     #[getter]
     fn touch_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.touch_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.touch_type)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.barrier_direction")]
     #[getter]
     fn barrier_direction<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.barrier_direction)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.barrier_direction)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.payout_amount")]
@@ -125,7 +125,7 @@ impl PyFxTouchOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.payout_timing")]
     #[getter]
     fn payout_timing<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.payout_timing)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.payout_timing)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_touch_option", "FxTouchOption.expiry")]

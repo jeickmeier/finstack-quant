@@ -8,7 +8,9 @@ use super::frame::sensitivity_rows;
 use super::im_curvature::PySimmCurvatureSensitivity;
 use super::types::{PyEligibleCollateralSchedule, extract_asset_class};
 use crate::bindings::core::config::PyFinstackConfig;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::py_to_date;
+use crate::bindings::macros::tabular_methods;
 use crate::bindings::module_utils::parse_currency;
 use crate::errors::core_to_py;
 use finstack_quant_margin as fm;
@@ -89,15 +91,15 @@ impl PySimmSensitivities {
         self.inner.to_json().map_err(core_to_py)
     }
 
-    /// Bulk-load sensitivities from the long-format frame ``to_dataframe``
-    /// emits (CRIF-style).
+    /// Bulk-load sensitivities from the long-format table ``to_pandas`` /
+    /// ``to_arrow`` emits (CRIF-style).
     ///
     /// Parameters
     /// ----------
     /// frame : pandas.DataFrame
     ///     Columns ``risk_class``, ``kind``, ``issuer``, ``bucket``,
     ///     ``tenor``, ``amount`` (and ``expiry_tenor`` on curvature rows)
-    ///     with the same encoding as ``to_dataframe``: ``issuer`` is the
+    ///     with the same encoding as ``to_pandas``: ``issuer`` is the
     ///     currency for ``interest_rate``/``fx`` delta, the ``"CCY1/CCY2"``
     ///     pair for FX vega, the issuer for credit, the underlier for equity
     ///     and the factor for curvature; ``bucket`` is the credit sector, the
@@ -109,7 +111,7 @@ impl PySimmSensitivities {
     ///     not carry it).
     ///
     /// Rows with the same key accumulate. Decoding is the Rust
-    /// ``SimmSensitivities::from_rows``, the inverse of ``to_dataframe``.
+    /// ``SimmSensitivities::from_rows``, the inverse of ``to_pandas``.
     /// Raises ``ValueError`` for an unknown risk class, kind, sector,
     /// currency, a missing column or value, or an invalid curvature row, and
     /// ``AttributeError`` when ``frame`` has no ``to_dict`` method.
@@ -306,50 +308,6 @@ impl PySimmSensitivities {
         self.inner.base_currency.to_string()
     }
 
-    /// Export every populated sensitivity bucket as one long-format pandas
-    /// ``DataFrame``.
-    ///
-    /// Columns: ``risk_class``, ``bucket``, ``tenor``, ``issuer``, ``kind``,
-    /// ``amount``, ``expiry_tenor``. One row per populated bucket; an empty container still
-    /// carries all six columns. Long format is used deliberately — a column
-    /// per bucket would give a different schema for every portfolio, and it
-    /// matches ``FrtbSensitivities.to_dataframe``.
-    ///
-    /// ``risk_class`` uses the SIMM labels ``interest_rate``,
-    /// ``credit_qualifying``, ``credit_non_qualifying``, ``equity``,
-    /// ``commodity`` and ``fx``. ``kind`` is ``delta``, ``vega`` or
-    /// ``curvature``; SIMM curvature is a single signed contribution per risk
-    /// class, not an up/down pair.
-    ///
-    /// ``issuer`` carries the name axis: a currency code for IR and FX delta,
-    /// a ``"CCY1/CCY2"`` pair for FX vega, an issuer or index for credit, an
-    /// underlier for equity. It is ``None`` for commodity (keyed by bucket
-    /// alone); curvature uses issuer for factor identity. ``bucket`` holds the SIMM credit sector for
-    /// bucketed credit deltas (e.g. ``"sovereign"``) and the commodity bucket
-    /// label; it is ``None`` elsewhere. ``tenor`` is the SIMM tenor bucket
-    /// (``"2W"``, ``"1M"``, ..., ``"30Y"``) where the risk class has one.
-    ///
-    /// ``amount`` is a signed currency sensitivity in the container's base
-    /// currency, in whatever convention the caller supplied — SIMM does not
-    /// re-scale these on ingest. ``from_dataframe`` accepts this frame back.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::core::table::envelope_to_pandas(
-            py,
-            &self.inner.to_table().map_err(core_to_py)?,
-        )
-    }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
-
     /// Summarise the container by populated bucket counts per risk class.
     fn __repr__(&self) -> String {
         let s = &self.inner;
@@ -368,6 +326,15 @@ impl PySimmSensitivities {
         )
     }
 }
+
+impl PySimmSensitivities {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let table = self.inner.to_table().map_err(core_to_py)?;
+        PyArrowTable::from_envelope(&table)
+    }
+}
+
+tabular_methods!(PySimmSensitivities);
 
 /// Indicative historical SIMM v2.6 calculator. USD-normalized inputs are required.
 /// Product-class, subcurve and some non-IR dimensions are incomplete; results

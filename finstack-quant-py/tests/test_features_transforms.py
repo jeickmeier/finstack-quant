@@ -273,8 +273,13 @@ def test_transform_panel_typed_twin() -> None:
     with pytest.raises(KeyError):
         result.get_column("missing")
     pd = pytest.importorskip("pandas")
-    frame = result.to_dataframe(index=pd.Index([10, 11, 12, 13]))
+    frame = result.to_pandas(index=pd.Index([10, 11, 12, 13]))
     assert list(frame.index) == [10, 11, 12, 13]
+    pl = pytest.importorskip("polars")
+    pa = pytest.importorskip("pyarrow")
+    assert result.to_polars().equals(pl.DataFrame(result))
+    assert result.to_pyarrow().equals(pa.table(result))
+    assert result.to_arrow().column_names() == ["rank"]
 
 
 def test_transform_panel_dict_and_json_share_rust_validation() -> None:

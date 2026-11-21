@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 class CompanyMetrics:
     """
@@ -522,23 +524,31 @@ class PeerSet:
         ValueError: ...
         """
     @staticmethod
-    def from_dataframe(df: Any, subject_id: str, period_basis: str, id_column: str | None = None) -> PeerSet:
+    def from_dataframe(
+        df: pd.DataFrame | pl.DataFrame | Any,
+        subject_id: str,
+        period_basis: str,
+        id_column: str | None = None,
+    ) -> PeerSet:
         """
-        Build a peer set from a pandas ``DataFrame`` (rows = companies).
+        Build a peer set from a pandas ``DataFrame``, Polars ``DataFrame``, or Arrow table (rows = companies).
 
         Parameters
         ----------
-        df : pandas.DataFrame
-            One row per company. The index (or ``id_column``) supplies company
-            ids; numeric columns become metrics (canonical names fill their
-            fields, others go to ``custom``); string columns become attribute
-            ``meta`` entries; ``NaN``/``None`` cells are treated as missing.
+        df : pandas.DataFrame | polars.DataFrame | Any
+            One row per company. The pandas index or ``id_column`` (for Polars/
+            Arrow, ``id_column`` or the first column when omitted) supplies
+            company ids; numeric columns become metrics (canonical names fill
+            their fields, others go to ``custom``); string columns become
+            attribute ``meta`` entries; ``NaN``/``None``/``null`` cells are
+            treated as missing.
         subject_id : str
             Id of the subject row; every other row becomes a peer.
         period_basis : str
             ``"ltm"``, ``"ntm"`` or a custom label (required).
         id_column : str | None
-            Column holding company ids; ``None`` uses the index.
+            Column holding company ids; ``None`` uses the pandas index (or the
+            first column for Polars/Arrow).
 
         Returns
         -------
@@ -769,22 +779,71 @@ class PeerStats:
         float
             Interquartile range ``q3 - q1``.
         """
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export as a single-row ``ArrowTable`` with one column per statistic.
+
+        Returns
+        -------
+        ArrowTable
+            Single-row table of peer statistics.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to an Arrow table.
+        """
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export as a single-row pandas ``DataFrame`` with one column per statistic.
 
         Returns
         -------
         pd.DataFrame
-            Export as a single-row pandas ``DataFrame`` with one column per statistic.
+            Single-row DataFrame of peer statistics.
 
         Raises
         ------
         ImportError
             If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the result cannot be converted to a pandas DataFrame.
         """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export as a single-row Polars ``DataFrame`` with one column per statistic.
+
+        Returns
+        -------
+        polars.DataFrame
+            Single-row Polars frame of peer statistics.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export as a single-row ``pyarrow.Table`` with one column per statistic.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row PyArrow table of peer statistics.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to canonical JSON.
@@ -910,22 +969,71 @@ class RegressionResult:
         int
             Number of observations used.
         """
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export as a single-row ``ArrowTable``.
+
+        Returns
+        -------
+        ArrowTable
+            Single-row table of regression outputs.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to an Arrow table.
+        """
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export as a single-row pandas ``DataFrame``.
 
         Returns
         -------
         pd.DataFrame
-            Export as a single-row pandas ``DataFrame``.
+            Single-row DataFrame of regression outputs.
 
         Raises
         ------
         ImportError
             If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the result cannot be converted to a pandas DataFrame.
         """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Single-row Polars frame of regression outputs.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row PyArrow table of regression outputs.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to canonical JSON.
@@ -1052,27 +1160,78 @@ class RelativeValueResult:
         int
             Number of peers scored against.
         """
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the per-dimension scores as a pandas ``DataFrame``.
+        Export the per-dimension scores as an ``ArrowTable``.
 
         Columns: ``label``, ``percentile`` (0-1), ``z_score``,
-        ``regression_residual`` (Y units, ``NaN`` without X), ``r_squared``
-        (``NaN`` without X), ``weight``. One row per dimension. The composite
+        ``regression_residual`` (Y units, null without X), ``r_squared``
+        (null without X), ``weight``. One row per dimension. The composite
         score, confidence and peer count are result metadata.
 
         Returns
         -------
+        ArrowTable
+            Per-dimension scores table.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to an Arrow table.
+        """
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the per-dimension scores as a pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`. One row per dimension.
+
+        Returns
+        -------
         pd.DataFrame
-            Export the per-dimension scores as a pandas ``DataFrame``. Columns: ``label``, ``percentile`` (0-1), ``z_score``, ``regression_residual`` (Y units, ``NaN`` without X), ``r_squared`` (``NaN`` without X), ``weight``. One row per dimension. The composite score, confidence and peer count are result metadata.
+            Per-dimension scores DataFrame.
 
         Raises
         ------
         ImportError
             If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the result cannot be converted to a pandas DataFrame.
         """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the per-dimension scores as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Per-dimension scores Polars frame.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export the per-dimension scores as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Per-dimension scores PyArrow table.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to canonical JSON.

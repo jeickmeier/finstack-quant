@@ -1,6 +1,6 @@
 //! Python binding for the `PortfolioResult` envelope.
 
-use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::portfolio::metrics::PyPortfolioMetrics;
 use crate::bindings::portfolio::valuation::PyPortfolioValuation;
 use crate::errors::display_to_py;

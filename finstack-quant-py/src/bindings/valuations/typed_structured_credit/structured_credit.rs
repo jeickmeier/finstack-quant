@@ -6,7 +6,7 @@ use crate::bindings::cashflows::builder::specs::{
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
-use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::valuations::convert::{
     attributes_from_py, enum_to_py_string, typed_list_from_py,
 };

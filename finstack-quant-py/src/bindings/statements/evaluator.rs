@@ -5,11 +5,10 @@ use super::monte_carlo::{PyMonteCarloResults, extract_config};
 use super::parse_period_id;
 use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::core::table::{envelope_to_pandas, selected_envelope_to_pandas};
+use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::{extract_market_ref, extract_model_ref};
 use crate::bindings::macros::wire_methods;
-use crate::bindings::pandas_utils::values_to_series;
 use crate::errors::statements_to_py;
 use finstack_quant_statements::evaluator::PeriodDateConvention;
 use pyo3::exceptions::PyKeyError;
@@ -177,7 +176,7 @@ impl PyStatementResult {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.cells")]
     #[getter]
     fn cells<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.cells)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.cells)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.get_cell")]
@@ -191,7 +190,7 @@ impl PyStatementResult {
         let pid = parse_period_id(period)?;
         self.inner
             .get_cell(node_id, &pid)
-            .map(|cell| crate::bindings::pandas_utils::serde_to_py(py, cell))
+            .map(|cell| crate::bindings::json_bridge::serde_to_py(py, cell))
             .transpose()
     }
 
@@ -201,7 +200,7 @@ impl PyStatementResult {
         self.inner
             .provenance
             .as_ref()
-            .map(|provenance| crate::bindings::pandas_utils::serde_to_py(py, provenance))
+            .map(|provenance| crate::bindings::json_bridge::serde_to_py(py, provenance))
             .transpose()
     }
 
@@ -211,14 +210,14 @@ impl PyStatementResult {
         self.inner
             .rollup_provenance
             .as_ref()
-            .map(|provenance| crate::bindings::pandas_utils::serde_to_py(py, provenance))
+            .map(|provenance| crate::bindings::json_bridge::serde_to_py(py, provenance))
             .transpose()
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.normalizations")]
     #[getter]
     fn normalizations<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.normalizations)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.normalizations)
     }
 
     /// Check report attached by an evaluator configured with
@@ -263,18 +262,14 @@ impl PyStatementResult {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.to_series")]
     #[pyo3(text_signature = "($self, node_id)")]
-    fn to_series<'py>(&self, py: Python<'py>, node_id: &str) -> PyResult<Bound<'py, PyAny>> {
+    fn to_series(&self, node_id: &str) -> PyResult<PyLabeledSeries> {
         let period_map = self
             .inner
             .get_node(node_id)
             .ok_or_else(|| PyKeyError::new_err(format!("unknown node: {node_id:?}")))?;
         let labels: Vec<String> = period_map.keys().map(ToString::to_string).collect();
-        // pandas marks a cell without a value as NaN.
-        let values: Vec<f64> = period_map
-            .values()
-            .map(|cell| cell.numeric().unwrap_or(f64::NAN))
-            .collect();
-        values_to_series(py, values, &labels, node_id)
+        let values: Vec<Option<f64>> = period_map.values().map(|cell| cell.numeric()).collect();
+        Ok(PyLabeledSeries::from_opt_f64(node_id, labels, values)?.with_index_name("period_id"))
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.to_dated_schedule")]
@@ -301,7 +296,7 @@ impl PyStatementResult {
             out.set_item("period_id", row.period_id.to_string())?;
             out.set_item(
                 "cell",
-                crate::bindings::pandas_utils::serde_to_py(py, &row.cell)?,
+                crate::bindings::json_bridge::serde_to_py(py, &row.cell)?,
             )?;
             Ok(out)
         })
@@ -377,7 +372,7 @@ impl PyStatementResult {
     /// the WASM ``Evaluator.evaluate`` result.
     #[getter]
     fn warnings<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.meta.warnings)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.meta.warnings)
     }
 
     /// Numeric mode stamped into the result envelope (policy visibility).
@@ -394,72 +389,64 @@ impl PyStatementResult {
         self.inner.meta.parallel
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.to_dataframe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.to_arrow")]
     #[pyo3(signature = (orient = "long"))]
     #[pyo3(text_signature = "($self, orient='long')")]
-    fn to_dataframe<'py>(&self, py: Python<'py>, orient: &str) -> PyResult<Bound<'py, PyAny>> {
-        match orient {
-            "long" => {
-                let table = self.inner.to_table_long().map_err(statements_to_py)?;
-                selected_envelope_to_pandas(
-                    py,
-                    &table,
-                    &[
-                        ("node_id", "node_id"),
-                        ("period_id", "period"),
-                        ("status", "status"),
-                        ("value", "value"),
-                        ("amount", "amount"),
-                        ("currency", "currency"),
-                        ("value_type", "value_type"),
-                        ("reason", "reason"),
-                        ("source", "source"),
-                    ],
-                )
-            }
-            "wide" => {
-                let table = self.inner.to_table_wide().map_err(statements_to_py)?;
-                let df = envelope_to_pandas(py, &table)?;
-                df.call_method1("set_index", ("period_id",))?.getattr("T")
-            }
-            other => Err(pyo3::exceptions::PyValueError::new_err(format!(
-                "orient must be 'long' or 'wide', got {other:?}"
-            ))),
+    fn to_arrow(&self, orient: &str) -> PyResult<PyArrowTable> {
+        self.to_arrow_table(orient)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.to_pandas")]
+    #[pyo3(signature = (orient = "long"))]
+    #[pyo3(text_signature = "($self, orient='long')")]
+    fn to_pandas<'py>(&self, py: Python<'py>, orient: &str) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.to_arrow_table(orient)?)?;
+        let df = PyArrowTable::to_pandas(&table, py)?;
+        if orient == "wide" {
+            df.call_method1("set_index", ("period_id",))?.getattr("T")
+        } else {
+            Ok(df)
         }
     }
 
-    /// Export the long-format table via Arrow (zero-copy for consumers).
-    ///
-    /// Returns an :class:`finstack_quant.core.table.ArrowTable` implementing
-    /// ``__arrow_c_stream__``; pass it to ``pyarrow.table(...)``,
-    /// ``polars.DataFrame(...)``, or DuckDB. Column values and
-    /// monetary-mirror semantics match ``to_dataframe("long")``, plus column
-    /// roles and table metadata are preserved as Arrow field/schema
-    /// metadata. One column name differs: the period column here is
-    /// ``period_id`` (the table envelope's native name), whereas
-    /// ``to_dataframe("long")`` renames it to ``period``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_arrow_long(&self) -> PyResult<crate::bindings::core::table::PyArrowTable> {
-        let table = self.inner.to_table_long().map_err(statements_to_py)?;
-        crate::bindings::core::table::PyArrowTable::from_envelope(&table)
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.to_polars")]
+    #[pyo3(signature = (orient = "long"))]
+    #[pyo3(text_signature = "($self, orient='long')")]
+    fn to_polars<'py>(&self, py: Python<'py>, orient: &str) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.to_arrow_table(orient)?)?;
+        PyArrowTable::to_polars(&table, py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.to_arrow_wide")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_arrow_wide(&self) -> PyResult<crate::bindings::core::table::PyArrowTable> {
-        let table = self.inner.to_table_wide().map_err(statements_to_py)?;
-        crate::bindings::core::table::PyArrowTable::from_envelope(&table)
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.to_pyarrow")]
+    #[pyo3(signature = (orient = "long"))]
+    #[pyo3(text_signature = "($self, orient='long')")]
+    fn to_pyarrow<'py>(&self, py: Python<'py>, orient: &str) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.to_arrow_table(orient)?)?;
+        PyArrowTable::to_pyarrow(&table, py)
     }
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to ``to_dataframe("wide")`` (nodes as rows, periods as
-    /// columns), so pandas' own row/column truncation applies. Returns
-    /// ``None`` if the frame cannot be built, which makes IPython fall back
-    /// to ``__repr__`` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py, "wide").ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+    /// Export via the Arrow PyCapsule C-stream protocol (`arrow_array_stream`).
+    #[pyo3(signature = (requested_schema = None))]
+    fn __arrow_c_stream__<'py>(
+        &self,
+        py: Python<'py>,
+        requested_schema: Option<Bound<'py, PyAny>>,
+    ) -> PyResult<Bound<'py, pyo3::types::PyCapsule>> {
+        let _ = requested_schema;
+        self.to_arrow_table("long")?.arrow_c_stream(py)
+    }
+
+    /// Export the Arrow schema via the Arrow PyCapsule interface (`arrow_schema`).
+    fn __arrow_c_schema__<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, pyo3::types::PyCapsule>> {
+        self.to_arrow_table("long")?.arrow_c_schema(py)
+    }
+
+    /// Render as an HTML table preview in Jupyter notebooks.
+    fn _repr_html_(&self) -> Option<String> {
+        self.to_arrow_table("wide").ok().map(|t| t.render_html())
     }
 
     /// Return the representation with node and period counts.
@@ -469,6 +456,24 @@ impl PyStatementResult {
             self.inner.cells.len(),
             self.inner.meta.num_periods
         )
+    }
+}
+
+impl PyStatementResult {
+    fn to_arrow_table(&self, orient: &str) -> PyResult<PyArrowTable> {
+        match orient {
+            "long" => {
+                let table = self.inner.to_table_long().map_err(statements_to_py)?;
+                PyArrowTable::from_envelope(&table)
+            }
+            "wide" => {
+                let table = self.inner.to_table_wide().map_err(statements_to_py)?;
+                PyArrowTable::from_envelope(&table)
+            }
+            other => Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "orient must be 'long' or 'wide', got {other:?}"
+            ))),
+        }
     }
 }
 

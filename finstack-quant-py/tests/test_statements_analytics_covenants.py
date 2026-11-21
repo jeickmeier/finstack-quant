@@ -7,6 +7,7 @@ import json
 import pytest
 
 from finstack_quant import statements
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.covenants import CovenantEngine, CovenantForecastConfig
 from finstack_quant.statements import StatementResult
 from finstack_quant.statements_analytics import evaluate_covenants, forecast_breaches
@@ -59,7 +60,9 @@ def test_window_keeps_early_non_finite_leverage_out_of_the_evaluation() -> None:
     assert results.get("leverage", "2024Q3") is None
     assert results.get_cell("leverage", "2024Q3")["status"] == "unavailable"
 
-    frame = evaluate_covenants(_engine("2024-10-01"), results)
+    table = evaluate_covenants(_engine("2024-10-01"), results)
+    assert isinstance(table, ArrowTable)
+    frame = table.to_pandas()
 
     assert frame["as_of"].unique().tolist() == ["2024-03-31", "2024-06-30", "2024-09-30", "2024-12-31"]
     leverage = frame[frame["covenant"] == "max_debt_to_ebitda"]
@@ -72,7 +75,7 @@ def test_json_inputs_and_engine_series_agree() -> None:
     results = _results()
     engine = _engine("2024-10-01")
     from_json = evaluate_covenants(engine, results.to_json())
-    assert from_json.equals(evaluate_covenants(engine, results))
+    assert from_json.to_pandas().equals(evaluate_covenants(engine, results).to_pandas())
 
 
 def test_required_non_finite_metric_raises_value_error() -> None:
@@ -107,7 +110,7 @@ def test_aliases_apply_to_assessment_and_forecast() -> None:
     results = _results()
     engine = _engine("2024-07-01")
     aliases = {"leverage": "interest_coverage"}
-    frame = evaluate_covenants(engine, results, aliases)
+    frame = evaluate_covenants(engine, results, aliases).to_pandas()
     leverage = frame[frame["covenant"] == "max_debt_to_ebitda"]
     assert leverage[["actual_value", "headroom_raw"]].values.tolist() == [[5.0, -1.5], [2.5, 1.0]]
 

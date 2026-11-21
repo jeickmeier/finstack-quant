@@ -14,6 +14,9 @@ from __future__ import annotations
 from typing import Any
 
 import pandas
+import polars as pl
+
+from finstack_quant.core.table import ArrowTable
 
 __all__ = [
     "GeneratorMatrix",
@@ -497,18 +500,20 @@ class TransitionMatrix:
 
     @staticmethod
     def from_dataframe(
-        df: pandas.DataFrame,
+        df: pandas.DataFrame | pl.DataFrame | Any,
         horizon: float,
         scale: RatingScale | None = None,
     ) -> TransitionMatrix:
         """
-        Build a transition matrix from a labelled square ``pandas.DataFrame``.
+        Build a transition matrix from a labelled square DataFrame or Arrow table.
 
         Parameters
         ----------
-        df : pandas.DataFrame
-            Square frame whose index (origins) and columns (destinations)
-            carry the same labels in scale order.
+        df : pandas.DataFrame | polars.DataFrame | Any
+            Square pandas frame whose index (origins) and columns (destinations)
+            carry the same labels in scale order, or a Polars/Arrow table
+            whose all-numeric column names (or leading label column plus numeric
+            destination columns) match in scale order.
         horizon : float
             Horizon in years (> 0).
         scale : RatingScale | None
@@ -700,21 +705,75 @@ class TransitionMatrix:
         This accessor does not raise; it returns the stored or derived value.
         """
         ...
-    def to_dataframe(self) -> pandas.DataFrame:
-        """
-        Labelled square frame (index = origin, columns = destination).
+    def to_arrow(self) -> ArrowTable:
+        """Export the labelled transition matrix as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            Labelled square frame (index = origin, columns = destination).
+        ArrowTable
+            Table with leading ``from_state`` column followed by one float64 column per destination label.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized into a pandas object.
+            If the value cannot be represented as an Arrow table.
         """
         ...
+
+    def to_pandas(self) -> pandas.DataFrame:
+        """Export the transition matrix as a square pandas ``DataFrame`` indexed by origin label.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Square frame (index = origin, columns = destination).
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the value cannot be represented as a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Export the labelled transition matrix as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Frame with leading ``from_state`` column followed by destination columns.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the value cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export the labelled transition matrix as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Table with leading ``from_state`` column followed by destination columns.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the value cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @staticmethod
     def from_json(json: str) -> TransitionMatrix:
         """
@@ -988,21 +1047,75 @@ class GeneratorMatrix:
         This accessor does not raise; it returns the stored or derived value.
         """
         ...
-    def to_dataframe(self) -> pandas.DataFrame:
-        """
-        Labelled square frame (index = origin, columns = destination).
+    def to_arrow(self) -> ArrowTable:
+        """Export the labelled generator matrix as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            Labelled square frame (index = origin, columns = destination).
+        ArrowTable
+            Table with leading ``from_state`` column followed by one float64 column per destination label.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized into a pandas object.
+            If the value cannot be represented as an Arrow table.
         """
         ...
+
+    def to_pandas(self) -> pandas.DataFrame:
+        """Export the generator matrix as a square pandas ``DataFrame`` indexed by origin label.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Square frame (index = origin, columns = destination).
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the value cannot be represented as a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Export the labelled generator matrix as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Frame with leading ``from_state`` column followed by destination columns.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the value cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export the labelled generator matrix as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Table with leading ``from_state`` column followed by destination columns.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the value cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @staticmethod
     def from_json(json: str) -> GeneratorMatrix:
         """
@@ -1306,8 +1419,8 @@ class RatingPaths:
     """
     Collection of simulated rating paths from ``MigrationSimulator.simulate``.
 
-    Indexable like a list of :class:`RatingPath`; ``to_dataframe()`` gives
-    one long frame over all transitions.
+    Indexable like a list of :class:`RatingPath`; ``to_pandas()`` / ``to_arrow()`` gives
+    one long table over all transitions.
 
     Examples
     --------
@@ -1350,21 +1463,79 @@ class RatingPaths:
         This accessor does not raise; it returns the stored or derived value.
         """
         ...
-    def to_dataframe(self) -> pandas.DataFrame:
-        """
-        Long frame with ``path`` (int), ``time`` (float, years), ``state`` (int), ``label`` (str); one row per recorded transition including the initial state, ordered by path then time.
+    def to_arrow(self) -> ArrowTable:
+        """Export simulated rating transitions as a long :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            Long frame with ``path`` (int), ``time`` (float, years), ``state`` (int), ``label`` (str); one row per recorded transition including the initial state, ordered by path then time.
+        ArrowTable
+            Long table with ``path`` (int), ``time`` (float, years), ``state`` (int), and
+            ``label`` (str), ordered by path then time.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized into a pandas object.
+            If the value cannot be represented as an Arrow table.
         """
         ...
+
+    def to_pandas(self) -> pandas.DataFrame:
+        """Export simulated rating transitions as a long pandas ``DataFrame``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Long frame with ``path`` (int), ``time`` (float, years), ``state`` (int), and
+            ``label`` (str), ordered by path then time.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the value cannot be represented as a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Export simulated rating transitions as a long Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Long frame with ``path`` (int), ``time`` (float, years), ``state`` (int), and
+            ``label`` (str), ordered by path then time.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the value cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export simulated rating transitions as a long ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Long table with ``path`` (int), ``time`` (float, years), ``state`` (int), and
+            ``label`` (str), ordered by path then time.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the value cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @staticmethod
     def from_json(json: str) -> RatingPaths:
         """

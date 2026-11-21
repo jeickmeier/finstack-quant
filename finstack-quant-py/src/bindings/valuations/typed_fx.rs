@@ -61,7 +61,7 @@ impl PyFxForward {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.spot_basis")]
     #[getter]
     fn spot_basis<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.spot_basis)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.spot_basis)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.example")]
@@ -398,13 +398,13 @@ impl PyFxOption {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.delivery")]
     #[getter]
     fn delivery<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.delivery)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.delivery)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.spot_basis")]
     #[getter]
     fn spot_basis<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.spot_basis)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.spot_basis)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.example")]

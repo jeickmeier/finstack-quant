@@ -3,9 +3,10 @@
 
 use super::report::PyCovenantReport;
 use super::spec::{PyCovenantSpec, PyCovenantWaiver};
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
 use crate::bindings::repr_support::repr_from_serde;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::{core_to_py, display_to_py, value_error};
 use finstack_quant_covenants::templates::{
     CovenantTemplate, covenant_template as covenant_template_rs,
@@ -17,15 +18,15 @@ use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-/// Accept a ``dict[str, float]`` or a JSON-object string of metric values.
-///
-/// A string goes to the Rust metric-map parser
-/// ([`HashMapMetricSource::from_json`]); a dict is converted here. Every dict
-/// value must be a real number; ``bool`` is rejected so a stray ``True``
-/// cannot silently evaluate as ``1.0``.
+/// Extract a ``dict[str, float]``, ``pandas.Series`` (mapping metric ids), or
+/// JSON-object string of metric values.
 pub(crate) fn extract_metrics(obj: &Bound<'_, PyAny>) -> PyResult<HashMapMetricSource> {
     if let Ok(text) = obj.extract::<std::borrow::Cow<'_, str>>() {
         return HashMapMetricSource::from_json(&text).map_err(core_to_py);
+    }
+    if crate::bindings::dataframe_utils::is_pandas_series(obj)? {
+        let dict = obj.call_method0("to_dict")?;
+        return extract_metric_dict(&dict).map(HashMapMetricSource::from_pairs);
     }
     extract_metric_dict(obj).map(HashMapMetricSource::from_pairs)
 }
@@ -71,87 +72,114 @@ pub(crate) fn reports_to_pydict<'py>(
     Ok(dict)
 }
 
-/// Columns of the frame produced by `CovenantEngine.evaluate_series`.
-const SERIES_COLUMNS: [ColumnSchema<'static>; 9] = [
-    ("as_of", "str"),
-    ("covenant", "str"),
-    ("covenant_type", "str"),
-    ("passed", "bool"),
-    ("actual_value", "float64"),
-    ("threshold", "float64"),
-    ("headroom", "float64"),
-    ("headroom_raw", "float64"),
-    ("details", "str"),
-];
-
-/// Flatten dated covenant reports into the long frame of `SERIES_COLUMNS`:
-/// one row per (test date, covenant), dates in series order and covenants in
-/// engine order. Shared by `CovenantEngine.evaluate_series` and
+/// Flatten dated covenant reports into the long Arrow table: one row per
+/// (test date, covenant), dates in series order and covenants in engine order.
+/// Shared by `CovenantEngine.evaluate_series` and
 /// `statements_analytics.evaluate_covenants`.
-pub(crate) fn dated_reports_frame(
-    py: Python<'_>,
-    series: Vec<DatedCovenantReports>,
-) -> PyResult<Bound<'_, PyAny>> {
-    let records: Vec<serde_json::Value> = series
-        .into_iter()
-        .flat_map(|dated| {
-            let as_of = dated.as_of.to_string();
-            dated.reports.into_iter().map(move |(key, report)| {
-                serde_json::json!({
-                    "as_of": as_of,
-                    "covenant": key,
-                    "covenant_type": report.covenant_type,
-                    "passed": report.passed,
-                    "actual_value": report.actual_value,
-                    "threshold": report.threshold,
-                    "headroom": report.headroom,
-                    "headroom_raw": report.headroom_raw,
-                    "details": report.details,
-                })
-            })
-        })
-        .collect();
-    serde_rows_to_dataframe_with_schema(py, &records, &SERIES_COLUMNS)
+pub(crate) fn dated_reports_table(series: Vec<DatedCovenantReports>) -> PyResult<PyArrowTable> {
+    let cap: usize = series.iter().map(|d| d.reports.len()).sum();
+    let mut as_ofs = Vec::with_capacity(cap);
+    let mut covenants = Vec::with_capacity(cap);
+    let mut covenant_types = Vec::with_capacity(cap);
+    let mut passed = Vec::with_capacity(cap);
+    let mut actual_values = Vec::with_capacity(cap);
+    let mut thresholds = Vec::with_capacity(cap);
+    let mut headrooms = Vec::with_capacity(cap);
+    let mut headrooms_raw = Vec::with_capacity(cap);
+    let mut details = Vec::with_capacity(cap);
+
+    for dated in series {
+        let as_of = dated.as_of.to_string();
+        for (key, report) in dated.reports {
+            as_ofs.push(as_of.clone());
+            covenants.push(key);
+            covenant_types.push(report.covenant_type);
+            passed.push(report.passed);
+            actual_values.push(report.actual_value);
+            thresholds.push(report.threshold);
+            headrooms.push(report.headroom);
+            headrooms_raw.push(report.headroom_raw);
+            details.push(report.details);
+        }
+    }
+
+    TableBuilder::new()
+        .utf8("as_of", as_ofs)?
+        .utf8("covenant", covenants)?
+        .utf8("covenant_type", covenant_types)?
+        .bool("passed", passed)?
+        .nullable_f64("actual_value", actual_values)?
+        .nullable_f64("threshold", thresholds)?
+        .nullable_f64("headroom", headrooms)?
+        .nullable_f64("headroom_raw", headrooms_raw)?
+        .nullable_utf8("details", details)?
+        .build()
 }
 
-/// Read a date-indexed metrics frame into Rust `DatedMetrics` rows.
+/// Read a dated metrics frame (pandas, Polars, or Arrow) into Rust `DatedMetrics` rows.
 ///
 /// Cells are preserved for canonical Rust validation. Duplicate metric
 /// columns are rejected rather than silently overwriting observations.
-pub(crate) fn extract_metric_frame(frame: &Bound<'_, PyAny>) -> PyResult<Vec<DatedMetrics>> {
-    let columns: Vec<String> = frame
-        .getattr("columns")?
-        .call_method0("tolist")?
-        .extract()
-        .map_err(|_| value_error("metrics frame columns must be metric-id strings"))?;
-    let unique: std::collections::HashSet<_> = columns.iter().collect();
-    if unique.len() != columns.len() {
+pub(crate) fn extract_metric_frame(
+    frame: &Bound<'_, PyAny>,
+    date_col: Option<&str>,
+) -> PyResult<Vec<DatedMetrics>> {
+    use crate::bindings::dataframe_utils::{
+        arrow_to_pyarrow_table, extract_dataframe_panel, has_arrow_c_stream, is_dataframe_like,
+        is_polars_dataframe, require_polars_module, resolve_arrow_date_col,
+        resolve_pandas_date_col_idx, resolve_polars_date_col, table_column_names,
+    };
+    if !is_dataframe_like(frame)? {
+        return Err(pyo3::exceptions::PyTypeError::new_err(
+            "metrics must be a pandas DataFrame, Polars DataFrame, or Arrow table",
+        ));
+    }
+    let cols = table_column_names(frame)?;
+    let resolved_date_name: Option<String> = if is_polars_dataframe(frame)? {
+        let pl = require_polars_module(frame.py())?;
+        Some(resolve_polars_date_col(&pl, frame, &cols, date_col)?)
+    } else if has_arrow_c_stream(frame)? {
+        let tbl = arrow_to_pyarrow_table(frame.py(), frame)?;
+        let pa_types = frame.py().import("pyarrow")?.getattr("types")?;
+        Some(resolve_arrow_date_col(&pa_types, &tbl, &cols, date_col)?)
+    } else {
+        if let Some(name) = date_col {
+            resolve_pandas_date_col_idx(&cols, name)?;
+        }
+        date_col.map(str::to_owned)
+    };
+    let metric_cols: Vec<&String> = cols
+        .iter()
+        .filter(|c| resolved_date_name.as_deref() != Some(c.as_str()))
+        .collect();
+    let unique: std::collections::HashSet<&String> = metric_cols.iter().copied().collect();
+    if unique.len() != metric_cols.len() {
         return Err(value_error(
             "metrics frame contains duplicate metric columns",
         ));
     }
-    let index = frame.getattr("index")?.call_method0("tolist")?;
-    let dates = index
-        .try_iter()?
-        .map(|item| py_to_date(&item?))
-        .collect::<PyResult<Vec<_>>>()?;
-    let values: Vec<Vec<f64>> = frame
-        .call_method1("astype", ("float64",))?
-        .call_method0("to_numpy")?
-        .call_method0("tolist")?
-        .extract()
-        .map_err(|_| value_error("metrics frame values must be numeric"))?;
-    if values.len() != dates.len() {
+    let panel = extract_dataframe_panel(
+        frame,
+        date_col,
+        "metrics must be a pandas DataFrame, Polars DataFrame, or Arrow table",
+    )?;
+    if panel.columns.len() != panel.ticker_names.len() {
         return Err(value_error(
             "metrics frame index and values disagree in length",
         ));
     }
-    Ok(dates
+    Ok(panel
+        .dates
         .into_iter()
-        .zip(values)
-        .map(|(date, row)| DatedMetrics {
+        .enumerate()
+        .map(|(row_idx, date)| DatedMetrics {
             date,
-            metrics: columns.iter().cloned().zip(row).collect(),
+            metrics: panel
+                .ticker_names
+                .iter()
+                .enumerate()
+                .map(|(col_idx, name)| (name.clone(), panel.columns[col_idx][row_idx]))
+                .collect(),
         })
         .collect())
 }
@@ -294,23 +322,25 @@ impl PyCovenantEngine {
 
     /// Evaluate the engine on every row of a date-indexed metrics frame.
     ///
-    /// ``metrics`` is a ``pandas.DataFrame`` whose index holds the test dates
-    /// and whose columns are unique metric ids; required cells must be finite.
-    /// Returns a long frame with one row per (date, covenant) and columns
-    /// ``as_of`` (ISO string), ``covenant`` (label), ``covenant_type``,
-    /// ``passed``, ``actual_value``, ``threshold``, ``headroom``, ``headroom_raw``, ``details``.
+    /// ``metrics`` is a ``pandas.DataFrame``, Polars ``DataFrame``, or Arrow
+    /// table holding test dates and unique metric columns; required cells must
+    /// be finite. Returns a long ``ArrowTable`` with one row per
+    /// ``(date, covenant)`` and columns ``as_of`` (ISO string), ``covenant``
+    /// (label), ``covenant_type``, ``passed``, ``actual_value``, ``threshold``,
+    /// ``headroom``, ``headroom_raw``, ``details``.
     ///
     /// Raises ``KeyError`` when a required metric is missing on any date and
     /// ``ValueError`` for an invalid engine or non-numeric frame.
-    #[pyo3(text_signature = "(metrics)")]
+    #[pyo3(signature = (metrics, *, date_col=None), text_signature = "(metrics, *, date_col=None)")]
     fn evaluate_series<'py>(
         &self,
         py: Python<'py>,
         metrics: &Bound<'py, PyAny>,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        let rows = extract_metric_frame(metrics)?;
+        date_col: Option<&str>,
+    ) -> PyResult<PyArrowTable> {
+        let rows = extract_metric_frame(metrics, date_col)?;
         let evaluated = py.detach(|| self.inner.evaluate_series(&rows).map_err(core_to_py))?;
-        dated_reports_frame(py, evaluated)
+        dated_reports_table(evaluated)
     }
 
     /// Deserialize from JSON; only ``specs`` is required.
@@ -626,7 +656,7 @@ pub(crate) fn covenant_template(template: PyCovenantTemplate) -> PyResult<Vec<Py
         .map(|specs| specs.into_iter().map(PyCovenantSpec::from_inner).collect())
 }
 
-/// Flatten ``evaluate`` output into one frame row per covenant.
+/// Flatten ``evaluate`` output into an ``ArrowTable`` with one row per covenant.
 ///
 /// ``reports`` is the ``dict[str, CovenantReport]`` returned by
 /// ``CovenantEngine.evaluate`` or ``evaluate_engine``. Columns:
@@ -636,37 +666,38 @@ pub(crate) fn covenant_template(template: PyCovenantTemplate) -> PyResult<Vec<Py
 /// Raises ``TypeError`` when a value is not a ``CovenantReport``.
 #[pyfunction]
 #[pyo3(text_signature = "(reports)")]
-pub(crate) fn reports_to_dataframe<'py>(
-    py: Python<'py>,
-    reports: &Bound<'py, PyDict>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let mut rows = Vec::with_capacity(reports.len());
+pub(crate) fn reports_table(reports: &Bound<'_, PyDict>) -> PyResult<PyArrowTable> {
+    let n = reports.len();
+    let mut covenants = Vec::with_capacity(n);
+    let mut covenant_types = Vec::with_capacity(n);
+    let mut passed = Vec::with_capacity(n);
+    let mut actual_values = Vec::with_capacity(n);
+    let mut thresholds = Vec::with_capacity(n);
+    let mut headrooms = Vec::with_capacity(n);
+    let mut headrooms_raw = Vec::with_capacity(n);
+    let mut details = Vec::with_capacity(n);
+
     for (key, value) in reports.iter() {
         let key: String = key.extract()?;
         let report = value.extract::<PyRef<'_, PyCovenantReport>>()?;
-        rows.push(serde_json::json!({
-            "covenant": key,
-            "covenant_type": report.inner.covenant_type,
-            "passed": report.inner.passed,
-            "actual_value": report.inner.actual_value,
-            "threshold": report.inner.threshold,
-            "headroom": report.inner.headroom,
-            "headroom_raw": report.inner.headroom_raw,
-            "details": report.inner.details,
-        }));
+        covenants.push(key);
+        covenant_types.push(report.inner.covenant_type.clone());
+        passed.push(report.inner.passed);
+        actual_values.push(report.inner.actual_value);
+        thresholds.push(report.inner.threshold);
+        headrooms.push(report.inner.headroom);
+        headrooms_raw.push(report.inner.headroom_raw);
+        details.push(report.inner.details.clone());
     }
-    serde_rows_to_dataframe_with_schema(
-        py,
-        &rows,
-        &[
-            ("covenant", "str"),
-            ("covenant_type", "str"),
-            ("passed", "bool"),
-            ("actual_value", "float64"),
-            ("threshold", "float64"),
-            ("headroom", "float64"),
-            ("headroom_raw", "float64"),
-            ("details", "str"),
-        ],
-    )
+
+    TableBuilder::new()
+        .utf8("covenant", covenants)?
+        .utf8("covenant_type", covenant_types)?
+        .bool("passed", passed)?
+        .nullable_f64("actual_value", actual_values)?
+        .nullable_f64("threshold", thresholds)?
+        .nullable_f64("headroom", headrooms)?
+        .nullable_f64("headroom_raw", headrooms_raw)?
+        .nullable_utf8("details", details)?
+        .build()
 }

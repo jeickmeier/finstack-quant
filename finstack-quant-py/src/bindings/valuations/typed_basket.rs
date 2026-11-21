@@ -64,7 +64,7 @@ impl PyBasket {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "Basket.constituents")]
     #[getter]
     fn constituents<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.constituents)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.constituents)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "Basket.expense_ratio")]
@@ -76,7 +76,7 @@ impl PyBasket {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "Basket.expense")]
     #[getter]
     fn expense<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.expense)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.expense)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "Basket.reporting_currency")]
@@ -100,7 +100,7 @@ impl PyBasket {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_basket", "Basket.pricing_config")]
     #[getter]
     fn pricing_config<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.pricing_config)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.pricing_config)
     }
 }
 

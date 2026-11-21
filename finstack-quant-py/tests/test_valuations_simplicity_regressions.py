@@ -42,11 +42,13 @@ def empty_tranche() -> dict:
 
 
 def test_empty_tranche_table_keeps_columns_and_numeric_dtypes() -> None:
-    frame = TrancheCashflows.from_json(json.dumps(empty_tranche())).to_dataframe()
+    tranche = TrancheCashflows.from_json(json.dumps(empty_tranche()))
+    frame = tranche.to_pandas()
     assert frame.empty
     assert list(frame.columns) == ["date", "cashflow", "interest", "principal", "pik", "deferred", "writedown"]
     assert pd.api.types.is_string_dtype(frame["date"].dtype)
     assert all(pd.api.types.is_float_dtype(frame[name].dtype) for name in frame.columns[1:])
+    assert tranche.to_arrow().num_rows == 0
 
 
 def test_tranche_table_rejects_mixed_currency_component() -> None:
@@ -54,4 +56,4 @@ def test_tranche_table_rejects_mixed_currency_component() -> None:
     payload["interest_flows"] = [["2025-01-02", {"amount": "1", "currency": "EUR"}]]
     cashflows = TrancheCashflows.from_json(json.dumps(payload))
     with pytest.raises(ValueError, match=r"currency|Currency"):
-        cashflows.to_dataframe()
+        cashflows.to_pandas()

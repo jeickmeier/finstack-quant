@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 import datetime
 from typing import Any
+import pandas as pd
+import polars as pl
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.models.factor import FactorModelConfig
 from finstack_quant.models.factor.risk import RiskDecomposition
@@ -277,7 +280,7 @@ class FactorModel:
         portfolio: Portfolio | str,
         market: MarketContext | str,
         as_of: datetime.date | str,
-        stresses: list[tuple[str, float]],
+        stresses: Mapping[str, float] | pd.Series | pd.DataFrame | pl.DataFrame | Sequence[tuple[str, float]] | Any,
     ) -> StressResult:
         """
         Shock factors, reprice, and decompose risk under the stressed market.
@@ -290,9 +293,12 @@ class FactorModel:
             Baseline market to shock.
         as_of : datetime.date | str
             Valuation date for both endpoints.
-        stresses : list[tuple[str, float]]
-            ``(factor_id, shift)`` pairs; each shift is in the factor's
-            configured market-mapping units (e.g. bp for ``rate_bp``).
+        stresses : Mapping[str, float] | pandas.Series | pandas.DataFrame | polars.DataFrame | sequence[tuple[str, float]] | Any
+            Factor shocks given as ``(factor_id, shift)`` pairs, a
+            ``dict[str, float]`` mapping, a factor-indexed ``pandas.Series``,
+            or a two-column DataFrame / Arrow table of ``(factor_id, shift)``;
+            each shift is in the factor's configured market-mapping units (e.g.
+            bp for ``rate_bp``).
 
         Returns
         -------
@@ -314,7 +320,7 @@ class FactorModel:
         portfolio: Portfolio | str,
         market: MarketContext | str,
         as_of: datetime.date | str,
-        stresses: list[tuple[str, float]],
+        stresses: Mapping[str, float] | pd.Series | pd.DataFrame | pl.DataFrame | Sequence[tuple[str, float]] | Any,
     ) -> StressPnl:
         """
         Shock factors and reprice without decomposing stressed risk.
@@ -327,9 +333,11 @@ class FactorModel:
             Baseline market to shock.
         as_of : datetime.date | str
             Valuation date for both endpoints.
-        stresses : list[tuple[str, float]]
-            ``(factor_id, shift)`` pairs in each factor's configured
-            market-mapping units.
+        stresses : Mapping[str, float] | pandas.Series | pandas.DataFrame | polars.DataFrame | sequence[tuple[str, float]] | Any
+            Factor shocks given as ``(factor_id, shift)`` pairs, a
+            ``dict[str, float]`` mapping, a factor-indexed ``pandas.Series``,
+            or a two-column DataFrame / Arrow table of ``(factor_id, shift)``,
+            in each factor's configured market-mapping units.
 
         Returns
         -------

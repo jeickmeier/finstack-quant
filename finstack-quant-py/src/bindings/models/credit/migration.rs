@@ -1,30 +1,40 @@
 //! Python bindings for `finstack_quant_models::credit::migration`.
 
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::TableBuilder;
+use crate::errors::{kinded_to_py, value_error};
 use finstack_quant_models::credit::migration::{
     self, GeneratorMatrix, MigrationSimulator, RatingPath, RatingScale, TransitionMatrix,
 };
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyModule};
+use pyo3::types::{PyList, PyModule};
 
-use crate::bindings::pandas_utils::dict_to_dataframe;
-use crate::bindings::pydoc::pydoc;
-use crate::errors::kinded_to_py;
-
-/// Build a labelled square `pd.DataFrame` (`index` = origin, `columns` = destination).
-fn labelled_square_frame<'py>(
-    py: Python<'py>,
+/// Build a labelled square [`PyArrowTable`] (`from_state` + destination columns).
+fn labelled_square_table(
     scale: &RatingScale,
     data: &nalgebra::DMatrix<f64>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let labels: Vec<&str> = scale.labels().iter().map(String::as_str).collect();
-    let columns = PyDict::new(py);
+) -> PyResult<PyArrowTable> {
+    let labels: Vec<String> = scale.labels().to_vec();
+    let mut builder = TableBuilder::new().utf8("from_state", labels.clone())?;
     for (col, label) in labels.iter().enumerate() {
         let values: Vec<f64> = (0..data.nrows()).map(|row| data[(row, col)]).collect();
-        columns.set_item(label, values)?;
+        builder = builder.f64(label, values)?;
     }
-    let index = PyList::new(py, &labels)?;
-    dict_to_dataframe(py, &columns, Some(index.into_any()))
+    builder.build()
+}
+
+/// Convert a labelled square [`PyArrowTable`] to a square `pd.DataFrame` indexed by origin label.
+fn labelled_square_pandas<'py>(
+    py: Python<'py>,
+    table: PyArrowTable,
+) -> PyResult<Bound<'py, PyAny>> {
+    let bound = Bound::new(py, table)?;
+    let frame = PyArrowTable::to_pandas(&bound, py)?;
+    frame
+        .call_method1("set_index", ("from_state",))?
+        .call_method1("rename_axis", (py.None(),))
 }
 
 #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingScale")]
@@ -213,6 +223,68 @@ impl PyTransitionMatrix {
         horizon: f64,
         scale: Option<&PyRatingScale>,
     ) -> PyResult<Self> {
+        use crate::bindings::dataframe_utils::{
+            extract_2d_f64, extract_f64_vec, has_arrow_c_stream, is_polars_dataframe,
+            table_column_names, table_column_to_pylist,
+        };
+        if is_polars_dataframe(df)? || has_arrow_c_stream(df)? {
+            let cols = table_column_names(df)?;
+            if let Ok(Some((flat, nrows, ncols))) = extract_2d_f64(df, "data")
+                && nrows == ncols
+            {
+                return TransitionMatrix::from_labeled(
+                    &cols,
+                    &cols,
+                    &flat,
+                    horizon,
+                    scale.map(|s| s.inner.clone()),
+                )
+                .map(Self::from_inner)
+                .map_err(kinded_to_py);
+            }
+            if cols.is_empty() {
+                return Err(crate::errors::value_error(
+                    "TransitionMatrix DataFrame cannot have zero columns",
+                ));
+            }
+            let row_labels: Vec<String> = table_column_to_pylist(df, &cols[0])?
+                .unwrap_or_default()
+                .into_iter()
+                .map(|item| item.str()?.extract::<String>())
+                .collect::<PyResult<_>>()?;
+            let col_labels = cols[1..].to_vec();
+            let mut col_data = Vec::with_capacity(col_labels.len());
+            if is_polars_dataframe(df)? {
+                for col in &col_labels {
+                    col_data.push(extract_f64_vec(&df.get_item(col)?, col)?);
+                }
+            } else {
+                let tbl = crate::bindings::dataframe_utils::arrow_to_pyarrow_table(df.py(), df)?;
+                for col in &col_labels {
+                    let py_col: Vec<f64> = tbl
+                        .call_method1("column", (col,))?
+                        .call_method0("to_pylist")?
+                        .extract()?;
+                    col_data.push(py_col);
+                }
+            }
+            let nrows = row_labels.len();
+            let mut flat = Vec::with_capacity(nrows * col_labels.len());
+            for r in 0..nrows {
+                for col in &col_data {
+                    flat.push(col[r]);
+                }
+            }
+            return TransitionMatrix::from_labeled(
+                &row_labels,
+                &col_labels,
+                &flat,
+                horizon,
+                scale.map(|s| s.inner.clone()),
+            )
+            .map(Self::from_inner)
+            .map_err(kinded_to_py);
+        }
         let index: Vec<String> = df.getattr("index")?.call_method0("tolist")?.extract()?;
         let columns: Vec<String> = df.getattr("columns")?.call_method0("tolist")?.extract()?;
         Self::from_labeled(index, columns, &df.getattr("values")?, horizon, scale)
@@ -283,9 +355,10 @@ impl PyTransitionMatrix {
         self.inner.to_rows()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        labelled_square_frame(py, self.inner.scale(), self.inner.as_matrix())
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.to_pandas")]
+    #[pyo3(text_signature = "($self)")]
+    fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        labelled_square_pandas(py, self.to_arrow_table()?)
     }
 
     #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.horizon")]
@@ -323,13 +396,24 @@ impl PyTransitionMatrix {
     }
 }
 
+impl PyTransitionMatrix {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        labelled_square_table(self.inner.scale(), self.inner.as_matrix())
+    }
+}
+
+tabular_methods!(
+    PyTransitionMatrix,
+    "TransitionMatrix",
+    module = "finstack_quant.models.credit.migration",
+    custom_pandas
+);
 wire_methods!(
     PyTransitionMatrix,
     TransitionMatrix,
     "TransitionMatrix",
     module = "finstack_quant.models.credit.migration"
 );
-impl_repr_html_via_dataframe!(PyTransitionMatrix);
 
 #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix")]
 #[pyclass(
@@ -398,9 +482,10 @@ impl PyGeneratorMatrix {
         self.inner.to_rows()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        labelled_square_frame(py, self.inner.scale(), self.inner.as_matrix())
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.to_pandas")]
+    #[pyo3(text_signature = "($self)")]
+    fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        labelled_square_pandas(py, self.to_arrow_table()?)
     }
 
     #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.n_states")]
@@ -438,13 +523,24 @@ impl PyGeneratorMatrix {
     }
 }
 
+impl PyGeneratorMatrix {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        labelled_square_table(self.inner.scale(), self.inner.as_matrix())
+    }
+}
+
+tabular_methods!(
+    PyGeneratorMatrix,
+    "GeneratorMatrix",
+    module = "finstack_quant.models.credit.migration",
+    custom_pandas
+);
 wire_methods!(
     PyGeneratorMatrix,
     GeneratorMatrix,
     "GeneratorMatrix",
     module = "finstack_quant.models.credit.migration"
 );
-impl_repr_html_via_dataframe!(PyGeneratorMatrix);
 
 #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPath")]
 #[pyclass(
@@ -566,28 +662,6 @@ impl PyRatingPaths {
         migration::default_rate(&self.inner)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPaths.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let mut path_col: Vec<u64> = Vec::new();
-        let mut time_col: Vec<f64> = Vec::new();
-        let mut state_col: Vec<u64> = Vec::new();
-        let mut label_col: Vec<String> = Vec::new();
-        for (index, path) in self.inner.iter().enumerate() {
-            for (time, state) in path.transitions() {
-                path_col.push(index as u64);
-                time_col.push(*time);
-                state_col.push(*state as u64);
-                label_col.push(path.scale().label_of(*state).unwrap_or_default().to_owned());
-            }
-        }
-        let columns = PyDict::new(py);
-        columns.set_item("path", path_col)?;
-        columns.set_item("time", time_col)?;
-        columns.set_item("state", state_col)?;
-        columns.set_item("label", label_col)?;
-        dict_to_dataframe(py, &columns, None)
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPaths.__len__")]
     fn __len__(&self) -> usize {
         self.inner.len()
@@ -617,6 +691,38 @@ impl PyRatingPaths {
     }
 }
 
+impl PyRatingPaths {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let mut path_col: Vec<i64> = Vec::new();
+        let mut time_col: Vec<f64> = Vec::new();
+        let mut state_col: Vec<i64> = Vec::new();
+        let mut label_col: Vec<String> = Vec::new();
+        for (index, path) in self.inner.iter().enumerate() {
+            let path_i64 = i64::try_from(index)
+                .map_err(|e| value_error(format!("path index overflow: {e}")))?;
+            for (time, state) in path.transitions() {
+                let state_i64 = i64::try_from(*state)
+                    .map_err(|e| value_error(format!("state index overflow: {e}")))?;
+                path_col.push(path_i64);
+                time_col.push(*time);
+                state_col.push(state_i64);
+                label_col.push(path.scale().label_of(*state).unwrap_or_default().to_owned());
+            }
+        }
+        TableBuilder::new()
+            .i64("path", path_col)?
+            .f64("time", time_col)?
+            .i64("state", state_col)?
+            .utf8("label", label_col)?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyRatingPaths,
+    "RatingPaths",
+    module = "finstack_quant.models.credit.migration"
+);
 wire_methods!(
     PyRatingPaths,
     Vec<RatingPath>,

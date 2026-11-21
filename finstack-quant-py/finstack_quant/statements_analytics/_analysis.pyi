@@ -6,9 +6,11 @@ from collections.abc import Mapping
 from datetime import date
 from typing import Any, Literal, TypedDict
 import pandas as pd
+import polars as pl
 from finstack_quant.statements import FinancialModelSpec, StatementResult
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable, LabeledSeries
 from finstack_quant.statements_analytics._typed import (
     BridgeChart,
     ScenarioDiff,
@@ -440,7 +442,26 @@ class Explanation:
         str
             Human-readable multi-line explanation.
         """
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export the breakdown as an ``ArrowTable``.
+
+        Columns: ``component``, ``value``, ``operation`` (null when absent).
+        One row per breakdown step in evaluation order.
+
+        Returns
+        -------
+        ArrowTable
+            Formula breakdown table with one row per step.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export the breakdown as a pandas ``DataFrame``.
 
@@ -450,7 +471,7 @@ class Explanation:
         Returns
         -------
         pd.DataFrame
-            Export the breakdown as a pandas ``DataFrame``. Columns: ``component``, ``value``, ``operation`` (``None`` when absent). One row per breakdown step in evaluation order.
+            Breakdown frame with one row per step.
 
         Raises
         ------
@@ -459,6 +480,47 @@ class Explanation:
         ValueError
             If the result cannot be converted to its wire form.
         """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the breakdown as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Breakdown frame with one row per step.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to its wire form.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the breakdown as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Breakdown table with one row per step.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to its wire form.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to canonical JSON (identical to the WASM ``explainFormula`` output).
@@ -651,26 +713,24 @@ class ForecastMetrics:
         str
             One-line human-readable summary (Rust ``ForecastMetrics::summary``).
         """
-    def to_series(self) -> pd.Series:
+    def to_series(self) -> LabeledSeries:
         """
-        Export as a pandas ``Series`` indexed by metric name.
+        Export as a ``LabeledSeries`` indexed by metric name.
 
         Index: ``mae``, ``mape``, ``mape_effective_n``, ``smape``, ``rmse``,
-        ``n``; counts are cast to float and unavailable percentages become
-        pandas ``NaN``.
+        ``n``; counts are represented as floats and unavailable percentages
+        become null (``NaN`` in ``to_pandas()``).
 
         Returns
         -------
-        pd.Series
-            Metrics indexed by name, with counts cast to float and unavailable
-            percentages represented as pandas ``NaN``.
+        LabeledSeries
+            Metrics indexed by name, with counts as floats and unavailable
+            percentages represented as null.
 
         Raises
         ------
-        ImportError
-            If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the series cannot be constructed.
         """
     def to_json(self) -> str:
         """
@@ -1134,56 +1194,55 @@ def evaluate_scenario_set_with_market(
 ) -> ScenarioResults:
     """Evaluate all scenarios in a scenario set against a market as of a date.
 
-        Each scenario is evaluated like ``Evaluator.evaluate_with_market``: the
-        capital structure's instruments are priced from ``market`` as of
-        ``as_of`` (floating coupons, swaps, caps), so every result carries
-        ``cs_cashflows``, and explicit actuals not yet available at ``as_of`` are
-        hidden. The market is shared unchanged by every scenario.
+    Each scenario is evaluated like ``Evaluator.evaluate_with_market``: the
+    capital structure's instruments are priced from ``market`` as of
+    ``as_of`` (floating coupons, swaps, caps), so every result carries
+    ``cs_cashflows``, and explicit actuals not yet available at ``as_of`` are
+    hidden. The market is shared unchanged by every scenario.
 
-        Parameters
-        ----------
-        model : FinancialModelSpec | str
-            A ``FinancialModelSpec`` object or a JSON string.
-        scenario_set : ScenarioSet | str
-            A typed scenario set or its JSON serialization.
-        market : MarketContext | str
-            Curves, fixings and FX the instruments are priced from, typed or its
-            canonical JSON.
-        as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-            Valuation date for the instruments' cashflows and the cutoff for
-            explicit-value visibility; ISO ``YYYY-MM-DD`` strings are accepted.
+    Parameters
+    ----------
+    model : FinancialModelSpec | str
+        A ``FinancialModelSpec`` object or a JSON string.
+    scenario_set : ScenarioSet | str
+        A typed scenario set or its JSON serialization.
+    market : MarketContext | str
+        Curves, fixings and FX the instruments are priced from, typed or its
+        canonical JSON.
+    as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
+        Valuation date for the instruments' cashflows and the cutoff for
+        explicit-value visibility; ISO ``YYYY-MM-DD`` strings are accepted.
 
-        Returns
-        -------
-        ScenarioResults
-            Typed mapping of scenario names to statement results.
+    Returns
+    -------
+    ScenarioResults
+        Typed mapping of scenario names to statement results.
 
-        Raises
-        ------
-        ValueError
-            If ``as_of`` is not date-like, the set is empty, a parent chain
-            cycles, an override is incompatible with its node, a forecast
-            override has invalid parameters, or evaluation fails.
-        KeyError
-            If an override names a node missing from the model, or an instrument
-            needs market data ``market`` lacks.
-        RuntimeError
-            If capital-structure cashflow generation or the waterfall fails.
+    Raises
+    ------
+    ValueError
+        If ``as_of`` is not date-like, the set is empty, a parent chain
+        cycles, an override is incompatible with its node, a forecast
+        override has invalid parameters, or evaluation fails.
+    KeyError
+        If an override names a node missing from the model, or an instrument
+        needs market data ``market`` lacks.
+    RuntimeError
+        If capital-structure cashflow generation or the waterfall fails.
 
-        Examples
-        --------
-        >>> from finstack_quant.core.market_data import MarketContext
-    from finstack_quant.core.money import Money
-        >>> from finstack_quant.statements import ModelBuilder
-        >>> from finstack_quant.statements_analytics import ScenarioSet, evaluate_scenario_set_with_market
-        >>> b = ModelBuilder("m")
-        >>> _ = b.periods("2025Q1..Q2", None)
-        >>> _ = b.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
-        >>> results = evaluate_scenario_set_with_market(
-        ...     b.build(), ScenarioSet({"base": {}, "down": {"revenue": 90.0}}), MarketContext(), "2025-01-01"
-        ... )
-        >>> results.names
-        ['base', 'down']
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.statements import ModelBuilder
+    >>> from finstack_quant.statements_analytics import ScenarioSet, evaluate_scenario_set_with_market
+    >>> b = ModelBuilder("m")
+    >>> _ = b.periods("2025Q1..Q2", None)
+    >>> _ = b.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
+    >>> results = evaluate_scenario_set_with_market(
+    ...     b.build(), ScenarioSet({"base": {}, "down": {"revenue": 90.0}}), MarketContext(), "2025-01-01"
+    ... )
+    >>> results.names
+    ['base', 'down']
     """
 
 def explain_formula(model: Any, results: Any, node_id: str, period: str) -> Explanation:
@@ -1204,8 +1263,8 @@ def explain_formula(model: Any, results: Any, node_id: str, period: str) -> Expl
     -------
     Explanation
         Typed explanation with the cell ``source``, the ``forecast`` spec of a
-        forecast cell, ``breakdown`` steps, ``to_text()`` and
-        ``to_dataframe()``; ``to_json()`` matches the WASM ``explainFormula``.
+        forecast cell, ``breakdown`` steps, ``to_text()``, ``to_arrow()``, and
+        ``to_pandas()``; ``to_json()`` matches the WASM ``explainFormula``.
 
     Raises
     ------

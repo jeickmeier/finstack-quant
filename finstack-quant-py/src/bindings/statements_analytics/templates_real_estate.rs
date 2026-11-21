@@ -8,12 +8,11 @@
 //! the canonical Rust builder, applies the template, and returns a typed model
 //! while preserving metadata and capital structure.
 
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
-use crate::bindings::pandas_utils::{
-    serde_object_to_single_row_dataframe, serde_object_to_single_row_dataframe_with_schema,
-};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::statements::parse_period_id;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use finstack_quant_statements_analytics::templates::real_estate as rust_re;
 use pyo3::prelude::*;
 
@@ -197,28 +196,32 @@ impl PyRenewalSpec {
 
     /// Export the renewal spec as a single-row pandas ``DataFrame``.
     ///
-    /// Columns: ``downtime_periods``, ``term_periods``, ``probability``,
-    /// ``rent_factor``, ``free_rent_periods``.
-    ///
-    /// The three ``*_periods`` columns are counts of model periods;
-    /// ``probability`` is a decimal fraction in ``[0, 1]`` and
-    /// ``rent_factor`` is a multiplier on the prior rent level.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe(py, &self.inner)
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
     /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
+    /// `to_json()` or a table exit when the contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("RenewalSpec", &self.inner)
     }
 }
 
 wire_methods!(PyRenewalSpec, rust_re::RenewalSpec, "RenewalSpec");
-impl_repr_html_via_dataframe!(PyRenewalSpec);
+
+impl PyRenewalSpec {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: [(&str, &str); 5] = [
+            ("downtime_periods", "int64"),
+            ("term_periods", "int64"),
+            ("probability", "float64"),
+            ("rent_factor", "float64"),
+            ("free_rent_periods", "int64"),
+        ];
+        serde_rows_to_arrow_table(&[&self.inner], &COLUMNS)
+    }
+}
+
+tabular_methods!(PyRenewalSpec);
 
 /// Compounding convention for lease rent growth.
 #[pyclass(
@@ -372,8 +375,33 @@ impl PyLeaseSpec {
             .map_err(crate::errors::statements_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.statements_analytics._templates_real_estate", "LeaseSpec.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    /// Identify this value in notebooks and logs.
+    ///
+    /// Rendered from the wire representation, so the fields shown are the
+    /// fields `to_json()` names. Collections are summarised by length; use
+    /// `to_json()` or a table exit when the contents matter.
+    fn __repr__(&self) -> String {
+        crate::bindings::repr_support::repr_from_serde("LeaseSpec", &self.inner)
+    }
+}
+
+wire_methods!(PyLeaseSpec, rust_re::LeaseSpec, "LeaseSpec");
+
+impl PyLeaseSpec {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: [(&str, &str); 11] = [
+            ("node_id", "str"),
+            ("start", "str"),
+            ("end", "str"),
+            ("base_rent", "float64"),
+            ("growth_rate", "float64"),
+            ("growth_convention", "str"),
+            ("free_rent_periods", "int64"),
+            ("occupancy", "float64"),
+            ("rent_step_count", "int64"),
+            ("free_rent_window_count", "int64"),
+            ("has_renewal", "bool"),
+        ];
         let row = serde_json::json!({
             "node_id": self.inner.node_id,
             "start": self.inner.start.to_string(),
@@ -387,37 +415,15 @@ impl PyLeaseSpec {
             "free_rent_window_count": self.inner.free_rent_windows.len(),
             "has_renewal": self.inner.renewal.is_some(),
         });
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &[
-                "node_id",
-                "start",
-                "end",
-                "base_rent",
-                "growth_rate",
-                "growth_convention",
-                "free_rent_periods",
-                "occupancy",
-                "rent_step_count",
-                "free_rent_window_count",
-                "has_renewal",
-            ],
-        )
-    }
-
-    /// Identify this value in notebooks and logs.
-    ///
-    /// Rendered from the wire representation, so the fields shown are the
-    /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
-    fn __repr__(&self) -> String {
-        crate::bindings::repr_support::repr_from_serde("LeaseSpec", &self.inner)
+        serde_rows_to_arrow_table(&[row], &COLUMNS)
     }
 }
 
-wire_methods!(PyLeaseSpec, rust_re::LeaseSpec, "LeaseSpec");
-impl_repr_html_via_dataframe!(PyLeaseSpec);
+tabular_methods!(
+    PyLeaseSpec,
+    "LeaseSpec",
+    module = "finstack_quant.statements_analytics._templates_real_estate"
+);
 
 /// Standard aggregated output node ids for a rent roll.
 #[pyclass(
@@ -482,20 +488,11 @@ impl PyRentRollOutputNodes {
         &self.inner.rent_effective_node
     }
 
-    /// Export the node-id mapping as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``rent_pgi_node``, ``free_rent_node``, ``vacancy_loss_node``,
-    /// ``rent_effective_node``. Every value is a statement node id, not a
-    /// numeric amount.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe(py, &self.inner)
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
     /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
+    /// `to_json()` or a table exit when the contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("RentRollOutputNodes", &self.inner)
     }
@@ -506,7 +503,20 @@ wire_methods!(
     rust_re::RentRollOutputNodes,
     "RentRollOutputNodes"
 );
-impl_repr_html_via_dataframe!(PyRentRollOutputNodes);
+
+impl PyRentRollOutputNodes {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: [(&str, &str); 4] = [
+            ("rent_pgi_node", "str"),
+            ("free_rent_node", "str"),
+            ("vacancy_loss_node", "str"),
+            ("rent_effective_node", "str"),
+        ];
+        serde_rows_to_arrow_table(&[&self.inner], &COLUMNS)
+    }
+}
+
+tabular_methods!(PyRentRollOutputNodes);
 
 /// Basis for management fee calculation.
 #[pyclass(
@@ -694,16 +704,37 @@ impl PyPropertyTemplateNodes {
         &self.inner.ncf_node
     }
 
-    /// Export the node-id mapping as a single-row pandas ``DataFrame``.
+    /// Identify this value in notebooks and logs.
     ///
-    /// Columns: ``rent_pgi_node``, ``free_rent_node``, ``vacancy_loss_node``,
-    /// ``rent_effective_node``, ``other_income_total_node``, ``egi_node``,
-    /// ``management_fee_node``, ``opex_total_node``, ``noi_node``,
-    /// ``capex_total_node``, ``ncf_node``.
-    ///
-    /// The four rent-roll node ids are flattened in rather than nested, so
-    /// every value is a plain statement node id, not a numeric amount.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    /// Rendered from the wire representation, so the fields shown are the
+    /// fields `to_json()` names. Collections are summarised by length; use
+    /// `to_json()` or a table exit when the contents matter.
+    fn __repr__(&self) -> String {
+        crate::bindings::repr_support::repr_from_serde("PropertyTemplateNodes", &self.inner)
+    }
+}
+
+wire_methods!(
+    PyPropertyTemplateNodes,
+    rust_re::PropertyTemplateNodes,
+    "PropertyTemplateNodes"
+);
+
+impl PyPropertyTemplateNodes {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: [(&str, &str); 11] = [
+            ("rent_pgi_node", "str"),
+            ("free_rent_node", "str"),
+            ("vacancy_loss_node", "str"),
+            ("rent_effective_node", "str"),
+            ("other_income_total_node", "str"),
+            ("egi_node", "str"),
+            ("management_fee_node", "str"),
+            ("opex_total_node", "str"),
+            ("noi_node", "str"),
+            ("capex_total_node", "str"),
+            ("ncf_node", "str"),
+        ];
         let row = serde_json::json!({
             "rent_pgi_node": self.inner.rent_roll.rent_pgi_node,
             "free_rent_node": self.inner.rent_roll.free_rent_node,
@@ -717,41 +748,11 @@ impl PyPropertyTemplateNodes {
             "capex_total_node": self.inner.capex_total_node,
             "ncf_node": self.inner.ncf_node,
         });
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &[
-                "rent_pgi_node",
-                "free_rent_node",
-                "vacancy_loss_node",
-                "rent_effective_node",
-                "other_income_total_node",
-                "egi_node",
-                "management_fee_node",
-                "opex_total_node",
-                "noi_node",
-                "capex_total_node",
-                "ncf_node",
-            ],
-        )
-    }
-
-    /// Identify this value in notebooks and logs.
-    ///
-    /// Rendered from the wire representation, so the fields shown are the
-    /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
-    fn __repr__(&self) -> String {
-        crate::bindings::repr_support::repr_from_serde("PropertyTemplateNodes", &self.inner)
+        serde_rows_to_arrow_table(&[row], &COLUMNS)
     }
 }
 
-wire_methods!(
-    PyPropertyTemplateNodes,
-    rust_re::PropertyTemplateNodes,
-    "PropertyTemplateNodes"
-);
-impl_repr_html_via_dataframe!(PyPropertyTemplateNodes);
+tabular_methods!(PyPropertyTemplateNodes);
 
 // add_noi_buildup
 

@@ -5,8 +5,10 @@ use finstack_quant_portfolio::factor_model::{
     self as fm, CreditVolReport, LevelVolContribution, PositionVolContribution,
 };
 
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::tabular_methods;
 use crate::bindings::models::factor::credit::PyCreditFactorModel;
-use crate::bindings::pandas_utils::dict_to_dataframe;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::portfolio_to_py;
 
 use crate::bindings::models::factor::risk::PyRiskDecomposition;
@@ -157,7 +159,7 @@ impl PyCreditVolReport {
     /// or ``{"expected_shortfall": {"confidence": c}}``.
     #[getter]
     fn measure<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.measure)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.measure)
     }
 
     /// Contribution from the generic (principal-component) ``credit::generic``
@@ -203,57 +205,52 @@ impl PyCreditVolReport {
         })
     }
 
-    /// Primary table: the per-hierarchy-level rollup.
-    ///
-    /// Alias of :meth:`to_level_dataframe`. Every tabular result type in the
-    /// library answers ``to_dataframe()``; the optional per-position
-    /// breakdown stays on :meth:`to_position_dataframe`.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        self.to_level_dataframe(py)
-    }
-
-    /// Export the per-hierarchy-level rollup as a pandas ``DataFrame``.
+    /// Export the per-hierarchy-level rollup as an
+    /// :class:`~finstack_quant.core.table.ArrowTable`.
     ///
     /// One row per entry of :attr:`by_level`. The per-bucket drill-down stays
     /// on :attr:`LevelVolContribution.by_bucket`, which is already a plain dict.
     ///
     /// Columns: ``level_name``, ``total`` (level contribution in the units of
     /// :attr:`measure`).
-    fn to_level_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        // The columns are built explicitly: the frame leaves out `by_bucket`.
+    #[pyo3(text_signature = "($self)")]
+    fn to_level_table(&self) -> PyResult<PyArrowTable> {
         let rows = &self.inner.by_level;
-        let level_names: Vec<&str> = rows.iter().map(|l| l.level_name.as_str()).collect();
+        let level_names: Vec<String> = rows.iter().map(|l| l.level_name.clone()).collect();
         let totals: Vec<f64> = rows.iter().map(|l| l.total).collect();
-        let data = PyDict::new(py);
-        data.set_item("level_name", level_names)?;
-        data.set_item("total", totals)?;
-        dict_to_dataframe(py, &data, None)
+        TableBuilder::new()
+            .utf8("level_name", level_names)?
+            .f64("total", totals)?
+            .build()
     }
 
-    /// Export the optional per-position breakdown as a pandas ``DataFrame``.
+    /// Export the optional per-position breakdown as an
+    /// :class:`~finstack_quant.core.table.ArrowTable`.
     ///
     /// One row per entry of :attr:`by_position`. When the report was built
-    /// without ``by_position=True`` the result is a zero-row frame that still
-    /// carries the full column schema, so downstream ``df[...]`` selections
-    /// keep working instead of raising ``KeyError``.
+    /// without ``by_position=True`` the result is a zero-row table that still
+    /// carries the full column schema.
     ///
     /// Columns: ``position_id``, ``factor_total`` (systematic),
     /// ``idiosyncratic`` (issuer-specific), ``total`` (their sum) — all in the
     /// units of :attr:`measure`.
-    fn to_position_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        // Built explicitly so the empty case keeps the full column schema.
+    #[pyo3(text_signature = "($self)")]
+    fn to_position_table(&self) -> PyResult<PyArrowTable> {
         let rows: &[PositionVolContribution] =
             self.inner.by_position.as_deref().unwrap_or_default();
-        let position_ids: Vec<&str> = rows.iter().map(|p| p.position_id.as_str()).collect();
+        let position_ids: Vec<String> = rows
+            .iter()
+            .map(|p| p.position_id.as_str().to_owned())
+            .collect();
         let factor_totals: Vec<f64> = rows.iter().map(|p| p.factor_total).collect();
         let idiosyncratic: Vec<f64> = rows.iter().map(|p| p.idiosyncratic).collect();
         let totals: Vec<f64> = rows.iter().map(|p| p.total).collect();
-        let data = PyDict::new(py);
-        data.set_item("position_id", position_ids)?;
-        data.set_item("factor_total", factor_totals)?;
-        data.set_item("idiosyncratic", idiosyncratic)?;
-        data.set_item("total", totals)?;
-        dict_to_dataframe(py, &data, None)
+        TableBuilder::new()
+            .utf8("position_id", position_ids)?
+            .f64("factor_total", factor_totals)?
+            .f64("idiosyncratic", idiosyncratic)?
+            .f64("total", totals)?
+            .build()
     }
 
     fn __repr__(&self) -> String {
@@ -266,6 +263,14 @@ impl PyCreditVolReport {
         )
     }
 }
+
+impl PyCreditVolReport {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        self.to_level_table()
+    }
+}
+
+tabular_methods!(PyCreditVolReport);
 
 /// Build a credit volatility report from a risk decomposition and credit model.
 #[pyfunction]

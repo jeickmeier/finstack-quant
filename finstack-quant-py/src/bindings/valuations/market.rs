@@ -10,7 +10,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
-use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::valuations::convert::{enum_to_py_string, opt_repr};
 use crate::errors::{core_to_py, display_to_py, value_error};

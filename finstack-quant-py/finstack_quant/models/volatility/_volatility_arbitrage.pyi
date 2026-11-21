@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any, Literal, TypedDict
 import pandas as pd
+import polars as pl
 from finstack_quant.core.market_data import VolSurface
+from finstack_quant.core.table import ArrowTable
 
 _ArbitrageTypeName = Literal[
     "butterfly",
@@ -35,7 +37,7 @@ class ArbitrageReport:
     Aggregated model-free arbitrage report for a volatility grid.
 
     Returned by :func:`check_surface` and :func:`check_surface_grid`. Picklable and JSON round-trippable;
-    ``to_dataframe()`` gives one row per violation.
+    ``to_pandas()`` / ``to_arrow()`` gives one row per violation.
 
     Examples
     --------
@@ -143,19 +145,87 @@ class ArbitrageReport:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        One row per violation.
+        Export arbitrage violations as an :class:`~finstack_quant.core.table.ArrowTable` (one row per violation).
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``violation_type``, ``severity``, ``strike``, ``expiry``,
+            ``adjacent_expiry``, ``magnitude``, ``suggested_fix``,
+            ``description``; empty with schema preserved when the surface passed.
+
+        Raises
+        ------
+        ValueError
+            If the report cannot be represented as an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export arbitrage violations as a pandas ``DataFrame`` (one row per violation).
 
         Returns
         -------
         pandas.DataFrame
             Columns ``violation_type``, ``severity``, ``strike``, ``expiry``,
             ``adjacent_expiry``, ``magnitude``, ``suggested_fix``,
-            ``description``; empty when the surface passed. Does not raise.
+            ``description``; empty when the surface passed.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the report cannot be represented as a pandas DataFrame.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export arbitrage violations as a Polars ``DataFrame`` (one row per violation).
+
+        Returns
+        -------
+        polars.DataFrame
+            Columns ``violation_type``, ``severity``, ``strike``, ``expiry``,
+            ``adjacent_expiry``, ``magnitude``, ``suggested_fix``,
+            ``description``; empty when the surface passed.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the report cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export arbitrage violations as a ``pyarrow.Table`` (one row per violation).
+
+        Returns
+        -------
+        pyarrow.Table
+            Columns ``violation_type``, ``severity``, ``strike``, ``expiry``,
+            ``adjacent_expiry``, ``magnitude``, ``suggested_fix``,
+            ``description``; empty when the surface passed.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the report cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to compact JSON (the Rust ``ArbitrageReport`` wire form).
@@ -386,7 +456,7 @@ def check_surface(surface: VolSurface, config: dict[str, Any] | str) -> Arbitrag
     ArbitrageReport
         Typed report carrying the surface id in ``vol_surface_id``, with
         ``passed``, ``total_violations``, ``by_severity``, ``by_type``,
-        ``violations`` and ``to_dataframe()``.
+        ``violations`` and ``to_pandas()`` / ``to_arrow()``.
 
     Raises
     ------
@@ -444,7 +514,7 @@ def check_surface_grid(
     -------
     ArbitrageReport
         Typed report with ``total_violations``, ``passed``, ``by_severity``,
-        ``by_type``, ``violations`` and ``to_dataframe()``.
+        ``by_type``, ``violations`` and ``to_pandas()`` / ``to_arrow()``.
 
     Raises
     ------

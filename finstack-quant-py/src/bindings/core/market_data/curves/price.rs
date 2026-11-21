@@ -8,11 +8,12 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use super::helpers::{
-    CurveSourceOptions, TimePoint, columns_to_dataframe, extract_time_point, required_option,
+    CurveSourceOptions, TimePoint, columns_to_arrow_table, extract_time_point, required_option,
 };
 use crate::bindings::core::dates::daycount::extract_day_count;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
@@ -104,17 +105,6 @@ impl PyPriceCurve {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        columns_to_dataframe(
-            py,
-            &[
-                ("t", self.inner.knots().to_vec()),
-                ("price", self.inner.prices().to_vec()),
-            ],
-        )
-    }
-
     #[doc = pydoc!("finstack_quant.core.market_data._curves.price", "PriceCurve.id")]
     #[getter]
     fn id(&self) -> &str {
@@ -180,6 +170,20 @@ impl PyPriceCurve {
     }
 }
 
+impl PyPriceCurve {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        columns_to_arrow_table(&[
+            ("t", self.inner.knots().to_vec()),
+            ("price", self.inner.prices().to_vec()),
+        ])
+    }
+}
+
+tabular_methods!(
+    PyPriceCurve,
+    "PriceCurve",
+    module = "finstack_quant.core.market_data._curves.price"
+);
 wire_methods!(
     PyPriceCurve,
     PriceCurve,
@@ -187,4 +191,3 @@ wire_methods!(
     module = "finstack_quant.core.market_data._curves.price",
     arc
 );
-impl_repr_html_via_dataframe!(PyPriceCurve);

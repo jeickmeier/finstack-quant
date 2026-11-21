@@ -120,7 +120,7 @@ def test_recovery_claim_and_allocation_round_trip() -> None:
 
     allocation = allocate_recovery(100.0, [claim]).allocations[0]
     assert RecoveryAllocation.from_json(allocation.to_json()) == allocation
-    frame = allocation.to_dataframe()
+    frame = allocation.to_pandas()
     assert len(frame) == 1
     assert frame["id"].iloc[0] == "SEN"
     assert frame["collateral_recovery"].iloc[0] == pytest.approx(45.0)

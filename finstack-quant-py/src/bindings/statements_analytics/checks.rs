@@ -299,7 +299,7 @@ impl PyThreeStatementMapping {
         self.inner
             .opening_cash
             .as_ref()
-            .map(|opening| crate::bindings::pandas_utils::serde_to_py(py, opening))
+            .map(|opening| crate::bindings::json_bridge::serde_to_py(py, opening))
             .transpose()
     }
 
@@ -312,7 +312,7 @@ impl PyThreeStatementMapping {
         self.inner
             .opening_retained_earnings
             .as_ref()
-            .map(|opening| crate::bindings::pandas_utils::serde_to_py(py, opening))
+            .map(|opening| crate::bindings::json_bridge::serde_to_py(py, opening))
             .transpose()
     }
 

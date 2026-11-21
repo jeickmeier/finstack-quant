@@ -237,7 +237,8 @@ the short form.
   (a Rust struct, a `Py*` wrapper, a plain JS object); `_json` / `*Json`
   surfaces are the wire twins that return JSON strings. Python result wrappers
   carry typed getters, `to_json`, `from_json`, and — where the result is
-  tabular — `to_dataframe()`, plus `to_series()` for 1-D labeled vectors. On
+  tabular — `to_arrow()`, `to_pandas()`, `to_polars()`, and `to_pyarrow()`, plus
+  `to_series()` returning a `LabeledSeries` for 1-D labeled vectors. On
   the WASM side the rule is pinned per export rather than across the whole
   surface, and a known set of exports still returns a JSON string under an
   unsuffixed name, so read the declared return type in `index.d.ts` before

@@ -52,7 +52,7 @@ pub(crate) fn execute_error_to_py(py: Python<'_>, err: ExecuteError) -> PyErr {
     let details_json = details.to_json();
     let exc = CalibrationEnvelopeError::new_err(details.cause.clone());
     let value = exc.value(py);
-    use crate::bindings::pandas_utils::serde_to_py;
+    use crate::bindings::json_bridge::serde_to_py;
     let converted = serde_to_py(py, &details.diagnostics).and_then(|diagnostics| {
         let solver = details
             .solver_diagnostics

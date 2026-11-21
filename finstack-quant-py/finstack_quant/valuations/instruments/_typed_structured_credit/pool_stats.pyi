@@ -5,6 +5,8 @@ from __future__ import annotations
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.valuations.instruments._typed_structured_credit.asset_pool import AssetPool
 
 class PoolStats:
@@ -22,7 +24,7 @@ class PoolStats:
     ...     ' "diversity_score": 1.0, "num_obligors": 0, "num_industries": 0,'
     ...     ' "defaulted_balance_pct": 0.0, "undrawn_commitment": 0.0}'
     ... )
-    >>> stats.wac, list(stats.to_dataframe().columns)[:2]
+    >>> stats.wac, list(stats.to_pandas().columns)[:2]
     (0.07, ['wac', 'weighted_avg_spread_bp'])
     """
 
@@ -116,7 +118,27 @@ class PoolStats:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        The statistics as a one-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``wac``, ``weighted_avg_spread_bp``,
+        ``weighted_avg_maturity``, ``diversity_score``, ``num_obligors``,
+        ``num_industries``, ``defaulted_balance_pct``, ``undrawn_commitment``.
+
+        Returns
+        -------
+        ArrowTable
+            One row holding every statistic.
+
+        Raises
+        ------
+        ValueError
+            If the statistics cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         The statistics as a one-row pandas ``DataFrame``.
 
@@ -131,11 +153,52 @@ class PoolStats:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
-            If the statistics cannot be serialized.
+            If the statistics cannot be converted.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        The statistics as a one-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row holding every statistic.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the statistics cannot be converted.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        The statistics as a one-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row holding every statistic.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the statistics cannot be converted.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @property
     def wac(self) -> float | None:
         """

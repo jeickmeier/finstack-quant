@@ -5,8 +5,10 @@ from __future__ import annotations
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.portfolio._container import Portfolio
 
 class PortfolioCashflowPositionSummary:
@@ -223,9 +225,9 @@ class PortfolioCashflows:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the flat ``events`` ladder as a pandas DataFrame.
+        Export the flat ``events`` ladder as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         One row per dated cashflow event, in the ladder's canonical
         payment-date order. ``amount`` is flattened to a float column plus a
@@ -240,16 +242,67 @@ class PortfolioCashflows:
 
         Returns
         -------
+        ArrowTable
+            One row per event; ``len(table)`` equals ``len(cashflows)``.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the flat ``events`` ladder as a pandas ``DataFrame``.
+
+        Returns
+        -------
         pd.DataFrame
             One row per event; ``len(df)`` equals ``len(cashflows)``.
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the flat ``events`` ladder as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per event.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the flat ``events`` ladder as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per event.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @property
     def events(self) -> list[dict[str, Any]]:
         """
@@ -334,20 +387,20 @@ class PortfolioCashflows:
         """
         ...
 
-    def to_issues_dataframe(self) -> pd.DataFrame:
+    def to_issues_table(self) -> ArrowTable:
         """
-        Export the extraction issues as a ``DataFrame``.
+        Export the extraction issues as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             Columns ``position_id``, ``instrument_id``, ``instrument_type``,
             ``message``; zero rows when there are no issues.
 
         Raises
         ------
         ValueError
-            If the frame cannot be built.
+            If the table cannot be built.
         """
         ...
 
@@ -379,9 +432,10 @@ class PortfolioCashflows:
         base_currency: Currency | str,
         as_of: datetime.date | str,
         discount_curves: dict[str, str] | None = None,
-    ) -> pd.DataFrame:
+    ) -> ArrowTable:
         """
-        Collapse the ladder to a base-currency ``(date, kind)`` table.
+        Collapse the ladder to a base-currency ``(date, kind)``
+        :class:`~finstack_quant.core.table.ArrowTable`.
 
         Payments on or before ``as_of`` use spot FX at ``as_of``. Later
         payments use the CIP forward ``F(T) = S × DF_from(T) / DF_base(T)``.
@@ -403,7 +457,7 @@ class PortfolioCashflows:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             Columns ``date`` (ISO 8601 string), ``kind``, ``amount`` (float in
             ``base_currency``), ``currency``; one row per ``(date, kind)``.
 

@@ -218,7 +218,10 @@ def test_universe_accepts_one_json_array_text() -> None:
 
 
 def test_to_dataframe_has_one_row_per_company() -> None:
-    frame = relative_value_report(SUBJECT, UNIVERSE, CONFIG).to_dataframe()
+    report = relative_value_report(SUBJECT, UNIVERSE, CONFIG)
+    frame = report.to_pandas()
+    assert report.to_polars().height == 6
+    assert report.to_arrow().num_rows == 6
 
     assert list(frame.columns) == ["id", "is_subject", "ev_ebitda", "pe"]
     assert list(frame["id"]) == ["SUBJ", "P1", "P2", "P3", "P4", "P5"]

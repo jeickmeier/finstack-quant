@@ -4,10 +4,16 @@
 use super::types::*;
 use crate::bindings::core::dates::daycount::{PyDayCount, PyDayCountContext};
 use crate::bindings::core::dates::periods::PyFiscalConfig;
-use crate::bindings::core::table::{PyArrowTable, envelope_to_pandas};
+use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
+use crate::bindings::dataframe_utils::{
+    DataFramePanel, arrow_to_pyarrow_table, extract_arrow_float64_column, extract_dataframe_panel,
+    extract_f64_vec, extract_pandas_panel, extract_polars_float64_column, has_arrow_c_stream,
+    is_dataframe_like, is_polars_dataframe, pandas_column_names, require_polars_module,
+    resolve_arrow_date_col, resolve_pandas_date_col_idx, resolve_polars_date_col,
+};
+use crate::bindings::date_utils::dates_to_pylist;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::wire_methods;
-use crate::bindings::pandas_utils::{dates_to_pylist, values_to_series};
 use crate::bindings::pydoc::pydoc;
 use crate::errors::analytics_to_py;
 use finstack_quant_analytics::{
@@ -15,14 +21,14 @@ use finstack_quant_analytics::{
 };
 use finstack_quant_core::dates::{Date, DayCountContext, PeriodKind};
 use finstack_quant_core::table::TableEnvelope;
-use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyKeyError, PyTypeError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PySlice, PyString};
+use pyo3::types::{PyBytes, PySlice, PyString};
 
 type PyPeriodicReturnPanel<'py> = Vec<Vec<(Bound<'py, PyAny>, f64)>>;
 
-const FRAME_TYPE_ERROR: &str = "Expected a pandas DataFrame, pandas Series, or Polars DataFrame";
+const FRAME_TYPE_ERROR: &str =
+    "Expected a pandas DataFrame, pandas Series, Polars DataFrame, or Arrow table";
 
 fn parse_cagr_day_count(day_count: Option<&Bound<'_, PyAny>>) -> PyResult<CagrDayCount> {
     let Some(value) = day_count.filter(|value| !value.is_none()) else {
@@ -37,147 +43,6 @@ fn parse_cagr_day_count(day_count: Option<&Bound<'_, PyAny>>) -> PyResult<CagrDa
     Err(PyTypeError::new_err(
         "day_count must be None, 'act365_25', a DayCount name such as 'act_365f', or a DayCount",
     ))
-}
-
-/// Look up `polars` in `sys.modules` without importing it, so callers who do
-/// not use Polars incur zero import cost and need not have it installed.
-fn polars_module<'py>(py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-    let module = py
-        .import("sys")?
-        .getattr("modules")?
-        .call_method1("get", ("polars",))?;
-    if module.is_none() {
-        Ok(None)
-    } else {
-        Ok(Some(module))
-    }
-}
-
-fn require_polars_module<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-    match polars_module(py)? {
-        Some(pl) => Ok(pl),
-        None => Ok(py.import("polars")?.into_any()),
-    }
-}
-
-fn is_polars_dataframe(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
-    let Some(pl) = polars_module(obj.py())? else {
-        return Ok(false);
-    };
-    obj.is_instance(&pl.getattr("DataFrame")?)
-}
-
-fn is_polars_series(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
-    let Some(pl) = polars_module(obj.py())? else {
-        return Ok(false);
-    };
-    obj.is_instance(&pl.getattr("Series")?)
-}
-
-/// Return true only for `pl.Date` or `pl.Datetime` (excluding `Time`/`Duration`).
-fn is_polars_date_dtype(pl: &Bound<'_, PyAny>, dtype: &Bound<'_, PyAny>) -> PyResult<bool> {
-    let pl_date = pl.getattr("Date")?;
-    let pl_datetime = pl.getattr("Datetime")?;
-    Ok(dtype.eq(&pl_date)? || dtype.is_instance(&pl_datetime)? || dtype.eq(&pl_datetime)?)
-}
-
-fn resolve_polars_date_col(
-    pl: &Bound<'_, PyAny>,
-    df: &Bound<'_, PyAny>,
-    col_names: &[String],
-    date_col: Option<&str>,
-) -> PyResult<String> {
-    if let Some(name) = date_col {
-        if col_names.iter().any(|col| col == name) {
-            return Ok(name.to_owned());
-        }
-        return Err(PyKeyError::new_err(format!(
-            "date_col {name:?} not found in DataFrame columns"
-        )));
-    }
-    let mut matches = Vec::new();
-    for col in col_names {
-        let dtype = df.get_item(col)?.getattr("dtype")?;
-        if is_polars_date_dtype(pl, &dtype)? {
-            matches.push(col.as_str());
-        }
-    }
-    match matches.as_slice() {
-        [single] => Ok((*single).to_owned()),
-        [] => Err(crate::errors::value_error(
-            "Polars DataFrame has no Date or Datetime column; pass date_col=... to specify the date column",
-        )),
-        _ => Err(crate::errors::value_error(format!(
-            "Polars DataFrame has multiple Date/Datetime columns ({}); keep only the observation date column and numeric series columns",
-            matches.join(", ")
-        ))),
-    }
-}
-
-fn extract_polars_dates(series: &Bound<'_, PyAny>) -> PyResult<Vec<Date>> {
-    let dates_py: Vec<Bound<'_, PyAny>> = series.call_method0("to_list")?.extract()?;
-    dates_py.iter().map(py_to_date).collect()
-}
-
-/// Extract a numeric Polars ``Series`` as `Vec<f64>`, converting `null` to
-/// `f64::NAN` while preserving `inf`/`nan` and rejecting non-numeric dtypes.
-fn extract_polars_float64_column(series: &Bound<'_, PyAny>, col_label: &str) -> PyResult<Vec<f64>> {
-    let py = series.py();
-    let pl = require_polars_module(py)?;
-    let dtype = series.getattr("dtype")?;
-    let is_numeric: bool = dtype.call_method0("is_numeric")?.extract()?;
-    let is_null: bool = dtype.eq(pl.getattr("Null")?)?;
-    if !is_numeric && !is_null {
-        return Err(PyTypeError::new_err(format!(
-            "Column {col_label:?} has non-numeric Polars dtype {dtype}; expected numeric values"
-        )));
-    }
-    let float_dtype = pl.getattr("Float64")?;
-    let float_series = series
-        .call_method1("cast", (float_dtype,))
-        .map_err(|err| {
-            PyTypeError::new_err(format!(
-                "Column {col_label:?} could not be converted to Polars Float64: {err}"
-            ))
-        })?
-        .call_method1("fill_null", (f64::NAN,))?;
-    let array = float_series.call_method0("to_numpy").map_err(|err| {
-        PyTypeError::new_err(format!(
-            "Column {col_label:?} could not be converted to a float64 NumPy array: {err}"
-        ))
-    })?;
-    let buffer = PyBuffer::<f64>::get(&array).map_err(|err| {
-        crate::errors::value_error(format!(
-            "Column {col_label:?} did not expose a contiguous float64 buffer: {err}"
-        ))
-    })?;
-    buffer.to_vec(py).map_err(|err| {
-        crate::errors::value_error(format!(
-            "Column {col_label:?} could not be read as float64 buffer: {err}"
-        ))
-    })
-}
-
-/// Extract a 1-D float vector from a Polars ``Series``, list, tuple, NumPy
-/// array, or pandas ``Series``.
-fn extract_f64_vec(obj: &Bound<'_, PyAny>, label: &str) -> PyResult<Vec<f64>> {
-    if is_polars_series(obj)? {
-        return extract_polars_float64_column(obj, label);
-    }
-    if is_polars_dataframe(obj)? {
-        return Err(PyTypeError::new_err(format!(
-            "{label} must be a sequence of floats, a NumPy array, a pandas Series, or a Polars Series"
-        )));
-    }
-    if let Ok(values) = obj.extract::<Vec<f64>>() {
-        return Ok(values);
-    }
-    if obj.hasattr("to_numpy")? {
-        return extract_float64_column(obj, label);
-    }
-    Err(PyTypeError::new_err(format!(
-        "{label} must be a sequence of floats, a NumPy array, a pandas Series, or a Polars Series"
-    )))
 }
 
 fn extract_factor_sequences(factor_returns: &Bound<'_, PyAny>) -> PyResult<Vec<Vec<f64>>> {
@@ -200,138 +65,17 @@ fn extract_factor_sequences(factor_returns: &Bound<'_, PyAny>) -> PyResult<Vec<V
     Ok(factors)
 }
 
-/// Decomposed DataFrame: dates, column-major numeric values, and ticker names.
-struct DataFramePanel {
-    /// Chronological observation dates.
-    dates: Vec<finstack_quant_core::dates::Date>,
-    /// `columns[ticker_idx][date_idx]`.
-    columns: Vec<Vec<f64>>,
-    /// Column names from the DataFrame.
-    ticker_names: Vec<String>,
-}
-
-fn pandas_column_names(df: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
-    let columns = df.getattr("columns")?;
-    let cols_list = columns.call_method0("tolist")?;
-    cols_list.extract().map_err(|_| {
-        PyTypeError::new_err(
-            "Performance requires string column labels (ticker names); the DataFrame \
-             columns are not all str — rename them, e.g. df.columns = df.columns.astype(str)",
-        )
-    })
-}
-
-fn resolve_pandas_date_col_idx(col_names: &[String], date_col: &str) -> PyResult<usize> {
-    let mut matches = col_names
-        .iter()
-        .enumerate()
-        .filter_map(|(idx, col)| (col == date_col).then_some(idx));
-    let Some(first) = matches.next() else {
-        return Err(PyKeyError::new_err(format!(
-            "date_col {date_col:?} not found in DataFrame columns"
-        )));
-    };
-    if matches.next().is_some() {
-        return Err(crate::errors::value_error(format!(
-            "duplicate date_col {date_col:?} in DataFrame columns"
-        )));
-    }
-    Ok(first)
-}
-
-fn extract_pandas_panel(df: &Bound<'_, PyAny>, date_col: Option<&str>) -> PyResult<DataFramePanel> {
-    let py = df.py();
-    let col_names = pandas_column_names(df)?;
-    let iloc = df.getattr("iloc")?;
-    let all_rows = PySlice::full(py);
-
-    let (dates_list, date_idx) = if let Some(name) = date_col {
-        let idx = resolve_pandas_date_col_idx(&col_names, name)?;
-        let series = iloc.get_item((&all_rows, idx))?;
-        (series.call_method0("tolist")?, Some(idx))
-    } else {
-        (df.getattr("index")?.call_method0("tolist")?, None)
-    };
-
-    let dates_py: Vec<Bound<'_, PyAny>> = dates_list.extract()?;
-    let dates = dates_py
-        .iter()
-        .map(py_to_date)
-        .collect::<PyResult<Vec<_>>>()?;
-
-    let mut ticker_names = Vec::with_capacity(col_names.len());
-    let mut columns = Vec::with_capacity(col_names.len());
-    for (i, col) in col_names.iter().enumerate() {
-        if date_idx == Some(i) {
-            continue;
-        }
-        // Index positionally so duplicate column names still reach Rust validation.
-        let series = iloc.get_item((&all_rows, i))?;
-        ticker_names.push(col.clone());
-        columns.push(extract_float64_column(&series, col)?);
-    }
-
-    Ok(DataFramePanel {
-        dates,
-        columns,
-        ticker_names,
-    })
-}
-
-fn extract_polars_panel(df: &Bound<'_, PyAny>, date_col: Option<&str>) -> PyResult<DataFramePanel> {
-    let py = df.py();
-    let pl = require_polars_module(py)?;
-    let col_names: Vec<String> = df.getattr("columns")?.extract()?;
-    let date_name = resolve_polars_date_col(&pl, df, &col_names, date_col)?;
-    let dates = extract_polars_dates(&df.get_item(&date_name)?)?;
-
-    let mut ticker_names = Vec::with_capacity(col_names.len().saturating_sub(1));
-    let mut columns = Vec::with_capacity(col_names.len().saturating_sub(1));
-    for col in &col_names {
-        if col == &date_name {
-            continue;
-        }
-        let series = df.get_item(col)?;
-        ticker_names.push(col.clone());
-        columns.push(extract_polars_float64_column(&series, col)?);
-    }
-
-    Ok(DataFramePanel {
-        dates,
-        columns,
-        ticker_names,
-    })
-}
-
-/// Extract dates, numeric matrix, and ticker names from a pandas ``DataFrame``,
-/// pandas ``Series``, or Polars ``DataFrame``.
-fn extract_dataframe_panel(
-    frame: &Bound<'_, PyAny>,
-    date_col: Option<&str>,
-    error_message: &str,
-) -> PyResult<DataFramePanel> {
-    if is_polars_dataframe(frame)? {
-        return extract_polars_panel(frame, date_col);
-    }
-    if is_polars_series(frame)? {
-        return Err(PyTypeError::new_err(
-            "Expected a pandas DataFrame/Series or a Polars DataFrame; a Polars Series has no date index — wrap it in a polars.DataFrame with a date column",
-        ));
-    }
-    let pd = frame.py().import("pandas")?;
-    if frame.is_instance(&pd.getattr("Series")?)? {
-        if date_col.is_some() {
-            return Err(crate::errors::value_error(
-                "date_col cannot be used with a pandas Series; a Series always uses its index for dates",
-            ));
-        }
-        let promoted = series_to_frame(frame)?;
-        return extract_pandas_panel(&promoted, None);
-    }
-    if frame.is_instance(&pd.getattr("DataFrame")?)? {
-        return extract_pandas_panel(frame, date_col);
-    }
-    Err(PyTypeError::new_err(error_message.to_owned()))
+enum FactorPanelSource {
+    Polars {
+        col_names: Vec<String>,
+        date_name: String,
+    },
+    Arrow {
+        tbl: Py<PyAny>,
+        col_names: Vec<String>,
+        date_name: String,
+    },
+    Pandas,
 }
 
 fn align_factor_panel(
@@ -340,18 +84,40 @@ fn align_factor_panel(
     date_col: Option<&str>,
 ) -> PyResult<Vec<Vec<f64>>> {
     let py = df.py();
-    let is_polars = is_polars_dataframe(df)?;
-    let (labels, polars_meta) = if is_polars {
+    let (labels, source): (Vec<Bound<'_, PyAny>>, FactorPanelSource) = if is_polars_dataframe(df)? {
         let pl = require_polars_module(py)?;
         let col_names: Vec<String> = df.getattr("columns")?.extract()?;
         let date_name = resolve_polars_date_col(&pl, df, &col_names, date_col)?;
-        let labels: Vec<Bound<'_, PyAny>> = df
+        let labels = df
             .get_item(&date_name)?
             .call_method0("to_list")?
             .extract()?;
-        (labels, Some((col_names, date_name)))
+        (
+            labels,
+            FactorPanelSource::Polars {
+                col_names,
+                date_name,
+            },
+        )
+    } else if has_arrow_c_stream(df)? {
+        let tbl = arrow_to_pyarrow_table(py, df)?;
+        let pa_types = py.import("pyarrow")?.getattr("types")?;
+        let col_names: Vec<String> = tbl.getattr("column_names")?.extract()?;
+        let date_name = resolve_arrow_date_col(&pa_types, &tbl, &col_names, date_col)?;
+        let labels = tbl
+            .call_method1("column", (&date_name,))?
+            .call_method0("to_pylist")?
+            .extract()?;
+        (
+            labels,
+            FactorPanelSource::Arrow {
+                tbl: tbl.unbind(),
+                col_names,
+                date_name,
+            },
+        )
     } else if df.is_instance(&py.import("pandas")?.getattr("DataFrame")?)? {
-        let labels: Vec<Bound<'_, PyAny>> = if let Some(name) = date_col {
+        let labels = if let Some(name) = date_col {
             let col_names = pandas_column_names(df)?;
             let date_idx = resolve_pandas_date_col_idx(&col_names, name)?;
             df.getattr("iloc")?
@@ -361,10 +127,10 @@ fn align_factor_panel(
         } else {
             df.getattr("index")?.call_method0("tolist")?.extract()?
         };
-        (labels, None)
+        (labels, FactorPanelSource::Pandas)
     } else {
         return Err(PyTypeError::new_err(
-            "factor_returns must be factor-major sequences, a pandas DataFrame, or a Polars DataFrame",
+            "factor_returns must be factor-major sequences, a pandas DataFrame, a Polars DataFrame, or an Arrow table",
         ));
     };
 
@@ -386,19 +152,49 @@ fn align_factor_panel(
         })
         .collect::<PyResult<Vec<_>>>()?;
 
-    let columns = if let Some((col_names, date_name)) = polars_meta {
-        let mut cols = Vec::with_capacity(col_names.len().saturating_sub(1));
-        for col in &col_names {
-            if col == &date_name {
-                continue;
+    let columns = match source {
+        FactorPanelSource::Polars {
+            col_names,
+            date_name,
+        } => {
+            let mut cols = Vec::with_capacity(col_names.len().saturating_sub(1));
+            for col in &col_names {
+                if col == &date_name {
+                    continue;
+                }
+                let gathered = df.get_item(col)?.call_method1("gather", (&positions,))?;
+                cols.push(extract_polars_float64_column(&gathered, col)?);
             }
-            let gathered = df.get_item(col)?.call_method1("gather", (&positions,))?;
-            cols.push(extract_polars_float64_column(&gathered, col)?);
+            cols
         }
-        cols
-    } else {
-        let selected = df.getattr("iloc")?.get_item(positions)?;
-        extract_pandas_panel(&selected, date_col)?.columns
+        FactorPanelSource::Arrow {
+            tbl,
+            col_names,
+            date_name,
+        } => {
+            let tbl = tbl.bind(py);
+            let taken = tbl.call_method1("take", (positions,))?;
+            let pa = py.import("pyarrow")?;
+            let pa_types = pa.getattr("types")?;
+            let float64_ty = pa.getattr("float64")?.call0()?;
+            let mut cols = Vec::with_capacity(col_names.len().saturating_sub(1));
+            for col in &col_names {
+                if col == &date_name {
+                    continue;
+                }
+                cols.push(extract_arrow_float64_column(
+                    &pa_types,
+                    &float64_ty,
+                    &taken.call_method1("column", (col,))?,
+                    col,
+                )?);
+            }
+            cols
+        }
+        FactorPanelSource::Pandas => {
+            let selected = df.getattr("iloc")?.get_item(positions)?;
+            extract_pandas_panel(&selected, date_col)?.columns
+        }
     };
 
     if columns.iter().flatten().any(|value| !value.is_finite()) {
@@ -407,49 +203,6 @@ fn align_factor_panel(
         ));
     }
     Ok(columns)
-}
-
-/// Pull a `Series` column out as a contiguous `Vec<f64>` via the NumPy buffer
-/// protocol. Returns explicit `PyTypeError` / `PyValueError` instead of
-/// silently coercing through `Series.tolist()`.
-fn extract_float64_column(series: &Bound<'_, PyAny>, col_label: &str) -> PyResult<Vec<f64>> {
-    // `Series.to_numpy(dtype="float64", copy=False)` keeps existing float64
-    // arrays zero-copy and forces numeric coercion errors at the boundary
-    // rather than letting them propagate as silent NaNs.
-    let py = series.py();
-    let kwargs = PyDict::new(py);
-    kwargs.set_item("dtype", "float64")?;
-    kwargs.set_item("copy", false)?;
-    let array = series
-        .call_method("to_numpy", (), Some(&kwargs))
-        .map_err(|err| {
-            PyTypeError::new_err(format!(
-                "Column {col_label:?} could not be converted to a float64 NumPy array: {err}"
-            ))
-        })?;
-
-    let buffer = PyBuffer::<f64>::get(&array).map_err(|err| {
-        crate::errors::value_error(format!(
-            "Column {col_label:?} did not expose a contiguous float64 buffer: {err}"
-        ))
-    })?;
-    buffer.to_vec(py).map_err(|err| {
-        crate::errors::value_error(format!(
-            "Column {col_label:?} could not be read as float64 buffer: {err}"
-        ))
-    })
-}
-
-/// Promote a pandas ``Series`` to a one-column ``DataFrame`` named after the
-/// series (or ``"asset"`` when unnamed).
-fn series_to_frame<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    let name = value.getattr("name")?;
-    let label: String = if name.is_none() {
-        "asset".to_owned()
-    } else {
-        name.str()?.extract()?
-    };
-    value.call_method1("to_frame", (label,))
 }
 
 /// Build a `Performance` from an extracted price or return DataFrame panel.
@@ -511,13 +264,20 @@ impl PyPerformance {
         confidence: f64,
     ) -> PyResult<TableEnvelope> {
         // The 22-metric table is assembled in Rust (`Performance::summary`),
-        // so summary(), to_dataframe(), to_arrow(), and WASM read the same
+        // so summary(), to_pandas(), to_polars(), to_arrow(), and WASM read the same
         // rows; release the GIL for the O(22 * n * m) walk.
         py.detach(|| {
             self.inner
                 .summary(risk_free_rate, mar, omega_threshold, confidence)
         })
         .map_err(analytics_to_py)
+    }
+
+    fn metric_series(&self, name: &str, values: Vec<f64>) -> PyResult<PyLabeledSeries> {
+        Ok(
+            PyLabeledSeries::from_f64(name, self.inner.get_ticker_names().to_vec(), values)?
+                .with_index_name("ticker"),
+        )
     }
 }
 
@@ -645,12 +405,11 @@ impl PyPerformance {
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.cagr")]
     #[pyo3(signature = (day_count = None, ctx = None))]
-    fn cagr<'py>(
+    fn cagr(
         &self,
-        py: Python<'py>,
         day_count: Option<&Bound<'_, PyAny>>,
         ctx: Option<&PyDayCountContext>,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    ) -> PyResult<PyLabeledSeries> {
         let day_count = parse_cagr_day_count(day_count)?;
         let context = ctx
             .map(|ctx| ctx.inner.to_ctx())
@@ -661,343 +420,298 @@ impl PyPerformance {
             .inner
             .cagr(day_count, context)
             .map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "cagr")
+        self.metric_series("cagr", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.mean_return")]
     #[pyo3(signature = (annualize))]
-    fn mean_return<'py>(&self, py: Python<'py>, annualize: bool) -> PyResult<Bound<'py, PyAny>> {
+    fn mean_return(&self, annualize: bool) -> PyResult<PyLabeledSeries> {
         let values = self.inner.mean_return(annualize).map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "mean_return")
+        self.metric_series("mean_return", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.volatility")]
     #[pyo3(signature = (annualize))]
-    fn volatility<'py>(&self, py: Python<'py>, annualize: bool) -> PyResult<Bound<'py, PyAny>> {
+    fn volatility(&self, annualize: bool) -> PyResult<PyLabeledSeries> {
         let values = self.inner.volatility(annualize).map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "volatility")
+        self.metric_series("volatility", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.sharpe")]
     #[pyo3(signature = (risk_free_rate))]
-    fn sharpe<'py>(&self, py: Python<'py>, risk_free_rate: f64) -> PyResult<Bound<'py, PyAny>> {
+    fn sharpe(&self, risk_free_rate: f64) -> PyResult<PyLabeledSeries> {
         let values = self.inner.sharpe(risk_free_rate).map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "sharpe")
+        self.metric_series("sharpe", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.sortino")]
     #[pyo3(signature = (mar))]
-    fn sortino<'py>(&self, py: Python<'py>, mar: f64) -> PyResult<Bound<'py, PyAny>> {
+    fn sortino(&self, mar: f64) -> PyResult<PyLabeledSeries> {
         let values = self.inner.sortino(mar).map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "sortino")
+        self.metric_series("sortino", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.calmar")]
-    fn calmar<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn calmar(&self) -> PyResult<PyLabeledSeries> {
         let values = self.inner.calmar().map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "calmar")
+        self.metric_series("calmar", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.max_drawdown")]
-    fn max_drawdown<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn max_drawdown(&self) -> PyResult<PyLabeledSeries> {
         let values = self.inner.max_drawdown().map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "max_drawdown")
+        self.metric_series("max_drawdown", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.mean_drawdown")]
-    fn mean_drawdown<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn mean_drawdown(&self) -> PyResult<PyLabeledSeries> {
         let values = self.inner.mean_drawdown().map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "mean_drawdown")
+        self.metric_series("mean_drawdown", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.value_at_risk")]
     #[pyo3(signature = (confidence))]
-    fn value_at_risk<'py>(&self, py: Python<'py>, confidence: f64) -> PyResult<Bound<'py, PyAny>> {
+    fn value_at_risk(&self, confidence: f64) -> PyResult<PyLabeledSeries> {
         let values = self
             .inner
             .value_at_risk(confidence)
             .map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "value_at_risk")
+        self.metric_series("value_at_risk", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.expected_shortfall")]
     #[pyo3(signature = (confidence))]
-    fn expected_shortfall<'py>(
-        &self,
-        py: Python<'py>,
-        confidence: f64,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    fn expected_shortfall(&self, confidence: f64) -> PyResult<PyLabeledSeries> {
         let values = self
             .inner
             .expected_shortfall(confidence)
             .map_err(analytics_to_py)?;
-        values_to_series(
-            py,
-            values,
-            self.inner.get_ticker_names(),
-            "expected_shortfall",
-        )
+        self.metric_series("expected_shortfall", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.tracking_error")]
-    fn tracking_error<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn tracking_error(&self) -> PyResult<PyLabeledSeries> {
         let values = self.inner.tracking_error().map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "tracking_error")
+        self.metric_series("tracking_error", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.information_ratio")]
-    fn information_ratio<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn information_ratio(&self) -> PyResult<PyLabeledSeries> {
         let values = self.inner.information_ratio().map_err(analytics_to_py)?;
-        values_to_series(
-            py,
-            values,
-            self.inner.get_ticker_names(),
-            "information_ratio",
-        )
+        self.metric_series("information_ratio", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.skewness")]
-    fn skewness<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn skewness(&self) -> PyResult<PyLabeledSeries> {
         let values = self.inner.skewness().map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "skewness")
+        self.metric_series("skewness", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.kurtosis")]
-    fn kurtosis<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn kurtosis(&self) -> PyResult<PyLabeledSeries> {
         let values = self.inner.kurtosis().map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "kurtosis")
+        self.metric_series("kurtosis", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.geometric_mean")]
-    fn geometric_mean<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn geometric_mean(&self) -> PyResult<PyLabeledSeries> {
         let values = self.inner.geometric_mean().map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "geometric_mean")
+        self.metric_series("geometric_mean", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.downside_deviation")]
     #[pyo3(signature = (mar))]
-    fn downside_deviation<'py>(&self, py: Python<'py>, mar: f64) -> PyResult<Bound<'py, PyAny>> {
+    fn downside_deviation(&self, mar: f64) -> PyResult<PyLabeledSeries> {
         let values = self
             .inner
             .downside_deviation(mar)
             .map_err(analytics_to_py)?;
-        values_to_series(
-            py,
-            values,
-            self.inner.get_ticker_names(),
-            "downside_deviation",
-        )
+        self.metric_series("downside_deviation", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.max_drawdown_duration")]
-    fn max_drawdown_duration<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn max_drawdown_duration(&self) -> PyResult<PyLabeledSeries> {
         let values = self
             .inner
             .max_drawdown_duration()
             .map_err(analytics_to_py)?;
-        let kwargs = PyDict::new(py);
-        kwargs.set_item("index", self.inner.get_ticker_names())?;
-        kwargs.set_item("name", "max_drawdown_duration")?;
-        kwargs.set_item("dtype", "Int64")?;
-        py.import("pandas")?
-            .getattr("Series")?
-            .call((values,), Some(&kwargs))
+        Ok(PyLabeledSeries::from_opt_i64(
+            "max_drawdown_duration",
+            self.inner.get_ticker_names().to_vec(),
+            values,
+        )?
+        .with_index_name("ticker"))
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.up_capture")]
-    fn up_capture<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn up_capture(&self) -> PyResult<PyLabeledSeries> {
         let values = self.inner.up_capture().map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "up_capture")
+        self.metric_series("up_capture", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.down_capture")]
-    fn down_capture<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn down_capture(&self) -> PyResult<PyLabeledSeries> {
         let values = self.inner.down_capture().map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "down_capture")
+        self.metric_series("down_capture", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.capture_ratio")]
-    fn capture_ratio<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn capture_ratio(&self) -> PyResult<PyLabeledSeries> {
         let values = self.inner.capture_ratio().map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "capture_ratio")
+        self.metric_series("capture_ratio", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.omega_ratio")]
     #[pyo3(signature = (threshold))]
-    fn omega_ratio<'py>(&self, py: Python<'py>, threshold: f64) -> PyResult<Bound<'py, PyAny>> {
+    fn omega_ratio(&self, threshold: f64) -> PyResult<PyLabeledSeries> {
         let values = self.inner.omega_ratio(threshold).map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "omega_ratio")
+        self.metric_series("omega_ratio", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.treynor")]
     #[pyo3(signature = (risk_free_rate))]
-    fn treynor<'py>(&self, py: Python<'py>, risk_free_rate: f64) -> PyResult<Bound<'py, PyAny>> {
+    fn treynor(&self, risk_free_rate: f64) -> PyResult<PyLabeledSeries> {
         let values = self
             .inner
             .treynor(risk_free_rate)
             .map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "treynor")
+        self.metric_series("treynor", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.gain_to_pain")]
-    fn gain_to_pain<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn gain_to_pain(&self) -> PyResult<PyLabeledSeries> {
         let values = self.inner.gain_to_pain().map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "gain_to_pain")
+        self.metric_series("gain_to_pain", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.ulcer_index")]
-    fn ulcer_index<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn ulcer_index(&self) -> PyResult<PyLabeledSeries> {
         let values = self.inner.ulcer_index().map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "ulcer_index")
+        self.metric_series("ulcer_index", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.martin_ratio")]
-    fn martin_ratio<'py>(
-        &self,
-        py: Python<'py>,
-        risk_free_rate: f64,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    fn martin_ratio(&self, risk_free_rate: f64) -> PyResult<PyLabeledSeries> {
         let values = self
             .inner
             .martin_ratio(risk_free_rate)
             .map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "martin_ratio")
+        self.metric_series("martin_ratio", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.recovery_factor")]
-    fn recovery_factor<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn recovery_factor(&self) -> PyResult<PyLabeledSeries> {
         let values = self.inner.recovery_factor().map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "recovery_factor")
+        self.metric_series("recovery_factor", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.pain_index")]
-    fn pain_index<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn pain_index(&self) -> PyResult<PyLabeledSeries> {
         let values = self.inner.pain_index().map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "pain_index")
+        self.metric_series("pain_index", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.pain_ratio")]
     #[pyo3(signature = (risk_free_rate))]
-    fn pain_ratio<'py>(&self, py: Python<'py>, risk_free_rate: f64) -> PyResult<Bound<'py, PyAny>> {
+    fn pain_ratio(&self, risk_free_rate: f64) -> PyResult<PyLabeledSeries> {
         let values = self
             .inner
             .pain_ratio(risk_free_rate)
             .map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "pain_ratio")
+        self.metric_series("pain_ratio", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.tail_ratio")]
     #[pyo3(signature = (confidence))]
-    fn tail_ratio<'py>(&self, py: Python<'py>, confidence: f64) -> PyResult<Bound<'py, PyAny>> {
+    fn tail_ratio(&self, confidence: f64) -> PyResult<PyLabeledSeries> {
         let values = self.inner.tail_ratio(confidence).map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "tail_ratio")
+        self.metric_series("tail_ratio", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.r_squared")]
-    fn r_squared<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn r_squared(&self) -> PyResult<PyLabeledSeries> {
         let values = self.inner.r_squared().map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "r_squared")
+        self.metric_series("r_squared", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.batting_average")]
-    fn batting_average<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn batting_average(&self) -> PyResult<PyLabeledSeries> {
         let values = self.inner.batting_average().map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "batting_average")
+        self.metric_series("batting_average", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.parametric_var")]
     #[pyo3(signature = (confidence, horizon_periods = None))]
-    fn parametric_var<'py>(
+    fn parametric_var(
         &self,
-        py: Python<'py>,
         confidence: f64,
         horizon_periods: Option<u64>,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    ) -> PyResult<PyLabeledSeries> {
         let values = self
             .inner
             .parametric_var(confidence, horizon_periods)
             .map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "parametric_var")
+        self.metric_series("parametric_var", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.cornish_fisher_var")]
     #[pyo3(signature = (confidence, horizon_periods = None))]
-    fn cornish_fisher_var<'py>(
+    fn cornish_fisher_var(
         &self,
-        py: Python<'py>,
         confidence: f64,
         horizon_periods: Option<u64>,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    ) -> PyResult<PyLabeledSeries> {
         let values = self
             .inner
             .cornish_fisher_var(confidence, horizon_periods)
             .map_err(analytics_to_py)?;
-        values_to_series(
-            py,
-            values,
-            self.inner.get_ticker_names(),
-            "cornish_fisher_var",
-        )
+        self.metric_series("cornish_fisher_var", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.cdar")]
     #[pyo3(signature = (confidence))]
-    fn cdar<'py>(&self, py: Python<'py>, confidence: f64) -> PyResult<Bound<'py, PyAny>> {
+    fn cdar(&self, confidence: f64) -> PyResult<PyLabeledSeries> {
         let values = self.inner.cdar(confidence).map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "cdar")
+        self.metric_series("cdar", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.m_squared")]
     #[pyo3(signature = (risk_free_rate))]
-    fn m_squared<'py>(&self, py: Python<'py>, risk_free_rate: f64) -> PyResult<Bound<'py, PyAny>> {
+    fn m_squared(&self, risk_free_rate: f64) -> PyResult<PyLabeledSeries> {
         let values = self
             .inner
             .m_squared(risk_free_rate)
             .map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "m_squared")
+        self.metric_series("m_squared", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.modified_sharpe")]
     #[pyo3(signature = (risk_free_rate, confidence))]
-    fn modified_sharpe<'py>(
-        &self,
-        py: Python<'py>,
-        risk_free_rate: f64,
-        confidence: f64,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    fn modified_sharpe(&self, risk_free_rate: f64, confidence: f64) -> PyResult<PyLabeledSeries> {
         let values = self
             .inner
             .modified_sharpe(risk_free_rate, confidence)
             .map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "modified_sharpe")
+        self.metric_series("modified_sharpe", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.sterling_ratio")]
     #[pyo3(signature = (risk_free_rate, n))]
-    fn sterling_ratio<'py>(
-        &self,
-        py: Python<'py>,
-        risk_free_rate: f64,
-        n: usize,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    fn sterling_ratio(&self, risk_free_rate: f64, n: usize) -> PyResult<PyLabeledSeries> {
         let values = self
             .inner
             .sterling_ratio(risk_free_rate, n)
             .map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "sterling_ratio")
+        self.metric_series("sterling_ratio", values)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.burke_ratio")]
-    fn burke_ratio<'py>(
-        &self,
-        py: Python<'py>,
-        risk_free_rate: f64,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    fn burke_ratio(&self, risk_free_rate: f64) -> PyResult<PyLabeledSeries> {
         let values = self
             .inner
             .burke_ratio(risk_free_rate)
             .map_err(analytics_to_py)?;
-        values_to_series(py, values, self.inner.get_ticker_names(), "burke_ratio")
+        self.metric_series("burke_ratio", values)
     }
 
     // -- Vector-per-ticker methods --
@@ -1193,9 +907,7 @@ impl PyPerformance {
         date_col: Option<&str>,
     ) -> PyResult<PyMultiFactorResult> {
         let ticker_idx = self.resolve_ticker(ticker_idx)?;
-        let factor_returns = if is_polars_dataframe(factor_returns)?
-            || factor_returns.is_instance(&py.import("pandas")?.getattr("DataFrame")?)?
-        {
+        let factor_returns = if is_dataframe_like(factor_returns)? {
             align_factor_panel(
                 factor_returns,
                 self.inner
@@ -1283,22 +995,7 @@ impl PyPerformance {
     ) -> PyResult<Bound<'py, PyAny>> {
         let table =
             self.compute_summary_table(py, risk_free_rate, mar, omega_threshold, confidence)?;
-        crate::bindings::pandas_utils::serde_to_py(py, &table)
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.to_dataframe")]
-    #[pyo3(signature = (risk_free_rate, mar, omega_threshold, confidence))]
-    fn to_dataframe<'py>(
-        &self,
-        py: Python<'py>,
-        risk_free_rate: f64,
-        mar: f64,
-        omega_threshold: f64,
-        confidence: f64,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        let table =
-            self.compute_summary_table(py, risk_free_rate, mar, omega_threshold, confidence)?;
-        envelope_to_pandas(py, &table)?.call_method1("set_index", ("ticker",))
+        crate::bindings::json_bridge::serde_to_py(py, &table)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.to_arrow")]
@@ -1316,12 +1013,64 @@ impl PyPerformance {
         PyArrowTable::from_envelope(&table)
     }
 
+    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.to_pandas")]
+    #[pyo3(signature = (risk_free_rate, mar, omega_threshold, confidence))]
+    fn to_pandas<'py>(
+        &self,
+        py: Python<'py>,
+        risk_free_rate: f64,
+        mar: f64,
+        omega_threshold: f64,
+        confidence: f64,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(
+            py,
+            self.to_arrow(py, risk_free_rate, mar, omega_threshold, confidence)?,
+        )?;
+        PyArrowTable::to_pandas(&table, py)?.call_method1("set_index", ("ticker",))
+    }
+
+    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.to_polars")]
+    #[pyo3(signature = (risk_free_rate, mar, omega_threshold, confidence))]
+    fn to_polars<'py>(
+        &self,
+        py: Python<'py>,
+        risk_free_rate: f64,
+        mar: f64,
+        omega_threshold: f64,
+        confidence: f64,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(
+            py,
+            self.to_arrow(py, risk_free_rate, mar, omega_threshold, confidence)?,
+        )?;
+        PyArrowTable::to_polars(&table, py)
+    }
+
+    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.to_pyarrow")]
+    #[pyo3(signature = (risk_free_rate, mar, omega_threshold, confidence))]
+    fn to_pyarrow<'py>(
+        &self,
+        py: Python<'py>,
+        risk_free_rate: f64,
+        mar: f64,
+        omega_threshold: f64,
+        confidence: f64,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(
+            py,
+            self.to_arrow(py, risk_free_rate, mar, omega_threshold, confidence)?,
+        )?;
+        PyArrowTable::to_pyarrow(&table, py)
+    }
+
     /// Identify this value in notebooks and logs.
     ///
     /// Returns a compact summary of the serialized fields, with collections
     /// summarized by length. Use accessors such as :meth:`get_ticker_names`,
-    /// :meth:`get_dates`, and :meth:`get_active_dates`, or a DataFrame exit such as
-    /// :meth:`to_dataframe`, when the contents matter.
+    /// :meth:`get_dates`, and :meth:`get_active_dates`, or a tabular exit such
+    /// as :meth:`to_pandas` / :meth:`to_polars` / :meth:`to_arrow`, when the
+    /// contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("Performance", &self.inner)
     }

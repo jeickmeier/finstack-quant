@@ -118,7 +118,7 @@ impl PyAdjustment {
         self.inner
             .cap
             .as_ref()
-            .map(|cap| crate::bindings::pandas_utils::serde_to_py(py, cap))
+            .map(|cap| crate::bindings::json_bridge::serde_to_py(py, cap))
             .transpose()
     }
 

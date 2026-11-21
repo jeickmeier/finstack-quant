@@ -499,6 +499,23 @@ def test_instrument_bond_matches_golden() -> None:
     assert _bond_golden_html() == golden.read_text(encoding="utf-8")
 
 
+def test_instrument_tearsheet_accepts_cashflow_envelope_and_arrow_polars() -> None:
+    import datetime as dt
+
+    from finstack_quant.core.market_data import DiscountCurve, MarketContext
+    from finstack_quant.reporting import instrument_tearsheet
+    import finstack_quant.valuations.instruments as ins
+
+    bond = ins.Bond.example()
+    as_of = bond.issue_date
+    market = MarketContext().insert(DiscountCurve.flat(bond.discount_curve_id, as_of, 0.04, "act_365f"))
+    result = ins.price_instrument(bond, market, as_of, metrics=["ytm", "dv01"])
+    envelope = ins.instrument_cashflows(bond, market, as_of, "discounting")
+    for cf_input in (envelope, envelope.to_arrow(), envelope.to_polars(), envelope.to_pandas()):
+        html = instrument_tearsheet(result, cashflows=cf_input, generated=dt.date(2026, 6, 19)).to_html()
+        assert "Cashflow Ladder" in html
+
+
 def test_instrument_cds_renders_credit_blocks() -> None:
     import datetime as dt
 

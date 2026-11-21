@@ -372,11 +372,11 @@ def test_diagnostics_carry_the_period_record_and_coverage_tests() -> None:
     periods = diagnostics.periods
     assert periods
     assert periods[0]["coverage_tests"][0]["test_id"] == "OC_A"
-    frame = diagnostics.to_dataframe()
+    frame = diagnostics.to_pandas()
     assert len(frame) == len(periods)
     assert frame["pool_factor"].iloc[0] == pytest.approx(periods[0]["pool_factor"])
     assert (frame["pool_factor"].diff().dropna() <= 1e-12).all()
-    tests = diagnostics.coverage_tests_dataframe()
+    tests = diagnostics.coverage_tests_table().to_pandas()
     assert list(tests.columns) == ["date", "test_id", "ratio", "trigger_level", "cushion", "passing"]
     assert len(tests) == len(periods)
     assert (tests["cushion"] == tests["ratio"] - tests["trigger_level"]).all()
@@ -389,7 +389,7 @@ def test_tranche_cashflows_and_equity_metrics_are_typed_results() -> None:
     market = _market()
     flows = deal.tranche_cashflows("A", market, CLOSE)
     assert isinstance(flows, TrancheCashflows)
-    frame = flows.to_dataframe()
+    frame = flows.to_pandas()
     assert frame["interest"].sum() == pytest.approx(flows.total_interest.amount)
     assert frame["principal"].sum() == pytest.approx(flows.total_principal.amount)
     assert flows.total_principal.amount == pytest.approx(60_000_000.0)
@@ -406,7 +406,9 @@ def test_tranche_cashflows_and_equity_metrics_are_typed_results() -> None:
     assert equity.irr is not None
     assert math.isfinite(equity.irr)
     assert equity.moic == pytest.approx(sum(value for _, value in equity.cash_on_cash))
-    assert len(equity.to_dataframe()) == len(equity.cash_on_cash)
+    assert len(equity.to_pandas()) == len(equity.cash_on_cash)
+    assert equity.to_arrow().num_rows == len(equity.cash_on_cash)
+    assert equity.to_polars().height == len(equity.cash_on_cash)
     cheaper = deal.equity_metrics(market, CLOSE, purchase_price_pct=80.0)
     assert cheaper.invested == 8_000_000.0
     assert cheaper.irr > equity.irr
@@ -454,7 +456,7 @@ def test_tranche_metrics_report_the_to_call_twins() -> None:
     assert metrics.wal_to_call < metrics.wal
     assert metrics.z_spread_to_call_bp is not None
     assert metrics.dm_to_call_bp is None
-    frame = metrics.to_dataframe()
+    frame = metrics.to_pandas()
     assert list(frame.columns)[-4:] == [
         "wal_to_call",
         "z_spread_to_call_bp",
@@ -513,7 +515,7 @@ def test_typed_constructors_accept_the_payment_calendar() -> None:
     flows = deal.tranche_cashflows("A", _market(), CLOSE)
     # Registry defaults carry defaults and recoveries, so the note is not made whole.
     assert 0.0 < flows.total_principal.amount < 100_000_000.0
-    assert flows.to_dataframe()["principal"].sum() == pytest.approx(flows.total_principal.amount)
+    assert flows.to_pandas()["principal"].sum() == pytest.approx(flows.total_principal.amount)
 
 
 def test_attachment_points_are_derived_from_balances() -> None:
@@ -589,8 +591,8 @@ def test_attachment_points_are_derived_from_balances() -> None:
         .build()
     )
     for tranche_id in ("A", "B", "E"):
-        left = explicit.tranche_cashflows(tranche_id, _market(), CLOSE).to_dataframe()
-        right = twin.tranche_cashflows(tranche_id, _market(), CLOSE).to_dataframe()
+        left = explicit.tranche_cashflows(tranche_id, _market(), CLOSE).to_pandas()
+        right = twin.tranche_cashflows(tranche_id, _market(), CLOSE).to_pandas()
         # The explicit deal also carries coverage tests and a call, so compare the
         # first payment only, where neither has acted yet.
         assert left.iloc[0]["interest"] == pytest.approx(right.iloc[0]["interest"])
@@ -830,13 +832,13 @@ def test_absent_values_are_none_not_zero_or_infinity() -> None:
     )
     assert metrics.moic is None
     assert metrics.cash_on_cash[0][1] is None
-    assert metrics.to_dataframe()["cash_on_cash"].isna().all()
+    assert metrics.to_pandas()["cash_on_cash"].isna().all()
 
     # The UI's retired-senior fixture: Rust's own record of a note paid off mid-deal.
     charts = Path(__file__).parents[2] / "finstack-quant-ui/tests/valuations/scenario-table/deal-charts.json"
     retired = next(case for case in json.loads(charts.read_text())["cases"] if case["name"] == "retired-senior")
     diagnostics = SimulationDiagnostics.from_json(json.dumps(retired["run"]["diagnostics"]))
-    frame = diagnostics.coverage_tests_dataframe()
+    frame = diagnostics.coverage_tests_table().to_pandas()
     senior = frame[frame["test_id"] == "OC_SENIOR"]
     assert senior["ratio"].isna().any()
     assert senior["ratio"].notna().any()
@@ -869,7 +871,9 @@ def test_asset_pool_exposes_the_rust_collateral_analytics() -> None:
     assert stats.weighted_avg_maturity == pool.weighted_avg_maturity(CLOSE)
     assert stats.defaulted_balance_pct == pytest.approx(20.0)
     assert PoolStats.from_json(stats.to_json()).to_dict() == stats.to_dict()
-    assert stats.to_dataframe().columns[0] == "wac"
+    assert stats.to_pandas().columns[0] == "wac"
+    assert stats.to_arrow().column_names()[0] == "wac"
+    assert stats.to_polars().columns[0] == "wac"
 
 
 def test_structured_credit_has_the_typed_instrument_surface() -> None:
@@ -909,7 +913,7 @@ def test_cashflow_frame_rejects_mixed_currency_components() -> None:
     document["interest_flows"][0][1]["currency"] = "EUR"
     mixed = TrancheCashflows.from_json(json.dumps(document))
     with pytest.raises(ValueError, match="Currency mismatch"):
-        mixed.to_dataframe()
+        mixed.to_pandas()
 
 
 @pytest.mark.parametrize(
@@ -1025,9 +1029,11 @@ def test_pool_report_is_one_native_call_over_the_pool_analytics() -> None:
     assert report.by_obligor[0].balance.amount == 400.0
     assert [row.key for row in report.by_rating] == ["BB", "B", "CCC", None]
 
-    frame = report.to_dataframe()
+    frame = report.to_pandas()
     assert list(frame.columns) == ["dimension", "key", "balance", "currency", "balance_pct", "asset_count"]
     assert frame.groupby("dimension")["balance_pct"].sum().tolist() == pytest.approx([100.0, 100.0, 100.0])
+    assert report.to_arrow().num_rows == len(frame)
+    assert report.to_polars().height == len(frame)
 
     assert PoolReport.from_json(report.to_json()).to_dict() == report.to_dict()
     assert pickle.loads(pickle.dumps(report)).to_dict() == report.to_dict()  # noqa: S301

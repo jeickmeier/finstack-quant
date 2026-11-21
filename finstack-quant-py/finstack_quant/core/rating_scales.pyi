@@ -23,10 +23,13 @@ Examples
 from __future__ import annotations
 
 from collections.abc import Iterator
+from typing import Any
 
 import pandas as pd
+import polars as pl
 
 from finstack_quant.core.config import FinstackConfig
+from finstack_quant.core.table import ArrowTable
 
 class RatingLevel:
     """
@@ -258,7 +261,22 @@ class ScorecardScale:
         bool
         """
         ...
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Bands as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Presentation view with columns ``name``, ``score``, and ``min_score``.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+    def to_pandas(self) -> pd.DataFrame:
         """
         Bands as a pandas ``DataFrame``.
 
@@ -276,6 +294,39 @@ class ScorecardScale:
             If pandas is not installed.
         """
         ...
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Bands as a ``polars.DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per band constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+    def to_pyarrow(self) -> Any:
+        """
+        Bands as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def _repr_html_(self) -> str | None: ...
     def classify(self, score: float) -> RatingLevel:
         """
         Classify a score into its band.

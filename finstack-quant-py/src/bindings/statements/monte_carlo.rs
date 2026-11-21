@@ -3,10 +3,10 @@
 //! The simulation itself is started from ``Evaluator.evaluate_monte_carlo``
 //! (see `evaluator.rs`), mirroring Rust's `Evaluator::evaluate_monte_carlo`.
 
-use crate::bindings::core::table::envelope_to_pandas;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::macros::wire_methods;
-use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::{serde_json_to_py, statements_to_py};
 use finstack_quant_statements::evaluator::{
     MonteCarloConfig as RustMonteCarloConfig, MonteCarloResults as RustMonteCarloResults,
@@ -191,7 +191,7 @@ impl PyMonteCarloResults {
     #[doc = pydoc!("finstack_quant.statements._monte_carlo", "MonteCarloResults.incomplete")]
     #[getter]
     fn incomplete<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.incomplete)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.incomplete)
     }
 
     #[doc = pydoc!("finstack_quant.statements._monte_carlo", "MonteCarloResults.seed")]
@@ -209,7 +209,7 @@ impl PyMonteCarloResults {
     #[doc = pydoc!("finstack_quant.statements._monte_carlo", "MonteCarloResults.warnings")]
     #[getter]
     fn warnings<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.warnings)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.warnings)
     }
 
     /// Look up one percentile of one metric as a period-keyed dict.
@@ -263,6 +263,32 @@ impl PyMonteCarloResults {
             .map_err(statements_to_py)
     }
 
+    /// Export one metric's percentile fan as an ``ArrowTable``.
+    ///
+    /// Rows are the metric's forecast periods (with column ``period``, in
+    /// evaluation order); each column holds one configured percentile of the
+    /// simulated distribution, in the metric's own units (currency amounts
+    /// for monetary nodes, unitless otherwise).
+    ///
+    /// Columns: ``period`` followed by one per configured percentile, named
+    /// ``p<percent>`` — ``p5``, ``p50``, ``p95`` for the default levels
+    /// (``p97.5`` for ``0.975``). A cell is null when a period is missing
+    /// that percentile.
+    ///
+    /// Parameters
+    /// ----------
+    /// metric : str
+    ///     Node identifier whose fan chart to build.
+    ///
+    /// Raises
+    /// ------
+    /// KeyError
+    ///     If ``metric`` was not simulated.
+    #[pyo3(text_signature = "($self, metric)")]
+    fn to_arrow(&self, metric: &str) -> PyResult<PyArrowTable> {
+        self.percentile_arrow_table(metric)
+    }
+
     /// Export one metric's percentile fan as a pandas ``DataFrame``.
     ///
     /// Rows are the metric's forecast periods (index name ``period``, in
@@ -285,40 +311,65 @@ impl PyMonteCarloResults {
     /// KeyError
     ///     If ``metric`` was not simulated.
     #[pyo3(text_signature = "($self, metric)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>, metric: &str) -> PyResult<Bound<'py, PyAny>> {
-        let table = self
-            .inner
-            .percentile_table(metric)
-            .map_err(statements_to_py)?
-            .ok_or_else(|| {
-                PyKeyError::new_err(format!("unknown Monte Carlo metric: {metric:?}"))
-            })?;
-        envelope_to_pandas(py, &table)?.call_method1("set_index", ("period",))
+    fn to_pandas<'py>(&self, py: Python<'py>, metric: &str) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.percentile_arrow_table(metric)?)?;
+        PyArrowTable::to_pandas(&table, py)?.call_method1("set_index", ("period",))
     }
 
-    /// Export the retained per-path values as a long-format pandas
-    /// ``DataFrame``.
+    /// Export one metric's percentile fan as a ``polars.DataFrame``.
+    ///
+    /// Parameters
+    /// ----------
+    /// metric : str
+    ///     Node identifier whose fan chart to build.
+    ///
+    /// Raises
+    /// ------
+    /// KeyError
+    ///     If ``metric`` was not simulated.
+    #[pyo3(text_signature = "($self, metric)")]
+    fn to_polars<'py>(&self, py: Python<'py>, metric: &str) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.percentile_arrow_table(metric)?)?;
+        PyArrowTable::to_polars(&table, py)
+    }
+
+    /// Export one metric's percentile fan as a ``pyarrow.Table``.
+    ///
+    /// Parameters
+    /// ----------
+    /// metric : str
+    ///     Node identifier whose fan chart to build.
+    ///
+    /// Raises
+    /// ------
+    /// KeyError
+    ///     If ``metric`` was not simulated.
+    #[pyo3(text_signature = "($self, metric)")]
+    fn to_pyarrow<'py>(&self, py: Python<'py>, metric: &str) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.percentile_arrow_table(metric)?)?;
+        PyArrowTable::to_pyarrow(&table, py)
+    }
+
+    /// Export the retained per-path values as a long-format ``ArrowTable``.
     ///
     /// Populated only when the run was configured with
-    /// ``include_path_data=True``; otherwise the frame is empty but still
-    /// carries the documented columns. Rows are ordered canonically by
+    /// ``include_path_data=True``; otherwise the table is empty but still
+    /// carries the documented schema. Rows are ordered canonically by
     /// ``(path_id, metric, period)`` so serial and parallel runs match.
     ///
-    /// Columns: ``path_id`` (0-based path index), ``period`` (period
+    /// Columns: ``path_id`` (0-based path index, uint32), ``period`` (period
     /// identifier string), ``metric`` (node identifier), ``value``
     /// (float64, in the metric's own units).
     #[pyo3(text_signature = "($self)")]
-    fn to_paths_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_paths_table(&self) -> PyResult<PyArrowTable> {
         match &self.inner.path_data {
-            Some(table) => envelope_to_pandas(py, table),
-            None => {
-                let columns = PyDict::new(py);
-                columns.set_item("path_id", Vec::<u32>::new())?;
-                columns.set_item("period", Vec::<String>::new())?;
-                columns.set_item("metric", Vec::<String>::new())?;
-                columns.set_item("value", Vec::<f64>::new())?;
-                dict_to_dataframe(py, &columns, None)
-            }
+            Some(table) => PyArrowTable::from_envelope(table),
+            None => TableBuilder::new()
+                .nullable_u32("path_id", Vec::new())?
+                .utf8("period", Vec::new())?
+                .utf8("metric", Vec::new())?
+                .f64("value", Vec::new())?
+                .build(),
         }
     }
 
@@ -326,9 +377,22 @@ impl PyMonteCarloResults {
     ///
     /// Rendered from the wire representation, so the fields shown are the
     /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
+    /// `to_json()` or a table exit when the contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("MonteCarloResults", &self.inner)
+    }
+}
+
+impl PyMonteCarloResults {
+    fn percentile_arrow_table(&self, metric: &str) -> PyResult<PyArrowTable> {
+        let table = self
+            .inner
+            .percentile_table(metric)
+            .map_err(statements_to_py)?
+            .ok_or_else(|| {
+                PyKeyError::new_err(format!("unknown Monte Carlo metric: {metric:?}"))
+            })?;
+        PyArrowTable::from_envelope(&table)
     }
 }
 

@@ -73,11 +73,11 @@ def test_cells_cover_every_period_and_round_trip() -> None:
 
 
 def test_long_dataframe_carries_status_reason_and_source() -> None:
-    frame = _mixed_result().to_dataframe("long")
+    frame = _mixed_result().to_pandas("long")
 
     assert list(frame.columns) == [
         "node_id",
-        "period",
+        "period_id",
         "status",
         "value",
         "amount",
@@ -86,7 +86,7 @@ def test_long_dataframe_carries_status_reason_and_source() -> None:
         "reason",
         "source",
     ]
-    revenue = frame[frame["node_id"] == "revenue"].set_index("period")["source"]
+    revenue = frame[frame["node_id"] == "revenue"].set_index("period_id")["source"]
     assert revenue.to_dict() == {Q1: "value", Q2: "formula", Q3: "forecast"}
     masked = frame[frame["node_id"] == "masked"]
     assert masked["status"].tolist() == ["masked"] * 3
@@ -100,7 +100,7 @@ def test_hand_built_result_exports_null_source() -> None:
             cell.pop("source", None)
     hand_built = StatementResult.from_json(json.dumps(document))
 
-    assert hand_built.to_dataframe("long")["source"].isna().all()
+    assert hand_built.to_pandas("long")["source"].isna().all()
 
 
 def _balance_sheet_report() -> CheckReport:
@@ -151,14 +151,14 @@ def test_failed_finding_reports_actual_expected_and_tolerance() -> None:
     assert difference == finding.materiality_absolute
     assert difference > comparison["tolerance"]
 
-    row = report.to_findings_dataframe().iloc[0]
+    row = report.to_findings_table().to_pandas().iloc[0]
     assert row["comparison_actual"] == 1000.0
     assert row["comparison_expected"] == 900.0
     assert row["comparison_tolerance"] == 0.0
 
 
 def test_comparisons_dataframe_lists_passing_periods_too() -> None:
-    frame = _balance_sheet_report().to_comparisons_dataframe()
+    frame = _balance_sheet_report().to_comparisons_table().to_pandas()
 
     assert list(frame.columns) == [
         "check_id",
@@ -199,7 +199,7 @@ def test_report_without_comparisons_yields_typed_empty_frame() -> None:
             },
         })
     )
-    frame = report.to_comparisons_dataframe()
+    frame = report.to_comparisons_table().to_pandas()
 
     assert len(frame) == 0
     assert str(frame.dtypes["actual"]) == "float64"
@@ -237,7 +237,7 @@ def _cashflows(*, with_detail: bool) -> CapitalStructureCashflows:
 
 
 def test_principal_sources_sum_to_principal_payment() -> None:
-    frame = _cashflows(with_detail=True).to_dataframe()
+    frame = _cashflows(with_detail=True).to_pandas()
     amounts = frame.set_index("flow_type")["value"]
 
     sources = ["scheduled_principal", "mandatory_prepayment", "sweep_prepayment", "voluntary_prepayment"]
@@ -247,7 +247,7 @@ def test_principal_sources_sum_to_principal_payment() -> None:
 
 def test_available_cash_reconciles_the_period_uses() -> None:
     cashflows = _cashflows(with_detail=True)
-    amounts = cashflows.to_dataframe().set_index("flow_type")["value"]
+    amounts = cashflows.to_pandas().set_index("flow_type")["value"]
     available = cashflows.available_cash[Q1]
     equity = cashflows.equity_distribution[Q1]
 
@@ -258,7 +258,7 @@ def test_available_cash_reconciles_the_period_uses() -> None:
 
 def test_cashflows_written_before_the_split_still_load() -> None:
     cashflows = _cashflows(with_detail=False)
-    frame = cashflows.to_dataframe()
+    frame = cashflows.to_pandas()
 
     assert cashflows.available_cash == {}
     assert isinstance(frame, pd.DataFrame)

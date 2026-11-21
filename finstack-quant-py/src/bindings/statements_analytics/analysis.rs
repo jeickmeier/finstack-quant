@@ -11,25 +11,25 @@
 //! `KeyError` for missing nodes, `RuntimeError` for capital-structure
 //! failures and `ValueError` otherwise.
 
+use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
-use crate::bindings::pandas_utils::{
-    ColumnSchema, labeled_values_to_series, serde_rows_to_dataframe_with_schema, serde_to_py,
-};
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::statements::parse_period_id;
 use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::statements_analytics::typed::{
     PyBridgeChart, PyScenarioDiff, PyScenarioResults, PyScenarioSet, PySensitivityConfig,
     PySensitivityResult, PyTornadoEntry, PyVarianceConfig, PyVarianceReport,
 };
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::{core_to_py, serde_json_to_py, statements_to_py};
 use finstack_quant_statements_analytics::analysis::{
     DependencyTree, Explanation, ExplanationStep, ForecastMetrics, GoalSeekResult,
 };
 use pyo3::prelude::*;
 
-/// Column schema for `Explanation.to_dataframe`.
-const EXPLANATION_COLUMNS: [ColumnSchema<'static>; 3] = [
+/// Column schema for [`PyExplanation`] tabular exports.
+const EXPLANATION_COLUMNS: [(&str, &str); 3] = [
     ("component", "str"),
     ("value", "float64"),
     ("operation", "str"),
@@ -594,25 +594,28 @@ impl PyForecastMetrics {
         self.inner.summary()
     }
 
-    /// Export as a pandas ``Series`` indexed by metric name.
+    /// Export as a ``LabeledSeries`` indexed by metric name.
     ///
     /// Index: ``mae``, ``mape``, ``mape_effective_n``, ``smape``, ``rmse``,
-    /// ``n``; counts are cast to float and unavailable percentages become
-    /// pandas ``NaN``.
-    fn to_series<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    /// ``n``; counts are represented as floats and unavailable percentages
+    /// become null (``NaN`` in ``to_pandas()``).
+    fn to_series(&self) -> PyResult<PyLabeledSeries> {
         let labels: Vec<String> = ["mae", "mape", "mape_effective_n", "smape", "rmse", "n"]
             .iter()
             .map(ToString::to_string)
             .collect();
         let values = vec![
-            self.inner.mae,
-            self.inner.mape.unwrap_or(f64::NAN),
-            self.inner.mape_effective_n as f64,
-            self.inner.smape.unwrap_or(f64::NAN),
-            self.inner.rmse,
-            self.inner.n as f64,
+            Some(self.inner.mae),
+            self.inner.mape,
+            Some(self.inner.mape_effective_n as f64),
+            self.inner.smape,
+            Some(self.inner.rmse),
+            Some(self.inner.n as f64),
         ];
-        labeled_values_to_series(py, &labels, values, "forecast_metrics")
+        Ok(
+            PyLabeledSeries::from_opt_f64("forecast_metrics", labels, values)?
+                .with_index_name("metric"),
+        )
     }
 
     fn __repr__(&self) -> String {
@@ -759,13 +762,13 @@ impl PyGoalSeekResult {
     #[getter]
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekResult.original_run")]
     fn original_run<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.original_run)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.original_run)
     }
 
     #[getter]
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._analysis", "GoalSeekResult.solved_run")]
     fn solved_run<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.solved_run)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.solved_run)
     }
 
     #[getter]
@@ -1170,11 +1173,15 @@ impl PyExplanation {
         self.inner.to_text()
     }
 
-    /// Export the breakdown as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``component``, ``value``, ``operation`` (``None`` when absent).
-    /// One row per breakdown step in evaluation order.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn __repr__(&self) -> String {
+        crate::bindings::repr_support::repr_from_serde("Explanation", &self.inner)
+    }
+}
+
+wire_methods!(PyExplanation, Explanation, "Explanation");
+
+impl PyExplanation {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         let rows: Vec<serde_json::Value> = self
             .inner
             .breakdown
@@ -1187,16 +1194,11 @@ impl PyExplanation {
                 })
             })
             .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, &EXPLANATION_COLUMNS)
-    }
-
-    fn __repr__(&self) -> String {
-        crate::bindings::repr_support::repr_from_serde("Explanation", &self.inner)
+        serde_rows_to_arrow_table(&rows, &EXPLANATION_COLUMNS)
     }
 }
 
-wire_methods!(PyExplanation, Explanation, "Explanation");
-impl_repr_html_via_dataframe!(PyExplanation);
+tabular_methods!(PyExplanation);
 
 /// Explain a formula for a specific node and period.
 ///
@@ -1215,8 +1217,8 @@ impl_repr_html_via_dataframe!(PyExplanation);
 /// -------
 /// Explanation
 ///     Typed explanation with the cell ``source``, the ``forecast`` spec of a
-///     forecast cell, ``breakdown`` steps, ``to_text()`` and
-///     ``to_dataframe()``; ``to_json()`` matches the WASM ``explainFormula``.
+///     forecast cell, ``breakdown`` steps, ``to_text()``, ``to_arrow()``,
+///     and ``to_pandas()``; ``to_json()`` matches the WASM ``explainFormula``.
 ///
 /// Raises
 /// ------

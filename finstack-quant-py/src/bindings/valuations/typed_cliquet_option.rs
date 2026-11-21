@@ -138,7 +138,7 @@ impl PyCliquetOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.path_model")]
     #[getter]
     fn path_model<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.path_model)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.path_model)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.div_yield_id")]
@@ -166,7 +166,7 @@ impl PyCliquetOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cliquet_option", "CliquetOption.payoff_type")]
     #[getter]
     fn payoff_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.payoff_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.payoff_type)
     }
 }
 

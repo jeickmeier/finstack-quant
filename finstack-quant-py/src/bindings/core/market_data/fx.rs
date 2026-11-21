@@ -11,11 +11,10 @@ use pyo3::types::PyModule;
 use pyo3::wrap_pyfunction;
 
 use crate::bindings::core::currency::{PyCurrency, extract_currency};
-use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::macros::{
-    impl_repr_html_via_dataframe, label_enum, typed_or_label, wire_methods,
-};
-use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema;
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::date_utils::py_to_date;
+use crate::bindings::macros::{label_enum, tabular_methods, typed_or_label, wire_methods};
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
 
 typed_or_label!(
@@ -78,22 +77,6 @@ impl PyFxRateResult {
         self.inner.triangulated
     }
 
-    /// Export as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``rate``, ``triangulated``.
-    ///
-    /// One lookup is one flat record, so a one-row frame is the right shape:
-    /// ``pd.concat([matrix.rate(*pair, d).to_dataframe() for pair in pairs])``
-    /// builds a fixing table, and the ``triangulated`` flag travels with each
-    /// rate so a downstream check can refuse derived quotes.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let row = serde_json::json!({
-            "rate": self.inner.rate,
-            "triangulated": self.inner.triangulated,
-        });
-        serde_object_to_single_row_dataframe_with_schema(py, &row, &["rate", "triangulated"])
-    }
-
     /// The rate as a plain ``float`` (``float(result)``).
     fn __float__(&self) -> f64 {
         self.inner.rate
@@ -112,8 +95,17 @@ impl PyFxRateResult {
     }
 }
 
+impl PyFxRateResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .f64("rate", vec![self.inner.rate])?
+            .bool("triangulated", vec![self.inner.triangulated])?
+            .build()
+    }
+}
+
+tabular_methods!(PyFxRateResult);
 wire_methods!(PyFxRateResult, FxRateResult, "FxRateResult");
-impl_repr_html_via_dataframe!(PyFxRateResult);
 
 /// Foreign-exchange rate matrix for currency conversion.
 ///
@@ -142,31 +134,23 @@ fn optional_pivot(
     }
 }
 
-/// Build a pandas ``DataFrame`` from pair-global or cached `(base, quote, rate)` FX quotes.
-fn pair_quotes_dataframe<'py>(
-    py: Python<'py>,
+/// Build an Arrow table from pair-global or cached `(base, quote, rate)` FX quotes.
+fn pair_quotes_table(
     rows: &[(
         finstack_quant_core::currency::Currency,
         finstack_quant_core::currency::Currency,
         f64,
     )],
-) -> PyResult<Bound<'py, PyAny>> {
-    let data = pyo3::types::PyDict::new(py);
-    data.set_item(
-        "base",
-        rows.iter().map(|q| q.0.to_string()).collect::<Vec<_>>(),
-    )?;
-    data.set_item(
-        "quote",
-        rows.iter().map(|q| q.1.to_string()).collect::<Vec<_>>(),
-    )?;
-    data.set_item("rate", rows.iter().map(|q| q.2).collect::<Vec<_>>())?;
-    crate::bindings::pandas_utils::dict_to_dataframe(py, &data, None)
+) -> PyResult<PyArrowTable> {
+    TableBuilder::new()
+        .utf8("base", rows.iter().map(|q| q.0.to_string()).collect())?
+        .utf8("quote", rows.iter().map(|q| q.1.to_string()).collect())?
+        .f64("rate", rows.iter().map(|q| q.2).collect())?
+        .build()
 }
 
-/// Build a pandas ``DataFrame`` from date-and-policy pinned `(base, quote, date, policy, rate)` quotes.
-fn pinned_quotes_dataframe<'py>(
-    py: Python<'py>,
+/// Build an Arrow table from date-and-policy pinned `(base, quote, date, policy, rate)` quotes.
+fn pinned_quotes_table(
     rows: &[(
         finstack_quant_core::currency::Currency,
         finstack_quant_core::currency::Currency,
@@ -174,27 +158,15 @@ fn pinned_quotes_dataframe<'py>(
         finstack_quant_core::money::fx::FxConversionPolicy,
         f64,
     )],
-) -> PyResult<Bound<'py, PyAny>> {
-    let data = pyo3::types::PyDict::new(py);
-    data.set_item(
-        "base",
-        rows.iter().map(|q| q.0.to_string()).collect::<Vec<_>>(),
-    )?;
-    data.set_item(
-        "quote",
-        rows.iter().map(|q| q.1.to_string()).collect::<Vec<_>>(),
-    )?;
-    let dates = rows
-        .iter()
-        .map(|q| date_to_py(py, q.2))
-        .collect::<PyResult<Vec<_>>>()?;
-    data.set_item("date", dates)?;
-    data.set_item(
-        "policy",
-        rows.iter().map(|q| q.3.to_string()).collect::<Vec<_>>(),
-    )?;
-    data.set_item("rate", rows.iter().map(|q| q.4).collect::<Vec<_>>())?;
-    crate::bindings::pandas_utils::dict_to_dataframe(py, &data, None)
+) -> PyResult<PyArrowTable> {
+    let dates: Vec<_> = rows.iter().map(|q| q.2).collect();
+    TableBuilder::new()
+        .utf8("base", rows.iter().map(|q| q.0.to_string()).collect())?
+        .utf8("quote", rows.iter().map(|q| q.1.to_string()).collect())?
+        .date("date", &dates)?
+        .utf8("policy", rows.iter().map(|q| q.3.to_string()).collect())?
+        .f64("rate", rows.iter().map(|q| q.4).collect())?
+        .build()
 }
 
 /// Extract a numeric FX value as `f64`, rejecting Python `bool`.
@@ -354,7 +326,7 @@ impl PyFxMatrix {
             .map_err(core_to_py)
     }
 
-    /// Explicit pair-global quotes as a pandas ``DataFrame``.
+    /// Explicit pair-global quotes as an ``ArrowTable``.
     ///
     /// Columns: ``base``, ``quote`` (ISO codes) and ``rate``, in the Rust
     /// snapshot order (by ISO-4217 numeric code of base, then quote).
@@ -363,19 +335,19 @@ impl PyFxMatrix {
     ///
     /// Returns
     /// -------
-    /// pandas.DataFrame
+    /// ArrowTable
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If repeated quote updates prevent a coherent snapshot or the
     ///     provider cannot version its snapshot quotes.
-    fn quotes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn quotes(&self) -> PyResult<PyArrowTable> {
         let state = self.inner.get_serializable_state().map_err(core_to_py)?;
-        pair_quotes_dataframe(py, &state.quotes)
+        pair_quotes_table(&state.quotes)
     }
 
-    /// Cached provider-observed quotes as a pandas ``DataFrame``.
+    /// Cached provider-observed quotes as an ``ArrowTable``.
     ///
     /// Columns: ``base``, ``quote`` (ISO codes) and ``rate``, in the Rust
     /// snapshot order (by ISO-4217 numeric code of base, then quote).
@@ -385,58 +357,58 @@ impl PyFxMatrix {
     ///
     /// Returns
     /// -------
-    /// pandas.DataFrame
+    /// ArrowTable
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If repeated quote updates prevent a coherent snapshot or the
     ///     provider cannot version its snapshot quotes.
-    fn provider_quotes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn provider_quotes(&self) -> PyResult<PyArrowTable> {
         let state = self.inner.get_serializable_state().map_err(core_to_py)?;
-        pair_quotes_dataframe(py, &state.provider_quotes)
+        pair_quotes_table(&state.provider_quotes)
     }
 
-    /// Explicit date-and-policy pinned quotes (``set_quote_on``) as a pandas ``DataFrame``.
+    /// Explicit date-and-policy pinned quotes (``set_quote_on``) as an ``ArrowTable``.
     ///
-    /// Columns: ``base``, ``quote`` (ISO codes), ``date`` (``datetime.date``),
+    /// Columns: ``base``, ``quote`` (ISO codes), ``date`` (Arrow ``date32``),
     /// ``policy`` (conversion policy label), and ``rate``. For their
     /// ``(date, policy)``, pinned quotes take highest authority, outranking
     /// both pair-global quotes (``set_quotes``) and provider observations.
     ///
     /// Returns
     /// -------
-    /// pandas.DataFrame
+    /// ArrowTable
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If repeated quote updates prevent a coherent snapshot or the
     ///     provider cannot version its snapshot quotes.
-    fn pinned_quotes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn pinned_quotes(&self) -> PyResult<PyArrowTable> {
         let state = self.inner.get_serializable_state().map_err(core_to_py)?;
-        pinned_quotes_dataframe(py, &state.pinned_quotes)
+        pinned_quotes_table(&state.pinned_quotes)
     }
 
-    /// Cached provider-observed date-and-policy quotes as a pandas ``DataFrame``.
+    /// Cached provider-observed date-and-policy quotes as an ``ArrowTable``.
     ///
-    /// Columns: ``base``, ``quote`` (ISO codes), ``date`` (``datetime.date``),
+    /// Columns: ``base``, ``quote`` (ISO codes), ``date`` (Arrow ``date32``),
     /// ``policy`` (conversion policy label), and ``rate``. These rank below
     /// both pinned fixings (``set_quote_on``) and explicit pair-global quotes
     /// (``set_quotes``).
     ///
     /// Returns
     /// -------
-    /// pandas.DataFrame
+    /// ArrowTable
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If repeated quote updates prevent a coherent snapshot or the
     ///     provider cannot version its snapshot quotes.
-    fn provider_pinned_quotes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn provider_pinned_quotes(&self) -> PyResult<PyArrowTable> {
         let state = self.inner.get_serializable_state().map_err(core_to_py)?;
-        pinned_quotes_dataframe(py, &state.provider_pinned_quotes)
+        pinned_quotes_table(&state.provider_pinned_quotes)
     }
 
     fn __repr__(&self) -> PyResult<String> {

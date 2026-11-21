@@ -287,7 +287,9 @@ def test_evaluate_dcf_exports_the_working_behind_enterprise_value() -> None:
     assert (bridge.total_debt, bridge.cash) == (25.0, 0.0)
     assert bridge.total_debt - bridge.cash == pytest.approx(result.net_debt.amount)
 
-    frame = result.to_dataframe()
+    frame = result.to_pandas()
+    assert result.to_polars().height == 1
+    assert result.to_arrow().num_rows == 1
     assert list(frame.columns[-6:]) == [
         "wacc",
         "pv_explicit",

@@ -3,7 +3,9 @@ use pyo3::types::PyType;
 
 use finstack_quant_portfolio::optimization::{OptimizationStatus, TradeSpec};
 
-use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe;
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::serde_object_to_single_row_arrow_table;
 
 use super::enums::{PyTradeDirection, PyTradeType};
 use crate::bindings::json_bridge::{deserialize_json, serialize_json};
@@ -206,18 +208,6 @@ impl PyTradeSpec {
         self.inner.target_weight
     }
 
-    /// Export this trade as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``position_id``, ``instrument_id``, ``trade_type``,
-    /// ``current_quantity``, ``target_quantity``, ``delta_quantity``,
-    /// ``direction``, ``current_weight``, ``target_weight`` — the same schema
-    /// :meth:`PortfolioOptimizationResult.to_trade_dataframe` emits, so
-    /// single-trade frames concatenate cleanly onto a full trade list.
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe(py, &self.inner)
-    }
-
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
             "TradeSpec(position_id={:?}, instrument_id={:?}, direction={:?}, delta_quantity={})",
@@ -227,15 +217,25 @@ impl PyTradeSpec {
             self.inner.delta_quantity,
         ))
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyTradeSpec {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_object_to_single_row_arrow_table(
+            &self.inner,
+            &[
+                ("position_id", "str"),
+                ("instrument_id", "str"),
+                ("trade_type", "str"),
+                ("current_quantity", "float64"),
+                ("target_quantity", "float64"),
+                ("delta_quantity", "float64"),
+                ("direction", "str"),
+                ("current_weight", "float64"),
+                ("target_weight", "float64"),
+            ],
+        )
     }
 }
+
+tabular_methods!(PyTradeSpec);

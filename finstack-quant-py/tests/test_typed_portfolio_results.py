@@ -186,12 +186,12 @@ def _assert_contract(wrapper: Any, cls: type) -> None:
     assert isinstance(wrapper.to_json(), str)
     restored = cls.from_json(wrapper.to_json())
     assert _approx_equal(json.loads(restored.to_json()), json.loads(wrapper.to_json()))
-    frame = wrapper.to_dataframe()
+    frame = wrapper.to_pandas()
     assert hasattr(frame, "columns")
 
 
 def _frame_columns(wrapper: Any) -> list[str]:
-    return list(wrapper.to_dataframe().columns)
+    return list(wrapper.to_pandas().columns)
 
 
 # ---------------------------------------------------------------------------
@@ -360,7 +360,7 @@ def test_grid_attribution_returns_typed_result() -> None:
         "benchmark_cell_return",
         "curve_effect",
     ]
-    assert list(result.to_sector_effects_dataframe().columns) == [
+    assert result.to_sector_effects_table().column_names() == [
         "cell",
         "sector",
         "allocation_effect",
@@ -400,7 +400,7 @@ def test_factor_brinson_attribution_returns_typed_result() -> None:
     assert result.active_return == pytest.approx(expected["active_return"])
     assert result.allocation == pytest.approx(expected["allocation"])
     assert _frame_columns(result) == ["factor", "active_loading", "factor_return", "contribution"]
-    assert list(result.to_asset_contributions_dataframe().columns) == [
+    assert result.to_asset_contributions_table().column_names() == [
         "asset",
         "specific_return",
         "active_weight",
@@ -444,7 +444,7 @@ def test_aggregate_metrics_returns_typed_portfolio_metrics() -> None:
     assert json.loads(metrics.to_json()) == expected
     restored = pf.PortfolioMetrics.from_json(metrics.to_json())
     assert json.loads(restored.to_json()) == expected
-    assert hasattr(metrics.to_dataframe(), "columns")
+    assert hasattr(metrics.to_pandas(), "columns")
 
 
 # ---------------------------------------------------------------------------
@@ -535,7 +535,8 @@ def test_scenario_pnl_batch_returns_typed_items() -> None:
         assert isinstance(item.pnl, pf.ScenarioPnl)
         assert item.pnl.total == pytest.approx(float(expected_item["pnl"]["total"]["amount"]))
         assert item.report.operations_applied == expected_item["report"]["operations_applied"]
-        assert list(item.to_dataframe().columns) == ["scenario_id", "position_id", "pnl"]
+        assert item.to_arrow().column_names() == ["scenario_id", "position_id", "pnl"]
+        assert list(item.to_pandas().columns) == ["scenario_id", "position_id", "pnl"]
     assert pf.scenario_pnl_batch(portfolio, "[]", market) == []
 
 

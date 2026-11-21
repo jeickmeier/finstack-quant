@@ -4,15 +4,18 @@
 //! (or bulk-load a long-format frame), then run an engine or the matching
 //! free function to get a typed result with a per-component breakdown.
 
-use super::frame::{opt_str, records, req_bool, req_date, req_f64, req_str, sensitivity_rows};
+use super::frame::{
+    opt_date, opt_str, records, req_bool, req_date, req_f64, req_str, sensitivity_rows,
+};
 use super::types::{PyNettingSetId, extract_netting_set_id};
-use crate::bindings::core::table::envelope_to_pandas;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::parse_label;
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::tabular_methods;
 use crate::bindings::module_utils::parse_currency;
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
-    serde_rows_to_dataframe_with_schema, serde_to_py,
+use crate::bindings::table_builders::{
+    serde_object_to_single_row_arrow_table, serde_rows_to_arrow_table,
 };
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_margin::regulatory::{
@@ -136,8 +139,8 @@ impl PyFrtbSensitivities {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    /// Bulk-load sensitivities from the long-format frame ``to_dataframe``
-    /// emits.
+    /// Bulk-load sensitivities from the long-format table ``to_pandas`` /
+    /// ``to_arrow`` emits.
     ///
     /// Parameters
     /// ----------
@@ -145,7 +148,7 @@ impl PyFrtbSensitivities {
     ///     Columns ``risk_class``, ``kind``, ``issuer``, ``bucket``,
     ///     ``tenor``, ``amount`` (plus the DRC columns ``sector``,
     ///     ``seniority``, ``maturity_years``,
-    ///     ``pnl_adjustment`` on ``drc`` rows) encoded as ``to_dataframe``
+    ///     ``pnl_adjustment`` on ``drc`` rows) encoded as ``to_pandas``
     ///     documents. ``curvature_up`` / ``curvature_down`` rows are
     ///     recombined into pairs; ``rrao`` rows carry ``exotic_notional`` /
     ///     ``other_notional``; each ``drc`` row is one default-risk position.
@@ -154,7 +157,7 @@ impl PyFrtbSensitivities {
     ///     it).
     ///
     /// Rows with the same key accumulate. Decoding is the Rust
-    /// ``FrtbSensitivities::from_rows``, the inverse of ``to_dataframe``.
+    /// ``FrtbSensitivities::from_rows``, the inverse of ``to_pandas``.
     /// Raises ``ValueError`` for an unknown risk class or kind, a missing
     /// column or value, a bad bucket, currency or DRC label.
     #[staticmethod]
@@ -482,46 +485,6 @@ impl PyFrtbSensitivities {
         self.inner.base_currency.to_string()
     }
 
-    /// Export every populated sensitivity bucket as one long-format pandas
-    /// ``DataFrame``.
-    ///
-    /// Columns: ``risk_class``, ``bucket``, ``tenor``, ``issuer``, ``kind``,
-    /// ``amount``, then the DRC columns ``sector``, ``seniority``,
-    /// ``maturity_years``, ``pnl_adjustment`` (``None`` /
-    /// ``NaN`` on non-DRC rows). One row per populated bucket; an empty
-    /// container still carries all ten columns. Long format is used
-    /// deliberately — a column per bucket would give a different schema for
-    /// every portfolio.
-    ///
-    /// ``risk_class`` uses the same labels as the ``frtb_sba_charge``
-    /// breakdown (``girr``, ``csr_non_sec``, ``csr_sec_ctp``,
-    /// ``csr_sec_non_ctp``, ``equity``, ``commodity``, ``fx``), plus ``drc``
-    /// and ``rrao`` for the two position lists.
-    ///
-    /// ``kind`` is ``delta``, ``vega``, ``repo_delta``, ``curvature_up``,
-    /// ``curvature_down``, ``inflation_delta``, ``xccy_basis_delta``, ``jtd``
-    /// (DRC notional), or
-    /// ``exotic_notional`` / ``other_notional`` (RRAO). A curvature pair is
-    /// split across two rows so ``amount`` stays scalar.
-    ///
-    /// ``issuer`` carries the name axis: a currency code for GIRR, a
-    /// ``"CCY1/CCY2"`` pair for FX, an issuer, tranche, underlier, commodity
-    /// name, or instrument id elsewhere. ``bucket`` is the FRTB bucket index
-    /// as a **string** (``pd.to_numeric`` if you need it numeric);
-    /// ``tenor`` is the tenor or option maturity, ``"{tenor}/{basis}"`` for
-    /// CSR and commodity deltas, and for GIRR vega the
-    /// ``"{option_maturity}/{underlying_tenor}"`` pair. Both are ``None``
-    /// where the risk class has no such axis.
-    ///
-    /// ``amount`` keeps each bucket's own convention: GIRR deltas are
-    /// base-currency P&L per **1 percentage point** of curve shift (that is,
-    /// ``100 x DV01``), DRC rows are signed JTD notionals before LGD, and
-    /// RRAO rows are gross notionals. ``from_dataframe`` accepts this frame
-    /// back, DRC rows included.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        envelope_to_pandas(py, &self.inner.to_table().map_err(core_to_py)?)
-    }
-
     /// Summarise the container by populated bucket counts.
     fn __repr__(&self) -> String {
         let s = &self.inner;
@@ -555,18 +518,16 @@ impl PyFrtbSensitivities {
             s.rrao_exotic_notionals.len(),
         )
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyFrtbSensitivities {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let table = self.inner.to_table().map_err(core_to_py)?;
+        PyArrowTable::from_envelope(&table)
     }
 }
+
+tabular_methods!(PyFrtbSensitivities);
 
 /// FRTB SBA engine.
 ///
@@ -684,7 +645,7 @@ pub struct PySaCcrTrade {
     pub(super) inner: SaCcrTrade,
 }
 
-const TRADE_COLUMNS: &[ColumnSchema<'_>] = &[
+const TRADE_COLUMNS: &[(&str, &str)] = &[
     ("trade_id", "str"),
     ("asset_class", "str"),
     ("notional", "float64"),
@@ -798,7 +759,7 @@ impl PySaCcrTrade {
 
     /// Build one validated trade per row of a trade tape.
     ///
-    /// ``frame`` must carry the columns ``to_dataframe`` emits (``trade_id``,
+    /// ``frame`` must carry the columns ``to_pandas`` / ``to_arrow`` emits (``trade_id``,
     /// ``asset_class``, ``notional``, ``start_date``, ``end_date``,
     /// ``underlier``, ``hedging_set``, ``direction``, ``supervisory_delta``,
     /// ``mtm``, ``is_option``; ``option_type``, ``supervisory_category`` and
@@ -815,12 +776,7 @@ impl PySaCcrTrade {
                     supervisory_category: opt_str(row, "supervisory_category")?
                         .map(|s| parse_label::<SaCcrSupervisoryCategory>(&s))
                         .transpose()?,
-                    option_maturity_date: row
-                        .get_item("option_maturity_date")?
-                        .filter(|v| !v.is_none())
-                        .as_ref()
-                        .map(py_to_date)
-                        .transpose()?,
+                    option_maturity_date: opt_date(row, "option_maturity_date")?,
                     trade_id: req_str(row, "trade_id")?,
                     asset_class: parse_label::<SaCcrAssetClass>(&req_str(row, "asset_class")?)?,
                     notional: req_f64(row, "notional")?,
@@ -840,13 +796,6 @@ impl PySaCcrTrade {
                 Ok(Self { inner })
             })
             .collect()
-    }
-
-    /// Export the trade as a single-row pandas ``DataFrame`` with the
-    /// columns ``from_dataframe`` reads; dates are ISO 8601 strings and
-    /// ``option_type`` is null for linear trades.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(py, &[self.row()], TRADE_COLUMNS)
     }
 
     /// Trade identifier.
@@ -952,18 +901,15 @@ impl PySaCcrTrade {
             py_bool(self.inner.is_option),
         )
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PySaCcrTrade {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_object_to_single_row_arrow_table(&self.row(), TRADE_COLUMNS)
     }
 }
+
+tabular_methods!(PySaCcrTrade);
 
 /// SA-CCR netting-set configuration.
 ///
@@ -1343,30 +1289,8 @@ impl PyFrtbSbaResult {
         serde_to_py(py, &self.inner.meta)
     }
 
-    /// Export the headline charge as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``total``, ``drc``, ``rrao`` (floats in the portfolio's base
-    /// currency) and ``binding_scenario`` (string). Per-risk-class detail lives
-    /// in ``to_breakdown_dataframe``.
-    ///
-    /// One row, so a book of desks stacks with
-    /// ``pd.concat([r.to_dataframe() for r in results])``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let row = serde_json::json!({
-            "total": self.inner.total,
-            "drc": self.inner.drc,
-            "rrao": self.inner.rrao,
-            "binding_scenario": self.binding_scenario(),
-        });
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &["total", "drc", "rrao", "binding_scenario"],
-        )
-    }
-
-    /// Export the per-risk-class breakdown as a long-format pandas ``DataFrame``.
+    /// Export the per-risk-class breakdown as a long-format
+    /// :class:`~finstack_quant.core.table.ArrowTable`.
     ///
     /// Columns: ``component`` (``"delta"``, ``"vega"``, or ``"curvature"``),
     /// ``risk_class`` (wire label, e.g. ``"girr"``), and ``charge`` (float in
@@ -1374,10 +1298,10 @@ impl PyFrtbSbaResult {
     /// risk-class sorted so repeated runs are byte-identical.
     ///
     /// The components do not sum to ``total``: SBA aggregates them with
-    /// prescribed correlations, and ``drc``/``rrao`` sit outside this frame.
+    /// prescribed correlations, and ``drc``/``rrao`` sit outside this table.
     #[pyo3(text_signature = "($self)")]
-    fn to_breakdown_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        const COLUMNS: &[ColumnSchema<'_>] = &[
+    fn to_breakdown_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: &[(&str, &str)] = &[
             ("component", "str"),
             ("risk_class", "str"),
             ("charge", "float64"),
@@ -1396,10 +1320,10 @@ impl PyFrtbSbaResult {
                 }));
             }
         }
-        serde_rows_to_dataframe_with_schema(py, &rows, COLUMNS)
+        serde_rows_to_arrow_table(&rows, COLUMNS)
     }
 
-    /// Export the per-scenario SBA charges as a pandas ``DataFrame``.
+    /// Export the per-scenario SBA charges as an :class:`~finstack_quant.core.table.ArrowTable`.
     ///
     /// Columns: ``scenario`` (``"low"``, ``"medium"``, ``"high"``),
     /// ``charge`` (delta+vega+curvature under that scenario, float in the
@@ -1407,8 +1331,8 @@ impl PyFrtbSbaResult {
     /// that produced ``total``). One row per evaluated scenario in
     /// low/medium/high order.
     #[pyo3(text_signature = "($self)")]
-    fn to_scenario_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        const COLUMNS: &[ColumnSchema<'_>] = &[
+    fn to_scenario_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: &[(&str, &str)] = &[
             ("scenario", "str"),
             ("charge", "float64"),
             ("binding", "bool"),
@@ -1425,7 +1349,7 @@ impl PyFrtbSbaResult {
                 })
             })
             .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, COLUMNS)
+        serde_rows_to_arrow_table(&rows, COLUMNS)
     }
 
     /// Return ``repr(self)``.
@@ -1438,18 +1362,29 @@ impl PyFrtbSbaResult {
             self.binding_scenario()
         )
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyFrtbSbaResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let row = serde_json::json!({
+            "total": self.inner.total,
+            "drc": self.inner.drc,
+            "rrao": self.inner.rrao,
+            "binding_scenario": self.binding_scenario(),
+        });
+        serde_object_to_single_row_arrow_table(
+            &row,
+            &[
+                ("total", "float64"),
+                ("drc", "float64"),
+                ("rrao", "float64"),
+                ("binding_scenario", "str"),
+            ],
+        )
     }
 }
+
+tabular_methods!(PyFrtbSbaResult);
 
 /// SA-CCR Exposure at Default result (BCBS 279).
 ///
@@ -1561,51 +1496,16 @@ impl PyEadResult {
         serde_to_py(py, &self.inner.meta)
     }
 
-    /// Export the headline exposure as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``ead``, ``rc``, ``pfe``, ``multiplier``, ``add_on_aggregate``
-    /// (floats in the netting set's reporting currency), ``alpha`` and
-    /// ``maturity_factor`` (dimensionless floats). Per-asset-class add-on
-    /// detail lives in ``to_add_on_dataframe``.
-    ///
-    /// One row, so a book of netting sets stacks with
-    /// ``pd.concat([r.to_dataframe() for r in results])``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let row = serde_json::json!({
-            "ead": self.inner.ead,
-            "rc": self.inner.rc,
-            "pfe": self.inner.pfe,
-            "multiplier": self.inner.multiplier,
-            "add_on_aggregate": self.inner.add_on_aggregate,
-            "alpha": self.inner.alpha,
-            "maturity_factor": self.inner.maturity_factor,
-        });
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &[
-                "ead",
-                "rc",
-                "pfe",
-                "multiplier",
-                "add_on_aggregate",
-                "alpha",
-                "maturity_factor",
-            ],
-        )
-    }
-
-    /// Export the per-asset-class add-on as a pandas ``DataFrame``.
+    /// Export the per-asset-class add-on as an :class:`~finstack_quant.core.table.ArrowTable`.
     ///
     /// Columns: ``asset_class`` (wire label) and ``add_on`` (float in the
     /// netting set's reporting currency). One row per asset class present,
     /// sorted by ``asset_class`` so repeated runs are byte-identical. A netting
-    /// set with no trades yields a zero-row frame that still carries both
+    /// set with no trades yields a zero-row table that still carries both
     /// columns with their real dtypes.
     #[pyo3(text_signature = "($self)")]
-    fn to_add_on_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        const COLUMNS: &[ColumnSchema<'_>] = &[("asset_class", "str"), ("add_on", "float64")];
+    fn to_add_on_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: &[(&str, &str)] = &[("asset_class", "str"), ("add_on", "float64")];
         let rows: Vec<serde_json::Value> = self
             .inner
             .add_on_by_asset_class
@@ -1617,7 +1517,7 @@ impl PyEadResult {
                 })
             })
             .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, COLUMNS)
+        serde_rows_to_arrow_table(&rows, COLUMNS)
     }
 
     /// Return ``repr(self)``.
@@ -1627,26 +1527,43 @@ impl PyEadResult {
             self.inner.ead, self.inner.rc, self.inner.pfe, self.inner.alpha
         )
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyEadResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let row = serde_json::json!({
+            "ead": self.inner.ead,
+            "rc": self.inner.rc,
+            "pfe": self.inner.pfe,
+            "multiplier": self.inner.multiplier,
+            "add_on_aggregate": self.inner.add_on_aggregate,
+            "alpha": self.inner.alpha,
+            "maturity_factor": self.inner.maturity_factor,
+        });
+        serde_object_to_single_row_arrow_table(
+            &row,
+            &[
+                ("ead", "float64"),
+                ("rc", "float64"),
+                ("pfe", "float64"),
+                ("multiplier", "float64"),
+                ("add_on_aggregate", "float64"),
+                ("alpha", "float64"),
+                ("maturity_factor", "float64"),
+            ],
+        )
     }
 }
+
+tabular_methods!(PyEadResult);
 
 /// Compute the FRTB SBA capital charge.
 ///
 /// Returns a ``FrtbSbaResult`` exposing ``total``, ``drc``, ``rrao``,
 /// ``binding_scenario``, ``scenario_charges``, and the per-risk-class
 /// ``delta_by_risk_class`` / ``vega_by_risk_class`` /
-/// ``curvature_by_risk_class`` breakdowns, plus ``to_dataframe`` /
-/// ``to_breakdown_dataframe`` / ``to_scenario_dataframe`` exits.
+/// ``curvature_by_risk_class`` breakdowns, plus ``to_pandas`` / ``to_polars`` /
+/// ``to_arrow`` and ``to_breakdown_table`` / ``to_scenario_table`` exits.
 ///
 /// If ``correlation_scenario`` is provided (``"low"``, ``"medium"``, ``"high"``),
 /// only that scenario is evaluated. Otherwise all three are run and the

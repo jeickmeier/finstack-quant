@@ -3,8 +3,10 @@
 use pyo3::prelude::*;
 
 use crate::bindings::core::money::PyMoney;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::date_to_py;
-use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, serde_to_py};
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::bindings::valuations::convert::money_to_py;
 use crate::errors::{display_to_py, serde_json_to_py};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::SimulationDiagnostics;
@@ -113,18 +115,9 @@ impl PySimulationDiagnostics {
         serde_to_py(py, &self.inner.periods)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.to_dataframe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.coverage_tests_table")]
     #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::table_to_dataframe(
-            py,
-            &self.inner.to_table().map_err(crate::errors::core_to_py)?,
-        )
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.coverage_tests_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn coverage_tests_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn coverage_tests_table(&self) -> PyResult<PyArrowTable> {
         let rows: Vec<serde_json::Value> = self
             .inner
             .periods
@@ -142,8 +135,7 @@ impl PySimulationDiagnostics {
                 })
             })
             .collect();
-        serde_rows_to_dataframe_with_schema(
-            py,
+        serde_rows_to_arrow_table(
             &rows,
             &[
                 ("date", "str"),
@@ -166,6 +158,19 @@ impl PySimulationDiagnostics {
         )
     }
 }
+
+impl PySimulationDiagnostics {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let table = self.inner.to_table().map_err(crate::errors::core_to_py)?;
+        PyArrowTable::from_envelope(&table)
+    }
+}
+
+crate::bindings::macros::tabular_methods!(
+    PySimulationDiagnostics,
+    "SimulationDiagnostics",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.diagnostics"
+);
 
 crate::bindings::macros::py_getters!(PySimulationDiagnostics |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.diagnostics", "SimulationDiagnostics.draws_from_reserve")]

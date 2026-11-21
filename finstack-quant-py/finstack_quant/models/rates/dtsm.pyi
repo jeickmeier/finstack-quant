@@ -30,6 +30,9 @@ from typing import Any, Sequence
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import polars as pl
+
+from finstack_quant.core.table import ArrowTable
 
 __all__ = [
     "DieboldLi",
@@ -76,19 +79,30 @@ class YieldPanel:
         yields: Sequence[Sequence[float]],
         dates: Sequence[Any] | None = None,
     ) -> None: ...
-    @classmethod
-    def from_dataframe(cls, df: pd.DataFrame) -> YieldPanel:
-        """Build a panel from a DataFrame with tenor columns.
+    @staticmethod
+    def from_dataframe(
+        df: pd.DataFrame | pl.DataFrame | Any,
+        *,
+        date_col: str | None = None,
+    ) -> YieldPanel:
+        """Build a panel from a DataFrame or Arrow table with tenor columns.
 
         Numeric column labels are years. Tenor labels such as 6M or 2Y use
         the native approximate year convention. Values are decimal zero rates.
-        A pandas RangeIndex represents an undated panel. Any other index must
-        contain valid observation dates.
+        A pandas RangeIndex (or undated Polars/Arrow table without ``date_col``
+        and without a unique date column) represents an undated panel. Any other
+        index or selected date column must contain valid observation dates.
 
         Parameters
         ----------
-        df : pandas.DataFrame
-            Wide frame of yields, one column per tenor.
+        df : pandas.DataFrame | polars.DataFrame | Any
+            Wide frame of yields (pandas ``DataFrame``, Polars ``DataFrame``,
+            or Arrow table), one column per tenor (plus optional date column).
+        date_col : str | None, optional
+            Column holding observation dates. Auto-detects a unique Polars/Arrow
+            date or datetime column when ``None``; optional for pandas
+            ``DataFrame`` inputs to read dates from a column instead of the
+            row index.
 
         Returns
         -------
@@ -97,10 +111,14 @@ class YieldPanel:
 
         Raises
         ------
+        KeyError
+            If ``date_col`` is specified but not found in ``df``.
         TypeError
-            If df is not a pandas DataFrame or a column or date has an incompatible type.
+            If ``df`` is not a pandas/Polars DataFrame or Arrow table, or a
+            column or date has an incompatible type.
         ValueError
-            If a tenor, date, or yield is invalid or the panel fails validation.
+            If a tenor, date, or yield is invalid, ``date_col`` cannot be
+            resolved uniquely, or the panel fails validation.
 
         Examples
         --------
@@ -230,8 +248,23 @@ class YieldPanel:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
-        """Return the panel as a DataFrame with one column per tenor.
+    def to_arrow(self) -> ArrowTable:
+        """Return the panel as an :class:`~finstack_quant.core.table.ArrowTable` with one column per tenor.
+
+        Returns
+        -------
+        ArrowTable
+            Includes leading ``date`` column (Date32) when dates are present.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be represented as an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """Return the panel as a pandas ``DataFrame`` with one column per tenor.
 
         Returns
         -------
@@ -240,19 +273,56 @@ class YieldPanel:
 
         Raises
         ------
-        ValueError
-            If the result cannot be converted to the tabular form.
         ImportError
-            If pandas is not installed in the environment.
+            If ``pandas`` is not installed in the environment.
+        ValueError
+            If the result cannot be converted to a pandas DataFrame.
 
         Examples
         --------
         >>> from finstack_quant.models.rates.dtsm import YieldPanel
-        >>> YieldPanel([1.0, 2.0], [[0.01, 0.02], [0.011, 0.021]]).to_dataframe().shape
+        >>> YieldPanel([1.0, 2.0], [[0.01, 0.02], [0.011, 0.021]]).to_pandas().shape
         (2, 2)
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """Return the panel as a Polars ``DataFrame`` with one column per tenor.
+
+        Returns
+        -------
+        polars.DataFrame
+            Includes leading ``date`` column when dates are present.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed in the environment.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Return the panel as a ``pyarrow.Table`` with one column per tenor.
+
+        Returns
+        -------
+        pyarrow.Table
+            Includes leading ``date`` column (date32) when dates are present.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed in the environment.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """Serialize to the canonical JSON wire format.
 
@@ -480,8 +550,23 @@ class FactorTimeSeries:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
-        """Return the factors as a DataFrame with ``level``, ``slope``, ``curvature`` columns.
+    def to_arrow(self) -> ArrowTable:
+        """Return the extracted factors as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``level``, ``slope``, ``curvature`` (with leading ``date`` column when available).
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be represented as an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """Return the factors as a pandas ``DataFrame`` with ``level``, ``slope``, ``curvature`` columns.
 
         Returns
         -------
@@ -490,21 +575,58 @@ class FactorTimeSeries:
 
         Raises
         ------
-        ValueError
-            If the result cannot be converted to the tabular form.
         ImportError
-            If pandas is not installed in the environment.
+            If ``pandas`` is not installed in the environment.
+        ValueError
+            If the result cannot be converted to a pandas DataFrame.
 
         Examples
         --------
         >>> from finstack_quant.models.rates.dtsm import DieboldLi, YieldPanel
         >>> panel = YieldPanel([1.0, 2.0, 5.0, 10.0], [[0.02, 0.025, 0.03, 0.035], [0.021, 0.026, 0.031, 0.036]])
         >>> fts = DieboldLi().extract_factors(panel).factors
-        >>> fts.to_dataframe().columns.tolist()
+        >>> fts.to_pandas().columns.tolist()
         ['level', 'slope', 'curvature']
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """Return the factors as a Polars ``DataFrame`` with ``level``, ``slope``, ``curvature`` columns.
+
+        Returns
+        -------
+        polars.DataFrame
+            Frame with leading ``date`` column when available.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed in the environment.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Return the factors as a ``pyarrow.Table`` with ``level``, ``slope``, ``curvature`` columns.
+
+        Returns
+        -------
+        pyarrow.Table
+            Table with leading ``date`` column when available.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed in the environment.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """Serialize to the canonical JSON wire format.
 
@@ -1048,8 +1170,23 @@ class YieldForecast:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
-        """Return the forecast as a DataFrame with one row per tenor.
+    def to_arrow(self) -> ArrowTable:
+        """Return the forecast as an :class:`~finstack_quant.core.table.ArrowTable` with one row per tenor.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``tenor``, ``yield``, ``lower_95``, and ``upper_95``.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be represented as an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """Return the forecast as a pandas ``DataFrame`` with one row per tenor.
 
         Returns
         -------
@@ -1058,10 +1195,10 @@ class YieldForecast:
 
         Raises
         ------
-        ValueError
-            If the result cannot be converted to the tabular form.
         ImportError
-            If pandas is not installed in the environment.
+            If ``pandas`` is not installed in the environment.
+        ValueError
+            If the result cannot be converted to a pandas DataFrame.
 
         Examples
         --------
@@ -1075,11 +1212,48 @@ class YieldForecast:
         ...     [0.020, 0.027, 0.030, 0.037],
         ...     [0.023, 0.026, 0.033, 0.035],
         ... ]
-        >>> DieboldLi().fit(YieldPanel(tenors, yields)).forecast(2).to_dataframe().columns.tolist()
+        >>> DieboldLi().fit(YieldPanel(tenors, yields)).forecast(2).to_pandas().columns.tolist()
         ['tenor', 'yield', 'lower_95', 'upper_95']
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """Return the forecast as a Polars ``DataFrame`` with one row per tenor.
+
+        Returns
+        -------
+        polars.DataFrame
+            Columns ``tenor``, ``yield``, ``lower_95``, and ``upper_95``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed in the environment.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Return the forecast as a ``pyarrow.Table`` with one row per tenor.
+
+        Returns
+        -------
+        pyarrow.Table
+            Columns ``tenor``, ``yield``, ``lower_95``, and ``upper_95``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed in the environment.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """Serialize to the canonical JSON wire format.
 
@@ -1515,8 +1689,23 @@ class YieldPca:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
-        """Return the loadings as a DataFrame indexed by tenor.
+    def to_arrow(self) -> ArrowTable:
+        """Return the component loadings as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Leading ``tenor`` column followed by ``PC1, PC2, ...``.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be represented as an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """Return the loadings as a pandas ``DataFrame`` indexed by tenor.
 
         Returns
         -------
@@ -1525,19 +1714,56 @@ class YieldPca:
 
         Raises
         ------
-        ValueError
-            If the result cannot be converted to the tabular form.
         ImportError
-            If pandas is not installed in the environment.
+            If ``pandas`` is not installed in the environment.
+        ValueError
+            If the result cannot be converted to a pandas DataFrame.
 
         Examples
         --------
         >>> from finstack_quant.models.rates.dtsm import YieldPca
-        >>> YieldPca.fit_yield_changes([[0.001, 0.002], [0.002, 0.001], [-0.001, 0.0]]).to_dataframe().columns.tolist()
+        >>> YieldPca.fit_yield_changes([[0.001, 0.002], [0.002, 0.001], [-0.001, 0.0]]).to_pandas().columns.tolist()
         ['PC1', 'PC2']
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """Return the component loadings as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Leading ``tenor`` column followed by ``PC1, PC2, ...``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed in the environment.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Return the component loadings as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Leading ``tenor`` column followed by ``PC1, PC2, ...``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed in the environment.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """Serialize to the canonical JSON wire format.
 
@@ -1751,50 +1977,100 @@ class YieldPcaView:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
-        """Return the loadings as a DataFrame indexed by tenor.
+    def to_arrow(self) -> ArrowTable:
+        """Return the view's component loadings as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            Columns ``PC1, PC2, ...``.
+        ArrowTable
+            Leading ``tenor`` column followed by ``PC1, PC2, ...``.
 
         Raises
         ------
         ValueError
-            If the result cannot be converted to the tabular form.
+            If the result cannot be represented as an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """Return the loadings as a pandas ``DataFrame`` indexed by tenor.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Columns ``PC1, PC2, ...``; index is the tenor grid.
+
+        Raises
+        ------
         ImportError
-            If pandas is not installed in the environment.
+            If ``pandas`` is not installed in the environment.
+        ValueError
+            If the result cannot be converted to a pandas DataFrame.
 
         Examples
         --------
         >>> from finstack_quant.models.rates.dtsm import YieldPca
         >>> view = YieldPca.fit_yield_changes([[0.001, 0.002], [0.002, 0.001], [-0.001, 0.0]]).truncated(1)
-        >>> view.to_dataframe().shape
+        >>> view.to_pandas().shape
         (2, 1)
         """
         ...
 
-    def to_scores_dataframe(self) -> pd.DataFrame:
-        """Return the scores as a DataFrame (one row per yield-change observation).
+    def to_polars(self) -> pl.DataFrame:
+        """Return the view's component loadings as a Polars ``DataFrame``.
 
         Returns
         -------
-        pandas.DataFrame
+        polars.DataFrame
+            Leading ``tenor`` column followed by ``PC1, PC2, ...``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed in the environment.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Return the view's component loadings as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Leading ``tenor`` column followed by ``PC1, PC2, ...``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed in the environment.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_scores_table(self) -> ArrowTable:
+        """Return the component scores as an :class:`~finstack_quant.core.table.ArrowTable` (one row per observation).
+
+        Returns
+        -------
+        ArrowTable
             Columns ``PC1, PC2, ...``.
 
         Raises
         ------
         ValueError
-            If the result cannot be converted to the tabular form.
-        ImportError
-            If pandas is not installed in the environment.
+            If the result cannot be represented as an Arrow table.
 
         Examples
         --------
         >>> from finstack_quant.models.rates.dtsm import YieldPca
         >>> view = YieldPca.fit_yield_changes([[0.001, 0.002], [0.002, 0.001], [-0.001, 0.0]]).truncated(1)
-        >>> view.to_scores_dataframe().shape
+        >>> view.to_scores_table().to_pandas().shape
         (3, 1)
         """
         ...

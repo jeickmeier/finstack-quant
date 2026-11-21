@@ -7,8 +7,9 @@ use finstack_quant_core::market_data::term_structures::{BaseCorrelationCurve, Cr
 use pyo3::prelude::*;
 
 use super::hazard::PyHazardCurve;
-use super::helpers::columns_to_dataframe;
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
+use super::helpers::columns_to_arrow_table;
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::errors::core_to_py;
 
 /// Base-correlation curve for synthetic credit index tranche pricing.
@@ -100,21 +101,6 @@ impl PyBaseCorrelationCurve {
             .map_err(core_to_py)
     }
 
-    /// Export knots as a pandas ``DataFrame`` with columns ``detachment_pct`` and ``correlation``.
-    ///
-    /// Returns
-    /// -------
-    /// pandas.DataFrame
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        columns_to_dataframe(
-            py,
-            &[
-                ("detachment_pct", self.inner.detachment_points().to_vec()),
-                ("correlation", self.inner.correlations().to_vec()),
-            ],
-        )
-    }
-
     /// Curve identifier string.
     #[getter]
     fn id(&self) -> &str {
@@ -154,13 +140,22 @@ impl PyBaseCorrelationCurve {
     }
 }
 
+impl PyBaseCorrelationCurve {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        columns_to_arrow_table(&[
+            ("detachment_pct", self.inner.detachment_points().to_vec()),
+            ("correlation", self.inner.correlations().to_vec()),
+        ])
+    }
+}
+
+tabular_methods!(PyBaseCorrelationCurve);
 wire_methods!(
     PyBaseCorrelationCurve,
     BaseCorrelationCurve,
     "BaseCorrelationCurve",
     arc
 );
-impl_repr_html_via_dataframe!(PyBaseCorrelationCurve);
 
 /// Credit index data bundle for synthetic tranche pricing.
 ///

@@ -13,8 +13,10 @@ use pyo3::types::{PyDict, PyList, PyModule};
 use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::py_to_date;
-use crate::bindings::macros::wire_methods;
+use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
 
 /// Convert Python ``[(date, Money), ...]`` into Rust dated flows.
@@ -131,31 +133,6 @@ impl PyPeriodAggregation {
         self.inner.len()
     }
 
-    #[doc = pydoc!("finstack_quant.cashflows.aggregation", "PeriodAggregation.to_dataframe")]
-    #[allow(clippy::wrong_self_convention)]
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows = self.inner.rows();
-        let columns = PyDict::new(py);
-        columns.set_item(
-            "period",
-            rows.iter()
-                .map(|(p, _, _)| p.to_string())
-                .collect::<Vec<_>>(),
-        )?;
-        columns.set_item(
-            "currency",
-            rows.iter()
-                .map(|(_, c, _)| c.to_string())
-                .collect::<Vec<_>>(),
-        )?;
-        columns.set_item(
-            "amount",
-            rows.iter().map(|(_, _, m)| m.amount()).collect::<Vec<_>>(),
-        )?;
-        crate::bindings::pandas_utils::dict_to_dataframe(py, &columns, None)
-    }
-
     /// Python-style summary.
     fn __repr__(&self) -> String {
         format!(
@@ -165,6 +142,29 @@ impl PyPeriodAggregation {
         )
     }
 }
+
+impl PyPeriodAggregation {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let rows = self.inner.rows();
+        TableBuilder::new()
+            .utf8(
+                "period",
+                rows.iter().map(|(p, _, _)| p.to_string()).collect(),
+            )?
+            .utf8(
+                "currency",
+                rows.iter().map(|(_, c, _)| c.to_string()).collect(),
+            )?
+            .f64("amount", rows.iter().map(|(_, _, m)| m.amount()).collect())?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyPeriodAggregation,
+    "PeriodAggregation",
+    module = "finstack_quant.cashflows.aggregation"
+);
 
 #[doc = pydoc!("finstack_quant.cashflows.aggregation", "aggregate_by_period")]
 #[pyfunction(name = "aggregate_by_period")]

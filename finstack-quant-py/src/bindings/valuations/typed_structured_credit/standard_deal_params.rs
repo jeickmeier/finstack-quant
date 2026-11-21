@@ -26,7 +26,7 @@ crate::bindings::macros::wire_methods!(
 impl PyStandardDealParams {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.standard_deal_params", "StandardDealParams.to_dict")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.standard_deal_params", "StandardDealParams.__init__")]

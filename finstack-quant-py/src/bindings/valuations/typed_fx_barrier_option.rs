@@ -107,19 +107,19 @@ impl PyFxBarrierOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.rebate_timing")]
     #[getter]
     fn rebate_timing<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.rebate_timing)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.rebate_timing)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.option_type")]
     #[getter]
     fn option_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.option_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.option_type)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.barrier_type")]
     #[getter]
     fn barrier_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.barrier_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.barrier_type)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.expiry")]
@@ -170,7 +170,7 @@ impl PyFxBarrierOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.monitoring")]
     #[getter]
     fn monitoring<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.monitoring)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.monitoring)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_fx_barrier_option", "FxBarrierOption.domestic_discount_curve_id")]

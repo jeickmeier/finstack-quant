@@ -2,10 +2,12 @@
 
 from collections.abc import Sequence
 import datetime
-from typing import Literal, TypedDict
+from typing import Any, Literal, TypedDict
 
 import pandas as pd
+import polars as pl
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.statements import StatementResult
 
 _Measure = Literal[
@@ -125,7 +127,23 @@ class CreditContextReport:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """Present dated ratios and their coverage status in a long ``ArrowTable``.
+
+        Returns
+        -------
+        ArrowTable
+            Period, measure, status, ratio, reference source ID and explanation.
+            An unknown ratio is null in the table.
+
+        Raises
+        ------
+        ValueError
+            If result data cannot be shaped into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """Present dated ratios and their coverage status in a long frame.
 
         Returns
@@ -143,20 +161,55 @@ class CreditContextReport:
         """
         ...
 
-    def coverage_to_dataframe(self) -> pd.DataFrame:
-        """Get the observation coverage and qualified minima by measure.
+    def to_polars(self) -> pl.DataFrame:
+        """Present dated ratios and their coverage status as a Polars ``DataFrame``.
 
         Returns
         -------
-        pd.DataFrame
-            Rows show measured, inapplicable and unavailable counts, the observed minimum over measured rows, and the full-path minimum when every applicable period is known.
+        polars.DataFrame
+            Period, measure, status, ratio, reference source ID and explanation.
 
         Raises
         ------
         ImportError
-            If pandas is unavailable.
+            If polars is unavailable.
         ValueError
-            If result data cannot be shaped into the requested frame.
+            If result data cannot be shaped into a frame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Present dated ratios and their coverage status as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Period, measure, status, ratio, reference source ID and explanation.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is unavailable.
+        ValueError
+            If result data cannot be shaped into a table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def coverage_to_table(self) -> ArrowTable:
+        """Get the observation coverage and qualified minima by measure as an ``ArrowTable``.
+
+        Returns
+        -------
+        ArrowTable
+            Rows show measured, inapplicable and unavailable counts, the observed minimum over measured rows, and the full-path minimum when every applicable period is known.
+
+        Raises
+        ------
+        ValueError
+            If result data cannot be shaped into the requested table.
         """
         ...
 
@@ -420,7 +473,22 @@ class CreditContextMetrics:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """Present the available ratios for this borrowing by period as an ``ArrowTable``.
+
+        Returns
+        -------
+        ArrowTable
+            Ordered reporting periods with one column per ratio, including LTV as a decimal fraction. Missing ratio observations appear as null values.
+
+        Raises
+        ------
+        ValueError
+            If result data cannot be shaped into the requested table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """Present the available ratios for this borrowing by period.
 
         Returns
@@ -436,6 +504,44 @@ class CreditContextMetrics:
             If result data cannot be shaped into the requested frame.
         """
         ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Present the available ratios for this borrowing by period as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Ordered reporting periods with one column per ratio, including LTV as a decimal fraction.
+
+        Raises
+        ------
+        ImportError
+            If polars is unavailable.
+        ValueError
+            If result data cannot be shaped into the requested frame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Present the available ratios for this borrowing by period as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Ordered reporting periods with one column per ratio, including LTV as a decimal fraction.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is unavailable.
+        ValueError
+            If result data cannot be shaped into the requested table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 def evaluate_credit_context(results: StatementResult, spec: CreditContextSpec) -> CreditContextReport:
     """Calculate one borrowing's selected credit ratios on one statement run.

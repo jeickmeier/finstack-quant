@@ -21,17 +21,18 @@
 //! Rust and Python use the canonical PascalCase forms (`SabrParameters`,
 //! `SabrSmile`, `SabrCalibrator`).
 
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use std::sync::Arc;
 
 use crate::bindings::core::market_data::curves::{
     PyFxDeltaVolSurface, PyVolCube, PyVolCubeExpirySlice, PyVolSurface,
 };
+use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::module_utils::py_to_serde;
-use crate::bindings::pandas_utils::dict_to_dataframe;
-use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::repr_support::repr_from_serde;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
 use finstack_quant_models::volatility as vol;
 use finstack_quant_models::volatility::VolatilityConvention;
@@ -41,7 +42,7 @@ use finstack_quant_models::volatility::sabr::{
 };
 use finstack_quant_models::volatility::svi::{SviParams, calibrate_svi as rust_calibrate_svi};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::PyList;
 
 #[doc = pydoc!("finstack_quant.models.volatility", "SabrParameters")]
 #[pyclass(
@@ -337,18 +338,31 @@ impl PySabrSmile {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>, strikes: Vec<f64>) -> PyResult<Bound<'py, PyAny>> {
-        let vols = self.inner.generate_smile(&strikes).map_err(core_to_py)?;
-        let log_moneyness: Vec<f64> = strikes
-            .iter()
-            .map(|&k| self.inner.log_moneyness(k))
-            .collect();
-        let data = PyDict::new(py);
-        data.set_item("strike", strikes)?;
-        data.set_item("vol", vols)?;
-        data.set_item("log_moneyness", log_moneyness)?;
-        dict_to_dataframe(py, &data, None)
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.to_arrow")]
+    #[pyo3(signature = (strikes), text_signature = "($self, strikes)")]
+    fn to_arrow(&self, strikes: Vec<f64>) -> PyResult<PyArrowTable> {
+        self.sabr_smile_table(&strikes)
+    }
+
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.to_pandas")]
+    #[pyo3(signature = (strikes), text_signature = "($self, strikes)")]
+    fn to_pandas<'py>(&self, py: Python<'py>, strikes: Vec<f64>) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.sabr_smile_table(&strikes)?)?;
+        PyArrowTable::to_pandas(&table, py)
+    }
+
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.to_polars")]
+    #[pyo3(signature = (strikes), text_signature = "($self, strikes)")]
+    fn to_polars<'py>(&self, py: Python<'py>, strikes: Vec<f64>) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.sabr_smile_table(&strikes)?)?;
+        PyArrowTable::to_polars(&table, py)
+    }
+
+    #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.to_pyarrow")]
+    #[pyo3(signature = (strikes), text_signature = "($self, strikes)")]
+    fn to_pyarrow<'py>(&self, py: Python<'py>, strikes: Vec<f64>) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.sabr_smile_table(&strikes)?)?;
+        PyArrowTable::to_pyarrow(&table, py)
     }
 
     #[doc = pydoc!("finstack_quant.models.volatility", "SabrSmile.forward")]
@@ -379,6 +393,21 @@ impl PySabrSmile {
             p.rho,
             shift_repr
         )
+    }
+}
+
+impl PySabrSmile {
+    fn sabr_smile_table(&self, strikes: &[f64]) -> PyResult<PyArrowTable> {
+        let vols = self.inner.generate_smile(strikes).map_err(core_to_py)?;
+        let log_moneyness: Vec<f64> = strikes
+            .iter()
+            .map(|&k| self.inner.log_moneyness(k))
+            .collect();
+        TableBuilder::new()
+            .f64("strike", strikes.to_vec())?
+            .f64("vol", vols)?
+            .f64("log_moneyness", log_moneyness)?
+            .build()
     }
 }
 
@@ -680,36 +709,6 @@ fn strike_to_delta(
     vol::strike_to_delta(is_call, strike, forward, vol, expiry).map_err(core_to_py)
 }
 
-fn grid_to_dataframe<'py>(
-    py: Python<'py>,
-    expiries: &[f64],
-    strikes: &[f64],
-    vols: &[f64],
-) -> PyResult<Bound<'py, PyAny>> {
-    if vols.len() != expiries.len() * strikes.len() {
-        return Err(crate::errors::value_error(format!(
-            "vol surface grid has {} values but {} expiries x {} strikes",
-            vols.len(),
-            expiries.len(),
-            strikes.len()
-        )));
-    }
-    let data = PyDict::new(py);
-    for (j, strike) in strikes.iter().enumerate() {
-        let column: Vec<f64> = (0..expiries.len())
-            .map(|i| vols[i * strikes.len() + j])
-            .collect();
-        data.set_item(*strike, column)?;
-    }
-    let kwargs = PyDict::new(py);
-    kwargs.set_item("name", "expiry")?;
-    let index = py
-        .import("pandas")?
-        .getattr("Index")?
-        .call((expiries.to_vec(),), Some(&kwargs))?;
-    dict_to_dataframe(py, &data, Some(index))
-}
-
 #[doc = pydoc!("finstack_quant.models.volatility", "convert_atm_volatility")]
 #[pyfunction]
 #[pyo3(signature = (vol, from_convention, to_convention, forward_rate, time_to_expiry))]
@@ -881,29 +880,53 @@ impl PyLocalVolSurface {
         self.inner.grid_shape()
     }
 
-    #[doc = pydoc!("finstack_quant.models.volatility", "LocalVolSurface.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        grid_to_dataframe(
-            py,
-            self.inner.expiries(),
-            self.inner.strikes(),
-            self.inner.local_vols(),
-        )
-    }
-
     fn __repr__(&self) -> String {
         let (expiries, strikes) = self.inner.grid_shape();
         format!("LocalVolSurface(expiries={expiries}, strikes={strikes})")
     }
 }
 
+impl PyLocalVolSurface {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let expiries = self.inner.expiries();
+        let strikes = self.inner.strikes();
+        let vols = self.inner.local_vols();
+        let expected = expiries.len() * strikes.len();
+        if vols.len() != expected {
+            return Err(crate::errors::value_error(format!(
+                "local vol grid has {} values but {} expiries x {} strikes",
+                vols.len(),
+                expiries.len(),
+                strikes.len()
+            )));
+        }
+        let mut exp_col = Vec::with_capacity(expected);
+        let mut strike_col = Vec::with_capacity(expected);
+        for &expiry in expiries {
+            for &strike in strikes {
+                exp_col.push(expiry);
+                strike_col.push(strike);
+            }
+        }
+        TableBuilder::new()
+            .f64("expiry", exp_col)?
+            .f64("strike", strike_col)?
+            .f64("local_vol", vols.to_vec())?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyLocalVolSurface,
+    "LocalVolSurface",
+    module = "finstack_quant.models.volatility"
+);
 wire_methods!(
     PyLocalVolSurface,
     LocalVolSurface,
     "LocalVolSurface",
     module = "finstack_quant.models.volatility"
 );
-impl_repr_html_via_dataframe!(PyLocalVolSurface);
 
 #[doc = pydoc!("finstack_quant.models.volatility", "calibrate_svi")]
 #[pyfunction]

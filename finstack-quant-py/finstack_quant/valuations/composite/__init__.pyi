@@ -55,9 +55,11 @@ import datetime
 from typing import Any
 
 import pandas as pd
+import polars as pl
 
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import Tenor
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 
@@ -1329,9 +1331,9 @@ class CompositeInstrument:
         """
         ...
 
-    def execution_trades_dataframe(self, previous: CompositeInstrument | None = None) -> pd.DataFrame:
+    def execution_trades_table(self, previous: CompositeInstrument | None = None) -> ArrowTable:
         """
-        :meth:`execution_trades` as a pandas ``DataFrame``.
+        :meth:`execution_trades` as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Parameters
         ----------
@@ -1340,7 +1342,7 @@ class CompositeInstrument:
 
         Returns
         -------
-        pandas.DataFrame
+        ArrowTable
             Columns ``instrument_id``, ``instrument_type``, ``quantity_delta``.
 
         Raises
@@ -1478,7 +1480,23 @@ class CompositeRebalanceResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export primitive execution deltas as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``instrument_id``, ``instrument_type``, ``quantity_delta``.
+
+        Raises
+        ------
+        ValueError
+            If canonical serialization fails.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export primitive execution deltas as a pandas ``DataFrame``.
 
@@ -1489,11 +1507,52 @@ class CompositeRebalanceResult:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
             If canonical serialization fails.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export primitive execution deltas as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Columns ``instrument_id``, ``instrument_type``, ``quantity_delta``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If canonical serialization fails.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export primitive execution deltas as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Columns ``instrument_id``, ``instrument_type``, ``quantity_delta``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If canonical serialization fails.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize the complete rebalance result.
@@ -1639,7 +1698,24 @@ class CompositeExposureReport:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export primitive aggregates as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``instrument_id``, ``instrument_type``, ``net_quantity``,
+            ``gross_quantity``, ``net_value``, ``gross_value``, ``currency``.
+
+        Raises
+        ------
+        ValueError
+            If canonical serialization fails.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export primitive aggregates as a pandas ``DataFrame``.
 
@@ -1647,11 +1723,12 @@ class CompositeExposureReport:
         -------
         pandas.DataFrame
             Columns ``instrument_id``, ``instrument_type``, ``net_quantity``,
-            ``gross_quantity``, ``net_value``, ``gross_value``, ``currency``,
-            then one column per additive metric requested.
+            ``gross_quantity``, ``net_value``, ``gross_value``, ``currency``.
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
             If canonical serialization fails.
 
@@ -1700,11 +1777,52 @@ class CompositeExposureReport:
         >>> _report = _spec.initialize(MarketContext(), datetime.date(2025, 1, 1)).instrument.primitive_exposures(
         ...     MarketContext(), datetime.date(2025, 1, 2)
         ... )
-        >>> list(_report.to_dataframe()["instrument_id"])
+        >>> list(_report.to_pandas()["instrument_id"])
         ['A', 'B']
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export primitive aggregates as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Columns ``instrument_id``, ``instrument_type``, ``net_quantity``,
+            ``gross_quantity``, ``net_value``, ``gross_value``, ``currency``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If canonical serialization fails.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export primitive aggregates as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Columns ``instrument_id``, ``instrument_type``, ``net_quantity``,
+            ``gross_quantity``, ``net_value``, ``gross_value``, ``currency``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If canonical serialization fails.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize paths and aggregate quantity, value, and additive risk.
@@ -1841,7 +1959,25 @@ class CompositeHistoryResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export the dated rows as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``date``, ``value``, ``cashflows``, ``pnl``, ``currency``,
+            ``period_return``, ``return_index``, ``held_state_effective_date``,
+            ``next_state_effective_date``, ``rebalance_trade_count``.
+
+        Raises
+        ------
+        ValueError
+            If canonical serialization fails.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export the dated rows as a pandas ``DataFrame``.
 
@@ -1850,11 +1986,12 @@ class CompositeHistoryResult:
         pandas.DataFrame
             Columns ``date``, ``value``, ``cashflows``, ``pnl``, ``currency``,
             ``period_return``, ``return_index``, ``held_state_effective_date``,
-            ``next_state_effective_date``, ``rebalance_trade_count``, then one
-            column per additive metric requested.
+            ``next_state_effective_date``, ``rebalance_trade_count``.
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
             If canonical serialization fails.
 
@@ -1909,11 +2046,54 @@ class CompositeHistoryResult:
         ...         {"date": "2025-01-02", "state": _state},
         ...     ]),
         ... )
-        >>> list(_history.to_dataframe()["return_index"])
+        >>> list(_history.to_pandas()["return_index"])
         [100.0, 100.0]
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the dated rows as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Columns ``date``, ``value``, ``cashflows``, ``pnl``, ``currency``,
+            ``period_return``, ``return_index``, ``held_state_effective_date``,
+            ``next_state_effective_date``, ``rebalance_trade_count``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If canonical serialization fails.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the dated rows as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Columns ``date``, ``value``, ``cashflows``, ``pnl``, ``currency``,
+            ``period_return``, ``return_index``, ``held_state_effective_date``,
+            ``next_state_effective_date``, ``rebalance_trade_count``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If canonical serialization fails.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def row(self, index: int) -> dict[str, Any]:
         """
         Return one zero-based dated history row as a ``dict``.

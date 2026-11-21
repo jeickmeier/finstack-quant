@@ -1,14 +1,15 @@
 //! Python bindings for period types from [`finstack_quant_core::dates`].
 
 use crate::bindings::date_utils::date_to_py;
-use crate::bindings::macros::{label_enum, wire_methods};
+use crate::bindings::macros::{label_enum, tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::{
     FiscalConfig, Period, PeriodId, PeriodKind, PeriodPlan, build_fiscal_periods, build_periods,
 };
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyIterator, PyList, PyModule, PyType};
+use pyo3::types::{PyIterator, PyList, PyModule, PyType};
 
 #[doc = pydoc!("finstack_quant.core.dates._periods", "PeriodKind")]
 #[pyclass(
@@ -338,7 +339,7 @@ impl PyPeriodPlan {
     /// ``{"fiscal": {"start_month": m, "start_day": d}}``.
     #[getter]
     fn calendar<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.get_calendar())
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.get_calendar())
     }
 
     /// List of periods in ascending order.
@@ -348,30 +349,6 @@ impl PyPeriodPlan {
             .iter()
             .map(|p| PyPeriod::from_inner(p.clone()))
             .collect()
-    }
-
-    /// Periods as a pandas DataFrame with columns ``id``, ``start``, ``end``,
-    /// ``is_actual`` (``start``/``end`` as ``datetime64``).
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let ids: Vec<String> = self.inner.iter().map(|p| p.id.to_string()).collect();
-        let starts: Vec<finstack_quant_core::dates::Date> =
-            self.inner.iter().map(|p| p.start).collect();
-        let ends: Vec<finstack_quant_core::dates::Date> =
-            self.inner.iter().map(|p| p.end).collect();
-        let actual: Vec<bool> = self.inner.iter().map(|p| p.is_actual).collect();
-        let columns = PyDict::new(py);
-        columns.set_item("id", ids)?;
-        columns.set_item(
-            "start",
-            crate::bindings::pandas_utils::dates_to_datetime_index(py, &starts)?,
-        )?;
-        columns.set_item(
-            "end",
-            crate::bindings::pandas_utils::dates_to_datetime_index(py, &ends)?,
-        )?;
-        columns.set_item("is_actual", actual)?;
-        crate::bindings::pandas_utils::dict_to_dataframe(py, &columns, None)
     }
 
     /// Iterate over the periods in ascending order.
@@ -397,6 +374,24 @@ impl PyPeriodPlan {
     }
 }
 
+impl PyPeriodPlan {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<crate::bindings::core::table::PyArrowTable> {
+        let ids: Vec<String> = self.inner.iter().map(|p| p.id.to_string()).collect();
+        let starts: Vec<finstack_quant_core::dates::Date> =
+            self.inner.iter().map(|p| p.start).collect();
+        let ends: Vec<finstack_quant_core::dates::Date> =
+            self.inner.iter().map(|p| p.end).collect();
+        let actual: Vec<bool> = self.inner.iter().map(|p| p.is_actual).collect();
+        TableBuilder::new()
+            .utf8("id", ids)?
+            .date("start", &starts)?
+            .date("end", &ends)?
+            .bool("is_actual", actual)?
+            .build()
+    }
+}
+
+tabular_methods!(PyPeriodPlan);
 wire_methods!(PyPeriodPlan, PeriodPlan, "PeriodPlan");
 
 /// Fiscal year configuration (the month and day the fiscal year starts).

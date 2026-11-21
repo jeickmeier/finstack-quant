@@ -7,10 +7,12 @@ import datetime
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal, TypedDict
 import pandas as pd
+import polars as pl
 from finstack_quant.statements import CheckReport, FinancialModelSpec, MonteCarloResults, StatementResult
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.statements_analytics._checks import CreditMapping, ThreeStatementMapping
 from finstack_quant.statements_analytics._credit_context import CreditContextMetrics
 from finstack_quant.statements_analytics._typed import TornadoEntry
@@ -65,27 +67,78 @@ class CorporateAnalysis:
             Instrument IDs mapped to their typed period series and minima.
         """
         ...
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the per-instrument credit metrics as a long pandas ``DataFrame``.
+        Export the per-instrument credit metrics as a long ``ArrowTable``.
 
         Columns: ``instrument_id``, ``period`` (period-id string), ``dscr``,
         ``dscr_total``, ``dscr_incl_fees``, ``interest_coverage`` (turns;
-        ``NaN`` where a metric is not available for that period). One row per
+        null where a metric is not available for that period). One row per
         (instrument, period) present on any metric series.
 
         Returns
         -------
+        ArrowTable
+            Long-format per-instrument credit metrics table.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to an Arrow table.
+        """
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the per-instrument credit metrics as a long pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`.
+
+        Returns
+        -------
         pd.DataFrame
-            Export the per-instrument credit metrics as a long pandas ``DataFrame``. Columns: ``instrument_id``, ``period`` (period-id string), ``dscr``, ``dscr_total``, ``dscr_incl_fees``, ``interest_coverage`` (turns; ``NaN`` where a metric is not available for that period). One row per (instrument, period) present on any metric series.
+            Long-format per-instrument credit metrics DataFrame.
 
         Raises
         ------
         ImportError
             If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the result cannot be converted to a pandas DataFrame.
         """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the per-instrument credit metrics as a long Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Long-format per-instrument credit metrics Polars frame.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export the per-instrument credit metrics as a long ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Long-format per-instrument credit metrics PyArrow table.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to canonical JSON.
@@ -345,31 +398,82 @@ class CorporateValuationResult:
         EquityBridge | None
             The bridge, or ``None`` only for a result loaded from JSON written before the DCF working was recorded.
         """
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export as a single-row pandas ``DataFrame``.
+        Export as a single-row ``ArrowTable``.
 
         Columns: ``currency``, ``equity_value``, ``enterprise_value``,
         ``net_debt``, ``other_equity_claims``, ``valuation_discount``, ``terminal_value_pv`` (float
         amounts in ``currency``), ``equity_value_per_share``,
-        ``diluted_shares`` (``None`` when absent), then the DCF working:
+        ``diluted_shares`` (null when absent), then the DCF working:
         ``wacc`` (decimal), ``pv_explicit``, ``terminal_value``,
         ``total_debt``, ``cash`` (float amounts in ``currency``) and
-        ``terminal_discount_years``; these six are ``None`` for a result
+        ``terminal_discount_years``; these six are null for a result
         loaded from JSON written before they were recorded.
 
         Returns
         -------
+        ArrowTable
+            One row summarizing corporate valuation metrics.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to an Arrow table.
+        """
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export as a single-row pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`.
+
+        Returns
+        -------
         pd.DataFrame
-            One row with columns ``currency``, ``equity_value``, ``enterprise_value``, ``net_debt``, ``other_equity_claims``, ``valuation_discount``, ``terminal_value_pv``, ``equity_value_per_share``, ``diluted_shares``, ``wacc``, ``pv_explicit``, ``terminal_value``, ``total_debt``, ``cash``, ``terminal_discount_years``.
+            One row summarizing corporate valuation metrics.
 
         Raises
         ------
         ImportError
             If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the result cannot be converted to a pandas DataFrame.
         """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row summarizing corporate valuation metrics.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row summarizing corporate valuation metrics.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to canonical JSON (``Money`` fields as ``{"amount", "currency"}``).
@@ -424,7 +528,7 @@ class DcfSensitivityResult:
     ...     '"entries":[{"parameter_id":"wacc","downside":-5.0,"upside":6.0}],'
     ...     '"wacc_down":0.09,"wacc_down_clamped":false,"terminal_growth_up":0.03,"terminal_growth_up_clamped":false}'
     ... )
-    >>> list(r.to_dataframe()["swing"])
+    >>> list(r.to_pandas()["swing"])
     [11.0]
     """
     @property
@@ -501,25 +605,76 @@ class DcfSensitivityResult:
         bool
             Whether the terminal-growth upside was clamped.
         """
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the tornado table as a pandas ``DataFrame``.
+        Export the tornado table as an ``ArrowTable``.
 
         Columns: ``parameter_id``, ``downside``, ``upside``, ``swing`` (EV
         deltas in the baseline currency). One row per entry, in ranked order.
 
         Returns
         -------
+        ArrowTable
+            Ranked tornado sensitivity table.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to an Arrow table.
+        """
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the tornado table as a pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`. One row per entry, in ranked order.
+
+        Returns
+        -------
         pd.DataFrame
-            Export the tornado table as a pandas ``DataFrame``. Columns: ``parameter_id``, ``downside``, ``upside``, ``swing`` (EV deltas in the baseline currency). One row per entry, in ranked order.
+            Ranked tornado sensitivity DataFrame.
 
         Raises
         ------
         ImportError
             If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the result cannot be converted to a pandas DataFrame.
         """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the tornado table as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Ranked tornado sensitivity Polars frame.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export the tornado table as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Ranked tornado sensitivity PyArrow table.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to canonical JSON.
@@ -1017,9 +1172,9 @@ class LboResult:
                 CheckReport | None
                     LBO model check report, or ``None`` when no ``check_mappings`` were supplied.
         """
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export as a single-row pandas ``DataFrame``.
+        Export as a single-row ``ArrowTable``.
 
         Columns: ``currency``, ``entry_enterprise_value``, ``entry_metric``,
         ``debt_total``, ``equity_check``, ``sources_total``, ``uses_total``,
@@ -1029,16 +1184,68 @@ class LboResult:
 
         Returns
         -------
+        ArrowTable
+            One row summarizing LBO returns and balance checks.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to an Arrow table.
+        """
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export as a single-row pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`. Money columns are float amounts in
+        ``currency``.
+
+        Returns
+        -------
         pd.DataFrame
-            Export as a single-row pandas ``DataFrame``. Columns: ``currency``, ``entry_enterprise_value``, ``entry_metric``, ``debt_total``, ``equity_check``, ``sources_total``, ``uses_total``, ``sources_uses_balanced``, ``exit_enterprise_value``, ``exit_metric``, ``exit_net_debt``, ``exit_equity_proceeds``, ``moic``. Money columns are float amounts in ``currency``.
+            One row summarizing LBO returns and balance checks.
 
         Raises
         ------
         ImportError
             If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the result cannot be converted to a pandas DataFrame.
         """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row summarizing LBO returns and balance checks.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row summarizing LBO returns and balance checks.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to canonical JSON.
@@ -1404,7 +1611,7 @@ def dcf_sensitivity(
     -------
     DcfSensitivityResult
         Baseline EV, ranked ``entries`` and the clamped-shock flags;
-        ``to_dataframe()`` gives the tornado table.
+        ``to_pandas()`` or ``to_arrow()`` gives the tornado table.
 
     Raises
     ------
@@ -1431,7 +1638,7 @@ def dcf_sensitivity(
     ...     net_debt_override=0.0,
     ...     options={"wacc_sensitivity_bump": 0.02},
     ... )
-    >>> list(sens.to_dataframe().columns)
+    >>> list(sens.to_pandas().columns)
     ['parameter_id', 'downside', 'upside', 'swing']
     """
 
@@ -1585,7 +1792,7 @@ def evaluate_lbo(model: Any, config: Mapping[str, Any] | str) -> LboResult:
     >>> config = {
     ...     "entry_multiple": 8.0,
     ...     "entry_metric_node": "ebitda",
-     "entry_period": "2025Q1",
+    ...     "entry_period": "2025Q1",
     ...     "transaction_fees": 0.0,
     ...     "sources": [{"name": "debt", "amount": 500.0}],
     ...     "exit_multiple": 9.0,
@@ -2239,7 +2446,7 @@ class DcfSensitivityGridResult:
     Examples
     --------
     >>> from finstack_quant.statements_analytics import DcfSensitivityGridResult
-    >>> hasattr(DcfSensitivityGridResult, "to_dataframe")
+    >>> hasattr(DcfSensitivityGridResult, "to_pandas")
     True
     """
 
@@ -2256,7 +2463,24 @@ class DcfSensitivityGridResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """Present enterprise value as WACC rows and terminal-level columns as an ``ArrowTable``.
+
+        Returns
+        -------
+        ArrowTable
+            Requested row and column order with ``wacc`` followed by one float
+            column per terminal level. Values are decimal currency amounts with
+            null cells for levels outside the admitted DCF domain.
+
+        Raises
+        ------
+        ValueError
+            If the Arrow table cannot be constructed.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """Present enterprise value as WACC rows and terminal-level columns.
 
         Returns
@@ -2271,6 +2495,46 @@ class DcfSensitivityGridResult:
             If pandas is unavailable.
         """
         ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Present enterprise value as WACC rows and terminal-level columns as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Requested row and column order with ``wacc`` followed by one float
+            column per terminal level.
+
+        Raises
+        ------
+        ImportError
+            If polars is unavailable.
+        ValueError
+            If the frame cannot be constructed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Present enterprise value as WACC rows and terminal-level columns as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Requested row and column order with ``wacc`` followed by one float
+            column per terminal level.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is unavailable.
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 def dcf_sensitivity_grid(
     model: FinancialModelSpec | str,
@@ -2329,7 +2593,7 @@ def dcf_sensitivity_grid(
     ... )
     >>> from finstack_quant.statements_analytics import DcfSensitivityGridSpec
     >>> axes = DcfSensitivityGridSpec([0.09, 0.10], [0.015, 0.02, 0.025])
-    >>> dcf_sensitivity_grid(model, results, request, axes).to_dataframe().shape
+    >>> dcf_sensitivity_grid(model, results, request, axes).to_pandas().shape
     (2, 3)
     """
     ...
@@ -2340,11 +2604,27 @@ class DcfDistributionResult:
     Examples
     --------
     >>> from finstack_quant.statements_analytics import DcfDistributionResult
-    >>> hasattr(DcfDistributionResult, "quantiles_to_dataframe")
+    >>> hasattr(DcfDistributionResult, "quantiles_to_table")
     True
     """
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """Present one enterprise and equity valuation per retained path as an ``ArrowTable``.
+
+        Returns
+        -------
+        ArrowTable
+            Zero-based path ID (uint32), float presentation values in model
+            currency, and the common ISO currency code in original path order.
+
+        Raises
+        ------
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """Present one enterprise and equity valuation per retained path.
 
         Returns
@@ -2357,22 +2637,63 @@ class DcfDistributionResult:
         ------
         ImportError
             If pandas is unavailable.
+        ValueError
+            If the frame cannot be constructed.
         """
         ...
 
-    def quantiles_to_dataframe(self) -> pd.DataFrame:
-        """Present R-7 sample quantiles of enterprise and common-equity value.
+    def to_polars(self) -> pl.DataFrame:
+        """Present one enterprise and equity valuation per retained path as a Polars ``DataFrame``.
 
         Returns
         -------
-        pd.DataFrame
+        polars.DataFrame
+            Zero-based path ID, float presentation values in model currency,
+            and the common ISO currency code in original path order.
+
+        Raises
+        ------
+        ImportError
+            If polars is unavailable.
+        ValueError
+            If the frame cannot be constructed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Present one enterprise and equity valuation per retained path as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-based path ID, float presentation values in model currency,
+            and the common ISO currency code in original path order.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is unavailable.
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def quantiles_to_table(self) -> ArrowTable:
+        """Present R-7 sample quantiles of enterprise and common-equity value as an ``ArrowTable``.
+
+        Returns
+        -------
+        ArrowTable
             One row per requested probability, with both monetary values
             expressed as floats in the reported ISO currency.
 
         Raises
         ------
-        ImportError
-            If pandas is unavailable.
+        ValueError
+            If the table cannot be constructed.
         """
         ...
 
@@ -2432,7 +2753,7 @@ def evaluate_dcf_monte_carlo(
     >>> from finstack_quant.statements import MonteCarloConfig
     >>> config = MonteCarloConfig(3, 7, ["ufcf"], [0.5], include_path_data=True)
     >>> samples = evaluator.evaluate_monte_carlo(model, config, market, as_of, as_of)
-    >>> len(evaluate_dcf_monte_carlo(model, results, samples, request).to_dataframe())
+    >>> len(evaluate_dcf_monte_carlo(model, results, samples, request).to_pandas())
     3
     """
     ...

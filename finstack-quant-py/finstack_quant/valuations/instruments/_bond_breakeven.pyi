@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import date
-from typing import Literal, TypedDict
+from typing import Any, Literal, TypedDict
 
 import pandas as pd
+import polars as pl
 
 from finstack_quant.core.dates import Tenor
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.valuations.instruments._instruments import Bond
 
 class BondBreakevenConfig(TypedDict):
@@ -165,20 +167,75 @@ class BondBreakevenLadder:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
-        """Present the requested horizons in an independent pandas DataFrame.
+    def to_arrow(self) -> ArrowTable:
+        """Present the requested horizons in an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            Ordered horizon, carry, sensitivity, breakeven_bp and currency columns.
+        ArrowTable
+            Ordered ``horizon``, ``carry``, ``sensitivity``, ``breakeven_bp``, and ``currency`` columns.
 
         Raises
         ------
         ValueError
+            If the native table cannot be represented as Arrow.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """Present the requested horizons in an independent pandas ``DataFrame``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Ordered ``horizon``, ``carry``, ``sensitivity``, ``breakeven_bp``, and ``currency`` columns.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
             If the native table cannot be represented by pandas.
         """
         ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Present the requested horizons in a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Ordered ``horizon``, ``carry``, ``sensitivity``, ``breakeven_bp``, and ``currency`` columns.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the native table cannot be represented by Polars.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Present the requested horizons in a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Ordered ``horizon``, ``carry``, ``sensitivity``, ``breakeven_bp``, and ``currency`` columns.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the native table cannot be represented by PyArrow.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 def bond_breakeven_ladder(
     bond: Bond,
@@ -220,8 +277,7 @@ def bond_breakeven_ladder(
     >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
     >>> from finstack_quant.valuations.instruments import Bond, bond_breakeven_ladder
     >>> bond = Bond.example()
-    >>> market = MarketContext()
-    >>> market.insert(
+    >>> market = MarketContext().insert(
     ...     DiscountCurve(
     ...         bond.discount_curve_id,
     ...         bond.issue_date,
@@ -238,7 +294,7 @@ def bond_breakeven_ladder(
     ...     ["3M"],
     ...     {"target": "z_spread", "mode": "linear"},
     ... )
-    >>> ladder.to_dataframe()["horizon"].tolist()
+    >>> ladder.to_pandas()["horizon"].tolist()
     ['3M']
     """
     ...

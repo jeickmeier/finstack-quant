@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 
 class EnhancedMonteCarloResult:
     """
@@ -15,7 +17,7 @@ class EnhancedMonteCarloResult:
     The present value and the draw option cost are antithetic-aware estimates
     (mean, standard error, 95% interval); :attr:`path_pvs` and
     :attr:`path_draw_option_costs` carry the per-path values in path order and
-    :meth:`to_dataframe` tabulates them.
+    :meth:`to_arrow`, :meth:`to_pandas`, and :meth:`to_polars` tabulate them.
 
     Examples
     --------
@@ -41,7 +43,7 @@ class EnhancedMonteCarloResult:
     >>> result = facility.price_with_paths(market, as_of)
     >>> (result.num_simulated_paths, len(result.path_pvs), str(result.pv.currency))
     (16, 16, 'USD')
-    >>> list(result.to_dataframe().columns)
+    >>> list(result.to_pandas().columns)
     ['path', 'pv', 'draw_option_cost']
     """
 
@@ -122,7 +124,26 @@ class EnhancedMonteCarloResult:
             If serialization fails.
         """
         ...
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        One row per simulated path as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``path`` (index in path order), ``pv`` and
+        ``draw_option_cost`` (facility currency units).
+
+        Returns
+        -------
+        ArrowTable
+            The per-path distribution of present value and draw option cost.
+
+        Raises
+        ------
+        ValueError
+            If component amounts have different currencies. Empty results
+            preserve column order and numeric dtypes.
+        """
+        ...
+    def to_pandas(self) -> pd.DataFrame:
         """
         One row per simulated path as a pandas ``DataFrame``.
 
@@ -136,11 +157,50 @@ class EnhancedMonteCarloResult:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
             If component amounts have different currencies. Empty results
             preserve column order and numeric dtypes.
         """
         ...
+    def to_polars(self) -> pl.DataFrame:
+        """
+        One row per simulated path as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            The per-path distribution with the columns documented on :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If component amounts have different currencies.
+        """
+        ...
+    def to_pyarrow(self) -> Any:
+        """
+        One row per simulated path as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            The per-path distribution with the columns documented on :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If component amounts have different currencies.
+        """
+        ...
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @property
     def pv(self) -> Money:
         """

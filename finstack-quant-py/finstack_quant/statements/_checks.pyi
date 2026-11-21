@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Literal
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 class CheckSuiteSpec:
     """
@@ -375,7 +377,7 @@ class CheckReport:
     @property
     def total_checks(self) -> int:
         """
-        Number of checks that ran, one per row of :meth:`to_dataframe`.
+        Number of checks that ran, one per row of :meth:`to_arrow`.
 
         Reads the canonical Rust ``CheckSummary.total_checks`` counter.
 
@@ -486,7 +488,7 @@ class CheckReport:
         Counts what survived the suite's ``min_severity`` and
         ``materiality_threshold`` reporting filters, not every raw diagnostic
         the checks produced — it matches the row count of
-        :meth:`to_findings_dataframe`. Delegates to the Rust
+        :meth:`to_findings_table`. Delegates to the Rust
         ``CheckReport::total_findings``.
 
         Returns
@@ -532,9 +534,9 @@ class CheckReport:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export one row per executed check as a pandas ``DataFrame``.
+        Export one row per executed check as an ``ArrowTable``.
 
         Columns: ``check_id`` (stable identifier), ``check_name``
         (human-readable name), ``category`` (snake_case group, one of
@@ -550,26 +552,87 @@ class CheckReport:
         :attr:`total_checks`. A report with no checks still yields the
         documented columns with zero rows. Per-finding detail — severity,
         message, and the observed-vs-reference materiality — lives in
-        :meth:`to_findings_dataframe`.
+        :meth:`to_findings_table`.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per check result.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as an Arrow table.
         """
         ...
 
-    def to_findings_dataframe(self) -> pd.DataFrame:
+    def to_pandas(self) -> pd.DataFrame:
         """
-        Export one row per retained finding as a pandas ``DataFrame``.
+        Export one row per executed check as a pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`. One row per check result, so the row
+        count equals :attr:`total_checks`. Per-finding detail lives in
+        :meth:`to_findings_table`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per check result.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the result cannot be represented as a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export one row per executed check as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row per check result.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export one row per executed check as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per check result.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_findings_table(self) -> ArrowTable:
+        """
+        Export one row per retained finding as an ``ArrowTable``.
 
         Columns: ``check_id``, ``check_name``, ``category`` (as in
-        :meth:`to_dataframe`), ``severity`` (``info``, ``warning`` or
+        :meth:`to_arrow`), ``severity`` (``info``, ``warning`` or
         ``error``), ``message`` (human-readable description), ``period``
         (period identifier string such as ``"2025Q1"``, ``None`` when the
         finding is not period-specific), ``nodes`` (comma-joined node
@@ -584,15 +647,15 @@ class CheckReport:
         nodes' own units) with ``comparison_currency`` (their ISO currency code,
         ``None`` for a scalar comparison).
 
-        The four materiality columns are ``None`` for findings that carry no
-        materiality context, and the three comparison columns are ``None`` for
+        The four materiality columns are null for findings that carry no
+        materiality context, and the comparison columns are null for
         findings that do not compare two numbers. The row count equals
         :attr:`total_findings`; a report with no findings still yields the
         documented columns with zero rows.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per retained finding.
 
         Notes
@@ -601,17 +664,17 @@ class CheckReport:
         """
         ...
 
-    def to_comparisons_dataframe(self) -> pd.DataFrame:
+    def to_comparisons_table(self) -> ArrowTable:
         """
-        Export one row per numeric comparison as a pandas ``DataFrame``.
+        Export one row per numeric comparison as an ``ArrowTable``.
 
         Lists every comparison the checks evaluated — passing and failing
         alike — so a passing check still shows the numbers it was judged on.
-        Unlike :meth:`to_findings_dataframe`, rows are not reduced by the
+        Unlike :meth:`to_findings_table`, rows are not reduced by the
         suite's ``min_severity`` / ``materiality_threshold`` filters.
 
         Columns: ``check_id``, ``check_name``, ``category`` (as in
-        :meth:`to_dataframe`), ``identity`` (snake_case name of the tested
+        :meth:`to_arrow`), ``identity`` (snake_case name of the tested
         identity, e.g. ``balance_sheet_articulation``, ``cash_roll_forward``,
         ``cash_flow_components``), ``period`` (period identifier string,
         ``None`` when not period-specific), ``actual`` (observed value),
@@ -629,7 +692,7 @@ class CheckReport:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per comparison, in check then evaluation order.
 
         Notes

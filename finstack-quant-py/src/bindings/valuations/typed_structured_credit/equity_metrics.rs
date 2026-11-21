@@ -2,8 +2,9 @@
 
 use pyo3::prelude::*;
 
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::date_to_py;
-use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
+use crate::bindings::table_builders::TableBuilder;
 use crate::bindings::valuations::convert::opt_repr;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::EquityMetrics;
 
@@ -43,27 +44,6 @@ impl PyEquityMetrics {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.equity_metrics", "EquityMetrics.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows: Vec<serde_json::Value> = self
-            .inner
-            .cash_on_cash
-            .iter()
-            .map(|(date, value)| {
-                serde_json::json!({
-                    "date": date.to_string(),
-                    "cash_on_cash": value,
-                })
-            })
-            .collect();
-        serde_rows_to_dataframe_with_schema(
-            py,
-            &rows,
-            &[("date", "str"), ("cash_on_cash", "float64")],
-        )
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -75,6 +55,27 @@ impl PyEquityMetrics {
         )
     }
 }
+
+impl PyEquityMetrics {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let mut dates = Vec::with_capacity(self.inner.cash_on_cash.len());
+        let mut values = Vec::with_capacity(self.inner.cash_on_cash.len());
+        for (date, value) in &self.inner.cash_on_cash {
+            dates.push(date.to_string());
+            values.push(*value);
+        }
+        TableBuilder::new()
+            .utf8("date", dates)?
+            .nullable_f64("cash_on_cash", values)?
+            .build()
+    }
+}
+
+crate::bindings::macros::tabular_methods!(
+    PyEquityMetrics,
+    "EquityMetrics",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.equity_metrics"
+);
 
 crate::bindings::macros::py_getters!(PyEquityMetrics |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.equity_metrics", "EquityMetrics.tranche_id")]

@@ -1,11 +1,9 @@
 //! Python bindings for `finstack_quant_models::credit::recovery_waterfall`.
 
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
-    serde_rows_to_dataframe_with_schema,
-};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::core_to_py;
 use finstack_quant_models::credit::recovery_waterfall::{
     self as waterfall, RecoveryAllocation, RecoveryClaim, RecoveryWaterfallResult,
@@ -13,9 +11,9 @@ use finstack_quant_models::credit::recovery_waterfall::{
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
-/// Column schema of `PyRecoveryWaterfallResult::to_dataframe`, kept so a
-/// claim-free waterfall still exports a frame with the documented columns.
-const ALLOCATION_COLUMNS: &[ColumnSchema<'static>] = &[
+/// Column schema of `PyRecoveryWaterfallResult::to_arrow_table`, kept so a
+/// claim-free waterfall still exports a table with the documented columns.
+const ALLOCATION_COLUMNS: &[(&str, &str)] = &[
     ("id", "str"),
     ("seniority", "str"),
     ("priority", "int64"),
@@ -195,17 +193,22 @@ impl PyRecoveryAllocation {
         self.inner.deficiency
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let columns: Vec<&str> = ALLOCATION_COLUMNS.iter().map(|(name, _)| *name).collect();
-        serde_object_to_single_row_dataframe_with_schema(py, &self.inner, &columns)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("RecoveryAllocation", &self.inner)
     }
 }
 
+impl PyRecoveryAllocation {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(std::slice::from_ref(&self.inner), ALLOCATION_COLUMNS)
+    }
+}
+
+tabular_methods!(
+    PyRecoveryAllocation,
+    "RecoveryAllocation",
+    module = "finstack_quant.models.credit.recovery_waterfall"
+);
 wire_methods!(
     PyRecoveryAllocation,
     RecoveryAllocation,
@@ -256,26 +259,31 @@ impl PyRecoveryWaterfallResult {
             .collect()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryWaterfallResult.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        // `RecoveryAllocation` derives Serialize and is already a flat record
-        // of `f64`/`String`/`u32` fields whose serde names match the columns
-        // above, so the rows go straight through the serde helper.
-        serde_rows_to_dataframe_with_schema(py, &self.inner.allocations, ALLOCATION_COLUMNS)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("RecoveryWaterfallResult", &self.inner)
     }
 }
 
+impl PyRecoveryWaterfallResult {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        // `RecoveryAllocation` derives Serialize and is already a flat record
+        // of `f64`/`String`/`u32` fields whose serde names match the columns
+        // above, so the rows go straight through the serde helper.
+        serde_rows_to_arrow_table(&self.inner.allocations, ALLOCATION_COLUMNS)
+    }
+}
+
+tabular_methods!(
+    PyRecoveryWaterfallResult,
+    "RecoveryWaterfallResult",
+    module = "finstack_quant.models.credit.recovery_waterfall"
+);
 wire_methods!(
     PyRecoveryWaterfallResult,
     RecoveryWaterfallResult,
     "RecoveryWaterfallResult",
     module = "finstack_quant.models.credit.recovery_waterfall"
 );
-impl_repr_html_via_dataframe!(PyRecoveryWaterfallResult);
 
 #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "allocate_recovery")]
 #[pyfunction]

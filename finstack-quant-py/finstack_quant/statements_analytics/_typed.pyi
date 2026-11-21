@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.statements import StatementResult
 
 class BridgeChart:
@@ -145,31 +147,77 @@ class BridgeChart:
         list[BridgeStep]
             Ordered driver contributions making up the bridge.
         """
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the driver steps as a pandas ``DataFrame``.
+        Export the driver steps as an ``ArrowTable``.
 
         Columns: ``driver``, ``contribution``. One row per bridge step, in
         decomposition order; an empty bridge still carries both columns.
         Contributions are raw deltas in each driver's own units.
 
-        The scalar header fields (``target_metric``, ``period``,
-        ``baseline_label``, ``comparison_label``, ``baseline_value``,
-        ``comparison_value``, ``unexplained``) are chart metadata and are not
-        repeated on every row.
+        Returns
+        -------
+        ArrowTable
+            Bridge steps table.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to an Arrow table.
+        """
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the driver steps as a pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`.
 
         Returns
         -------
         pd.DataFrame
-            Export the driver steps as a pandas ``DataFrame``. Columns: ``driver``, ``contribution``. One row per bridge step, in decomposition order; an empty bridge still carries both columns. Contributions are raw deltas in each driver's own units. The scalar header fields (``target_metric``, ``period``, ``baseline_label``, ``comparison_label``, ``baseline_value``, ``comparison_value``, ``unexplained``) are chart metadata and are not repeated on every row.
+            Bridge steps DataFrame.
 
         Raises
         ------
         ImportError
             If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the result cannot be converted to a pandas DataFrame.
         """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the driver steps as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Bridge steps Polars frame.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export the driver steps as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Bridge steps PyArrow table.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @property
     def unexplained(self) -> float:
         """
@@ -466,32 +514,80 @@ class ScenarioDiff:
         VarianceReport
             Underlying variance report between the two named scenarios.
         """
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the underlying variance rows as a pandas ``DataFrame``.
+        Export the underlying variance rows as an ``ArrowTable``.
 
         Columns: ``period``, ``metric``, ``baseline``, ``comparison``,
         ``abs_var``, ``pct_var``. One row per (metric, period) pair, in report
         order; an empty diff still carries the full column schema.
 
-        This is the same table as ``variance.to_dataframe()`` — both call one
-        implementation, so the two cannot drift apart. The two scenario *names*
-        are diff metadata (the ``baseline`` / ``comparison`` getters) and are
-        not repeated per row; the ``baseline`` and ``comparison`` columns hold
-        the metric *values* in each scenario.
+        This is the same table as ``variance.to_arrow()`` — both call one
+        implementation, so the two cannot drift apart.
+
+        Returns
+        -------
+        ArrowTable
+            Underlying variance rows table.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to an Arrow table.
+        """
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the underlying variance rows as a pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`.
 
         Returns
         -------
         pd.DataFrame
-            Export the underlying variance rows as a pandas ``DataFrame``. Columns: ``period``, ``metric``, ``baseline``, ``comparison``, ``abs_var``, ``pct_var``. One row per (metric, period) pair, in report order; an empty diff still carries the full column schema. This is the same table as ``variance.to_dataframe()`` — both call one implementation, so the two cannot drift apart. The two scenario *names* are diff metadata (the ``baseline`` / ``comparison`` getters) and are not repeated per row; the ``baseline`` and ``comparison`` columns hold the metric *values* in each scenario.
+            Underlying variance rows DataFrame.
 
         Raises
         ------
         ImportError
             If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the result cannot be converted to a pandas DataFrame.
         """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the underlying variance rows as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Underlying variance rows Polars frame.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export the underlying variance rows as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Underlying variance rows PyArrow table.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 class ScenarioResults:
     """
@@ -579,7 +675,7 @@ class ScenarioResults:
 
         This lookup returns ``None`` for an unknown name and does not raise.
         """
-    def to_comparison_table(self, metrics: list[str]) -> Any:
+    def to_comparison_table(self, metrics: list[str]) -> ArrowTable:
         """Build a side-by-side comparison table across every evaluated scenario.
 
         Parameters
@@ -599,9 +695,9 @@ class ScenarioResults:
         KeyError
             If a metric in ``metrics`` is not a node of the baseline scenario.
         """
-    def to_dataframe(self, metrics: list[str]) -> pd.DataFrame:
+    def to_arrow(self, metrics: list[str]) -> ArrowTable:
         """
-        Export the scenario comparison as a pandas ``DataFrame``.
+        Export the scenario comparison as an ``ArrowTable``.
 
         Columns: ``period``, ``metric``, one column per scenario name holding
         that scenario's metric value, and one ``{scenario}_vs_{baseline}_frac``
@@ -610,10 +706,28 @@ class ScenarioResults:
         ``_frac`` suffix states the unit: multiply by 100 for percent.
         One row per (metric, period) pair.
 
-        This is the same table as ``to_comparison_table`` — both call one Rust
-        implementation, so the two exports cannot drift apart. The baseline is
-        the scenario named ``"base"`` when present, otherwise the first
-        scenario.
+        Parameters
+        ----------
+        metrics : list[str]
+            Node identifiers to include as rows.
+
+        Returns
+        -------
+        ArrowTable
+            Scenario comparison table with one row per (metric, period) pair.
+
+        Raises
+        ------
+        ValueError
+            If the result set or ``metrics`` is empty.
+        KeyError
+            If a metric in ``metrics`` is not a node of the baseline scenario.
+        """
+    def to_pandas(self, metrics: list[str]) -> pd.DataFrame:
+        """
+        Export the scenario comparison as a pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`.
 
         Parameters
         ----------
@@ -623,10 +737,58 @@ class ScenarioResults:
         Returns
         -------
         pd.DataFrame
-            Export the scenario comparison as a pandas ``DataFrame``. Columns: ``period``, ``metric``, one column per scenario name holding that scenario's metric value, and one ``{scenario}_vs_{baseline}_frac`` column per non-baseline scenario holding the relative change as a decimal fraction (``0.1`` = +10%, ``NaN`` on a near-zero baseline). The ``_frac`` suffix states the unit: multiply by 100 for percent. One row per (metric, period) pair. This is the same table as ``to_comparison_table`` — both call one Rust implementation, so the two exports cannot drift apart. The baseline is the scenario named ``"base"`` when present, otherwise the first scenario.
+            Scenario comparison DataFrame.
 
         Raises
         ------
+        ImportError
+            If pandas is not installed in the running interpreter.
+        ValueError
+            If the result set or ``metrics`` is empty.
+        KeyError
+            If a metric in ``metrics`` is not a node of the baseline scenario.
+        """
+    def to_polars(self, metrics: list[str]) -> pl.DataFrame:
+        """
+        Export the scenario comparison as a Polars ``DataFrame``.
+
+        Parameters
+        ----------
+        metrics : list[str]
+            Node identifiers to include as rows.
+
+        Returns
+        -------
+        polars.DataFrame
+            Scenario comparison Polars frame.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result set or ``metrics`` is empty.
+        KeyError
+            If a metric in ``metrics`` is not a node of the baseline scenario.
+        """
+    def to_pyarrow(self, metrics: list[str]) -> Any:
+        """
+        Export the scenario comparison as a ``pyarrow.Table``.
+
+        Parameters
+        ----------
+        metrics : list[str]
+            Node identifiers to include as rows.
+
+        Returns
+        -------
+        pyarrow.Table
+            Scenario comparison PyArrow table.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
         ValueError
             If the result set or ``metrics`` is empty.
         KeyError
@@ -995,12 +1157,12 @@ class SensitivityResult:
                 list[tuple[Any, StatementResult]]
                     Per-scenario ``(parameter_values, results)`` pairs in generation order, where ``parameter_values`` is a ``{"node_id@period": value}`` dict.
         """
-    def to_dataframe(self, metrics: list[str] | None = None) -> pd.DataFrame:
+    def to_arrow(self, metrics: list[str] | None = None) -> ArrowTable:
         """
-        Export the run as a long pandas ``DataFrame``.
+        Export the run as a long ``ArrowTable``.
 
         Columns: ``scenario`` (0-based index), one column per perturbed
-        parameter named ``node_id@period`` (``NaN`` where a scenario does not
+        parameter named ``node_id@period`` (null where a scenario does not
         perturb it), then ``node_id``, ``period`` and ``value`` holding each
         tracked metric's value in that scenario. One row per (scenario, metric,
         period); when no metric is tracked, one row per scenario with the
@@ -1011,18 +1173,86 @@ class SensitivityResult:
         metrics : list[str] | None
             Node identifiers to emit; ``None`` uses the config's
             ``target_metrics``.
+
+        Returns
+        -------
+        ArrowTable
+            Long-format sensitivity table.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to an Arrow table.
+        """
+    def to_pandas(self, metrics: list[str] | None = None) -> pd.DataFrame:
+        """
+        Export the run as a long pandas ``DataFrame``.
+
+        Parameters
+        ----------
+        metrics : list[str] | None
+            Node identifiers to emit; ``None`` uses the config's
+            ``target_metrics``.
+
         Returns
         -------
         pd.DataFrame
-            Export the run as a long pandas ``DataFrame``. Columns: ``scenario`` (0-based index), one column per perturbed parameter named ``node_id@period`` (``NaN`` where a scenario does not perturb it), then ``node_id``, ``period`` and ``value`` holding each tracked metric's value in that scenario. One row per (scenario, metric, period); when no metric is tracked, one row per scenario with the metric columns null so the parameter grid stays visible.
+            Long-format sensitivity DataFrame.
 
         Raises
         ------
         ImportError
             If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the result cannot be converted to a pandas DataFrame.
         """
+    def to_polars(self, metrics: list[str] | None = None) -> pl.DataFrame:
+        """
+        Export the run as a long Polars ``DataFrame``.
+
+        Parameters
+        ----------
+        metrics : list[str] | None
+            Node identifiers to emit; ``None`` uses the config's
+            ``target_metrics``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Long-format sensitivity Polars frame.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self, metrics: list[str] | None = None) -> Any:
+        """
+        Export the run as a long ``pyarrow.Table``.
+
+        Parameters
+        ----------
+        metrics : list[str] | None
+            Node identifiers to emit; ``None`` uses the config's
+            ``target_metrics``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Long-format sensitivity PyArrow table.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def get_parameter_value(self, scenario_index: int, parameter: str) -> float | None:
         """
         Read the perturbed parameter value used by one sensitivity scenario.
@@ -1377,9 +1607,9 @@ class VarianceReport:
         list[VarianceRow]
             Per-metric, per-period variance rows, in report order.
         """
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the variance rows as a pandas ``DataFrame``.
+        Export the variance rows as an ``ArrowTable``.
 
         Columns: ``period``, ``metric``, ``baseline``, ``comparison``,
         ``abs_var``, ``pct_var``. One row per
@@ -1388,21 +1618,71 @@ class VarianceReport:
 
         ``baseline``, ``comparison`` and ``abs_var`` are in the metric's own
         units; ``pct_var`` is a decimal fraction (``0.1`` = +10%) and is
-        ``NaN`` where the baseline is effectively zero. The scenario labels are report metadata
-        (``baseline_label`` / ``comparison_label``) and are not repeated per row.
+        null where the baseline is effectively zero.
+
+        Returns
+        -------
+        ArrowTable
+            Variance rows table.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to an Arrow table.
+        """
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the variance rows as a pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`.
 
         Returns
         -------
         pd.DataFrame
-            Export the variance rows as a pandas ``DataFrame``. Columns: ``period``, ``metric``, ``baseline``, ``comparison``, ``abs_var``, ``pct_var``. One row per (metric, period) pair, in report order; an empty report still carries the full column schema. ``baseline``, ``comparison`` and ``abs_var`` are in the metric's own units; ``pct_var`` is a decimal fraction (``0.1`` = +10%) and is ``NaN`` where the baseline is effectively zero. The scenario labels are report metadata (``baseline_label`` / ``comparison_label``) and are not repeated per row.
+            Variance rows DataFrame.
 
         Raises
         ------
         ImportError
             If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the result cannot be converted to a pandas DataFrame.
         """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the variance rows as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Variance rows Polars frame.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export the variance rows as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Variance rows PyArrow table.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 class VarianceRow:
     """

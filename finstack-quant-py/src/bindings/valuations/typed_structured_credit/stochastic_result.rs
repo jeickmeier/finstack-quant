@@ -3,9 +3,11 @@
 use pyo3::prelude::*;
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, serde_to_py};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::table_builders::{TableBuilder, serde_rows_to_arrow_table};
 use crate::bindings::valuations::convert::money_to_py;
-use crate::errors::{display_to_py, serde_json_to_py};
+use crate::errors::{display_to_py, serde_json_to_py, value_error};
 use finstack_quant_valuations::results::structured_credit::StochasticPricingResult;
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.stochastic_result", "StochasticPricingResult")]
@@ -62,17 +64,43 @@ impl PyStochasticPricingResult {
         serde_to_py(py, &self.inner.tranche_results)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.stochastic_result", "StochasticPricingResult.to_dataframe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.stochastic_result", "StochasticPricingResult.draw_option_cost_table")]
     #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn draw_option_cost_table(&self) -> PyResult<PyArrowTable> {
+        let paths = (0..self.inner.draw_option_cost_paths.len())
+            .map(|p| i64::try_from(p).map_err(|_| value_error("path index overflows i64")))
+            .collect::<PyResult<Vec<_>>>()?;
+        TableBuilder::new()
+            .i64("path", paths)?
+            .f64(
+                "draw_option_cost",
+                self.inner.draw_option_cost_paths.clone(),
+            )?
+            .build()
+    }
+
+    /// Return ``repr(self)``.
+    fn __repr__(&self) -> String {
+        format!(
+            "StochasticPricingResult(npv={}, expected_loss={}, num_paths={}, tranches={})",
+            self.inner.npv.amount(),
+            self.inner.expected_loss.amount(),
+            self.inner.num_paths,
+            self.inner.tranche_results.len()
+        )
+    }
+}
+
+impl PyStochasticPricingResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         let rows: Vec<serde_json::Value> = self
             .inner
             .tranche_results
             .iter()
             .map(|tranche| {
-                serde_json::json!({
+                Ok(serde_json::json!({
                     "tranche_id": tranche.tranche_id,
-                    "seniority": serde_json::to_value(tranche.seniority).unwrap_or_default(),
+                    "seniority": serde_json::to_value(tranche.seniority).map_err(display_to_py)?,
                     "npv": tranche.npv.amount(),
                     "price_pct": tranche.price_pct,
                     "expected_loss": tranche.expected_loss.amount(),
@@ -84,11 +112,10 @@ impl PyStochasticPricingResult {
                     "paths_with_principal": tranche.paths_with_principal,
                     "credit_duration": tranche.credit_duration,
                     "draw_option_cost": tranche.draw_option_cost.amount(),
-                })
+                }))
             })
-            .collect();
-        serde_rows_to_dataframe_with_schema(
-            py,
+            .collect::<PyResult<Vec<_>>>()?;
+        serde_rows_to_arrow_table(
             &rows,
             &[
                 ("tranche_id", "str"),
@@ -107,35 +134,13 @@ impl PyStochasticPricingResult {
             ],
         )
     }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.stochastic_result", "StochasticPricingResult.draw_option_cost_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn draw_option_cost_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows: Vec<serde_json::Value> = self
-            .inner
-            .draw_option_cost_paths
-            .iter()
-            .enumerate()
-            .map(|(path, cost)| serde_json::json!({ "path": path, "draw_option_cost": cost }))
-            .collect();
-        serde_rows_to_dataframe_with_schema(
-            py,
-            &rows,
-            &[("path", "int64"), ("draw_option_cost", "float64")],
-        )
-    }
-
-    /// Return ``repr(self)``.
-    fn __repr__(&self) -> String {
-        format!(
-            "StochasticPricingResult(npv={}, expected_loss={}, num_paths={}, tranches={})",
-            self.inner.npv.amount(),
-            self.inner.expected_loss.amount(),
-            self.inner.num_paths,
-            self.inner.tranche_results.len()
-        )
-    }
 }
+
+crate::bindings::macros::tabular_methods!(
+    PyStochasticPricingResult,
+    "StochasticPricingResult",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.stochastic_result"
+);
 
 crate::bindings::macros::py_getters!(PyStochasticPricingResult |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.stochastic_result", "StochasticPricingResult.npv")]

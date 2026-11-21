@@ -190,8 +190,8 @@ def test_canonical_nested_sensitivity_json_roundtrips_and_reconciles_risk() -> N
     assert decomposition.total_risk == pytest.approx(1.0)
     contributions = decomposition.position_factor_contributions
     assert sum(row.risk_contribution for row in contributions) == pytest.approx(1.0)
-    assert decomposition.to_position_factor_dataframe()["position_id"].tolist() == ["A", "B"]
-    assert decomposition.to_factor_dataframe()["factor_id"].tolist() == ["F"]
+    assert decomposition.to_position_factor_table().to_pandas()["position_id"].tolist() == ["A", "B"]
+    assert decomposition.to_factor_table().to_pandas()["factor_id"].tolist() == ["F"]
 
 
 @pytest.mark.parametrize("data", [[], [[], []], [[]], [[2.0, 3.0]], [2.0], [[None]]])

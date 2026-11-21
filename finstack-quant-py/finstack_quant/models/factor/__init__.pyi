@@ -22,7 +22,9 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import polars as pl
 
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.models.factor import credit as credit
 from finstack_quant.models.factor import risk as risk
 from finstack_quant.models.factor import schema as schema
@@ -44,7 +46,7 @@ class FactorCovarianceMatrix:
     --------
     >>> from finstack_quant.models.factor import FactorCovarianceMatrix
     >>> matrix = FactorCovarianceMatrix(["a", "b"], [[0.04, 0.0], [0.0, 0.01]])
-    >>> (matrix.variance("a"), float(matrix.to_dataframe().loc["b", "b"]))
+    >>> (matrix.variance("a"), float(matrix.to_pandas().loc["b", "b"]))
     (0.04, 0.01)
     """
 
@@ -115,14 +117,17 @@ class FactorCovarianceMatrix:
         ...
 
     @staticmethod
-    def from_dataframe(df: pd.DataFrame) -> FactorCovarianceMatrix:
-        """Build a covariance matrix from labeled pandas rows and columns.
+    def from_dataframe(df: pd.DataFrame | pl.DataFrame | Any) -> FactorCovarianceMatrix:
+        """Build a covariance matrix from a labeled square DataFrame or Arrow table.
 
         Parameters
         ----------
-        df : pandas.DataFrame
-            Annualized covariances in the factors' native units. Rows and columns
-            must contain the same unique string identifiers in the same order.
+        df : pandas.DataFrame | polars.DataFrame | Any
+            Annualized covariances in the factors' native units. Pandas frames
+            match row index and column labels; Polars and Arrow tables accept
+            either a square all-numeric table whose column names give the factor
+            order or an ``(n, n + 1)`` table whose first column gives the row
+            factor identifiers matching the remaining column names in order.
 
         Returns
         -------
@@ -132,7 +137,8 @@ class FactorCovarianceMatrix:
         Raises
         ------
         TypeError
-            If df is not a DataFrame or an axis contains non-string labels.
+            If ``df`` is not a pandas/Polars DataFrame or Arrow table, or an axis
+            contains non-string labels.
         ValueError
             If axes differ, values cannot convert to float64, or the matrix is
             nonfinite, asymmetric or not positive semidefinite.
@@ -274,9 +280,25 @@ class FactorCovarianceMatrix:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        The matrix as a square pandas DataFrame.
+        The matrix as an :class:`~finstack_quant.core.table.ArrowTable` with leading ``factor_id`` column.
+
+        Returns
+        -------
+        ArrowTable
+            Table with ``factor_id`` followed by one float64 column per factor ID.
+
+        Raises
+        ------
+        ValueError
+            If the Arrow table cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        The matrix as a square pandas ``DataFrame`` (lazily imports ``pandas``).
 
         Returns
         -------
@@ -285,11 +307,52 @@ class FactorCovarianceMatrix:
 
         Raises
         ------
+        ImportError
+            If pandas is not installed.
         ValueError
             If pandas cannot build the frame.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        The matrix as a Polars ``DataFrame`` with leading ``factor_id`` column (lazily imports ``polars``).
+
+        Returns
+        -------
+        polars.DataFrame
+            Frame with string column ``factor_id`` followed by one float64 column per factor ID.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed.
+        ValueError
+            If Polars cannot build the frame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        The matrix as a ``pyarrow.Table`` with leading ``factor_id`` column (lazily imports ``pyarrow``).
+
+        Returns
+        -------
+        pyarrow.Table
+            Table with string column ``factor_id`` followed by one float64 column per factor ID.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed.
+        ValueError
+            If PyArrow cannot build the table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __eq__(self, other: object) -> bool: ...
     def __repr__(self) -> str: ...
 

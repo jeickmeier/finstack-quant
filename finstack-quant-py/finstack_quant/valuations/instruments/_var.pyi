@@ -5,7 +5,9 @@ from __future__ import annotations
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.valuations.instruments._pricing import MarketHistory
 
 def calculate_var(
@@ -121,7 +123,7 @@ class VarResult:
     ...     '{"var": -10.0, "expected_shortfall": -12.0, "pnl_distribution": [-12.0, 3.0],'
     ...     ' "num_scenarios": 2, "confidence_level": 0.95}'
     ... )
-    >>> (result.var, list(result.to_dataframe()["pnl"]))
+    >>> (result.var, list(result.to_pandas()["pnl"]))
     (-10.0, [-12.0, 3.0])
     """
 
@@ -200,7 +202,22 @@ class VarResult:
         This accessor does not raise; it returns the stored value.
         """
         ...
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        The P&L distribution as a one-column :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Column ``pnl`` (``float64``), one row per scenario, worst first.
+
+        Raises
+        ------
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+    def to_pandas(self) -> pd.DataFrame:
         """
         The P&L distribution as a one-column pandas ``DataFrame``.
 
@@ -215,6 +232,39 @@ class VarResult:
             If pandas is not installed.
         """
         ...
+    def to_polars(self) -> pl.DataFrame:
+        """
+        The P&L distribution as a one-column Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Column ``pnl`` (``Float64``), one row per scenario, worst first.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed.
+        """
+        ...
+    def to_pyarrow(self) -> Any:
+        """
+        The P&L distribution as a one-column ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Column ``pnl`` (``float64``), one row per scenario, worst first.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed.
+        """
+        ...
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @staticmethod
     def from_json(json: str) -> VarResult:
         """

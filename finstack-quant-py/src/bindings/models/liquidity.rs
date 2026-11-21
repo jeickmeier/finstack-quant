@@ -9,18 +9,17 @@
 //! (`LvarBangiaScalar`, `ImpactEstimate`, `ExecutionTrajectory`) with JSON,
 //! pickle and pandas exits.
 
-use crate::bindings::macros::wire_methods;
-use crate::bindings::pandas_utils::{
-    dict_to_dataframe, labeled_values_to_series, serde_object_to_single_row_dataframe_with_schema,
-};
+use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
 use finstack_quant_models::liquidity::{
     self, AlmgrenChrissModel, ExecutionTrajectory, ImpactEstimate, KyleLambdaModel,
     LiquidityProfile, LvarBangiaScalar, TradeParams,
 };
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyType};
+use pyo3::types::PyType;
 
 #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile")]
 #[pyclass(
@@ -298,14 +297,14 @@ impl PyImpactEstimate {
     }
 
     #[doc = pydoc!("finstack_quant.models.liquidity", "ImpactEstimate.to_series")]
-    fn to_series<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_series(&self) -> PyResult<PyLabeledSeries> {
         let labels: Vec<String> = IMPACT_ESTIMATE_COLUMNS
             .iter()
             .map(|label| (*label).to_string())
             .collect();
-        labeled_values_to_series(
-            py,
-            &labels,
+        Ok(PyLabeledSeries::from_f64(
+            "impact",
+            labels,
             vec![
                 self.inner.permanent_impact,
                 self.inner.temporary_impact,
@@ -313,13 +312,8 @@ impl PyImpactEstimate {
                 self.inner.cost_bp,
                 self.inner.execution_risk,
             ],
-            "impact",
-        )
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "ImpactEstimate.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe_with_schema(py, &self.inner, &IMPACT_ESTIMATE_COLUMNS)
+        )?
+        .with_index_name("metric"))
     }
 
     fn __repr__(&self) -> String {
@@ -327,6 +321,23 @@ impl PyImpactEstimate {
     }
 }
 
+impl PyImpactEstimate {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .f64("permanent_impact", vec![self.inner.permanent_impact])?
+            .f64("temporary_impact", vec![self.inner.temporary_impact])?
+            .f64("total_cost", vec![self.inner.total_cost])?
+            .f64("cost_bp", vec![self.inner.cost_bp])?
+            .f64("execution_risk", vec![self.inner.execution_risk])?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyImpactEstimate,
+    "ImpactEstimate",
+    module = "finstack_quant.models.liquidity"
+);
 wire_methods!(
     PyImpactEstimate,
     ImpactEstimate,
@@ -384,23 +395,29 @@ impl PyExecutionTrajectory {
         self.inner.cost_variance
     }
 
-    #[doc = pydoc!("finstack_quant.models.liquidity", "ExecutionTrajectory.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let mut trade = Vec::with_capacity(self.inner.remaining.len());
-        trade.push(0.0);
-        trade.extend(self.inner.quantities.iter().copied());
-        let data = PyDict::new(py);
-        data.set_item("t", self.inner.time_points.clone())?;
-        data.set_item("holdings", self.inner.remaining.clone())?;
-        data.set_item("trade", trade)?;
-        dict_to_dataframe(py, &data, None)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("ExecutionTrajectory", &self.inner)
     }
 }
 
+impl PyExecutionTrajectory {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let mut trade = Vec::with_capacity(self.inner.remaining.len());
+        trade.push(0.0);
+        trade.extend(self.inner.quantities.iter().copied());
+        TableBuilder::new()
+            .f64("t", self.inner.time_points.clone())?
+            .f64("holdings", self.inner.remaining.clone())?
+            .f64("trade", trade)?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyExecutionTrajectory,
+    "ExecutionTrajectory",
+    module = "finstack_quant.models.liquidity"
+);
 wire_methods!(
     PyExecutionTrajectory,
     ExecutionTrajectory,
@@ -456,27 +473,22 @@ impl PyLvarBangiaScalar {
     }
 
     #[doc = pydoc!("finstack_quant.models.liquidity", "LvarBangiaScalar.to_series")]
-    fn to_series<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_series(&self) -> PyResult<PyLabeledSeries> {
         let labels: Vec<String> = LVAR_COLUMNS
             .iter()
             .map(|label| (*label).to_string())
             .collect();
-        labeled_values_to_series(
-            py,
-            &labels,
+        Ok(PyLabeledSeries::from_f64(
+            "lvar",
+            labels,
             vec![
                 self.inner.var,
                 self.inner.spread_cost,
                 self.inner.lvar,
                 self.inner.lvar_ratio,
             ],
-            "lvar",
-        )
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LvarBangiaScalar.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe_with_schema(py, &self.inner, &LVAR_COLUMNS)
+        )?
+        .with_index_name("metric"))
     }
 
     fn __repr__(&self) -> String {
@@ -484,6 +496,22 @@ impl PyLvarBangiaScalar {
     }
 }
 
+impl PyLvarBangiaScalar {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .f64("var", vec![self.inner.var])?
+            .f64("spread_cost", vec![self.inner.spread_cost])?
+            .f64("lvar", vec![self.inner.lvar])?
+            .f64("lvar_ratio", vec![self.inner.lvar_ratio])?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyLvarBangiaScalar,
+    "LvarBangiaScalar",
+    module = "finstack_quant.models.liquidity"
+);
 wire_methods!(
     PyLvarBangiaScalar,
     LvarBangiaScalar,

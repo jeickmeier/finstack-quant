@@ -12,8 +12,9 @@ use std::sync::Arc;
 use finstack_quant_core::market_data::surfaces::VolQuoteType;
 use pyo3::prelude::*;
 
-use super::helpers::columns_to_dataframe;
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
+use super::helpers::columns_to_arrow_table;
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::errors::core_to_py;
 
 enum VolInput {
@@ -23,6 +24,37 @@ enum VolInput {
 
 /// Preserve nested rows until the canonical Rust constructor validates their shape.
 fn extract_vol_grid(obj: &Bound<'_, PyAny>) -> PyResult<VolInput> {
+    if crate::bindings::dataframe_utils::is_dataframe_like(obj)?
+        && let Some((flat, _nrows, ncols)) =
+            crate::bindings::dataframe_utils::extract_2d_f64(obj, "vols")?
+    {
+        if ncols == 0 {
+            return Ok(VolInput::Flat(Vec::new()));
+        }
+        let rows = flat.chunks_exact(ncols).map(<[f64]>::to_vec).collect();
+        return Ok(VolInput::Rows(rows));
+    }
+    if let Ok(untyped) = obj.cast::<numpy::PyUntypedArray>() {
+        use numpy::PyUntypedArrayMethods;
+        let ndim = untyped.ndim();
+        if ndim == 1 {
+            return Ok(VolInput::Flat(
+                crate::bindings::dataframe_utils::extract_f64_vec(obj, "vols")?,
+            ));
+        }
+        if ndim == 2 {
+            let casted = obj.call_method1("astype", ("float64",))?;
+            let array = casted.extract::<numpy::PyReadonlyArray2<'_, f64>>()?;
+            let ncols = array.shape()[1];
+            let flat = crate::bindings::matrix_input::numpy_row_major(&array);
+            let rows = if ncols == 0 {
+                Vec::new()
+            } else {
+                flat.chunks_exact(ncols).map(<[f64]>::to_vec).collect()
+            };
+            return Ok(VolInput::Rows(rows));
+        }
+    }
     if let Ok(rows) = obj.extract::<Vec<Vec<f64>>>() {
         return Ok(VolInput::Rows(rows));
     }
@@ -39,7 +71,7 @@ fn extract_vol_grid(obj: &Bound<'_, PyAny>) -> PyResult<VolInput> {
         }
     }
     Err(pyo3::exceptions::PyTypeError::new_err(
-        "vols must be a flat row-major list of floats, a list of rows, or a 2-D numpy array",
+        "vols must be a flat row-major list of floats, a list of rows, a DataFrame, or a 2-D numpy array",
     ))
 }
 
@@ -248,28 +280,6 @@ impl PyVolSurface {
         })
     }
 
-    /// Export the grid in long form with columns ``expiry``, ``secondary_value`` and ``vol``.
-    ///
-    /// Returns
-    /// -------
-    /// pandas.DataFrame
-    ///     One row per grid node, expiries outer and secondary values inner.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let (expiry, (secondary_value, vol)): (Vec<f64>, (Vec<f64>, Vec<f64>)) = self
-            .inner
-            .grid_points()
-            .map(|(expiry, secondary_value, vol)| (expiry, (secondary_value, vol)))
-            .unzip();
-        columns_to_dataframe(
-            py,
-            &[
-                ("expiry", expiry),
-                ("secondary_value", secondary_value),
-                ("vol", vol),
-            ],
-        )
-    }
-
     /// Surface identifier string.
     #[getter]
     fn id(&self) -> &str {
@@ -351,8 +361,23 @@ impl PyVolSurface {
     }
 }
 
+impl PyVolSurface {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let (expiry, (secondary_value, vol)): (Vec<f64>, (Vec<f64>, Vec<f64>)) = self
+            .inner
+            .grid_points()
+            .map(|(expiry, secondary_value, vol)| (expiry, (secondary_value, vol)))
+            .unzip();
+        columns_to_arrow_table(&[
+            ("expiry", expiry),
+            ("secondary_value", secondary_value),
+            ("vol", vol),
+        ])
+    }
+}
+
+tabular_methods!(PyVolSurface);
 wire_methods!(PyVolSurface, VolSurface, "VolSurface", arc);
-impl_repr_html_via_dataframe!(PyVolSurface);
 
 /// Delta-quoted FX volatility surface (ATM, 25-delta RR/BF, optional 10-delta wings).
 ///
@@ -536,28 +561,6 @@ impl PyFxDeltaVolSurface {
         })
     }
 
-    /// Export pillars as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``expiry``, ``atm_vol``, ``rr_25d``, ``bf_25d`` and, when
-    /// 10-delta wings are stored, ``rr_10d`` and ``bf_10d``.
-    ///
-    /// Returns
-    /// -------
-    /// pandas.DataFrame
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let mut columns = vec![
-            ("expiry", self.inner.expiries().to_vec()),
-            ("atm_vol", self.inner.atm_vols().to_vec()),
-            ("rr_25d", self.inner.rr_25d().to_vec()),
-            ("bf_25d", self.inner.bf_25d().to_vec()),
-        ];
-        if let (Some(rr), Some(bf)) = (self.inner.rr_10d(), self.inner.bf_10d()) {
-            columns.push(("rr_10d", rr.to_vec()));
-            columns.push(("bf_10d", bf.to_vec()));
-        }
-        columns_to_dataframe(py, &columns)
-    }
-
     /// Surface identifier string.
     #[getter]
     fn id(&self) -> &str {
@@ -654,13 +657,29 @@ impl PyFxDeltaVolSurface {
     }
 }
 
+impl PyFxDeltaVolSurface {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let mut columns = vec![
+            ("expiry", self.inner.expiries().to_vec()),
+            ("atm_vol", self.inner.atm_vols().to_vec()),
+            ("rr_25d", self.inner.rr_25d().to_vec()),
+            ("bf_25d", self.inner.bf_25d().to_vec()),
+        ];
+        if let (Some(rr), Some(bf)) = (self.inner.rr_10d(), self.inner.bf_10d()) {
+            columns.push(("rr_10d", rr.to_vec()));
+            columns.push(("bf_10d", bf.to_vec()));
+        }
+        columns_to_arrow_table(&columns)
+    }
+}
+
+tabular_methods!(PyFxDeltaVolSurface);
 wire_methods!(
     PyFxDeltaVolSurface,
     FxDeltaVolSurface,
     "FxDeltaVolSurface",
     arc
 );
-impl_repr_html_via_dataframe!(PyFxDeltaVolSurface);
 
 /// Calibrated SABR parameters for one vol-cube node.
 ///
@@ -959,33 +978,6 @@ impl PyVolCube {
             .map_err(core_to_py)
     }
 
-    /// Export nodes in long form.
-    ///
-    /// Columns: ``expiry``, ``tenor``, ``alpha``, ``beta``, ``rho``, ``nu``,
-    /// ``shift`` (``NaN`` when absent) and ``forward``.
-    ///
-    /// Returns
-    /// -------
-    /// pandas.DataFrame
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        type Node<'a> = (f64, f64, &'a SabrParameterData, f64);
-        let nodes: Vec<Node<'_>> = self.inner.nodes().collect();
-        let column = |f: &dyn Fn(&Node<'_>) -> f64| -> Vec<f64> { nodes.iter().map(f).collect() };
-        columns_to_dataframe(
-            py,
-            &[
-                ("expiry", column(&|n| n.0)),
-                ("tenor", column(&|n| n.1)),
-                ("alpha", column(&|n| n.2.alpha())),
-                ("beta", column(&|n| n.2.beta())),
-                ("rho", column(&|n| n.2.rho())),
-                ("nu", column(&|n| n.2.nu())),
-                ("shift", column(&|n| n.2.shift().unwrap_or(f64::NAN))),
-                ("forward", column(&|n| n.3)),
-            ],
-        )
-    }
-
     /// Cube identifier string.
     #[getter]
     fn id(&self) -> &str {
@@ -1044,5 +1036,23 @@ impl PyVolCube {
     }
 }
 
+impl PyVolCube {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        type Node<'a> = (f64, f64, &'a SabrParameterData, f64);
+        let nodes: Vec<Node<'_>> = self.inner.nodes().collect();
+        let column = |f: &dyn Fn(&Node<'_>) -> f64| -> Vec<f64> { nodes.iter().map(f).collect() };
+        columns_to_arrow_table(&[
+            ("expiry", column(&|n| n.0)),
+            ("tenor", column(&|n| n.1)),
+            ("alpha", column(&|n| n.2.alpha())),
+            ("beta", column(&|n| n.2.beta())),
+            ("rho", column(&|n| n.2.rho())),
+            ("nu", column(&|n| n.2.nu())),
+            ("shift", column(&|n| n.2.shift().unwrap_or(f64::NAN))),
+            ("forward", column(&|n| n.3)),
+        ])
+    }
+}
+
+tabular_methods!(PyVolCube);
 wire_methods!(PyVolCube, VolCube, "VolCube", arc);
-impl_repr_html_via_dataframe!(PyVolCube);

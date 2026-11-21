@@ -12,13 +12,16 @@ Examples
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
+import polars as pl
 
 __all__ = ["kahan_sum", "neumaier_sum"]
 
-def kahan_sum(values: Sequence[float] | npt.NDArray[np.float64]) -> float:
+def kahan_sum(values: Sequence[float] | npt.NDArray[Any] | pd.Series | pl.Series) -> float:
     """
     Kahan compensated summation -- reduces floating-point rounding errors.
 
@@ -27,7 +30,7 @@ def kahan_sum(values: Sequence[float] | npt.NDArray[np.float64]) -> float:
 
     Parameters
     ----------
-    values : list[float]
+    values : Sequence[float] | numpy.ndarray | pandas.Series | polars.Series
         Values to sum.
 
     Returns
@@ -50,7 +53,7 @@ def kahan_sum(values: Sequence[float] | npt.NDArray[np.float64]) -> float:
     """
     ...
 
-def neumaier_sum(values: Sequence[float] | npt.NDArray[np.float64]) -> float:
+def neumaier_sum(values: Sequence[float] | npt.NDArray[Any] | pd.Series | pl.Series) -> float:
     """
     Neumaier compensated summation -- handles mixed-sign values
     better than Kahan.
@@ -59,7 +62,7 @@ def neumaier_sum(values: Sequence[float] | npt.NDArray[np.float64]) -> float:
 
     Parameters
     ----------
-    values : list[float]
+    values : Sequence[float] | numpy.ndarray | pandas.Series | polars.Series
         Values to sum.
 
     Returns

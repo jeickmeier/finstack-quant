@@ -8,10 +8,11 @@ use crate::bindings::attribution::return_contribution::{
 use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{extract_date_iso, py_to_date};
 use crate::bindings::extract::{extract_instrument, extract_market_ref};
 use crate::bindings::module_utils::{py_to_serde, spec_from_py};
-use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::core_to_py;
 use finstack_quant_attribution::{AttributionEnvelope, AttributionInputs, AttributionSpec};
 use finstack_quant_core::market_data::context::MarketContextState;
@@ -110,11 +111,11 @@ pub(crate) fn attribute_pnl(
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.attribution._entry", "attribute_pnl_many")]
 #[pyfunction]
 #[pyo3(signature = (inputs, instruments))]
-pub(crate) fn attribute_pnl_many<'py>(
-    py: Python<'py>,
-    inputs: &Bound<'py, PyAny>,
-    instruments: Vec<Bound<'py, PyAny>>,
-) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn attribute_pnl_many(
+    py: Python<'_>,
+    inputs: &Bound<'_, PyAny>,
+    instruments: Vec<Bound<'_, PyAny>>,
+) -> PyResult<PyArrowTable> {
     let payloads = instruments
         .iter()
         .map(instrument_payload)
@@ -127,8 +128,8 @@ pub(crate) fn attribute_pnl_many<'py>(
         .iter()
         .map(finstack_quant_attribution::long_rows::pnl_attribution_wide_row)
         .collect::<Result<Vec<_>, _>>()
-        .map_err(crate::errors::core_to_py)?;
-    serde_rows_to_dataframe_with_schema(py, &rows, &WIDE_COLUMNS)
+        .map_err(core_to_py)?;
+    serde_rows_to_arrow_table(&rows, &WIDE_COLUMNS)
 }
 
 /// Headline P&L bridge: ``value(T₁) − value(T₀)`` in one currency.
@@ -285,8 +286,8 @@ pub(crate) fn attribute_pnl_envelope(
 /// -------
 /// ReturnContributionResult
 ///     Typed result. Use ``.to_json()`` for the wire form,
-///     ``.to_dataframe()`` for per-instrument rows, ``.to_group_dataframe()``
-///     / ``.to_factor_dataframe()`` for the other blocks, and
+///     ``.to_pandas()`` / ``.to_polars()`` / ``.to_arrow()`` for per-instrument rows,
+///     ``.to_group_table()`` / ``.to_factor_table()`` for the other blocks, and
 ///     ``.to_series()`` for contributions indexed by instrument id.
 ///
 /// Raises

@@ -73,7 +73,7 @@ def test_evaluate_engine_report_dataframe_and_pickle() -> None:
 
     assert report.passed is False
 
-    frame = report.to_dataframe()
+    frame = report.to_pandas()
     assert list(frame.columns) == [
         "covenant_type",
         "covenant_id",
@@ -86,6 +86,8 @@ def test_evaluate_engine_report_dataframe_and_pickle() -> None:
     ]
     assert len(frame) == 1
     assert not bool(frame["passed"].iloc[0])
+    assert report.to_polars().height == 1
+    assert report.to_arrow().column_names() == list(frame.columns)
 
     revived = pickle.loads(pickle.dumps(report))  # noqa: S301
     assert revived.to_json() == report.to_json()
@@ -290,7 +292,8 @@ def test_evaluate_series_and_reports_to_dataframe() -> None:
         {"total_leverage": [6.0, 7.5], "senior_leverage": [3.0, 3.5]},
         index=pd.to_datetime(["2026-03-31", "2026-06-30"]),
     )
-    out = engine.evaluate_series(frame)
+    out_tbl = engine.evaluate_series(frame)
+    out = out_tbl.to_pandas()
     assert list(out.columns) == [
         "as_of",
         "covenant",
@@ -305,9 +308,10 @@ def test_evaluate_series_and_reports_to_dataframe() -> None:
     assert len(out) == 6
     assert out.loc[out["covenant"] == "max_total_leverage", "passed"].tolist() == [True, False]
     assert out["as_of"].iloc[0] == "2026-03-31"
+    assert out_tbl.to_polars().height == 6
 
     reports = engine.evaluate({"total_leverage": 5.0, "senior_leverage": 3.0}, "2026-03-31")
-    table = covenants.reports_to_dataframe(reports)
+    table = covenants.reports_table(reports).to_pandas()
     assert table["covenant"].tolist() == ["max_total_leverage", "max_senior_leverage", "negative"]
     assert bool(table["passed"].all())
 
@@ -326,7 +330,7 @@ def test_forecast_covenant_and_breaches_from_dataframe() -> None:
     assert forecast.breach_probability == [0.0, 0.0, 1.0]
     assert forecast.first_breach_date == datetime.date(2026, 9, 30)
     assert forecast.comparator == "at_most"
-    table = forecast.to_dataframe()
+    table = forecast.to_pandas()
     assert list(table.columns) == [
         "test_date",
         "projected_value",
@@ -337,6 +341,8 @@ def test_forecast_covenant_and_breaches_from_dataframe() -> None:
         "breach_probability_stderr",
     ]
     assert len(table) == 3
+    assert forecast.to_polars().height == 3
+    assert forecast.to_arrow().num_rows == 3
     assert pickle.loads(pickle.dumps(forecast)) == forecast  # noqa: S301
 
     config = covenants.CovenantForecastConfig(stochastic=True, volatility=0.25, reference_date="2025-12-31")
@@ -381,8 +387,8 @@ def test_forecast_covenant_and_breaches_from_dataframe() -> None:
         ("max_senior_leverage", datetime.date(2026, 6, 30)),
         ("max_total_leverage", datetime.date(2026, 6, 30)),
     ]
-    assert covenants.breaches_to_dataframe(breaches)["breach_date"].tolist() == ["2026-06-30", "2026-06-30"]
-    assert next(iter(covenants.breaches_to_dataframe([]).columns)) == "covenant_id"
+    assert covenants.breaches_table(breaches).to_pandas()["breach_date"].tolist() == ["2026-06-30", "2026-06-30"]
+    assert covenants.breaches_table([]).column_names()[0] == "covenant_id"
 
 
 def test_forecast_rejects_duplicate_columns_and_incomplete_observations() -> None:

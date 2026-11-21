@@ -16,6 +16,9 @@ from __future__ import annotations
 from typing import Any, Sequence
 
 import pandas as pd
+import polars as pl
+
+from finstack_quant.core.table import ArrowTable
 
 __all__ = [
     "Copula",
@@ -1009,53 +1012,100 @@ class PortfolioLossResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the simulated loss distribution as a pandas DataFrame.
+        Export the simulated loss distribution as an :class:`~finstack_quant.core.table.ArrowTable`.
 
-        Columns: ``loss``.
+        Returns
+        -------
+        ArrowTable
+            Single-column ``loss`` table with one row per simulated path.
 
-        One row per simulated path, indexed by path id (a ``RangeIndex``), in
-        the ascending path order Rust produced — so repeated exports of the
-        same result are identical. Feed it straight to ``df["loss"].hist()`` or
-        ``df["loss"].quantile(...)``.
+        Raises
+        ------
+        ValueError
+            If the result cannot be represented as an Arrow table.
+        """
+        ...
 
-        The aggregate statistics are not repeated per row; see
-        :meth:`to_summary_dataframe`.
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the simulated loss distribution as a pandas ``DataFrame``.
+
+        Columns: ``loss``. Aggregate statistics live on :meth:`to_summary_table`.
 
         Returns
         -------
         pd.DataFrame
-            One row per simulated path.
+            One row per simulated path in deterministic path order.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the result cannot be represented as a pandas DataFrame.
         """
         ...
 
-    def to_summary_dataframe(self) -> pd.DataFrame:
+    def to_polars(self) -> pl.DataFrame:
         """
-        Export the aggregate loss statistics as a single-row pandas DataFrame.
+        Export the simulated loss distribution as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per simulated path with column ``loss``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the simulated loss distribution as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per simulated path with column ``loss``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_summary_table(self) -> ArrowTable:
+        """
+        Export aggregate loss statistics as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``expected_loss``, ``var``, ``expected_shortfall``,
         ``confidence``, ``num_paths``.
-
-        One simulation is one flat record, so a one-row frame is the right
-        shape: ``pd.concat`` over several correlation or recovery assumptions
-        gives a comparison table directly.
 
         ``var`` and ``expected_shortfall`` are loss-positive, matching the Rust
         convention: a larger number is a worse outcome.
 
         Returns
         -------
-        pd.DataFrame
-            Single-row frame of the distribution's aggregate statistics.
+        ArrowTable
+            Single-row table of the distribution's aggregate statistics.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If the summary table cannot be constructed.
         """
         ...
 
@@ -1104,8 +1154,8 @@ class PortfolioLossResult:
         ... )
         >>> config = PortfolioLossConfig(1000, 42, 0.99, CopulaSpec.gaussian())
         >>> result = simulate_portfolio_loss([CreditExposure("A", 1e6, 0.02, 0.6, [0.3])], config)
-        >>> PortfolioLossResult.from_json(result.to_json()).expected_loss
-        14400.0
+        >>> PortfolioLossResult.from_json(result.to_json()).expected_loss == result.expected_loss
+        True
 
         Raises
         ------
@@ -1333,9 +1383,9 @@ class TrancheLossStatistics:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export as a single-row pandas DataFrame.
+        Export tranche loss statistics as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``attachment``, ``detachment``, ``tranche_notional``,
         ``expected_loss_fraction``, ``expected_loss_amount``, ``var_fraction``,
@@ -1343,20 +1393,31 @@ class TrancheLossStatistics:
         ``expected_shortfall_amount``, ``prob_attachment_breached``,
         ``prob_full_writedown``.
 
-        These statistics describe ONE tranche, so a one-row frame is the right
-        shape. Build the capital-structure table by stacking tranches::
+        Returns
+        -------
+        ArrowTable
+            Single-row table describing this tranche.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be represented as an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export tranche loss statistics as a single-row pandas ``DataFrame``.
+
+        Stack multiple tranches with::
 
             pd.concat(
                 [
-                    result.tranche_loss_statistics(100 * a, 100 * d, pool).to_dataframe()
+                    result.tranche_loss_statistics(100 * a, 100 * d, pool).to_pandas()
                     for a, d in [(0.0, 0.03), (0.03, 0.07), (0.07, 1.0)]
                 ],
                 ignore_index=True,
             )
-
-        ``*_fraction`` columns are shares of the tranche's own notional;
-        ``*_amount`` columns are in the pool-notional unit passed to
-        :meth:`PortfolioLossResult.tranche_loss_statistics`.
 
         Returns
         -------
@@ -1365,11 +1426,52 @@ class TrancheLossStatistics:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as a pandas DataFrame.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export tranche loss statistics as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Single-row frame describing this tranche.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export tranche loss statistics as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row table describing this tranche.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize `TrancheLossStatistics` to canonical JSON.
@@ -2712,7 +2814,7 @@ class CorrelatedBernoulli:
         ...
 
 def simulate_portfolio_loss(
-    exposures: Sequence[CreditExposure] | pd.DataFrame,
+    exposures: Sequence[CreditExposure] | pd.DataFrame | pl.DataFrame | Any,
     config: PortfolioLossConfig,
     recovery: RecoverySpec | None = None,
 ) -> PortfolioLossResult:
@@ -2726,12 +2828,12 @@ def simulate_portfolio_loss(
 
     Parameters
     ----------
-    exposures : Sequence[CreditExposure] or pandas.DataFrame
+    exposures : Sequence[CreditExposure] or pandas.DataFrame or polars.DataFrame or Any
         Obligors to simulate, each with exposure, marginal PD, LGD, and factor
-        loadings compatible with ``config.copula``. A DataFrame's columns are
-        the ``CreditExposure`` field names: ``id``, ``notional``,
-        ``default_probability``, ``lgd`` and ``factor_loadings`` (a list
-        per name).
+        loadings compatible with ``config.copula``. A pandas/Polars DataFrame
+        or Arrow table's columns are the ``CreditExposure`` field names:
+        ``id``, ``notional``, ``default_probability``, ``lgd`` and
+        ``factor_loadings`` (a list per name).
     config : PortfolioLossConfig
         Path count, RNG seed, confidence level, and dependence-model settings.
     recovery : RecoverySpec or None, default None

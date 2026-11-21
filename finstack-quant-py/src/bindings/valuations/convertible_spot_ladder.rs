@@ -8,7 +8,7 @@ use finstack_quant_valuations::instruments::fixed_income::convertible::{
 
 use super::convert::enum_to_py_string;
 use super::typed_convertible::PyConvertibleBond;
-use crate::bindings::core::table::envelope_to_pandas;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
@@ -113,12 +113,6 @@ impl PyConvertibleSpotLadder {
         date_to_py(py, self.inner.as_of)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._convertible_spot_ladder", "ConvertibleSpotLadder.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        envelope_to_pandas(py, &self.inner.to_table())
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -129,6 +123,18 @@ impl PyConvertibleSpotLadder {
         )
     }
 }
+
+impl PyConvertibleSpotLadder {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        PyArrowTable::from_envelope(&self.inner.to_table())
+    }
+}
+
+crate::bindings::macros::tabular_methods!(
+    PyConvertibleSpotLadder,
+    "ConvertibleSpotLadder",
+    module = "finstack_quant.valuations.instruments._convertible_spot_ladder"
+);
 
 crate::bindings::macros::py_getters!(PyConvertibleSpotLadder |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._convertible_spot_ladder", "ConvertibleSpotLadder.instrument_id")]

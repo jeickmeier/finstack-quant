@@ -106,7 +106,7 @@ impl PyTarn {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_tarn", "Tarn.index_tenor")]
     #[getter]
     fn index_tenor<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.index_tenor)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.index_tenor)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_tarn", "Tarn.forward_curve_id")]

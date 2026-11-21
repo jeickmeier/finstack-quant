@@ -80,15 +80,21 @@ def test_explicit_grid_round_trips_and_tabulates() -> None:
         assert restored.to_json() == local.to_json()
     assert repr(local) == "LocalVolSurface(expiries=2, strikes=2)"
 
-    frame = local.to_dataframe()
-    assert frame.index.name == "expiry"
-    assert list(frame.index) == [1.0, 2.0]
-    assert list(frame.columns) == [100.0, 200.0]
-    assert frame.loc[2.0, 100.0] == 0.3
-    assert "<table" in local._repr_html_()
-    # Same layout as the implied surface it came from.
-    implied = _skew().to_dataframe().pivot(index="expiry", columns="secondary_value", values="vol")
-    extracted = LocalVolSurface.from_implied_vol(_skew(), FORWARDS).to_dataframe()
+    frame = local.to_pandas()
+    assert list(frame.columns) == ["expiry", "strike", "local_vol"]
+    grid = frame.pivot(index="expiry", columns="strike", values="local_vol")
+    assert list(grid.index) == [1.0, 2.0]
+    assert list(grid.columns) == [100.0, 200.0]
+    assert grid.loc[2.0, 100.0] == 0.3
+    assert "<table" in (local._repr_html_() or "")
+    # Same grid coordinates as the implied surface it came from.
+    implied = _skew().to_pandas().pivot(index="expiry", columns="secondary_value", values="vol")
+    extracted = (
+        LocalVolSurface
+        .from_implied_vol(_skew(), FORWARDS)
+        .to_pandas()
+        .pivot(index="expiry", columns="strike", values="local_vol")
+    )
     assert list(extracted.index) == list(implied.index)
     assert list(extracted.columns) == list(implied.columns)
 

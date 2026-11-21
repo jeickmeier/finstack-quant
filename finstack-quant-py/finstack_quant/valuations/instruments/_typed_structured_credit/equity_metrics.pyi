@@ -5,6 +5,8 @@ from __future__ import annotations
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 class EquityMetrics:
     """
@@ -23,7 +25,7 @@ class EquityMetrics:
     ...     '{"tranche_id": "E", "currency": "USD", "invested": 100.0, "irr": 0.12,'
     ...     ' "moic": 1.5, "nav_pct": 90.0, "cash_on_cash": [["2025-01-15", 0.1]]}'
     ... )
-    >>> metrics.moic, list(metrics.to_dataframe().columns)
+    >>> metrics.moic, list(metrics.to_pandas().columns)
     (1.5, ['date', 'cash_on_cash'])
     """
 
@@ -117,7 +119,26 @@ class EquityMetrics:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Cash-on-cash series as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``date`` (ISO 8601 string) and ``cash_on_cash`` (decimal
+        share of the invested amount distributed on that date).
+
+        Returns
+        -------
+        ArrowTable
+            One row per distribution date.
+
+        Raises
+        ------
+        ValueError
+            If the rows cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Cash-on-cash series as a pandas ``DataFrame``.
 
@@ -131,11 +152,52 @@ class EquityMetrics:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
-            If the rows cannot be serialized.
+            If the rows cannot be converted.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Cash-on-cash series as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per distribution date with columns ``date`` and ``cash_on_cash``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the rows cannot be converted.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Cash-on-cash series as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per distribution date with columns ``date`` and ``cash_on_cash``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the rows cannot be converted.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @property
     def tranche_id(self) -> str:
         """

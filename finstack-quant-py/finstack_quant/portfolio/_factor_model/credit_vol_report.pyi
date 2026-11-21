@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.models.factor.credit import CreditFactorModel
 from finstack_quant.models.factor.risk import RiskDecomposition
 
@@ -326,32 +328,81 @@ class CreditVolReport:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Primary table: the per-hierarchy-level rollup.
+        Primary table: the per-hierarchy-level rollup as an
+        :class:`~finstack_quant.core.table.ArrowTable`.
 
-        Alias of :meth:`to_level_dataframe`. Every tabular result type in the library
-        answers ``to_dataframe()``; the optional per-position breakdown stays on
-        :meth:`to_position_dataframe`.
+        Returns the same table as :meth:`to_level_table`; the optional
+        per-position breakdown stays on :meth:`to_position_table`.
+
+        Returns
+        -------
+        ArrowTable
+            One row per hierarchy level.
+
+        Raises
+        ------
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the per-hierarchy-level rollup as a pandas ``DataFrame``.
 
         Returns
         -------
         pd.DataFrame
-            The same frame :meth:`to_level_dataframe` returns.
+            One row per hierarchy level.
 
-        Examples
-        --------
-        >>> frame = result.to_dataframe()  # doctest: +SKIP
-
-        Notes
-        -----
-        This alias does not raise; it delegates to the method named above.
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
-    def to_level_dataframe(self) -> pd.DataFrame:
+    def to_polars(self) -> pl.DataFrame:
         """
-        Export the per-hierarchy-level rollup as a pandas DataFrame.
+        Export the per-hierarchy-level rollup as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per hierarchy level.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the per-hierarchy-level rollup as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per hierarchy level.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_level_table(self) -> ArrowTable:
+        """
+        Export the per-hierarchy-level rollup as an
+        :class:`~finstack_quant.core.table.ArrowTable`.
 
         One row per entry of :attr:`by_level`. The per-bucket drill-down stays
         on ``LevelVolContribution.by_bucket``, which is already a plain dict.
@@ -361,24 +412,24 @@ class CreditVolReport:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per hierarchy level.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the table cannot be constructed.
         """
         ...
 
-    def to_position_dataframe(self) -> pd.DataFrame:
+    def to_position_table(self) -> ArrowTable:
         """
-        Export the optional per-position breakdown as a pandas DataFrame.
+        Export the optional per-position breakdown as an
+        :class:`~finstack_quant.core.table.ArrowTable`.
 
         One row per entry of :attr:`by_position`. When the report was built
-        without ``by_position=True`` the result is a zero-row frame that still
-        carries the full column schema, so downstream ``df[...]`` selections
-        keep working instead of raising ``KeyError``.
+        without ``by_position=True`` the result is a zero-row table that still
+        carries the full column schema.
 
         Columns: ``position_id``, ``factor_total`` (systematic),
         ``idiosyncratic`` (issuer-specific), ``total`` (their sum) — all in
@@ -386,14 +437,14 @@ class CreditVolReport:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per position, or zero rows when :attr:`by_position` is
             ``None``.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the table cannot be constructed.
         """
         ...
 

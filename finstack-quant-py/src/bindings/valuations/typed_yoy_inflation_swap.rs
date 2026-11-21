@@ -90,7 +90,7 @@ impl PyYoYInflationSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_yoy_inflation_swap", "YoYInflationSwap.frequency")]
     #[getter]
     fn frequency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.frequency)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.frequency)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_yoy_inflation_swap", "YoYInflationSwap.inflation_index_id")]
@@ -114,19 +114,19 @@ impl PyYoYInflationSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_yoy_inflation_swap", "YoYInflationSwap.side")]
     #[getter]
     fn side<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.side)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.side)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_yoy_inflation_swap", "YoYInflationSwap.lag")]
     #[getter]
     fn lag<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.lag)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.lag)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_yoy_inflation_swap", "YoYInflationSwap.interpolation")]
     #[getter]
     fn interpolation<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.interpolation)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.interpolation)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_yoy_inflation_swap", "YoYInflationSwap.base_cpi")]

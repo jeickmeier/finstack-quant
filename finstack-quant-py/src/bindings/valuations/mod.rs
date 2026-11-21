@@ -89,10 +89,10 @@ pub(crate) mod typed_xccy_swap;
 pub(crate) mod typed_yoy_inflation_swap;
 mod var;
 
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_rows_to_dataframe_with_schema, serde_to_py,
-};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::display_to_py;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -109,25 +109,22 @@ pub(crate) struct PyValuationResult {
 }
 
 impl PyValuationResult {
-    fn wide_rows_dataframe<'py>(
-        py: Python<'py>,
+    fn wide_rows_arrow_table(
         rows: &[finstack_quant_valuations::results::ValuationRow],
-    ) -> PyResult<Bound<'py, PyAny>> {
-        let identity: [ColumnSchema<'_>; 4] = [
+    ) -> PyResult<PyArrowTable> {
+        let identity: [(&str, &str); 4] = [
             ("instrument_id", "str"),
             ("as_of_date", "str"),
             ("pv", "float64"),
             ("currency", "str"),
         ];
-        serde_rows_to_dataframe_with_schema(py, rows, &identity)
+        serde_rows_to_arrow_table(rows, &identity)
     }
 
-    fn long_rows_dataframe<'py>(
-        py: Python<'py>,
+    fn long_rows_arrow_table(
         rows: &[finstack_quant_valuations::results::ValuationLongRow],
-    ) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(
-            py,
+    ) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(
             rows,
             &[
                 ("metric", "str"),
@@ -137,7 +134,17 @@ impl PyValuationResult {
             ],
         )
     }
+
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        Self::wide_rows_arrow_table(&[self.inner.to_row()])
+    }
 }
+
+crate::bindings::macros::tabular_methods!(
+    PyValuationResult,
+    "ValuationResult",
+    module = "finstack_quant.valuations"
+);
 
 #[pymethods]
 impl PyValuationResult {
@@ -218,20 +225,16 @@ impl PyValuationResult {
         Ok(self.inner.metric_series(&base))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult.metric_series_dataframe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult.metric_series_table")]
     #[pyo3(text_signature = "($self, base)")]
-    fn metric_series_dataframe<'py>(
-        &self,
-        py: Python<'py>,
-        base: &str,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        Self::long_rows_dataframe(py, &self.inner.to_series_rows(base))
+    fn metric_series_table(&self, base: &str) -> PyResult<PyArrowTable> {
+        Self::long_rows_arrow_table(&self.inner.to_series_rows(base))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult.to_long_dataframe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult.to_long_table")]
     #[pyo3(text_signature = "($self)")]
-    fn to_long_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        Self::long_rows_dataframe(py, &self.inner.to_long_rows())
+    fn to_long_table(&self) -> PyResult<PyArrowTable> {
+        Self::long_rows_arrow_table(&self.inner.to_long_rows())
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult.metric_units")]
@@ -290,22 +293,11 @@ impl PyValuationResult {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        Self::wide_rows_dataframe(py, &[self.inner.to_row()])
-    }
-
     #[doc = pydoc!("finstack_quant.valuations", "ValuationResult.concat")]
     #[staticmethod]
-    fn concat<'py>(py: Python<'py>, results: Vec<PyRef<'py, Self>>) -> PyResult<Bound<'py, PyAny>> {
+    fn concat(results: Vec<PyRef<'_, Self>>) -> PyResult<PyArrowTable> {
         let rows: Vec<_> = results.iter().map(|result| result.inner.to_row()).collect();
-        Self::wide_rows_dataframe(py, &rows)
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult._repr_html_")]
-    fn _repr_html_<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        self.to_dataframe(py)?.call_method0("_repr_html_")
+        Self::wide_rows_arrow_table(&rows)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult.meta")]
@@ -397,7 +389,7 @@ fn instrument_envelope_from_spec<'py>(
     let spec = crate::bindings::module_utils::py_to_json_value(py, spec, "spec")?;
     let envelope = finstack_quant_valuations::pricer::instrument_envelope_from_spec(type_tag, spec)
         .map_err(crate::errors::core_to_py)?;
-    crate::bindings::pandas_utils::serde_to_py(py, &envelope)
+    crate::bindings::json_bridge::serde_to_py(py, &envelope)
 }
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "pretty_instrument_json")]

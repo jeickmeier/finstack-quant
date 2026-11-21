@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import datetime
 import pandas as pd
+import polars as pl
 from collections.abc import Sequence
 from typing import Any
 from finstack_quant.core.config import FinstackConfig
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.statements import FinancialModelSpec
 from finstack_quant.scenarios._spec import ScenarioSpec
 
@@ -222,8 +224,25 @@ class ApplicationReport:
         """
         ...
 
-    def _repr_html_(self) -> str | None: ...
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export the report counters as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            One row with columns ``operations_applied``, ``user_operations``,
+            ``expanded_operations``, ``warning_count``, ``as_of_changed``,
+            ``all_dirty`` and ``shock_count``.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export the report counters as a single-row pandas DataFrame.
 
@@ -237,26 +256,61 @@ class ApplicationReport:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import MarketContext
         >>> from finstack_quant.scenarios import ScenarioSpec, apply_scenario
-        >>> frame = apply_scenario(ScenarioSpec("s", []), MarketContext(), "2025-01-15").report.to_dataframe()
+        >>> frame = apply_scenario(ScenarioSpec("s", []), MarketContext(), "2025-01-15").report.to_pandas()
         >>> list(frame.columns)[:4]
         ['operations_applied', 'user_operations', 'expanded_operations', 'warning_count']
         """
         ...
 
-    def changes_to_dataframe(self) -> pd.DataFrame:
+    def to_polars(self) -> pl.DataFrame:
         """
-        Export the market targets the scenario actually changed, one row each.
+        Export the report counters as a single-row ``polars.DataFrame``.
 
         Returns
         -------
-        pd.DataFrame
+        pl.DataFrame
+            One-row Polars DataFrame constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the report counters as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_changes_table(self) -> ArrowTable:
+        """
+        Export the market targets the scenario actually changed as an :class:`~finstack_quant.core.table.ArrowTable`, one row each.
+
+        Returns
+        -------
+        ArrowTable
             Columns ``kind`` (``curve``, ``volatility_index``,
             ``base_correlation``, ``vol_surface``, ``equity_price``, ``fx``),
             ``id`` (identifier, or ``BASE/QUOTE`` for FX) and ``curve_kind``
@@ -266,26 +320,25 @@ class ApplicationReport:
         Raises
         ------
         ValueError
-            If the manifest cannot be serialized into a pandas object.
+            If the manifest cannot be serialized into an Arrow table.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import MarketContext
         >>> from finstack_quant.scenarios import ScenarioSpec, apply_scenario
-        >>> frame = apply_scenario(ScenarioSpec("s", []), MarketContext(), "2025-01-15").report.changes_to_dataframe()
-        >>> list(frame.columns)
+        >>> tbl = apply_scenario(ScenarioSpec("s", []), MarketContext(), "2025-01-15").report.to_changes_table()
+        >>> tbl.column_names()
         ['kind', 'id', 'curve_kind']
         """
         ...
 
-    def carry_to_dataframe(self) -> pd.DataFrame:
+    def to_carry_table(self) -> ArrowTable:
         """
-        Export per-instrument carry from the time roll, one row per
-        instrument and currency.
+        Export per-instrument carry from the time roll as an :class:`~finstack_quant.core.table.ArrowTable`, one row per instrument and currency.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             Columns ``instrument_id``, ``amount`` (carry P&L as a float) and
             ``currency`` (ISO-4217 code). Empty when the scenario had no
             ``time_roll_forward`` or no instruments were supplied.
@@ -293,14 +346,14 @@ class ApplicationReport:
         Raises
         ------
         ValueError
-            If the carry rows cannot be serialized into a pandas object.
+            If the carry rows cannot be serialized into an Arrow table.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import MarketContext
         >>> from finstack_quant.scenarios import ScenarioSpec, apply_scenario
-        >>> frame = apply_scenario(ScenarioSpec("s", []), MarketContext(), "2025-01-15").report.carry_to_dataframe()
-        >>> list(frame.columns)
+        >>> tbl = apply_scenario(ScenarioSpec("s", []), MarketContext(), "2025-01-15").report.to_carry_table()
+        >>> tbl.column_names()
         ['instrument_id', 'amount', 'currency']
         """
         ...
@@ -473,29 +526,80 @@ class ApplicationResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export the application report counters as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Same columns as :meth:`ApplicationReport.to_arrow`.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export the application report counters as a single-row pandas DataFrame.
 
         Returns
         -------
         pd.DataFrame
-            Same columns as :meth:`ApplicationReport.to_dataframe`.
+            Same columns as :meth:`ApplicationReport.to_pandas`.
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import MarketContext
         >>> from finstack_quant.scenarios import ScenarioSpec, apply_scenario
-        >>> len(apply_scenario(ScenarioSpec("s", []), MarketContext(), "2025-01-15").to_dataframe())
+        >>> len(apply_scenario(ScenarioSpec("s", []), MarketContext(), "2025-01-15").to_pandas())
         1
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the application report counters as a single-row ``polars.DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One-row Polars DataFrame constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the application report counters as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize this result to canonical JSON.

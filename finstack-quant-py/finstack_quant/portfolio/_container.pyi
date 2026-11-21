@@ -6,6 +6,7 @@ import datetime
 from typing import Any
 import pandas as pd
 from finstack_quant.core.currency import Currency
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.portfolio._materialization import InstrumentArtifactCache, MaterializationReport
 
 class PortfolioBuilder:
@@ -863,6 +864,25 @@ class Portfolio:
         ------
         ValueError
             If the specification cannot be serialized.
+        """
+        ...
+
+    def positions_table(self) -> ArrowTable:
+        """
+        Export the portfolio positions as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``position_id``, ``entity_id``, ``instrument_id``,
+        ``instrument_type``, ``quantity``, ``unit``, ``book_id``.
+
+        Returns
+        -------
+        ArrowTable
+            One row per position in portfolio order.
+
+        Raises
+        ------
+        ValueError
+            If the table cannot be constructed.
         """
         ...
 

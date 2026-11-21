@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 import datetime
 from typing import Any
+import numpy as np
+import numpy.typing as npt
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 class LinkedReturn:
     """
@@ -88,12 +93,28 @@ class LinkedReturn:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Single-row pandas DataFrame view of the linked return.
+        Single-row :class:`~finstack_quant.core.table.ArrowTable` view of the linked return.
 
         Columns: ``cumulative``, ``annualised``, ``is_annualised``, ``num_periods``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
+
+        Returns
+        -------
+        ArrowTable
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Single-row pandas ``DataFrame`` view of the linked return.
 
         Returns
         -------
@@ -102,11 +123,46 @@ class LinkedReturn:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Single-row Polars ``DataFrame`` view of the linked return.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Single-row ``pyarrow.Table`` view of the linked return.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize this result to canonical JSON.
@@ -195,14 +251,26 @@ def twrr_modified_dietz(period: dict[str, Any] | str) -> float:
     """
     ...
 
-def twrr_linked(returns: str | dict[str, Any] | list[Any] | pd.DataFrame, horizon_years: float) -> LinkedReturn:
+def twrr_linked(
+    returns: str
+    | Sequence[float]
+    | npt.NDArray[np.float64]
+    | pd.Series
+    | pl.Series
+    | pd.DataFrame
+    | pl.DataFrame
+    | Any,
+    horizon_years: float,
+) -> LinkedReturn:
     """
     Geometrically link TWRR sub-period returns over a horizon.
 
     Parameters
     ----------
-    returns : str | dict | list | pandas.DataFrame
-        JSON array of sub-period decimal returns (e.g. from Modified Dietz).
+    returns : str | Sequence[float] | numpy.ndarray | pandas.Series | polars.Series | pandas.DataFrame | polars.DataFrame | Any
+        Sub-period decimal returns supplied as a sequence, 1-D NumPy array,
+        ``pandas.Series``, ``polars.Series``, single-column DataFrame / Arrow
+        table, or JSON array string (e.g. from Modified Dietz).
     horizon_years : float
         Full elapsed horizon in 365-day calendar years; must be finite.
         Horizons of at least one year are annualized; shorter ones, including
@@ -232,7 +300,13 @@ def twrr_linked(returns: str | dict[str, Any] | list[Any] | pd.DataFrame, horizo
     ...
 
 def mwr_xirr(
-    cashflows: list[tuple[datetime.date | str, float]] | list[dict[str, Any]] | pd.DataFrame | str,
+    cashflows: Sequence[tuple[datetime.date | str, float]]
+    | Sequence[dict[str, Any]]
+    | pd.Series
+    | pd.DataFrame
+    | pl.DataFrame
+    | str
+    | Any,
 ) -> float:
     """
     Compute the money-weighted return (XIRR, Act/365F) from dated cashflows.
@@ -241,13 +315,16 @@ def mwr_xirr(
 
     Parameters
     ----------
-    cashflows : list[tuple[date, float]] | list[dict] | pd.DataFrame | str
+    cashflows : sequence[tuple[date, float]] | sequence[dict] | pandas.Series | pandas.DataFrame | polars.DataFrame | str | Any
         Dated flows from the investor's cash account: contributions negative,
         terminal value / distributions positive. Accepts ``(date, amount)``
-        pairs (dates as ``datetime.date`` or ISO strings), dicts with
-        ``date`` and ``amount`` keys, a DataFrame with those columns, or the
-        canonical JSON array string. Dates are sorted and equal-date flows
-        netted; remaining nonzero flows must change sign exactly once.
+        pairs (dates as ``datetime.date``, timestamps, ``numpy.datetime64``, or
+        ISO strings), dicts with ``date`` and ``amount`` keys, a date-indexed
+        ``pandas.Series``, a DataFrame or Arrow table with ``date`` and
+        ``amount`` columns (or a date-indexed pandas DataFrame with an
+        ``amount`` column), or the canonical JSON array string. Dates are
+        sorted and equal-date flows netted; remaining nonzero flows must change
+        sign exactly once.
 
     Returns
     -------

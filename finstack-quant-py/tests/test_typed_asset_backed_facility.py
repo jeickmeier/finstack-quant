@@ -154,7 +154,7 @@ def test_projection_reconciles_with_the_lender_cashflows_and_the_price() -> None
     facility = _facility()
     projection = facility.project(_market(), CLOSE)
     assert isinstance(projection, FacilityProjection)
-    frame = projection.to_dataframe()
+    frame = projection.to_pandas()
     assert list(frame.columns) == [
         "date",
         "interest",
@@ -196,7 +196,7 @@ def test_projection_frame_lender_total_comes_from_rust_lender_cashflows() -> Non
     first_date, first_money = doc["facility"]["cashflows"][0]
     first_money["amount"] = str(float(first_money["amount"]) + 1_000_000.0)
     tampered = FacilityProjection.from_json(json.dumps(doc))
-    frame = tampered.to_dataframe()
+    frame = tampered.to_pandas()
     rust = {date.isoformat(): money.amount for date, money in tampered.lender_cashflows}
     row = frame.loc[frame["date"] == first_date, "lender_total"]
     assert float(row.iloc[0]) == pytest.approx(rust[first_date])
@@ -208,7 +208,7 @@ def test_projection_frame_keeps_the_rust_currency_check() -> None:
     doc["commitment_fees"][0][1]["currency"] = "EUR"
     tampered = FacilityProjection.from_json(json.dumps(doc))
     with pytest.raises(ValueError, match="Currency mismatch"):
-        tampered.to_dataframe()
+        tampered.to_pandas()
 
 
 def test_facility_is_accepted_as_a_typed_composite_leg() -> None:
@@ -306,7 +306,8 @@ def test_draws_fees_and_readvance_round_trip_and_project() -> None:
     projection = facility.project(_market(), CLOSE)
     assert len(projection.draws) == 1
     assert projection.draws[0][1].amount == 5_000_000.0
-    frame = projection.to_dataframe()
+    frame = projection.to_pandas()
     assert "draw" in frame.columns
+    assert projection.to_arrow().num_rows == len(frame)
     assert projection.diagnostics.early_amortization_date is None
     assert [amount.amount for _, _, amount in projection.diagnostics.tranche_draws] == [5_000_000.0]

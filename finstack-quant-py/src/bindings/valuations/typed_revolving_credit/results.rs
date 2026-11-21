@@ -3,7 +3,7 @@
 use pyo3::prelude::*;
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::valuations::convert::money_to_py;
 use crate::errors::{display_to_py, serde_json_to_py};
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult;
@@ -117,15 +117,6 @@ impl PyEnhancedMonteCarloResult {
             .unwrap_or_default()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.results", "EnhancedMonteCarloResult.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::core::table::envelope_to_pandas(
-            py,
-            &self.inner.to_table().map_err(crate::errors::core_to_py)?,
-        )
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -136,6 +127,19 @@ impl PyEnhancedMonteCarloResult {
         )
     }
 }
+
+impl PyEnhancedMonteCarloResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<crate::bindings::core::table::PyArrowTable> {
+        let table = self.inner.to_table().map_err(crate::errors::core_to_py)?;
+        crate::bindings::core::table::PyArrowTable::from_envelope(&table)
+    }
+}
+
+crate::bindings::macros::tabular_methods!(
+    PyEnhancedMonteCarloResult,
+    "EnhancedMonteCarloResult",
+    module = "finstack_quant.valuations.instruments._typed_revolving_credit.results"
+);
 
 crate::bindings::macros::py_getters!(PyEnhancedMonteCarloResult |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.results", "EnhancedMonteCarloResult.pv")]

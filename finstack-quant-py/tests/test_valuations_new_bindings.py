@@ -61,7 +61,7 @@ def _build_deposit_market() -> tuple[str, MarketContext]:
 def test_instrument_cashflows_deposit_reconciles_with_price() -> None:
     inst_json, market = _build_deposit_market()
     envelope = instrument_cashflows(inst_json, market, "2025-01-15", "discounting")
-    df = envelope.to_dataframe()
+    df = envelope.to_pandas()
 
     assert isinstance(envelope, InstrumentCashflowEnvelope)
     assert envelope.reconciles_with_base_value is True
@@ -132,9 +132,12 @@ def test_instrument_cashflows_serialization_and_dataframe() -> None:
     assert not hasattr(valuations, "instrument_cashflows")
     assert type(instrument_cashflows).__name__ == "builtin_function_or_method"
     assert InstrumentCashflowEnvelope.from_json(text).to_json() == envelope.to_json()
-    df = envelope.to_dataframe()
+    df = envelope.to_pandas()
     assert str(df["date"].dtype).startswith("datetime64")
     assert list(df.columns)[:4] == ["date", "amount", "currency", "kind"]
+    at = envelope.to_arrow()
+    assert at.num_rows == len(df)
+    assert at.column_names()[:4] == ["date", "amount", "currency", "kind"]
 
 
 def test_instrument_cashflows_unsupported_model_raises() -> None:

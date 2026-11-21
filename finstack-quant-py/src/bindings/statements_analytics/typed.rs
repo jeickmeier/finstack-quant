@@ -1,13 +1,13 @@
 //! Typed Python wrappers for statement-analysis configs and root results.
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::core::table::envelope_to_pandas;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::{label, parse_label};
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
-use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements::parse_period_id;
 use crate::bindings::statements::types::PyForecastSpec;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::statements_to_py;
 use finstack_quant_statements::types::AmountOrScalar;
 use finstack_quant_statements_analytics::analysis::{
@@ -24,8 +24,8 @@ use pyo3::types::PyDict;
 
 type SensitivityParameterInput = (String, String, f64, Vec<f64>);
 
-/// Column schema for [`PyVarianceReport::to_dataframe`].
-const VARIANCE_ROW_COLUMNS: [ColumnSchema<'static>; 6] = [
+/// Column schema for [`PyVarianceReport`] tabular exports.
+const VARIANCE_ROW_COLUMNS: [(&str, &str); 6] = [
     ("period", "str"),
     ("metric", "str"),
     ("baseline", "float64"),
@@ -34,14 +34,13 @@ const VARIANCE_ROW_COLUMNS: [ColumnSchema<'static>; 6] = [
     ("pct_var", "float64"),
 ];
 
-/// Column schema for the fixed part of [`PySensitivityResult::to_dataframe`];
-/// one column per perturbed parameter is inserted after ``scenario``.
-const SENSITIVITY_TAIL_COLUMNS: [ColumnSchema<'static>; 3] =
+/// Column schema for the fixed part of [`PySensitivityResult`] tabular
+/// exports; one column per perturbed parameter is inserted after ``scenario``.
+const SENSITIVITY_TAIL_COLUMNS: [(&str, &str); 3] =
     [("node_id", "str"), ("period", "str"), ("value", "float64")];
 
-/// Column schema for [`PyBridgeChart::to_dataframe`].
-const BRIDGE_STEP_COLUMNS: [ColumnSchema<'static>; 2] =
-    [("driver", "str"), ("contribution", "float64")];
+/// Column schema for [`PyBridgeChart`] tabular exports.
+const BRIDGE_STEP_COLUMNS: [(&str, &str); 2] = [("driver", "str"), ("contribution", "float64")];
 
 fn extract_amount_or_scalar(value: &Bound<'_, PyAny>) -> PyResult<AmountOrScalar> {
     if let Ok(money) = value.extract::<PyRef<'_, PyMoney>>() {
@@ -667,10 +666,10 @@ impl PySensitivityResult {
             .collect()
     }
 
-    /// Export the run as a long pandas ``DataFrame``.
+    /// Export the run as a long ``ArrowTable``.
     ///
     /// Columns: ``scenario`` (0-based index), one column per perturbed
-    /// parameter named ``node_id@period`` (``NaN`` where a scenario does not
+    /// parameter named ``node_id@period`` (null where a scenario does not
     /// perturb it), then ``node_id``, ``period`` and ``value`` holding each
     /// tracked metric's value in that scenario. One row per (scenario, metric,
     /// period); when no metric is tracked, one row per scenario with the
@@ -682,56 +681,78 @@ impl PySensitivityResult {
     ///     Node identifiers to emit; ``None`` uses the config's
     ///     ``target_metrics``.
     #[pyo3(signature = (metrics=None))]
-    fn to_dataframe<'py>(
+    fn to_arrow(&self, metrics: Option<Vec<String>>) -> PyResult<PyArrowTable> {
+        self.to_arrow_table(metrics)
+    }
+
+    /// Export the run as a long pandas ``DataFrame``.
+    ///
+    /// Parameters
+    /// ----------
+    /// metrics : list[str] | None
+    ///     Node identifiers to emit; ``None`` uses the config's
+    ///     ``target_metrics``.
+    #[pyo3(signature = (metrics=None))]
+    fn to_pandas<'py>(
         &self,
         py: Python<'py>,
         metrics: Option<Vec<String>>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let metrics = metrics.unwrap_or_else(|| self.inner.config.target_metrics.clone());
-        let mut parameter_names: Vec<String> = Vec::new();
-        for scenario in &self.inner.scenarios {
-            for name in scenario.parameter_values.keys() {
-                if !parameter_names.contains(name) {
-                    parameter_names.push(name.clone());
-                }
-            }
-        }
-        let mut rows: Vec<serde_json::Value> = Vec::new();
-        for (index, scenario) in self.inner.scenarios.iter().enumerate() {
-            let mut base = serde_json::Map::new();
-            base.insert("scenario".to_string(), serde_json::json!(index));
-            for (parameter, value) in &scenario.parameter_values {
-                base.insert(parameter.clone(), serde_json::json!(value));
-            }
-            let mut emitted = false;
-            for metric in &metrics {
-                if let Some(series) = scenario.results.get_node(metric) {
-                    for (period, value) in series.iter() {
-                        let mut row = base.clone();
-                        row.insert("node_id".to_string(), serde_json::json!(metric));
-                        row.insert("period".to_string(), serde_json::json!(period.to_string()));
-                        row.insert("value".to_string(), serde_json::json!(value));
-                        rows.push(serde_json::Value::Object(row));
-                        emitted = true;
-                    }
-                }
-            }
-            if !emitted {
-                let mut row = base;
-                row.insert("node_id".to_string(), serde_json::Value::Null);
-                row.insert("period".to_string(), serde_json::Value::Null);
-                row.insert("value".to_string(), serde_json::Value::Null);
-                rows.push(serde_json::Value::Object(row));
-            }
-        }
-        let mut columns: Vec<ColumnSchema<'_>> = vec![("scenario", "int64")];
-        columns.extend(
-            parameter_names
-                .iter()
-                .map(|name| (name.as_str(), "float64")),
-        );
-        columns.extend(SENSITIVITY_TAIL_COLUMNS);
-        serde_rows_to_dataframe_with_schema(py, &rows, &columns)
+        let table = Bound::new(py, self.to_arrow_table(metrics)?)?;
+        PyArrowTable::to_pandas(&table, py)
+    }
+
+    /// Export the run as a long Polars ``DataFrame``.
+    ///
+    /// Parameters
+    /// ----------
+    /// metrics : list[str] | None
+    ///     Node identifiers to emit; ``None`` uses the config's
+    ///     ``target_metrics``.
+    #[pyo3(signature = (metrics=None))]
+    fn to_polars<'py>(
+        &self,
+        py: Python<'py>,
+        metrics: Option<Vec<String>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.to_arrow_table(metrics)?)?;
+        PyArrowTable::to_polars(&table, py)
+    }
+
+    /// Export the run as a long ``pyarrow.Table``.
+    ///
+    /// Parameters
+    /// ----------
+    /// metrics : list[str] | None
+    ///     Node identifiers to emit; ``None`` uses the config's
+    ///     ``target_metrics``.
+    #[pyo3(signature = (metrics=None))]
+    fn to_pyarrow<'py>(
+        &self,
+        py: Python<'py>,
+        metrics: Option<Vec<String>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.to_arrow_table(metrics)?)?;
+        PyArrowTable::to_pyarrow(&table, py)
+    }
+
+    /// Export via the Arrow PyCapsule C-stream protocol (`arrow_array_stream`).
+    #[pyo3(signature = (requested_schema = None))]
+    fn __arrow_c_stream__<'py>(
+        &self,
+        py: Python<'py>,
+        requested_schema: Option<Bound<'py, PyAny>>,
+    ) -> PyResult<Bound<'py, pyo3::types::PyCapsule>> {
+        let _ = requested_schema;
+        self.to_arrow_table(None)?.arrow_c_stream(py)
+    }
+
+    /// Export the Arrow schema via the Arrow PyCapsule interface (`arrow_schema`).
+    fn __arrow_c_schema__<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, pyo3::types::PyCapsule>> {
+        self.to_arrow_table(None)?.arrow_c_schema(py)
     }
 
     fn get_parameter_value(&self, scenario_index: usize, parameter: &str) -> PyResult<Option<f64>> {
@@ -751,24 +772,68 @@ impl PySensitivityResult {
             .map_err(statements_to_py)
     }
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py, None).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+    /// Render as an HTML table preview in Jupyter notebooks.
+    fn _repr_html_(&self) -> Option<String> {
+        self.to_arrow_table(None).ok().map(|t| t.render_html())
     }
 
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
     /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
+    /// `to_json()` or a table exit when the contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("SensitivityResult", &self.inner)
+    }
+}
+
+impl PySensitivityResult {
+    fn to_arrow_table(&self, metrics: Option<Vec<String>>) -> PyResult<PyArrowTable> {
+        let metrics = metrics.unwrap_or_else(|| self.inner.config.target_metrics.clone());
+        let mut parameter_names: Vec<String> = Vec::new();
+        for scenario in &self.inner.scenarios {
+            for name in scenario.parameter_values.keys() {
+                if !parameter_names.contains(name) {
+                    parameter_names.push(name.clone());
+                }
+            }
+        }
+        let mut rows: Vec<serde_json::Value> = Vec::new();
+        for (index, scenario) in self.inner.scenarios.iter().enumerate() {
+            let mut base = serde_json::Map::new();
+            base.insert("scenario".to_string(), serde_json::json!(index));
+            for (parameter, value) in &scenario.parameter_values {
+                base.insert(parameter.clone(), serde_json::json!(value));
+            }
+            let mut emitted = false;
+            for metric in &metrics {
+                if let Some(series) = scenario.results.get_node(metric) {
+                    for (period, cell) in series.iter() {
+                        let mut row = base.clone();
+                        row.insert("node_id".to_string(), serde_json::json!(metric));
+                        row.insert("period".to_string(), serde_json::json!(period.to_string()));
+                        row.insert("value".to_string(), serde_json::json!(cell.numeric()));
+                        rows.push(serde_json::Value::Object(row));
+                        emitted = true;
+                    }
+                }
+            }
+            if !emitted {
+                let mut row = base;
+                row.insert("node_id".to_string(), serde_json::Value::Null);
+                row.insert("period".to_string(), serde_json::Value::Null);
+                row.insert("value".to_string(), serde_json::Value::Null);
+                rows.push(serde_json::Value::Object(row));
+            }
+        }
+        let mut columns: Vec<(&str, &str)> = vec![("scenario", "int64")];
+        columns.extend(
+            parameter_names
+                .iter()
+                .map(|name| (name.as_str(), "float64")),
+        );
+        columns.extend(SENSITIVITY_TAIL_COLUMNS);
+        serde_rows_to_arrow_table(&rows, &columns)
     }
 }
 
@@ -878,18 +943,20 @@ impl PyVarianceReport {
             .collect()
     }
 
-    /// Export the variance rows as a pandas ``DataFrame``.
+    /// Identify this value in notebooks and logs.
     ///
-    /// Columns: ``period``, ``metric``, ``baseline``, ``comparison``,
-    /// ``abs_var``, ``pct_var``. One row per
-    /// (metric, period) pair, in report order; an empty report still carries
-    /// the full column schema.
-    ///
-    /// ``baseline``, ``comparison`` and ``abs_var`` are in the metric's own
-    /// units; ``pct_var`` is a decimal fraction (``0.1`` = +10%) and is
-    /// ``NaN`` where the baseline is effectively zero. The scenario labels are report metadata
-    /// (``baseline_label`` / ``comparison_label``) and are not repeated per row.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    /// Rendered from the wire representation, so the fields shown are the
+    /// fields `to_json()` names. Collections are summarised by length; use
+    /// `to_json()` or a table exit when the contents matter.
+    fn __repr__(&self) -> String {
+        crate::bindings::repr_support::repr_from_serde("VarianceReport", &self.inner)
+    }
+}
+
+wire_methods!(PyVarianceReport, RustVarianceReport, "VarianceReport");
+
+impl PyVarianceReport {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         let rows: Vec<serde_json::Value> = self
             .inner
             .rows
@@ -908,21 +975,11 @@ impl PyVarianceReport {
                 })
             })
             .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, &VARIANCE_ROW_COLUMNS)
-    }
-
-    /// Identify this value in notebooks and logs.
-    ///
-    /// Rendered from the wire representation, so the fields shown are the
-    /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
-    fn __repr__(&self) -> String {
-        crate::bindings::repr_support::repr_from_serde("VarianceReport", &self.inner)
+        serde_rows_to_arrow_table(&rows, &VARIANCE_ROW_COLUMNS)
     }
 }
 
-wire_methods!(PyVarianceReport, RustVarianceReport, "VarianceReport");
-impl_repr_html_via_dataframe!(PyVarianceReport);
+tabular_methods!(PyVarianceReport);
 
 /// Typed evaluated results for a set of named scenarios.
 ///
@@ -981,15 +1038,12 @@ impl PyScenarioResults {
     /// KeyError
     ///     If a metric in ``metrics`` is not a node of the baseline scenario.
     #[pyo3(text_signature = "(metrics)")]
-    fn to_comparison_table(
-        &self,
-        metrics: Vec<String>,
-    ) -> PyResult<crate::bindings::core::table::PyArrowTable> {
+    fn to_comparison_table(&self, metrics: Vec<String>) -> PyResult<PyArrowTable> {
         let table = self.comparison_table(&metrics)?;
-        crate::bindings::core::table::PyArrowTable::from_envelope(&table)
+        PyArrowTable::from_envelope(&table)
     }
 
-    /// Export the scenario comparison as a pandas ``DataFrame``.
+    /// Export the scenario comparison as an ``ArrowTable``.
     ///
     /// Columns: ``period``, ``metric``, one column per scenario name holding
     /// that scenario's metric value, and one ``{scenario}_vs_{baseline}_frac``
@@ -999,9 +1053,7 @@ impl PyScenarioResults {
     /// One row per (metric, period) pair.
     ///
     /// This is the same table as ``to_comparison_table`` — both call one Rust
-    /// implementation, so the two exports cannot drift apart. The baseline is
-    /// the scenario named ``"base"`` when present, otherwise the first
-    /// scenario.
+    /// implementation, so the two cannot drift apart.
     ///
     /// Parameters
     /// ----------
@@ -1015,13 +1067,73 @@ impl PyScenarioResults {
     /// KeyError
     ///     If a metric in ``metrics`` is not a node of the baseline scenario.
     #[pyo3(text_signature = "(metrics)")]
-    fn to_dataframe<'py>(
+    fn to_arrow(&self, metrics: Vec<String>) -> PyResult<PyArrowTable> {
+        let table = self.comparison_table(&metrics)?;
+        PyArrowTable::from_envelope(&table)
+    }
+
+    /// Export the scenario comparison as a pandas ``DataFrame``.
+    ///
+    /// Parameters
+    /// ----------
+    /// metrics : list[str]
+    ///     Node identifiers to include as rows.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the result set or ``metrics`` is empty.
+    /// KeyError
+    ///     If a metric in ``metrics`` is not a node of the baseline scenario.
+    #[pyo3(text_signature = "(metrics)")]
+    fn to_pandas<'py>(&self, py: Python<'py>, metrics: Vec<String>) -> PyResult<Bound<'py, PyAny>> {
+        let table = self.comparison_table(&metrics)?;
+        let arrow = Bound::new(py, PyArrowTable::from_envelope(&table)?)?;
+        PyArrowTable::to_pandas(&arrow, py)
+    }
+
+    /// Export the scenario comparison as a Polars ``DataFrame``.
+    ///
+    /// Parameters
+    /// ----------
+    /// metrics : list[str]
+    ///     Node identifiers to include as rows.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the result set or ``metrics`` is empty.
+    /// KeyError
+    ///     If a metric in ``metrics`` is not a node of the baseline scenario.
+    #[pyo3(text_signature = "(metrics)")]
+    fn to_polars<'py>(&self, py: Python<'py>, metrics: Vec<String>) -> PyResult<Bound<'py, PyAny>> {
+        let table = self.comparison_table(&metrics)?;
+        let arrow = Bound::new(py, PyArrowTable::from_envelope(&table)?)?;
+        PyArrowTable::to_polars(&arrow, py)
+    }
+
+    /// Export the scenario comparison as a ``pyarrow.Table``.
+    ///
+    /// Parameters
+    /// ----------
+    /// metrics : list[str]
+    ///     Node identifiers to include as rows.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the result set or ``metrics`` is empty.
+    /// KeyError
+    ///     If a metric in ``metrics`` is not a node of the baseline scenario.
+    #[pyo3(text_signature = "(metrics)")]
+    fn to_pyarrow<'py>(
         &self,
         py: Python<'py>,
         metrics: Vec<String>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let table = self.comparison_table(&metrics)?;
-        envelope_to_pandas(py, &table)
+        let arrow = Bound::new(py, PyArrowTable::from_envelope(&table)?)?;
+        PyArrowTable::to_pyarrow(&arrow, py)
     }
 }
 
@@ -1029,7 +1141,7 @@ wire_methods!(PyScenarioResults, ScenarioResults, "ScenarioResults");
 
 impl PyScenarioResults {
     /// Build the canonical comparison table shared by `to_comparison_table`
-    /// and `to_dataframe`.
+    /// and the tabular export methods.
     fn comparison_table(
         &self,
         metrics: &[String],
@@ -1082,26 +1194,17 @@ impl PyScenarioDiff {
             inner: self.inner.variance.clone(),
         }
     }
-
-    /// Export the underlying variance rows as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``period``, ``metric``, ``baseline``, ``comparison``,
-    /// ``abs_var``, ``pct_var``. One row per (metric, period) pair, in report
-    /// order; an empty diff still carries the full column schema.
-    ///
-    /// This is the same table as ``variance.to_dataframe()`` — both call one
-    /// implementation, so the two cannot drift apart. The two scenario *names*
-    /// are diff metadata (the ``baseline`` / ``comparison`` getters) and are
-    /// not repeated per row; the ``baseline`` and ``comparison`` columns hold
-    /// the metric *values* in each scenario.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        self.variance().to_dataframe(py)
-    }
 }
 
 wire_methods!(PyScenarioDiff, RustScenarioDiff, "ScenarioDiff");
-impl_repr_html_via_dataframe!(PyScenarioDiff);
+
+impl PyScenarioDiff {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        self.variance().to_arrow_table()
+    }
+}
+
+tabular_methods!(PyScenarioDiff);
 
 /// One driver step in a bridge decomposition.
 #[pyclass(
@@ -1207,31 +1310,6 @@ impl PyBridgeChart {
             .collect()
     }
 
-    /// Export the driver steps as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``driver``, ``contribution``. One row per bridge step, in
-    /// decomposition order; an empty bridge still carries both columns.
-    /// Contributions are raw deltas in each driver's own units.
-    ///
-    /// The scalar header fields (``target_metric``, ``period``,
-    /// ``baseline_label``, ``comparison_label``, ``baseline_value``,
-    /// ``comparison_value``, ``unexplained``) are chart metadata and are not
-    /// repeated on every row.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows: Vec<serde_json::Value> = self
-            .inner
-            .steps
-            .iter()
-            .map(|step| {
-                serde_json::json!({
-                    "driver": step.driver,
-                    "contribution": step.contribution,
-                })
-            })
-            .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, &BRIDGE_STEP_COLUMNS)
-    }
-
     /// Residual variance not explained by the driver deltas.
     ///
     /// Driver contributions are raw deltas in driver units rather than
@@ -1246,14 +1324,32 @@ impl PyBridgeChart {
     ///
     /// Rendered from the wire representation, so the fields shown are the
     /// fields `to_json()` names. Collections are summarised by length; use
-    /// `to_json()` or a DataFrame exit when the contents matter.
+    /// `to_json()` or a table exit when the contents matter.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("BridgeChart", &self.inner)
     }
 }
 
 wire_methods!(PyBridgeChart, RustBridgeChart, "BridgeChart");
-impl_repr_html_via_dataframe!(PyBridgeChart);
+
+impl PyBridgeChart {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let rows: Vec<serde_json::Value> = self
+            .inner
+            .steps
+            .iter()
+            .map(|step| {
+                serde_json::json!({
+                    "driver": step.driver,
+                    "contribution": step.contribution,
+                })
+            })
+            .collect();
+        serde_rows_to_arrow_table(&rows, &BRIDGE_STEP_COLUMNS)
+    }
+}
+
+tabular_methods!(PyBridgeChart);
 
 pub fn register(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyParameterSpec>()?;

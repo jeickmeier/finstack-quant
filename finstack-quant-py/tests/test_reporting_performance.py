@@ -143,7 +143,7 @@ def test_rolling_window_uses_explicit_observation_count() -> None:
     # 60 monthly observations with a 12-observation window give 49 points per
     # series; a fixed 252 window gave none (two empty charts).
     assert section.body.count("<polyline") == 2
-    assert len(perf.rolling_sharpe(0, window=12, risk_free_rate=0.0).to_dataframe()) == 49
+    assert len(perf.rolling_sharpe(0, window=12, risk_free_rate=0.0).to_pandas()) == 49
 
 
 def test_performance_and_benchmark_tearsheets_assert_no_numeric_mode() -> None:

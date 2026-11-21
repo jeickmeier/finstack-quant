@@ -191,16 +191,18 @@ def test_time_roll_without_instruments_still_rolls_market() -> None:
     assert result.report.time_roll is not None
     assert result.report.time_roll["days"] == 31
     assert result.report.changes["as_of_changed"] is True
-    assert result.report.carry_to_dataframe().empty
+    assert result.report.to_carry_table().num_rows == 0
 
 
 def test_instruments_are_accepted_as_json_envelopes_for_carry() -> None:
     spec = ScenarioSpec("roll", [OperationSpec.time_roll_forward("1M", roll_mode="calendar_days")])
     result = apply_scenario(spec, _market(), AS_OF, instruments=[_deposit_json()])
-    carry = result.report.carry_to_dataframe()
+    carry_tbl = result.report.to_carry_table()
+    carry = carry_tbl.to_pandas()
     assert list(carry.columns) == ["instrument_id", "amount", "currency"]
     assert list(carry["instrument_id"]) == ["DEP-0"]
     assert list(carry["currency"]) == ["USD"]
+    assert carry_tbl.to_polars().height == 1
 
 
 # ---------------------------------------------------------------------------
@@ -218,7 +220,7 @@ def test_report_exposes_structured_warnings_and_counters() -> None:
     assert "warnings=1" in repr(result)
     assert "operations_applied=" in repr(report)
 
-    frame = report.to_dataframe()
+    frame = report.to_pandas()
     assert list(frame.columns) == [
         "operations_applied",
         "user_operations",
@@ -230,14 +232,16 @@ def test_report_exposes_structured_warnings_and_counters() -> None:
     ]
     assert int(frame.loc[0, "warning_count"]) == 1
     assert int(frame.loc[0, "shock_count"]) == len(report.applied_shocks) == 0
-    assert list(result.to_dataframe().columns) == list(frame.columns)
+    assert list(result.to_pandas().columns) == list(frame.columns)
+    assert report.to_polars().columns == list(frame.columns)
+    assert result.to_arrow().column_names() == list(frame.columns)
 
 
 def test_changes_to_dataframe_lists_resolved_targets() -> None:
     result = apply_scenario(_up_25(), _market(), AS_OF)
-    changes = result.report.changes_to_dataframe()
-    assert list(changes.columns) == ["kind", "id", "curve_kind"]
-    assert changes.to_dict("records") == [{"kind": "curve", "id": "USD-OIS", "curve_kind": "discount"}]
+    changes_tbl = result.report.to_changes_table()
+    assert changes_tbl.column_names() == ["kind", "id", "curve_kind"]
+    assert changes_tbl.to_records() == [{"kind": "curve", "id": "USD-OIS", "curve_kind": "discount"}]
 
 
 def test_applied_shocks_report_the_size_of_each_change() -> None:
@@ -308,8 +312,10 @@ def test_compute_horizon_return_typed_inputs_and_result_surface() -> None:
     assert isinstance(result.scenario_report, ApplicationReport)
     assert result.scenario_report.user_operations == 2
     assert result.warnings == result.scenario_report.warnings
-    assert "total_return" in result.to_dataframe().columns
-    assert "total_return_pct" not in result.to_dataframe().columns
+    assert "total_return" in result.to_pandas().columns
+    assert "total_return_pct" not in result.to_pandas().columns
+    assert "total_return" in result.to_polars().columns
+    assert "total_return" in result.to_arrow().column_names()
     assert result.explain().startswith("Horizon Total Return:")
     assert repr(result).startswith("HorizonResult(total_return=")
     assert result._repr_html_() is not None

@@ -41,7 +41,7 @@ def test_cube_materialization_retains_expiry_tenor_and_displacement() -> None:
     restored = VolCubeExpirySlice.from_json(grid.to_json())
     assert restored.expiry == grid.expiry
     assert restored.displacements == grid.displacements
-    frame = grid.to_dataframe()
+    frame = grid.to_pandas()
     assert frame.columns.tolist() == ["expiry", "tenor", "strike", "vol"]
     assert frame["expiry"].tolist() == [1.0] * 6
 

@@ -1,18 +1,18 @@
 //! Python wrappers for the financial statement checks framework.
 
-use crate::bindings::macros::impl_repr_html_via_dataframe;
-use crate::bindings::macros::wire_methods;
-use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
-use crate::bindings::pandas_utils::{ColumnSchema, serde_to_py};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::{serde_json_to_py, statements_to_py, value_error};
 use finstack_quant_statements::checks::{
     BuiltinCheckSpec, CheckConfig, CheckFinding, FormulaCheckSpec, Severity,
 };
 use pyo3::prelude::*;
 
-/// Columns emitted by [`PyCheckReport::to_dataframe`].
-const CHECK_RESULT_COLUMNS: [ColumnSchema<'static>; 6] = [
+/// Columns emitted by [`PyCheckReport`] tabular exports.
+const CHECK_RESULT_COLUMNS: [(&str, &str); 6] = [
     ("check_id", "str"),
     ("check_name", "str"),
     ("category", "str"),
@@ -21,8 +21,8 @@ const CHECK_RESULT_COLUMNS: [ColumnSchema<'static>; 6] = [
     ("finding_count", "int64"),
 ];
 
-/// Columns emitted by [`PyCheckReport::to_findings_dataframe`].
-const CHECK_FINDING_COLUMNS: [ColumnSchema<'static>; 15] = [
+/// Columns emitted by [`PyCheckReport::to_findings_table`].
+const CHECK_FINDING_COLUMNS: [(&str, &str); 15] = [
     ("check_id", "str"),
     ("check_name", "str"),
     ("category", "str"),
@@ -40,8 +40,8 @@ const CHECK_FINDING_COLUMNS: [ColumnSchema<'static>; 15] = [
     ("comparison_currency", "str"),
 ];
 
-/// Columns emitted by [`PyCheckReport::to_comparisons_dataframe`].
-const CHECK_COMPARISON_COLUMNS: [ColumnSchema<'static>; 11] = [
+/// Columns emitted by [`PyCheckReport::to_comparisons_table`].
+const CHECK_COMPARISON_COLUMNS: [(&str, &str); 11] = [
     ("check_id", "str"),
     ("check_name", "str"),
     ("category", "str"),
@@ -688,7 +688,7 @@ impl PyCheckReport {
         self.inner.outcome == finstack_quant_statements::checks::CheckOutcome::Pass
     }
 
-    /// Number of checks that ran, one per row of :meth:`to_dataframe`.
+    /// Number of checks that ran, one per row of :meth:`to_arrow`.
     ///
     /// Reads the canonical ``CheckSummary.total_checks`` counter.
     #[getter]
@@ -744,7 +744,7 @@ impl PyCheckReport {
     /// Counts what survived the suite's ``min_severity`` and
     /// ``materiality_threshold`` reporting filters, not every raw diagnostic
     /// the checks produced — it matches the row count of
-    /// :meth:`to_findings_dataframe`. Delegates to the Rust
+    /// :meth:`to_findings_table`. Delegates to the Rust
     /// ``CheckReport::total_findings``.
     #[getter]
     fn total_findings(&self) -> usize {
@@ -763,45 +763,10 @@ impl PyCheckReport {
         self.inner.summary.warnings
     }
 
-    /// Export one row per executed check as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``check_id`` (stable identifier), ``check_name``
-    /// (human-readable name), ``category`` (snake_case group, one of
-    /// ``accounting_identity``, ``cross_statement_reconciliation``,
-    /// ``internal_consistency``, ``credit_reasonableness``,
-    /// ``data_quality``), ``passed`` (``True`` when the check retained no
-    /// error-severity finding), ``finding_count`` (retained findings for this
-    /// check, after the suite's reporting filters).
-    ///
-    /// One row per check result, so the row count equals
-    /// :attr:`total_checks`. A report with no checks still yields the
-    /// documented columns with zero rows. Per-finding detail — severity,
-    /// message, and the observed-vs-reference materiality — lives in
-    /// :meth:`to_findings_dataframe`.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows: Vec<serde_json::Value> = self
-            .inner
-            .results
-            .iter()
-            .map(|result| {
-                serde_json::json!({
-                    "check_id": result.check_id,
-                    "check_name": result.check_name,
-                    "category": result.category,
-                    "outcome": result.outcome.as_str(),
-                    "evaluated": result.evaluated,
-                    "finding_count": result.findings.len(),
-                })
-            })
-            .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, &CHECK_RESULT_COLUMNS)
-    }
-
-    /// Export one row per retained finding as a pandas ``DataFrame``.
+    /// Export one row per retained finding as an ``ArrowTable``.
     ///
     /// Columns: ``check_id``, ``check_name``, ``category`` (as in
-    /// :meth:`to_dataframe`), ``severity`` (``info``, ``warning`` or
+    /// :meth:`to_arrow`), ``severity`` (``info``, ``warning`` or
     /// ``error``), ``message`` (human-readable description), ``period``
     /// (period identifier string such as ``"2025Q1"``, ``None`` when the
     /// finding is not period-specific), ``nodes`` (comma-joined node
@@ -815,15 +780,15 @@ impl PyCheckReport {
     /// ``total_assets``), and ``comparison_actual``, ``comparison_expected``,
     /// ``comparison_tolerance`` (the two values the check compared and the
     /// absolute tolerance it allowed on their difference, all in the
-    /// compared nodes' own units).
+    /// compared nodes' own units) with ``comparison_currency``.
     ///
-    /// The four materiality columns are ``None`` for findings that carry no
-    /// materiality context, and the three comparison columns are ``None``
+    /// The four materiality columns are null for findings that carry no
+    /// materiality context, and the comparison columns are null
     /// for findings that do not compare two numbers. The row count equals :attr:`total_findings`; a
     /// report with no findings still yields the documented columns with zero
     /// rows.
     #[pyo3(text_signature = "($self)")]
-    fn to_findings_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_findings_table(&self) -> PyResult<PyArrowTable> {
         let rows: Vec<serde_json::Value> = self
             .inner
             .results
@@ -858,18 +823,18 @@ impl PyCheckReport {
                 })
             })
             .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, &CHECK_FINDING_COLUMNS)
+        serde_rows_to_arrow_table(&rows, &CHECK_FINDING_COLUMNS)
     }
 
-    /// Export one row per numeric comparison as a pandas ``DataFrame``.
+    /// Export one row per numeric comparison as an ``ArrowTable``.
     ///
     /// Lists every comparison the checks evaluated — passing and failing
     /// alike — so a passing check still shows the numbers it was judged on.
-    /// Unlike :meth:`to_findings_dataframe`, rows are not reduced by the
+    /// Unlike :meth:`to_findings_table`, rows are not reduced by the
     /// suite's ``min_severity`` / ``materiality_threshold`` filters.
     ///
     /// Columns: ``check_id``, ``check_name``, ``category`` (as in
-    /// :meth:`to_dataframe`), ``identity`` (snake_case name of the tested
+    /// :meth:`to_arrow`), ``identity`` (snake_case name of the tested
     /// identity, e.g. ``balance_sheet_articulation``, ``cash_roll_forward``,
     /// ``cash_flow_components``), ``period`` (period identifier string,
     /// ``None`` when not period-specific), ``actual`` (observed value),
@@ -885,7 +850,7 @@ impl PyCheckReport {
     /// for missing inputs, contribute no rows. A report with no comparisons
     /// still yields the documented columns with zero rows.
     #[pyo3(text_signature = "($self)")]
-    fn to_comparisons_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_comparisons_table(&self) -> PyResult<PyArrowTable> {
         let rows: Vec<serde_json::Value> = self
             .inner
             .results
@@ -908,7 +873,7 @@ impl PyCheckReport {
                 })
             })
             .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, &CHECK_COMPARISON_COLUMNS)
+        serde_rows_to_arrow_table(&rows, &CHECK_COMPARISON_COLUMNS)
     }
 
     /// Return the representation with check, error and warning counts.
@@ -927,7 +892,28 @@ impl PyCheckReport {
     }
 }
 
-impl_repr_html_via_dataframe!(PyCheckReport);
+impl PyCheckReport {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let rows: Vec<serde_json::Value> = self
+            .inner
+            .results
+            .iter()
+            .map(|result| {
+                serde_json::json!({
+                    "check_id": result.check_id,
+                    "check_name": result.check_name,
+                    "category": result.category,
+                    "outcome": result.outcome.as_str(),
+                    "evaluated": result.evaluated,
+                    "finding_count": result.findings.len(),
+                })
+            })
+            .collect();
+        serde_rows_to_arrow_table(&rows, &CHECK_RESULT_COLUMNS)
+    }
+}
+
+tabular_methods!(PyCheckReport);
 
 /// Register check types on the parent module.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {

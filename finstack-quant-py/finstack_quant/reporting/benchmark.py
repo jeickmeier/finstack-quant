@@ -61,18 +61,18 @@ def _section_summary(perf: Any, t: int, rf: float) -> Section:
     )
     active = tables.kv_table(
         [
-            ("Tracking Error", fmt.pct(perf.tracking_error().iloc[t] * 100.0), ""),
-            ("Information Ratio", fmt.ratio(perf.information_ratio().iloc[t]), ""),
-            ("Treynor", fmt.pct(perf.treynor(rf).iloc[t] * 100.0, signed=True), ""),
-            ("M-Squared", fmt.pct(perf.m_squared(rf).iloc[t] * 100.0, signed=True), ""),
+            ("Tracking Error", fmt.pct(perf.tracking_error().to_list()[t] * 100.0), ""),
+            ("Information Ratio", fmt.ratio(perf.information_ratio().to_list()[t]), ""),
+            ("Treynor", fmt.pct(perf.treynor(rf).to_list()[t] * 100.0, signed=True), ""),
+            ("M-Squared", fmt.pct(perf.m_squared(rf).to_list()[t] * 100.0, signed=True), ""),
         ],
     )
     capture = tables.kv_table(
         [
-            ("Up Capture", fmt.ratio(perf.up_capture().iloc[t]), ""),
-            ("Down Capture", fmt.ratio(perf.down_capture().iloc[t]), ""),
-            ("Capture Ratio", fmt.ratio(perf.capture_ratio().iloc[t]), ""),
-            ("Batting Average", fmt.pct(perf.batting_average().iloc[t] * 100.0), ""),
+            ("Up Capture", fmt.ratio(perf.up_capture().to_list()[t]), ""),
+            ("Down Capture", fmt.ratio(perf.down_capture().to_list()[t]), ""),
+            ("Capture Ratio", fmt.ratio(perf.capture_ratio().to_list()[t]), ""),
+            ("Batting Average", fmt.pct(perf.batting_average().to_list()[t] * 100.0), ""),
         ],
     )
     return Section("Benchmark-Relative Statistics", f'<div class="statgrid">{regression}{active}{capture}</div>')
@@ -243,8 +243,8 @@ def benchmark_tearsheet(
     kpis = [
         KPI("Alpha (ann.)", fmt.pct(g.alpha * 100.0, signed=True), fmt.sign_class(g.alpha)),
         KPI("Beta", fmt.ratio(g.beta), ""),
-        KPI("Information Ratio", fmt.ratio(perf.information_ratio().iloc[t]), ""),
-        KPI("Capture Ratio", fmt.ratio(perf.capture_ratio().iloc[t]), ""),
+        KPI("Information Ratio", fmt.ratio(perf.information_ratio().to_list()[t]), ""),
+        KPI("Capture Ratio", fmt.ratio(perf.capture_ratio().to_list()[t]), ""),
     ]
 
     fund_name = names[t] if t < len(names) else "Fund"

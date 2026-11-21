@@ -5,7 +5,9 @@ from __future__ import annotations
 import datetime
 from typing import Any, Literal
 import pandas as pd
+import polars as pl
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.statements import FinancialModelSpec, StatementResult
 
 class CapitalStructureTranche:
@@ -566,7 +568,26 @@ class CapitalStructureSummary:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        One row per tranche as an ``ArrowTable``, by rank then model declaration order.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``id``, ``kind``, ``rank``, ``payment_class``, ``balance``,
+            ``share_of_debt``, ``maturity`` (ISO string), ``cumulative_debt``,
+            ``leverage``, ``interest_coverage`` and ``ltm_interest``, with amounts in
+            :attr:`currency` as floats and undefined figures as null.
+
+        Raises
+        ------
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         One row per tranche, by rank then model declaration order.
 
@@ -581,10 +602,51 @@ class CapitalStructureSummary:
         Raises
         ------
         ImportError
-            If ``pyarrow`` is not installed.
+            If ``pandas`` is not installed.
+        ValueError
+            If the frame cannot be constructed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        One row per tranche as a Polars ``DataFrame``, by rank then model declaration order.
+
+        Returns
+        -------
+        polars.DataFrame
+            Columns match :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the frame cannot be constructed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        One row per tranche as a ``pyarrow.Table``, by rank then model declaration order.
+
+        Returns
+        -------
+        pyarrow.Table
+            Columns match :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @property
     def as_of(self) -> str:
         """

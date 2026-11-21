@@ -59,7 +59,7 @@ impl PyCommoditySpotOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.underlying")]
     #[getter]
     fn underlying<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.underlying)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.underlying)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.strike")]
@@ -71,13 +71,13 @@ impl PyCommoditySpotOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.option_type")]
     #[getter]
     fn option_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.option_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.option_type)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.exercise_style")]
     #[getter]
     fn exercise_style<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.exercise_style)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.exercise_style)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.exercise_dates")]
@@ -116,13 +116,13 @@ impl PyCommoditySpotOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.settlement")]
     #[getter]
     fn settlement<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.settlement)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.settlement)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.exercise")]
     #[getter]
     fn exercise<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.exercise)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.exercise)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_spot_option", "CommoditySpotOption.forward_curve_id")]

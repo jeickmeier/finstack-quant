@@ -7,15 +7,17 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyModule};
 
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
-    serde_rows_to_dataframe_with_schema, serde_to_py,
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::{
+    serde_object_to_single_row_arrow_table, serde_rows_to_arrow_table,
 };
 use crate::errors::{portfolio_to_py, serde_json_to_py};
 
-/// Column schema for [`PyGridAttributionResult::to_dataframe`] (per-cell
+/// Column schema for [`PyGridAttributionResult::to_arrow_table`] (per-cell
 /// curve effects).
-const GRID_CURVE_COLUMNS: &[ColumnSchema<'static>] = &[
+const GRID_CURVE_COLUMNS: &[(&str, &str)] = &[
     ("cell", "str"),
     ("portfolio_weight", "float64"),
     ("benchmark_weight", "float64"),
@@ -23,8 +25,8 @@ const GRID_CURVE_COLUMNS: &[ColumnSchema<'static>] = &[
     ("curve_effect", "float64"),
 ];
 
-/// Column schema for [`PyGridAttributionResult::to_sector_effects_dataframe`].
-const GRID_SECTOR_COLUMNS: &[ColumnSchema<'static>] = &[
+/// Column schema for [`PyGridAttributionResult::to_sector_effects_table`].
+const GRID_SECTOR_COLUMNS: &[(&str, &str)] = &[
     ("cell", "str"),
     ("sector", "str"),
     ("allocation_effect", "float64"),
@@ -100,22 +102,13 @@ impl PyGridAttributionResult {
         self.inner.total_selection
     }
 
-    /// Per-cell curve effects as a :class:`pandas.DataFrame`.
-    ///
-    /// The primary frame is the duration-cell axis; the two (cell, sector)
-    /// tables are available from :meth:`to_sector_effects_dataframe` .
-    ///
-    /// Columns: ``cell``, ``portfolio_weight``, ``benchmark_weight``,
-    /// ``benchmark_cell_return``, ``curve_effect``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(py, &self.inner.curve_effects, GRID_CURVE_COLUMNS)
-    }
-
-    /// Per-(cell, sector) allocation and selection effects as a :class:`pandas.DataFrame`.
+    /// Per-(cell, sector) allocation and selection effects as an
+    /// :class:`~finstack_quant.core.table.ArrowTable`.
     ///
     /// Columns: ``cell``, ``sector``, ``allocation_effect``, ``selection_effect``.
-    fn to_sector_effects_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(py, &self.inner.sector_effects, GRID_SECTOR_COLUMNS)
+    #[pyo3(text_signature = "($self)")]
+    fn to_sector_effects_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.inner.sector_effects, GRID_SECTOR_COLUMNS)
     }
 
     fn __repr__(&self) -> String {
@@ -126,6 +119,14 @@ impl PyGridAttributionResult {
         )
     }
 }
+
+impl PyGridAttributionResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.inner.curve_effects, GRID_CURVE_COLUMNS)
+    }
+}
+
+tabular_methods!(PyGridAttributionResult);
 
 /// Multi-period Carino-linked hierarchical grid attribution result.
 ///
@@ -187,33 +188,6 @@ impl PyGridCarinoLinkedResult {
         self.inner.linked_selection
     }
 
-    /// Single-row :class:`pandas.DataFrame` view of the linked totals.
-    ///
-    /// Columns: ``portfolio_return_compounded``,
-    /// ``benchmark_return_compounded``, ``linked_curve``, ``linked_sector``,
-    /// ``linked_selection``. The per-period detail is available from the
-    /// ``periods`` getter.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let row = serde_json::json!({
-            "portfolio_return_compounded": self.inner.portfolio_return_compounded,
-            "benchmark_return_compounded": self.inner.benchmark_return_compounded,
-            "linked_curve": self.inner.linked_curve,
-            "linked_sector": self.inner.linked_sector,
-            "linked_selection": self.inner.linked_selection,
-        });
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &[
-                "portfolio_return_compounded",
-                "benchmark_return_compounded",
-                "linked_curve",
-                "linked_sector",
-                "linked_selection",
-            ],
-        )
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "GridCarinoLinkedResult(periods={}, linked_selection={})",
@@ -222,6 +196,30 @@ impl PyGridCarinoLinkedResult {
         )
     }
 }
+
+impl PyGridCarinoLinkedResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let row = serde_json::json!({
+            "portfolio_return_compounded": self.inner.portfolio_return_compounded,
+            "benchmark_return_compounded": self.inner.benchmark_return_compounded,
+            "linked_curve": self.inner.linked_curve,
+            "linked_sector": self.inner.linked_sector,
+            "linked_selection": self.inner.linked_selection,
+        });
+        serde_object_to_single_row_arrow_table(
+            &row,
+            &[
+                ("portfolio_return_compounded", "float64"),
+                ("benchmark_return_compounded", "float64"),
+                ("linked_curve", "float64"),
+                ("linked_sector", "float64"),
+                ("linked_selection", "float64"),
+            ],
+        )
+    }
+}
+
+tabular_methods!(PyGridCarinoLinkedResult);
 
 /// Compute a single-period hierarchical duration-cell x sector grid attribution.
 ///
@@ -357,6 +355,16 @@ fn grid_carino_link(
     py: Python<'_>,
     periods: &Bound<'_, PyAny>,
 ) -> PyResult<PyGridCarinoLinkedResult> {
+    if let Ok(typed) = periods.extract::<Vec<PyRef<'_, PyGridAttributionResult>>>() {
+        let items: Vec<_> = typed.into_iter().map(|item| item.inner.clone()).collect();
+        return Ok(PyGridCarinoLinkedResult {
+            inner: py
+                .detach(move || {
+                    finstack_quant_portfolio::grid_attribution::grid_carino_link(&items)
+                })
+                .map_err(portfolio_to_py)?,
+        });
+    }
     let periods = crate::bindings::extract::extract_records_json(py, periods, "periods")?;
     Ok(PyGridCarinoLinkedResult {
         inner: py.detach(move || {

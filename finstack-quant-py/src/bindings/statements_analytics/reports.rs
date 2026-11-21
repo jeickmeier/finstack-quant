@@ -6,11 +6,11 @@
 //! that renders to text, a table envelope, or a pandas frame from one Rust
 //! implementation. The `*_text` twins remain for WASM parity.
 
-use crate::bindings::core::table::envelope_to_pandas;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::extract_results_ref;
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
-use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::statements::parse_period_id;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::evaluator::StatementResult;
@@ -19,8 +19,8 @@ use finstack_quant_statements_analytics::analysis::{
 };
 use pyo3::prelude::*;
 
-/// Column schema for `CreditAssessment.to_dataframe`.
-const SERIES_COLUMNS: [ColumnSchema<'static>; 4] = [
+/// Column schema for [`PyCreditAssessment`] tabular exports.
+const SERIES_COLUMNS: [(&str, &str); 4] = [
     ("period", "str"),
     ("leverage_ratio", "float64"),
     ("interest_coverage", "float64"),
@@ -129,12 +129,15 @@ impl PyCreditAssessment {
             .collect()
     }
 
-    /// Export the per-period series as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``period`` (period-id string), ``leverage_ratio``,
-    /// ``interest_coverage`` (turns), ``free_cash_flow`` (model units);
-    /// ``NaN`` where a metric is unavailable. One row per period, ascending.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn __repr__(&self) -> String {
+        crate::bindings::repr_support::repr_from_serde("CreditAssessment", &self.inner)
+    }
+}
+
+wire_methods!(PyCreditAssessment, CreditAssessment, "CreditAssessment");
+
+impl PyCreditAssessment {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         let rows: Vec<serde_json::Value> = self
             .inner
             .series
@@ -148,16 +151,11 @@ impl PyCreditAssessment {
                 })
             })
             .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, &SERIES_COLUMNS)
-    }
-
-    fn __repr__(&self) -> String {
-        crate::bindings::repr_support::repr_from_serde("CreditAssessment", &self.inner)
+        serde_rows_to_arrow_table(&rows, &SERIES_COLUMNS)
     }
 }
 
-wire_methods!(PyCreditAssessment, CreditAssessment, "CreditAssessment");
-impl_repr_html_via_dataframe!(PyCreditAssessment);
+tabular_methods!(PyCreditAssessment);
 
 /// Compute a structured credit assessment (leverage, interest coverage, FCF).
 ///
@@ -254,8 +252,8 @@ fn credit_assessment_report_text(results: &Bound<'_, PyAny>, period: &str) -> Py
 
 /// P&L summary of selected line items across periods.
 ///
-/// Built by ``pl_summary_report``; renders to text, an ``ArrowTable`` or a
-/// pandas frame from the same Rust implementation.
+/// Built by ``pl_summary_report``; renders to text, an ``ArrowTable``, or a
+/// pandas / Polars / PyArrow table from the same Rust implementation.
 ///
 /// Examples
 /// --------
@@ -263,7 +261,7 @@ fn credit_assessment_report_text(results: &Bound<'_, PyAny>, period: &str) -> Py
 /// >>> from finstack_quant.statements_analytics import pl_summary_report
 /// >>> b = ModelBuilder("m"); b.periods("2025Q1..Q2", None); b.value("revenue", [("2025Q1", 1.0), ("2025Q2", 2.0)])
 /// >>> report = pl_summary_report(Evaluator().evaluate(b.build()), ["revenue"], ["2025Q1", "2025Q2"])
-/// >>> list(report.to_dataframe()["value"])
+/// >>> list(report.to_pandas()["value"])
 /// [1.0, 2.0]
 #[pyclass(
     name = "PLSummaryReport",
@@ -280,6 +278,11 @@ pub struct PyPLSummaryReport {
 impl PyPLSummaryReport {
     fn report(&self) -> PLSummaryReport<'_> {
         PLSummaryReport::new(&self.results, self.line_items.clone(), self.periods.clone())
+    }
+
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let table = self.report().to_table().map_err(core_to_py)?;
+        PyArrowTable::from_envelope(&table)
     }
 }
 
@@ -302,27 +305,6 @@ impl PyPLSummaryReport {
         self.report().to_string()
     }
 
-    /// Export the report as a long ``ArrowTable``.
-    ///
-    /// Columns: ``line_item``, ``period``, ``value`` (nullable; missing line
-    /// items are null rather than ``0.0``).
-    fn to_table(&self) -> PyResult<crate::bindings::core::table::PyArrowTable> {
-        let table = self.report().to_table().map_err(core_to_py)?;
-        crate::bindings::core::table::PyArrowTable::from_envelope(&table)
-    }
-
-    /// Export the report as a long pandas ``DataFrame``.
-    ///
-    /// Columns: ``line_item``, ``period`` (period-id string), ``value`` (the
-    /// node's value in its own units; ``NaN`` where the line item is missing).
-    /// One row per (line item, period). Pivot with
-    /// ``df.pivot(index="line_item", columns="period", values="value")`` for
-    /// the line-items-by-periods layout of the text report.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let table = self.report().to_table().map_err(core_to_py)?;
-        envelope_to_pandas(py, &table)
-    }
-
     fn __str__(&self) -> String {
         self.to_text()
     }
@@ -336,7 +318,7 @@ impl PyPLSummaryReport {
     }
 }
 
-impl_repr_html_via_dataframe!(PyPLSummaryReport);
+tabular_methods!(PyPLSummaryReport);
 
 /// Build a P&L summary report for selected line items and periods.
 ///
@@ -352,7 +334,7 @@ impl_repr_html_via_dataframe!(PyPLSummaryReport);
 /// Returns
 /// -------
 /// PLSummaryReport
-///     Report with ``to_text()``, ``to_table()`` and ``to_dataframe()``.
+///     Report with ``to_text()``, ``to_arrow()``, ``to_pandas()``, ``to_polars()``, and ``to_pyarrow()``.
 ///
 /// Raises
 /// ------

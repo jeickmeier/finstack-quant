@@ -5,7 +5,9 @@ from __future__ import annotations
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.valuations.instruments._typed_structured_credit.asset_pool import AssetPool
 from finstack_quant.valuations.instruments._typed_structured_credit.pool_stats import PoolStats
 
@@ -192,7 +194,7 @@ class PoolReport:
     >>> report = pool_report(StructuredCredit.example().pool, "2024-01-01")
     >>> PoolReport.from_json(report.to_json()).warf == report.warf
     True
-    >>> list(report.to_dataframe().columns)
+    >>> list(report.to_pandas().columns)
     ['dimension', 'key', 'balance', 'currency', 'balance_pct', 'asset_count']
     """
 
@@ -286,14 +288,36 @@ class PoolReport:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        The three concentration tables as one long :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``dimension`` (``"obligor"``, ``"industry"`` or ``"rating"``),
+        ``key`` (``None`` for the assets with no value on the dimension),
+        ``balance``, ``currency``, ``balance_pct`` (percent points) and
+        ``asset_count``. Rows keep each table's order. :meth:`PoolStats.to_arrow`
+        on :attr:`stats` is the statistics table.
+
+        Returns
+        -------
+        ArrowTable
+            One row per concentration entry.
+
+        Raises
+        ------
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         The three concentration tables as one long pandas ``DataFrame``.
 
         Columns: ``dimension`` (``"obligor"``, ``"industry"`` or ``"rating"``),
         ``key`` (``None`` for the assets with no value on the dimension),
         ``balance``, ``currency``, ``balance_pct`` (percent points) and
-        ``asset_count``. Rows keep each table's order. ``PoolStats.to_dataframe``
+        ``asset_count``. Rows keep each table's order. :meth:`PoolStats.to_pandas`
         on :attr:`stats` is the statistics frame.
 
         Returns
@@ -304,10 +328,51 @@ class PoolReport:
         Raises
         ------
         ImportError
-            If ``pyarrow`` is not installed.
+            If ``pandas`` is not installed.
+        ValueError
+            If the table cannot be converted.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        The three concentration tables as one long Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per concentration entry with columns matching :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the table cannot be converted.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        The three concentration tables as one long ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per concentration entry with columns matching :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the table cannot be converted.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @property
     def total_balance(self) -> Money:
         """

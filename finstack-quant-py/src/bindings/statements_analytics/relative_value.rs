@@ -7,9 +7,9 @@ use super::comps::{
     period_basis_label,
 };
 use super::py_bool;
-use crate::bindings::core::table::envelope_to_pandas;
-use crate::bindings::macros::wire_methods;
-use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::valuations::convert::enum_to_py_string;
 use crate::errors::core_to_py;
@@ -304,12 +304,6 @@ impl PyRelativeValueReport {
             .transpose()
     }
 
-    #[doc = pydoc!("finstack_quant.statements_analytics._relative_value", "RelativeValueReport.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        envelope_to_pandas(py, &self.inner.to_table().map_err(core_to_py)?)
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -321,6 +315,19 @@ impl PyRelativeValueReport {
         )
     }
 }
+
+impl PyRelativeValueReport {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let table = self.inner.to_table().map_err(core_to_py)?;
+        PyArrowTable::from_envelope(&table)
+    }
+}
+
+tabular_methods!(
+    PyRelativeValueReport,
+    "RelativeValueReport",
+    module = "finstack_quant.statements_analytics._relative_value"
+);
 
 crate::bindings::macros::py_getters!(PyRelativeValueReport |s| {
     #[doc = pydoc!("finstack_quant.statements_analytics._relative_value", "RelativeValueReport.subject_id")]

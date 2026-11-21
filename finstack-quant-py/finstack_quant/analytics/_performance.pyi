@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 from typing import Any, Sequence
 from finstack_quant.core.dates import FiscalConfig
-from finstack_quant.core.table import ArrowTable
+from finstack_quant.core.table import ArrowTable, LabeledSeries
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
@@ -38,10 +38,10 @@ class Performance:
     supplied) and column headings as ticker names; Polars inputs treat the
     selected date column as dates and all remaining columns as ticker names.
 
-    Scalar-per-ticker metrics return a ``pandas.Series`` indexed by ticker name
-    and named after the metric, so results are selected by label rather than by
-    column position, and ``pd.concat([perf.sharpe(0.0), perf.sortino(0.0)], axis=1)``
-    yields correctly-named columns.
+    Scalar-per-ticker metrics return a :class:`~finstack_quant.core.table.LabeledSeries`
+    indexed by ticker name and named after the metric, supporting direct
+    label lookup (``perf.sharpe(0.0)["FUND"]``) as well as ``.to_pandas()``,
+    ``.to_polars()``, ``.to_arrow()``, ``.to_numpy()``, and ``.to_dict()``.
 
     Examples
     --------
@@ -57,7 +57,7 @@ class Performance:
 
     def __init__(
         self,
-        prices: pd.DataFrame | pd.Series | pl.DataFrame,
+        prices: pd.DataFrame | pd.Series | pl.DataFrame | ArrowTable | Any,
         benchmark_ticker: str | None = None,
         frequency: str | None = None,
         date_col: str | None = None,
@@ -67,14 +67,18 @@ class Performance:
 
         Parameters
         ----------
-        prices : pd.DataFrame, pd.Series, or pl.DataFrame
-            Strictly increasing date-indexed (pandas) or date-column (Polars) price or prepared wealth-index levels, with unique nonblank string ticker labels; only contiguous observed spans with edge missing values (``NaN`` or Polars ``null``) are admitted.
+        prices : pd.DataFrame, pd.Series, pl.DataFrame, or Arrow table
+            Strictly increasing date-indexed (pandas) or date-column (Polars or
+            Arrow PyCapsule / ``ArrowTable`` / ``pyarrow.Table``) price or
+            prepared wealth-index levels, with unique nonblank string ticker
+            labels; only contiguous observed spans with edge missing values
+            (``NaN`` or Polars/Arrow ``null``) are admitted.
         benchmark_ticker : str, optional
             Explicit loaded comparison ticker; None leaves benchmark context absent.
         frequency : str, optional
             Declared observation frequency used for annualized risk and cash conversion; None leaves frequency absent.
         date_col : str, optional
-            Name of the column holding observation dates; all other columns must be numeric ticker series. Auto-detects a unique Polars ``Date``/``Datetime`` column when ``None`` (pass ``date_col`` when dates use another dtype such as ISO strings); optional for pandas ``DataFrame`` inputs to read dates from a column instead of the index; must be ``None`` for a pandas ``Series``.
+            Name of the column holding observation dates; all other columns must be numeric ticker series. Auto-detects a unique Polars/Arrow date or datetime column when ``None`` (pass ``date_col`` when dates use another dtype such as ISO strings); optional for pandas ``DataFrame`` inputs to read dates from a column instead of the index; must be ``None`` for a pandas ``Series``.
 
         Raises
         ------
@@ -83,7 +87,7 @@ class Performance:
         KeyError
             If an explicit benchmark label or ``date_col`` is unknown.
         TypeError
-            If ``prices`` is not a supported numeric pandas or Polars object (including a Polars ``Series``, which lacks dates).
+            If ``prices`` is not a supported numeric pandas, Polars, or Arrow table object (including a Polars ``Series``, which lacks dates).
         ValueError
             If ``date_col`` cannot be resolved uniquely or is passed with a pandas ``Series``.
         """
@@ -91,7 +95,7 @@ class Performance:
 
     @staticmethod
     def from_returns(
-        returns: pd.DataFrame | pd.Series | pl.DataFrame,
+        returns: pd.DataFrame | pd.Series | pl.DataFrame | ArrowTable | Any,
         initial_date: datetime.date | str,
         benchmark_ticker: str | None = None,
         frequency: str | None = None,
@@ -102,8 +106,10 @@ class Performance:
 
         Parameters
         ----------
-        returns : pd.DataFrame, pd.Series, or pl.DataFrame
-            Return-ending date-indexed (pandas) or date-column (Polars) decimal simple-return columns; values are at least -1 and a terminal -1 must be the last observed return.
+        returns : pd.DataFrame, pd.Series, pl.DataFrame, or Arrow table
+            Return-ending date-indexed (pandas) or date-column (Polars or Arrow
+            table) decimal simple-return columns; values are at least -1 and a
+            terminal -1 must be the last observed return.
         initial_date : datetime.date or str
             Actual valuation date before the first return endpoint; anchors the first declared holding interval.
         benchmark_ticker : str, optional
@@ -111,7 +117,7 @@ class Performance:
         frequency : str, optional
             Declared observation frequency; None leaves annualization context absent.
         date_col : str, optional
-            Name of the column holding return-ending dates. Auto-detects a unique Polars ``Date``/``Datetime`` column when ``None``; optional for pandas ``DataFrame`` inputs; must be ``None`` for a pandas ``Series``.
+            Name of the column holding return-ending dates. Auto-detects a unique Polars/Arrow date or datetime column when ``None``; optional for pandas ``DataFrame`` inputs; must be ``None`` for a pandas ``Series``.
 
         Returns
         -------
@@ -323,7 +329,7 @@ class Performance:
 
     # -- Scalar-per-ticker methods --
 
-    def cagr(self, day_count: str | DayCount | None = None, ctx: DayCountContext | None = None) -> pd.Series:
+    def cagr(self, day_count: str | DayCount | None = None, ctx: DayCountContext | None = None) -> LabeledSeries:
         """
         Calculate geometric annual growth using actual holding dates.
 
@@ -336,7 +342,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             One result per ticker in original order, indexed by ticker name. Undefined estimates are NaN; valid nonzero reward at exactly zero risk can yield signed infinity.
 
         Raises
@@ -350,7 +356,7 @@ class Performance:
         """
         ...
 
-    def mean_return(self, annualize: bool) -> pd.Series:
+    def mean_return(self, annualize: bool) -> LabeledSeries:
         """
         Calculate the equal-observation arithmetic mean.
 
@@ -361,7 +367,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Arithmetic mean decimal returns in the explicitly selected units; empty ticker histories give NaN.
 
         Raises
@@ -373,7 +379,7 @@ class Performance:
         """
         ...
 
-    def volatility(self, annualize: bool) -> pd.Series:
+    def volatility(self, annualize: bool) -> LabeledSeries:
         """
         Calculate sample standard deviation with an n - 1 denominator.
 
@@ -384,7 +390,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Sample standard deviation in explicitly selected units; fewer than two observations gives NaN and measured constant history gives zero.
 
         Raises
@@ -396,7 +402,7 @@ class Performance:
         """
         ...
 
-    def sharpe(self, risk_free_rate: float) -> pd.Series:
+    def sharpe(self, risk_free_rate: float) -> LabeledSeries:
         """
         Calculate frequency-scaled arithmetic excess mean divided by sample volatility.
 
@@ -407,7 +413,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Dimensionless annualized Sharpe; fewer than two observations gives NaN, finite nonzero excess over exact zero volatility gives signed infinity, and 0/0 gives NaN.
 
         Raises
@@ -419,7 +425,7 @@ class Performance:
         """
         ...
 
-    def sortino(self, mar: float) -> pd.Series:
+    def sortino(self, mar: float) -> LabeledSeries:
         """
         Calculate frequency-scaled mean excess over all-observation downside deviation.
 
@@ -430,7 +436,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Dimensionless annualized Sortino; two observations are required, exact zero downside with nonzero excess gives signed infinity, and 0/0 gives NaN.
 
         Raises
@@ -442,13 +448,13 @@ class Performance:
         """
         ...
 
-    def calmar(self) -> pd.Series:
+    def calmar(self) -> LabeledSeries:
         """
         Divide Actual/365 Fixed dated CAGR by absolute maximum drawdown over the selected window.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Dated CAGR divided by absolute maximum drawdown; empty history gives NaN, valid nonzero reward at zero drawdown gives signed infinity and 0/0 gives NaN.
 
         Raises
@@ -458,13 +464,13 @@ class Performance:
         """
         ...
 
-    def max_drawdown(self) -> pd.Series:
+    def max_drawdown(self) -> LabeledSeries:
         """
         Return the most negative compounded percentage drawdown.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Most negative endpoint drawdown in [-1, 0]; empty history gives NaN, observed no-loss history gives zero, and a terminal wipeout gives -1.
 
         Raises
@@ -474,13 +480,13 @@ class Performance:
         """
         ...
 
-    def mean_drawdown(self) -> pd.Series:
+    def mean_drawdown(self) -> LabeledSeries:
         """
         Average signed compounded endpoint drawdowns with equal observation weight.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Equal-weight mean signed endpoint drawdown in [-1, 0]; empty history gives NaN and observed no-loss history gives zero.
 
         Raises
@@ -490,7 +496,7 @@ class Performance:
         """
         ...
 
-    def value_at_risk(self, confidence: float) -> pd.Series:
+    def value_at_risk(self, confidence: float) -> LabeledSeries:
         """
         Calculate signed observation-period historical VaR using R-7 interpolation.
 
@@ -501,7 +507,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Signed decimal return quantile at lower-tail probability 1 - confidence, without flooring or absolute value; empty history gives NaN.
 
         Raises
@@ -513,7 +519,7 @@ class Performance:
         """
         ...
 
-    def expected_shortfall(self, confidence: float) -> pd.Series:
+    def expected_shortfall(self, confidence: float) -> LabeledSeries:
         """
         Average the exact fractional empirical lower-tail probability mass.
 
@@ -524,7 +530,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Signed decimal mean return over the exact fractional empirical lower tail; empty history gives NaN and tails smaller than one observation return the worst return.
 
         Raises
@@ -536,13 +542,13 @@ class Performance:
         """
         ...
 
-    def tracking_error(self) -> pd.Series:
+    def tracking_error(self) -> LabeledSeries:
         """
         Calculate sample standard deviation of paired arithmetic active returns, annualized by declared frequency.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             One result per ticker in original order, indexed by ticker name. Undefined estimates are NaN; valid nonzero reward at exactly zero risk can yield signed infinity.
 
         Raises
@@ -554,13 +560,13 @@ class Performance:
         """
         ...
 
-    def information_ratio(self) -> pd.Series:
+    def information_ratio(self) -> LabeledSeries:
         """
         Divide annualized paired arithmetic active mean by annualized tracking error.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             One result per ticker in original order, indexed by ticker name. Undefined estimates are NaN; valid nonzero reward at exactly zero risk can yield signed infinity.
 
         Raises
@@ -572,13 +578,13 @@ class Performance:
         """
         ...
 
-    def skewness(self) -> pd.Series:
+    def skewness(self) -> LabeledSeries:
         """
         Calculate Fisher-adjusted Type 2 skewness.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Ticker-indexed dimensionless estimates; fewer than three returns or zero variance gives NaN.
 
         Raises
@@ -588,13 +594,13 @@ class Performance:
         """
         ...
 
-    def kurtosis(self) -> pd.Series:
+    def kurtosis(self) -> LabeledSeries:
         """
         Calculate Fisher-adjusted Type 2 excess kurtosis.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Ticker-indexed excess-kurtosis estimates; fewer than four returns or zero variance gives NaN.
 
         Raises
@@ -604,13 +610,13 @@ class Performance:
         """
         ...
 
-    def geometric_mean(self) -> pd.Series:
+    def geometric_mean(self) -> LabeledSeries:
         """
         Calculate geometric mean simple growth per observation.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Geometric decimal return per observation, without annualization; empty history gives NaN and a valid terminal loss gives exactly -1.
 
         Raises
@@ -620,7 +626,7 @@ class Performance:
         """
         ...
 
-    def downside_deviation(self, mar: float) -> pd.Series:
+    def downside_deviation(self, mar: float) -> LabeledSeries:
         """
         Calculate annualized lower partial deviation using every observation in the denominator.
 
@@ -631,7 +637,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Nonnegative annualized lower-partial deviation, using all observations in its denominator; empty history gives NaN, while observed zero downside gives zero.
 
         Raises
@@ -643,13 +649,13 @@ class Performance:
         """
         ...
 
-    def max_drawdown_duration(self) -> pd.Series:
+    def max_drawdown_duration(self) -> LabeledSeries:
         """
         Measure the longest observed drawdown episode in actual calendar days.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Nullable integer calendar-day durations per ticker; zero for observed history without a decline, and missing for empty history.
 
         Raises
@@ -659,13 +665,13 @@ class Performance:
         """
         ...
 
-    def up_capture(self) -> pd.Series:
+    def up_capture(self) -> LabeledSeries:
         """
         Compare geometric annualized returns on strictly positive benchmark observations.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Signed ratio of geometrically annualized portfolio and benchmark returns on benchmark-positive pairs; no selected pairs gives NaN. There is no near-zero denominator floor.
 
         Raises
@@ -677,13 +683,13 @@ class Performance:
         """
         ...
 
-    def down_capture(self) -> pd.Series:
+    def down_capture(self) -> LabeledSeries:
         """
         Compare geometric annualized returns on strictly negative benchmark observations.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Signed ratio of geometrically annualized portfolio and benchmark returns on benchmark-negative pairs; no selected pairs gives NaN. There is no near-zero denominator floor.
 
         Raises
@@ -695,13 +701,13 @@ class Performance:
         """
         ...
 
-    def capture_ratio(self) -> pd.Series:
+    def capture_ratio(self) -> LabeledSeries:
         """
         Divide up capture by down capture using their separately selected paired subsets.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Up-capture divided by down-capture; unavailable subsets remain NaN, valid nonzero/zero gives signed infinity and 0/0 gives NaN.
 
         Raises
@@ -713,7 +719,7 @@ class Performance:
         """
         ...
 
-    def omega_ratio(self, threshold: float) -> pd.Series:
+    def omega_ratio(self, threshold: float) -> LabeledSeries:
         """
         Calculate the unannualized empirical gain-to-shortfall ratio at an explicit hurdle.
 
@@ -724,7 +730,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Unannualized gain/shortfall ratio; empty samples and 0/0 give NaN, while observed gains with zero shortfall give positive infinity.
 
         Raises
@@ -736,7 +742,7 @@ class Performance:
         """
         ...
 
-    def treynor(self, risk_free_rate: float) -> pd.Series:
+    def treynor(self, risk_free_rate: float) -> LabeledSeries:
         """
         Divide annualized arithmetic excess mean by paired OLS beta.
 
@@ -747,7 +753,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Annual arithmetic excess return divided by paired beta; unavailable or exactly zero beta gives NaN, without a near-zero cutoff.
 
         Raises
@@ -759,13 +765,13 @@ class Performance:
         """
         ...
 
-    def gain_to_pain(self) -> pd.Series:
+    def gain_to_pain(self) -> LabeledSeries:
         """
         Divide the arithmetic net return sum by magnitudes of negative observations.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Unannualized arithmetic net-return sum divided by loss magnitudes; empty history and 0/0 give NaN, while gains without losses give positive infinity.
 
         Raises
@@ -775,13 +781,13 @@ class Performance:
         """
         ...
 
-    def ulcer_index(self) -> pd.Series:
+    def ulcer_index(self) -> LabeledSeries:
         """
         Calculate the root mean square of all signed percentage endpoint drawdowns.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Nonnegative root mean square percentage endpoint drawdown; empty history gives NaN and observed no-loss history gives zero.
 
         Raises
@@ -791,7 +797,7 @@ class Performance:
         """
         ...
 
-    def martin_ratio(self, risk_free_rate: float) -> pd.Series:
+    def martin_ratio(self, risk_free_rate: float) -> LabeledSeries:
         """
         Divide dated CAGR less annual-effective cash by Ulcer index.
 
@@ -802,7 +808,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Dated CAGR minus annual-effective cash, divided by Ulcer index; empty history gives NaN, valid nonzero/zero gives signed infinity and 0/0 gives NaN.
 
         Raises
@@ -814,13 +820,13 @@ class Performance:
         """
         ...
 
-    def recovery_factor(self) -> pd.Series:
+    def recovery_factor(self) -> LabeledSeries:
         """
         Divide compounded total return by absolute maximum drawdown without annualization.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Compounded total return divided by absolute maximum drawdown without annualization; empty history gives NaN, valid nonzero/zero gives signed infinity and 0/0 gives NaN.
 
         Raises
@@ -830,13 +836,13 @@ class Performance:
         """
         ...
 
-    def pain_index(self) -> pd.Series:
+    def pain_index(self) -> LabeledSeries:
         """
         Average absolute compounded drawdown across all observed endpoints.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Nonnegative mean absolute endpoint drawdown; empty history gives NaN and observed no-loss history gives zero.
 
         Raises
@@ -846,7 +852,7 @@ class Performance:
         """
         ...
 
-    def pain_ratio(self, risk_free_rate: float) -> pd.Series:
+    def pain_ratio(self, risk_free_rate: float) -> LabeledSeries:
         """
         Divide dated CAGR less annual-effective cash by the observation-weighted Pain index.
 
@@ -857,7 +863,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Dated CAGR minus annual-effective cash, divided by Pain index; empty history gives NaN, valid nonzero/zero gives signed infinity and 0/0 gives NaN.
 
         Raises
@@ -869,7 +875,7 @@ class Performance:
         """
         ...
 
-    def tail_ratio(self, confidence: float) -> pd.Series:
+    def tail_ratio(self, confidence: float) -> LabeledSeries:
         """
         Divide magnitudes of the R-7 upper and lower empirical quantiles without annualization.
 
@@ -880,7 +886,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Magnitude ratio |Q(confidence)| / |Q(1 - confidence)|; empty samples and 0/0 give NaN, while a positive numerator over exact zero gives positive infinity.
 
         Raises
@@ -892,13 +898,13 @@ class Performance:
         """
         ...
 
-    def r_squared(self) -> pd.Series:
+    def r_squared(self) -> LabeledSeries:
         """
         Calculate paired equal-weight intercept OLS squared correlation.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Paired sample squared Pearson correlation, in [0, 1]; fewer than two pairs or a constant portfolio or benchmark gives NaN.
 
         Raises
@@ -910,13 +916,13 @@ class Performance:
         """
         ...
 
-    def batting_average(self) -> pd.Series:
+    def batting_average(self) -> LabeledSeries:
         """
         Count strict portfolio outperformance over the exact paired sample.
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Strict wins divided by all paired observations, including ties; no paired observations gives NaN.
 
         Raises
@@ -928,7 +934,7 @@ class Performance:
         """
         ...
 
-    def parametric_var(self, confidence: float, horizon_periods: int | None = None) -> pd.Series:
+    def parametric_var(self, confidence: float, horizon_periods: int | None = None) -> LabeledSeries:
         """
         Calculate a signed Gaussian quantile under additive independent observation-period scaling.
 
@@ -941,7 +947,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Signed additive-model decimal quantile, without an investment-return lower bound; fewer than two returns gives NaN and constant histories yield their point-mass quantile.
 
         Raises
@@ -953,7 +959,7 @@ class Performance:
         """
         ...
 
-    def cornish_fisher_var(self, confidence: float, horizon_periods: int | None = None) -> pd.Series:
+    def cornish_fisher_var(self, confidence: float, horizon_periods: int | None = None) -> LabeledSeries:
         """
         Calculate a classical plug-in Cornish-Fisher quantile after a global quantile-ordering check.
 
@@ -966,7 +972,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Signed additive-model decimal quantile; fewer than four returns or zero variance gives NaN. An estimable globally unordered fit raises instead of substituting an estimate.
 
         Raises
@@ -978,7 +984,7 @@ class Performance:
         """
         ...
 
-    def cdar(self, confidence: float) -> pd.Series:
+    def cdar(self, confidence: float) -> LabeledSeries:
         """
         Average the fractional empirical lower tail of compounded percentage endpoint drawdowns.
 
@@ -989,7 +995,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Nonpositive percentage-drawdown tail mean; empty history gives NaN and a valid observed no-drawdown path gives zero.
 
         Raises
@@ -1001,7 +1007,7 @@ class Performance:
         """
         ...
 
-    def m_squared(self, risk_free_rate: float) -> pd.Series:
+    def m_squared(self, risk_free_rate: float) -> LabeledSeries:
         """
         Calculate absolute cash-adjusted arithmetic M-squared return at benchmark volatility.
 
@@ -1012,7 +1018,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Absolute annual arithmetic cash-adjusted return, not active performance; fewer than two pairs or exactly zero portfolio volatility gives NaN.
 
         Raises
@@ -1024,7 +1030,7 @@ class Performance:
         """
         ...
 
-    def modified_sharpe(self, risk_free_rate: float, confidence: float) -> pd.Series:
+    def modified_sharpe(self, risk_free_rate: float, confidence: float) -> LabeledSeries:
         """
         Divide observation-period arithmetic cash excess by the negative one-period CF return quantile.
 
@@ -1037,7 +1043,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Observation-period cash-excess mean divided by negative one-period CF return quantile, without annualization. An unavailable fit or nonpositive loss denominator gives NaN.
 
         Raises
@@ -1049,7 +1055,7 @@ class Performance:
         """
         ...
 
-    def sterling_ratio(self, risk_free_rate: float, n: int) -> pd.Series:
+    def sterling_ratio(self, risk_free_rate: float, n: int) -> LabeledSeries:
         """
         Divide dated CAGR less cash by the mean magnitude of the deepest observed episodes.
 
@@ -1062,7 +1068,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Dated CAGR less cash divided by mean selected episode magnitude; empty history gives NaN, valid nonzero reward over exact zero risk gives signed infinity and 0/0 gives NaN.
 
         Raises
@@ -1074,7 +1080,7 @@ class Performance:
         """
         ...
 
-    def burke_ratio(self, risk_free_rate: float) -> pd.Series:
+    def burke_ratio(self, risk_free_rate: float) -> LabeledSeries:
         """
         Calculate modified Burke from every episode, normalized by return observation count.
 
@@ -1085,7 +1091,7 @@ class Performance:
 
         Returns
         -------
-        pd.Series
+        LabeledSeries
             Dated CAGR less cash divided by sqrt(sum(all episode depths squared) / N), with N equal to return-observation count. Empty history and 0/0 give NaN; nonzero reward at zero risk gives signed infinity.
 
         Raises
@@ -1474,7 +1480,7 @@ class Performance:
     def multi_factor_greeks(
         self,
         ticker_idx: int | str,
-        factor_returns: Sequence[Sequence[float]] | pd.DataFrame | pl.DataFrame,
+        factor_returns: Sequence[Sequence[float]] | pd.DataFrame | pl.DataFrame | ArrowTable | Any,
         risk_free_rate: float,
         date_col: str | None = None,
     ) -> MultiFactorResult:
@@ -1485,15 +1491,15 @@ class Performance:
         ----------
         ticker_idx : int or str
             Zero-based ticker column index or an exact, case-sensitive loaded ticker name.
-        factor_returns : sequence of sequences of float, pandas.DataFrame or polars.DataFrame
+        factor_returns : sequence of sequences of float, pandas.DataFrame, polars.DataFrame, or Arrow table
             Supply finite factor-major predictors aligned to this ticker's active interval sample.
-            A pandas DataFrame uses string-labeled factor columns and date-like return end dates as its index (or ``date_col`` when supplied); a Polars DataFrame uses a date column (auto-detected when unique, or selected via ``date_col``) and numeric factor columns.
+            A pandas DataFrame uses string-labeled factor columns and date-like return end dates as its index (or ``date_col`` when supplied); a Polars DataFrame or Arrow table uses a date column (auto-detected when unique, or selected via ``date_col``) and numeric factor columns.
             Rows are selected and ordered by the ticker's active dates. Extra dates are ignored.
             Factors use the caller's units and are used without subtracting cash.
         risk_free_rate : float
             Explicit annual-effective decimal cash rate, finite and greater than -1; geometric per-observation conversion uses the declared frequency where required.
         date_col : str, optional
-            Name of the date column when ``factor_returns`` is a DataFrame. Auto-detects a unique Polars ``Date``/``Datetime`` column when omitted; optional for pandas ``DataFrame`` inputs; rejected if ``factor_returns`` is a sequence.
+            Name of the date column when ``factor_returns`` is a DataFrame or Arrow table. Auto-detects a unique Polars/Arrow date or datetime column when omitted; optional for pandas ``DataFrame`` inputs; rejected if ``factor_returns`` is a sequence.
 
         Returns
         -------
@@ -1648,37 +1654,6 @@ class Performance:
         """
         ...
 
-    def to_dataframe(
-        self, risk_free_rate: float, mar: float, omega_threshold: float, confidence: float
-    ) -> pd.DataFrame:
-        """
-        Export the fixed 22-metric summary with explicit inputs and stored sample metadata.
-
-        Parameters
-        ----------
-        risk_free_rate : float
-            Explicit annual-effective decimal cash rate, finite and greater than -1; geometric per-observation conversion uses the declared frequency where required.
-        mar : float
-            Explicit finite minimum acceptable decimal return per observation; this is not an annual rate.
-        omega_threshold : float
-            Explicit finite decimal per-observation Omega hurdle, independent of MAR.
-        confidence : float
-            Explicit finite decimal tail confidence strictly between 0.5 and 1; the lower-tail probability is 1 - confidence.
-
-        Returns
-        -------
-        pd.DataFrame
-            Ticker-indexed fixed metric columns; annualized arithmetic risk/means, native-period geometric mean and historical VaR/ES. Undefined values and signed infinities retain their meanings.
-
-        Raises
-        ------
-        AnalyticsError
-            If benchmark/frequency context is absent, cash is invalid, MAR/Omega is nonfinite, or confidence is outside the open interval (0.5, 1).
-        RuntimeError
-            If a required numerical calculation or requested finite result cannot be represented.
-        """
-        ...
-
     def to_arrow(self, risk_free_rate: float, mar: float, omega_threshold: float, confidence: float) -> ArrowTable:
         """
         Export the fixed 22-metric summary table via Arrow (zero-copy for Polars and PyArrow).
@@ -1687,7 +1662,7 @@ class Performance:
         ``__arrow_c_stream__`` with 23 columns (``ticker`` followed by the 22
         summary metrics) plus field roles and summary provenance metadata;
         consume with ``polars.DataFrame(table)``, ``pyarrow.table(table)``, or
-        ``table.to_polars()``.
+        :meth:`to_polars` / :meth:`to_pandas`.
 
         Parameters
         ----------
@@ -1726,6 +1701,99 @@ class Performance:
         >>> table = perf.to_arrow(0.0, 0.0, 0.0, 0.95)
         >>> (table.num_rows, table.num_columns)
         (2, 23)
+        """
+        ...
+
+    def to_pandas(self, risk_free_rate: float, mar: float, omega_threshold: float, confidence: float) -> pd.DataFrame:
+        """
+        Export the fixed 22-metric summary as a ticker-indexed ``pandas.DataFrame``.
+
+        Parameters
+        ----------
+        risk_free_rate : float
+            Explicit annual-effective decimal cash rate, finite and greater than -1; geometric per-observation conversion uses the declared frequency where required.
+        mar : float
+            Explicit finite minimum acceptable decimal return per observation; this is not an annual rate.
+        omega_threshold : float
+            Explicit finite decimal per-observation Omega hurdle, independent of MAR.
+        confidence : float
+            Explicit finite decimal tail confidence strictly between 0.5 and 1; the lower-tail probability is 1 - confidence.
+
+        Returns
+        -------
+        pd.DataFrame
+            Ticker-indexed fixed metric columns; annualized arithmetic risk/means, native-period geometric mean and historical VaR/ES. Undefined values and signed infinities retain their meanings.
+
+        Raises
+        ------
+        AnalyticsError
+            If benchmark/frequency context is absent, cash is invalid, MAR/Omega is nonfinite, or confidence is outside the open interval (0.5, 1).
+        ImportError
+            If ``pandas`` is not installed.
+        RuntimeError
+            If a required numerical calculation or requested finite result cannot be represented.
+        """
+        ...
+
+    def to_polars(self, risk_free_rate: float, mar: float, omega_threshold: float, confidence: float) -> pl.DataFrame:
+        """
+        Export the fixed 22-metric summary as a ``polars.DataFrame`` with explicit ``ticker`` column.
+
+        Parameters
+        ----------
+        risk_free_rate : float
+            Explicit annual-effective decimal cash rate, finite and greater than -1; geometric per-observation conversion uses the declared frequency where required.
+        mar : float
+            Explicit finite minimum acceptable decimal return per observation; this is not an annual rate.
+        omega_threshold : float
+            Explicit finite decimal per-observation Omega hurdle, independent of MAR.
+        confidence : float
+            Explicit finite decimal tail confidence strictly between 0.5 and 1; the lower-tail probability is 1 - confidence.
+
+        Returns
+        -------
+        pl.DataFrame
+            Polars DataFrame with explicit ``ticker`` column and 22 summary metric columns.
+
+        Raises
+        ------
+        AnalyticsError
+            If benchmark/frequency context is absent, cash is invalid, MAR/Omega is nonfinite, or confidence is outside the open interval (0.5, 1).
+        ImportError
+            If ``polars`` is not installed.
+        RuntimeError
+            If a required numerical calculation or requested finite result cannot be represented.
+        """
+        ...
+
+    def to_pyarrow(self, risk_free_rate: float, mar: float, omega_threshold: float, confidence: float) -> Any:
+        """
+        Export the fixed 22-metric summary as a ``pyarrow.Table``.
+
+        Parameters
+        ----------
+        risk_free_rate : float
+            Explicit annual-effective decimal cash rate, finite and greater than -1; geometric per-observation conversion uses the declared frequency where required.
+        mar : float
+            Explicit finite minimum acceptable decimal return per observation; this is not an annual rate.
+        omega_threshold : float
+            Explicit finite decimal per-observation Omega hurdle, independent of MAR.
+        confidence : float
+            Explicit finite decimal tail confidence strictly between 0.5 and 1; the lower-tail probability is 1 - confidence.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy PyArrow table with 23 columns and field metadata matching :meth:`to_arrow`.
+
+        Raises
+        ------
+        AnalyticsError
+            If benchmark/frequency context is absent, cash is invalid, MAR/Omega is nonfinite, or confidence is outside the open interval (0.5, 1).
+        ImportError
+            If ``pyarrow`` is not installed.
+        RuntimeError
+            If a required numerical calculation or requested finite result cannot be represented.
         """
         ...
 

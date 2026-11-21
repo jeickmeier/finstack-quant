@@ -65,19 +65,19 @@ impl PyLookbackOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_lookback_option", "LookbackOption.strike")]
     #[getter]
     fn strike<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.strike)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.strike)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_lookback_option", "LookbackOption.option_type")]
     #[getter]
     fn option_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.option_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.option_type)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_lookback_option", "LookbackOption.lookback_type")]
     #[getter]
     fn lookback_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.lookback_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.lookback_type)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_lookback_option", "LookbackOption.expiry")]
@@ -137,7 +137,7 @@ impl PyLookbackOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_lookback_option", "LookbackOption.monitoring")]
     #[getter]
     fn monitoring<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.monitoring)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.monitoring)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_lookback_option", "LookbackOption.observed_min")]

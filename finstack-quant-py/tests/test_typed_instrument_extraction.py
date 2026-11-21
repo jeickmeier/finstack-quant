@@ -351,7 +351,8 @@ def test_attribution_many_typed_equal_envelope() -> None:
         },
         [i.to_json() for i in instruments],
     )
-    assert typed.equals(via_json)
+    assert typed.to_records() == via_json.to_records()
+    assert typed.to_pandas().equals(via_json.to_pandas())
 
 
 @pytest.mark.parametrize("make", [_fixed_bond, _frn], ids=["fixed", "frn"])

@@ -1,8 +1,12 @@
 //! Python wrappers for margin domain types and enums.
 
 use crate::bindings::core::config::PyFinstackConfig;
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::tabular_methods;
 use crate::bindings::module_utils::parse_currency;
-use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
+use crate::bindings::table_builders::{
+    serde_object_to_single_row_arrow_table, serde_rows_to_arrow_table,
+};
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_core::money::Money;
 use finstack_quant_margin as fm;
@@ -1071,7 +1075,7 @@ impl PyCsaSpec {
     /// ``delivery_grace_days``).
     #[getter]
     fn call_timing<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.call_timing)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.call_timing)
     }
 
     /// Validate CSA identifiers and the contractual holiday calendar.
@@ -1080,69 +1084,6 @@ impl PyCsaSpec {
     /// ``from_json`` also applies on ingest.
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(core_to_py)
-    }
-
-    /// Export the commercial terms as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``id``, ``base_currency``, ``calendar_id``,
-    /// ``collateral_curve_id``, ``vm_threshold``, ``vm_mta``, ``vm_rounding``,
-    /// ``vm_independent_amount``, ``vm_frequency``, ``vm_settlement_lag``,
-    /// ``requires_im``, ``im_methodology``, ``im_mpor_days``, ``im_threshold``,
-    /// ``im_mta``, ``im_segregated``. Amount columns are floats in
-    /// ``base_currency``; the ``im_*`` columns are null when no IM applies.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let im = self.inner.im_params.as_ref();
-        let row = serde_json::json!({
-            "id": self.inner.id,
-            "base_currency": self.inner.base_currency.to_string(),
-            "calendar_id": self.inner.calendar_id,
-            "collateral_curve_id": self.inner.collateral_curve_id.as_str(),
-            "vm_threshold": self.vm_threshold(),
-            "vm_mta": self.vm_mta(),
-            "vm_rounding": self.vm_rounding(),
-            "vm_independent_amount": self.vm_independent_amount(),
-            "vm_frequency": self.inner.vm_params.frequency.to_string(),
-            "vm_settlement_lag": self.inner.vm_params.settlement_lag,
-            "requires_im": im.is_some(),
-            "im_methodology": im.map(|p| p.methodology.to_string()),
-            "im_mpor_days": im.map(|p| p.mpor_days),
-            "im_threshold": im.map(|p| p.threshold.amount()),
-            "im_mta": im.map(|p| p.mta.amount()),
-            "im_segregated": im.map(|p| p.segregated),
-        });
-        crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &[
-                "id",
-                "base_currency",
-                "calendar_id",
-                "collateral_curve_id",
-                "vm_threshold",
-                "vm_mta",
-                "vm_rounding",
-                "vm_independent_amount",
-                "vm_frequency",
-                "vm_settlement_lag",
-                "requires_im",
-                "im_methodology",
-                "im_mpor_days",
-                "im_threshold",
-                "im_mta",
-                "im_segregated",
-            ],
-        )
-    }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
     }
 
     fn __repr__(&self) -> String {
@@ -1167,9 +1108,56 @@ impl PyCsaSpec {
     }
 }
 
+impl PyCsaSpec {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let im = self.inner.im_params.as_ref();
+        let row = serde_json::json!({
+            "id": self.inner.id,
+            "base_currency": self.inner.base_currency.to_string(),
+            "calendar_id": self.inner.calendar_id,
+            "collateral_curve_id": self.inner.collateral_curve_id.as_str(),
+            "vm_threshold": self.vm_threshold(),
+            "vm_mta": self.vm_mta(),
+            "vm_rounding": self.vm_rounding(),
+            "vm_independent_amount": self.vm_independent_amount(),
+            "vm_frequency": self.inner.vm_params.frequency.to_string(),
+            "vm_settlement_lag": self.inner.vm_params.settlement_lag,
+            "requires_im": im.is_some(),
+            "im_methodology": im.map(|p| p.methodology.to_string()),
+            "im_mpor_days": im.map(|p| p.mpor_days),
+            "im_threshold": im.map(|p| p.threshold.amount()),
+            "im_mta": im.map(|p| p.mta.amount()),
+            "im_segregated": im.map(|p| p.segregated),
+        });
+        serde_object_to_single_row_arrow_table(
+            &row,
+            &[
+                ("id", "str"),
+                ("base_currency", "str"),
+                ("calendar_id", "str"),
+                ("collateral_curve_id", "str"),
+                ("vm_threshold", "float64"),
+                ("vm_mta", "float64"),
+                ("vm_rounding", "float64"),
+                ("vm_independent_amount", "float64"),
+                ("vm_frequency", "str"),
+                ("vm_settlement_lag", "int64"),
+                ("requires_im", "bool"),
+                ("im_methodology", "str"),
+                ("im_mpor_days", "int64"),
+                ("im_threshold", "float64"),
+                ("im_mta", "float64"),
+                ("im_segregated", "bool"),
+            ],
+        )
+    }
+}
+
+tabular_methods!(PyCsaSpec);
+
 /// Eligible collateral schedule with haircuts.
 ///
-/// Answers "what can I post and at what haircut": ``to_dataframe`` lists
+/// Answers "what can I post and at what haircut": ``to_pandas`` / ``to_arrow`` lists
 /// every eligible asset class with its haircut, rating and maturity
 /// constraints; ``haircut_for_maturity`` resolves the maturity-bucketed
 /// haircut for a bond; ``check_concentration_limits`` flags a proposed
@@ -1326,15 +1314,15 @@ impl PyEligibleCollateralSchedule {
     ///     ``(asset_class, amount)`` pairs; amounts share one currency and
     ///     are converted to fractions of their total.
     ///
-    /// Returns a pandas ``DataFrame`` with columns ``asset_class``,
-    /// ``fraction``, ``limit``, ``excess`` (all decimal fractions), one row
-    /// per breached limit; an empty frame means the mix is within limits.
+    /// Returns an :class:`~finstack_quant.core.table.ArrowTable` with columns
+    /// ``asset_class``, ``fraction``, ``limit``, ``excess`` (all decimal
+    /// fractions), one row per breached limit; an empty table means the mix
+    /// is within limits.
     fn check_concentration_limits<'py>(
         &self,
-        py: Python<'py>,
         allocations: Vec<(Bound<'py, PyAny>, f64)>,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        const COLUMNS: &[ColumnSchema<'_>] = &[
+    ) -> PyResult<PyArrowTable> {
+        const COLUMNS: &[(&str, &str)] = &[
             ("asset_class", "str"),
             ("fraction", "float64"),
             ("limit", "float64"),
@@ -1357,18 +1345,34 @@ impl PyEligibleCollateralSchedule {
                 })
             })
             .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, COLUMNS)
+        serde_rows_to_arrow_table(&rows, COLUMNS)
     }
 
-    /// Export the eligibility rows as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``asset_class``, ``min_rating``, ``min_remaining_years``,
-    /// ``max_remaining_years``, ``haircut``, ``fx_haircut_addon``,
-    /// ``concentration_limit``. Haircuts and limits are decimal fractions;
-    /// optional constraints are null when absent. One row per eligible entry,
-    /// in schedule order (the order ``haircut_for`` searches).
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        const COLUMNS: &[ColumnSchema<'_>] = &[
+    fn __repr__(&self) -> String {
+        let classes: Vec<String> = self
+            .inner
+            .eligible
+            .iter()
+            .map(|e| e.asset_class.to_string())
+            .collect();
+        format!(
+            "EligibleCollateralSchedule(eligible=[{}], default_haircut={}, rehypothecation_allowed={})",
+            classes.join(", "),
+            self.inner
+                .default_haircut
+                .map_or("None".to_string(), |h| h.to_string()),
+            if self.inner.rehypothecation_allowed {
+                "True"
+            } else {
+                "False"
+            }
+        )
+    }
+}
+
+impl PyEligibleCollateralSchedule {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: &[(&str, &str)] = &[
             ("asset_class", "str"),
             ("min_rating", "str"),
             ("min_remaining_years", "float64"),
@@ -1394,41 +1398,11 @@ impl PyEligibleCollateralSchedule {
                 })
             })
             .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, COLUMNS)
-    }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
-
-    fn __repr__(&self) -> String {
-        let classes: Vec<String> = self
-            .inner
-            .eligible
-            .iter()
-            .map(|e| e.asset_class.to_string())
-            .collect();
-        format!(
-            "EligibleCollateralSchedule(eligible=[{}], default_haircut={}, rehypothecation_allowed={})",
-            classes.join(", "),
-            self.inner
-                .default_haircut
-                .map_or("None".to_string(), |h| h.to_string()),
-            if self.inner.rehypothecation_allowed {
-                "True"
-            } else {
-                "False"
-            }
-        )
+        serde_rows_to_arrow_table(&rows, COLUMNS)
     }
 }
+
+tabular_methods!(PyEligibleCollateralSchedule);
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "SimmCreditClassification")]
 #[pyclass(
@@ -1463,7 +1437,7 @@ impl PySimmCreditClassification {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "SimmCreditClassification.to_dict")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner)
     }
 }
 
@@ -1526,7 +1500,7 @@ impl PyOtcMarginSpec {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._types", "OtcMarginSpec.to_dict")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner)
     }
 }
 
@@ -1549,7 +1523,7 @@ pub fn register(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // constants plus the registry/calculator constants hosts need to
     // interpret results.
     let constants =
-        crate::bindings::pandas_utils::serde_to_py(py, &fm::constants::MarginConstants::current())?;
+        crate::bindings::json_bridge::serde_to_py(py, &fm::constants::MarginConstants::current())?;
     m.add("CONSTANTS", constants)?;
 
     Ok(())

@@ -2,6 +2,8 @@
 
 from typing import Any, TypedDict
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 class QuoteQuality:
     """Fit quality for one calibration quote.
@@ -223,7 +225,22 @@ class CalibrationDiagnostics:
             Root-mean-square residual across quotes, in the target's own units.
         """
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """Return the per-quote rows as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``quote_id``, ``quote_value``, ``residual`` and
+            ``sensitivity``, one row per quote.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+
+    def to_pandas(self) -> pd.DataFrame:
         """Return the per-quote rows as a DataFrame.
 
         Returns
@@ -234,11 +251,42 @@ class CalibrationDiagnostics:
 
         Raises
         ------
-        RuntimeError
+        ImportError
             If pandas is not installed.
 
         """
 
+    def to_polars(self) -> pl.DataFrame:
+        """Return the per-quote rows as a Polars DataFrame.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row per quote constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+
+    def to_pyarrow(self) -> Any:
+        """Return the per-quote rows as a PyArrow Table.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to compact JSON.
@@ -627,7 +675,23 @@ class CalibrationReport:
             Per-quote diagnostics, or None when diagnostics were not computed.
         """
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """Return the per-quote residuals as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``quote_id``, ``quote_value``, ``residual`` and
+            ``sensitivity``. Quote value and sensitivity are ``NaN`` when
+            diagnostics were not computed.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+
+    def to_pandas(self) -> pd.DataFrame:
         """Return the per-quote residuals as a DataFrame.
 
         Returns
@@ -639,11 +703,42 @@ class CalibrationReport:
 
         Raises
         ------
-        RuntimeError
+        ImportError
             If pandas is not installed.
 
         """
 
+    def to_polars(self) -> pl.DataFrame:
+        """Return the per-quote residuals as a Polars DataFrame.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row per quote constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+
+    def to_pyarrow(self) -> Any:
+        """Return the per-quote residuals as a PyArrow Table.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to compact JSON.
@@ -758,7 +853,21 @@ class CalibrationValidationReport:
             identifiers in ``writes``. An empty plan has no nodes.
         """
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """Return the static findings as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``kind``, ``step_id``, and ``message``; empty when valid.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+
+    def to_pandas(self) -> pd.DataFrame:
         """Return the static findings as a DataFrame.
 
         Returns
@@ -769,11 +878,42 @@ class CalibrationValidationReport:
 
         Raises
         ------
-        RuntimeError
+        ImportError
             If pandas is not installed.
 
         """
 
+    def to_polars(self) -> pl.DataFrame:
+        """Return the static findings as a Polars DataFrame.
+
+        Returns
+        -------
+        polars.DataFrame
+            Findings constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+
+    def to_pyarrow(self) -> Any:
+        """Return the static findings as a PyArrow Table.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to compact JSON.

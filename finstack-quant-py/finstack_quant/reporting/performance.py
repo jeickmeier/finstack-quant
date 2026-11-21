@@ -109,8 +109,8 @@ def _section_drawdown(perf: Any, ticker: int, theme: Theme) -> Section:
 
 
 def _section_rolling(perf: Any, ticker: int, window: int, risk_free_rate: float, theme: Theme) -> Section:
-    rs = perf.rolling_sharpe(ticker, window=window, risk_free_rate=risk_free_rate).to_dataframe()
-    rv = perf.rolling_volatility(ticker, window=window).to_dataframe()
+    rs = perf.rolling_sharpe(ticker, window=window, risk_free_rate=risk_free_rate).to_pandas()
+    rv = perf.rolling_volatility(ticker, window=window).to_pandas()
     rs_svg = charts.line_chart(fmt._dates_of(rs), rs.iloc[:, 0].tolist(), theme=theme, color=theme.ink, height=170)
     rv_svg = charts.line_chart(
         fmt._dates_of(rv),
@@ -233,7 +233,7 @@ def performance_tearsheet(
     """
     wanted = _resolve_sections(sections, ALL_SECTIONS)
 
-    summary = perf.to_dataframe(risk_free_rate, mar, omega_threshold, confidence)
+    summary = perf.to_pandas(risk_free_rate, mar, omega_threshold, confidence)
     col = perf.get_ticker_names()[ticker]
     row = summary.iloc[ticker]
 

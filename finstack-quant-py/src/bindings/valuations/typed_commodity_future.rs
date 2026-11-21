@@ -85,7 +85,7 @@ impl PyCommodityFuture {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_future", "CommodityFuture.fixing")]
     #[getter]
     fn fixing<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.fixing)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.fixing)
     }
 }
 

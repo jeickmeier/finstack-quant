@@ -55,7 +55,7 @@ def test_defaults_rust_leaves_to_the_caller_are_required() -> None:
 def test_default_probabilities_follow_the_rust_horizon_rule() -> None:
     model = MertonModel(100.0, 0.25, 80.0, 0.05)
     series = model.default_probabilities([1.0, 0.0, -1.0])
-    assert list(series) == [model.default_probability(1.0), 0.0, 0.0]
+    assert series.values() == [model.default_probability(1.0), 0.0, 0.0]
 
 
 def test_toggle_label_errors_come_from_rust() -> None:
@@ -142,7 +142,7 @@ def test_simulated_path_dataframe_uses_validated_times() -> None:
     from finstack_quant.models.credit import SimulatedPaths
 
     paths = MertonModel(100.0, 0.25, 80.0, 0.05).simulate_paths(2, 4, 1.0, 7, True)
-    frame = paths.to_dataframe()
+    frame = paths.to_pandas()
     assert frame["time"].to_list() == paths.times * 2
     wire = json.loads(paths.to_json())
     wire["times"].pop()

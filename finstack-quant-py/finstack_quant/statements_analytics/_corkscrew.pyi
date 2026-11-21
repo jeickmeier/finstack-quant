@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.statements import FinancialModelSpec, StatementResult
 
 # Corkscrew (balance-sheet roll-forward) extension
@@ -559,37 +561,99 @@ class CorkscrewReport:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the report header as a single-row pandas ``DataFrame``.
+        Export the report header as a single-row ``ArrowTable``.
 
         Columns: ``status``, ``message``, ``account_count``,
         ``warning_count``, ``error_count``.
 
         ``account_count`` is the number of validated accounts. Per-account
-        detail lives in ``to_validations_dataframe``.
+        detail lives in :meth:`to_validations_table`.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row describing the validation run.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
-
-        RuntimeError
-            If the stored enum cannot be rendered as its canonical Rust wire label.
+            If the result cannot be represented as an Arrow table.
         RuntimeError
             If the report status cannot be rendered as its canonical Rust wire label.
         """
         ...
 
-    def to_validations_dataframe(self) -> pd.DataFrame:
+    def to_pandas(self) -> pd.DataFrame:
         """
-        Export the per-account roll-forward validations as a pandas
-        ``DataFrame``.
+        Export the report header as a single-row pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`. Per-account detail lives in
+        :meth:`to_validations_table`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row describing the validation run.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the result cannot be represented as a pandas DataFrame.
+        RuntimeError
+            If the report status cannot be rendered as its canonical Rust wire label.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the report header as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row describing the validation run.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be represented as a Polars DataFrame.
+        RuntimeError
+            If the report status cannot be rendered as its canonical Rust wire label.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the report header as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row describing the validation run.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be represented as a PyArrow table.
+        RuntimeError
+            If the report status cannot be rendered as its canonical Rust wire label.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_validations_table(self) -> ArrowTable:
+        """
+        Export the per-account roll-forward validations as an ``ArrowTable``.
 
         Columns: ``account``, ``type``, ``periods_validated``, ``max_error``,
         ``is_valid``. One row per validated account, in configured order; a
@@ -603,7 +667,7 @@ class CorkscrewReport:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per validated account.
 
         Notes

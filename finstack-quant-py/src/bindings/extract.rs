@@ -756,8 +756,7 @@ pub fn extract_records_json(
     if let Ok(json) = obj.extract::<String>() {
         return Ok(json);
     }
-    if obj.hasattr("to_dict")? && obj.hasattr("columns")? {
-        let records = obj.call_method1("to_dict", ("records",))?;
+    if let Some(records) = crate::bindings::dataframe_utils::table_to_py_records(py, obj)? {
         return crate::bindings::module_utils::py_to_json_string(py, &records, label);
     }
     crate::bindings::module_utils::py_to_json_string(py, obj, label)

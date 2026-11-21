@@ -10,7 +10,7 @@ mod forecast;
 mod report;
 mod spec;
 
-pub(crate) use engine::{PyCovenantBreach, PyCovenantEngine, dated_reports_frame};
+pub(crate) use engine::{PyCovenantBreach, PyCovenantEngine, dated_reports_table};
 pub(crate) use forecast::{PyCovenantForecast, PyCovenantForecastConfig, PyFutureBreach};
 pub(crate) use report::PyCovenantReport;
 pub(crate) use spec::{
@@ -143,12 +143,12 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFutureBreach>()?;
     m.add_class::<PySpringingCondition>()?;
     m.add_class::<PyThresholdSchedule>()?;
-    m.add_function(wrap_pyfunction!(forecast::breaches_to_dataframe, &m)?)?;
+    m.add_function(wrap_pyfunction!(forecast::breaches_table, &m)?)?;
     m.add_function(wrap_pyfunction!(engine::covenant_template, &m)?)?;
     m.add_function(wrap_pyfunction!(evaluate_engine, &m)?)?;
     m.add_function(wrap_pyfunction!(forecast::forecast_breaches, &m)?)?;
     m.add_function(wrap_pyfunction!(forecast::forecast_covenant, &m)?)?;
-    m.add_function(wrap_pyfunction!(engine::reports_to_dataframe, &m)?)?;
+    m.add_function(wrap_pyfunction!(engine::reports_table, &m)?)?;
     m.add_function(wrap_pyfunction!(validate_covenant_engine_json, &m)?)?;
     m.add_function(wrap_pyfunction!(validate_covenant_report_json, &m)?)?;
     m.add_function(wrap_pyfunction!(validate_covenant_spec_json, &m)?)?;
@@ -170,12 +170,12 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "FutureBreach",
             "SpringingCondition",
             "ThresholdSchedule",
-            "breaches_to_dataframe",
+            "breaches_table",
             "covenant_template",
             "evaluate_engine",
             "forecast_breaches",
             "forecast_covenant",
-            "reports_to_dataframe",
+            "reports_table",
             "validate_covenant_engine_json",
             "validate_covenant_report_json",
             "validate_covenant_spec_json",

@@ -1,19 +1,19 @@
 //! Result classes for the analytics domain.
 
 use crate::bindings::core::dates::periods::PyFiscalConfig;
+use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
 use crate::bindings::date_utils::date_to_py;
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
-use crate::bindings::pandas_utils::{
-    dates_to_datetime_index, dates_to_pylist, dict_to_dataframe, labeled_values_to_series,
-};
+use crate::bindings::date_utils::dates_to_pylist;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::TableBuilder;
 use finstack_quant_analytics::{
     BetaResult, CorrelationResult, DatedSeries, DrawdownEpisode, GreeksResult, LookbackReturns,
     LookbackSample, MultiFactorResult, PeriodStats, RollingGreeks,
 };
 use numpy::PyArray1;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::PyCapsule;
 
 #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats")]
 #[pyclass(name = "PeriodStats", module = "finstack_quant.analytics", frozen)]
@@ -100,28 +100,13 @@ impl PyPeriodStats {
     }
 
     #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.to_series")]
-    fn to_series<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_series(&self) -> PyResult<PyLabeledSeries> {
         let (labels, values): (Vec<String>, Vec<f64>) = self
             .fields()
             .into_iter()
             .map(|(name, value)| (name.to_owned(), value))
             .unzip();
-        labeled_values_to_series(py, &labels, values, "period_stats")
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        for (name, value) in self.fields() {
-            data.set_item(name, PyArray1::from_slice(py, &[value]))?;
-        }
-        // Observation and streak counts stay integer columns.
-        data.set_item("n_obs", vec![self.inner.n_obs])?;
-        data.set_item("wins", vec![self.inner.wins])?;
-        data.set_item("losses", vec![self.inner.losses])?;
-        data.set_item("consecutive_wins", vec![self.inner.consecutive_wins])?;
-        data.set_item("consecutive_losses", vec![self.inner.consecutive_losses])?;
-        dict_to_dataframe(py, &data, None)
+        Ok(PyLabeledSeries::from_f64("period_stats", labels, values)?.with_index_name("metric"))
     }
 
     fn __repr__(&self) -> String {
@@ -133,6 +118,27 @@ impl PyPeriodStats {
 }
 
 impl PyPeriodStats {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let s = &self.inner;
+        TableBuilder::new()
+            .i64("n_obs", vec![s.n_obs as i64])?
+            .i64("wins", vec![s.wins as i64])?
+            .i64("losses", vec![s.losses as i64])?
+            .f64("best", vec![s.best])?
+            .f64("worst", vec![s.worst])?
+            .i64("consecutive_wins", vec![s.consecutive_wins as i64])?
+            .i64("consecutive_losses", vec![s.consecutive_losses as i64])?
+            .f64("win_rate", vec![s.win_rate])?
+            .f64("avg_return", vec![s.avg_return])?
+            .f64("avg_win", vec![s.avg_win])?
+            .f64("avg_loss", vec![s.avg_loss])?
+            .f64("payoff_ratio", vec![s.payoff_ratio])?
+            .f64("profit_factor", vec![s.profit_factor])?
+            .f64("cpc_index", vec![s.cpc_index])?
+            .f64("kelly_risk_fraction", vec![s.kelly_risk_fraction])?
+            .build()
+    }
+
     /// Statistic names and values in `PeriodStats` field order (streak
     /// counts as `f64`).
     fn fields(&self) -> [(&'static str, f64); 15] {
@@ -196,27 +202,25 @@ impl PyBetaResult {
         self.inner.confidence_level
     }
 
-    #[doc = pydoc!("finstack_quant.analytics._types", "BetaResult.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let r = &self.inner;
-        let data = PyDict::new(py);
-        data.set_item("beta", PyArray1::from_slice(py, &[r.beta]))?;
-        data.set_item("std_err", PyArray1::from_slice(py, &[r.std_err]))?;
-        data.set_item("ci_lower", PyArray1::from_slice(py, &[r.ci_lower]))?;
-        data.set_item("ci_upper", PyArray1::from_slice(py, &[r.ci_upper]))?;
-        data.set_item("n_obs", PyArray1::from_slice(py, &[r.n_obs as i64]))?;
-        data.set_item(
-            "confidence_level",
-            PyArray1::from_slice(py, &[r.confidence_level]),
-        )?;
-        dict_to_dataframe(py, &data, None)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "BetaResult(beta={:.4}, se={:.4}, ci=[{:.4}, {:.4}])",
             self.inner.beta, self.inner.std_err, self.inner.ci_lower, self.inner.ci_upper
         )
+    }
+}
+
+impl PyBetaResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let r = &self.inner;
+        TableBuilder::new()
+            .f64("beta", vec![r.beta])?
+            .f64("std_err", vec![r.std_err])?
+            .f64("ci_lower", vec![r.ci_lower])?
+            .f64("ci_upper", vec![r.ci_upper])?
+            .i64("n_obs", vec![r.n_obs as i64])?
+            .f64("confidence_level", vec![r.confidence_level])?
+            .build()
     }
 }
 
@@ -254,26 +258,24 @@ impl PyGreeksResult {
         self.inner.n_obs
     }
 
-    #[doc = pydoc!("finstack_quant.analytics._types", "GreeksResult.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let r = &self.inner;
-        let data = PyDict::new(py);
-        data.set_item("alpha", PyArray1::from_slice(py, &[r.alpha]))?;
-        data.set_item("beta", PyArray1::from_slice(py, &[r.beta]))?;
-        data.set_item("r_squared", PyArray1::from_slice(py, &[r.r_squared]))?;
-        data.set_item(
-            "adjusted_r_squared",
-            PyArray1::from_slice(py, &[r.adjusted_r_squared]),
-        )?;
-        data.set_item("n_obs", PyArray1::from_slice(py, &[r.n_obs as i64]))?;
-        dict_to_dataframe(py, &data, None)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "GreeksResult(alpha={:.6}, beta={:.4}, r2={:.4}, adj_r2={:.4})",
             self.inner.alpha, self.inner.beta, self.inner.r_squared, self.inner.adjusted_r_squared
         )
+    }
+}
+
+impl PyGreeksResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let r = &self.inner;
+        TableBuilder::new()
+            .f64("alpha", vec![r.alpha])?
+            .f64("beta", vec![r.beta])?
+            .f64("r_squared", vec![r.r_squared])?
+            .f64("adjusted_r_squared", vec![r.adjusted_r_squared])?
+            .i64("n_obs", vec![r.n_obs as i64])?
+            .build()
     }
 }
 
@@ -301,17 +303,18 @@ impl PyRollingGreeks {
         PyArray1::from_slice(py, &self.inner.betas)
     }
 
-    #[doc = pydoc!("finstack_quant.analytics._types", "RollingGreeks.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        data.set_item("alpha", PyArray1::from_slice(py, &self.inner.alphas))?;
-        data.set_item("beta", PyArray1::from_slice(py, &self.inner.betas))?;
-        let idx = dates_to_datetime_index(py, &self.inner.dates)?;
-        dict_to_dataframe(py, &data, Some(idx))
-    }
-
     fn __repr__(&self) -> String {
         format!("RollingGreeks(len={})", self.inner.dates.len())
+    }
+}
+
+impl PyRollingGreeks {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .date("date", &self.inner.dates)?
+            .f64("alpha", self.inner.alphas.clone())?
+            .f64("beta", self.inner.betas.clone())?
+            .build()
     }
 }
 
@@ -358,14 +361,73 @@ impl PyMultiFactorResult {
         self.inner.n_obs
     }
 
-    #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult.to_dataframe")]
-    #[pyo3(signature = (factor_names=None))]
-    #[pyo3(text_signature = "(self, factor_names=None)")]
-    fn to_dataframe<'py>(
+    #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult.to_arrow")]
+    #[pyo3(signature = (factor_names=None), text_signature = "(self, factor_names=None)")]
+    fn to_arrow(&self, factor_names: Option<Vec<String>>) -> PyResult<PyArrowTable> {
+        self.build_arrow_table(factor_names)
+    }
+
+    #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult.to_pandas")]
+    #[pyo3(signature = (factor_names=None), text_signature = "(self, factor_names=None)")]
+    fn to_pandas<'py>(
         &self,
         py: Python<'py>,
         factor_names: Option<Vec<String>>,
     ) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.build_arrow_table(factor_names)?)?;
+        PyArrowTable::to_pandas(&table, py)
+    }
+
+    #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult.to_polars")]
+    #[pyo3(signature = (factor_names=None), text_signature = "(self, factor_names=None)")]
+    fn to_polars<'py>(
+        &self,
+        py: Python<'py>,
+        factor_names: Option<Vec<String>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.build_arrow_table(factor_names)?)?;
+        PyArrowTable::to_polars(&table, py)
+    }
+
+    #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult.to_pyarrow")]
+    #[pyo3(signature = (factor_names=None), text_signature = "(self, factor_names=None)")]
+    fn to_pyarrow<'py>(
+        &self,
+        py: Python<'py>,
+        factor_names: Option<Vec<String>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.build_arrow_table(factor_names)?)?;
+        PyArrowTable::to_pyarrow(&table, py)
+    }
+
+    #[pyo3(signature = (requested_schema=None))]
+    fn __arrow_c_stream__<'py>(
+        &self,
+        py: Python<'py>,
+        requested_schema: Option<Bound<'py, PyAny>>,
+    ) -> PyResult<Bound<'py, PyCapsule>> {
+        let _ = requested_schema;
+        self.build_arrow_table(None)?.arrow_c_stream(py)
+    }
+
+    fn __arrow_c_schema__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyCapsule>> {
+        self.build_arrow_table(None)?.arrow_c_schema(py)
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "MultiFactorResult(alpha={:.6}, r2={:.4}, adj_r2={:.4})",
+            self.inner.alpha, self.inner.r_squared, self.inner.adjusted_r_squared
+        )
+    }
+
+    fn _repr_html_(&self) -> Option<String> {
+        self.build_arrow_table(None).ok().map(|t| t.render_html())
+    }
+}
+
+impl PyMultiFactorResult {
+    fn build_arrow_table(&self, factor_names: Option<Vec<String>>) -> PyResult<PyArrowTable> {
         let betas = &self.inner.betas;
         let names = match factor_names {
             Some(names) if names.len() != betas.len() => {
@@ -378,49 +440,16 @@ impl PyMultiFactorResult {
             Some(names) => names,
             None => (0..betas.len()).map(|i| format!("factor_{i}")).collect(),
         };
-        let data = PyDict::new(py);
-        let kwargs = PyDict::new(py);
-        kwargs.set_item("dtype", "str")?;
-        let factors = py
-            .import("pandas")?
-            .getattr("Series")?
-            .call((names,), Some(&kwargs))?;
-        data.set_item("factor", factors)?;
-        data.set_item("beta", PyArray1::from_slice(py, betas))?;
-        data.set_item(
-            "alpha",
-            PyArray1::from_vec(py, vec![self.inner.alpha; betas.len()]),
-        )?;
-        data.set_item(
-            "r_squared",
-            PyArray1::from_vec(py, vec![self.inner.r_squared; betas.len()]),
-        )?;
-        data.set_item(
-            "adjusted_r_squared",
-            PyArray1::from_vec(py, vec![self.inner.adjusted_r_squared; betas.len()]),
-        )?;
-        data.set_item(
-            "residual_vol",
-            PyArray1::from_vec(py, vec![self.inner.residual_vol; betas.len()]),
-        )?;
-        data.set_item(
-            "n_obs",
-            PyArray1::from_vec(py, vec![self.inner.n_obs as i64; betas.len()]),
-        )?;
-        dict_to_dataframe(py, &data, None)
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "MultiFactorResult(alpha={:.6}, r2={:.4}, adj_r2={:.4})",
-            self.inner.alpha, self.inner.r_squared, self.inner.adjusted_r_squared
-        )
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult._repr_html_")]
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py, None).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+        let n = betas.len();
+        TableBuilder::new()
+            .utf8("factor", names)?
+            .f64("beta", betas.clone())?
+            .f64("alpha", vec![self.inner.alpha; n])?
+            .f64("r_squared", vec![self.inner.r_squared; n])?
+            .f64("adjusted_r_squared", vec![self.inner.adjusted_r_squared; n])?
+            .f64("residual_vol", vec![self.inner.residual_vol; n])?
+            .i64("n_obs", vec![self.inner.n_obs as i64; n])?
+            .build()
     }
 }
 
@@ -461,33 +490,24 @@ impl PyDrawdownEpisode {
         self.inner.max_drawdown
     }
 
-    #[doc = pydoc!("finstack_quant.analytics._types", "DrawdownEpisode.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let e = &self.inner;
-        let data = PyDict::new(py);
-        let end = match e.end {
-            Some(date) => date_to_py(py, date)?.into_any(),
-            None => py.None().into_bound(py),
-        };
-        data.set_item("start", dates_to_datetime_index(py, &[e.start])?)?;
-        data.set_item("valley", dates_to_datetime_index(py, &[e.valley])?)?;
-        data.set_item(
-            "end",
-            py.import("pandas")?.call_method1("to_datetime", ([end],))?,
-        )?;
-        data.set_item(
-            "duration_days",
-            PyArray1::from_slice(py, &[e.duration_days]),
-        )?;
-        data.set_item("max_drawdown", PyArray1::from_slice(py, &[e.max_drawdown]))?;
-        dict_to_dataframe(py, &data, None)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "DrawdownEpisode(dd={:.4}, days={})",
             self.inner.max_drawdown, self.inner.duration_days
         )
+    }
+}
+
+impl PyDrawdownEpisode {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let e = &self.inner;
+        TableBuilder::new()
+            .date("start", &[e.start])?
+            .date("valley", &[e.valley])?
+            .nullable_date("end", &[e.end])?
+            .i64("duration_days", vec![e.duration_days])?
+            .f64("max_drawdown", vec![e.max_drawdown])?
+            .build()
     }
 }
 
@@ -577,28 +597,24 @@ impl PyLookbackReturns {
         PyArray1::from_slice(py, &self.inner.fytd)
     }
 
-    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        data.set_item("mtd", PyArray1::from_slice(py, &self.inner.mtd))?;
-        data.set_item("qtd", PyArray1::from_slice(py, &self.inner.qtd))?;
-        data.set_item("ytd", PyArray1::from_slice(py, &self.inner.ytd))?;
-        data.set_item("fytd", PyArray1::from_slice(py, &self.inner.fytd))?;
-        let idx = self
-            .inner
-            .ticker_names
-            .clone()
-            .into_pyobject(py)?
-            .into_any();
-        dict_to_dataframe(py, &data, Some(idx))
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "LookbackReturns(mtd_len={}, fytd_len={})",
             self.inner.mtd.len(),
             self.inner.fytd.len()
         )
+    }
+}
+
+impl PyLookbackReturns {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .utf8("ticker", self.inner.ticker_names.clone())?
+            .f64("mtd", self.inner.mtd.clone())?
+            .f64("qtd", self.inner.qtd.clone())?
+            .f64("ytd", self.inner.ytd.clone())?
+            .f64("fytd", self.inner.fytd.clone())?
+            .build()
     }
 }
 
@@ -626,23 +642,21 @@ impl PyDatedSeries {
         self.inner.value_column.as_str()
     }
 
-    #[doc = pydoc!("finstack_quant.analytics._types", "DatedSeries.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        data.set_item(
-            self.inner.value_column.as_str(),
-            PyArray1::from_slice(py, &self.inner.values),
-        )?;
-        let idx = dates_to_datetime_index(py, &self.inner.dates)?;
-        dict_to_dataframe(py, &data, Some(idx))
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "DatedSeries(name={:?}, len={})",
             self.inner.value_column.as_str(),
             self.inner.values.len()
         )
+    }
+}
+
+impl PyDatedSeries {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .date("date", &self.inner.dates)?
+            .f64(self.inner.value_column.as_str(), self.inner.values.clone())?
+            .build()
     }
 }
 
@@ -715,8 +729,16 @@ impl PyCorrelationResult {
         date_to_py(py, self.inner.end_date)
     }
 
-    #[doc = pydoc!("finstack_quant.analytics._types", "CorrelationResult.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn __repr__(&self) -> String {
+        format!(
+            "CorrelationResult(tickers={:?}, n_obs={}, start_date={}, end_date={})",
+            self.inner.tickers, self.inner.n_obs, self.inner.start_date, self.inner.end_date
+        )
+    }
+}
+
+impl PyCorrelationResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         let tickers = &self.inner.tickers;
         if self.inner.matrix.len() != tickers.len() {
             return Err(crate::errors::value_error(format!(
@@ -725,7 +747,7 @@ impl PyCorrelationResult {
                 tickers.len()
             )));
         }
-        let data = PyDict::new(py);
+        let mut builder = TableBuilder::new().utf8("ticker", tickers.clone())?;
         for (j, ticker) in tickers.iter().enumerate() {
             let column: Vec<f64> = self
                 .inner
@@ -737,17 +759,9 @@ impl PyCorrelationResult {
                     })
                 })
                 .collect::<PyResult<_>>()?;
-            data.set_item(ticker, PyArray1::from_vec(py, column))?;
+            builder = builder.f64(ticker, column)?;
         }
-        let index = pyo3::types::PyList::new(py, tickers)?;
-        dict_to_dataframe(py, &data, Some(index.into_any()))
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "CorrelationResult(tickers={:?}, n_obs={}, start_date={}, end_date={})",
-            self.inner.tickers, self.inner.n_obs, self.inner.start_date, self.inner.end_date
-        )
+        builder.build()
     }
 }
 
@@ -757,9 +771,10 @@ wire_methods!(
     "PeriodStats",
     module = "finstack_quant.analytics._types"
 );
-impl_repr_html_via_dataframe!(
+tabular_methods!(
     PyPeriodStats,
-    pydoc!("finstack_quant.analytics._types", "PeriodStats._repr_html_")
+    "PeriodStats",
+    module = "finstack_quant.analytics._types"
 );
 wire_methods!(
     PyBetaResult,
@@ -767,9 +782,10 @@ wire_methods!(
     "BetaResult",
     module = "finstack_quant.analytics._types"
 );
-impl_repr_html_via_dataframe!(
+tabular_methods!(
     PyBetaResult,
-    pydoc!("finstack_quant.analytics._types", "BetaResult._repr_html_")
+    "BetaResult",
+    module = "finstack_quant.analytics._types"
 );
 wire_methods!(
     PyGreeksResult,
@@ -777,12 +793,10 @@ wire_methods!(
     "GreeksResult",
     module = "finstack_quant.analytics._types"
 );
-impl_repr_html_via_dataframe!(
+tabular_methods!(
     PyGreeksResult,
-    pydoc!(
-        "finstack_quant.analytics._types",
-        "GreeksResult._repr_html_"
-    )
+    "GreeksResult",
+    module = "finstack_quant.analytics._types"
 );
 wire_methods!(
     PyRollingGreeks,
@@ -790,12 +804,11 @@ wire_methods!(
     "RollingGreeks",
     module = "finstack_quant.analytics._types"
 );
-impl_repr_html_via_dataframe!(
+tabular_methods!(
     PyRollingGreeks,
-    pydoc!(
-        "finstack_quant.analytics._types",
-        "RollingGreeks._repr_html_"
-    )
+    "RollingGreeks",
+    module = "finstack_quant.analytics._types",
+    index = "date"
 );
 wire_methods!(
     PyMultiFactorResult,
@@ -809,12 +822,10 @@ wire_methods!(
     "DrawdownEpisode",
     module = "finstack_quant.analytics._types"
 );
-impl_repr_html_via_dataframe!(
+tabular_methods!(
     PyDrawdownEpisode,
-    pydoc!(
-        "finstack_quant.analytics._types",
-        "DrawdownEpisode._repr_html_"
-    )
+    "DrawdownEpisode",
+    module = "finstack_quant.analytics._types"
 );
 wire_methods!(
     PyLookbackReturns,
@@ -822,12 +833,11 @@ wire_methods!(
     "LookbackReturns",
     module = "finstack_quant.analytics._types"
 );
-impl_repr_html_via_dataframe!(
+tabular_methods!(
     PyLookbackReturns,
-    pydoc!(
-        "finstack_quant.analytics._types",
-        "LookbackReturns._repr_html_"
-    )
+    "LookbackReturns",
+    module = "finstack_quant.analytics._types",
+    index = "ticker"
 );
 wire_methods!(
     PyDatedSeries,
@@ -835,9 +845,11 @@ wire_methods!(
     "DatedSeries",
     module = "finstack_quant.analytics._types"
 );
-impl_repr_html_via_dataframe!(
+tabular_methods!(
     PyDatedSeries,
-    pydoc!("finstack_quant.analytics._types", "DatedSeries._repr_html_")
+    "DatedSeries",
+    module = "finstack_quant.analytics._types",
+    index = "date"
 );
 
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -867,10 +879,9 @@ wire_methods!(
     "CorrelationResult",
     module = "finstack_quant.analytics._types"
 );
-impl_repr_html_via_dataframe!(
+tabular_methods!(
     PyCorrelationResult,
-    pydoc!(
-        "finstack_quant.analytics._types",
-        "CorrelationResult._repr_html_"
-    )
+    "CorrelationResult",
+    module = "finstack_quant.analytics._types",
+    index = "ticker"
 );

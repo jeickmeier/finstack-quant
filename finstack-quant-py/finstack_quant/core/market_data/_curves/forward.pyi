@@ -5,9 +5,11 @@ from __future__ import annotations
 import datetime
 from typing import Any, NotRequired, Optional, Sequence, TypedDict, Union
 import pandas as pd
+import polars as pl
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import DateLike, TimeOrDate
 from finstack_quant.core.market_data._curves.discount import DiscountCurve
+from finstack_quant.core.table import ArrowTable
 
 class _ForwardCurveOptions(TypedDict):
     id: str
@@ -496,7 +498,24 @@ class ForwardCurve:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export knots as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``t`` (years) and ``factor`` (projection factor); one row
+            per knot, ascending.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export knots as a pandas ``DataFrame``.
 
@@ -508,11 +527,45 @@ class ForwardCurve:
 
         Raises
         ------
-        ValueError
-            If the frame cannot be built.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export knots as a ``polars.DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per knot constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export knots as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
     @property
     def id(self) -> str:
         """

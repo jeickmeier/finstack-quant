@@ -1,6 +1,4 @@
-use numpy::{PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 
 use finstack_quant_factor::{RiskMeasure, risk as model_risk};
 
@@ -79,45 +77,12 @@ pub(in crate::bindings::models::factor) fn extract_risk_measure(
     }
 }
 
-/// `True` when `obj` is a `pandas.DataFrame` (checked by module + type name so
-/// pandas is not imported when it is not already loaded).
-fn is_dataframe(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
-    let ty = obj.get_type();
-    let name: String = ty.getattr("__name__")?.extract()?;
-    if name != "DataFrame" {
-        return Ok(false);
-    }
-    let module: String = ty.getattr("__module__")?.extract()?;
-    Ok(module.starts_with("pandas"))
-}
-
-/// Column labels of a DataFrame as strings.
-fn dataframe_columns(frame: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
-    let columns = frame.getattr("columns")?;
-    columns
-        .try_iter()?
-        .map(|c| c?.str()?.extract::<String>())
-        .collect()
-}
-
-/// `frame.to_numpy(dtype="float64")` as a NumPy array object.
-fn dataframe_to_f64_array<'py>(
-    py: Python<'py>,
-    frame: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let kwargs = PyDict::new(py);
-    kwargs.set_item("dtype", "float64")?;
-    frame
-        .call_method("to_numpy", (), Some(&kwargs))
-        .map_err(|_| value_error("DataFrame must be convertible to a float64 array"))
-}
-
 /// Resolve `position_ids` and the position × scenario P&L matrix.
 ///
 /// Accepted shapes for `position_pnls`:
 ///
-/// - `pandas.DataFrame` — rows are scenarios, columns are positions
-///   (`position_ids` defaults to the column labels);
+/// - `pandas.DataFrame`, `polars.DataFrame`, or Arrow table — rows are scenarios,
+///   columns are positions (`position_ids` defaults to the column labels);
 /// - nested list or 2-D NumPy array shaped `n_positions × n_scenarios`
 ///   (position-major), the Rust `flatten_position_pnls` layout WASM shares.
 pub(super) fn extract_pnl_input(
@@ -125,28 +90,25 @@ pub(super) fn extract_pnl_input(
     position_ids: Option<Vec<String>>,
     position_pnls: &Bound<'_, PyAny>,
 ) -> PyResult<(Vec<String>, PositionPnlMatrix)> {
-    if is_dataframe(position_pnls)? {
-        let columns = dataframe_columns(position_pnls)?;
+    use crate::bindings::dataframe_utils::{extract_2d_f64, is_dataframe_like, table_column_names};
+    if is_dataframe_like(position_pnls)? {
+        let columns = table_column_names(position_pnls)?;
         let ids = position_ids.unwrap_or(columns);
-        let array = dataframe_to_f64_array(py, position_pnls)?;
-        let array = array
-            .extract::<PyReadonlyArray2<'_, f64>>()
-            .map_err(|_| value_error("position_pnls DataFrame must be two-dimensional"))?;
-        let shape = array.shape();
-        if shape[1] != ids.len() {
+        let (data, n_scenarios, ncols) = extract_2d_f64(position_pnls, "position_pnls")?
+            .ok_or_else(|| value_error("position_pnls DataFrame must be convertible to float64"))?;
+        if ncols != ids.len() {
             return Err(value_error(format!(
                 "position_pnls DataFrame has {} columns but {} position ids; \
                  rows are scenarios and columns are positions",
-                shape[1],
+                ncols,
                 ids.len()
             )));
         }
-        let data: Vec<f64> = array.as_array().iter().copied().collect();
-        let matrix = PositionPnlMatrix::from_scenario_major(data, shape[0]);
+        let matrix = PositionPnlMatrix::from_scenario_major(data, n_scenarios);
         return Ok((ids, matrix));
     }
     let ids = position_ids.ok_or_else(|| {
-        value_error("position_ids is required unless position_pnls is a pandas.DataFrame")
+        value_error("position_ids is required unless position_pnls is a DataFrame")
     })?;
     let matrix = extract_position_pnls(py, position_pnls, ids.len())?;
     Ok((ids, matrix))

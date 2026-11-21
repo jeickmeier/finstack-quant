@@ -7,15 +7,16 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyModule};
 
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_rows_to_dataframe_with_schema, serde_to_py,
-};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::{portfolio_to_py, serde_json_to_py};
 
-/// Column schema shared by [`PyBrinsonPeriodResult::to_dataframe`] and
-/// [`PyCarinoLinkedAttribution::to_dataframe`] (both frames are sector-effect
+/// Column schema shared by [`PyBrinsonPeriodResult::to_arrow_table`] and
+/// [`PyCarinoLinkedAttribution::to_arrow_table`] (both tables are sector-effect
 /// tables).
-const SECTOR_EFFECT_COLUMNS: &[ColumnSchema<'static>] = &[
+const SECTOR_EFFECT_COLUMNS: &[(&str, &str)] = &[
     ("sector", "str"),
     ("allocation", "float64"),
     ("selection", "float64"),
@@ -87,14 +88,6 @@ impl PyBrinsonPeriodResult {
         self.inner.total_excess_return
     }
 
-    /// Per-sector effects as a :class:`pandas.DataFrame`.
-    ///
-    /// Columns: ``sector``, ``allocation``, ``selection``, ``interaction``,
-    /// ``total``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(py, &self.inner.sectors, SECTOR_EFFECT_COLUMNS)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "BrinsonPeriodResult(sectors={}, total_excess_return={})",
@@ -103,6 +96,14 @@ impl PyBrinsonPeriodResult {
         )
     }
 }
+
+impl PyBrinsonPeriodResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.inner.sectors, SECTOR_EFFECT_COLUMNS)
+    }
+}
+
+tabular_methods!(PyBrinsonPeriodResult);
 
 /// Carino-linked multi-period Brinson attribution result.
 ///
@@ -168,14 +169,6 @@ impl PyCarinoLinkedAttribution {
         self.inner.linked_interaction
     }
 
-    /// Linked per-sector effects as a :class:`pandas.DataFrame`.
-    ///
-    /// Columns: ``sector``, ``allocation``, ``selection``, ``interaction``,
-    /// ``total``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(py, &self.inner.linked_sectors, SECTOR_EFFECT_COLUMNS)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "CarinoLinkedAttribution(periods={}, sectors={})",
@@ -184,6 +177,14 @@ impl PyCarinoLinkedAttribution {
         )
     }
 }
+
+impl PyCarinoLinkedAttribution {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.inner.linked_sectors, SECTOR_EFFECT_COLUMNS)
+    }
+}
+
+tabular_methods!(PyCarinoLinkedAttribution);
 
 /// Compute a single-period Brinson-Fachler attribution from sector JSON.
 ///
@@ -198,7 +199,7 @@ impl PyCarinoLinkedAttribution {
 /// -------
 /// BrinsonPeriodResult
 ///     Typed result with per-sector effects, effect totals, and
-///     ``to_dataframe()`` / ``to_json()`` exits. Use
+///     ``to_pandas()`` / ``to_polars()`` / ``to_arrow()`` / ``to_json()`` exits. Use
 ///     :meth:`to_json` for the raw wire string.
 #[pyfunction]
 #[pyo3(text_signature = "(sectors)")]
@@ -242,6 +243,14 @@ fn brinson_fachler(py: Python<'_>, sectors: &Bound<'_, PyAny>) -> PyResult<PyBri
 #[pyfunction]
 #[pyo3(text_signature = "(periods)")]
 fn carino_link(py: Python<'_>, periods: &Bound<'_, PyAny>) -> PyResult<PyCarinoLinkedAttribution> {
+    if let Ok(typed) = periods.extract::<Vec<PyRef<'_, PyBrinsonPeriodResult>>>() {
+        let items: Vec<_> = typed.into_iter().map(|item| item.inner.clone()).collect();
+        return Ok(PyCarinoLinkedAttribution {
+            inner: py
+                .detach(move || finstack_quant_portfolio::brinson::carino_link(&items))
+                .map_err(portfolio_to_py)?,
+        });
+    }
     let periods = crate::bindings::extract::extract_records_json(py, periods, "periods")?;
     Ok(PyCarinoLinkedAttribution {
         inner: py.detach(move || {
@@ -259,13 +268,12 @@ fn carino_link(py: Python<'_>, periods: &Bound<'_, PyAny>) -> PyResult<PyCarinoL
 ///
 /// Parameters
 /// ----------
-/// periods : str | list[list[dict]]
-///     Chronological periods, each a list of ``SectorPeriod`` objects
-///     (``sector``, ``portfolio_weight``, ``benchmark_weight``,
-///     ``portfolio_return``, ``benchmark_return``), or the JSON of that
-///     nested list. Weights are decimal fractions summing to one on each
-///     side; returns are decimal period returns. Every period lists the same
-///     sectors in the same order.
+/// periods : str | list[list[dict]] | list[pandas.DataFrame] | pandas.DataFrame | polars.DataFrame
+///     Chronological periods, either as nested ``SectorPeriod`` sequences
+///     (list of per-period sector lists or DataFrames) or as a tidy DataFrame
+///     with a ``period`` column grouping chronological rows (each group
+///     holding ``sector``, ``portfolio_weight``, ``benchmark_weight``,
+///     ``portfolio_return``, ``benchmark_return``).
 ///
 /// Returns
 /// -------
@@ -276,7 +284,7 @@ fn carino_link(py: Python<'_>, periods: &Bound<'_, PyAny>) -> PyResult<PyCarinoL
 /// Raises
 /// ------
 /// ValueError
-///     If the JSON is malformed.
+///     If the JSON is malformed or a tidy DataFrame lacks a ``period`` column.
 /// PortfolioError
 ///     If there are no periods, a period fails Brinson-Fachler (the message
 ///     names the zero-based period), the sector ordering changes between
@@ -287,11 +295,45 @@ fn brinson_linked(
     py: Python<'_>,
     periods: &Bound<'_, PyAny>,
 ) -> PyResult<PyCarinoLinkedAttribution> {
-    let periods = crate::bindings::extract::extract_records_json(py, periods, "periods")?;
+    let grouped_json = if let Some(records_py) =
+        crate::bindings::dataframe_utils::table_to_py_records(py, periods)?
+    {
+        let records: Vec<Bound<'_, pyo3::types::PyDict>> = records_py.extract()?;
+        let mut order: Vec<String> = Vec::new();
+        let mut groups: std::collections::HashMap<String, Vec<Bound<'_, pyo3::types::PyDict>>> =
+            std::collections::HashMap::new();
+        for row in records {
+            let copy = row.copy()?;
+            let period_key = copy
+                .call_method1("pop", ("period",))
+                .map_err(|_| {
+                    crate::errors::value_error(
+                        "brinson_linked expects a 'period' column when given a single DataFrame",
+                    )
+                })?
+                .str()?
+                .to_string();
+            groups
+                .entry(period_key.clone())
+                .or_insert_with(|| {
+                    order.push(period_key);
+                    Vec::new()
+                })
+                .push(copy);
+        }
+        let grouped: Vec<Vec<Bound<'_, pyo3::types::PyDict>>> = order
+            .into_iter()
+            .filter_map(|key| groups.remove(&key))
+            .collect();
+        let list = pyo3::types::PyList::new(py, grouped)?;
+        crate::bindings::module_utils::py_to_json_string(py, &list, "periods")?
+    } else {
+        crate::bindings::extract::extract_records_json(py, periods, "periods")?
+    };
     Ok(PyCarinoLinkedAttribution {
         inner: py.detach(move || {
             let periods: Vec<Vec<finstack_quant_portfolio::brinson::SectorPeriod>> =
-                serde_json::from_str(&periods)
+                serde_json::from_str(&grouped_json)
                     .map_err(|err| serde_json_to_py(err, "invalid Brinson sector periods JSON"))?;
             finstack_quant_portfolio::brinson::brinson_linked(&periods).map_err(portfolio_to_py)
         })?,

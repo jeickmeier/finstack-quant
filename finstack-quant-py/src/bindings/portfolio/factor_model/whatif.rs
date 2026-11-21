@@ -2,16 +2,17 @@
 //! (Rust `factor_model::whatif`): `WhatIfResult`, `FactorContributionDelta`,
 //! `StressResult` and `StressPnl`.
 
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::tabular_methods;
 use crate::bindings::models::factor::risk::PyRiskDecomposition;
 use crate::bindings::module_utils::py_to_serde;
-use crate::bindings::pandas_utils::dict_to_dataframe;
+use crate::bindings::table_builders::TableBuilder;
 use finstack_quant_portfolio::factor_model as fm;
 use finstack_quant_portfolio::factor_model::FactorContributionDelta;
 use finstack_quant_portfolio::factor_model::StressPnl;
 use finstack_quant_portfolio::factor_model::StressResult;
 use finstack_quant_portfolio::factor_model::WhatIfResult;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 
 /// Deserialize what-if position changes straight into the canonical Rust
 /// `PositionChange` wire shape (`{"kind": "remove" | "resize", ...}`).
@@ -99,7 +100,7 @@ impl PyWhatIfResult {
 impl PyWhatIfResult {
     /// Baseline risk decomposition used as the comparison point.
     ///
-    /// Use its own frame accessors (:meth:`RiskDecomposition.to_factor_dataframe`
+    /// Use its own table accessors (:meth:`RiskDecomposition.to_factor_table`
     /// and friends) for a tabular view of the baseline.
     #[getter]
     fn before(&self) -> PyRiskDecomposition {
@@ -123,27 +124,6 @@ impl PyWhatIfResult {
             .collect()
     }
 
-    /// Export the per-factor contribution changes as a pandas ``DataFrame``.
-    ///
-    /// One row per entry of :attr:`delta`. The baseline and scenario
-    /// decompositions are not flattened here — reach them through
-    /// :attr:`before` / :attr:`after` and their own frame accessors.
-    ///
-    /// Columns: ``factor_id``, ``absolute_change`` (risk-measure units),
-    /// ``relative_change`` (dimensionless fraction, not a percentage).
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows = &self.inner.delta;
-        let factor_ids: Vec<&str> = rows.iter().map(|d| d.factor_id.as_str()).collect();
-        let absolute_change: Vec<f64> = rows.iter().map(|d| d.absolute_change).collect();
-        let relative_change: Vec<f64> = rows.iter().map(|d| d.relative_change).collect();
-        let data = PyDict::new(py);
-        data.set_item("factor_id", factor_ids)?;
-        data.set_item("absolute_change", absolute_change)?;
-        data.set_item("relative_change", relative_change)?;
-        dict_to_dataframe(py, &data, None)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "WhatIfResult(before_total={}, after_total={}, delta_entries={})",
@@ -154,7 +134,22 @@ impl PyWhatIfResult {
     }
 }
 crate::bindings::macros::wire_methods!(PyWhatIfResult, WhatIfResult, "WhatIfResult");
-crate::bindings::macros::impl_repr_html_via_dataframe!(PyWhatIfResult);
+
+impl PyWhatIfResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let rows = &self.inner.delta;
+        let factor_ids: Vec<String> = rows.iter().map(|d| d.factor_id.to_string()).collect();
+        let absolute_change: Vec<f64> = rows.iter().map(|d| d.absolute_change).collect();
+        let relative_change: Vec<f64> = rows.iter().map(|d| d.relative_change).collect();
+        TableBuilder::new()
+            .utf8("factor_id", factor_ids)?
+            .f64("absolute_change", absolute_change)?
+            .f64("relative_change", relative_change)?
+            .build()
+    }
+}
+
+tabular_methods!(PyWhatIfResult);
 
 /// Result of a factor-stress scenario.
 #[pyclass(
@@ -204,24 +199,6 @@ impl PyStressResult {
         PyRiskDecomposition::from_inner(self.inner.stressed_decomposition.clone())
     }
 
-    /// Export the per-position stressed P&L as a pandas ``DataFrame``.
-    ///
-    /// One row per entry of :attr:`position_pnl`. The scenario totals stay on
-    /// :attr:`total_pnl` and :attr:`stressed_decomposition`.
-    ///
-    /// Columns: ``position_id``, ``pnl`` (portfolio-currency amount; a loss is
-    /// negative).
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows = &self.inner.pnl.position_pnl;
-        let position_ids: Vec<&str> = rows.iter().map(|(id, _)| id.as_str()).collect();
-        let pnl: Vec<f64> = rows.iter().map(|(_, pnl)| *pnl).collect();
-        let data = PyDict::new(py);
-        data.set_item("position_id", position_ids)?;
-        data.set_item("pnl", pnl)?;
-        dict_to_dataframe(py, &data, None)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "StressResult(total_pnl={}, positions={}, stressed_total_risk={})",
@@ -232,7 +209,20 @@ impl PyStressResult {
     }
 }
 crate::bindings::macros::wire_methods!(PyStressResult, StressResult, "StressResult");
-crate::bindings::macros::impl_repr_html_via_dataframe!(PyStressResult);
+
+impl PyStressResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let rows = &self.inner.pnl.position_pnl;
+        let position_ids: Vec<String> = rows.iter().map(|(id, _)| id.as_str().to_owned()).collect();
+        let pnl: Vec<f64> = rows.iter().map(|(_, pnl)| *pnl).collect();
+        TableBuilder::new()
+            .utf8("position_id", position_ids)?
+            .f64("pnl", pnl)?
+            .build()
+    }
+}
+
+tabular_methods!(PyStressResult);
 
 /// P&L-only result of a factor-stress scenario.
 ///
@@ -280,21 +270,6 @@ impl PyStressPnl {
             .collect()
     }
 
-    /// Export the per-position stressed P&L as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``position_id``, ``pnl`` (portfolio base-currency amount; a
-    /// loss is negative).
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows = &self.inner.position_pnl;
-        let position_ids: Vec<&str> = rows.iter().map(|(id, _)| id.as_str()).collect();
-        let pnl: Vec<f64> = rows.iter().map(|(_, pnl)| *pnl).collect();
-        let data = PyDict::new(py);
-        data.set_item("position_id", position_ids)?;
-        data.set_item("pnl", pnl)?;
-        dict_to_dataframe(py, &data, None)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "StressPnl(total_pnl={}, positions={})",
@@ -304,4 +279,17 @@ impl PyStressPnl {
     }
 }
 crate::bindings::macros::wire_methods!(PyStressPnl, StressPnl, "StressPnl");
-crate::bindings::macros::impl_repr_html_via_dataframe!(PyStressPnl);
+
+impl PyStressPnl {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let rows = &self.inner.position_pnl;
+        let position_ids: Vec<String> = rows.iter().map(|(id, _)| id.as_str().to_owned()).collect();
+        let pnl: Vec<f64> = rows.iter().map(|(_, pnl)| *pnl).collect();
+        TableBuilder::new()
+            .utf8("position_id", position_ids)?
+            .f64("pnl", pnl)?
+            .build()
+    }
+}
+
+tabular_methods!(PyStressPnl);

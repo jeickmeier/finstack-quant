@@ -65,7 +65,7 @@ impl PyCommodityForward {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.underlying")]
     #[getter]
     fn underlying<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.underlying)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.underlying)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.quantity")]
@@ -89,13 +89,13 @@ impl PyCommodityForward {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.settlement")]
     #[getter]
     fn settlement<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.settlement)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.settlement)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.position")]
     #[getter]
     fn position<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.position)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.position)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.contract_price")]
@@ -143,7 +143,7 @@ impl PyCommodityForward {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.convention")]
     #[getter]
     fn convention<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.convention)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.convention)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_forward", "CommodityForward.settlement_days")]

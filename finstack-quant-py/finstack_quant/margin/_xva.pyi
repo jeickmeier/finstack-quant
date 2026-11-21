@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import Any, Literal, TypedDict, Unpack
 import pandas as pd
+import polars as pl
 from finstack_quant.core.market_data import DiscountCurve, HazardCurve
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.margin._im import SimmCalculator, SimmSensitivities
 from finstack_quant.margin._types import NettingSetId
 
@@ -433,7 +435,7 @@ class ExposureProfile:
     >>> profile.validate()
     >>> profile.as_of.isoformat()
     '2025-01-01'
-    >>> ExposureProfile.from_dataframe(profile.to_dataframe()).ene
+    >>> ExposureProfile.from_dataframe(profile.to_pandas()).ene
     [0.0, 40.0]
     >>> ExposureProfile.from_json(profile.to_json()).dates == profile.dates
     True
@@ -462,24 +464,63 @@ class ExposureProfile:
         """
 
     @staticmethod
-    def from_dataframe(frame: pd.DataFrame) -> ExposureProfile:
-        """Restore a valid profile from a frame exported by to_dataframe.
+    def from_dataframe(
+        frame: pd.DataFrame | pl.DataFrame | Any,
+        *,
+        as_of: date | str | None = None,
+        currency: str | None = None,
+        basis: Mapping[str, Any] | None = None,
+        diagnostics: ExposureDiagnostics | Mapping[str, Any] | None = None,
+        time_col: str | None = None,
+    ) -> ExposureProfile:
+        """Restore a valid profile from a tabular exposure frame.
+
+        Accepts a pandas ``DataFrame``, Polars ``DataFrame``, or Arrow table
+        with ``dates``, ``mtm_values``, ``epe``, and ``ene`` columns plus year
+        fractions from either a ``times`` column, ``time_col``, or the pandas
+        index. Provenance metadata embedded in pandas ``frame.attrs["finstack_exposure"]``
+        is used as a default and overridden by explicit keyword arguments.
 
         Parameters
         ----------
-        frame : DataFrame
-            Year-fraction index with dates and exposure columns and preserved
-            finstack_exposure metadata.
+        frame : pd.DataFrame | pl.DataFrame | Any
+            Tabular profile containing ``dates``, ``mtm_values``, ``epe``, and
+            ``ene`` columns (plus year fractions in ``times``, ``time_col``, or
+            the pandas index). Polars and Arrow frames must supply ``as_of``
+            and ``currency`` explicitly because they do not carry pandas
+            ``attrs`` metadata.
+        as_of : datetime.date | str | None, optional
+            Valuation date (ISO-8601 string or date-like object). Overrides any
+            ``as_of`` stored in ``frame.attrs["finstack_exposure"]``; required
+            when absent from metadata.
+        currency : str | None, optional
+            ISO-4217 exposure currency code. Overrides any ``currency`` stored
+            in ``frame.attrs["finstack_exposure"]``; required when absent from
+            metadata.
+        basis : Mapping[str, Any] | None, optional
+            Optional provenance mapping describing the exposure simulation basis.
+            Overrides any ``basis`` stored in ``frame.attrs["finstack_exposure"]``.
+        diagnostics : ExposureDiagnostics | Mapping[str, Any] | None, optional
+            Optional diagnostic counts for the simulated profile. Overrides any
+            ``diagnostics`` stored in ``frame.attrs["finstack_exposure"]``.
+        time_col : str | None, optional
+            Column name holding year fractions from ``as_of``. When omitted,
+            uses a ``"times"`` column if present or falls back to the pandas
+            row index.
 
         Returns
         -------
         ExposureProfile
-            Checked profile with the original valuation cut and provenance.
+            Checked profile with the original or supplied valuation cut and
+            provenance.
 
         Raises
         ------
+        KeyError
+            If ``time_col`` is specified but not found in ``frame``.
         TypeError
-            If the object is not a DataFrame or its metadata is not a mapping.
+            If ``frame`` is not a supported DataFrame/Arrow table or its
+            metadata is not a mapping.
         ValueError
             If a required column or provenance field is missing or invalid.
 
@@ -496,7 +537,7 @@ class ExposureProfile:
         ...     ene=[0.0],
         ...     diagnostics=ExposureDiagnostics(total_time_points=1),
         ... )
-        >>> ExposureProfile.from_dataframe(profile.to_dataframe()).mtm_values
+        >>> ExposureProfile.from_dataframe(profile.to_pandas()).mtm_values
         [10.0]
         """
 
@@ -696,21 +737,76 @@ class ExposureProfile:
             Grid size including the opening observation.
         """
 
-    def to_dataframe(self) -> pd.DataFrame:
-        """Export dated exposure amounts and source evidence.
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export dated exposure amounts as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        DataFrame
-            Columns dates, mtm_values, epe and ene, indexed by year
-            fractions with source evidence in the finstack_exposure attribute.
+        ArrowTable
+            Columns ``times`` (year fractions), ``dates``, ``mtm_values``,
+            ``epe``, and ``ene``.
 
         Raises
         ------
         ValueError
-            If the profile data cannot be converted to pandas.
+            If the exposure profile cannot be converted to an Arrow table.
         """
 
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export dated exposure amounts and source evidence as a pandas ``DataFrame``.
+
+        Returns
+        -------
+        pd.DataFrame
+            Columns ``dates``, ``mtm_values``, ``epe``, and ``ene``, indexed by
+            year fractions (``times``) with source evidence in
+            ``df.attrs["finstack_exposure"]``.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the exposure profile cannot be converted to pandas.
+        """
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export dated exposure amounts as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Columns ``times`` (year fractions), ``dates``, ``mtm_values``,
+            ``epe``, and ``ene``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export dated exposure amounts as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Columns ``times`` (year fractions), ``dates``, ``mtm_values``,
+            ``epe``, and ``ene``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str: ...
 
 class XvaResult:
@@ -1096,18 +1192,34 @@ class XvaResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the XVA components as a single-row pandas DataFrame.
+        Export the XVA components as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``cva``, ``dva``, ``fva``, ``mva``, ``total_xva``,
         ``max_epe``, ``effective_epe`` -- all in the netting set's currency
         units, matching the properties of the same name. Uncomputed legs
-        (``dva`` / ``fva`` / ``mva``) are ``NaN`` rather than absent, so the
-        frame keeps its schema across netting sets.
+        (``dva`` / ``fva`` / ``mva``) are null rather than absent, so the
+        table keeps its schema across netting sets.
 
         This is the default export; the time-indexed exposure profiles are a
-        separate table -- see :meth:`to_profiles_dataframe`.
+        separate table -- see :meth:`to_profiles_table`.
+
+        Returns
+        -------
+        ArrowTable
+            Single-row table of XVA components.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the XVA components as a single-row pandas ``DataFrame``.
 
         Returns
         -------
@@ -1117,22 +1229,56 @@ class XvaResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
-    def to_profiles_dataframe(self) -> pd.DataFrame:
+    def to_polars(self) -> pl.DataFrame:
         """
-        Export exposure profiles as a pandas DataFrame.
-
-        Columns: ``epe``, ``ene``, ``effective_epe`` -- indexed
-        by time in years.
+        Export the XVA components as a single-row Polars ``DataFrame``.
 
         Returns
         -------
-        pd.DataFrame
-            Profile DataFrame.
+        pl.DataFrame
+            Single-row DataFrame of XVA components.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the XVA components as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row table of XVA components.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_profiles_table(self) -> ArrowTable:
+        """
+        Export exposure profiles as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``times``, ``epe``, ``ene``, ``effective_epe``.
+
+        Returns
+        -------
+        ArrowTable
+            Profile table.
 
         Notes
         -----
@@ -1406,15 +1552,19 @@ class MarginFundingSpread:
         """
 
     @staticmethod
-    def dated(knots: Sequence[tuple[date | str, float]] | pd.Series) -> MarginFundingSpread:
+    def dated(
+        knots: Sequence[tuple[date | str, float]] | pd.Series | pd.DataFrame | pl.DataFrame | Any,
+    ) -> MarginFundingSpread:
         """Author linear interpolation across calendar spread observations.
 
         Parameters
         ----------
-        knots : sequence or pandas.Series
+        knots : sequence | pd.Series | pd.DataFrame | pl.DataFrame | Any
             Strictly ordered calendar dates and nonnegative finite basis-point
-            spreads. A Series supplies date objects or ISO strings as its
-            index. The dates must cover the full IM horizon.
+            spreads. A ``pandas.Series`` supplies date objects or ISO strings
+            as its index; two-column DataFrames or Arrow tables read dates
+            from the first column and spreads from the second. The dates must
+            cover the full IM horizon.
 
         Returns
         -------
@@ -1630,7 +1780,21 @@ class ImProfile:
         [100.0, 0.0]
         """
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """Build a dated :class:`~finstack_quant.core.table.ArrowTable` of IM observations.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``times``, ``date``, and ``im``.
+
+        Raises
+        ------
+        ValueError
+            If the table cannot be built.
+        """
+
+    def to_pandas(self) -> pd.DataFrame:
         """Build a dated pandas observation frame.
 
         Returns
@@ -1644,6 +1808,37 @@ class ImProfile:
             If pandas is unavailable.
         """
 
+    def to_polars(self) -> pl.DataFrame:
+        """Build a dated Polars observation frame.
+
+        Returns
+        -------
+        polars.DataFrame
+            Columns ``times``, ``date``, and ``im``.
+
+        Raises
+        ------
+        ImportError
+            If polars is unavailable.
+        """
+
+    def to_pyarrow(self) -> Any:
+        """Build a dated ``pyarrow.Table`` of IM observations.
+
+        Returns
+        -------
+        pyarrow.Table
+            Columns ``times``, ``date``, and ``im``.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is unavailable.
+        """
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __len__(self) -> int: ...
     def __repr__(self) -> str: ...
 
@@ -1800,7 +1995,23 @@ class MvaResult:
             If the numerical evidence cannot be represented as Python data.
         """
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export the IM profile as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``times``, ``date``, and ``im``.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export the IM profile as a pandas ``DataFrame``.
 
@@ -1811,11 +2022,46 @@ class MvaResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the IM profile as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Columns ``times``, ``date``, and ``im``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the IM profile as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Columns ``times``, ``date``, and ``im``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str: ...
 
 def im_profile_from_simm(

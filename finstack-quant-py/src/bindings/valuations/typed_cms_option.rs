@@ -70,7 +70,7 @@ impl PyCmsOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.cms_tenor")]
     #[getter]
     fn cms_tenor<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.cms_tenor)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.cms_tenor)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.fixing_dates")]
@@ -100,13 +100,13 @@ impl PyCmsOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.accrual_fractions")]
     #[getter]
     fn accrual_fractions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.accrual_fractions)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.accrual_fractions)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.option_type")]
     #[getter]
     fn option_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.option_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.option_type)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.notional")]
@@ -139,13 +139,13 @@ impl PyCmsOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.swap_fixed_frequency")]
     #[getter]
     fn swap_fixed_frequency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.swap_fixed_frequency)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.swap_fixed_frequency)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.swap_float_frequency")]
     #[getter]
     fn swap_float_frequency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.swap_float_frequency)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.swap_float_frequency)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_option", "CmsOption.swap_fixed_day_count")]

@@ -6,7 +6,7 @@
 //! classification and lookup logic stays in Rust.
 
 use super::config::PyFinstackConfig;
-use crate::bindings::macros::wire_methods;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::errors::core_to_py;
 use finstack_quant_core::rating_scales::{
     RATING_SCALES_EXTENSION_KEY, RatingLevel, RatingScaleEntry, RatingScaleRegistry,
@@ -262,15 +262,15 @@ impl PyScorecardScale {
             self.inner.get_ratings().len()
         )
     }
+}
 
-    /// Rating levels as a pandas ``DataFrame`` with columns
-    /// ``name``, ``score``, ``min_score`` (one row per level, best first).
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::core::table::envelope_to_pandas(py, &self.inner.to_table())
+impl PyScorecardScale {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<crate::bindings::core::table::PyArrowTable> {
+        crate::bindings::core::table::PyArrowTable::from_envelope(&self.inner.to_table())
     }
 }
 
+tabular_methods!(PyScorecardScale);
 wire_methods!(PyScorecardScale, ScorecardScale, "ScorecardScale");
 
 /// One registered scale with its normalized id and provenance.

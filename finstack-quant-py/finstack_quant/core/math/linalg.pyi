@@ -4,10 +4,11 @@ Linear algebra utilities: Cholesky decomposition and triangular solves.
 Correlation-matrix validation lives in
 :func:`finstack_quant.models.correlation.validate_correlation_matrix`.
 
-Matrix inputs accept nested ``list[list[float]]`` or two-dimensional
-``numpy.ndarray`` (``float64``) arrays. NumPy inputs use logical row and
-column order for C-contiguous, Fortran-contiguous, transposed and strided
-layouts; vectors are ``list[float]``.
+Matrix inputs accept nested ``Sequence[Sequence[float]]``, two-dimensional
+numeric ``numpy.ndarray`` arrays, ``pandas.DataFrame``, ``polars.DataFrame``,
+or Arrow tables. NumPy inputs use logical row and column order for
+C-contiguous, Fortran-contiguous, transposed and strided layouts; vectors
+accept sequences, 1-D NumPy arrays, ``pandas.Series``, and ``polars.Series``.
 
 Examples
 --------
@@ -20,11 +21,17 @@ Examples
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
+import polars as pl
 
 from finstack_quant.core import FinstackError
+
+MatrixInput = Sequence[Sequence[float]] | npt.NDArray[Any] | pd.DataFrame | pl.DataFrame | Any
+VectorInput = Sequence[float] | npt.NDArray[Any] | pd.Series | pl.Series | Any
 
 __all__ = [
     "CholeskyError",
@@ -55,9 +62,7 @@ class CholeskyError(FinstackError):
 
     ...
 
-def apply_lower_triangular(
-    l: list[list[float]] | npt.NDArray[np.float64], z: Sequence[float] | npt.NDArray[np.float64]
-) -> list[float]:
+def apply_lower_triangular(l: MatrixInput, z: VectorInput) -> list[float]:
     """
     Apply a lower-triangular factor L to a vector z, returning ``L z``.
 
@@ -67,11 +72,11 @@ def apply_lower_triangular(
 
     Parameters
     ----------
-    l : list[list[float]] or numpy.ndarray
+    l : Sequence[Sequence[float]] or numpy.ndarray or DataFrame or Arrow table
         Square lower-triangular factor L, typically the output of
         ``cholesky_decomposition``. Only the lower triangle is read; the
         upper triangle is assumed zero and ignored.
-    z : list[float]
+    z : Sequence[float] or numpy.ndarray or Series
         Vector to transform, of the same length as L's dimension,
         typically independent standard-normal draws.
 
@@ -99,16 +104,16 @@ def apply_lower_triangular(
     ...
 
 def apply_lower_triangular_many(
-    l: Sequence[Sequence[float]] | npt.NDArray[np.float64],
-    z: Sequence[Sequence[float]] | npt.NDArray[np.float64],
+    l: MatrixInput,
+    z: MatrixInput,
 ) -> npt.NDArray[np.float64]:
     """Apply one lower-triangular factor to rows of independent draws.
 
     Parameters
     ----------
-    l : array-like
+    l : array-like or DataFrame
         A square factor in row-major order. Only its lower triangle is read.
-    z : array-like
+    z : array-like or DataFrame
         Draw matrix of shape ``(n_draws, n_variables)``. Each row contains one
         finite observation per variable in factor order.
 
@@ -135,7 +140,7 @@ def apply_lower_triangular_many(
     ...
 
 def cholesky_decomposition(
-    matrix: list[list[float]] | npt.NDArray[np.float64],
+    matrix: MatrixInput,
 ) -> list[list[float]]:
     """
     Compute the Cholesky decomposition L of a symmetric positive-definite
@@ -148,7 +153,7 @@ def cholesky_decomposition(
 
     Parameters
     ----------
-    matrix : list[list[float]] or numpy.ndarray
+    matrix : Sequence[Sequence[float]] or numpy.ndarray or DataFrame or Arrow table
         Finite symmetric positive-definite square matrix in logical row
         and column order; NumPy strides do not change that ordering.
 
@@ -179,9 +184,7 @@ def cholesky_decomposition(
     """
     ...
 
-def cholesky_solve(
-    chol: list[list[float]] | npt.NDArray[np.float64], b: Sequence[float] | npt.NDArray[np.float64]
-) -> list[float]:
+def cholesky_solve(chol: MatrixInput, b: VectorInput) -> list[float]:
     """
     Solve a symmetric positive-definite linear system A x = b given
     the Cholesky factor L of A (where A = L L^T).
@@ -192,11 +195,11 @@ def cholesky_solve(
 
     Parameters
     ----------
-    chol : list[list[float]] or numpy.ndarray
+    chol : Sequence[Sequence[float]] or numpy.ndarray or DataFrame or Arrow table
         Square Cholesky factor L; its consumed lower triangle must be
         finite. The unused upper triangle is ignored. NumPy inputs use
         logical row and column order regardless of strides.
-    b : Sequence[float] or numpy.ndarray
+    b : Sequence[float] or numpy.ndarray or Series
         Finite right-hand side vector with one value per factor row.
 
     Returns
@@ -225,14 +228,14 @@ def cholesky_solve(
     ...
 
 def symmetric_eigen(
-    matrix: list[list[float]] | npt.NDArray[np.float64],
+    matrix: MatrixInput,
 ) -> tuple[list[float], list[list[float]]]:
     """
     Symmetric eigendecomposition of a square matrix.
 
     Parameters
     ----------
-    matrix : list[list[float]] or numpy.ndarray
+    matrix : Sequence[Sequence[float]] or numpy.ndarray or DataFrame or Arrow table
         Finite symmetric square matrix in logical row and column order.
 
     Returns
@@ -263,7 +266,7 @@ def symmetric_eigen(
     ...
 
 def ledoit_wolf_shrinkage(
-    observations: list[list[float]] | npt.NDArray[np.float64],
+    observations: MatrixInput,
 ) -> tuple[list[list[float]], float]:
     """
     Ledoit-Wolf (2004) shrinkage of a sample covariance toward a scaled identity.
@@ -276,7 +279,7 @@ def ledoit_wolf_shrinkage(
 
     Parameters
     ----------
-    observations : list[list[float]] or numpy.ndarray
+    observations : Sequence[Sequence[float]] or numpy.ndarray or DataFrame or Arrow table
         ``t x n`` matrix: ``t`` observations (rows) of ``n`` variables
         (columns), ``t >= 2``, ``n >= 1``; every entry must be finite. Use
         comparable units across columns because the target pools their

@@ -13,13 +13,14 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyModule};
 
 use crate::bindings::core::market_data::curves::PyDiscountCurve;
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_rows_to_dataframe_with_schema, serde_to_py,
-};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::{portfolio_to_py, serde_json_to_py};
 
-/// Column schema for [`PyDurationCellTable::to_dataframe`].
-const CELL_COLUMNS: &[ColumnSchema<'static>] = &[
+/// Column schema for [`PyDurationCellTable::to_arrow_table`].
+const CELL_COLUMNS: &[(&str, &str)] = &[
     ("label", "str"),
     ("lower", "float64"),
     ("upper", "float64"),
@@ -27,8 +28,8 @@ const CELL_COLUMNS: &[ColumnSchema<'static>] = &[
     ("observed", "bool"),
 ];
 
-/// Column schema for [`PyExcessReturnResult::to_dataframe`].
-const POSITION_EXCESS_COLUMNS: &[ColumnSchema<'static>] = &[
+/// Column schema for [`PyExcessReturnResult::to_arrow_table`].
+const POSITION_EXCESS_COLUMNS: &[(&str, &str)] = &[
     ("id", "str"),
     ("cell", "str"),
     ("base_return", "float64"),
@@ -71,14 +72,6 @@ impl PyDurationCellTable {
         serde_to_py(py, &self.inner.cells)
     }
 
-    /// Cells as a :class:`pandas.DataFrame`.
-    ///
-    /// Columns: ``label``, ``lower``, ``upper``, ``base_return``,
-    /// ``observed``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(py, &self.inner.cells, CELL_COLUMNS)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "DurationCellTable(base_label={:?}, cells={})",
@@ -87,6 +80,14 @@ impl PyDurationCellTable {
         )
     }
 }
+
+impl PyDurationCellTable {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.inner.cells, CELL_COLUMNS)
+    }
+}
+
+tabular_methods!(PyDurationCellTable);
 
 /// Per-position and portfolio-level duration-matched credit excess returns.
 ///
@@ -140,13 +141,6 @@ impl PyExcessReturnResult {
         self.inner.portfolio_excess_return
     }
 
-    /// Per-position excess returns as a :class:`pandas.DataFrame`.
-    ///
-    /// Columns: ``id``, ``cell``, ``base_return``, ``excess_return``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(py, &self.inner.positions, POSITION_EXCESS_COLUMNS)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "ExcessReturnResult(positions={}, portfolio_excess_return={})",
@@ -155,6 +149,14 @@ impl PyExcessReturnResult {
         )
     }
 }
+
+impl PyExcessReturnResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.inner.positions, POSITION_EXCESS_COLUMNS)
+    }
+}
+
+tabular_methods!(PyExcessReturnResult);
 
 /// Build a duration-cell base-return table from a reference universe.
 ///
@@ -179,7 +181,7 @@ impl PyExcessReturnResult {
 /// Returns
 /// -------
 /// DurationCellTable
-///     Typed cell table with ``to_dataframe()`` / ``to_json()`` exits. Use
+///     Typed cell table with ``to_pandas()`` / ``to_polars()`` / ``to_arrow()`` / ``to_json()`` exits. Use
 ///     :meth:`to_json` for the raw wire string.
 ///
 /// Raises
@@ -263,7 +265,7 @@ fn cell_returns_from_reference(
 /// Returns
 /// -------
 /// DurationCellTable
-///     Typed cell table with ``to_dataframe()`` / ``to_json()`` exits. Use
+///     Typed cell table with ``to_pandas()`` / ``to_polars()`` / ``to_arrow()`` / ``to_json()`` exits. Use
 ///     :meth:`to_json` for the raw wire string.
 ///
 /// Raises
@@ -388,15 +390,28 @@ fn excess_returns(
     table: &Bound<'_, PyAny>,
 ) -> PyResult<PyExcessReturnResult> {
     let positions = crate::bindings::extract::extract_records_json(py, positions, "positions")?;
-    let table = crate::bindings::extract::extract_records_json(py, table, "table")?;
+    let typed_table = table
+        .cast::<PyDurationCellTable>()
+        .ok()
+        .map(|tbl| tbl.borrow().inner.clone());
+    let table_json = if typed_table.is_none() {
+        Some(crate::bindings::extract::extract_records_json(
+            py, table, "table",
+        )?)
+    } else {
+        None
+    };
     Ok(PyExcessReturnResult {
         inner: py.detach(move || {
             let positions: Vec<finstack_quant_portfolio::excess_return::ExcessReturnPosition> =
                 serde_json::from_str(&positions)
                     .map_err(|err| serde_json_to_py(err, "invalid positions JSON"))?;
             let table: finstack_quant_portfolio::excess_return::DurationCellTable =
-                serde_json::from_str(&table)
-                    .map_err(|err| serde_json_to_py(err, "invalid table JSON"))?;
+                match typed_table {
+                    Some(tbl) => tbl,
+                    None => serde_json::from_str(table_json.as_deref().unwrap_or_default())
+                        .map_err(|err| serde_json_to_py(err, "invalid table JSON"))?,
+                };
             finstack_quant_portfolio::excess_return::excess_returns(&positions, &table)
                 .map_err(portfolio_to_py)
         })?,

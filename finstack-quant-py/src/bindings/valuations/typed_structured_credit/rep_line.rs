@@ -50,7 +50,7 @@ impl PyRepLine {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.__reduce__")]
@@ -62,7 +62,7 @@ impl PyRepLine {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.asset_type")]
     #[getter]
     fn asset_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.asset_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.asset_type)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.maturity")]

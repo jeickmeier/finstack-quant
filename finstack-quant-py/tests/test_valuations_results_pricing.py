@@ -115,9 +115,12 @@ def test_metric_keys_have_no_rust_escaping() -> None:
     assert "pv01::USD-OIS" in keys
     assert any(key.startswith("bucketed_dv01::USD-OIS::") and key.endswith("y") for key in keys), keys
 
-    columns = list(result.to_dataframe().columns)
+    columns = list(result.to_pandas().columns)
     assert not any("_x2d" in column or "_x5f" in column for column in columns), columns
     assert "pv01::USD-OIS" in columns
+    assert result.to_arrow().column_names() == columns
+    assert result.to_polars().columns == columns
+    assert result.to_pyarrow().column_names == columns
 
     payload = json.loads(result.to_json())
     assert "pv01::USD-OIS" in payload["measures"]
@@ -201,7 +204,9 @@ def test_valuation_result_structural_equality_and_pickle() -> None:
 def test_long_and_series_dataframes() -> None:
     result = price_instrument(_swap(), _market(), AS_OF, metrics=["dv01", "bucketed_dv01"])
 
-    long = result.to_long_dataframe()
+    long_table = result.to_long_table()
+    assert long_table.column_names() == ["metric", "curve", "bucket", "value"]
+    long = long_table.to_pandas()
     assert list(long.columns) == ["metric", "curve", "bucket", "value"]
     scalar = long[long["metric"] == "dv01"]
     assert len(scalar) == 1
@@ -209,7 +214,8 @@ def test_long_and_series_dataframes() -> None:
     buckets = long[(long["metric"] == "bucketed_dv01") & long["bucket"].notna()]
     assert set(buckets["curve"]) == {"USD-OIS", "USD-SOFR-3M"}
 
-    series = result.metric_series_dataframe("bucketed_dv01")
+    series_table = result.metric_series_table("bucketed_dv01")
+    series = series_table.to_pandas()
     assert list(series.columns) == ["metric", "curve", "bucket", "value"]
     assert len(series) == len(result.metric_series("bucketed_dv01"))
     assert series["value"].sum() == pytest.approx(sum(value for _, value in result.metric_series("bucketed_dv01")))
@@ -373,10 +379,12 @@ def test_market_history_typed_twin() -> None:
     assert MarketHistory.from_dict(json.loads(history.to_json())).to_json() == history.to_json()
     assert pickle.loads(pickle.dumps(history)).to_json() == history.to_json()  # noqa: S301
 
-    frame = history.to_dataframe()
+    frame = history.to_pandas()
     assert list(frame.columns)[:3] == ["date", "type", "curve_id"]
     assert frame["shift"].tolist() == [0.001, -0.0005]
     assert (frame["type"] == "discount_rate").all()
+    assert history.to_arrow().num_rows == len(frame)
+    assert history.to_polars().height == len(frame)
 
     typed = price_instrument(_bond(), _market(), AS_OF, metrics=["hvar"], extras={"market_history": history})
     as_dict = price_instrument(
@@ -387,10 +395,13 @@ def test_market_history_typed_twin() -> None:
 
 def test_instrument_cashflows_accepts_typed_instrument_and_date() -> None:
     envelope = instrument_cashflows(_bond(), _market(), AS_OF, "discounting")
-    frame = envelope.to_dataframe()
+    frame = envelope.to_pandas()
     assert envelope.instrument_id == "B1"
     assert isinstance(frame, pd.DataFrame)
     assert len(frame) > 0
+    assert str(frame["date"].dtype).startswith("datetime64")
+    assert envelope.to_arrow().num_rows == len(frame)
+    assert envelope.to_polars().height == len(frame)
     assert pickle.loads(pickle.dumps(envelope)).to_json() == envelope.to_json()  # noqa: S301
     assert envelope.total_pv == pytest.approx(price_instrument(_bond(), _market(), AS_OF).price, abs=0.01)
 
@@ -692,9 +703,11 @@ def test_calculate_var_config_model_and_result_round_trip() -> None:
     assert result.confidence_level == 0.99
     assert VarResult.from_json(result.to_json()) == result
     assert pickle.loads(pickle.dumps(result)) == result  # noqa: S301
-    frame = result.to_dataframe()
+    frame = result.to_pandas()
     assert list(frame.columns) == ["pnl"]
     assert frame["pnl"].tolist() == result.pnl_distribution
+    assert result.to_arrow().to_dict()["pnl"] == result.pnl_distribution
+    assert result.to_polars()["pnl"].to_list() == result.pnl_distribution
 
     empty = calculate_var([], _market(), history, AS_OF)
     assert (empty.var, empty.num_scenarios) == (0.0, 0)

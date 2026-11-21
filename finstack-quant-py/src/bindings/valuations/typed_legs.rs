@@ -16,7 +16,7 @@ use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::date_utils::date_to_py;
-use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::json_bridge::serde_to_py;
 use crate::errors::{core_to_py, display_to_py};
 
 use super::convert::{enum_to_py_string, opt_repr};

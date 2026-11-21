@@ -7,15 +7,16 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyModule};
 
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_rows_to_dataframe_with_schema, serde_to_py,
-};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::tabular_methods;
 use crate::bindings::portfolio::attribution::PyReconciliationReport;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::portfolio_to_py;
 
-/// Column schema for [`PyFiAttributionResult::to_dataframe`] (per-sector
+/// Column schema for [`PyFiAttributionResult::to_arrow_table`] (per-sector
 /// effects).
-const FI_SECTOR_COLUMNS: &[ColumnSchema<'static>] = &[
+const FI_SECTOR_COLUMNS: &[(&str, &str)] = &[
     ("sector", "str"),
     ("portfolio_weight", "float64"),
     ("benchmark_weight", "float64"),
@@ -30,9 +31,9 @@ const FI_SECTOR_COLUMNS: &[ColumnSchema<'static>] = &[
     ("total_active", "float64"),
 ];
 
-/// Column schema for [`PyFiCarinoLinkedResult::to_dataframe`] (linked
+/// Column schema for [`PyFiCarinoLinkedResult::to_arrow_table`] (linked
 /// per-sector effects).
-const FI_LINKED_SECTOR_COLUMNS: &[ColumnSchema<'static>] = &[
+const FI_LINKED_SECTOR_COLUMNS: &[(&str, &str)] = &[
     ("sector", "str"),
     ("allocation", "float64"),
     ("active_carry", "float64"),
@@ -129,16 +130,6 @@ impl PyFiAttributionResult {
         self.inner.total_residual
     }
 
-    /// Per-sector effects as a :class:`pandas.DataFrame`.
-    ///
-    /// Columns: ``sector``, ``portfolio_weight``, ``benchmark_weight``,
-    /// ``portfolio_return``, ``benchmark_return``, ``allocation``,
-    /// ``active_carry``, ``active_treasury``, ``active_spread``,
-    /// ``residual``, ``total_active``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(py, &self.inner.sectors, FI_SECTOR_COLUMNS)
-    }
-
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "FiAttributionResult.reconciliation_check")]
     #[pyo3(text_signature = "(self, tolerance)")]
     fn reconciliation_check(&self, tolerance: f64) -> PyResult<PyReconciliationReport> {
@@ -156,6 +147,14 @@ impl PyFiAttributionResult {
         )
     }
 }
+
+impl PyFiAttributionResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.inner.sectors, FI_SECTOR_COLUMNS)
+    }
+}
+
+tabular_methods!(PyFiAttributionResult);
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._fi_attribution", "FiCarinoLinkedResult")]
 #[pyclass(
@@ -238,19 +237,6 @@ impl PyFiCarinoLinkedResult {
         self.inner.linked_residual
     }
 
-    /// Linked per-sector effects as a :class:`pandas.DataFrame`.
-    ///
-    /// Columns: ``sector``, ``allocation``, ``active_carry``,
-    /// ``active_treasury``, ``active_spread``, ``residual``,
-    /// ``total_active``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(
-            py,
-            &self.inner.linked_sectors,
-            FI_LINKED_SECTOR_COLUMNS,
-        )
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "FiCarinoLinkedResult(periods={}, sectors={})",
@@ -259,6 +245,14 @@ impl PyFiCarinoLinkedResult {
         )
     }
 }
+
+impl PyFiCarinoLinkedResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.inner.linked_sectors, FI_LINKED_SECTOR_COLUMNS)
+    }
+}
+
+tabular_methods!(PyFiCarinoLinkedResult);
 
 use finstack_quant_portfolio::fi_attribution::{
     FiAttributionConfig, FiPositionSnapshot, FiQuote, FiQuoteLeg, FiReportingBasis,

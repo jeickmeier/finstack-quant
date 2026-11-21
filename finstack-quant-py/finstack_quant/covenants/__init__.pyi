@@ -52,14 +52,14 @@ from finstack_quant.covenants._engine import (
     CovenantEngine as CovenantEngine,
     CovenantTemplate as CovenantTemplate,
     covenant_template as covenant_template,
-    reports_to_dataframe as reports_to_dataframe,
+    reports_table as reports_table,
 )
 from finstack_quant.covenants._report import CovenantReport as CovenantReport
 from finstack_quant.covenants._forecast import (
     CovenantForecast as CovenantForecast,
     CovenantForecastConfig as CovenantForecastConfig,
     FutureBreach as FutureBreach,
-    breaches_to_dataframe as breaches_to_dataframe,
+    breaches_table as breaches_table,
     forecast_breaches as forecast_breaches,
     forecast_covenant as forecast_covenant,
 )
@@ -79,12 +79,12 @@ __all__ = [
     "FutureBreach",
     "SpringingCondition",
     "ThresholdSchedule",
-    "breaches_to_dataframe",
+    "breaches_table",
     "covenant_template",
     "evaluate_engine",
     "forecast_breaches",
     "forecast_covenant",
-    "reports_to_dataframe",
+    "reports_table",
     "validate_covenant_engine_json",
     "validate_covenant_report_json",
     "validate_covenant_spec_json",

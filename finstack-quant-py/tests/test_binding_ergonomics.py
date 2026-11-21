@@ -104,10 +104,10 @@ class TestModelBuilderChaining:
 
         assert chained.node_ids() == stepwise.node_ids()
 
-        chained_frame = Evaluator().evaluate(chained).to_dataframe(orient="long")
-        stepwise_frame = Evaluator().evaluate(stepwise).to_dataframe(orient="long")
+        chained_frame = Evaluator().evaluate(chained).to_pandas(orient="long")
+        stepwise_frame = Evaluator().evaluate(stepwise).to_pandas(orient="long")
         pd.testing.assert_frame_equal(chained_frame, stepwise_frame)
-        values = chained_frame.set_index(["node_id", "period"])["value"].to_dict()
+        values = chained_frame.set_index(["node_id", "period_id"])["value"].to_dict()
         assert values == {
             ("revenue", "2025Q1"): 10.0,
             ("revenue", "2025Q2"): 20.0,
@@ -156,10 +156,10 @@ class TestModelBuilderChaining:
             .build()
         )
         result = Evaluator().evaluate(model)
-        frame = result.to_dataframe(orient="long")
+        frame = result.to_pandas(orient="long")
         assert set(frame["node_id"]) == {"revenue", "cogs"}
         # The formula the chain configured, evaluated: 100 * 0.4 and 110 * 0.4.
-        values = frame.set_index(["node_id", "period"])["value"].to_dict()
+        values = frame.set_index(["node_id", "period_id"])["value"].to_dict()
         assert values[("cogs", "2025Q1")] == pytest.approx(40.0)
         assert values[("cogs", "2025Q2")] == pytest.approx(44.0)
         assert values[("revenue", "2025Q1")] == pytest.approx(100.0)

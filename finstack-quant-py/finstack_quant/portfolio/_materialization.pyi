@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 class InstrumentArtifactCache:
     """
@@ -278,9 +280,10 @@ class MaterializationReport:
         This accessor does not raise; it returns the stored or derived value.
         """
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the materialization counters as a single-row DataFrame.
+        Export the materialization counters as a single-row
+        :class:`~finstack_quant.core.table.ArrowTable`.
 
         The report is a flat set of counters, so it yields exactly one row —
         concatenate rows across loads to chart materialization cost over time.
@@ -295,13 +298,65 @@ class MaterializationReport:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             Exactly one row. The ``phase_*`` columns are zero — not measured
             durations — whenever ``timing_available`` is ``False``.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be serialized into an Arrow table.
         """
         ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the materialization counters as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pd.DataFrame
+            Exactly one row of materialization counters.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the materialization counters as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Exactly one row of materialization counters.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the materialization counters as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Exactly one row of materialization counters.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...

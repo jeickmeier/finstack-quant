@@ -11,7 +11,9 @@
 //! - Multi-dimension composite rich/cheap scoring
 //!   (`score_relative_value` -> `RelativeValueResult`).
 
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_statements_analytics::analysis::{
     CompanyMetrics, DimensionScore, MetricExtractor, Multiple, PeerFilter, PeerSet, PeerStats,
@@ -24,14 +26,10 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
-    serde_rows_to_dataframe_with_schema,
-};
 use crate::errors::{core_to_py, display_to_py};
 
-/// Column schema for `RelativeValueResult.to_dataframe`.
-const DIMENSION_COLUMNS: [ColumnSchema<'static>; 6] = [
+/// Column schema for [`PyRelativeValueResult`] tabular exports.
+const DIMENSION_COLUMNS: [(&str, &str); 6] = [
     ("label", "str"),
     ("percentile", "float64"),
     ("z_score", "float64"),
@@ -451,12 +449,81 @@ impl PyPeerSet {
     #[staticmethod]
     #[pyo3(signature = (df, subject_id, period_basis, id_column=None))]
     fn from_dataframe(
-        py: Python<'_>,
         df: &Bound<'_, PyAny>,
         subject_id: &str,
         period_basis: &str,
         id_column: Option<&str>,
     ) -> PyResult<Self> {
+        use crate::bindings::dataframe_utils::{
+            has_arrow_c_stream, is_missing_cell, is_polars_dataframe, table_column_names,
+            table_to_py_records,
+        };
+        let py = df.py();
+        if is_polars_dataframe(df)? || has_arrow_c_stream(df)? {
+            let cols = table_column_names(df)?;
+            if cols.is_empty() {
+                return Err(crate::errors::value_error("DataFrame has no columns"));
+            }
+            let id_col = match id_column {
+                Some(c) => {
+                    if !cols.iter().any(|name| name == c) {
+                        return Err(pyo3::exceptions::PyKeyError::new_err(format!(
+                            "id_column {c:?} not found in DataFrame"
+                        )));
+                    }
+                    c.to_owned()
+                }
+                None => cols
+                    .iter()
+                    .find(|c| matches!(c.as_str(), "id" | "company_id"))
+                    .cloned()
+                    .unwrap_or_else(|| cols[0].clone()),
+            };
+            let rows_py = table_to_py_records(py, df)?
+                .ok_or_else(|| crate::errors::value_error("expected table records"))?;
+            let rows: Vec<Bound<'_, PyDict>> = rows_py.extract()?;
+            let mut subject = None;
+            let mut peers = Vec::with_capacity(rows.len());
+            for row in rows {
+                let copy = row.copy()?;
+                let id_val = copy.call_method1("pop", (&id_col,))?;
+                let id: String = id_val.str()?.extract()?;
+                let mut values = Vec::with_capacity(copy.len());
+                let mut meta = BTreeMap::new();
+                for (col_key, cell) in copy.iter() {
+                    let column: String = col_key.extract()?;
+                    if is_missing_cell(&cell)? {
+                        values.push((column, None));
+                    } else if let Ok(v) = cell.extract::<f64>()
+                        && !cell.is_instance_of::<pyo3::types::PyBool>()
+                    {
+                        values.push((column, (!v.is_nan()).then_some(v)));
+                    } else if let Ok(s) = cell.extract::<String>() {
+                        meta.insert(column, s);
+                    } else {
+                        return Err(crate::errors::value_error(format!(
+                            "column '{column}' for company '{id}' must be numeric, string or missing"
+                        )));
+                    }
+                }
+                let mut metrics = CompanyMetrics::from_flat_metrics(id.clone(), values);
+                metrics.attributes.meta = meta;
+                if id == subject_id {
+                    subject = Some(metrics);
+                } else {
+                    peers.push(metrics);
+                }
+            }
+            let subject = subject.ok_or_else(|| {
+                pyo3::exceptions::PyKeyError::new_err(format!(
+                    "subject_id '{subject_id}' not found in DataFrame"
+                ))
+            })?;
+            return Ok(Self {
+                inner: PeerSet::new(subject, peers, parse_period_basis(period_basis)),
+            });
+        }
+
         let records = match id_column {
             Some(column) => df.call_method1("set_index", (column,))?,
             None => df.clone(),
@@ -470,7 +537,6 @@ impl PyPeerSet {
             .getattr("values")?
             .call_method0("tolist")?
             .extract()?;
-        let math = py.import("math")?;
 
         let mut subject = None;
         let mut peers = Vec::with_capacity(rows.len());
@@ -479,14 +545,12 @@ impl PyPeerSet {
             let mut values = Vec::with_capacity(row.len());
             let mut meta = BTreeMap::new();
             for (column, cell) in columns.iter().zip(row.iter()) {
-                if cell.is_none() {
+                if is_missing_cell(cell)? {
                     values.push((column.clone(), None));
                 } else {
                     match cell.extract::<f64>() {
-                        Ok(v) => {
-                            // pandas marks a missing numeric cell with NaN.
-                            let is_nan: bool = math.call_method1("isnan", (v,))?.extract()?;
-                            values.push((column.clone(), (!is_nan).then_some(v)));
+                        Ok(v) if !cell.is_instance_of::<pyo3::types::PyBool>() => {
+                            values.push((column.clone(), (!v.is_nan()).then_some(v)));
                         }
                         _ => match cell.extract::<String>() {
                             Ok(s) => {
@@ -735,23 +799,31 @@ impl PyPeerStats {
         self.inner.iqr
     }
 
-    /// Export as a single-row pandas ``DataFrame`` with one column per statistic.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &self.inner,
-            &[
-                "count", "mean", "median", "std_dev", "min", "max", "q1", "q3", "iqr",
-            ],
-        )
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("PeerStats", &self.inner)
     }
 }
 
 wire_methods!(PyPeerStats, PeerStats, "PeerStats");
+
+impl PyPeerStats {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: [(&str, &str); 9] = [
+            ("count", "int64"),
+            ("mean", "float64"),
+            ("median", "float64"),
+            ("std_dev", "float64"),
+            ("min", "float64"),
+            ("max", "float64"),
+            ("q1", "float64"),
+            ("q3", "float64"),
+            ("iqr", "float64"),
+        ];
+        serde_rows_to_arrow_table(&[&self.inner], &COLUMNS)
+    }
+}
+
+tabular_methods!(PyPeerStats);
 
 /// Single-factor OLS fit evaluated at the subject.
 ///
@@ -809,28 +881,28 @@ impl PyRegressionResult {
         self.inner.n
     }
 
-    /// Export as a single-row pandas ``DataFrame``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &self.inner,
-            &[
-                "intercept",
-                "slope",
-                "r_squared",
-                "fitted_value",
-                "residual",
-                "n",
-            ],
-        )
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("RegressionResult", &self.inner)
     }
 }
 
 wire_methods!(PyRegressionResult, RegressionResult, "RegressionResult");
+
+impl PyRegressionResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: [(&str, &str); 6] = [
+            ("intercept", "float64"),
+            ("slope", "float64"),
+            ("r_squared", "float64"),
+            ("fitted_value", "float64"),
+            ("residual", "float64"),
+            ("n", "int64"),
+        ];
+        serde_rows_to_arrow_table(&[&self.inner], &COLUMNS)
+    }
+}
+
+tabular_methods!(PyRegressionResult);
 
 /// Decomposed score of one dimension in a `RelativeValueResult`.
 #[pyclass(
@@ -946,31 +1018,6 @@ impl PyRelativeValueResult {
         self.inner.peer_count
     }
 
-    /// Export the per-dimension scores as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``label``, ``percentile`` (0-1), ``z_score``,
-    /// ``regression_residual`` (Y units, ``NaN`` without X), ``r_squared``
-    /// (``NaN`` without X), ``weight``. One row per dimension. The composite
-    /// score, confidence and peer count are result metadata.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows: Vec<serde_json::Value> = self
-            .inner
-            .dimensions
-            .iter()
-            .map(|dim| {
-                serde_json::json!({
-                    "label": dim.label,
-                    "percentile": dim.percentile,
-                    "z_score": dim.z_score,
-                    "regression_residual": dim.regression_residual,
-                    "r_squared": dim.r_squared,
-                    "weight": dim.weight,
-                })
-            })
-            .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, &DIMENSION_COLUMNS)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "RelativeValueResult(company_id='{}', composite_score={}, confidence={}, peer_count={}, dimensions={})",
@@ -988,7 +1035,29 @@ wire_methods!(
     RelativeValueResult,
     "RelativeValueResult"
 );
-impl_repr_html_via_dataframe!(PyRelativeValueResult);
+
+impl PyRelativeValueResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let rows: Vec<serde_json::Value> = self
+            .inner
+            .dimensions
+            .iter()
+            .map(|dim| {
+                serde_json::json!({
+                    "label": dim.label,
+                    "percentile": dim.percentile,
+                    "z_score": dim.z_score,
+                    "regression_residual": dim.regression_residual,
+                    "r_squared": dim.r_squared,
+                    "weight": dim.weight,
+                })
+            })
+            .collect();
+        serde_rows_to_arrow_table(&rows, &DIMENSION_COLUMNS)
+    }
+}
+
+tabular_methods!(PyRelativeValueResult);
 
 /// Percentile rank of ``value`` within ``values`` (0-1 scale).
 ///

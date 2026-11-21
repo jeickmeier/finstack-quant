@@ -45,6 +45,11 @@ fn extract_linalg_f64(elem: &Bound<'_, PyAny>, what: &str) -> PyResult<f64> {
 
 /// Extract a 1-D numeric vector, rejecting `bool` and non-numeric types with `TypeError`.
 fn extract_vector(vec_obj: &Bound<'_, PyAny>, label: &str) -> PyResult<Vec<f64>> {
+    if crate::bindings::dataframe_utils::is_polars_series(vec_obj)?
+        || crate::bindings::dataframe_utils::is_pandas_series(vec_obj)?
+    {
+        return crate::bindings::dataframe_utils::extract_f64_vec(vec_obj, label);
+    }
     if let Ok(untyped) = vec_obj.cast::<PyUntypedArray>() {
         let kind = untyped.dtype().kind();
         if !matches!(kind, b'f' | b'i' | b'u') {
@@ -61,6 +66,9 @@ fn extract_vector(vec_obj: &Bound<'_, PyAny>, label: &str) -> PyResult<Vec<f64>>
         if let Ok(array) = vec_obj.extract::<PyReadonlyArray1<'_, f64>>() {
             return Ok(array.as_array().iter().copied().collect());
         }
+        let casted = vec_obj.call_method1("astype", ("float64",))?;
+        let array = casted.extract::<PyReadonlyArray1<'_, f64>>()?;
+        return Ok(array.as_array().iter().copied().collect());
     }
     if vec_obj.is_instance_of::<PyString>() || vec_obj.is_instance_of::<PyBytes>() {
         return Err(PyTypeError::new_err(format!(
@@ -84,6 +92,11 @@ fn extract_vector(vec_obj: &Bound<'_, PyAny>, label: &str) -> PyResult<Vec<f64>>
 /// rows) raise `ValueError`; non-sequence containers, strings, `bool` values,
 /// and non-numeric entries raise `TypeError`.
 pub(super) fn extract_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize, usize)> {
+    if crate::bindings::dataframe_utils::is_dataframe_like(matrix)?
+        && let Some(mat) = crate::bindings::dataframe_utils::extract_2d_f64(matrix, "matrix")?
+    {
+        return Ok(mat);
+    }
     if let Ok(untyped) = matrix.cast::<PyUntypedArray>() {
         let kind = untyped.dtype().kind();
         if !matches!(kind, b'f' | b'i' | b'u') {
@@ -105,6 +118,15 @@ pub(super) fn extract_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, u
                 cols,
             ));
         }
+        let casted = matrix.call_method1("astype", ("float64",))?;
+        let array = casted.extract::<PyReadonlyArray2<'_, f64>>()?;
+        let shape = array.shape();
+        let (rows, cols) = (shape[0], shape[1]);
+        return Ok((
+            crate::bindings::matrix_input::numpy_row_major(&array),
+            rows,
+            cols,
+        ));
     }
     if matrix.is_instance_of::<PyString>() || matrix.is_instance_of::<PyBytes>() {
         return Err(PyTypeError::new_err(

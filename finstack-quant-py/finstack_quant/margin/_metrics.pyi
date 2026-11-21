@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 class MarginUtilization:
     """
@@ -220,9 +222,9 @@ class MarginUtilization:
         ...
 
     def __repr__(self) -> str: ...
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the result as a single-row pandas ``DataFrame``.
+        Export the result as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``posted``, ``required``, ``ratio``, ``shortfall``,
         ``is_adequate``, ``currency``.
@@ -234,15 +236,67 @@ class MarginUtilization:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row describing margin utilization.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be serialized into an Arrow table.
         """
         ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the result as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row describing margin utilization.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the result as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row describing margin utilization.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the result as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row describing margin utilization.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 class ExcessCollateral:
     """
@@ -476,9 +530,9 @@ class ExcessCollateral:
         ...
 
     def __repr__(self) -> str: ...
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the result as a single-row pandas ``DataFrame``.
+        Export the result as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``collateral_value``, ``required_value``, ``excess``,
         ``excess_percentage``, ``has_excess``, ``has_shortfall``,
@@ -491,15 +545,67 @@ class ExcessCollateral:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row describing the collateral position.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be serialized into an Arrow table.
         """
         ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the result as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row describing the collateral position.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the result as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row describing the collateral position.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the result as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row describing the collateral position.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 class MarginFundingCost:
     """
@@ -768,9 +874,9 @@ class MarginFundingCost:
         ...
 
     def __repr__(self) -> str: ...
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the result as a single-row pandas ``DataFrame``.
+        Export the result as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``margin_posted``, ``funding_rate``, ``collateral_rate``,
         ``spread_rate``, ``annual_cost``, ``currency``.
@@ -782,15 +888,67 @@ class MarginFundingCost:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row describing the funding cost.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be serialized into an Arrow table.
         """
         ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the result as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row describing the funding cost.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the result as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row describing the funding cost.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the result as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row describing the funding cost.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 class Haircut01:
     """
@@ -986,9 +1144,9 @@ class Haircut01:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the result as a single-row pandas ``DataFrame``.
+        Export the result as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``collateral_value``, ``current_haircut``, ``haircut_bp``,
         ``pv_change``, ``currency``. ``collateral_value`` and ``pv_change``
@@ -997,19 +1155,75 @@ class Haircut01:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row describing the haircut sensitivity.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be serialized into an Arrow table.
 
         Examples
         --------
-        >>> float(Haircut01(1.0, 0.01, "USD").to_dataframe()["haircut_bp"].iloc[0])
+        >>> float(Haircut01(1.0, 0.01, "USD").to_arrow().to_dict()["haircut_bp"][0])
         100.0
         """
         ...
 
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the result as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row describing the haircut sensitivity.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+
+        Examples
+        --------
+        >>> float(Haircut01(1.0, 0.01, "USD").to_pandas()["haircut_bp"].iloc[0])
+        100.0
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the result as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row describing the haircut sensitivity.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the result as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row describing the haircut sensitivity.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str: ...

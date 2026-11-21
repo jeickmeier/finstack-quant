@@ -88,6 +88,8 @@ def _section_coverage(coverage: Any) -> Section | None:
 
 
 def _section_covenants(covenants: Any) -> Section | None:
+    if hasattr(covenants, "to_pandas") and not hasattr(covenants, "iterrows"):
+        covenants = covenants.to_pandas()
     if hasattr(covenants, "columns") and hasattr(covenants, "to_dict"):
         if "as_of" in covenants.columns:
             covenants = covenants[covenants["as_of"] == covenants["as_of"].max()]
@@ -152,9 +154,12 @@ def credit_tearsheet(
         Statement results for the EBITDA-build section.
     coverage : list[dict], optional
         Per-instrument rows (``instrument``/``dscr``/``interest_coverage``/``ltv``). LTV is a decimal ratio, such as 0.55 for 55%.
-    covenants : pandas.DataFrame or list[dict], optional
-        Native covenant report frames with an as-of column use the latest date.
-        Covenant rows (``covenant``/``threshold``/``current``/``headroom``/``status``).
+    covenants : ArrowTable | pandas.DataFrame | polars.DataFrame | list[dict], optional
+        Tabular covenant results (native ``ArrowTable`` from ``reports_table`` or
+        ``evaluate_covenants``, ``pandas.DataFrame``, ``polars.DataFrame``,
+        ``pyarrow.Table``, or any object exposing ``to_pandas()``) or row dicts
+        (``covenant``/``threshold``/``current``/``headroom``/``status``). Native
+        frames with an ``as_of`` column keep the latest date.
     title : str, optional
         Optional main report heading; defaults derive from the assessment.
     subtitle : str, optional

@@ -64,7 +64,7 @@ impl PyAgencyTba {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.agency")]
     #[getter]
     fn agency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.agency)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.agency)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.coupon")]
@@ -76,7 +76,7 @@ impl PyAgencyTba {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.term")]
     #[getter]
     fn term<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.term)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.term)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.settlement_year")]
@@ -94,7 +94,7 @@ impl PyAgencyTba {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.settlement_class")]
     #[getter]
     fn settlement_class<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.settlement_class)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.settlement_class)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.settlement_date")]
@@ -136,13 +136,13 @@ impl PyAgencyTba {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.assumed_pool")]
     #[getter]
     fn assumed_pool<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.assumed_pool)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.assumed_pool)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.prepayment_spec")]
     #[getter]
     fn prepayment_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.prepayment_spec)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.prepayment_spec)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_agency_tba", "AgencyTba.discount_curve_id")]

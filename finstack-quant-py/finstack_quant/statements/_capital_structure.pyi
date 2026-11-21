@@ -6,7 +6,9 @@ from collections.abc import Mapping
 from typing import Any
 
 import pandas as pd
+import polars as pl
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 
 class EcfSweepSpec:
     """
@@ -1178,14 +1180,14 @@ class CapitalStructureCashflows:
 
         Populated for every evaluation with capital-structure flows, including
         multi-currency structures without a reporting currency, where
-        ``to_totals_dataframe`` and the ``get_component(..., "total", ...)`` lookups have nothing
+        ``to_totals_table`` and the ``get_component(..., "total", ...)`` lookups have nothing
         to report.
 
         Returns
         -------
         dict[str, dict[str, dict[str, Money]]]
             ISO currency code to period id to flow type (the ``flow_type``
-            names of :meth:`to_dataframe`) to amount in that currency.
+            names of :meth:`to_arrow`) to amount in that currency.
 
         This accessor does not raise; it is empty when no capital-structure
         flows were evaluated.
@@ -1193,12 +1195,12 @@ class CapitalStructureCashflows:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
-        """Long frame of per-instrument flows.
+    def to_arrow(self) -> ArrowTable:
+        """Long ``ArrowTable`` of per-instrument flows.
 
         Returns
         -------
-        pandas.DataFrame
+        ArrowTable
             Columns ``instrument``, ``period``, ``flow_type``, ``value`` (float
             view), ``amount`` (the exact amount as decimal text) and
             ``currency``. ``flow_type`` is one of
@@ -1217,26 +1219,78 @@ class CapitalStructureCashflows:
 
         Raises
         ------
-        RuntimeError
-            If pandas is not installed.
-
+        ValueError
+            If the table cannot be constructed.
         """
         ...
 
-    def to_totals_dataframe(self) -> pd.DataFrame:
-        """Long frame of per-period totals across all instruments.
+    def to_pandas(self) -> pd.DataFrame:
+        """Long pandas ``DataFrame`` of per-instrument flows.
 
         Returns
         -------
         pandas.DataFrame
+            Columns matching :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the frame cannot be constructed.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Long Polars ``DataFrame`` of per-instrument flows.
+
+        Returns
+        -------
+        polars.DataFrame
+            Columns matching :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the frame cannot be constructed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Long ``pyarrow.Table`` of per-instrument flows.
+
+        Returns
+        -------
+        pyarrow.Table
+            Columns matching :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_totals_table(self) -> ArrowTable:
+        """Long ``ArrowTable`` of per-period totals across all instruments.
+
+        Returns
+        -------
+        ArrowTable
             Columns ``period``, ``flow_type``, ``value`` (float view),
             ``amount`` (the exact amount as decimal text) and ``currency``.
 
         Raises
         ------
-        RuntimeError
-            If pandas is not installed.
-
+        ValueError
+            If the table cannot be constructed.
         """
         ...
 

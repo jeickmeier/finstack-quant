@@ -2,7 +2,7 @@
 
 use super::instruments::PyBond;
 use crate::bindings::core::dates::tenor::{PyTenor, extract_tenor};
-use crate::bindings::core::table::envelope_to_pandas;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market_ref;
 use crate::bindings::pydoc::pydoc;
@@ -61,12 +61,19 @@ impl PyBondBreakevenLadder {
     fn as_of<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.as_of)
     }
+}
 
-    #[doc = pydoc!("finstack_quant.valuations.instruments._bond_breakeven", "BondBreakevenLadder.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        envelope_to_pandas(py, &self.inner.to_table())
+impl PyBondBreakevenLadder {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        PyArrowTable::from_envelope(&self.inner.to_table())
     }
 }
+
+crate::bindings::macros::tabular_methods!(
+    PyBondBreakevenLadder,
+    "BondBreakevenLadder",
+    module = "finstack_quant.valuations.instruments._bond_breakeven"
+);
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._bond_breakeven", "bond_breakeven_ladder")]
 #[pyfunction]

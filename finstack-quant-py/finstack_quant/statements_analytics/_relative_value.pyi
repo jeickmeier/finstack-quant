@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.statements_analytics._comps import (
     CompanyMetrics,
     PeerStats,
@@ -963,9 +965,30 @@ class RelativeValueReport:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Return the comps table as a DataFrame with one row per company.
+        Return the comps table as an ``ArrowTable`` with one row per company.
+
+        Columns are ``id``, ``is_subject`` and then one float column per configured
+        multiple, named by its serde name, in config order. A value Rust cannot compute
+        is null.
+
+        Returns
+        -------
+        ArrowTable
+            The subject's row first, then the peers in universe order.
+
+        Raises
+        ------
+        ValueError
+            If a multiple appears twice or a company row does not hold one value
+            per multiple (only possible for a report rebuilt from edited JSON).
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Return the comps table as a pandas ``DataFrame`` with one row per company.
 
         Columns are ``id``, ``is_subject`` and then one float column per configured
         multiple, named by its serde name, in config order. A value Rust cannot compute
@@ -978,14 +1001,55 @@ class RelativeValueReport:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
             If a multiple appears twice or a company row does not hold one value
             per multiple (only possible for a report rebuilt from edited JSON).
-        ImportError
-            If ``pyarrow`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Return the comps table as a Polars ``DataFrame`` with one row per company.
+
+        Returns
+        -------
+        polars.DataFrame
+            The subject's row first, then the peers in universe order.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If a multiple appears twice or a company row does not hold one value
+            per multiple (only possible for a report rebuilt from edited JSON).
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Return the comps table as a ``pyarrow.Table`` with one row per company.
+
+        Returns
+        -------
+        pyarrow.Table
+            The subject's row first, then the peers in universe order.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If a multiple appears twice or a company row does not hold one value
+            per multiple (only possible for a report rebuilt from edited JSON).
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @property
     def subject_id(self) -> str:
         """

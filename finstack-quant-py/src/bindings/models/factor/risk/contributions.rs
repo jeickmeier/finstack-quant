@@ -1,21 +1,15 @@
-use crate::bindings::macros::impl_repr_html_via_dataframe;
-use std::collections::HashMap;
-
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
-
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::repr_support::repr_from_serde;
+use crate::bindings::table_builders::TableBuilder;
 use finstack_quant_factor::risk::{
     FactorContribution, PositionEsContribution, PositionFactorContribution,
     PositionResidualContribution, PositionRiskDecomposition, PositionVarContribution,
     ResidualContributionSource, RiskDecomposition,
 };
-
-use crate::bindings::pandas_utils::{
-    dict_to_dataframe, serde_object_to_single_row_dataframe, serde_to_py,
-};
-use crate::bindings::repr_support::repr_from_serde;
-
-use crate::bindings::macros::wire_methods;
+use pyo3::prelude::*;
+use std::collections::HashMap;
 
 /// Python-style rendering of an optional float (`None` or the number).
 fn py_opt(value: Option<f64>) -> String {
@@ -85,19 +79,23 @@ impl PyFactorContribution {
         self.inner.marginal_risk
     }
 
-    /// Export this contribution as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``factor_id``, ``absolute_risk``, ``relative_risk``,
-    /// ``marginal_risk``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe(py, &self.inner)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("FactorContribution", &self.inner)
     }
 }
+
+impl PyFactorContribution {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .utf8("factor_id", vec![self.inner.factor_id.as_str().to_owned()])?
+            .f64("absolute_risk", vec![self.inner.absolute_risk])?
+            .f64("relative_risk", vec![self.inner.relative_risk])?
+            .f64("marginal_risk", vec![self.inner.marginal_risk])?
+            .build()
+    }
+}
+
+tabular_methods!(PyFactorContribution);
 
 /// Per-position contribution to a specific factor bucket.
 #[pyclass(
@@ -144,18 +142,25 @@ impl PyPositionFactorContribution {
         self.inner.risk_contribution
     }
 
-    /// Export this contribution as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``position_id``, ``factor_id``, ``risk_contribution``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe(py, &self.inner)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("PositionFactorContribution", &self.inner)
     }
 }
+
+impl PyPositionFactorContribution {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .utf8(
+                "position_id",
+                vec![self.inner.position_id.as_str().to_owned()],
+            )?
+            .utf8("factor_id", vec![self.inner.factor_id.as_str().to_owned()])?
+            .f64("risk_contribution", vec![self.inner.risk_contribution])?
+            .build()
+    }
+}
+
+tabular_methods!(PyPositionFactorContribution);
 
 /// Annualized residual variance contributed by a single position.
 #[pyclass(
@@ -211,21 +216,6 @@ impl PyPositionResidualContribution {
             .map(str::to_owned)
     }
 
-    /// Export this contribution as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``position_id``, ``residual_variance``, ``source_kind``,
-    /// ``source_issuer_id`` (``None`` unless ``source_kind`` is
-    /// ``"from_credit_model"``).
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        data.set_item("position_id", vec![self.inner.position_id.as_str()])?;
-        data.set_item("residual_variance", vec![self.inner.residual_variance])?;
-        data.set_item("source_kind", vec![self.source_kind()])?;
-        data.set_item("source_issuer_id", vec![self.source_issuer_id()])?;
-        dict_to_dataframe(py, &data, None)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "PositionResidualContribution(position_id={:?}, residual_variance={}, source_kind={:?}, source_issuer_id={})",
@@ -237,6 +227,22 @@ impl PyPositionResidualContribution {
         )
     }
 }
+
+impl PyPositionResidualContribution {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .utf8(
+                "position_id",
+                vec![self.inner.position_id.as_str().to_owned()],
+            )?
+            .f64("residual_variance", vec![self.inner.residual_variance])?
+            .utf8("source_kind", vec![self.source_kind().to_owned()])?
+            .nullable_utf8("source_issuer_id", vec![self.source_issuer_id()])?
+            .build()
+    }
+}
+
+tabular_methods!(PyPositionResidualContribution);
 
 /// Portfolio-level decomposition of total risk across common factors and residuals.
 #[pyclass(
@@ -328,76 +334,80 @@ impl PyRiskDecomposition {
             .collect()
     }
 
-    /// Primary table: the factor-level risk decomposition.
-    ///
-    /// Alias of :meth:`to_factor_dataframe`. Every tabular result type in the
-    /// library answers ``to_dataframe()``; the position-level views stay on
-    /// :meth:`to_position_factor_dataframe` and
-    /// :meth:`to_position_residual_dataframe`.
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        self.to_factor_dataframe(py)
-    }
-
-    /// Export factor contributions as a pandas ``DataFrame``.
+    /// Export factor contributions as an ``ArrowTable``.
     ///
     /// Columns: ``factor_id``, ``absolute_risk``, ``relative_risk``,
     /// ``marginal_risk``.
-    #[pyo3(text_signature = "(self)")]
-    fn to_factor_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    #[pyo3(text_signature = "($self)")]
+    fn to_factor_table(&self) -> PyResult<PyArrowTable> {
         let rows = &self.inner.factor_contributions;
-        let factor_ids: Vec<&str> = rows.iter().map(|c| c.factor_id.as_str()).collect();
+        let factor_ids: Vec<String> = rows
+            .iter()
+            .map(|c| c.factor_id.as_str().to_owned())
+            .collect();
         let absolute_risks: Vec<f64> = rows.iter().map(|c| c.absolute_risk).collect();
         let relative_risks: Vec<f64> = rows.iter().map(|c| c.relative_risk).collect();
         let marginal_risks: Vec<f64> = rows.iter().map(|c| c.marginal_risk).collect();
-        let data = PyDict::new(py);
-        data.set_item("factor_id", factor_ids)?;
-        data.set_item("absolute_risk", absolute_risks)?;
-        data.set_item("relative_risk", relative_risks)?;
-        data.set_item("marginal_risk", marginal_risks)?;
-        dict_to_dataframe(py, &data, None)
+        TableBuilder::new()
+            .utf8("factor_id", factor_ids)?
+            .f64("absolute_risk", absolute_risks)?
+            .f64("relative_risk", relative_risks)?
+            .f64("marginal_risk", marginal_risks)?
+            .build()
     }
 
-    /// Export position × factor contributions as a pandas ``DataFrame``.
+    /// Export position × factor contributions as an ``ArrowTable``.
     ///
     /// Columns: ``position_id``, ``factor_id``, ``risk_contribution``.
-    #[pyo3(text_signature = "(self)")]
-    fn to_position_factor_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    #[pyo3(text_signature = "($self)")]
+    fn to_position_factor_table(&self) -> PyResult<PyArrowTable> {
         let rows = &self.inner.position_factor_contributions;
-        let position_ids: Vec<&str> = rows.iter().map(|c| c.position_id.as_str()).collect();
-        let factor_ids: Vec<&str> = rows.iter().map(|c| c.factor_id.as_str()).collect();
+        let position_ids: Vec<String> = rows
+            .iter()
+            .map(|c| c.position_id.as_str().to_owned())
+            .collect();
+        let factor_ids: Vec<String> = rows
+            .iter()
+            .map(|c| c.factor_id.as_str().to_owned())
+            .collect();
         let risk_contributions: Vec<f64> = rows.iter().map(|c| c.risk_contribution).collect();
-        let data = PyDict::new(py);
-        data.set_item("position_id", position_ids)?;
-        data.set_item("factor_id", factor_ids)?;
-        data.set_item("risk_contribution", risk_contributions)?;
-        dict_to_dataframe(py, &data, None)
+        TableBuilder::new()
+            .utf8("position_id", position_ids)?
+            .utf8("factor_id", factor_ids)?
+            .f64("risk_contribution", risk_contributions)?
+            .build()
     }
 
-    /// Export per-position residual variance contributions as a pandas ``DataFrame``.
+    /// Export per-position residual variance contributions as an ``ArrowTable``.
     ///
     /// Columns: ``position_id``, ``residual_variance`` (annualized variance,
     /// non-negative), ``source_kind`` (``"from_credit_model"`` or ``"other"``),
     /// ``source_issuer_id`` (``None`` unless ``source_kind`` is
     /// ``"from_credit_model"``).
     ///
-    /// The frame has zero rows — with the columns still present — when the
+    /// The table has zero rows — with the columns still present — when the
     /// decomposer produced no position-level residual allocation.
-    #[pyo3(text_signature = "(self)")]
-    fn to_position_residual_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    #[pyo3(text_signature = "($self)")]
+    fn to_position_residual_table(&self) -> PyResult<PyArrowTable> {
         let rows = &self.inner.position_residual_contributions;
-        let position_ids: Vec<&str> = rows.iter().map(|c| c.position_id.as_str()).collect();
-        let residual_variances: Vec<f64> = rows.iter().map(|c| c.residual_variance).collect();
-        let (source_kinds, source_issuer_ids): (Vec<&str>, Vec<Option<&str>>) = rows
+        let position_ids: Vec<String> = rows
             .iter()
-            .map(|c| residual_source_parts(&c.source))
+            .map(|c| c.position_id.as_str().to_owned())
+            .collect();
+        let residual_variances: Vec<f64> = rows.iter().map(|c| c.residual_variance).collect();
+        let (source_kinds, source_issuer_ids): (Vec<String>, Vec<Option<String>>) = rows
+            .iter()
+            .map(|c| {
+                let (kind, issuer) = residual_source_parts(&c.source);
+                (kind.to_owned(), issuer.map(str::to_owned))
+            })
             .unzip();
-        let data = PyDict::new(py);
-        data.set_item("position_id", position_ids)?;
-        data.set_item("residual_variance", residual_variances)?;
-        data.set_item("source_kind", source_kinds)?;
-        data.set_item("source_issuer_id", source_issuer_ids)?;
-        dict_to_dataframe(py, &data, None)
+        TableBuilder::new()
+            .utf8("position_id", position_ids)?
+            .f64("residual_variance", residual_variances)?
+            .utf8("source_kind", source_kinds)?
+            .nullable_utf8("source_issuer_id", source_issuer_ids)?
+            .build()
     }
 
     fn __repr__(&self) -> String {
@@ -411,6 +421,14 @@ impl PyRiskDecomposition {
         )
     }
 }
+
+impl PyRiskDecomposition {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        self.to_factor_table()
+    }
+}
+
+tabular_methods!(PyRiskDecomposition);
 
 /// Per-position component VaR and marginal VaR.
 #[pyclass(
@@ -491,15 +509,6 @@ impl PyPositionVarContribution {
         self.inner.incremental_var
     }
 
-    /// Export this contribution as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``position_id``, ``component_var``, ``relative_var``,
-    /// ``marginal_var``, ``incremental_var``.
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe(py, &self.inner)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "PositionVarContribution(position_id={:?}, component_var={}, relative_var={}, marginal_var={}, incremental_var={})",
@@ -512,7 +521,22 @@ impl PyPositionVarContribution {
     }
 }
 
-impl_repr_html_via_dataframe!(PyPositionVarContribution);
+impl PyPositionVarContribution {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .utf8(
+                "position_id",
+                vec![self.inner.position_id.as_str().to_owned()],
+            )?
+            .f64("component_var", vec![self.inner.component_var])?
+            .f64("relative_var", vec![self.inner.relative_var])?
+            .nullable_f64("marginal_var", vec![self.inner.marginal_var])?
+            .nullable_f64("incremental_var", vec![self.inner.incremental_var])?
+            .build()
+    }
+}
+
+tabular_methods!(PyPositionVarContribution);
 
 /// Per-position component ES and marginal ES.
 #[pyclass(
@@ -566,15 +590,6 @@ impl PyPositionEsContribution {
         self.inner.marginal_es
     }
 
-    /// Export this contribution as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``position_id``, ``component_es``, ``relative_es``,
-    /// ``marginal_es``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe(py, &self.inner)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "PositionEsContribution(position_id={:?}, component_es={}, relative_es={}, marginal_es={})",
@@ -585,6 +600,22 @@ impl PyPositionEsContribution {
         )
     }
 }
+
+impl PyPositionEsContribution {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .utf8(
+                "position_id",
+                vec![self.inner.position_id.as_str().to_owned()],
+            )?
+            .f64("component_es", vec![self.inner.component_es])?
+            .f64("relative_es", vec![self.inner.relative_es])?
+            .nullable_f64("marginal_es", vec![self.inner.marginal_es])?
+            .build()
+    }
+}
+
+tabular_methods!(PyPositionEsContribution);
 
 /// Complete position-level risk decomposition.
 #[pyclass(
@@ -688,59 +719,6 @@ impl PyPositionRiskDecomposition {
             .collect()
     }
 
-    /// Export the joined per-position VaR and ES decomposition as a pandas
-    /// ``DataFrame``.
-    ///
-    /// ``var_contributions`` and ``es_contributions`` are both keyed by
-    /// position, so they are joined on ``position_id`` into one frame. Rows
-    /// follow ``var_contributions`` order; an ES column is ``None`` for a
-    /// position that has no matching ES entry.
-    ///
-    /// The portfolio-level scalars (:attr:`portfolio_var`,
-    /// :attr:`portfolio_es`, :attr:`confidence`, :attr:`method`) are header
-    /// metadata and are deliberately **not** repeated on every row.
-    ///
-    /// Columns: ``position_id``, ``component_var``, ``relative_var``,
-    /// ``marginal_var``, ``incremental_var``, ``component_es``,
-    /// ``relative_es``, ``marginal_es``.
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let es_rows = &self.inner.es_contributions;
-        let es_by_position: HashMap<&str, &PositionEsContribution> = es_rows
-            .iter()
-            .map(|c| (c.position_id.as_str(), c))
-            .collect();
-        let rows = &self.inner.var_contributions;
-        let position_ids: Vec<&str> = rows.iter().map(|c| c.position_id.as_str()).collect();
-        let component_var: Vec<f64> = rows.iter().map(|c| c.component_var).collect();
-        let relative_var: Vec<f64> = rows.iter().map(|c| c.relative_var).collect();
-        let marginal_var: Vec<Option<f64>> = rows.iter().map(|c| c.marginal_var).collect();
-        let incremental_var: Vec<Option<f64>> = rows.iter().map(|c| c.incremental_var).collect();
-        let matched: Vec<Option<&PositionEsContribution>> = position_ids
-            .iter()
-            .map(|pid| es_by_position.get(pid).copied())
-            .collect();
-        let component_es: Vec<Option<f64>> =
-            matched.iter().map(|e| e.map(|c| c.component_es)).collect();
-        let relative_es: Vec<Option<f64>> =
-            matched.iter().map(|e| e.map(|c| c.relative_es)).collect();
-        let marginal_es: Vec<Option<f64>> = matched
-            .iter()
-            .map(|e| e.and_then(|c| c.marginal_es))
-            .collect();
-
-        let data = PyDict::new(py);
-        data.set_item("position_id", position_ids)?;
-        data.set_item("component_var", component_var)?;
-        data.set_item("relative_var", relative_var)?;
-        data.set_item("marginal_var", marginal_var)?;
-        data.set_item("incremental_var", incremental_var)?;
-        data.set_item("component_es", component_es)?;
-        data.set_item("relative_es", relative_es)?;
-        data.set_item("marginal_es", marginal_es)?;
-        dict_to_dataframe(py, &data, None)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "PositionRiskDecomposition(portfolio_var={}, portfolio_es={}, confidence={}, n_positions={}, method={:?}, euler_residual={})",
@@ -755,4 +733,46 @@ impl PyPositionRiskDecomposition {
     }
 }
 
-impl_repr_html_via_dataframe!(PyPositionRiskDecomposition);
+impl PyPositionRiskDecomposition {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let es_rows = &self.inner.es_contributions;
+        let es_by_position: HashMap<&str, &PositionEsContribution> = es_rows
+            .iter()
+            .map(|c| (c.position_id.as_str(), c))
+            .collect();
+        let rows = &self.inner.var_contributions;
+        let position_ids: Vec<String> = rows
+            .iter()
+            .map(|c| c.position_id.as_str().to_owned())
+            .collect();
+        let component_var: Vec<f64> = rows.iter().map(|c| c.component_var).collect();
+        let relative_var: Vec<f64> = rows.iter().map(|c| c.relative_var).collect();
+        let marginal_var: Vec<Option<f64>> = rows.iter().map(|c| c.marginal_var).collect();
+        let incremental_var: Vec<Option<f64>> = rows.iter().map(|c| c.incremental_var).collect();
+        let matched: Vec<Option<&PositionEsContribution>> = position_ids
+            .iter()
+            .map(|pid| es_by_position.get(pid.as_str()).copied())
+            .collect();
+        let component_es: Vec<Option<f64>> =
+            matched.iter().map(|e| e.map(|c| c.component_es)).collect();
+        let relative_es: Vec<Option<f64>> =
+            matched.iter().map(|e| e.map(|c| c.relative_es)).collect();
+        let marginal_es: Vec<Option<f64>> = matched
+            .iter()
+            .map(|e| e.and_then(|c| c.marginal_es))
+            .collect();
+
+        TableBuilder::new()
+            .utf8("position_id", position_ids)?
+            .f64("component_var", component_var)?
+            .f64("relative_var", relative_var)?
+            .nullable_f64("marginal_var", marginal_var)?
+            .nullable_f64("incremental_var", incremental_var)?
+            .nullable_f64("component_es", component_es)?
+            .nullable_f64("relative_es", relative_es)?
+            .nullable_f64("marginal_es", marginal_es)?
+            .build()
+    }
+}
+
+tabular_methods!(PyPositionRiskDecomposition);

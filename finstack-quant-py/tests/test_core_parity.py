@@ -1357,13 +1357,15 @@ def test_slice2_fx_matrix_pinned_and_provider_quotes_and_repr() -> None:
     assert fx.rate("EUR", "USD", d_fix, FxConversionPolicy.CASHFLOW_DATE).rate == pytest.approx(1.15)
     assert fx.rate("EUR", "USD", date(2025, 1, 16), FxConversionPolicy.CASHFLOW_DATE).rate == pytest.approx(1.10)
 
-    pinned_df = fx.pinned_quotes()
-    assert list(pinned_df.columns) == ["base", "quote", "date", "policy", "rate"]
-    assert pinned_df.to_dict(orient="records") == [
+    pinned_tbl = fx.pinned_quotes()
+    assert pinned_tbl.column_names() == ["base", "quote", "date", "policy", "rate"]
+    assert pinned_tbl.to_records() == [
         {"base": "EUR", "quote": "USD", "date": d_fix, "policy": "cashflow_date", "rate": 1.15}
     ]
-    assert list(fx.provider_quotes().columns) == ["base", "quote", "rate"]
-    assert list(fx.provider_pinned_quotes().columns) == [
+    assert list(pinned_tbl.to_pandas().columns) == pinned_tbl.column_names()
+    assert pinned_tbl.to_polars().height == 1
+    assert fx.provider_quotes().column_names() == ["base", "quote", "rate"]
+    assert fx.provider_pinned_quotes().column_names() == [
         "base",
         "quote",
         "date",
@@ -1379,8 +1381,8 @@ def test_slice2_fx_matrix_pinned_and_provider_quotes_and_repr() -> None:
     state["fx"]["provider_pinned_quotes"] = [["GBP", "USD", "2025-01-15", "period_end", 1.26]]
     restored = MarketContext.from_json(json.dumps(state)).fx
     assert restored is not None
-    assert list(restored.provider_quotes().to_dict(orient="records")) == [{"base": "GBP", "quote": "USD", "rate": 1.25}]
-    assert list(restored.provider_pinned_quotes().to_dict(orient="records")) == [
+    assert restored.provider_quotes().to_records() == [{"base": "GBP", "quote": "USD", "rate": 1.25}]
+    assert restored.provider_pinned_quotes().to_records() == [
         {"base": "GBP", "quote": "USD", "date": d_fix, "policy": "period_end", "rate": 1.26}
     ]
     assert repr(restored) == ("FxMatrix(quotes=1, pinned_quotes=1, provider_quotes=1, provider_pinned_quotes=1)")

@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import datetime
 import pandas as pd
+import polars as pl
 from collections.abc import Mapping
 from typing import Any
 from finstack_quant.attribution import PnlAttribution
 from finstack_quant.core.config import FinstackConfig
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.scenarios._engine import ApplicationReport
 from finstack_quant.scenarios._spec import ScenarioSpec
 
@@ -265,7 +267,32 @@ class HorizonResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export the horizon summary as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``initial_value``, ``terminal_value``, ``currency``,
+        ``total_pnl``, ``total_return``, ``annualized_return``,
+        ``horizon_days``, ``user_operations``, ``expanded_operations``,
+        ``operations_applied``, ``warning_count``.
+
+        ``total_return`` and ``annualized_return`` are decimal fractions
+        (``0.05`` = +5%). For the factor-level breakdown use
+        ``result.attribution.to_arrow()``.
+
+        Returns
+        -------
+        ArrowTable
+            One-row summary table.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export the horizon summary as a single-row pandas ``DataFrame``.
 
@@ -276,7 +303,7 @@ class HorizonResult:
 
         ``total_return`` and ``annualized_return`` are decimal fractions
         (``0.05`` = +5%). For the factor-level breakdown use
-        ``result.attribution.to_dataframe()``.
+        ``result.attribution.to_pandas()``.
 
         Returns
         -------
@@ -285,11 +312,46 @@ class HorizonResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the horizon summary as a single-row ``polars.DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One-row Polars DataFrame constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the horizon summary as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def _repr_html_(self) -> str | None: ...
     def explain(self) -> str:
         """
         Human-readable summary of horizon return and attribution.
@@ -304,22 +366,6 @@ class HorizonResult:
         Notes
         -----
         This method does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    def _repr_html_(self) -> str | None:
-        """
-        Render as an HTML table in Jupyter notebooks.
-
-        Returns
-        -------
-        str or None
-            HTML for the frame from :meth:`to_dataframe`, or ``None`` when the
-            frame cannot be built (IPython then falls back to ``__repr__``).
-
-        Notes
-        -----
-        This method does not raise.
         """
         ...
 

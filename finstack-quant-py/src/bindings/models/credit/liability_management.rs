@@ -1,8 +1,9 @@
 //! Python bindings for `finstack_quant_models::credit::liability_management`.
 
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
-use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema;
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
 use finstack_quant_core::wire::{serde_label, serde_parse};
 use finstack_quant_models::credit::liability_management::{
@@ -81,38 +82,6 @@ impl PyExchangeOfferAnalysis {
         self.inner.tender_recommended
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        // Built explicitly so the column order is fixed; `exchange_type`
-        // serializes to its snake_case label.
-        let row = serde_json::json!({
-            "exchange_type": self.inner.exchange_type,
-            "old_npv": self.inner.old_npv,
-            "new_npv": self.inner.new_npv,
-            "consent_fee": self.inner.consent_fee,
-            "equity_sweetener_value": self.inner.equity_sweetener_value,
-            "tender_total": self.inner.tender_total,
-            "delta_npv": self.inner.delta_npv,
-            "breakeven_recovery": self.inner.breakeven_recovery,
-            "tender_recommended": self.inner.tender_recommended,
-        });
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &[
-                "exchange_type",
-                "old_npv",
-                "new_npv",
-                "consent_fee",
-                "equity_sweetener_value",
-                "tender_total",
-                "delta_npv",
-                "breakeven_recovery",
-                "tender_recommended",
-            ],
-        )
-    }
-
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
             "ExchangeOfferAnalysis(exchange_type='{}', tender_total={}, delta_npv={}, \
@@ -125,13 +94,36 @@ impl PyExchangeOfferAnalysis {
     }
 }
 
+impl PyExchangeOfferAnalysis {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .utf8("exchange_type", vec![self.exchange_type()?])?
+            .f64("old_npv", vec![self.inner.old_npv])?
+            .f64("new_npv", vec![self.inner.new_npv])?
+            .f64("consent_fee", vec![self.inner.consent_fee])?
+            .f64(
+                "equity_sweetener_value",
+                vec![self.inner.equity_sweetener_value],
+            )?
+            .f64("tender_total", vec![self.inner.tender_total])?
+            .f64("delta_npv", vec![self.inner.delta_npv])?
+            .f64("breakeven_recovery", vec![self.inner.breakeven_recovery])?
+            .bool("tender_recommended", vec![self.inner.tender_recommended])?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyExchangeOfferAnalysis,
+    "ExchangeOfferAnalysis",
+    module = "finstack_quant.models.credit.liability_management"
+);
 wire_methods!(
     PyExchangeOfferAnalysis,
     ExchangeOfferAnalysis,
     "ExchangeOfferAnalysis",
     module = "finstack_quant.models.credit.liability_management"
 );
-impl_repr_html_via_dataframe!(PyExchangeOfferAnalysis);
 
 #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact")]
 #[pyclass(
@@ -178,21 +170,6 @@ impl PyLeverageImpact {
         self.inner.leverage_reduction
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &self.inner,
-            &[
-                "pre_total_debt",
-                "post_total_debt",
-                "pre_leverage",
-                "post_leverage",
-                "leverage_reduction",
-            ],
-        )
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "LeverageImpact(pre_leverage={}, post_leverage={}, leverage_reduction={})",
@@ -201,6 +178,23 @@ impl PyLeverageImpact {
     }
 }
 
+impl PyLeverageImpact {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .f64("pre_total_debt", vec![self.inner.pre_total_debt])?
+            .f64("post_total_debt", vec![self.inner.post_total_debt])?
+            .f64("pre_leverage", vec![self.inner.pre_leverage])?
+            .f64("post_leverage", vec![self.inner.post_leverage])?
+            .f64("leverage_reduction", vec![self.inner.leverage_reduction])?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyLeverageImpact,
+    "LeverageImpact",
+    module = "finstack_quant.models.credit.liability_management"
+);
 wire_methods!(
     PyLeverageImpact,
     LeverageImpact,
@@ -268,44 +262,6 @@ impl PyLmeAnalysis {
             .map(|inner| PyLeverageImpact { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        // `LmeAnalysis` derives Serialize, but `leverage_impact` is a nested
-        // struct that blind serde would drop into a single object-dtype cell,
-        // so the row is flattened by hand.
-        let leverage = self.inner.leverage_impact.as_ref();
-        let row = serde_json::json!({
-            "lme_type": self.inner.lme_type,
-            "cost": self.inner.cost,
-            "notional_reduction": self.inner.notional_reduction,
-            "discount_capture": self.inner.discount_capture,
-            "discount_capture_pct": self.inner.discount_capture_pct,
-            "remaining_holder_impact_pct": self.inner.remaining_holder_impact_pct,
-            "pre_total_debt": leverage.map(|l| l.pre_total_debt),
-            "post_total_debt": leverage.map(|l| l.post_total_debt),
-            "pre_leverage": leverage.map(|l| l.pre_leverage),
-            "post_leverage": leverage.map(|l| l.post_leverage),
-            "leverage_reduction": leverage.map(|l| l.leverage_reduction),
-        });
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &[
-                "lme_type",
-                "cost",
-                "notional_reduction",
-                "discount_capture",
-                "discount_capture_pct",
-                "remaining_holder_impact_pct",
-                "pre_total_debt",
-                "post_total_debt",
-                "pre_leverage",
-                "post_leverage",
-                "leverage_reduction",
-            ],
-        )
-    }
-
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
             "LmeAnalysis(lme_type='{}', cost={}, notional_reduction={}, discount_capture={})",
@@ -317,13 +273,45 @@ impl PyLmeAnalysis {
     }
 }
 
+impl PyLmeAnalysis {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let leverage = self.inner.leverage_impact.as_ref();
+        TableBuilder::new()
+            .utf8("lme_type", vec![self.lme_type()?])?
+            .f64("cost", vec![self.inner.cost])?
+            .f64("notional_reduction", vec![self.inner.notional_reduction])?
+            .f64("discount_capture", vec![self.inner.discount_capture])?
+            .f64(
+                "discount_capture_pct",
+                vec![self.inner.discount_capture_pct],
+            )?
+            .f64(
+                "remaining_holder_impact_pct",
+                vec![self.inner.remaining_holder_impact_pct],
+            )?
+            .nullable_f64("pre_total_debt", vec![leverage.map(|l| l.pre_total_debt)])?
+            .nullable_f64("post_total_debt", vec![leverage.map(|l| l.post_total_debt)])?
+            .nullable_f64("pre_leverage", vec![leverage.map(|l| l.pre_leverage)])?
+            .nullable_f64("post_leverage", vec![leverage.map(|l| l.post_leverage)])?
+            .nullable_f64(
+                "leverage_reduction",
+                vec![leverage.map(|l| l.leverage_reduction)],
+            )?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyLmeAnalysis,
+    "LmeAnalysis",
+    module = "finstack_quant.models.credit.liability_management"
+);
 wire_methods!(
     PyLmeAnalysis,
     LmeAnalysis,
     "LmeAnalysis",
     module = "finstack_quant.models.credit.liability_management"
 );
-impl_repr_html_via_dataframe!(PyLmeAnalysis);
 
 #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer")]
 #[pyclass(

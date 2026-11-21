@@ -1,9 +1,9 @@
-"""Tests for the `statements_analytics` pandas ``DataFrame`` accessors.
+"""Tests for the `statements_analytics` tabular and Arrow/pandas/Polars accessors.
 
-Covers every ``to_dataframe`` / ``to_*_dataframe`` on the domain's result and
-spec types: `VarianceReport`, `SensitivityResult`, `ScenarioResults`,
-`BridgeChart`, `ScorecardReport`, `CorkscrewReport`, `Exposure`, and the
-real-estate template specs.
+Covers every tabular accessor (``to_pandas`` / ``to_polars`` / ``to_arrow`` /
+``to_*_table``) on the domain's result and spec types: `VarianceReport`,
+`SensitivityResult`, `ScenarioResults`, `BridgeChart`, `ScorecardReport`,
+`CorkscrewReport`, `Exposure`, and the real-estate template specs.
 
 Fixtures are built inline (public constructors, or ``from_json`` with a
 hand-written canonical payload) so the tests stay self-contained and never
@@ -72,7 +72,7 @@ def _variance_report(rows: list[dict[str, object]]) -> VarianceReport:
 
 def test_variance_report_to_dataframe_keeps_schema_when_empty() -> None:
     """An empty report must still carry every documented column."""
-    df = _variance_report([]).to_dataframe()
+    df = _variance_report([]).to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 0
     assert list(df.columns) == VARIANCE_COLUMNS
@@ -98,7 +98,7 @@ def test_variance_report_to_dataframe_row_per_metric_period() -> None:
         },
     ]
     report = _variance_report(rows)
-    df = report.to_dataframe()
+    df = report.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == VARIANCE_COLUMNS
@@ -123,7 +123,7 @@ def test_variance_report_to_dataframe_keeps_pct_var_column_when_all_null() -> No
             "abs_var": 5.0,
         }
     ]
-    df = _variance_report(rows).to_dataframe()
+    df = _variance_report(rows).to_pandas()
     assert "pct_var" in df.columns
     assert df["pct_var"].isna().all()
 
@@ -147,7 +147,7 @@ def _bridge_chart(steps: list[dict[str, object]]) -> BridgeChart:
 
 
 def test_bridge_chart_to_dataframe_keeps_schema_when_empty() -> None:
-    df = _bridge_chart([]).to_dataframe()
+    df = _bridge_chart([]).to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 0
     assert list(df.columns) == ["driver", "contribution"]
@@ -160,7 +160,7 @@ def test_bridge_chart_to_dataframe_preserves_step_order() -> None:
         {"driver": "cogs", "contribution": 10.0},
     ]
     chart = _bridge_chart(steps)
-    df = chart.to_dataframe()
+    df = chart.to_pandas()
 
     assert list(df.columns) == ["driver", "contribution"]
     assert len(df) == len(chart.steps) == 3
@@ -183,7 +183,7 @@ def _sensitivity_result(scenarios: list[dict[str, object]]) -> SensitivityResult
 
 
 def test_sensitivity_result_to_dataframe_keeps_scenario_column_when_empty() -> None:
-    df = _sensitivity_result([]).to_dataframe()
+    df = _sensitivity_result([]).to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 0
     assert list(df.columns) == ["scenario", "node_id", "period", "value"]
@@ -201,7 +201,7 @@ def test_sensitivity_result_to_dataframe_row_per_scenario() -> None:
         },
     ]
     result = _sensitivity_result(scenarios)
-    df = result.to_dataframe()
+    df = result.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == len(result) == 2
@@ -230,7 +230,7 @@ def test_scenario_result_set_to_dataframe_renders_the_comparison() -> None:
     exports call the same Rust builder, so they agree by construction even if
     that builder is wrong. The literals below are what actually pin it.
     """
-    df = _scenario_result_set().to_dataframe(["revenue"])
+    df = _scenario_result_set().to_pandas(["revenue"])
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == [
@@ -256,7 +256,7 @@ def test_scenario_result_set_unknown_metric_raises_key_error() -> None:
     with pytest.raises(KeyError, match="nope"):
         results.to_comparison_table(["nope"])
     with pytest.raises(KeyError, match="nope"):
-        results.to_dataframe(["nope"])
+        results.to_pandas(["nope"])
 
 
 def test_scenario_result_set_to_dataframe_matches_comparison_table() -> None:
@@ -267,7 +267,7 @@ def test_scenario_result_set_to_dataframe_matches_comparison_table() -> None:
     column, not a wrong number. The value assertions live in the test above.
     """
     results = _scenario_result_set()
-    df = results.to_dataframe(["revenue"])
+    df = results.to_pandas(["revenue"])
     table = results.to_comparison_table(["revenue"])
 
     assert list(df.columns) == table.column_names()
@@ -276,7 +276,7 @@ def test_scenario_result_set_to_dataframe_matches_comparison_table() -> None:
 
 def test_scenario_result_set_to_dataframe_rejects_empty_metrics() -> None:
     with pytest.raises(ValueError, match="metrics cannot be empty"):
-        _scenario_result_set().to_dataframe([])
+        _scenario_result_set().to_pandas([])
 
 
 # ScorecardReport
@@ -303,7 +303,7 @@ def _scorecard_report(metric_scores: list[dict[str, object]]) -> ScorecardReport
 
 
 def test_scorecard_report_to_dataframe_is_one_row() -> None:
-    df = _scorecard_report([]).to_dataframe()
+    df = _scorecard_report([]).to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
     assert list(df.columns) == [
@@ -344,7 +344,7 @@ def test_scorecard_report_metric_scores_dataframe() -> None:
             "weighted_score": 1.2,
         },
     ]
-    df = _scorecard_report(scores).to_metric_scores_dataframe()
+    df = _scorecard_report(scores).to_metric_scores_table().to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == len(scores)
@@ -354,7 +354,7 @@ def test_scorecard_report_metric_scores_dataframe() -> None:
 
 
 def test_scorecard_report_metric_scores_dataframe_keeps_schema_when_empty() -> None:
-    df = _scorecard_report([]).to_metric_scores_dataframe()
+    df = _scorecard_report([]).to_metric_scores_table().to_pandas()
     assert len(df) == 0
     assert list(df.columns) == [
         "metric",
@@ -390,7 +390,7 @@ def test_corkscrew_report_to_dataframe_is_one_row() -> None:
             "is_valid": True,
         }
     ]
-    df = _corkscrew_report(validations).to_dataframe()
+    df = _corkscrew_report(validations).to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -421,7 +421,7 @@ def test_corkscrew_report_validations_dataframe() -> None:
             "is_valid": False,
         },
     ]
-    df = _corkscrew_report(validations).to_validations_dataframe()
+    df = _corkscrew_report(validations).to_validations_table().to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == len(validations)
@@ -437,7 +437,7 @@ def test_corkscrew_report_validations_dataframe() -> None:
 
 
 def test_corkscrew_report_validations_dataframe_keeps_schema_when_empty() -> None:
-    df = _corkscrew_report([]).to_validations_dataframe()
+    df = _corkscrew_report([]).to_validations_table().to_pandas()
     assert len(df) == 0
     assert list(df.columns) == [
         "account",
@@ -462,7 +462,7 @@ def test_exposure_to_dataframe_is_one_row() -> None:
         origination_pd=0.01,
         days_past_due=45,
     )
-    df = exposure.to_dataframe()
+    df = exposure.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -498,7 +498,7 @@ def test_exposure_to_dataframe_defaults_days_past_due_to_zero() -> None:
         remaining_maturity_years=2.0,
         current_pd=0.03,
         origination_pd=0.02,
-    ).to_dataframe()
+    ).to_pandas()
     assert df.iloc[0]["days_past_due"] == 0
 
 
@@ -507,7 +507,7 @@ def test_exposure_to_dataframe_defaults_days_past_due_to_zero() -> None:
 
 def test_renewal_spec_to_dataframe() -> None:
     renewal = RenewalSpec(4, 0.75, downtime_periods=1, rent_factor=1.05, free_rent_periods=1)
-    df = renewal.to_dataframe()
+    df = renewal.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -533,7 +533,7 @@ def test_lease_spec_to_dataframe_summarises_nested_collections() -> None:
         growth_rate=0.02,
         renewal=RenewalSpec(4, 0.6),
     )
-    df = lease.to_dataframe()
+    df = lease.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -558,7 +558,7 @@ def test_lease_spec_to_dataframe_summarises_nested_collections() -> None:
 
 
 def test_rent_roll_output_nodes_to_dataframe() -> None:
-    df = RentRollOutputNodes().to_dataframe()
+    df = RentRollOutputNodes().to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -572,7 +572,7 @@ def test_rent_roll_output_nodes_to_dataframe() -> None:
 
 
 def test_property_template_nodes_to_dataframe_flattens_rent_roll() -> None:
-    df = PropertyTemplateNodes().to_dataframe()
+    df = PropertyTemplateNodes().to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1

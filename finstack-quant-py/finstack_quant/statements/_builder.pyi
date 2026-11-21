@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import PeriodPlan
 from finstack_quant.core.money import Money
@@ -715,18 +716,29 @@ class ModelBuilder:
         """
         ...
 
-    def from_dataframe(self, df: pd.DataFrame, node_id_column: str | None = None) -> ModelBuilder:
-        """Import scalar value nodes from a wide pandas DataFrame.
+    def from_dataframe(
+        self,
+        df: pd.DataFrame | pl.DataFrame | Any,
+        node_id_column: str | None = None,
+    ) -> ModelBuilder:
+        """Import scalar value nodes from a wide pandas, Polars, or Arrow table.
 
         The model timeline must already be set; an import never infers it.
         Columns map to periods by label in any order. The import is atomic.
 
         Parameters
         ----------
-        df:
-            One row per new value node and one column per period label (for example ``"2025Q1"``). Labels must be unique and belong to the model timeline, including all-null columns. A numeric cell is a scalar observation in the node's own units; a ``None`` or NaN cell is a missing observation and is left out; ``0`` is kept as a known zero.
-        node_id_column:
-            Column containing node identifiers; None takes identifiers from the frame index.
+        df : pd.DataFrame | pl.DataFrame | Any
+            One row per new value node and one column per period label (for
+            example ``"2025Q1"``). Labels must be unique and belong to the model
+            timeline, including all-null columns. A numeric cell is a scalar
+            observation in the node's own units; a ``None`` / ``null`` / NaN
+            cell is a missing observation and is left out; ``0`` is kept as a
+            known zero.
+        node_id_column : str | None, optional
+            Column containing node identifiers; ``None`` takes identifiers from
+            the pandas frame index (or ``"node_id"`` / ``"id"`` / first column
+            on Polars/Arrow inputs).
 
         Returns
         -------

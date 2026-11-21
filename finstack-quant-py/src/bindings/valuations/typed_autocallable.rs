@@ -126,7 +126,7 @@ impl PyAutocallable {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.final_payoff_type")]
     #[getter]
     fn final_payoff_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.final_payoff_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.final_payoff_type)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.cap_level")]
@@ -168,7 +168,7 @@ impl PyAutocallable {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.path_model")]
     #[getter]
     fn path_model<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.path_model)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.path_model)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_autocallable", "Autocallable.div_yield_id")]

@@ -94,7 +94,7 @@ def test_im_profile_from_simm_scales_by_decay() -> None:
 def test_im_profile_to_dataframe() -> None:
     pd = pytest.importorskip("pandas")
     profile = expected_im([0, 1], [100.0, 50.0])
-    df = profile.to_dataframe()
+    df = profile.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["date", "im"]
     assert list(df.index) == [0.0, 1.0]
@@ -105,7 +105,7 @@ def test_mva_result_to_dataframe_and_json_round_trip() -> None:
     pd = pytest.importorskip("pandas")
     profile = expected_im([0, 1, 2], [1e6, 1e6, 500_000.0])
     result = compute_mva(profile, MarginFundingSpread.flat(50.0), flat_discount_curve(), None)
-    df = result.to_dataframe()
+    df = result.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["date", "im"]
     back = MvaResult.from_json(result.to_json())

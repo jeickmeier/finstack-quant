@@ -116,8 +116,8 @@ MEMBERS: dict[str, dict[str, Any]] = LEDGER.get("members", {})
 
 
 def rule_excluded(name: str) -> bool:
-    """Members excluded by rule: listed exits plus any pandas ``to_*_dataframe`` / ``to_*_series`` exit."""
-    return name in PY_RULE_MEMBERS or (name.startswith("to_") and name.endswith(("_dataframe", "_series")))
+    """Members excluded by rule: listed host-only exits in ``python_rule_excluded_members``."""
+    return name in PY_RULE_MEMBERS
 
 
 def js_name(name: str) -> str:

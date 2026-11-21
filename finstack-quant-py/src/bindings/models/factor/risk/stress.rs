@@ -1,17 +1,13 @@
-use crate::bindings::macros::impl_repr_html_via_dataframe;
-use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
-
+use super::functions::extract_pnl_input;
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::repr_support::repr_from_serde;
+use crate::bindings::table_builders::TableBuilder;
+use crate::errors::{core_to_py, value_error};
 use finstack_quant_factor::risk::{
     self as model_risk, StressAttribution, StressPositionEntry, TailScenarioBreakdown,
 };
-
-use crate::bindings::pandas_utils::{dict_to_dataframe, serde_object_to_single_row_dataframe};
-use crate::bindings::repr_support::repr_from_serde;
-use crate::errors::{core_to_py, value_error};
-
-use super::functions::extract_pnl_input;
-use crate::bindings::macros::wire_methods;
+use pyo3::prelude::*;
 
 /// Single position's contribution to tail stress.
 #[pyclass(
@@ -64,19 +60,26 @@ impl PyStressPositionEntry {
         self.inner.worst_scenario_pnl
     }
 
-    /// Export this entry as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``position_id``, ``avg_tail_pnl``, ``pct_of_tail_loss``
-    /// (fraction, not percentage), ``worst_scenario_pnl``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe(py, &self.inner)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("StressPositionEntry", &self.inner)
     }
 }
+
+impl PyStressPositionEntry {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .utf8(
+                "position_id",
+                vec![self.inner.position_id.as_str().to_owned()],
+            )?
+            .f64("avg_tail_pnl", vec![self.inner.avg_tail_pnl])?
+            .f64("pct_of_tail_loss", vec![self.inner.pct_of_tail_loss])?
+            .f64("worst_scenario_pnl", vec![self.inner.worst_scenario_pnl])?
+            .build()
+    }
+}
+
+tabular_methods!(PyStressPositionEntry);
 
 /// Breakdown of a single tail scenario.
 #[pyclass(
@@ -212,11 +215,75 @@ impl PyTailScenarioBreakdown {
     ///     If no identifiers are available or their count does not match
     ///     ``len(position_pnls)``.
     #[pyo3(signature = (position_ids = None), text_signature = "($self, position_ids=None)")]
-    fn to_dataframe<'py>(
+    fn to_arrow(&self, position_ids: Option<Vec<String>>) -> PyResult<PyArrowTable> {
+        self.to_arrow_table_with_ids(position_ids)
+    }
+
+    #[pyo3(signature = (position_ids = None), text_signature = "($self, position_ids=None)")]
+    fn to_pandas<'py>(
         &self,
         py: Python<'py>,
         position_ids: Option<Vec<String>>,
     ) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.to_arrow_table_with_ids(position_ids)?)?;
+        PyArrowTable::to_pandas(&table, py)
+    }
+
+    #[pyo3(signature = (position_ids = None), text_signature = "($self, position_ids=None)")]
+    fn to_polars<'py>(
+        &self,
+        py: Python<'py>,
+        position_ids: Option<Vec<String>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.to_arrow_table_with_ids(position_ids)?)?;
+        PyArrowTable::to_polars(&table, py)
+    }
+
+    #[pyo3(signature = (position_ids = None), text_signature = "($self, position_ids=None)")]
+    fn to_pyarrow<'py>(
+        &self,
+        py: Python<'py>,
+        position_ids: Option<Vec<String>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.to_arrow_table_with_ids(position_ids)?)?;
+        PyArrowTable::to_pyarrow(&table, py)
+    }
+
+    #[pyo3(signature = (requested_schema = None))]
+    fn __arrow_c_stream__<'py>(
+        &self,
+        py: Python<'py>,
+        requested_schema: Option<Bound<'py, PyAny>>,
+    ) -> PyResult<Bound<'py, pyo3::types::PyCapsule>> {
+        let _ = requested_schema;
+        self.to_arrow_table_with_ids(None)?.arrow_c_stream(py)
+    }
+
+    fn __arrow_c_schema__<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, pyo3::types::PyCapsule>> {
+        self.to_arrow_table_with_ids(None)?.arrow_c_schema(py)
+    }
+
+    fn _repr_html_(&self) -> Option<String> {
+        self.to_arrow_table_with_ids(None)
+            .ok()
+            .map(|t| t.render_html())
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "TailScenarioBreakdown(scenario_index={}, portfolio_pnl={}, positions={})",
+            self.inner.scenario_index,
+            self.inner.portfolio_pnl,
+            self.inner.position_pnls.len(),
+        )
+    }
+}
+
+impl PyTailScenarioBreakdown {
+    fn to_arrow_table_with_ids(&self, position_ids: Option<Vec<String>>) -> PyResult<PyArrowTable> {
         let Some(position_ids) = position_ids.or_else(|| self.position_ids.clone()) else {
             return Err(value_error(
                 "position_ids is required: this TailScenarioBreakdown carries no parent \
@@ -230,19 +297,10 @@ impl PyTailScenarioBreakdown {
                 position_ids.len(),
             )));
         }
-        let data = PyDict::new(py);
-        data.set_item("position_id", position_ids)?;
-        data.set_item("pnl", self.inner.position_pnls.clone())?;
-        dict_to_dataframe(py, &data, None)
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "TailScenarioBreakdown(scenario_index={}, portfolio_pnl={}, positions={})",
-            self.inner.scenario_index,
-            self.inner.portfolio_pnl,
-            self.inner.position_pnls.len(),
-        )
+        TableBuilder::new()
+            .utf8("position_id", position_ids)?
+            .f64("pnl", self.inner.position_pnls.clone())?
+            .build()
     }
 }
 
@@ -311,8 +369,8 @@ impl PyStressAttribution {
     }
 
     /// Per-scenario breakdowns for every tail event. Each breakdown carries
-    /// this attribution's ``position_ids`` so its ``to_dataframe()`` needs no
-    /// argument.
+    /// this attribution's ``position_ids`` so its ``to_pandas()`` / ``to_arrow()``
+    /// needs no argument.
     #[getter]
     fn tail_scenarios(&self) -> Vec<PyTailScenarioBreakdown> {
         let ids = self.position_ids();
@@ -324,38 +382,11 @@ impl PyStressAttribution {
             .collect()
     }
 
-    /// Export the per-position tail-loss contributions as a pandas ``DataFrame``.
+    /// Export the tail scenario × position P&L matrix as an ``ArrowTable``.
     ///
-    /// One row per entry of :attr:`position_contributions`, in the same
-    /// (largest-driver-first) order.
-    ///
-    /// Columns: ``position_id``, ``avg_tail_pnl`` (portfolio-currency average
-    /// across tail scenarios; a loss is negative), ``pct_of_tail_loss``
-    /// (**fraction**, not percentage, of total portfolio tail loss),
-    /// ``worst_scenario_pnl``.
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows = &self.inner.position_contributions;
-        let position_ids: Vec<&str> = rows.iter().map(|e| e.position_id.as_str()).collect();
-        let avg_tail_pnl: Vec<f64> = rows.iter().map(|e| e.avg_tail_pnl).collect();
-        let pct_of_tail_loss: Vec<f64> = rows.iter().map(|e| e.pct_of_tail_loss).collect();
-        let worst_scenario_pnl: Vec<f64> = rows.iter().map(|e| e.worst_scenario_pnl).collect();
-        let data = PyDict::new(py);
-        data.set_item("position_id", position_ids)?;
-        data.set_item("avg_tail_pnl", avg_tail_pnl)?;
-        data.set_item("pct_of_tail_loss", pct_of_tail_loss)?;
-        data.set_item("worst_scenario_pnl", worst_scenario_pnl)?;
-        dict_to_dataframe(py, &data, None)
-    }
-
-    /// Export the tail scenario × position P&L matrix as a pandas ``DataFrame``.
-    ///
-    /// Rows are tail scenarios indexed by
-    /// :attr:`TailScenarioBreakdown.scenario_index`; columns are the position
-    /// identifiers from :attr:`position_ids`, in that order. Every cell is a
-    /// portfolio-currency P&L (a loss is negative).
-    ///
-    /// Columns: one per entry of :attr:`position_ids`.
+    /// Column 0 is ``scenario_index`` (:attr:`TailScenarioBreakdown.scenario_index`);
+    /// remaining columns are the position identifiers from :attr:`position_ids`,
+    /// in that order. Every P&L cell is in portfolio currency (a loss is negative).
     ///
     /// Raises
     /// ------
@@ -363,8 +394,8 @@ impl PyStressAttribution {
     ///     If any tail scenario's ``position_pnls`` width disagrees with
     ///     ``len(position_ids)`` (only reachable through a hand-built
     ///     :meth:`from_json` payload).
-    #[pyo3(text_signature = "(self)")]
-    fn to_scenario_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    #[pyo3(text_signature = "($self)")]
+    fn to_scenario_table(&self) -> PyResult<PyArrowTable> {
         let n_positions = self.inner.position_ids.len();
         for scenario in &self.inner.tail_scenarios {
             if scenario.position_pnls.len() != n_positions {
@@ -375,7 +406,16 @@ impl PyStressAttribution {
                 )));
             }
         }
-        let data = PyDict::new(py);
+        let scenario_indices: Vec<i64> = self
+            .inner
+            .tail_scenarios
+            .iter()
+            .map(|scenario| {
+                i64::try_from(scenario.scenario_index)
+                    .map_err(|e| value_error(format!("scenario_index overflow: {e}")))
+            })
+            .collect::<PyResult<_>>()?;
+        let mut builder = TableBuilder::new().i64("scenario_index", scenario_indices)?;
         for (i, position_id) in self.inner.position_ids.iter().enumerate() {
             let column: Vec<f64> = self
                 .inner
@@ -383,16 +423,9 @@ impl PyStressAttribution {
                 .iter()
                 .map(|scenario| scenario.position_pnls[i])
                 .collect();
-            data.set_item(position_id.as_str(), column)?;
+            builder = builder.f64(position_id.as_str(), column)?;
         }
-        let index: Vec<usize> = self
-            .inner
-            .tail_scenarios
-            .iter()
-            .map(|scenario| scenario.scenario_index)
-            .collect();
-        let index = PyList::new(py, index)?;
-        dict_to_dataframe(py, &data, Some(index.into_any()))
+        builder.build()
     }
 
     fn __repr__(&self) -> String {
@@ -406,7 +439,26 @@ impl PyStressAttribution {
     }
 }
 
-impl_repr_html_via_dataframe!(PyStressAttribution);
+impl PyStressAttribution {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let rows = &self.inner.position_contributions;
+        let position_ids: Vec<String> = rows
+            .iter()
+            .map(|e| e.position_id.as_str().to_owned())
+            .collect();
+        let avg_tail_pnl: Vec<f64> = rows.iter().map(|e| e.avg_tail_pnl).collect();
+        let pct_of_tail_loss: Vec<f64> = rows.iter().map(|e| e.pct_of_tail_loss).collect();
+        let worst_scenario_pnl: Vec<f64> = rows.iter().map(|e| e.worst_scenario_pnl).collect();
+        TableBuilder::new()
+            .utf8("position_id", position_ids)?
+            .f64("avg_tail_pnl", avg_tail_pnl)?
+            .f64("pct_of_tail_loss", pct_of_tail_loss)?
+            .f64("worst_scenario_pnl", worst_scenario_pnl)?
+            .build()
+    }
+}
+
+tabular_methods!(PyStressAttribution);
 
 /// Build tail-scenario stress attribution from position x scenario P&Ls.
 ///

@@ -76,7 +76,7 @@ def main() -> None:
     result = price_instrument(
         bond, mc.to_json(), as_of, model="discounting", metrics=metrics
     )
-    cashflows = instrument_cashflows(bond, mc.to_json(), as_of, "discounting").to_dataframe()
+    cashflows = instrument_cashflows(bond, mc.to_json(), as_of, "discounting").to_pandas()
 
     ts = reporting.instrument_tearsheet(
         result,

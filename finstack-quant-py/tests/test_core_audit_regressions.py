@@ -21,17 +21,20 @@ from finstack_quant.core.money import Money
 def test_schedule_notebook_preview_limits_the_displayed_periods() -> None:
     schedule = (
         Schedule
-        .builder("2025-01-01", "2027-01-01")
+        .builder("2025-01-01", "2028-01-01")
         .frequency("1M")
         .stub_rule("none")
         .grid("natural")
         .unadjusted()
         .build()
     )
-    assert len(schedule.to_dataframe()) == 24
+    assert len(schedule.to_pandas()) == 36
+    assert schedule.to_polars().height == 36
+    assert schedule.to_arrow().num_rows == 36
     html = schedule._repr_html_()
     assert html is not None
-    assert html.count("<tr>") == 12
+    assert 1 < html.count("<tr>") < 37
+    assert "..." in html
     assert "period_end" in html
 
 

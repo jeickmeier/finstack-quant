@@ -5,7 +5,9 @@ from __future__ import annotations
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 
 class TrancheCashflows:
     """
@@ -59,7 +61,7 @@ class TrancheCashflows:
     ... )
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03, "act_365f"))
     >>> flows = deal.tranche_cashflows("A", market, as_of)
-    >>> flows.tranche_id, list(flows.to_dataframe().columns)
+    >>> flows.tranche_id, list(flows.to_pandas().columns)
     ('A', ['date', 'cashflow', 'interest', 'principal', 'pik', 'deferred', 'writedown'])
     """
 
@@ -153,7 +155,28 @@ class TrancheCashflows:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        One row per payment date as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``date`` (ISO 8601 string), ``cashflow`` (total paid),
+        ``interest``, ``principal``, ``pik``, ``deferred`` and ``writedown``,
+        all in currency units; a component absent on a date is ``0.0``.
+
+        Returns
+        -------
+        ArrowTable
+            The projected flows in date order.
+
+        Raises
+        ------
+        ValueError
+            If component amounts have different currencies. Empty results
+            preserve column order and numeric dtypes.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         One row per payment date as a pandas ``DataFrame``.
 
@@ -168,12 +191,53 @@ class TrancheCashflows:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
             If component amounts have different currencies. Empty results
             preserve column order and numeric dtypes.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        One row per payment date as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            The projected flows in date order with the columns documented on :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If component amounts have different currencies.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        One row per payment date as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            The projected flows in date order with the columns documented on :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If component amounts have different currencies.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @property
     def tranche_id(self) -> str:
         """

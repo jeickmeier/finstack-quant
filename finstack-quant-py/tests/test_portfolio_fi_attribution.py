@@ -82,7 +82,7 @@ def test_one_sided_report_stores_comparator_without_invented_observation() -> No
     missing = result.sectors[0]
     assert missing["portfolio_return"] is None
     assert missing["residual"] == 0.0
-    assert list(result.to_dataframe().columns) == [
+    assert list(result.to_pandas().columns) == [
         "sector",
         "portfolio_weight",
         "benchmark_weight",

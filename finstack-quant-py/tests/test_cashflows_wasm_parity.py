@@ -224,7 +224,7 @@ def _pv_by_period() -> Any:
 def _ladder() -> Any:
     schedule = bond()
     frame = schedule.calendar_year_ladder([index + 0.5 for index in range(len(schedule.get_flows()))])
-    return frame.to_dict("records")
+    return frame.to_records()
 
 
 def _from_parts() -> Any:

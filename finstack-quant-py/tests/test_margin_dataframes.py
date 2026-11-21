@@ -111,7 +111,7 @@ def _vm_result() -> VmResult:
 
 def test_vm_result_to_dataframe_is_one_row() -> None:
     result = _vm_result()
-    df = result.to_dataframe()
+    df = result.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -141,7 +141,7 @@ def test_vm_result_to_dataframe_renders_a_collateral_return() -> None:
     across a pair of results.
     """
     result = VmCalculator(_threshold_csa()).calculate(1_000_000.0, 1_200_000.0, "USD", dt.date(2025, 6, 30))
-    row = result.to_dataframe().iloc[0]
+    row = result.to_pandas().iloc[0]
 
     assert row["gross_exposure"] == pytest.approx(1_000_000.0)
     assert row["net_exposure"] == pytest.approx(800_000.0)
@@ -165,7 +165,7 @@ def _im_result() -> ImResult:
 
 def test_im_result_to_dataframe_is_one_row() -> None:
     result = _im_result()
-    df = result.to_dataframe()
+    df = result.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -187,7 +187,7 @@ def test_im_result_to_dataframe_is_one_row() -> None:
 
 def test_im_result_breakdown_dataframe_is_sorted_by_risk_class() -> None:
     result = _im_result()
-    df = result.to_breakdown_dataframe()
+    df = result.to_breakdown_table().to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["risk_class", "amount", "currency"]
@@ -219,7 +219,7 @@ def test_im_result_breakdown_dataframe_keeps_schema_when_empty() -> None:
     assert result.breakdown_keys() == []
     assert result.amount == pytest.approx(0.0)
 
-    df = result.to_breakdown_dataframe()
+    df = result.to_breakdown_table().to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 0
     assert list(df.columns) == ["risk_class", "amount", "currency"]
@@ -230,7 +230,7 @@ def test_schedule_im_breakdown_dataframe_has_one_row_per_asset_class() -> None:
     result = ScheduleImCalculator.bcbs_standard().calculate_for_notional(
         10_000_000.0, "USD", "interest_rate", 7.0, "2025-06-30"
     )
-    df = result.to_breakdown_dataframe()
+    df = result.to_breakdown_table().to_pandas()
 
     assert list(df.columns) == ["risk_class", "amount", "currency"]
     assert list(df["risk_class"]) == result.breakdown_keys() == ["interest_rate"]
@@ -244,7 +244,7 @@ def test_schedule_im_breakdown_dataframe_has_one_row_per_asset_class() -> None:
 
 def test_margin_utilization_to_dataframe() -> None:
     metric = MarginUtilization(800_000.0, 1_000_000.0, "USD")
-    df = metric.to_dataframe()
+    df = metric.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -264,7 +264,7 @@ def test_margin_utilization_to_dataframe() -> None:
 
 def test_excess_collateral_to_dataframe() -> None:
     metric = ExcessCollateral(1_200_000.0, 1_000_000.0, "USD")
-    df = metric.to_dataframe()
+    df = metric.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -286,7 +286,7 @@ def test_excess_collateral_to_dataframe() -> None:
 
 def test_margin_funding_cost_to_dataframe() -> None:
     metric = MarginFundingCost(1_000_000.0, 0.05, 0.03, "USD")
-    df = metric.to_dataframe()
+    df = metric.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -309,7 +309,7 @@ def test_margin_funding_cost_to_dataframe() -> None:
 
 
 def test_frtb_sensitivities_to_dataframe_keeps_schema_when_empty() -> None:
-    df = FrtbSensitivities("USD").to_dataframe()
+    df = FrtbSensitivities("USD").to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 0
     assert list(df.columns) == FRTB_SENSITIVITY_COLUMNS
@@ -325,7 +325,7 @@ def test_frtb_sensitivities_to_dataframe_is_long_and_sorted() -> None:
     sens.add_girr_curvature("USD", 500.0, -400.0)
     sens.add_rrao_position("EXOTIC-1", 5_000_000.0, True)
 
-    df = sens.to_dataframe()
+    df = sens.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == FRTB_SENSITIVITY_COLUMNS
@@ -375,8 +375,8 @@ def test_frtb_sensitivities_row_order_ignores_the_insertion_order() -> None:
             sens.add_equity_delta(f"NAME_{tenor}", 1, 2.0 * amounts[tenor])
         return sens
 
-    forward = build(tenors).to_dataframe()
-    backward = build(tuple(reversed(tenors))).to_dataframe()
+    forward = build(tenors).to_pandas()
+    backward = build(tuple(reversed(tenors))).to_pandas()
 
     assert len(forward) == 10
     pd.testing.assert_frame_equal(forward, backward)
@@ -386,7 +386,7 @@ def test_frtb_sensitivities_row_order_ignores_the_insertion_order() -> None:
 
 
 def test_simm_sensitivities_to_dataframe_keeps_schema_when_empty() -> None:
-    df = SimmSensitivities("USD").to_dataframe()
+    df = SimmSensitivities("USD").to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 0
     assert list(df.columns) == [*SENSITIVITY_COLUMNS, "expiry_tenor"]
@@ -404,7 +404,7 @@ def test_simm_sensitivities_to_dataframe_is_long_and_sorted() -> None:
     sens.add_commodity_delta("crude", 30_000.0)
     sens.add_curvature(SimmCurvatureSensitivity("interest_rate", "USD", "OIS", "1Y", 5_000.0, "5Y"))
 
-    df = sens.to_dataframe()
+    df = sens.to_pandas()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == [*SENSITIVITY_COLUMNS, "expiry_tenor"]
@@ -436,7 +436,7 @@ def test_simm_sensitivities_to_dataframe_is_long_and_sorted() -> None:
 def test_simm_sensitivities_credit_qualifying_carries_sector_label() -> None:
     sens = SimmSensitivities("USD")
     sens.add_credit_qualifying_delta("sovereign", "GOVT_A", "5Y", 40_000.0)
-    df = sens.to_dataframe()
+    df = sens.to_pandas()
 
     assert len(df) == 1
     row = df.iloc[0]
@@ -464,8 +464,8 @@ def test_simm_sensitivities_row_order_ignores_the_insertion_order() -> None:
             sens.add_equity_delta(f"NAME_{tenor}", 2.0 * amounts[tenor])
         return sens
 
-    forward = build(tenors).to_dataframe()
-    backward = build(tuple(reversed(tenors))).to_dataframe()
+    forward = build(tenors).to_pandas()
+    backward = build(tuple(reversed(tenors))).to_pandas()
 
     assert len(forward) == 10
     pd.testing.assert_frame_equal(forward, backward)

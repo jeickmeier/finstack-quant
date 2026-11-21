@@ -2,7 +2,9 @@
 
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.calibration._report import CalibrationReport
 
 class CalibrationResultEnvelope:
@@ -120,8 +122,8 @@ class CalibrationResultEnvelope:
 
         """
 
-    def residuals(self, step_id: str) -> pd.DataFrame:
-        """Return one step's per-quote residuals as a DataFrame.
+    def residuals(self, step_id: str) -> ArrowTable:
+        """Return one step's per-quote residuals as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Parameters
         ----------
@@ -130,7 +132,7 @@ class CalibrationResultEnvelope:
 
         Returns
         -------
-        pandas.DataFrame
+        ArrowTable
             Columns ``quote_id``, ``quote_value`` (native quote units),
             ``residual`` (in the report's declared units, target zero) and
             ``sensitivity``.
@@ -139,28 +141,75 @@ class CalibrationResultEnvelope:
         ------
         KeyError
             If no step with that identifier exists.
-        RuntimeError
-            If pandas is not installed.
 
         """
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """Return one row per step summarizing its fit as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``step_id``, ``success``, ``iterations``, ``max_residual``,
+            ``rmse``, ``worst_quote_id``, and ``convergence_reason``. Plan-level
+            aggregates (``max_residual_ratio``, ``rmse_ratio``) are on
+            ``result.report``.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+
+    def to_pandas(self) -> pd.DataFrame:
         """Return one row per step summarizing its fit.
 
         Returns
         -------
         pandas.DataFrame
             Columns ``step_id``, ``success``, ``iterations``, ``max_residual``,
-            ``rmse`` and ``convergence_reason``. Plan-level aggregates
-            (``max_residual_ratio``, ``rmse_ratio``) are on ``result.report``.
+            ``rmse``, ``worst_quote_id``, and ``convergence_reason``. Plan-level
+            aggregates (``max_residual_ratio``, ``rmse_ratio``) are on
+            ``result.report``.
 
         Raises
         ------
-        RuntimeError
+        ImportError
             If pandas is not installed.
 
         """
 
+    def to_polars(self) -> pl.DataFrame:
+        """Return one row per step summarizing its fit as a ``polars.DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Per-step summary constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+
+    def to_pyarrow(self) -> Any:
+        """Return one row per step summarizing its fit as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def _repr_html_(self) -> str | None: ...
     def content_hash(self) -> str:
         """Stable content hash of the canonical result JSON.
 

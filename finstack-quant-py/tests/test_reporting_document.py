@@ -86,3 +86,29 @@ def test_resolve_sections_preserves_short_valid_label() -> None:
         _resolve_sections(["zzz"], ["first", "second"], valid_label="valid")
 
     assert str(exc_info.value) == "unknown section(s): ['zzz']; valid: ['first', 'second']"
+
+
+def test_section_from_dataframe_accepts_arrow_table() -> None:
+    from finstack_quant.statements import ModelBuilder
+
+    b = ModelBuilder("demo")
+    b.periods("2025Q1..Q2", None)
+    b.value("revenue", [("2025Q1", 100.0), ("2025Q2", -25.0)])
+    from finstack_quant.statements import Evaluator
+
+    result = Evaluator().evaluate(b.build())
+    arrow_table = result.to_arrow(orient="long")
+
+    section = Section.from_dataframe("Statement Cells", arrow_table, columns=["node_id", "period_id", "value"])
+    assert "Statement Cells" in section.title
+    assert "2025Q1" in section.body
+    assert "revenue" in section.body
+
+
+def test_section_from_dataframe_accepts_polars_dataframe() -> None:
+    pl = pytest.importorskip("polars")
+
+    frame = pl.DataFrame({"Asset": ["Bond A", "Swap B"], "PnL": [125.0, -40.0]})
+    section = Section.from_dataframe("Positions", frame, neg_columns={"PnL"})
+    assert "Bond A" in section.body
+    assert 'class="neg"' in section.body

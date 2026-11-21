@@ -183,7 +183,7 @@ def _mismatches() -> set[str]:
         for member in vars(value):
             if member.startswith("_") or member in WIRE_MEMBERS or member in PY_RULE_MEMBERS:
                 continue
-            if member.startswith("to_") and member.endswith(("_dataframe", "_series")):
+            if member.startswith("to_") and member.endswith(("_table", "_series")):
                 continue
             rust = member.rstrip("_")
             if rust not in rust_members and rust.lower() not in rust_members:

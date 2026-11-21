@@ -65,7 +65,7 @@ impl PyRangeAccrual {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_range_accrual", "RangeAccrual.terms")]
     #[getter]
     fn terms<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.terms)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.terms)
     }
 }
 

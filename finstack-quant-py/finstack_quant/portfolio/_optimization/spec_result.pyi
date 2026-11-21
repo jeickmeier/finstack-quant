@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.portfolio._container import Portfolio
 from finstack_quant.portfolio._optimization.enums import MissingMetricPolicy, WeightingScheme
 from finstack_quant.portfolio._optimization.expressions import Constraint, Objective, PositionFilter
@@ -1044,36 +1046,87 @@ class PortfolioOptimizationResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the per-position weight and quantity solution, indexed by position.
+        Export the per-position weight and quantity solution as an
+        :class:`~finstack_quant.core.table.ArrowTable`.
 
         ``current_weights``, ``optimal_weights``, ``weight_deltas`` and
         ``implied_quantities`` share one position key space, so they are
-        joined into a single frame. The row axis is the union of their keys,
+        joined into a single table. The row axis is the union of their keys,
         ordered by first appearance (``current_weights`` first); a value
-        missing from one map becomes ``None`` in that column — this is how
-        candidate positions with no current weight show up.
+        missing from one map becomes null in that column.
 
-        Columns: ``current_weight``, ``optimal_weight``, ``weight_delta`` (all
-        fractions of the portfolio, not percentages), ``implied_quantity``
-        (units / face / notional per the weighting scheme).
+        Columns: ``position_id``, ``current_weight``, ``optimal_weight``,
+        ``weight_delta`` (all fractions of the portfolio, not percentages),
+        ``implied_quantity`` (units / face / notional per the weighting scheme).
 
         Returns
         -------
-        pd.DataFrame
-            One row per position; the index holds the position ids.
+        ArrowTable
+            One row per position.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the table cannot be constructed.
         """
         ...
 
-    def to_trade_dataframe(self) -> pd.DataFrame:
+    def to_pandas(self) -> pd.DataFrame:
         """
-        Export :meth:`to_trade_list` as a pandas DataFrame.
+        Export the per-position weight and quantity solution, indexed by ``position_id``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per position; indexed by ``position_id``.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the per-position weight and quantity solution as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per position with ``position_id`` column.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the per-position weight and quantity solution as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per position with ``position_id`` column.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_trade_table(self) -> ArrowTable:
+        """
+        Export :meth:`to_trade_list` as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         One row per trade, in the same order as :meth:`to_trade_list` (sorted
         by absolute quantity delta, largest first).
@@ -1086,13 +1139,14 @@ class PortfolioOptimizationResult:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per trade; a solution that requires no trades yields a
-            zero-row frame that still carries the column schema.
+            zero-row table that still carries the column schema.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If the table cannot be constructed.
         """
         ...
 

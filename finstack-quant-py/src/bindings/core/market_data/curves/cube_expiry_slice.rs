@@ -6,8 +6,9 @@ use finstack_quant_core::market_data::surfaces::VolCubeExpirySlice;
 use finstack_quant_core::market_data::surfaces::VolQuoteType;
 use pyo3::prelude::*;
 
-use super::helpers::columns_to_dataframe;
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
+use super::helpers::columns_to_arrow_table;
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::errors::core_to_py;
 
 /// Volatility grid at one fixed option expiry, indexed by tenor and strike.
@@ -128,24 +129,6 @@ impl PyVolCubeExpirySlice {
         self.inner.grid_shape()
     }
 
-    /// Export ``expiry``, ``tenor``, ``strike``, and ``vol`` columns.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let (tenor, (strike, vol)): (Vec<f64>, (Vec<f64>, Vec<f64>)) = self
-            .inner
-            .grid_points()
-            .map(|(tenor, strike, vol)| (tenor, (strike, vol)))
-            .unzip();
-        columns_to_dataframe(
-            py,
-            &[
-                ("expiry", vec![self.inner.expiry(); vol.len()]),
-                ("tenor", tenor),
-                ("strike", strike),
-                ("vol", vol),
-            ],
-        )
-    }
-
     fn __repr__(&self) -> String {
         let (n_ten, n_strk) = self.inner.grid_shape();
         format!(
@@ -159,10 +142,26 @@ impl PyVolCubeExpirySlice {
     }
 }
 
+impl PyVolCubeExpirySlice {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let (tenor, (strike, vol)): (Vec<f64>, (Vec<f64>, Vec<f64>)) = self
+            .inner
+            .grid_points()
+            .map(|(tenor, strike, vol)| (tenor, (strike, vol)))
+            .unzip();
+        columns_to_arrow_table(&[
+            ("expiry", vec![self.inner.expiry(); vol.len()]),
+            ("tenor", tenor),
+            ("strike", strike),
+            ("vol", vol),
+        ])
+    }
+}
+
+tabular_methods!(PyVolCubeExpirySlice);
 wire_methods!(
     PyVolCubeExpirySlice,
     VolCubeExpirySlice,
     "VolCubeExpirySlice",
     arc
 );
-impl_repr_html_via_dataframe!(PyVolCubeExpirySlice);

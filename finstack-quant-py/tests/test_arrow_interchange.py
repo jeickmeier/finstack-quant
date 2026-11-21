@@ -75,7 +75,7 @@ def _portfolio_valuation() -> object:
 
 
 def test_to_arrow_long_returns_arrow_table_with_stream_protocol() -> None:
-    at = _statement_result().to_arrow_long()
+    at = _statement_result().to_arrow(orient="long")
     assert isinstance(at, ArrowTable)
     assert hasattr(at, "__arrow_c_stream__")
     assert at.num_rows == 4
@@ -94,11 +94,11 @@ def test_to_arrow_long_returns_arrow_table_with_stream_protocol() -> None:
 
 def test_pyarrow_values_match_pandas_export_exactly() -> None:
     res = _statement_result()
-    tbl = pa.table(res.to_arrow_long())
-    df = res.to_dataframe(orient="long")
+    tbl = pa.table(res.to_arrow("long"))
+    df = res.to_pandas(orient="long")
     assert tbl.num_rows == len(df)
     assert tbl.column("node_id").to_pylist() == df["node_id"].tolist()
-    assert tbl.column("period_id").to_pylist() == df["period"].tolist()
+    assert tbl.column("period_id").to_pylist() == df["period_id"].tolist()
     # Exact float equality: values pass through bit-identically.
     assert tbl.column("value").to_pylist() == df["value"].tolist()
     assert tbl.column("value_type").to_pylist() == df["value_type"].tolist()
@@ -106,7 +106,7 @@ def test_pyarrow_values_match_pandas_export_exactly() -> None:
 
 def test_null_handling_for_scalar_nodes() -> None:
     # Scalar (non-Money) nodes leave amount/currency null in the long table.
-    tbl = pa.table(_statement_result().to_arrow_long())
+    tbl = pa.table(_statement_result().to_arrow("long"))
     assert tbl.column("amount").null_count == tbl.num_rows
     assert tbl.column("currency").null_count == tbl.num_rows
     assert all(v is None for v in tbl.column("amount").to_pylist())
@@ -114,29 +114,29 @@ def test_null_handling_for_scalar_nodes() -> None:
 
 def test_polars_roundtrip_matches_values_exactly() -> None:
     res = _statement_result()
-    df_pl = pl.DataFrame(res.to_arrow_long())
-    df_pd = res.to_dataframe(orient="long")
+    df_pl = pl.DataFrame(res.to_arrow("long"))
+    df_pd = res.to_pandas(orient="long")
     assert df_pl.get_column("value").to_list() == df_pd["value"].tolist()
     assert df_pl.get_column("node_id").to_list() == df_pd["node_id"].tolist()
     assert df_pl.get_column("amount").null_count() == df_pl.height
 
 
 def test_arrow_table_is_reusable_across_consumers() -> None:
-    at = _statement_result().to_arrow_long()
+    at = _statement_result().to_arrow("long")
     first = pa.table(at)
     second = pa.table(at)  # fresh stream per __arrow_c_stream__ call
     assert first.equals(second)
 
 
 def test_field_metadata_carries_roles() -> None:
-    tbl = pa.table(_statement_result().to_arrow_long())
+    tbl = pa.table(_statement_result().to_arrow("long"))
     md = tbl.schema.field("node_id").metadata or {}
     assert md.get(b"finstack:role") == b"dimension"
 
 
 def test_to_arrow_wide_shape() -> None:
     res = _statement_result()
-    tbl = pa.table(res.to_arrow_wide())
+    tbl = pa.table(res.to_arrow("wide"))
     assert tbl.column_names[0] == "period_id"
     assert set(tbl.column_names) == {"period_id", "revenue", "ebitda"}
     assert tbl.column("period_id").to_pylist() == ["2025Q1", "2025Q2"]
@@ -145,7 +145,7 @@ def test_to_arrow_wide_shape() -> None:
 
 def test_portfolio_positions_to_arrow() -> None:
     val = _portfolio_valuation()
-    tbl = pa.table(val.to_arrow_positions())
+    tbl = pa.table(val.to_arrow())
     assert tbl.num_rows == len(val)
     assert tbl.column("position_id").to_pylist() == ["USD-POS"]
     assert tbl.column("entity_id").to_pylist() == ["FUND"]
@@ -154,7 +154,7 @@ def test_portfolio_positions_to_arrow() -> None:
     assert math.isfinite(value_base)
     assert value_base > 0.0
     # Values agree exactly with polars consumption of the same export.
-    df_pl = pl.DataFrame(val.to_arrow_positions())
+    df_pl = pl.DataFrame(val.to_arrow())
     assert df_pl.get_column("value_base").to_list() == [value_base]
 
 
@@ -179,7 +179,7 @@ def test_performance_to_arrow_roundtrips_with_polars_pyarrow_and_pandas() -> Non
     assert table_meta["kind"] == "analytics_summary"
 
     df_pl = pl.DataFrame(at)
-    df_pd = perf.to_dataframe(0.0, 0.0, 0.0, 0.95)
+    df_pd = perf.to_pandas(0.0, 0.0, 0.0, 0.95)
     assert df_pl.get_column("ticker").to_list() == list(df_pd.index)
     assert df_pl.equals(at.to_polars())
     pa_tbl = at.to_pyarrow()

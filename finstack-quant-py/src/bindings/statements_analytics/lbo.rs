@@ -269,7 +269,7 @@ impl PyDatedLboResult {
     #[getter]
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._lbo", "DatedLboResult.run")]
     fn run<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.run)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.run)
     }
 
     #[getter]

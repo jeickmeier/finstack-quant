@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 class BrinsonPeriodResult:
     """
@@ -142,12 +145,28 @@ class BrinsonPeriodResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Per-sector effects as a pandas DataFrame.
+        Per-sector effects as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``sector``, ``allocation``, ``selection``, ``interaction``, ``total``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
+
+        Returns
+        -------
+        ArrowTable
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Per-sector effects as a pandas ``DataFrame``.
 
         Returns
         -------
@@ -156,11 +175,46 @@ class BrinsonPeriodResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Per-sector effects as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Per-sector effects as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize this result to canonical JSON.
@@ -346,12 +400,28 @@ class CarinoLinkedAttribution:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Linked per-sector effects as a pandas DataFrame.
+        Linked per-sector effects as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``sector``, ``allocation``, ``selection``, ``interaction``, ``total``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
+
+        Returns
+        -------
+        ArrowTable
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Linked per-sector effects as a pandas ``DataFrame``.
 
         Returns
         -------
@@ -360,11 +430,46 @@ class CarinoLinkedAttribution:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Linked per-sector effects as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Linked per-sector effects as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize this result to canonical JSON.
@@ -413,23 +518,27 @@ class CarinoLinkedAttribution:
         """
         ...
 
-def brinson_fachler(sectors: str | dict[str, Any] | list[Any] | pd.DataFrame) -> BrinsonPeriodResult:
+def brinson_fachler(
+    sectors: str | dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
+) -> BrinsonPeriodResult:
     """
-    Compute single-period Brinson-Fachler attribution from sector JSON.
+    Compute single-period Brinson-Fachler attribution from sector inputs.
 
     Parameters
     ----------
-    sectors : str | dict | list | pandas.DataFrame
-        JSON array of ``SectorPeriod`` objects with ``sector``,
-        ``portfolio_weight``, ``benchmark_weight``, ``portfolio_return``, and
-        ``benchmark_return`` fields. Returns are simple decimal returns for the
-        period (e.g. ``0.02`` for +2%).
+    sectors : str | dict | list | pandas.DataFrame | polars.DataFrame | Any
+        Sequence/JSON array of ``SectorPeriod`` records or a pandas/Polars
+        DataFrame or Arrow table with ``sector``, ``portfolio_weight``,
+        ``benchmark_weight``, ``portfolio_return``, and ``benchmark_return``
+        columns. Returns are simple decimal returns for the period (e.g.
+        ``0.02`` for +2%).
 
     Returns
     -------
     BrinsonPeriodResult
         Typed result with per-sector effects, effect totals, and
-        ``to_dataframe()`` / ``to_json()`` exits; use
+        ``to_arrow()`` / ``to_pandas()`` / ``to_polars()`` / ``to_pyarrow()``
+        / ``to_json()`` exits;
         serialize with ``to_json()`` for the wire string.
 
     Raises
@@ -461,7 +570,9 @@ def brinson_fachler(sectors: str | dict[str, Any] | list[Any] | pd.DataFrame) ->
     """
     ...
 
-def carino_link(periods: str | dict[str, Any] | list[Any] | pd.DataFrame) -> CarinoLinkedAttribution:
+def carino_link(
+    periods: str | dict[str, Any] | Sequence[BrinsonPeriodResult | dict[str, Any]] | pd.DataFrame | pl.DataFrame | Any,
+) -> CarinoLinkedAttribution:
     """
     Carino-link already-computed single-period Brinson-Fachler results.
 
@@ -472,8 +583,8 @@ def carino_link(periods: str | dict[str, Any] | list[Any] | pd.DataFrame) -> Car
 
     Parameters
     ----------
-    periods : str | dict | list | pandas.DataFrame
-        Chronological list of typed ``BrinsonPeriodResult`` objects (as
+    periods : str | dict | sequence | pandas.DataFrame | polars.DataFrame | Any
+        Chronological sequence of typed ``BrinsonPeriodResult`` objects (as
         returned by :func:`brinson_fachler`) or their JSON form (for example
         ``json.loads(brinson_fachler(...).to_json())`` per period) with identical
         sector ordering in every period.
@@ -516,7 +627,14 @@ def carino_link(periods: str | dict[str, Any] | list[Any] | pd.DataFrame) -> Car
     """
     ...
 
-def brinson_linked(periods: str | list[list[dict[str, Any]]]) -> CarinoLinkedAttribution:
+def brinson_linked(
+    periods: str
+    | list[list[dict[str, Any]]]
+    | Sequence[pd.DataFrame | pl.DataFrame | Any]
+    | pd.DataFrame
+    | pl.DataFrame
+    | Any,
+) -> CarinoLinkedAttribution:
     """
     Attribute each period with Brinson-Fachler and Carino-link the results.
 
@@ -526,14 +644,17 @@ def brinson_linked(periods: str | list[list[dict[str, Any]]]) -> CarinoLinkedAtt
 
     Parameters
     ----------
-    periods : str | list[list[dict]]
-        Chronological periods, each a list of ``SectorPeriod`` objects
-        (``sector``, ``portfolio_weight``, ``benchmark_weight``,
-        ``portfolio_return``, ``benchmark_return``), or the JSON of that
-        nested list. Weights are decimal fractions summing to one on each
-        side; returns are decimal period returns (``0.015`` is +1.5 %).
-        Every period lists the same sectors in the same order; a sector
-        absent on one side keeps a zero weight.
+    periods : str | list[list[dict]] | sequence[DataFrame] | pd.DataFrame | pl.DataFrame | Any
+        Chronological periods given as a list of per-period ``SectorPeriod``
+        record lists, a sequence of per-period pandas/Polars DataFrames or Arrow
+        tables, a single tidy pandas/Polars DataFrame or Arrow table with a
+        ``period`` column grouping periods in first-appearance order, or a JSON
+        string. Each row holds ``sector``, ``portfolio_weight``,
+        ``benchmark_weight``, ``portfolio_return``, and ``benchmark_return``.
+        Weights are decimal fractions summing to one on each side; returns are
+        decimal period returns (``0.015`` is +1.5 %). Every period lists the
+        same sectors in the same order; a sector absent on one side keeps a
+        zero weight.
 
     Returns
     -------

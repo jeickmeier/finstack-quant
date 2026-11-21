@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import datetime
-from typing import Iterator, Optional
+from typing import Any, Iterator, Optional
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 # Periods
 
@@ -645,7 +647,24 @@ class PeriodPlan:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Periods as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            One row per period with columns ``id`` (str), ``start`` and
+            ``end`` (``Date32``) and ``is_actual`` (bool).
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Periods as a pandas DataFrame.
 
@@ -653,7 +672,7 @@ class PeriodPlan:
         -------
         pandas.DataFrame
             One row per period with columns ``id`` (str), ``start`` and
-            ``end`` (``datetime64``) and ``is_actual`` (bool).
+            ``end`` (dates) and ``is_actual`` (bool).
 
         Raises
         ------
@@ -663,11 +682,46 @@ class PeriodPlan:
         Examples
         --------
         >>> from finstack_quant.core.dates import build_periods
-        >>> list(build_periods("2024Q1..Q2").to_dataframe().columns)
+        >>> list(build_periods("2024Q1..Q2").to_pandas().columns)
         ['id', 'start', 'end', 'is_actual']
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Periods as a ``polars.DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row per period constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Periods as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to the canonical JSON wire form.

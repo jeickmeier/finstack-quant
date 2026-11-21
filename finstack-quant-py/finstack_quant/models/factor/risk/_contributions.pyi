@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 import pandas as pd
+import polars as pl
+
+from finstack_quant.core.table import ArrowTable
 
 class FactorContribution:
     """
@@ -130,13 +133,13 @@ class FactorContribution:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export this entry as a single-row pandas DataFrame.
+        Export this entry as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row with columns ``factor_id``, ``absolute_risk``, ``relative_risk``, ``marginal_risk``.
 
         Raises
@@ -146,6 +149,63 @@ class FactorContribution:
         """
         ...
 
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export this entry as a single-row pandas ``DataFrame`` (lazily imports ``pandas``).
+
+        Returns
+        -------
+        pd.DataFrame
+            One row with columns ``factor_id``, ``absolute_risk``, ``relative_risk``, ``marginal_risk``.
+
+        Raises
+        ------
+        ImportError
+            If pandas is not installed.
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export this entry as a single-row Polars ``DataFrame`` (lazily imports ``polars``).
+
+        Returns
+        -------
+        polars.DataFrame
+            One row with columns ``factor_id``, ``absolute_risk``, ``relative_risk``, ``marginal_risk``.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed.
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export this entry as a single-row ``pyarrow.Table`` (lazily imports ``pyarrow``).
+
+        Returns
+        -------
+        pyarrow.Table
+            One row with columns ``factor_id``, ``absolute_risk``, ``relative_risk``, ``marginal_risk``.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed.
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """Return a concise debug representation.
         Returns
@@ -261,13 +321,13 @@ class PositionFactorContribution:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export this entry as a single-row pandas DataFrame.
+        Export this entry as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row with columns ``position_id``, ``factor_id``, ``risk_contribution``.
 
         Raises
@@ -277,6 +337,63 @@ class PositionFactorContribution:
         """
         ...
 
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export this entry as a single-row pandas ``DataFrame`` (lazily imports ``pandas``).
+
+        Returns
+        -------
+        pd.DataFrame
+            One row with columns ``position_id``, ``factor_id``, ``risk_contribution``.
+
+        Raises
+        ------
+        ImportError
+            If pandas is not installed.
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export this entry as a single-row Polars ``DataFrame`` (lazily imports ``polars``).
+
+        Returns
+        -------
+        polars.DataFrame
+            One row with columns ``position_id``, ``factor_id``, ``risk_contribution``.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed.
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export this entry as a single-row ``pyarrow.Table`` (lazily imports ``pyarrow``).
+
+        Returns
+        -------
+        pyarrow.Table
+            One row with columns ``position_id``, ``factor_id``, ``risk_contribution``.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed.
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """Return a concise debug representation.
         Returns
@@ -409,13 +526,13 @@ class PositionResidualContribution:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export this entry as a single-row pandas DataFrame.
+        Export this entry as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row with columns ``position_id``, ``residual_variance``, ``source_kind``, ``source_issuer_id``.
 
         Raises
@@ -425,6 +542,63 @@ class PositionResidualContribution:
         """
         ...
 
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export this entry as a single-row pandas ``DataFrame`` (lazily imports ``pandas``).
+
+        Returns
+        -------
+        pd.DataFrame
+            One row with columns ``position_id``, ``residual_variance``, ``source_kind``, ``source_issuer_id``.
+
+        Raises
+        ------
+        ImportError
+            If pandas is not installed.
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export this entry as a single-row Polars ``DataFrame`` (lazily imports ``polars``).
+
+        Returns
+        -------
+        polars.DataFrame
+            One row with columns ``position_id``, ``residual_variance``, ``source_kind``, ``source_issuer_id``.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed.
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export this entry as a single-row ``pyarrow.Table`` (lazily imports ``pyarrow``).
+
+        Returns
+        -------
+        pyarrow.Table
+            One row with columns ``position_id``, ``residual_variance``, ``source_kind``, ``source_issuer_id``.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed.
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """Return a concise debug representation.
         Returns
@@ -585,35 +759,36 @@ class RiskDecomposition:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Primary table: the factor-level risk decomposition.
+        Primary table: factor-level risk decomposition as an :class:`~finstack_quant.core.table.ArrowTable`.
 
-        Alias of :meth:`to_factor_dataframe`. Every tabular result type in the library
-        answers ``to_dataframe()``; the position × factor view stays on
-        :meth:`to_position_factor_dataframe`.
+        Matches :meth:`to_factor_table`. The position × factor and position
+        residual views live on :meth:`to_position_factor_table` and
+        :meth:`to_position_residual_table`.
 
         Returns
         -------
-        pd.DataFrame
-            The same frame :meth:`to_factor_dataframe` returns.
+        ArrowTable
+            Table with columns ``factor_id``, ``absolute_risk``,
+            ``relative_risk``, ``marginal_risk``.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted into an Arrow table.
 
         Examples
         --------
-        >>> frame = result.to_dataframe()  # doctest: +SKIP
-
-        Notes
-        -----
-        This alias does not raise; it delegates to the method named above.
+        >>> table = result.to_arrow()  # doctest: +SKIP
         """
         ...
 
-    def to_factor_dataframe(self) -> pd.DataFrame:
+    def to_pandas(self) -> pd.DataFrame:
         """
-        Export factor contributions as a pandas DataFrame.
+        Primary table: export factor contributions as a pandas ``DataFrame`` (lazily imports ``pandas``).
 
-        Columns: ``factor_id``, ``absolute_risk``, ``relative_risk``,
-        ``marginal_risk``.
+        Equivalent to ``to_factor_table().to_pandas()``.
 
         Returns
         -------
@@ -622,48 +797,109 @@ class RiskDecomposition:
 
         Raises
         ------
+        ImportError
+            If pandas is not installed.
         ValueError
             If the result cannot be serialized into a pandas object.
         """
         ...
 
-    def to_position_factor_dataframe(self) -> pd.DataFrame:
+    def to_polars(self) -> pl.DataFrame:
         """
-        Export position x factor contributions as a pandas DataFrame.
+        Primary table: export factor contributions as a Polars ``DataFrame`` (lazily imports ``polars``).
+
+        Returns
+        -------
+        polars.DataFrame
+            One row per entry of :attr:`factor_contributions`.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed.
+        ValueError
+            If the result cannot be converted into a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Primary table: export factor contributions as a ``pyarrow.Table`` (lazily imports ``pyarrow``).
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per entry of :attr:`factor_contributions`.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed.
+        ValueError
+            If the result cannot be converted into a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_factor_table(self) -> ArrowTable:
+        """
+        Export factor contributions as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``factor_id``, ``absolute_risk``, ``relative_risk``,
+        ``marginal_risk``. Identical to :meth:`to_arrow`.
+
+        Returns
+        -------
+        ArrowTable
+            One row per entry of :attr:`factor_contributions`.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted into an Arrow table.
+        """
+        ...
+
+    def to_position_factor_table(self) -> ArrowTable:
+        """
+        Export position x factor contributions as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``position_id``, ``factor_id``, ``risk_contribution``.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per entry of :attr:`position_factor_contributions`.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be converted into an Arrow table.
         """
         ...
 
-    def to_position_residual_dataframe(self) -> pd.DataFrame:
+    def to_position_residual_table(self) -> ArrowTable:
         """
-        Export per-position residual variance contributions as a DataFrame.
+        Export per-position residual variance contributions as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``position_id``, ``residual_variance`` (annualized variance,
         non-negative), ``source_kind`` (``"from_credit_model"`` or
-        ``"other"``), ``source_issuer_id`` (``None`` unless ``source_kind`` is
+        ``"other"``), ``source_issuer_id`` (null unless ``source_kind`` is
         ``"from_credit_model"``).
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per entry of :attr:`position_residual_contributions`; zero
             rows — with the columns still present — when the decomposer
             produced no position-level residual allocation.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted into an Arrow table.
         """
         ...
 
@@ -814,9 +1050,28 @@ class PositionVarContribution:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export this contribution as a single-row pandas DataFrame.
+        Export this contribution as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``position_id``, ``component_var``, ``relative_var``,
+        ``marginal_var``, ``incremental_var``.
+
+        Returns
+        -------
+        ArrowTable
+            Exactly one row, for symmetry with :meth:`PositionRiskDecomposition.to_arrow`.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export this contribution as a single-row pandas ``DataFrame`` (lazily imports ``pandas``).
 
         Columns: ``position_id``, ``component_var``, ``relative_var``,
         ``marginal_var``, ``incremental_var``.
@@ -825,15 +1080,62 @@ class PositionVarContribution:
         -------
         pd.DataFrame
             Exactly one row, for symmetry with
-            :meth:`PositionRiskDecomposition.to_dataframe`.
+            :meth:`PositionRiskDecomposition.to_pandas`.
 
         Raises
         ------
+        ImportError
+            If pandas is not installed.
         ValueError
             If the result cannot be serialized into a pandas object.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export this contribution as a single-row Polars ``DataFrame`` (lazily imports ``polars``).
+
+        Columns: ``position_id``, ``component_var``, ``relative_var``,
+        ``marginal_var``, ``incremental_var``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Exactly one row, for symmetry with :meth:`PositionRiskDecomposition.to_polars`.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed.
+        ValueError
+            If the result cannot be converted into a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export this contribution as a single-row ``pyarrow.Table`` (lazily imports ``pyarrow``).
+
+        Columns: ``position_id``, ``component_var``, ``relative_var``,
+        ``marginal_var``, ``incremental_var``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Exactly one row, for symmetry with :meth:`PositionRiskDecomposition.to_pyarrow`.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed.
+        ValueError
+            If the result cannot be converted into a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """Return a concise debug representation.
         Returns
@@ -966,13 +1268,13 @@ class PositionEsContribution:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export this entry as a single-row pandas DataFrame.
+        Export this entry as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row with columns ``position_id``, ``component_es``, ``relative_es``, ``marginal_es``.
 
         Raises
@@ -982,6 +1284,63 @@ class PositionEsContribution:
         """
         ...
 
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export this entry as a single-row pandas ``DataFrame`` (lazily imports ``pandas``).
+
+        Returns
+        -------
+        pd.DataFrame
+            One row with columns ``position_id``, ``component_es``, ``relative_es``, ``marginal_es``.
+
+        Raises
+        ------
+        ImportError
+            If pandas is not installed.
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export this entry as a single-row Polars ``DataFrame`` (lazily imports ``polars``).
+
+        Returns
+        -------
+        polars.DataFrame
+            One row with columns ``position_id``, ``component_es``, ``relative_es``, ``marginal_es``.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed.
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export this entry as a single-row ``pyarrow.Table`` (lazily imports ``pyarrow``).
+
+        Returns
+        -------
+        pyarrow.Table
+            One row with columns ``position_id``, ``component_es``, ``relative_es``, ``marginal_es``.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed.
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """Return a concise debug representation.
         Returns
@@ -1171,18 +1530,38 @@ class PositionRiskDecomposition:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the joined per-position VaR and ES decomposition.
+        Export the joined per-position VaR and ES decomposition as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         ``var_contributions`` and ``es_contributions`` are both keyed by
-        position, so they are joined on ``position_id`` into one frame. Rows
-        follow ``var_contributions`` order; an ES column is ``None`` for a
-        position that has no matching ES entry.
+        position, so they are joined on ``position_id`` into one table. Rows
+        follow ``var_contributions`` order; an ES column is null for a position
+        that has no matching ES entry.
 
         The portfolio-level scalars (:attr:`portfolio_var`,
         :attr:`portfolio_es`, :attr:`confidence`, :attr:`method`) are header
         metadata and are deliberately **not** repeated on every row.
+
+        Columns: ``position_id``, ``component_var``, ``relative_var``,
+        ``marginal_var``, ``incremental_var``, ``component_es``,
+        ``relative_es``, ``marginal_es``.
+
+        Returns
+        -------
+        ArrowTable
+            One row per entry of :attr:`var_contributions`.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the joined per-position VaR and ES decomposition as a pandas ``DataFrame`` (lazily imports ``pandas``).
 
         Columns: ``position_id``, ``component_var``, ``relative_var``,
         ``marginal_var``, ``incremental_var``, ``component_es``,
@@ -1195,11 +1574,56 @@ class PositionRiskDecomposition:
 
         Raises
         ------
+        ImportError
+            If pandas is not installed.
         ValueError
             If the result cannot be serialized into a pandas object.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the joined per-position VaR and ES decomposition as a Polars ``DataFrame`` (lazily imports ``polars``).
+
+        Columns match :meth:`to_arrow`.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row per entry of :attr:`var_contributions`.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed.
+        ValueError
+            If the result cannot be converted into a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the joined per-position VaR and ES decomposition as a ``pyarrow.Table`` (lazily imports ``pyarrow``).
+
+        Columns match :meth:`to_arrow`.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per entry of :attr:`var_contributions`.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed.
+        ValueError
+            If the result cannot be converted into a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """Return a concise debug representation.
         Returns

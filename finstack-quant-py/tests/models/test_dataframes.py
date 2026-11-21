@@ -39,7 +39,7 @@ def _gbm_spec(seed: int) -> dict[str, object]:
 
 def test_path_summary_to_dataframe_is_path_and_time_by_factor() -> None:
     summary = simulate_paths(_gbm_spec(7))
-    df = summary.to_dataframe()
+    df = summary.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert list(df.index.names) == ["path", "time"]
     assert list(df.columns) == summary.factor_names == ["spot"]
@@ -50,7 +50,9 @@ def test_path_summary_to_dataframe_is_path_and_time_by_factor() -> None:
     assert list(wide.index) == summary.times
     assert list(wide.columns) == [0, 1, 2]
     assert list(wide[1]) == summary.values[3:6]
-    assert summary._repr_html_() == df._repr_html_()
+    html = summary._repr_html_()
+    assert isinstance(html, str)
+    assert "<table" in html
 
 
 def test_path_summary_to_dataframe_has_one_column_per_factor() -> None:
@@ -69,7 +71,7 @@ def test_path_summary_to_dataframe_has_one_column_per_factor() -> None:
         "initial_state": [100.0],
         "antithetic": True,
     })
-    df = summary.to_dataframe()
+    df = summary.to_pandas()
     assert list(df.columns) == ["spot", "variance"]
     assert df.shape == (6 * 3, 2)
     assert list(df["spot"]) == summary.values[0::2]
@@ -97,7 +99,7 @@ def test_path_summary_to_dataframe_rejects_an_inconsistent_shape() -> None:
         '{"num_paths":1,"num_simulated_paths":1,"dim":1,"times":[0.0,1.0],"factor_names":["spot"],"values":[1.0]}'
     )
     with pytest.raises(ValueError, match="dimensions"):
-        inconsistent.to_dataframe()
+        inconsistent.to_pandas()
     with pytest.raises(ValueError, match="dimensions"):
         inconsistent.to_numpy()
     assert inconsistent._repr_html_() is None
@@ -111,11 +113,11 @@ def test_path_summary_dataframe_is_reproducible_from_the_seed() -> None:
     determinism claim the seed argument exists for. A different seed must move
     the paths, otherwise the seed is being ignored.
     """
-    first = simulate_paths(_gbm_spec(7)).to_dataframe()
-    second = simulate_paths(_gbm_spec(7)).to_dataframe()
+    first = simulate_paths(_gbm_spec(7)).to_pandas()
+    second = simulate_paths(_gbm_spec(7)).to_pandas()
     pd.testing.assert_frame_equal(first, second)
 
-    other_seed = simulate_paths(_gbm_spec(8)).to_dataframe()
+    other_seed = simulate_paths(_gbm_spec(8)).to_pandas()
     assert list(other_seed.columns) == list(first.columns)
     assert not first.equals(other_seed), "a different seed must produce different paths"
 
@@ -154,7 +156,7 @@ def _portfolio_loss_result() -> PortfolioLossResult:
 
 def test_portfolio_loss_distribution_dataframe_is_one_row_per_path() -> None:
     result = _portfolio_loss_result()
-    df = result.to_dataframe()
+    df = result.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["loss"]
     assert len(df) == len(result.losses)
@@ -163,7 +165,7 @@ def test_portfolio_loss_distribution_dataframe_is_one_row_per_path() -> None:
 
 def test_portfolio_loss_summary_dataframe_is_one_row() -> None:
     result = _portfolio_loss_result()
-    df = result.to_summary_dataframe()
+    df = result.to_summary_table().to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
     assert list(df.columns) == [
@@ -202,7 +204,7 @@ _TRANCHE_COLUMNS = [
 def test_tranche_loss_statistics_to_dataframe_is_one_row() -> None:
     """A mezzanine tranche the loss distribution straddles, so no two cells tie."""
     stats = _portfolio_loss_result().tranche_loss_statistics(5.0, 20.0, _PORTFOLIO_NOTIONAL)
-    df = stats.to_dataframe()
+    df = stats.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
     assert list(df.columns) == _TRANCHE_COLUMNS
@@ -221,7 +223,7 @@ def test_tranche_loss_statistics_respect_the_domain_ordering() -> None:
     These are the invariants that make the eleven columns meaningful, and they
     only bite on a tranche that is neither wiped out nor untouched.
     """
-    df = _portfolio_loss_result().tranche_loss_statistics(5.0, 20.0, _PORTFOLIO_NOTIONAL).to_dataframe()
+    df = _portfolio_loss_result().tranche_loss_statistics(5.0, 20.0, _PORTFOLIO_NOTIONAL).to_pandas()
     row = df.iloc[0]
 
     for scale in ("fraction", "amount"):
@@ -245,7 +247,7 @@ def test_tranche_loss_statistics_concat_into_a_capital_structure() -> None:
     result = _portfolio_loss_result()
     tranches = [(0.0, 0.03), (0.03, 0.07), (0.07, 1.0)]
     table = pd.concat(
-        [result.tranche_loss_statistics(100 * a, 100 * d, _PORTFOLIO_NOTIONAL).to_dataframe() for a, d in tranches],
+        [result.tranche_loss_statistics(100 * a, 100 * d, _PORTFOLIO_NOTIONAL).to_pandas() for a, d in tranches],
         ignore_index=True,
     )
     assert len(table) == len(tranches)

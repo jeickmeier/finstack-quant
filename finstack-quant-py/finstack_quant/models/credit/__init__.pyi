@@ -27,8 +27,10 @@ import datetime
 import numpy as np
 from numpy.typing import NDArray
 import pandas
+import polars as pl
 from finstack_quant.core.dates import DayCount
 from finstack_quant.core.market_data import HazardCurve
+from finstack_quant.core.table import ArrowTable, LabeledSeries
 from typing import Any
 from finstack_quant.models.credit import lgd as lgd
 from finstack_quant.models.credit import liability_management as liability_management
@@ -879,24 +881,83 @@ class MertonReport:
         """
         ...
 
-    def to_dataframe(self) -> pandas.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """Export the Merton report term structure as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            One row per horizon with ``horizon``, ``default_probability``,
+            ``distance_to_default``, ``implied_spread``, ``debt_spread``,
+            ``grade``, and ``central_pd``. Rejected spread columns hold nulls.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be represented as an Arrow table.
         """
-        Return the term structure with one row per horizon.
+        ...
+
+    def to_pandas(self) -> pandas.DataFrame:
+        """Export the Merton report term structure as a pandas ``DataFrame``.
 
         Returns
         -------
         pandas.DataFrame
-            Columns ``horizon``, ``default_probability``,
+            One row per horizon with ``horizon``, ``default_probability``,
             ``distance_to_default``, ``implied_spread``, ``debt_spread``,
-            ``grade`` and ``central_pd``; a rejected spread column holds nulls.
+            ``grade``, and ``central_pd``.
 
         Raises
         ------
         ImportError
-            If pandas is not installed.
+            If ``pandas`` is not installed.
+        ValueError
+            If the result cannot be represented as a pandas DataFrame.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """Export the Merton report term structure as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row per horizon with ``horizon``, ``default_probability``,
+            ``distance_to_default``, ``implied_spread``, ``debt_spread``,
+            ``grade``, and ``central_pd``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export the Merton report term structure as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per horizon with ``horizon``, ``default_probability``,
+            ``distance_to_default``, ``implied_spread``, ``debt_spread``,
+            ``grade``, and ``central_pd``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """
         Return a compact debug representation.
@@ -1146,21 +1207,79 @@ class SimulatedPaths:
         """
         ...
 
-    def to_dataframe(self) -> pandas.DataFrame:
-        """
-        Long frame with ``path`` (int), ``time`` (float, years), ``asset_value`` (float); one row per path per grid point, ordered by path then time.
+    def to_arrow(self) -> ArrowTable:
+        """Export simulated asset paths as a long :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            Long frame with ``path`` (int), ``time`` (float, years), ``asset_value`` (float); one row per path per grid point, ordered by path then time.
+        ArrowTable
+            Long table with ``path`` (int), ``time`` (float, years), and ``asset_value`` (float),
+            ordered by path then time.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized into a pandas object.
+            If the value cannot be represented as an Arrow table.
         """
         ...
+
+    def to_pandas(self) -> pandas.DataFrame:
+        """Export simulated asset paths as a long pandas ``DataFrame``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Long frame with ``path`` (int), ``time`` (float, years), and ``asset_value`` (float),
+            ordered by path then time.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the value cannot be represented as a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Export simulated asset paths as a long Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Long frame with ``path`` (int), ``time`` (float, years), and ``asset_value`` (float),
+            ordered by path then time.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the value cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export simulated asset paths as a long ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Long table with ``path`` (int), ``time`` (float, years), and ``asset_value`` (float),
+            ordered by path then time.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the value cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def get(self, path_idx: int, time_idx: int) -> float | None:
         """
         Return one asset value by path and time-grid index.
@@ -1752,22 +1871,75 @@ class MertonModel:
         """
         ...
 
-    def to_dataframe(self) -> pandas.DataFrame:
-        """
-        Export the model parameters as a single-row pandas ``DataFrame``.
+    def to_arrow(self) -> ArrowTable:
+        """Export the Merton model parameters as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            One row with the canonical model fields as columns.
+        ArrowTable
+            Single-row table with the canonical model fields as columns.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as an Arrow table.
         """
         ...
 
+    def to_pandas(self) -> pandas.DataFrame:
+        """Export the Merton model parameters as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Single-row frame with the canonical model fields as columns.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the result cannot be represented as a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Export the Merton model parameters as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Single-row frame with the canonical model fields as columns.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export the Merton model parameters as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row table with the canonical model fields as columns.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def distance_to_default(self, horizon: float) -> float:
         """
         Return risk-neutral distance to default at ``horizon`` years.
@@ -1880,12 +2052,11 @@ class MertonModel:
         """
         ...
 
-    def default_probabilities(self, horizons: list[float]) -> pandas.Series:
+    def default_probabilities(self, horizons: list[float]) -> LabeledSeries:
         """
         Risk-neutral cumulative default probabilities over several horizons.
 
-        A pandas convenience over :meth:`default_probability`: each horizon
-        follows the same Rust rule, so a non-positive horizon gives ``0.0``.
+        Each horizon follows the same Rust rule, so a non-positive horizon gives ``0.0``.
 
         Parameters
         ----------
@@ -1894,9 +2065,9 @@ class MertonModel:
 
         Returns
         -------
-        pandas.Series
-            Float series named ``default_probability`` indexed by the horizon
-            labels (``str(horizon)``), in input order.
+        LabeledSeries
+            Series named ``default_probability`` indexed by ``horizon`` labels
+            (``str(horizon)``), in input order.
 
         Raises
         ------
@@ -2500,22 +2671,75 @@ class DynamicRecoverySpec:
         """
         ...
 
-    def to_dataframe(self) -> pandas.DataFrame:
-        """
-        Export the recovery specification as a single-row pandas ``DataFrame``.
+    def to_arrow(self) -> ArrowTable:
+        """Export the recovery specification as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            One row with the canonical specification fields as columns.
+        ArrowTable
+            Single-row table with the canonical specification fields as columns.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as an Arrow table.
         """
         ...
 
+    def to_pandas(self) -> pandas.DataFrame:
+        """Export the recovery specification as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Single-row frame with the canonical specification fields as columns.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the result cannot be represented as a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Export the recovery specification as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Single-row frame with the canonical specification fields as columns.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export the recovery specification as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row table with the canonical specification fields as columns.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Reconstruct this value for ``pickle`` through its canonical JSON form.
 
@@ -2807,22 +3031,75 @@ class EndogenousHazardSpec:
         """
         ...
 
-    def to_dataframe(self) -> pandas.DataFrame:
-        """
-        Export the hazard specification as a single-row pandas ``DataFrame``.
+    def to_arrow(self) -> ArrowTable:
+        """Export the hazard specification as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            One row with the canonical specification fields as columns.
+        ArrowTable
+            Single-row table with the canonical specification fields as columns.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as an Arrow table.
         """
         ...
 
+    def to_pandas(self) -> pandas.DataFrame:
+        """Export the hazard specification as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Single-row frame with the canonical specification fields as columns.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the result cannot be represented as a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Export the hazard specification as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Single-row frame with the canonical specification fields as columns.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export the hazard specification as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row table with the canonical specification fields as columns.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Reconstruct this value for ``pickle`` through its canonical JSON form.
 
@@ -3033,22 +3310,75 @@ class CreditState:
         """
         ...
 
-    def to_dataframe(self) -> pandas.DataFrame:
-        """
-        Export the observed credit state as a single-row pandas ``DataFrame``.
+    def to_arrow(self) -> ArrowTable:
+        """Export the observed credit state as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            One row with the canonical state fields as columns.
+        ArrowTable
+            Single-row table with the canonical state fields as columns.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as an Arrow table.
         """
         ...
 
+    def to_pandas(self) -> pandas.DataFrame:
+        """Export the observed credit state as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Single-row frame with the canonical state fields as columns.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the result cannot be represented as a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Export the observed credit state as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Single-row frame with the canonical state fields as columns.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export the observed credit state as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row table with the canonical state fields as columns.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Reconstruct this value for ``pickle`` through its canonical JSON form.
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Literal
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.models.credit import DynamicRecoverySpec, EndogenousHazardSpec, MertonModel, ToggleExerciseModel
 
 class BarrierCrossing:
@@ -978,7 +980,28 @@ class MertonMcResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export the headline results as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``clean_price_pct``, ``dirty_price_pct``, ``expected_loss``,
+            ``unexpected_loss``, ``expected_shortfall_95``,
+            ``average_pik_fraction``, ``effective_spread_bp``, ``num_paths``,
+            ``standard_error``, ``default_rate``, ``avg_default_time``,
+            ``avg_terminal_notional``, ``avg_recovery_rate`` and
+            ``pik_exercise_rate``.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export the headline results as a single-row pandas ``DataFrame``.
 
@@ -994,26 +1017,52 @@ class MertonMcResult:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be serialized into a table.
         """
         ...
 
-    def _repr_html_(self) -> str:
+    def to_polars(self) -> pl.DataFrame:
         """
-        Jupyter rich display: the :meth:`to_dataframe` table as HTML.
+        Export the headline results as a single-row Polars ``DataFrame``.
 
         Returns
         -------
-        str
-            HTML table rendered by pandas.
+        pl.DataFrame
+            One-row DataFrame with the columns documented on :meth:`to_arrow`.
 
         Raises
         ------
+        ImportError
+            If ``polars`` is not installed.
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be serialized into a table.
         """
         ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the headline results as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One-row table with the columns documented on :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be serialized into a table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 class PathStatistics:
     """

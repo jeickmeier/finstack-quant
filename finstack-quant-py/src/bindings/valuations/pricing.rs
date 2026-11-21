@@ -6,11 +6,13 @@
 
 use super::PyValuationResult;
 use crate::bindings::core::config::PyFinstackConfig;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::{extract_instrument, extract_market};
+use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::module_utils::{
     opt_spec_from_py, py_to_json_string, py_to_serde, spec_from_py,
 };
-use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, serde_to_py};
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::{core_to_py, display_to_py, value_error};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::cashflow_export::InstrumentCashflowEnvelope;
@@ -260,15 +262,6 @@ impl PyMarketHistory {
         self.inner.len()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MarketHistory.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::core::table::envelope_to_pandas(
-            py,
-            &self.inner.to_table().map_err(crate::errors::core_to_py)?,
-        )
-    }
-
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MarketHistory.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
@@ -305,6 +298,19 @@ crate::bindings::macros::py_getters!(PyMarketHistory |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MarketHistory.window_days")]
     window_days -> u32 = s.inner.window_days;
 });
+
+impl PyMarketHistory {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let table = self.inner.to_table().map_err(crate::errors::core_to_py)?;
+        PyArrowTable::from_envelope(&table)
+    }
+}
+
+crate::bindings::macros::tabular_methods!(
+    PyMarketHistory,
+    "MarketHistory",
+    module = "finstack_quant.valuations.instruments._pricing"
+);
 
 /// Coerce ``MetricPricingOverrides | dict | str | None`` into the JSON patch
 /// ``validate_instrument_json`` merges before validation.
@@ -661,8 +667,8 @@ pub(crate) struct PyInstrumentCashflowEnvelope {
     pub(crate) inner: InstrumentCashflowEnvelope,
 }
 
-/// Documented column order of ``InstrumentCashflowEnvelope.to_dataframe``:
-/// every ``CashflowRow`` field, in struct order, with its empty-frame dtype.
+/// Documented column order of ``InstrumentCashflowEnvelope`` tabular exports:
+/// every ``CashflowRow`` field, in struct order, with its empty-table dtype.
 const CASHFLOW_ROW_COLUMNS: &[(&str, &str)] = &[
     ("date", "str"),
     ("amount", "float64"),
@@ -718,11 +724,11 @@ impl PyInstrumentCashflowEnvelope {
         serde_to_py(py, &self.inner.flows)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.to_dataframe")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.to_pandas")]
     #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let frame =
-            serde_rows_to_dataframe_with_schema(py, &self.inner.flows, CASHFLOW_ROW_COLUMNS)?;
+    fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let table = Bound::new(py, self.to_arrow_table()?)?;
+        let frame = PyArrowTable::to_pandas(&table, py)?;
         let to_datetime = py.import("pandas")?.getattr("to_datetime")?;
         let parsed = pyo3::types::PyDict::new(py);
         for column in [
@@ -799,6 +805,19 @@ crate::bindings::macros::py_getters!(PyInstrumentCashflowEnvelope |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.reconciles_with_base_value")]
     reconciles_with_base_value -> bool = s.inner.reconciles_with_base_value;
 });
+
+impl PyInstrumentCashflowEnvelope {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.inner.flows, CASHFLOW_ROW_COLUMNS)
+    }
+}
+
+crate::bindings::macros::tabular_methods!(
+    PyInstrumentCashflowEnvelope,
+    "InstrumentCashflowEnvelope",
+    module = "finstack_quant.valuations.instruments._pricing",
+    custom_pandas
+);
 
 /// Register pricing functions on the valuations submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {

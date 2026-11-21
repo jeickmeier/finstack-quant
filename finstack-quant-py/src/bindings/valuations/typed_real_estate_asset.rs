@@ -74,13 +74,13 @@ impl PyRealEstateAsset {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.valuation_method")]
     #[getter]
     fn valuation_method<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.valuation_method)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.valuation_method)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.property_type")]
     #[getter]
     fn property_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.property_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.property_type)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_real_estate_asset", "RealEstateAsset.noi_schedule")]

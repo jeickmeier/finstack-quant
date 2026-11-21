@@ -6,7 +6,8 @@
 
 use finstack_quant_core::math::linalg::flatten_square_matrix as core_flatten_square_matrix;
 use finstack_quant_factor::risk::flatten_position_pnls as core_flatten_position_pnls;
-use numpy::{PyReadonlyArray2, PyUntypedArrayMethods};
+use numpy::{PyArrayDescrMethods, PyReadonlyArray2, PyUntypedArray, PyUntypedArrayMethods};
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 
 /// Storage order of an extracted position-by-scenario P&L matrix.
@@ -70,15 +71,45 @@ pub(crate) fn numpy_row_major(array: &PyReadonlyArray2<'_, f64>) -> Vec<f64> {
     array.as_array().iter().copied().collect()
 }
 
-/// Extract and flatten an `n x n` covariance-style matrix.
+/// Extract and flatten an `n x n` covariance-style matrix from a DataFrame,
+/// Arrow table, NumPy array, flat list, or nested rows.
 pub(crate) fn extract_square_matrix(
     py: Python<'_>,
     matrix: &Bound<'_, PyAny>,
     n: usize,
     label: &str,
 ) -> PyResult<Vec<f64>> {
-    if let Ok(array) = matrix.extract::<PyReadonlyArray2<'_, f64>>() {
-        let shape = array.shape();
+    if crate::bindings::dataframe_utils::is_dataframe_like(matrix)?
+        && let Some((flat, rows, cols)) =
+            crate::bindings::dataframe_utils::extract_2d_f64(matrix, label)?
+    {
+        if rows != n {
+            return Err(crate::errors::value_error(format!(
+                "{label} must have {n} rows, got {rows}"
+            )));
+        }
+        if cols != n {
+            return Err(crate::errors::value_error(format!(
+                "{label} must have {n} columns, got {cols}"
+            )));
+        }
+        return Ok(flat);
+    }
+
+    if let Ok(untyped) = matrix.cast::<PyUntypedArray>() {
+        let kind = untyped.dtype().kind();
+        if !matches!(kind, b'f' | b'i' | b'u') {
+            return Err(PyTypeError::new_err(format!(
+                "{label} must have a real numeric dtype, not bool or non-numeric"
+            )));
+        }
+        if untyped.ndim() != 2 {
+            return Err(crate::errors::value_error(format!(
+                "{label} must be 2-D, got {}-D array",
+                untyped.ndim()
+            )));
+        }
+        let shape = untyped.shape();
         if shape[0] != n {
             return Err(crate::errors::value_error(format!(
                 "{label} must have {n} rows, got {}",
@@ -91,6 +122,11 @@ pub(crate) fn extract_square_matrix(
                 shape[1]
             )));
         }
+        if let Ok(array) = matrix.extract::<PyReadonlyArray2<'_, f64>>() {
+            return Ok(numpy_row_major(&array));
+        }
+        let casted = matrix.call_method1("astype", ("float64",))?;
+        let array = casted.extract::<PyReadonlyArray2<'_, f64>>()?;
         return Ok(numpy_row_major(&array));
     }
 
@@ -114,8 +150,20 @@ pub(crate) fn extract_position_pnls(
     position_pnls: &Bound<'_, PyAny>,
     n_positions: usize,
 ) -> PyResult<PositionPnlMatrix> {
-    if let Ok(array) = position_pnls.extract::<PyReadonlyArray2<'_, f64>>() {
-        let shape = array.shape();
+    if let Ok(untyped) = position_pnls.cast::<PyUntypedArray>() {
+        let kind = untyped.dtype().kind();
+        if !matches!(kind, b'f' | b'i' | b'u') {
+            return Err(PyTypeError::new_err(
+                "position_pnls must have a real numeric dtype, not bool or non-numeric",
+            ));
+        }
+        if untyped.ndim() != 2 {
+            return Err(crate::errors::value_error(format!(
+                "position_pnls must be 2-D, got {}-D array",
+                untyped.ndim()
+            )));
+        }
+        let shape = untyped.shape();
         if shape[0] != n_positions {
             return Err(crate::errors::value_error(format!(
                 "position_pnls must have {n_positions} rows, got {}",
@@ -129,8 +177,15 @@ pub(crate) fn extract_position_pnls(
                 order: PositionPnlOrder::ScenarioMajor,
             });
         }
+        let data = if let Ok(array) = position_pnls.extract::<PyReadonlyArray2<'_, f64>>() {
+            numpy_row_major(&array)
+        } else {
+            let casted = position_pnls.call_method1("astype", ("float64",))?;
+            let array = casted.extract::<PyReadonlyArray2<'_, f64>>()?;
+            numpy_row_major(&array)
+        };
         return Ok(PositionPnlMatrix {
-            data: numpy_row_major(&array),
+            data,
             n_scenarios: shape[1],
             order: PositionPnlOrder::PositionMajor,
         });

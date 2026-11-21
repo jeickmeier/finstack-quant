@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import datetime
-from typing import Iterator, Union
+from typing import Any, Iterator, Union
 import pandas as pd
+import polars as pl
 from finstack_quant.core.dates._calendar import BusinessDayConvention, HolidayCalendar
 from finstack_quant.core.dates._tenor import Tenor
+from finstack_quant.core.table import ArrowTable
 
 # Schedule
 
@@ -305,15 +307,32 @@ class Schedule:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Accrual periods as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            One row per period with ``Date32`` columns ``period_start``,
+            ``period_end``, ``payment_date`` and nullable ``fixing_date``.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Accrual periods as a pandas DataFrame.
 
         Returns
         -------
         pandas.DataFrame
-            One row per period with ``datetime64`` columns ``period_start``,
-            ``period_end``, ``payment_date`` and ``fixing_date`` (``NaT`` when
+            One row per period with columns ``period_start``,
+            ``period_end``, ``payment_date`` and ``fixing_date`` (``None`` when
             no fixing lag is configured).
 
         Raises
@@ -332,13 +351,47 @@ class Schedule:
         ...     .unadjusted()
         ...     .frequency("6M")
         ...     .build()
-        ...     .to_dataframe()
+        ...     .to_pandas()
         ... )
         >>> list(frame.columns)
         ['period_start', 'period_end', 'payment_date', 'fixing_date']
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Accrual periods as a ``polars.DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row per period constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Accrual periods as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
     def to_json(self) -> str:
         """
         Serialize to the canonical JSON wire form (strict field names).

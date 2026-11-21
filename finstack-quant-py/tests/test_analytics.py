@@ -15,6 +15,7 @@ import pickle
 
 import pandas as pd
 import polars as pl
+import pyarrow as pa
 import pytest
 
 import finstack_quant.analytics as analytics_mod
@@ -35,6 +36,7 @@ from finstack_quant.analytics import (
     volatility,
 )
 from finstack_quant.core.dates import DayCountContext, FiscalConfig
+from finstack_quant.core.table import LabeledSeries
 from tests.analytics_helpers import opening_date
 from tests.stub_helpers import stub_text as read_stub_text
 
@@ -83,7 +85,7 @@ def test_native_frames_preserve_infinite_period_statistics() -> None:
         benchmark_ticker="FUND",
     )
     stats = perf.period_stats(0, aggregation_frequency="daily")
-    frame = stats.to_dataframe()
+    frame = stats.to_pandas()
     assert math.isinf(frame["profit_factor"].iloc[0])
     for name in ("payoff_ratio", "cpc_index"):
         assert math.isnan(frame[name].iloc[0])
@@ -91,6 +93,8 @@ def test_native_frames_preserve_infinite_period_statistics() -> None:
     assert frame["consecutive_wins"].dtype == "int64"
     assert frame["consecutive_losses"].dtype == "int64"
     assert list(frame.columns) == list(stats.to_series().index)
+    assert stats.to_polars().equals(pl.DataFrame(stats))
+    assert pl.from_arrow(stats.to_pyarrow()).equals(pl.from_arrow(pa.table(stats)))
 
 
 def test_degenerate_regression_frames_keep_numeric_nan_columns() -> None:
@@ -101,16 +105,16 @@ def test_degenerate_regression_frames_keep_numeric_nan_columns() -> None:
         benchmark_ticker="BENCH",
         frequency="daily",
     )
-    for frame in (
-        perf.beta()[0].to_dataframe(),
-        perf.greeks(risk_free_rate=0.0)[0].to_dataframe(),
-    ):
+    for res in (perf.beta()[0], perf.greeks(risk_free_rate=0.0)[0]):
+        frame = res.to_pandas()
         # The estimates are NaN; the sample description is always reported.
         described = {"n_obs", "confidence_level"}
         estimates = frame.drop(columns=described & set(frame.columns))
         assert estimates.isna().all().all()
         assert all(dtype == "float64" for dtype in estimates.dtypes)
         assert (frame["n_obs"] == 4).all()
+        assert res.to_polars().equals(pl.DataFrame(res))
+        assert pl.from_arrow(res.to_pyarrow()).equals(pl.from_arrow(pa.table(res)))
 
 
 def test_drawdown_episode_frame_retains_populated_dtypes() -> None:
@@ -119,10 +123,13 @@ def test_drawdown_episode_frame_retains_populated_dtypes() -> None:
         frequency="daily",
         benchmark_ticker="FUND",
     )
-    frame = perf.drawdown_details(0, n=5)[0].to_dataframe()
+    ep = perf.drawdown_details(0, n=5)[0]
+    frame = ep.to_pandas()
     assert frame["duration_days"].dtype == "int64"
     assert "truncated_at_start" not in frame
     assert frame["max_drawdown"].iloc[0] == pytest.approx(-0.10)
+    assert ep.to_polars().equals(pl.DataFrame(ep))
+    assert ep.to_pyarrow().equals(pa.table(ep))
 
 
 def test_lookback_frame_preserves_ticker_and_metric_labels() -> None:
@@ -133,9 +140,12 @@ def test_lookback_frame_preserves_ticker_and_metric_labels() -> None:
         frequency="daily",
         benchmark_ticker="A",
     )
-    frame = perf.lookback_returns(_daily_dates(4)[-1]).to_dataframe()
+    lb = perf.lookback_returns(_daily_dates(4)[-1])
+    frame = lb.to_pandas()
     assert list(frame.index) == ["A", "B"]
     assert list(frame.columns) == ["mtd", "qtd", "ytd", "fytd"]
+    assert lb.to_polars().equals(pl.DataFrame(lb))
+    assert lb.to_pyarrow().equals(pa.table(lb))
 
 
 @pytest.fixture
@@ -263,7 +273,7 @@ class TestReturnRiskMetrics:
     def test_cagr_returns_one_per_ticker(self, perf_prices: Performance) -> None:
         values = perf_prices.cagr()
         assert list(values.index) == ["ACME", "BENCH"]
-        assert all(isinstance(v, float) for v in values)
+        assert all(isinstance(v, float) for v in values.values())
 
     def test_cagr_act365f_label_matches_default(self, perf_prices: Performance) -> None:
         default = perf_prices.cagr()
@@ -336,33 +346,38 @@ class TestReturnRiskMetrics:
         for getter in (perf_prices.value_at_risk, perf_prices.expected_shortfall):
             values = getter(0.95)
             assert list(values.index) == ["ACME", "BENCH"]
-            assert not values.isna().any()
+            assert all(math.isfinite(v) for v in values.values())
 
     def test_higher_moments_finite(self, perf_prices: Performance) -> None:
         for getter in (perf_prices.skewness, perf_prices.kurtosis):
             values = getter()
             assert list(values.index) == ["ACME", "BENCH"]
-            assert not values.isna().any()
+            assert all(math.isfinite(v) for v in values.values())
 
-    def test_to_dataframe_has_one_row_per_ticker(self, perf_prices: Performance) -> None:
-        summary = perf_prices.to_dataframe(risk_free_rate=0.0, mar=0.0, omega_threshold=0.0, confidence=0.95)
+    def test_to_pandas_and_polars_have_one_row_per_ticker(self, perf_prices: Performance) -> None:
+        summary = perf_prices.to_pandas(risk_free_rate=0.0, mar=0.0, omega_threshold=0.0, confidence=0.95)
         assert list(summary.index) == ["ACME", "BENCH"]
         assert "cagr" in summary.columns
         assert "sharpe" in summary.columns
         assert "max_drawdown" in summary.columns
-        custom = perf_prices.to_dataframe(risk_free_rate=0.02, confidence=0.99, mar=0.0, omega_threshold=0.0)
+        custom = perf_prices.to_pandas(risk_free_rate=0.02, confidence=0.99, mar=0.0, omega_threshold=0.0)
         assert custom.loc["ACME", "sharpe"] != pytest.approx(summary.loc["ACME", "sharpe"])
+        summary_pl = perf_prices.to_polars(risk_free_rate=0.0, mar=0.0, omega_threshold=0.0, confidence=0.95)
+        assert summary_pl["ticker"].to_list() == ["ACME", "BENCH"]
+        assert pl.from_arrow(perf_prices.to_pyarrow(0.0, 0.0, 0.0, 0.95)).equals(
+            pl.from_arrow(pa.table(perf_prices.to_arrow(0.0, 0.0, 0.0, 0.95)))
+        )
 
 
 # Scalar-metric Series contract
 
 
 class TestScalarMetricSeries:
-    """Per-ticker scalar metrics are ticker-labelled `pd.Series`, not lists."""
+    """Per-ticker scalar metrics return ``LabeledSeries`` with pandas/Polars/Arrow exports."""
 
     def test_metric_returns_series(self, perf_prices: Performance) -> None:
-        assert isinstance(perf_prices.sharpe(risk_free_rate=0.0), pd.Series)
-        assert isinstance(perf_prices.max_drawdown_duration(), pd.Series)
+        assert isinstance(perf_prices.sharpe(risk_free_rate=0.0), LabeledSeries)
+        assert isinstance(perf_prices.max_drawdown_duration(), LabeledSeries)
 
     def test_metric_index_equals_ticker_names(self, perf_prices: Performance) -> None:
         assert list(perf_prices.volatility(annualize=True).index) == perf_prices.get_ticker_names()
@@ -376,17 +391,21 @@ class TestScalarMetricSeries:
 
     def test_label_access_matches_positional(self, perf_prices: Performance) -> None:
         vols = perf_prices.volatility(annualize=True)
-        assert vols["ACME"] == vols.iloc[0]
-        assert vols["BENCH"] == vols.iloc[1]
+        assert vols["ACME"] == vols.values()[0]
+        assert vols["BENCH"] == vols.values()[1]
 
     def test_concat_yields_metric_named_columns(self, perf_prices: Performance) -> None:
-        df = pd.concat([perf_prices.sharpe(risk_free_rate=0.0), perf_prices.sortino(mar=0.0)], axis=1)
+        df = pd.concat(
+            [perf_prices.sharpe(risk_free_rate=0.0).to_pandas(), perf_prices.sortino(mar=0.0).to_pandas()], axis=1
+        )
         assert list(df.columns) == ["sharpe", "sortino"]
         assert list(df.index) == ["ACME", "BENCH"]
+        assert perf_prices.sharpe(risk_free_rate=0.0).to_polars().columns == ["ticker", "sharpe"]
+        assert perf_prices.sharpe(risk_free_rate=0.0).to_arrow().num_rows == 2
 
     def test_max_drawdown_duration_keeps_integer_dtype(self, perf_prices: Performance) -> None:
         durations = perf_prices.max_drawdown_duration()
-        assert durations.dtype.kind == "i"
+        assert durations.to_pandas().dtype == pd.Int64Dtype()
         assert durations["ACME"] >= 0
 
 
@@ -402,12 +421,13 @@ class TestPeriodicReturns:
         assert len(lb.ytd) == 2
         assert len(lb.fytd) == 2
         assert lb.ticker_names == perf_prices.get_ticker_names()
-        assert list(lb.to_dataframe().columns) == [
+        assert list(lb.to_pandas().columns) == [
             "mtd",
             "qtd",
             "ytd",
             "fytd",
         ]
+        assert list(lb.to_polars().columns) == ["ticker", "mtd", "qtd", "ytd", "fytd"]
         assert "fytd_len=2" in repr(lb)
         assert "has_fytd" not in repr(lb)
 
@@ -652,8 +672,8 @@ class TestPolarsAndDateCol:
         for frame in (pl_date, pl_naive_dt, pl_utc_dt):
             actual = Performance(frame, benchmark_ticker="BENCH", frequency="daily")
             assert actual.to_json() == expected.to_json()
-            assert actual.sharpe(0.0).equals(expected.sharpe(0.0))
-            assert actual.cagr().equals(expected.cagr())
+            assert actual.sharpe(0.0) == expected.sharpe(0.0)
+            assert actual.cagr() == expected.cagr()
 
     def test_polars_explicit_date_col_with_iso_strings_and_multiple_date_cols(self) -> None:
         dates = _daily_dates(4)
@@ -726,7 +746,7 @@ class TestPolarsAndDateCol:
         )
         # Integer price columns promote cleanly to float64.
         pl_int = pl.DataFrame({"date": dates, "A": [100, 101, 102, 103]})
-        assert Performance(pl_int, frequency="daily").cagr().iloc[0] > 0.0
+        assert Performance(pl_int, frequency="daily").cagr()["A"] > 0.0
 
     def test_polars_null_and_nan_edge_gaps_and_domain_errors(self) -> None:
         dates = _daily_dates(6)

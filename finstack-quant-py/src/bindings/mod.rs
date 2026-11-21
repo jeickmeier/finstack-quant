@@ -12,6 +12,7 @@ pub mod calibration;
 pub mod cashflows;
 pub mod core;
 pub mod covenants;
+pub(crate) mod dataframe_utils;
 pub(crate) mod date_utils;
 pub(crate) mod extract;
 pub mod features;
@@ -21,7 +22,6 @@ pub mod margin;
 pub(crate) mod matrix_input;
 pub mod models;
 pub(crate) mod module_utils;
-pub(crate) mod pandas_utils;
 pub(crate) mod pickle_support;
 pub mod portfolio;
 pub(crate) mod pydoc;
@@ -31,6 +31,7 @@ pub mod schema;
 pub(crate) mod schema_registry;
 pub mod statements;
 pub mod statements_analytics;
+pub(crate) mod table_builders;
 pub mod valuations;
 
 /// Register all binding domains under the top-level `finstack_quant` module.

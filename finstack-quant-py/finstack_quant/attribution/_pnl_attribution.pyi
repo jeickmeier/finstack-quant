@@ -7,6 +7,8 @@ from collections.abc import Sequence
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 class PnlAttribution:
     """
@@ -201,7 +203,7 @@ class PnlAttribution:
         -------
         float
             Rates-curve bucket P&L in :attr:`currency`. Use
-            :meth:`to_long_dataframe` for per-curve and per-tenor detail.
+            :meth:`to_long_table` for per-curve and per-tenor detail.
 
         Notes
         -----
@@ -218,7 +220,7 @@ class PnlAttribution:
         -------
         float
             Credit-curve bucket P&L in :attr:`currency`. Use
-            :meth:`to_credit_factor_dataframe` when a credit factor model was
+            :meth:`to_credit_factor_table` when a credit factor model was
             supplied.
 
         Notes
@@ -1027,19 +1029,19 @@ class PnlAttribution:
         ...
 
     @staticmethod
-    def compare(attributions: Sequence[PnlAttribution]) -> pd.DataFrame:
+    def compare(attributions: Sequence[PnlAttribution]) -> ArrowTable:
         """Collect one wide row per result in input order.
 
         Parameters
         ----------
         attributions : Sequence[PnlAttribution]
-            Ordered typed result objects. Each row carries its own reporting currency, method, dates and factor contributions. Every row must pass the same currency validation as to_dataframe.
+            Ordered typed result objects. Each row carries its own reporting currency, method, dates and factor contributions. Every row must pass the same currency validation as ``to_arrow``.
 
         Returns
         -------
-        pandas.DataFrame
-            Wide frame in the to_dataframe column order. An empty sequence
-            returns a zero-row frame with the standard identity columns.
+        ArrowTable
+            Wide table in the ``to_arrow`` column order. An empty sequence
+            returns a zero-row table with the standard identity columns.
 
         Raises
         ------
@@ -1051,12 +1053,36 @@ class PnlAttribution:
         Examples
         --------
         >>> from finstack_quant.attribution import PnlAttribution
-        >>> PnlAttribution.compare([]).empty
+        >>> PnlAttribution.compare([]).num_rows == 0
         True
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export attribution as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns include ``instrument_id``, ``method``, ``t0``, ``t1``,
+        ``currency``, ``total_pnl``, ``mark_to_market_pnl`` (nullable),
+        ``pv_t0`` and ``pv_t1`` (the endpoint present values, nullable), all
+        factor P&L amounts, ``residual``, ``residual_pct``,
+        ``num_repricings``, and ``result_invalid``.
+
+        Returns
+        -------
+        ArrowTable
+            Single-row Arrow table.
+
+        Raises
+        ------
+        ValueError
+            If any headline, factor, residual, detail, or diagnostic amount
+            uses a currency different from ``total_pnl.currency``, or the
+            result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export attribution as a single-row pandas DataFrame.
 
@@ -1075,14 +1101,53 @@ class PnlAttribution:
         ------
         ValueError
             If any headline, factor, residual, detail, or diagnostic amount
-            uses a currency different from ``total_pnl.currency``, or the
-            result cannot be serialized into a pandas object.
+            uses a currency different from ``total_pnl.currency``.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
-    def to_long_dataframe(self) -> pd.DataFrame:
+    def to_polars(self) -> pl.DataFrame:
         """
-        Export every populated detail breakdown as one long-format DataFrame.
+        Export attribution as a single-row ``polars.DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Single-row Polars DataFrame constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ValueError
+            If currency validation fails.
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export attribution as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ValueError
+            If currency validation fails.
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def to_long_table(self) -> ArrowTable:
+        """
+        Export every populated detail breakdown as one long-format :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns:
             kind: dotted-path identifier (e.g. ``"rates.by_curve"``,
@@ -1097,9 +1162,7 @@ class PnlAttribution:
                 ``"credit_factor"``, ``"carry"``, ``"inflation"``,
                 ``"correlations"``, ``"model_params"``).
             sub: ``kind`` with the ``factor.`` prefix removed
-                (``"by_curve"``, ``"coupon_income.rates"``), so
-                ``df.pivot_table(index="factor", columns="sub", values="amount")``
-                works without string surgery.
+                (``"by_curve"``, ``"coupon_income.rates"``).
             key_a: primary identifier (curve_id, pair label, vol_surface_id,
                 equity_id, level_name, sub-component name).
             key_b: secondary key when present (tenor, ``to``-currency, bucket
@@ -1107,26 +1170,24 @@ class PnlAttribution:
             amount: float P&L amount.
             currency: 3-letter currency code.
 
-        The DataFrame is empty (zero rows, schema columns present) when no
-        detail breakdown was populated. Use
-        ``df.query("kind.str.startswith('rates')")`` or
-        ``df.pivot_table(index="key_a", columns="key_b", values="amount")``
-        to slice the desired view.
+        Returns an empty table (zero rows, schema columns present) when no
+        detail breakdown was populated.
 
         Returns
         -------
-        pd.DataFrame
-            Long-format DataFrame.
+        ArrowTable
+            Long-format Arrow table.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
         """
         ...
 
-    def to_waterfall_steps_dataframe(self) -> pd.DataFrame:
+    def to_waterfall_steps_table(self) -> ArrowTable:
         """
-        Export the waterfall step chain, one row per step in the order applied.
+        Export the waterfall step chain as an :class:`~finstack_quant.core.table.ArrowTable`, one row per step in the order applied.
 
         Columns: ``step_index``, ``factor`` (snake-case factor name such as
         ``"rates_curves"``), ``pv_before``, ``pv_after``, ``step_pnl``
@@ -1138,20 +1199,20 @@ class PnlAttribution:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per waterfall step with float amounts; zero rows (schema
             columns present) unless the waterfall method produced the result.
 
         Raises
         ------
         ValueError
-            If the rows cannot be serialized into a pandas object.
+            If the rows cannot be serialized into an Arrow table.
         """
         ...
 
-    def to_sensitivity_steps_dataframe(self) -> pd.DataFrame:
+    def to_sensitivity_steps_table(self) -> ArrowTable:
         """
-        Export the working behind each Taylor or metrics-based factor.
+        Export the working behind each Taylor or metrics-based factor as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``step_index``, ``factor``, ``tenor_years``, ``move_unit``
         (``"basis_point"``, ``"vol_point"``, ``"percent"`` or
@@ -1168,62 +1229,60 @@ class PnlAttribution:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             Factor and bucket rows with float amounts; zero rows (schema
             columns present) for the parallel and waterfall methods.
 
         Raises
         ------
         ValueError
-            If the rows cannot be serialized into a pandas object.
+            If the rows cannot be serialized into an Arrow table.
         """
         ...
 
-    def to_carry_detail_dataframe(self) -> pd.DataFrame:
+    def to_carry_detail_table(self) -> ArrowTable:
         """
-        Export the carry decomposition as a typed long DataFrame.
+        Export the carry decomposition as a typed long :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns (``kind``, ``factor``, ``sub``, ``key_a``, ``key_b``,
-        ``amount``, ``currency``) are the same as :meth:`to_long_dataframe`
-        but the kind values
-        are limited to the ``"carry.*"`` family — useful when you only want the
-        carry split (coupon income, pull-to-par, roll-down, funding cost),
-        including the optional rates/credit splits when a credit
-        factor model was supplied.
+        ``amount``, ``currency``) are the same as :meth:`to_long_table`
+        but the kind values are limited to the ``"carry.*"`` family.
 
-        Returns an empty DataFrame when ``carry_detail`` is not populated.
+        Returns an empty table when ``carry_detail`` is not populated.
 
         Returns
         -------
-        pd.DataFrame
-            Carry-decomposition DataFrame.
+        ArrowTable
+            Carry-decomposition table.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If the rows cannot be serialized into an Arrow table.
         """
         ...
 
-    def to_credit_factor_dataframe(self) -> pd.DataFrame:
+    def to_credit_factor_table(self) -> ArrowTable:
         """
-        Export the credit-factor hierarchy decomposition as a typed long DataFrame.
+        Export the credit-factor hierarchy decomposition as a typed long :class:`~finstack_quant.core.table.ArrowTable`.
 
-        Columns are the same as :meth:`to_long_dataframe`; rows are limited to
+        Columns are the same as :meth:`to_long_table`; rows are limited to
         the ``"credit_factor.*"`` family. Includes generic, per-level, adder,
         curve_shape, plus per-bucket and per-issuer rows when present.
 
-        Returns an empty DataFrame when ``credit_factor_detail`` is not
+        Returns an empty table when ``credit_factor_detail`` is not
         populated (no ``credit_factor_model`` was supplied, or the instrument
         has no resolvable issuer).
 
         Returns
         -------
-        pd.DataFrame
-            Credit-factor DataFrame.
+        ArrowTable
+            Credit-factor table.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If the rows cannot be serialized into an Arrow table.
         """
         ...
 
@@ -1236,18 +1295,4 @@ class PnlAttribution:
         """
         ...
 
-    def _repr_html_(self) -> str | None:
-        """
-        HTML table for Jupyter, rendered from :meth:`to_dataframe`.
-
-        Returns
-        -------
-        str or None
-            pandas HTML markup, or ``None`` when the frame cannot be built
-            (IPython then falls back to ``__repr__``).
-
-        Notes
-        -----
-        This method does not raise; failures degrade to ``None``.
-        """
-        ...
+    def _repr_html_(self) -> str | None: ...

@@ -91,3 +91,34 @@ def test_credit_tearsheet_tolerates_bad_rows() -> None:
     assert "Leverage &amp; Coverage" in html  # valid series points still render
     assert "Per-Instrument Coverage" not in html  # all coverage rows bad -> skipped
     assert "Covenant Compliance" not in html  # all covenant rows bad -> skipped
+
+
+def test_credit_tearsheet_accepts_arrow_table_covenants() -> None:
+    from finstack_quant.covenants import (
+        Covenant,
+        CovenantEngine,
+        CovenantSpec,
+        CovenantType,
+        reports_table,
+    )
+
+    res = _results()
+    covenant = Covenant(CovenantType.max_debt_to_ebitda(4.5), "3M", "max_total_leverage")
+    engine = CovenantEngine().add_spec(CovenantSpec(covenant, "debt_to_ebitda"))
+    table = reports_table(engine.evaluate({"debt_to_ebitda": 3.2}, "2025-12-31"))
+
+    html = credit_tearsheet(_assessment(res), results=res, covenants=table, generated=dt.date(2026, 6, 22)).to_html()
+    assert "Covenant Compliance" in html
+    assert "max_total_leverage" in html
+
+
+def test_credit_tearsheet_accepts_polars_covenants() -> None:
+    pl = pytest.importorskip("polars")
+
+    res = _results()
+    html = credit_tearsheet(
+        _assessment(res), results=res, covenants=pl.DataFrame(_COVENANTS), generated=dt.date(2026, 6, 22)
+    ).to_html()
+    assert "Covenant Compliance" in html
+    assert "Max Leverage" in html
+    assert "Min Coverage" in html

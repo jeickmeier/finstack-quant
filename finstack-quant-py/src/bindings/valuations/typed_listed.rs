@@ -129,6 +129,6 @@ impl PyFutureOptionTerms {
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_listed", "FutureOptionTerms.to_dict")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner)
     }
 }

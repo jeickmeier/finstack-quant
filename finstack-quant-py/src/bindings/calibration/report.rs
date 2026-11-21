@@ -1,11 +1,12 @@
 //! Typed calibration report, diagnostics, quote-quality and validation-report wrappers.
 
-use crate::bindings::macros::wire_methods;
-use crate::bindings::pandas_utils::{dict_to_dataframe, serde_to_py};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::TableBuilder;
 use finstack_quant_calibration::api::validate::CalibrationValidationReport;
 use finstack_quant_calibration::{CalibrationDiagnostics, CalibrationReport, QuoteQuality};
-use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -134,20 +135,6 @@ impl PyCalibrationDiagnostics {
         self.inner.rms_residual
     }
 
-    /// Per-quote diagnostics as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``quote_id``, ``quote_value``, ``residual``,
-    /// ``sensitivity`` (one row per quote, solve order).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If pandas cannot build the frame.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        quote_quality_dataframe(py, &self.inner.per_quote)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "CalibrationDiagnostics(quotes={}, max_residual={:.3e}, rms_residual={:.3e})",
@@ -158,17 +145,21 @@ impl PyCalibrationDiagnostics {
     }
 }
 
+impl PyCalibrationDiagnostics {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        quote_quality_table(&self.inner.per_quote)
+    }
+}
+
+tabular_methods!(PyCalibrationDiagnostics);
 wire_methods!(
     PyCalibrationDiagnostics,
     CalibrationDiagnostics,
     "CalibrationDiagnostics"
 );
 
-/// Build the per-quote quality frame shared by diagnostics and residual exports.
-pub(crate) fn quote_quality_dataframe<'py>(
-    py: Python<'py>,
-    rows: &[QuoteQuality],
-) -> PyResult<Bound<'py, PyAny>> {
+/// Build the per-quote quality table shared by diagnostics and residual exports.
+pub(crate) fn quote_quality_table(rows: &[QuoteQuality]) -> PyResult<PyArrowTable> {
     let n = rows.len();
     let mut ids = Vec::with_capacity(n);
     let mut quote_values = Vec::with_capacity(n);
@@ -180,18 +171,12 @@ pub(crate) fn quote_quality_dataframe<'py>(
         residuals.push(row.residual);
         sensitivities.push(row.sensitivity);
     }
-    let data = PyDict::new(py);
-    data.set_item("quote_id", ids)?;
-    data.set_item(
-        "quote_value",
-        PyArray1::from_vec(py, quote_values).into_any(),
-    )?;
-    data.set_item("residual", PyArray1::from_vec(py, residuals).into_any())?;
-    data.set_item(
-        "sensitivity",
-        PyArray1::from_vec(py, sensitivities).into_any(),
-    )?;
-    dict_to_dataframe(py, &data, None)
+    TableBuilder::new()
+        .utf8("quote_id", ids)?
+        .f64("quote_value", quote_values)?
+        .f64("residual", residuals)?
+        .f64("sensitivity", sensitivities)?
+        .build()
 }
 
 /// Detailed report of one calibration step or of the whole plan.
@@ -380,21 +365,6 @@ impl PyCalibrationReport {
             .map(PyCalibrationDiagnostics::from_inner)
     }
 
-    /// Residuals per quote as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``quote_id``, ``quote_value``, ``residual``,
-    /// ``sensitivity``. ``quote_value`` / ``sensitivity`` come from
-    /// ``diagnostics`` and are ``NaN`` when diagnostics were not computed.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If pandas cannot build the frame.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        quote_quality_dataframe(py, &self.inner.quote_rows())
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "CalibrationReport(success={}, quotes={}, iterations={}, max_residual={:.3e}, rmse={:.3e})",
@@ -407,6 +377,13 @@ impl PyCalibrationReport {
     }
 }
 
+impl PyCalibrationReport {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        quote_quality_table(&self.inner.quote_rows())
+    }
+}
+
+tabular_methods!(PyCalibrationReport);
 wire_methods!(PyCalibrationReport, CalibrationReport, "CalibrationReport");
 
 /// Solver-free validation report: every static envelope error plus the step dependency graph.
@@ -458,32 +435,6 @@ impl PyCalibrationValidationReport {
         serde_to_py(py, &self.inner.dependency_graph)
     }
 
-    /// One row per static error as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``kind``, ``step_id``, ``message``; an empty frame carries
-    /// the same columns.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If pandas cannot build the frame.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let mut kinds = Vec::with_capacity(self.inner.errors.len());
-        let mut steps: Vec<Option<String>> = Vec::with_capacity(self.inner.errors.len());
-        let mut messages = Vec::with_capacity(self.inner.errors.len());
-        for error in &self.inner.errors {
-            kinds.push(error.kind_str().to_string());
-            steps.push(error.step_id().map(str::to_string));
-            messages.push(error.to_string());
-        }
-        let data = PyDict::new(py);
-        data.set_item("kind", kinds)?;
-        data.set_item("step_id", steps)?;
-        data.set_item("message", messages)?;
-        dict_to_dataframe(py, &data, None)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "CalibrationValidationReport(errors={}, steps={})",
@@ -493,6 +444,25 @@ impl PyCalibrationValidationReport {
     }
 }
 
+impl PyCalibrationValidationReport {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let mut kinds = Vec::with_capacity(self.inner.errors.len());
+        let mut steps: Vec<Option<String>> = Vec::with_capacity(self.inner.errors.len());
+        let mut messages = Vec::with_capacity(self.inner.errors.len());
+        for error in &self.inner.errors {
+            kinds.push(error.kind_str().to_string());
+            steps.push(error.step_id().map(str::to_string));
+            messages.push(error.to_string());
+        }
+        TableBuilder::new()
+            .utf8("kind", kinds)?
+            .nullable_utf8("step_id", steps)?
+            .utf8("message", messages)?
+            .build()
+    }
+}
+
+tabular_methods!(PyCalibrationValidationReport);
 wire_methods!(
     PyCalibrationValidationReport,
     CalibrationValidationReport,

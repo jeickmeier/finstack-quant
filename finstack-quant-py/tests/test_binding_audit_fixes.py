@@ -314,12 +314,12 @@ def test_zero_target_breach_reports_infinite_utilization_everywhere() -> None:
     entry = result.positions[0]
     assert math.isinf(entry.utilization)
 
-    single_row = entry.to_dataframe()
+    single_row = entry.to_pandas()
     cell = single_row["utilization"].iloc[0]
     assert isinstance(cell, float), f"expected numeric utilization, got {type(cell)}"
     assert math.isinf(cell)
 
-    frame = result.to_dataframe()
+    frame = result.to_pandas()
     assert math.isinf(float(frame["utilization"].iloc[0]))
 
     payload = json.loads(result.to_json())

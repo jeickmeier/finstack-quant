@@ -1,14 +1,15 @@
 //! Python bindings for the factor-model sensitivity engines.
 //!
 //! Wraps `finstack_quant_portfolio::sensitivity` to expose delta-based and
-//! full-repricing factor sensitivities from Python, with DataFrame export.
+//! full-repricing factor sensitivities from Python, with Arrow table export.
 
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref, extract_records_json};
-use crate::bindings::pandas_utils::dict_to_dataframe;
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
 
 /// Positions-by-factors sensitivity matrix.
 ///
@@ -158,20 +159,6 @@ impl PySensitivityMatrix {
         self.inner.factor_deltas(factor_idx).map_err(core_to_py)
     }
 
-    /// Export as a pandas ``DataFrame`` with positions as rows and factors as columns.
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        for (fi, factor_id) in self.inner.factor_ids().iter().enumerate() {
-            data.set_item(
-                factor_id.to_string(),
-                self.inner.factor_deltas(fi).map_err(core_to_py)?,
-            )?;
-        }
-        let index = PyList::new(py, self.inner.position_ids())?;
-        dict_to_dataframe(py, &data, Some(index.into_any()))
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "SensitivityMatrix(positions={}, factors={})",
@@ -179,18 +166,26 @@ impl PySensitivityMatrix {
             self.inner.n_factors()
         )
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PySensitivityMatrix {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let position_ids: Vec<String> = self
+            .inner
+            .position_ids()
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        let mut builder = TableBuilder::new().utf8("position_id", position_ids)?;
+        for (fi, factor_id) in self.inner.factor_ids().iter().enumerate() {
+            let col = self.inner.factor_deltas(fi).map_err(core_to_py)?.to_vec();
+            builder = builder.f64(factor_id.as_str(), col)?;
+        }
+        builder.build()
     }
 }
+
+tabular_methods!(PySensitivityMatrix, index = "position_id");
 
 /// P&L profile for one factor across a scenario grid.
 ///
@@ -253,20 +248,6 @@ impl PyFactorPnlProfile {
         self.inner.position_pnls.clone()
     }
 
-    /// Export as a pandas ``DataFrame`` with shifts as rows and positions as
-    /// columns (column labels are the profile's own ``position_ids``).
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        self.inner.validate().map_err(crate::errors::core_to_py)?;
-        let data = PyDict::new(py);
-        for (pi, pid) in self.inner.position_ids.iter().enumerate() {
-            let column: Vec<f64> = self.inner.position_pnls.iter().map(|row| row[pi]).collect();
-            data.set_item(pid, column)?;
-        }
-        let index = PyList::new(py, &self.inner.shifts)?;
-        dict_to_dataframe(py, &data, Some(index.into_any()))
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "FactorPnlProfile(factor={:?}, shifts={}, positions={})",
@@ -276,6 +257,20 @@ impl PyFactorPnlProfile {
         )
     }
 }
+
+impl PyFactorPnlProfile {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        self.inner.validate().map_err(core_to_py)?;
+        let mut builder = TableBuilder::new().f64("shift", self.inner.shifts.clone())?;
+        for (pi, pid) in self.inner.position_ids.iter().enumerate() {
+            let column: Vec<f64> = self.inner.position_pnls.iter().map(|row| row[pi]).collect();
+            builder = builder.f64(pid.as_str(), column)?;
+        }
+        builder.build()
+    }
+}
+
+tabular_methods!(PyFactorPnlProfile, index = "shift");
 
 /// Deserialize factor definitions from a JSON string, list of dicts or
 /// ``pandas.DataFrame``.

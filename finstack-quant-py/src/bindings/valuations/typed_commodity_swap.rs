@@ -65,7 +65,7 @@ impl PyCommoditySwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.underlying")]
     #[getter]
     fn underlying<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.underlying)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.underlying)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.quantity")]
@@ -89,7 +89,7 @@ impl PyCommoditySwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.side")]
     #[getter]
     fn side<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.side)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.side)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.start_date")]
@@ -107,7 +107,7 @@ impl PyCommoditySwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.frequency")]
     #[getter]
     fn frequency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.frequency)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.frequency)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_commodity_swap", "CommoditySwap.calendar_id")]

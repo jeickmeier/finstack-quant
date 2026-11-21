@@ -31,14 +31,15 @@ def test_almgren_chriss_impact_returns_typed_estimate() -> None:
     )
 
     assert isinstance(result, ImpactEstimate)
-    assert result.to_series().index.tolist() == [
+    assert result.to_series().index == [
         "permanent_impact",
         "temporary_impact",
         "total_cost",
         "cost_bp",
         "execution_risk",
     ]
-    assert result.to_dataframe().shape == (1, 5)
+    assert result.to_pandas().shape == (1, 5)
+    assert result.to_arrow().num_rows == 1
     assert result.total_cost == pytest.approx(result.permanent_impact + result.temporary_impact)
     assert result.cost_bp == pytest.approx(result.total_cost / (10_000.0 * 100.0) * 10_000.0)
     assert result.execution_risk >= 0.0
@@ -53,7 +54,7 @@ def test_lvar_bangia_returns_typed_scalar() -> None:
     assert isinstance(result, LvarBangiaScalar)
     assert result.lvar <= result.var <= 0.0
     assert result.spread_cost >= 0.0
-    assert result.to_dataframe().columns.tolist() == ["var", "spread_cost", "lvar", "lvar_ratio"]
+    assert result.to_pandas().columns.tolist() == ["var", "spread_cost", "lvar", "lvar_ratio"]
     assert LvarBangiaScalar.from_json(result.to_json()) == result
     assert pickle.loads(pickle.dumps(result)) == result  # noqa: S301
 
@@ -97,7 +98,7 @@ def test_impact_models_round_trip_and_trade() -> None:
     kyle = KyleLambdaModel.from_amihud(0.0001, 50.0)
     assert kyle.lambda_ == pytest.approx(0.005)
     trajectory = kyle.optimal_trajectory(params, 4)
-    frame = trajectory.to_dataframe()
+    frame = trajectory.to_pandas()
     assert frame.columns.tolist() == ["t", "holdings", "trade"]
     assert len(frame) == 5
     assert trajectory.remaining[-1] == 0.0

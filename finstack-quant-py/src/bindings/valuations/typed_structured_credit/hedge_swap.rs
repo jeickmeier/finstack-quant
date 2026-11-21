@@ -2,7 +2,7 @@
 
 use pyo3::prelude::*;
 
-use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::valuations::convert::enum_to_py_string;
 use crate::bindings::valuations::typed_rates::PyInterestRateSwap;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{

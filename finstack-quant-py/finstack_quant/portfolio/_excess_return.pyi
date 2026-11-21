@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.market_data import DiscountCurve
+from finstack_quant.core.table import ArrowTable
 
 class DurationCellTable:
     """
@@ -56,12 +58,28 @@ class DurationCellTable:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Cells as a pandas DataFrame.
+        Cells as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``label``, ``lower``, ``upper``, ``base_return``, ``observed``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
+
+        Returns
+        -------
+        ArrowTable
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Cells as a pandas ``DataFrame``.
 
         Returns
         -------
@@ -70,11 +88,46 @@ class DurationCellTable:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Cells as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Cells as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize this result to canonical JSON.
@@ -221,12 +274,28 @@ class ExcessReturnResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Per-position excess returns as a pandas DataFrame.
+        Per-position excess returns as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``id``, ``cell``, ``base_return``, ``excess_return``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
+
+        Returns
+        -------
+        ArrowTable
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Per-position excess returns as a pandas ``DataFrame``.
 
         Returns
         -------
@@ -235,11 +304,46 @@ class ExcessReturnResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Per-position excess returns as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Per-position excess returns as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize this result to canonical JSON.
@@ -318,7 +422,8 @@ def cell_returns_from_reference(
     Returns
     -------
     DurationCellTable
-        Typed cell table with ``to_dataframe()`` / ``to_json()`` exits; use
+        Typed cell table with ``to_arrow()`` / ``to_pandas()`` / ``to_polars()``
+        / ``to_pyarrow()`` / ``to_json()`` exits;
         serialize with ``to_json()`` for the wire string.
 
     Raises
@@ -389,7 +494,8 @@ def cell_returns_from_curves(
     Returns
     -------
     DurationCellTable
-        Typed cell table with ``to_dataframe()`` / ``to_json()`` exits; use
+        Typed cell table with ``to_arrow()`` / ``to_pandas()`` / ``to_polars()``
+        / ``to_pyarrow()`` / ``to_json()`` exits;
         serialize with ``to_json()`` for the wire string.
 
     Raises
@@ -427,8 +533,8 @@ def cell_returns_from_curves(
     ...
 
 def excess_returns(
-    positions: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    table: DurationCellTable | str | dict[str, Any] | list[Any] | pd.DataFrame,
+    positions: str | dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
+    table: DurationCellTable | str | dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
 ) -> ExcessReturnResult:
     """
     Compute duration-matched credit excess returns against a base-return table.
@@ -441,15 +547,14 @@ def excess_returns(
 
     Parameters
     ----------
-    positions : str | dict | list | pandas.DataFrame
-        JSON array of ``ExcessReturnPosition`` objects (``id``, ``weight``,
-        ``duration``, ``total_return``); weights must sum to ``1.0`` within
-        ``1e-6``.
-    table : DurationCellTable | str | dict | list | pandas.DataFrame
-        Typed ``DurationCellTable`` or its JSON form, as returned by
-        :func:`cell_returns_from_reference`,
-        :func:`cell_returns_from_curves`, or
-        ``DurationCellTable.to_json()``.
+    positions : str | dict | list | pandas.DataFrame | polars.DataFrame | Any
+        JSON array, record list, pandas/Polars DataFrame, or Arrow table of
+        ``ExcessReturnPosition`` objects (``id``, ``weight``, ``duration``,
+        ``total_return``); weights must sum to ``1.0`` within ``1e-6``.
+    table : DurationCellTable | str | dict | list | pandas.DataFrame | polars.DataFrame | Any
+        Typed ``DurationCellTable``, its JSON form, or a tabular record input as
+        returned by :func:`cell_returns_from_reference`,
+        :func:`cell_returns_from_curves`, or ``DurationCellTable.to_json()``.
 
     Returns
     -------

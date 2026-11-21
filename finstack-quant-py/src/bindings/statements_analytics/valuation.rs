@@ -9,12 +9,10 @@
 //! the canonical JSON string.
 
 use crate::bindings::core::money::PyMoney;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::{extract_market_opt, extract_model_ref};
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
-    serde_rows_to_dataframe_with_schema, serde_to_py,
-};
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::statements::checks::PyCheckReport;
 use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements_analytics::checks::{
@@ -22,6 +20,7 @@ use crate::bindings::statements_analytics::checks::{
     extract_three_statement_mapping,
 };
 use crate::bindings::statements_analytics::typed::PyTornadoEntry;
+use crate::bindings::table_builders::{TableBuilder, serde_rows_to_arrow_table};
 use crate::errors::{serde_json_to_py, statements_to_py};
 use finstack_quant_statements_analytics::analysis::DcfDistributionResult;
 use finstack_quant_statements_analytics::analysis::{
@@ -38,16 +37,16 @@ use finstack_quant_valuations::instruments::equity::dcf_equity::{
 };
 use pyo3::prelude::*;
 
-/// Column schema for `DcfSensitivityResult.to_dataframe`.
-const TORNADO_COLUMNS: [ColumnSchema<'static>; 4] = [
+/// Column schema for [`PyDcfSensitivityResult`] tabular exports.
+const TORNADO_COLUMNS: [(&str, &str); 4] = [
     ("parameter_id", "str"),
     ("downside", "float64"),
     ("upside", "float64"),
     ("swing", "float64"),
 ];
 
-/// Column schema for `CorporateAnalysis.to_dataframe`.
-const CREDIT_COLUMNS: [ColumnSchema<'static>; 6] = [
+/// Column schema for [`PyCorporateAnalysis`] tabular exports.
+const CREDIT_COLUMNS: [(&str, &str); 6] = [
     ("instrument_id", "str"),
     ("period", "str"),
     ("dscr", "float64"),
@@ -647,8 +646,8 @@ impl PyDcfSensitivityGridResult {
         PyMoney::from_inner(self.inner.baseline_enterprise_value)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfSensitivityGridResult.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfSensitivityGridResult.to_pandas")]
+    fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows = self
             .inner
             .cells
@@ -673,6 +672,34 @@ impl PyDcfSensitivityGridResult {
     }
 }
 
+impl PyDcfSensitivityGridResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let mut builder = TableBuilder::new().f64("wacc", self.inner.axes.wacc_values.clone())?;
+        for (col_idx, term_val) in self.inner.axes.terminal_values.iter().enumerate() {
+            let col_vals: Vec<Option<f64>> = self
+                .inner
+                .cells
+                .iter()
+                .map(|row| match row.get(col_idx) {
+                    Some(DcfSensitivityEndpoint::Priced {
+                        enterprise_value, ..
+                    }) => Some(enterprise_value.amount()),
+                    _ => None,
+                })
+                .collect();
+            builder = builder.nullable_f64(&term_val.to_string(), col_vals)?;
+        }
+        builder.build()
+    }
+}
+
+tabular_methods!(
+    PyDcfSensitivityGridResult,
+    "DcfSensitivityGridResult",
+    module = "finstack_quant.statements_analytics._valuation",
+    custom_pandas
+);
+
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "dcf_sensitivity_on_results")]
 #[pyfunction]
 fn dcf_sensitivity_on_results<'py>(
@@ -693,7 +720,7 @@ fn dcf_sensitivity_on_results<'py>(
             )
         })
         .map_err(statements_to_py)?;
-    crate::bindings::pandas_utils::serde_to_py(py, &report)
+    crate::bindings::json_bridge::serde_to_py(py, &report)
 }
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "dcf_sensitivity_grid")]
@@ -733,35 +760,8 @@ struct PyDcfDistributionResult {
 
 #[pymethods]
 impl PyDcfDistributionResult {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfDistributionResult.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows = self
-            .inner
-            .paths
-            .iter()
-            .map(|row| {
-                serde_json::json!({
-                    "path_id": row.path_id,
-                    "enterprise_value": row.enterprise_value.amount(),
-                    "equity_value": row.equity_value.amount(),
-                    "currency": row.enterprise_value.currency().to_string(),
-                })
-            })
-            .collect::<Vec<_>>();
-        serde_rows_to_dataframe_with_schema(
-            py,
-            &rows,
-            &[
-                ("path_id", "uint32"),
-                ("enterprise_value", "float64"),
-                ("equity_value", "float64"),
-                ("currency", "str"),
-            ],
-        )
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfDistributionResult.quantiles_to_dataframe")]
-    fn quantiles_to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "DcfDistributionResult.quantiles_to_table")]
+    fn quantiles_to_table(&self) -> PyResult<PyArrowTable> {
         let rows = self
             .inner
             .quantiles
@@ -775,8 +775,7 @@ impl PyDcfDistributionResult {
                 })
             })
             .collect::<Vec<_>>();
-        serde_rows_to_dataframe_with_schema(
-            py,
+        serde_rows_to_arrow_table(
             &rows,
             &[
                 ("probability", "float64"),
@@ -787,6 +786,39 @@ impl PyDcfDistributionResult {
         )
     }
 }
+
+impl PyDcfDistributionResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let rows = self
+            .inner
+            .paths
+            .iter()
+            .map(|row| {
+                serde_json::json!({
+                    "path_id": row.path_id,
+                    "enterprise_value": row.enterprise_value.amount(),
+                    "equity_value": row.equity_value.amount(),
+                    "currency": row.enterprise_value.currency().to_string(),
+                })
+            })
+            .collect::<Vec<_>>();
+        serde_rows_to_arrow_table(
+            &rows,
+            &[
+                ("path_id", "uint32"),
+                ("enterprise_value", "float64"),
+                ("equity_value", "float64"),
+                ("currency", "str"),
+            ],
+        )
+    }
+}
+
+tabular_methods!(
+    PyDcfDistributionResult,
+    "DcfDistributionResult",
+    module = "finstack_quant.statements_analytics._valuation"
+);
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "evaluate_dcf_monte_carlo")]
 #[pyfunction]
@@ -951,17 +983,36 @@ impl PyCorporateValuationResult {
             .map(|inner| PyEquityBridge { inner })
     }
 
-    /// Export as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``currency``, ``equity_value``, ``enterprise_value``,
-    /// ``net_debt``, ``other_equity_claims``, ``valuation_discount``, ``terminal_value_pv`` (float
-    /// amounts in ``currency``),
-    /// ``equity_value_per_share``, ``diluted_shares`` (``None`` when absent),
-    /// then the DCF working: ``wacc`` (decimal), ``pv_explicit``,
-    /// ``terminal_value``, ``total_debt``, ``cash`` (float amounts in
-    /// ``currency``) and ``terminal_discount_years``; these six are ``None``
-    /// for a result loaded from JSON written before they were recorded.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn __repr__(&self) -> String {
+        crate::bindings::repr_support::repr_from_serde("CorporateValuationResult", &self.inner)
+    }
+}
+
+wire_methods!(
+    PyCorporateValuationResult,
+    CorporateValuationResult,
+    "CorporateValuationResult"
+);
+
+impl PyCorporateValuationResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: [(&str, &str); 15] = [
+            ("currency", "str"),
+            ("equity_value", "float64"),
+            ("enterprise_value", "float64"),
+            ("net_debt", "float64"),
+            ("other_equity_claims", "float64"),
+            ("valuation_discount", "float64"),
+            ("terminal_value_pv", "float64"),
+            ("equity_value_per_share", "float64"),
+            ("diluted_shares", "float64"),
+            ("wacc", "float64"),
+            ("pv_explicit", "float64"),
+            ("terminal_value", "float64"),
+            ("total_debt", "float64"),
+            ("cash", "float64"),
+            ("terminal_discount_years", "float64"),
+        ];
         let bridge = self.inner.equity_bridge.as_ref();
         let row = serde_json::json!({
             "currency": self.inner.equity_value.currency().to_string(),
@@ -980,40 +1031,11 @@ impl PyCorporateValuationResult {
             "cash": bridge.map(|bridge| bridge.cash),
             "terminal_discount_years": self.inner.terminal_discount_years,
         });
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &[
-                "currency",
-                "equity_value",
-                "enterprise_value",
-                "net_debt",
-                "other_equity_claims",
-                "valuation_discount",
-                "terminal_value_pv",
-                "equity_value_per_share",
-                "diluted_shares",
-                "wacc",
-                "pv_explicit",
-                "terminal_value",
-                "total_debt",
-                "cash",
-                "terminal_discount_years",
-            ],
-        )
-    }
-
-    fn __repr__(&self) -> String {
-        crate::bindings::repr_support::repr_from_serde("CorporateValuationResult", &self.inner)
+        serde_rows_to_arrow_table(&[row], &COLUMNS)
     }
 }
 
-wire_methods!(
-    PyCorporateValuationResult,
-    CorporateValuationResult,
-    "CorporateValuationResult"
-);
-impl_repr_html_via_dataframe!(PyCorporateValuationResult);
+tabular_methods!(PyCorporateValuationResult);
 
 /// Tornado ranking of the headline DCF assumptions by enterprise-value impact.
 ///
@@ -1024,7 +1046,7 @@ impl_repr_html_via_dataframe!(PyCorporateValuationResult);
 /// ...     '{"baseline_enterprise_value":{"amount":"100","currency":"USD"},'
 /// ...     '"entries":[{"parameter_id":"wacc","downside":-5.0,"upside":6.0}],'
 /// ...     '"wacc_down":0.09,"wacc_down_clamped":false,"terminal_growth_up":0.03,"terminal_growth_up_clamped":false}')
-/// >>> list(r.to_dataframe()["swing"])
+/// >>> list(r.to_pandas()["swing"])
 /// [11.0]
 #[pyclass(
     name = "DcfSensitivityResult",
@@ -1081,11 +1103,19 @@ impl PyDcfSensitivityResult {
         self.inner.terminal_growth_up_clamped
     }
 
-    /// Export the tornado table as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``parameter_id``, ``downside``, ``upside``, ``swing`` (EV
-    /// deltas in the baseline currency). One row per entry, in ranked order.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn __repr__(&self) -> String {
+        crate::bindings::repr_support::repr_from_serde("DcfSensitivityResult", &self.inner)
+    }
+}
+
+wire_methods!(
+    PyDcfSensitivityResult,
+    DcfSensitivityResult,
+    "DcfSensitivityResult"
+);
+
+impl PyDcfSensitivityResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         let rows: Vec<serde_json::Value> = self
             .inner
             .entries
@@ -1099,20 +1129,11 @@ impl PyDcfSensitivityResult {
                 })
             })
             .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, &TORNADO_COLUMNS)
-    }
-
-    fn __repr__(&self) -> String {
-        crate::bindings::repr_support::repr_from_serde("DcfSensitivityResult", &self.inner)
+        serde_rows_to_arrow_table(&rows, &TORNADO_COLUMNS)
     }
 }
 
-wire_methods!(
-    PyDcfSensitivityResult,
-    DcfSensitivityResult,
-    "DcfSensitivityResult"
-);
-impl_repr_html_via_dataframe!(PyDcfSensitivityResult);
+tabular_methods!(PyDcfSensitivityResult);
 
 /// Node mappings that switch on the LBO model check suite.
 ///
@@ -1290,14 +1311,30 @@ impl PyLboResult {
         self.inner.checks.clone().map(PyCheckReport::from_inner)
     }
 
-    /// Export as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``currency``, ``entry_enterprise_value``, ``entry_metric``,
-    /// ``debt_total``, ``equity_check``, ``sources_total``, ``uses_total``,
-    /// ``sources_uses_balanced``, ``exit_enterprise_value``, ``exit_metric``,
-    /// ``exit_net_debt``, ``exit_equity_proceeds``, ``moic``. Money columns are
-    /// float amounts in ``currency``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn __repr__(&self) -> String {
+        crate::bindings::repr_support::repr_from_serde("LboResult", &self.inner)
+    }
+}
+
+wire_methods!(PyLboResult, LboResult, "LboResult");
+
+impl PyLboResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        const COLUMNS: [(&str, &str); 13] = [
+            ("currency", "str"),
+            ("entry_enterprise_value", "float64"),
+            ("entry_metric", "float64"),
+            ("debt_total", "float64"),
+            ("equity_check", "float64"),
+            ("sources_total", "float64"),
+            ("uses_total", "float64"),
+            ("sources_uses_balanced", "bool"),
+            ("exit_enterprise_value", "float64"),
+            ("exit_metric", "float64"),
+            ("exit_net_debt", "float64"),
+            ("exit_equity_proceeds", "float64"),
+            ("moic", "float64"),
+        ];
         let row = serde_json::json!({
             "currency": self.inner.entry_enterprise_value.currency().to_string(),
             "entry_enterprise_value": self.inner.entry_enterprise_value.amount(),
@@ -1313,34 +1350,11 @@ impl PyLboResult {
             "exit_equity_proceeds": self.inner.exit_equity_proceeds.amount(),
             "moic": self.inner.moic,
         });
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &[
-                "currency",
-                "entry_enterprise_value",
-                "entry_metric",
-                "debt_total",
-                "equity_check",
-                "sources_total",
-                "uses_total",
-                "sources_uses_balanced",
-                "exit_enterprise_value",
-                "exit_metric",
-                "exit_net_debt",
-                "exit_equity_proceeds",
-                "moic",
-            ],
-        )
-    }
-
-    fn __repr__(&self) -> String {
-        crate::bindings::repr_support::repr_from_serde("LboResult", &self.inner)
+        serde_rows_to_arrow_table(&[row], &COLUMNS)
     }
 }
 
-wire_methods!(PyLboResult, LboResult, "LboResult");
-impl_repr_html_via_dataframe!(PyLboResult);
+tabular_methods!(PyLboResult);
 
 /// Orchestrated statement + equity + credit analysis envelope.
 ///
@@ -1400,13 +1414,24 @@ impl PyCorporateAnalysis {
             .collect()
     }
 
-    /// Export the per-instrument credit metrics as a long pandas ``DataFrame``.
-    ///
-    /// Columns: ``instrument_id``, ``period`` (period-id string), ``dscr``,
-    /// ``dscr_total``, ``dscr_incl_fees``, ``interest_coverage`` (turns;
-    /// ``NaN`` where a metric is not available for that period). One row per
-    /// (instrument, period) present on any metric series.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn __repr__(&self) -> String {
+        format!(
+            "CorporateAnalysis(statement_nodes={}, equity={}, credit_instruments={})",
+            self.inner.statement.cells.len(),
+            if self.inner.equity.is_some() {
+                "CorporateValuationResult(...)"
+            } else {
+                "None"
+            },
+            self.inner.credit.len()
+        )
+    }
+}
+
+wire_methods!(PyCorporateAnalysis, CorporateAnalysis, "CorporateAnalysis");
+
+impl PyCorporateAnalysis {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         let mut rows = Vec::new();
         for (instrument_id, metrics) in &self.inner.credit {
             for (period, values) in super::credit_context::observations(metrics) {
@@ -1423,24 +1448,11 @@ impl PyCorporateAnalysis {
                 }));
             }
         }
-        serde_rows_to_dataframe_with_schema(py, &rows, &CREDIT_COLUMNS)
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "CorporateAnalysis(statement_nodes={}, equity={}, credit_instruments={})",
-            self.inner.statement.cells.len(),
-            if self.inner.equity.is_some() {
-                "CorporateValuationResult(...)"
-            } else {
-                "None"
-            },
-            self.inner.credit.len()
-        )
+        serde_rows_to_arrow_table(&rows, &CREDIT_COLUMNS)
     }
 }
 
-wire_methods!(PyCorporateAnalysis, CorporateAnalysis, "CorporateAnalysis");
+tabular_methods!(PyCorporateAnalysis);
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "evaluate_dcf")]
 #[pyfunction]
@@ -1518,7 +1530,7 @@ fn evaluate_dcf<'py>(
 /// -------
 /// DcfSensitivityResult
 ///     Baseline EV, ranked ``entries`` and the clamped-shock flags;
-///     ``to_dataframe()`` gives the tornado table.
+///     ``to_pandas()`` or ``to_arrow()`` gives the tornado table.
 ///
 /// Raises
 /// ------
@@ -1538,7 +1550,7 @@ fn evaluate_dcf<'py>(
 /// >>> b.value_money("ufcf", [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))])
 /// >>> b.with_meta("currency", '"USD"')
 /// >>> sens = dcf_sensitivity(b.build(), 0.10, TerminalValueSpec.gordon_growth(0.02), net_debt_override=0.0)
-/// >>> list(sens.to_dataframe().columns)
+/// >>> list(sens.to_pandas().columns)
 /// ['parameter_id', 'downside', 'upside', 'swing']
 #[pyfunction]
 #[pyo3(signature = (

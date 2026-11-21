@@ -723,12 +723,12 @@ def test_metric_keys_are_human_readable_not_escaped() -> None:
             assert "_x2d" not in component, component
             assert "_x5f" not in component, component
 
-    frame = result.to_dataframe()
+    frame = result.to_pandas()
     for column in frame.columns:
         assert "_x2d" not in column, column
         assert "_x5f" not in column, column
 
-    long_frame = result.to_long_dataframe()
+    long_frame = result.to_long_table().to_pandas()
     for value in long_frame["curve"].dropna().tolist():
         assert "_x2d" not in value, value
         assert "_x5f" not in value, value

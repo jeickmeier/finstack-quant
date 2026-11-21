@@ -120,7 +120,7 @@ impl PyCreditDefaultSwap {
         self.inner
             .margin_spec
             .as_ref()
-            .map(|spec| crate::bindings::pandas_utils::serde_to_py(py, spec))
+            .map(|spec| crate::bindings::json_bridge::serde_to_py(py, spec))
             .transpose()
     }
 

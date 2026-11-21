@@ -54,7 +54,7 @@ def test_rejected_measure_keeps_its_message_beside_the_rest() -> None:
     assert report.debt_spread is None
     assert "Terminal only" in report.errors["debt_spread"]
     assert report.implied_spread is not None
-    frame = report.to_dataframe()
+    frame = report.to_pandas()
     assert list(frame["horizon"]) == report.horizons
     assert frame["debt_spread"].isna().all()
 

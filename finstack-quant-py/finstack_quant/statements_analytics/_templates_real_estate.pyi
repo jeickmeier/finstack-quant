@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.statements import ModelBuilder
 
 # Real-estate template
@@ -430,9 +433,9 @@ class RenewalSpec:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the renewal spec as a single-row pandas ``DataFrame``.
+        Export the renewal spec as a single-row ``ArrowTable``.
 
         Columns: ``downtime_periods``, ``term_periods``, ``probability``,
         ``rent_factor``, ``free_rent_periods``.
@@ -443,15 +446,75 @@ class RenewalSpec:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row describing the renewal terms.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the renewal spec cannot be converted to an Arrow table.
         """
         ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the renewal spec as a single-row pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row describing the renewal terms.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the result cannot be converted to a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the renewal spec as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row describing the renewal terms.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the renewal spec as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row describing the renewal terms.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 class LeaseGrowthConvention:
     """
@@ -815,9 +878,9 @@ class LeaseSpec:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the lease spec as a single-row pandas ``DataFrame``.
+        Export the lease spec as a single-row ``ArrowTable``.
 
         Columns: ``node_id``, ``start``, ``end``, ``base_rent``,
         ``growth_rate``, ``growth_convention``, ``free_rent_periods``,
@@ -828,7 +891,25 @@ class LeaseSpec:
         model period, ``growth_rate`` and ``occupancy`` are decimal fractions,
         and ``free_rent_periods`` is a count of model periods. The nested
         collections are summarised as counts here - read ``renewal`` (and its
-        own ``to_dataframe``) for the renewal terms.
+        own ``to_arrow`` / ``to_pandas``) for the renewal terms.
+
+        Returns
+        -------
+        ArrowTable
+            One row describing the lease.
+
+        Raises
+        ------
+        ValueError
+            If the lease spec cannot be converted to an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the lease spec as a single-row pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`.
 
         Returns
         -------
@@ -837,10 +918,52 @@ class LeaseSpec:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be converted to a pandas DataFrame.
         """
         ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the lease spec as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row describing the lease.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the lease spec as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row describing the lease.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 class RentRollOutputNodes:
     """
@@ -1002,13 +1125,31 @@ class RentRollOutputNodes:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the node-id mapping as a single-row pandas ``DataFrame``.
+        Export the node-id mapping as a single-row ``ArrowTable``.
 
         Columns: ``rent_pgi_node``, ``free_rent_node``, ``vacancy_loss_node``,
         ``rent_effective_node``. Every value is a statement node id, not a
         numeric amount.
+
+        Returns
+        -------
+        ArrowTable
+            One row of rent-roll output node ids.
+
+        Raises
+        ------
+        ValueError
+            If the mapping cannot be converted to an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the node-id mapping as a single-row pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`.
 
         Returns
         -------
@@ -1017,10 +1158,52 @@ class RentRollOutputNodes:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be converted to a pandas DataFrame.
         """
         ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the node-id mapping as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row of rent-roll output node ids.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the node-id mapping as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row of rent-roll output node ids.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 class ManagementFeeBase:
     """
@@ -1441,9 +1624,9 @@ class PropertyTemplateNodes:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the node-id mapping as a single-row pandas ``DataFrame``.
+        Export the node-id mapping as a single-row ``ArrowTable``.
 
         Columns: ``rent_pgi_node``, ``free_rent_node``, ``vacancy_loss_node``,
         ``rent_effective_node``, ``other_income_total_node``, ``egi_node``,
@@ -1455,15 +1638,75 @@ class PropertyTemplateNodes:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row of property template node ids.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the mapping cannot be converted to an Arrow table.
         """
         ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the node-id mapping as a single-row pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row of property template node ids.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the result cannot be converted to a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the node-id mapping as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            One row of property template node ids.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the node-id mapping as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row of property template node ids.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 def add_noi_buildup(
     builder: ModelBuilder,

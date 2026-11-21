@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any, Literal
+import numpy as np
+import numpy.typing as npt
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 class StrategyAllocationInput:
     """One strategy's inputs to the selected allocation scheme.
@@ -60,7 +65,12 @@ class WeightAllocationSpec:
         total_capital: float,
         strategies: list[StrategyAllocationInput],
         *,
-        covariance: list[list[float]] | None = None,
+        covariance: Sequence[Sequence[float]]
+        | npt.NDArray[np.float64]
+        | pd.DataFrame
+        | pl.DataFrame
+        | Any
+        | None = None,
         money_decimal_places: int | None = None,
     ) -> None:
         """Store inputs to the native strategy allocator.
@@ -73,8 +83,10 @@ class WeightAllocationSpec:
             Finite signed capital in the reporting currency.
         strategies : list[StrategyAllocationInput]
             Rows in strategy order. Ties in rounding follow this order.
-        covariance : list[list[float]], optional
-            Square strategy-return covariance in strategy order for risk budgeting.
+        covariance : sequence[sequence[float]] | numpy.ndarray | pandas.DataFrame | polars.DataFrame | Any, optional
+            Square strategy-return covariance in strategy order for risk
+            budgeting (nested sequences, 2-D numeric array, pandas/Polars
+            DataFrame, or Arrow table).
         money_decimal_places : int, optional
             Scale from zero through 12 for capital rounding. None uses 10.
 
@@ -152,12 +164,28 @@ class WeightAllocationResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Per-strategy allocations as a pandas DataFrame.
+        Per-strategy allocations as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``id``, ``weight``, ``capital``, ``volatility``, ``risk_contribution``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
+
+        Returns
+        -------
+        ArrowTable
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Per-strategy allocations as a pandas ``DataFrame``.
 
         Returns
         -------
@@ -166,11 +194,46 @@ class WeightAllocationResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Per-strategy allocations as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Per-strategy allocations as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize this result to canonical JSON.
@@ -247,7 +310,8 @@ def allocate_weights(spec: WeightAllocationSpec | str | dict[str, Any]) -> Weigh
     -------
     WeightAllocationResult
         Typed result with ``scheme``, ``allocations`` and ``diagnostics``
-        getters plus ``to_dataframe()``; serialize with ``to_json()`` for the
+        getters plus ``to_arrow()`` / ``to_pandas()`` / ``to_polars()`` /
+        ``to_pyarrow()``; serialize with ``to_json()`` for the
         wire string. A spec that allocates without error is valid.
 
     Raises

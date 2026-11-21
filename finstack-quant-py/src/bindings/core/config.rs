@@ -353,7 +353,7 @@ impl PyFinstackConfig {
         self.inner
             .extensions
             .get(key)
-            .map(|value| crate::bindings::pandas_utils::serde_to_py(py, value))
+            .map(|value| crate::bindings::json_bridge::serde_to_py(py, value))
             .transpose()
     }
 

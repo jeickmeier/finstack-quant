@@ -71,7 +71,7 @@ impl PyRepo {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.collateral")]
     #[getter]
     fn collateral<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.collateral)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.collateral)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.repo_rate")]
@@ -101,7 +101,7 @@ impl PyRepo {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.repo_type")]
     #[getter]
     fn repo_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.repo_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.repo_type)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.triparty")]
@@ -137,7 +137,7 @@ impl PyRepo {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_repo", "Repo.margin_spec")]
     #[getter]
     fn margin_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.margin_spec)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.margin_spec)
     }
 }
 

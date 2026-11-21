@@ -11,11 +11,12 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use super::discount::PyDiscountCurve;
-use super::helpers::{CurveSourceOptions, TimePoint, columns_to_dataframe, extract_time_point};
+use super::helpers::{CurveSourceOptions, TimePoint, columns_to_arrow_table, extract_time_point};
 use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::core::dates::tenor::{PyTenor, extract_tenor};
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::errors::core_to_py;
 
 /// Projection-factor curve for one floating-rate index.
@@ -474,22 +475,6 @@ impl PyForwardCurve {
         self.inner.instantaneous_forward(t).map_err(core_to_py)
     }
 
-    /// Export knots as a pandas ``DataFrame`` with columns ``t`` (years) and ``factor``.
-    ///
-    /// Returns
-    /// -------
-    /// pandas.DataFrame
-    ///     One row per knot, in ascending time order.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        columns_to_dataframe(
-            py,
-            &[
-                ("t", self.inner.knots().to_vec()),
-                ("factor", self.inner.factors().to_vec()),
-            ],
-        )
-    }
-
     /// Curve identifier string.
     #[getter]
     fn id(&self) -> &str {
@@ -559,7 +544,7 @@ impl PyForwardCurve {
     fn rate_calibration<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
             .rate_calibration()
-            .map(|recipe| crate::bindings::pandas_utils::serde_to_py(py, recipe))
+            .map(|recipe| crate::bindings::json_bridge::serde_to_py(py, recipe))
             .transpose()
     }
 
@@ -579,5 +564,14 @@ impl PyForwardCurve {
     }
 }
 
+impl PyForwardCurve {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        columns_to_arrow_table(&[
+            ("t", self.inner.knots().to_vec()),
+            ("factor", self.inner.factors().to_vec()),
+        ])
+    }
+}
+
+tabular_methods!(PyForwardCurve);
 wire_methods!(PyForwardCurve, ForwardCurve, "ForwardCurve", arc);
-impl_repr_html_via_dataframe!(PyForwardCurve);

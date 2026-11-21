@@ -28,10 +28,12 @@ import datetime
 from typing import Any
 
 import pandas as pd
+import polars as pl
 
 from finstack_quant.core.dates import StubKind
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.valuations import composite as composite
 from finstack_quant.valuations import instruments as instruments
 from finstack_quant.valuations import market as market
@@ -59,8 +61,9 @@ class ValuationResult:
     ``bucketed_dv01::USD-OIS::10y``); ``result["dv01"]`` / :meth:`get_metric`
     read one measure, :attr:`metrics` is the whole dict, :meth:`metric_units`
     labels every key (``ytm`` is a decimal, ``par_spread`` is basis points,
-    ``dv01`` is currency per bp). :meth:`to_dataframe` is one wide row;
-    :meth:`to_long_dataframe` is tidy ``metric / curve / bucket / value``.
+    ``dv01`` is currency per bp). :meth:`to_arrow`, :meth:`to_pandas`, and
+    :meth:`to_polars` export one wide row; :meth:`to_long_table` is tidy
+    ``metric / curve / bucket / value``.
 
     ``details`` is the optional tagged model-specific pricing payload; ``meta``
     is the Rust ``ResultsMeta`` policy stamp (numeric mode, rounding, FX, timing).
@@ -381,9 +384,9 @@ class ValuationResult:
         """
         ...
 
-    def metric_series_dataframe(self, base: str) -> pd.DataFrame:
+    def metric_series_table(self, base: str) -> ArrowTable:
         """
-        Tidy ``DataFrame`` of one composite base metric.
+        Tidy ``ArrowTable`` of one composite base metric.
 
         Parameters
         ----------
@@ -392,7 +395,7 @@ class ValuationResult:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             Columns ``metric`` (the base), ``curve`` (first component),
             ``bucket`` (remaining components joined with ``::``, or ``None``)
             and ``value``; the scalar aggregate stored under ``base`` is
@@ -401,26 +404,27 @@ class ValuationResult:
         Raises
         ------
         ValueError
-            If the rows cannot be serialized into a pandas object.
+            If the rows cannot be serialized into an Arrow table.
         """
         ...
 
-    def to_long_dataframe(self) -> pd.DataFrame:
+    def to_long_table(self) -> ArrowTable:
         """
-        Every measure as one tidy row.
+        Every measure as one tidy row in an ``ArrowTable``.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             Columns ``metric`` (base name), ``curve`` (first composite
             component or ``None``), ``bucket`` (second and later components
             joined with ``::``, or ``None``) and ``value``, in computation
-            order. Pivot with ``df.pivot(index="bucket", columns="curve")``.
+            order. Pivot the pandas export with
+            ``res.to_long_table().to_pandas().pivot(index="bucket", columns="curve")``.
 
         Raises
         ------
         ValueError
-            If the rows cannot be serialized into a pandas object.
+            If the rows cannot be serialized into an Arrow table.
         """
         ...
 
@@ -545,36 +549,23 @@ class ValuationResult:
         """
         ...
 
-    def _repr_html_(self) -> str:
-        """
-        Jupyter rich display: the :meth:`to_dataframe` table as HTML.
-
-        Returns
-        -------
-        str
-            HTML table rendered by pandas.
-
-        Raises
-        ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
-        """
-        ...
-
     @staticmethod
-    def concat(results: Sequence[ValuationResult]) -> pd.DataFrame:
+    def concat(results: Sequence[ValuationResult]) -> ArrowTable:
         """Collect one wide row per result in input order.
 
         Parameters
         ----------
         results : Sequence[ValuationResult]
-            Ordered typed result objects. Each row contains the valuation date, PV, currency and its computed measures. Metric columns appear in order of first occurrence; missing measures are null.
+            Ordered typed result objects. Each row contains the valuation date,
+            PV, currency and its computed measures. Metric columns appear in
+            order of first occurrence; missing measures are null.
 
         Returns
         -------
-        pandas.DataFrame
-            Wide frame in the to_dataframe column order. An empty sequence
-            returns a zero-row frame with the standard identity columns.
+        ArrowTable
+            Wide Arrow table in the :meth:`to_arrow` column order. An empty
+            sequence returns a zero-row table with the standard identity
+            columns.
 
         Raises
         ------
@@ -586,24 +577,39 @@ class ValuationResult:
         Examples
         --------
         >>> from finstack_quant.valuations import ValuationResult
-        >>> ValuationResult.concat([]).empty
+        >>> ValuationResult.concat([]).to_pandas().empty
         True
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the headline result as a single-row pandas DataFrame.
+        Export the headline result as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``instrument_id``, ``as_of_date`` (ISO 8601 string), ``pv``,
         ``currency``, then one column per metric key in ``measures``
         insertion order.
 
-        This is the default export, built from the Rust crate's own
-        ``ValuationResult::to_row`` flattener. Stack a book with
-        ``pd.concat([r.to_dataframe() for r in results])``; instruments with
-        different metric sets align on column name and leave ``NaN``
-        elsewhere.
+        Returns
+        -------
+        ArrowTable
+            Single-row Arrow table with the identity columns followed by one
+            column per metric.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the headline result as a single-row pandas ``DataFrame``.
+
+        Columns: ``instrument_id``, ``as_of_date`` (ISO 8601 string), ``pv``,
+        ``currency``, then one column per metric key in ``measures``
+        insertion order. Stack a book with ``ValuationResult.concat(results).to_pandas()``.
 
         Returns
         -------
@@ -613,11 +619,54 @@ class ValuationResult:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be serialized into a table.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the headline result as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Single-row DataFrame with the identity columns followed by one
+            column per metric.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be serialized into a table.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the headline result as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row table with the identity columns followed by one
+            column per metric.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be serialized into a table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @property
     def meta(self) -> dict[str, Any]:
         """

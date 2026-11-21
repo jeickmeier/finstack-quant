@@ -95,9 +95,10 @@ def test_sa_ccr_trade_keyword_constructor_matches_json() -> None:
 
 def test_sa_ccr_trade_dataframe_round_trip() -> None:
     trade = SaCcrTrade.from_json(json.dumps(linear_trade_payload()))
-    frame = trade.to_dataframe()
+    frame = trade.to_pandas()
     assert list(frame.columns)[:3] == ["trade_id", "asset_class", "notional"]
     assert frame.iloc[0]["start_date"] == "2025-01-15"
+    assert trade.to_arrow().column_names()[:3] == ["trade_id", "asset_class", "notional"]
 
     tape = pd.concat([frame, frame.assign(trade_id="IRS-2", direction=-1.0, supervisory_delta=-1.0)])
     trades = SaCcrTrade.from_dataframe(tape)
@@ -164,7 +165,7 @@ def test_ead_result_wire_and_frame_surfaces() -> None:
     )
     assert "EadResult(" in repr(result)
 
-    frame = result.to_dataframe()
+    frame = result.to_pandas()
     assert list(frame.columns) == [
         "ead",
         "rc",
@@ -177,7 +178,7 @@ def test_ead_result_wire_and_frame_surfaces() -> None:
     assert len(frame) == 1
     assert str(frame["ead"].dtype) == "float64"
 
-    add_ons = result.to_add_on_dataframe()
+    add_ons = result.to_add_on_table().to_pandas()
     assert list(add_ons.columns) == ["asset_class", "add_on"]
     assert add_ons["asset_class"].tolist() == ["interest_rate"]
     assert str(add_ons["add_on"].dtype) == "float64"
@@ -226,12 +227,12 @@ def test_frtb_sba_result_wire_and_frame_surfaces() -> None:
     )
     assert "FrtbSbaResult(" in repr(result)
 
-    frame = result.to_dataframe()
+    frame = result.to_pandas()
     assert list(frame.columns) == ["total", "drc", "rrao", "binding_scenario"]
     assert len(frame) == 1
     assert str(frame["total"].dtype) == "float64"
 
-    breakdown = result.to_breakdown_dataframe()
+    breakdown = result.to_breakdown_table().to_pandas()
     assert list(breakdown.columns) == ["component", "risk_class", "charge"]
     assert set(breakdown["component"]) <= {"delta", "vega", "curvature"}
     assert str(breakdown["charge"].dtype) == "float64"
@@ -284,7 +285,7 @@ def test_frtb_engine_configuration_and_scenario_frame() -> None:
     assert engine.scenarios == ["high"]
     assert engine.risk_classes == ["girr", "equity"]
     result = engine.calculate(sample_sensitivities())
-    frame = result.to_scenario_dataframe()
+    frame = result.to_scenario_table().to_pandas()
     assert list(frame.columns) == ["scenario", "charge", "binding"]
     assert frame["scenario"].tolist() == ["high"]
     assert bool(frame["binding"].iloc[0]) is True
@@ -323,7 +324,7 @@ def test_frtb_sensitivities_adders_and_dataframe_round_trip() -> None:
     sens.add_rrao_position("PLAIN-1", 5_000_000.0, False)
     sens.validate()
 
-    restored = FrtbSensitivities.from_dataframe(sens.to_dataframe(), "USD")
+    restored = FrtbSensitivities.from_dataframe(sens.to_pandas(), "USD")
     assert restored.to_json() == sens.to_json()
     assert "delta=9" in repr(sens)
 
@@ -338,7 +339,7 @@ def test_frtb_sensitivities_adders_and_dataframe_round_trip() -> None:
     })
     charged = frtb_sba_charge(sens)
     assert charged.drc > 0.0
-    with_drc = FrtbSensitivities.from_dataframe(sens.to_dataframe(), "USD")
+    with_drc = FrtbSensitivities.from_dataframe(sens.to_arrow(), "USD")
     assert with_drc.to_json() == sens.to_json()
 
     empty = frtb_sba_charge(FrtbSensitivities("USD"))
@@ -352,7 +353,7 @@ def test_frtb_basis_repo_and_option_categories_round_trip() -> None:
     sens.add_commodity_delta("WTI", 2, "1Y", "Cushing", 100.0)
     sens.add_commodity_delta("WTI", 2, "1Y", "Houston", -100.0)
     sens.add_equity_repo_delta("ACME", 3, 1_000.0)
-    assert FrtbSensitivities.from_dataframe(sens.to_dataframe(), "USD").to_json() == sens.to_json()
+    assert FrtbSensitivities.from_dataframe(sens.to_polars(), "USD").to_json() == sens.to_json()
     assert frtb_sba_charge(sens).total > 0
     option = SaCcrTrade(
         trade_id="OPT",
@@ -370,7 +371,7 @@ def test_frtb_basis_repo_and_option_categories_round_trip() -> None:
         supervisory_category="equity_single_name",
         option_maturity_date="2026-01-15",
     )
-    assert SaCcrTrade.from_dataframe(option.to_dataframe())[0].to_json() == option.to_json()
+    assert SaCcrTrade.from_dataframe(option.to_arrow())[0].to_json() == option.to_json()
     assert option.option_maturity_date == dt.date(2026, 1, 15)
     assert option.supervisory_category == "equity_single_name"
 
@@ -397,7 +398,7 @@ def test_frtb_dataframe_round_trips_drc_positions_and_base_currency() -> None:
         "maturity_years": 3.0,
         "pnl_adjustment": 0.0,
     })
-    frame = sens.to_dataframe()
+    frame = sens.to_pandas()
     assert list(frame.columns)[6:] == ["curve_id", "sector", "seniority", "maturity_years", "pnl_adjustment"]
     drc = frame[frame["risk_class"] == "drc"]
     assert set(drc["sector"]) == {"corporate", "sovereign"}
@@ -420,7 +421,7 @@ def test_regulatory_inputs_have_no_binding_defaults() -> None:
     with pytest.raises(TypeError):
         FrtbSensitivities()  # type: ignore[call-arg]
     with pytest.raises(TypeError):
-        FrtbSensitivities.from_dataframe(FrtbSensitivities("EUR").to_dataframe())  # type: ignore[call-arg]
+        FrtbSensitivities.from_dataframe(FrtbSensitivities("EUR").to_pandas())  # type: ignore[call-arg]
     sens = FrtbSensitivities("USD")
     with pytest.raises(TypeError):
         sens.add_rrao_position("X", 1_000_000.0)  # type: ignore[call-arg]
@@ -438,7 +439,7 @@ def test_regulatory_inputs_have_no_binding_defaults() -> None:
             mtm=0.0,
         )  # type: ignore[call-arg]
 
-    tape = SaCcrTrade.from_json(json.dumps(linear_trade_payload())).to_dataframe()
+    tape = SaCcrTrade.from_json(json.dumps(linear_trade_payload())).to_pandas()
     with pytest.raises(ValueError, match="is_option"):
         SaCcrTrade.from_dataframe(tape.drop(columns=["is_option"]))
 

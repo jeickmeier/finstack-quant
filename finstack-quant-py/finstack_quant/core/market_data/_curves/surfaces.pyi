@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from typing import Any, Optional, Sequence, Union
 import pandas as pd
+import polars as pl
 
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import VolatilityClock
+from finstack_quant.core.table import ArrowTable
 
 class VolSurface:
     """
@@ -62,10 +64,10 @@ class VolSurface:
             Strictly increasing expiry times in years.
         secondary_values : Sequence[float]
             Strictly increasing secondary-axis coordinates.
-        vols : Sequence[float], Sequence[Sequence[float]] or numpy.ndarray
+        vols : Sequence[float], Sequence[Sequence[float]], numpy.ndarray, DataFrame, or Arrow table
             Volatilities as decimals, either flat row-major
             (``len(expiries) * len(secondary_values)``) or as ``len(expiries)`` rows of
-            ``len(secondary_values)`` values (a 2-D array is accepted).
+            ``len(secondary_values)`` values (a 2-D array, pandas/Polars ``DataFrame``, or Arrow table is accepted).
         secondary_axis : str
             ``"strike"`` or ``"tenor"``.
         quote_type : str
@@ -158,7 +160,24 @@ class VolSurface:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export the grid in long form as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``expiry``, ``secondary_value`` and ``vol``; one row per grid node,
+            expiries outer and secondary values inner.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export the grid in long form.
 
@@ -170,11 +189,45 @@ class VolSurface:
 
         Raises
         ------
-        ValueError
-            If the frame cannot be built.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the grid in long form as a ``polars.DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Polars DataFrame constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the grid in long form as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
     @property
     def id(self) -> str:
         """
@@ -513,7 +566,24 @@ class FxDeltaVolSurface:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export pillars as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``expiry``, ``atm_vol``, ``rr_25d``, ``bf_25d`` and, when
+            10-delta wings are stored, ``rr_10d`` and ``bf_10d``.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export pillars as a pandas ``DataFrame``.
 
@@ -525,11 +595,45 @@ class FxDeltaVolSurface:
 
         Raises
         ------
-        ValueError
-            If the frame cannot be built.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export pillars as a ``polars.DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Polars DataFrame constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export pillars as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
     @property
     def id(self) -> str:
         """
@@ -1077,7 +1181,24 @@ class VolCube:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export nodes in long form as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``expiry``, ``tenor``, ``alpha``, ``beta``, ``rho``, ``nu``,
+            ``shift`` (``NaN`` when absent) and ``forward``.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export nodes in long form.
 
@@ -1089,11 +1210,45 @@ class VolCube:
 
         Raises
         ------
-        ValueError
-            If the frame cannot be built.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export nodes in long form as a ``polars.DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Polars DataFrame constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export nodes in long form as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
     @property
     def id(self) -> str:
         """

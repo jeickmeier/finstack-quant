@@ -4,13 +4,14 @@
 //! `portfolio::portfolio` trips clippy `module_inception`.
 
 use crate::bindings::core::currency::extract_currency;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::extract::InstrumentArg;
 use crate::bindings::extract::extract_instrument;
+use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::module_utils::py_to_serde;
-use crate::bindings::pandas_utils::dict_to_dataframe;
-use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
 use crate::errors::display_to_py;
 use crate::errors::portfolio_to_py;
@@ -377,7 +378,7 @@ impl PyPortfolio {
     #[allow(clippy::wrong_self_convention)]
     #[pyo3(text_signature = "(self)")]
     fn to_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.to_spec())
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.to_spec())
     }
 
     /// Serialize the canonical ``PortfolioSpec`` (Rust ``Portfolio::to_spec``)
@@ -389,19 +390,27 @@ impl PyPortfolio {
             .map_err(display_to_py)
     }
 
-    /// Export the position table as a pandas ``DataFrame``.
+    /// Export the position table as an :class:`~finstack_quant.core.table.ArrowTable`.
     ///
     /// One row per position in portfolio order. Columns: ``position_id``,
     /// ``entity_id``, ``instrument_id``, ``instrument_type``, ``quantity``,
     /// ``unit`` (serde name, e.g. ``"units"``, ``"face_value"``), ``book_id``
     /// (``None`` when unassigned).
     #[pyo3(text_signature = "(self)")]
-    fn positions_to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn positions_table(&self) -> PyResult<PyArrowTable> {
         let positions = self.inner.positions();
-        let position_ids: Vec<&str> = positions.iter().map(|p| p.position_id.as_str()).collect();
-        let entity_ids: Vec<&str> = positions.iter().map(|p| p.entity_id.as_str()).collect();
-        let instrument_ids: Vec<&str> =
-            positions.iter().map(|p| p.instrument_id.as_str()).collect();
+        let position_ids: Vec<String> = positions
+            .iter()
+            .map(|p| p.position_id.as_str().to_owned())
+            .collect();
+        let entity_ids: Vec<String> = positions
+            .iter()
+            .map(|p| p.entity_id.as_str().to_owned())
+            .collect();
+        let instrument_ids: Vec<String> = positions
+            .iter()
+            .map(|p| p.instrument_id.as_str().to_owned())
+            .collect();
         let instrument_types: Vec<String> = positions
             .iter()
             .map(|p| p.instrument.key().to_string())
@@ -415,15 +424,15 @@ impl PyPortfolio {
             .iter()
             .map(|p| p.book_id.as_ref().map(|b| b.to_string()))
             .collect();
-        let data = PyDict::new(py);
-        data.set_item("position_id", position_ids)?;
-        data.set_item("entity_id", entity_ids)?;
-        data.set_item("instrument_id", instrument_ids)?;
-        data.set_item("instrument_type", instrument_types)?;
-        data.set_item("quantity", quantities)?;
-        data.set_item("unit", units)?;
-        data.set_item("book_id", book_ids)?;
-        dict_to_dataframe(py, &data, None)
+        TableBuilder::new()
+            .utf8("position_id", position_ids)?
+            .utf8("entity_id", entity_ids)?
+            .utf8("instrument_id", instrument_ids)?
+            .utf8("instrument_type", instrument_types)?
+            .f64("quantity", quantities)?
+            .utf8("unit", units)?
+            .nullable_utf8("book_id", book_ids)?
+            .build()
     }
 
     fn __repr__(&self) -> String {

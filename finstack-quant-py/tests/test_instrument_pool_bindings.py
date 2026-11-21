@@ -177,7 +177,7 @@ def test_deterministic_pool_prices_and_reports_the_reserve_path() -> None:
     assert all(isinstance(d, datetime.date) for d, _ in path)
     interest = sum(m.amount for _, m in diagnostics.reserve_interest_paid)
     assert interest > 0.0
-    frame = diagnostics.to_dataframe()
+    frame = diagnostics.to_pandas()
     assert list(frame.columns)[:3] == ["date", "pool_balance", "pool_factor"]
     assert {"reserve_balance", "reserve_interest", "funding_account"} <= set(frame.columns)
     assert len(frame) == len(diagnostics.periods) == len(path)
@@ -221,12 +221,14 @@ def test_stochastic_pool_reports_draws_and_the_option_cost_by_tranche() -> None:
     total = sum(float(c["amount"]) for c in tranche_costs.values())
     assert total == pytest.approx(result.draw_option_cost.amount, rel=1e-6)
 
-    frame = result.to_dataframe()
+    frame = result.to_pandas()
     assert list(frame["tranche_id"]) == ["EQ", "A"]
     assert frame["draw_option_cost"].sum() == pytest.approx(result.draw_option_cost.amount, rel=1e-6)
-    distribution = result.draw_option_cost_dataframe()
+    distribution = result.draw_option_cost_table().to_pandas()
     assert list(distribution.columns) == ["path", "draw_option_cost"]
     assert distribution["draw_option_cost"].mean() == pytest.approx(result.draw_option_cost.amount)
+    assert result.to_arrow().num_rows == 2
+    assert result.to_polars().height == 2
 
     again = StochasticPricingResult.from_json(result.to_json())
     assert again.draw_option_cost == result.draw_option_cost
@@ -350,7 +352,7 @@ def test_diagnostics_dataframe_preserves_join_order_values_and_empty_dtypes(empt
     for key, value in values.items():
         expected[key] = pd.Series([value] * len(dates), dtype="float64")
     for key, value in averages.items():
-        expected[key] = pd.Series([value] * len(dates), dtype="Float64")
+        expected[key] = pd.Series([value] * len(dates), dtype="float64")
     expected["reserve_interest"] = pd.Series([] if empty else [21.0, 22.0, 21.0, 0.0], dtype="float64")
     columns = [
         "date",
@@ -373,7 +375,7 @@ def test_diagnostics_dataframe_preserves_join_order_values_and_empty_dtypes(empt
         "servicer_advances_outstanding",
         "excess_spread",
     ]
-    pd.testing.assert_frame_equal(diagnostics.to_dataframe(), pd.DataFrame(expected, columns=columns))
+    pd.testing.assert_frame_equal(diagnostics.to_pandas(), pd.DataFrame(expected, columns=columns))
 
 
 @pytest.mark.parametrize("empty", [False, True])

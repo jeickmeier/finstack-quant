@@ -33,7 +33,7 @@ def test_yield_panel_dates_and_dataframe_round_trip() -> None:
         TENORS, YIELDS, ["2025-01-01", "2025-01-02", "2025-01-03", "2025-01-04", "2025-01-05", "2025-01-06"]
     )
     assert panel.dates == DATES
-    frame = panel.to_dataframe()
+    frame = panel.to_pandas()
     assert isinstance(frame.index, pd.DatetimeIndex)
     assert frame.columns.tolist() == TENORS
     rebuilt = YieldPanel.from_dataframe(frame)
@@ -53,13 +53,13 @@ def test_diebold_li_typed_pipeline() -> None:
     assert len(model.phi) == 3
     factors = model.factors
     assert isinstance(factors, FactorTimeSeries)
-    frame = factors.to_dataframe()
+    frame = factors.to_pandas()
     assert frame.columns.tolist() == ["level", "slope", "curvature"]
     assert isinstance(frame.index, pd.DatetimeIndex)
     assert factors.dates == DATES
     forecast = model.forecast(2)
     assert isinstance(forecast, YieldForecast)
-    assert forecast.to_dataframe().columns.tolist() == ["tenor", "yield", "lower_95", "upper_95"]
+    assert forecast.to_pandas().columns.tolist() == ["tenor", "yield", "lower_95", "upper_95"]
     assert DieboldLi.from_json(model.to_json()).forecast(2).yields == forecast.yields
     with pytest.raises(ValueError, match="fit_var"):
         DieboldLi().extract_factors(panel).forecast(1)
@@ -80,7 +80,7 @@ def test_yield_pca_typed_api() -> None:
     panel = YieldPanel(TENORS, YIELDS)
     pca = YieldPca.fit(panel)
     assert pca.tenors == TENORS
-    assert pca.to_dataframe().columns.tolist()[:2] == ["PC1", "PC2"]
+    assert pca.to_pandas().columns.tolist()[:2] == ["PC1", "PC2"]
     assert len(pca.scenario([2.0])) == 4
     assert pca.apply_scenario(YIELDS[-1], [0.0]) == pytest.approx(YIELDS[-1])
     assert pca.truncated(1).explained_variance_ratio == pca.variance_explained[:1]

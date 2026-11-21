@@ -5,7 +5,9 @@ from __future__ import annotations
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.valuations.instruments._typed_structured_credit.structured_credit import StructuredCredit
 
 class OasResult:
@@ -165,9 +167,29 @@ class OasResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export as a single-row pandas DataFrame.
+        Export as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``oas`` (annual decimal), ``model_price`` and
+        ``market_price`` (percentage of current balance), ``num_paths``,
+        ``price_std_error`` (percentage of current balance).
+
+        Returns
+        -------
+        ArrowTable
+            Single-row Arrow table of the OAS solve.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export as a single-row pandas ``DataFrame``.
 
         Columns: ``oas`` (annual decimal), ``model_price`` and
         ``market_price`` (percentage of current balance), ``num_paths``,
@@ -181,11 +203,52 @@ class OasResult:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be converted.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Single-row DataFrame of the OAS solve with columns matching :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be converted.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row table of the OAS solve with columns matching :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be converted.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
 
@@ -655,9 +718,32 @@ class TrancheMetrics:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export as a single-row pandas DataFrame.
+        Export as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``tranche_id``, ``currency``, ``pv``, ``clean_price_pct``,
+        ``dirty_price_pct``, ``accrued``, ``factor``, ``wal``, ``ytm``,
+        ``z_spread_bp``, ``cs01``, ``spread_duration``, ``spread_convexity``,
+        ``effective_duration``, ``effective_convexity``, ``target_price_pct``,
+        ``wal_to_call``, ``z_spread_to_call_bp``, ``dm_to_call_bp``, ``dm_bp``.
+        Requested registry metrics stay in :attr:`metrics`.
+
+        Returns
+        -------
+        ArrowTable
+            Single-row Arrow table of the tranche metrics.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export as a single-row pandas ``DataFrame``.
 
         Columns: ``tranche_id``, ``currency``, ``pv``, ``clean_price_pct``,
         ``dirty_price_pct``, ``accrued``, ``factor``, ``wal``, ``ytm``,
@@ -678,11 +764,52 @@ class TrancheMetrics:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be converted.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Single-row DataFrame with the columns documented on :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be converted.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row table with the columns documented on :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be converted.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
 
@@ -823,9 +950,31 @@ class ScenarioTable:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the evaluated cells as a pandas DataFrame.
+        Export the evaluated cells as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``tranche_id``, ``cpr``, ``cdr``, ``severity``, ``price``
+        (percentage of current balance), ``wal`` (years), ``writedown``
+        (currency units). One row per cell, in CPR-major then CDR then
+        severity order -- the same cells and order as ``cells``.
+
+        Returns
+        -------
+        ArrowTable
+            One row per scenario cell. A grid that evaluated no cells yields a
+            zero-row table that still carries the columns above.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the evaluated cells as a pandas ``DataFrame``.
 
         Columns: ``tranche_id``, ``cpr``, ``cdr``, ``severity``, ``price``
         (percentage of current balance), ``wal`` (years), ``writedown``
@@ -840,11 +989,52 @@ class ScenarioTable:
 
         Raises
         ------
+        ImportError
+            If ``pandas`` is not installed.
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be converted.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the evaluated cells as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per scenario cell with the columns documented on :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the result cannot be converted.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the evaluated cells as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per scenario cell with the columns documented on :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the result cannot be converted.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
 

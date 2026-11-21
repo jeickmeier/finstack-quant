@@ -1,11 +1,15 @@
 """
 Type stubs for ``finstack_quant.features.dataframe``.
 
-Pandas DataFrame convenience wrappers around the compiled feature
-transforms. Each helper selects columns (or index levels) from a DataFrame,
-forwards them to the corresponding :mod:`finstack_quant.features` entry
-point, and returns a ``pandas.Series`` aligned to the input index (or a
-``pandas.DataFrame`` for :func:`panel`).
+DataFrame convenience wrappers around the compiled feature transforms
+(pandas and Polars). Each helper selects columns (or pandas index levels) from
+a :class:`pandas.DataFrame` or :class:`polars.DataFrame`, forwards them to the
+corresponding :mod:`finstack_quant.features` entry point, and returns a
+``Series`` aligned to the input rows (or a ``DataFrame`` for :func:`panel`)
+using the same DataFrame library (pandas in -> pandas out; Polars in ->
+Polars out). Cross-sectional ``time_key`` and time-series ``order`` may be
+omitted when a pandas input uses a ``DatetimeIndex`` or a Polars input has a
+unique ``Date``/``Datetime`` column.
 
 Examples
 --------
@@ -18,6 +22,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from typing import Any
+
+import pandas as pd
+import polars as pl
 
 from . import (
     CrossSectionalOp as _CrossSectionalOp,
@@ -42,13 +49,13 @@ __all__ = [
 ]
 
 def cross_sectional(
-    df: Any,
+    df: pd.DataFrame | pl.DataFrame,
     value: str,
     time_key: KeySelector | None = None,
     *,
     op: str | _CrossSectionalOp,
     params: TransformParams | None = None,
-) -> Any:
+) -> pd.Series | pl.Series:
     """
     Transform a value column across entities within each timestamp partition.
 
@@ -57,13 +64,14 @@ def cross_sectional(
 
     Parameters
     ----------
-    df : pandas.DataFrame
+    df : pandas.DataFrame | polars.DataFrame
         Source DataFrame.
     value : str
-        Numeric column to transform; ``NaN``/``None`` entries are missing.
+        Numeric column to transform; ``NaN``/``None``/``null`` entries are missing.
     time_key : str or int, optional
-        Column, index level name, or integer index level position that
-        partitions the cross-section. Omit for a ``DatetimeIndex``.
+        Column, pandas index level name, or integer pandas index level position
+        that partitions the cross-section. Omit for a pandas ``DatetimeIndex``
+        or a unique Polars ``Date``/``Datetime`` column.
     op : str or CrossSectionalOp
         Cross-sectional operation name (required keyword-only).
     params : dict, optional
@@ -71,8 +79,9 @@ def cross_sectional(
 
     Returns
     -------
-    pandas.Series
-        Transformed values aligned to ``df.index``.
+    pandas.Series | polars.Series
+        Transformed values matching the input host library (aligned to
+        ``df.index`` for pandas, or a ``polars.Series`` named ``value``).
 
     Raises
     ------
@@ -95,14 +104,14 @@ def cross_sectional(
     ...
 
 def timeseries(
-    df: Any,
+    df: pd.DataFrame | pl.DataFrame,
     value: str,
     entity: KeySelector,
     order: KeySelector | None = None,
     *,
     op: str | _TimeSeriesOp,
     params: TransformParams | None = None,
-) -> Any:
+) -> pd.Series | pl.Series:
     """
     Transform a value column within each entity over time.
 
@@ -111,15 +120,16 @@ def timeseries(
 
     Parameters
     ----------
-    df : pandas.DataFrame
+    df : pandas.DataFrame | polars.DataFrame
         Source DataFrame.
     value : str
-        Numeric column to transform; ``NaN``/``None`` entries are missing.
+        Numeric column to transform; ``NaN``/``None``/``null`` entries are missing.
     entity : str or int
-        Column, index level name, or integer index level position naming
-        the entity key.
+        Column, pandas index level name, or integer pandas index level position
+        naming the entity key.
     order : str or int, optional
-        Sort key within each entity. Omit for a ``DatetimeIndex``.
+        Sort key within each entity. Omit for a pandas ``DatetimeIndex`` or a
+        unique Polars ``Date``/``Datetime`` column.
     op : str or TimeSeriesOp
         Time-series operation name (required keyword-only).
     params : dict, optional
@@ -127,8 +137,9 @@ def timeseries(
 
     Returns
     -------
-    pandas.Series
-        Transformed values aligned to ``df.index``.
+    pandas.Series | polars.Series
+        Transformed values matching the input host library (aligned to
+        ``df.index`` for pandas, or a ``polars.Series`` named ``value``).
 
     Raises
     ------
@@ -151,14 +162,14 @@ def timeseries(
     ...
 
 def panel(
-    df: Any,
+    df: pd.DataFrame | pl.DataFrame,
     value: str,
     operations: Sequence[Mapping[str, Any]],
     *,
     entity: str | None = None,
     order: str | None = None,
     time_key: str | None = None,
-) -> Any:
+) -> pd.DataFrame | pl.DataFrame:
     """
     Apply a JSON panel transform pipeline to a DataFrame value column.
 
@@ -168,7 +179,7 @@ def panel(
 
     Parameters
     ----------
-    df : pandas.DataFrame
+    df : pandas.DataFrame | polars.DataFrame
         Source DataFrame.
     value : str
         Numeric column shared by every operation.
@@ -182,15 +193,17 @@ def panel(
         ``family="timeseries"``.
     order : str, optional
         Sort key; Rust requires it for time-series operations. Defaults to
-        ``df.index`` when that is a ``DatetimeIndex``.
+        ``df.index`` when that is a pandas ``DatetimeIndex`` or a unique Polars
+        ``Date``/``Datetime`` column.
     time_key : str, optional
         Partition key; Rust requires it for cross-sectional operations.
-        Defaults to ``df.index`` when that is a ``DatetimeIndex``.
+        Defaults to ``df.index`` when that is a pandas ``DatetimeIndex`` or a
+        unique Polars ``Date``/``Datetime`` column.
 
     Returns
     -------
-    pandas.DataFrame
-        One column per operation name, aligned to ``df.index``.
+    pandas.DataFrame | polars.DataFrame
+        One column per operation name, matching the input host library.
 
     Raises
     ------
@@ -213,14 +226,14 @@ def panel(
     ...
 
 def grouped(
-    df: Any,
+    df: pd.DataFrame | pl.DataFrame,
     value: str,
     time_key: KeySelector | None = None,
     *,
     groups: KeySelector,
     op: str | _CrossSectionalOp,
     params: TransformParams | None = None,
-) -> Any:
+) -> pd.Series | pl.Series:
     """
     Transform a value column within each timestamp/group sub-partition.
 
@@ -230,12 +243,13 @@ def grouped(
 
     Parameters
     ----------
-    df : pandas.DataFrame
+    df : pandas.DataFrame | polars.DataFrame
         Source DataFrame.
     value : str
-        Numeric column to transform; ``NaN``/``None`` entries are missing.
+        Numeric column to transform; ``NaN``/``None``/``null`` entries are missing.
     time_key : str or int, optional
-        Timestamp partition key. Omit for a ``DatetimeIndex``.
+        Timestamp partition key. Omit for a pandas ``DatetimeIndex`` or a
+        unique Polars ``Date``/``Datetime`` column.
     groups : str or int
         Group key forming the sub-partition (required keyword-only).
     op : str or CrossSectionalOp
@@ -245,8 +259,9 @@ def grouped(
 
     Returns
     -------
-    pandas.Series
-        Transformed values aligned to ``df.index``.
+    pandas.Series | polars.Series
+        Transformed values matching the input host library (aligned to
+        ``df.index`` for pandas, or a ``polars.Series`` named ``value``).
 
     Raises
     ------
@@ -273,13 +288,13 @@ def grouped(
     ...
 
 def neutralize(
-    df: Any,
+    df: pd.DataFrame | pl.DataFrame,
     value: str,
     time_key: KeySelector | None = None,
     *,
     exposures: Sequence[str],
     params: TransformParams | None = None,
-) -> Any:
+) -> pd.Series | pl.Series:
     """
     Return cross-sectional OLS residuals for a DataFrame signal column.
 
@@ -288,12 +303,13 @@ def neutralize(
 
     Parameters
     ----------
-    df : pandas.DataFrame
+    df : pandas.DataFrame | polars.DataFrame
         Source DataFrame.
     value : str
         Signal column to neutralize.
     time_key : str or int, optional
-        Cross-section partition key. Omit for a ``DatetimeIndex``.
+        Cross-section partition key. Omit for a pandas ``DatetimeIndex`` or a
+        unique Polars ``Date``/``Datetime`` column.
     exposures : Sequence[str]
         Exposure columns regressed against ``value`` (required keyword-only).
     params : dict, optional
@@ -301,8 +317,8 @@ def neutralize(
 
     Returns
     -------
-    pandas.Series
-        Residualized signal aligned to ``df.index``.
+    pandas.Series | polars.Series
+        Residualized signal matching the input host library.
 
     Raises
     ------
@@ -329,7 +345,7 @@ def neutralize(
     ...
 
 def pairwise(
-    df: Any,
+    df: pd.DataFrame | pl.DataFrame,
     value: str,
     other: str,
     entity: KeySelector,
@@ -337,7 +353,7 @@ def pairwise(
     *,
     op: str | _PairwiseOp,
     params: TransformParams | None = None,
-) -> Any:
+) -> pd.Series | pl.Series:
     """
     Transform two value columns per entity with a rolling pairwise operation.
 
@@ -347,7 +363,7 @@ def pairwise(
 
     Parameters
     ----------
-    df : pandas.DataFrame
+    df : pandas.DataFrame | polars.DataFrame
         Source DataFrame.
     value : str
         First numeric column.
@@ -356,7 +372,8 @@ def pairwise(
     entity : str or int
         Entity key.
     order : str or int, optional
-        Sort key within each entity. Omit for a ``DatetimeIndex``.
+        Sort key within each entity. Omit for a pandas ``DatetimeIndex`` or a
+        unique Polars ``Date``/``Datetime`` column.
     op : str or PairwiseOp
         Pairwise operation name (required keyword-only).
     params : dict, optional
@@ -364,8 +381,8 @@ def pairwise(
 
     Returns
     -------
-    pandas.Series
-        Pairwise-transformed values aligned to ``df.index``.
+    pandas.Series | polars.Series
+        Pairwise-transformed values matching the input host library.
 
     Raises
     ------
@@ -402,13 +419,13 @@ def pairwise(
     ...
 
 def rolling_regression_residual(
-    df: Any,
+    df: pd.DataFrame | pl.DataFrame,
     value: str,
     exposures: Sequence[str],
     entity: KeySelector,
     order: KeySelector | None = None,
     params: TransformParams | None = None,
-) -> Any:
+) -> pd.Series | pl.Series:
     """
     Return rolling per-entity OLS residuals for a DataFrame signal column.
 
@@ -418,7 +435,7 @@ def rolling_regression_residual(
 
     Parameters
     ----------
-    df : pandas.DataFrame
+    df : pandas.DataFrame | polars.DataFrame
         Source DataFrame.
     value : str
         Signal column.
@@ -427,15 +444,16 @@ def rolling_regression_residual(
     entity : str or int
         Entity key.
     order : str or int, optional
-        Sort key within each entity. Omit for a ``DatetimeIndex``.
+        Sort key within each entity. Omit for a pandas ``DatetimeIndex`` or a
+        unique Polars ``Date``/``Datetime`` column.
     params : dict, optional
         Row-window parameters: positive ``window`` and ``min_periods`` complete
         rows, with ``min_periods <= window``; ``fit_intercept`` defaults to true.
 
     Returns
     -------
-    pandas.Series
-        Rolling residuals aligned to ``df.index``.
+    pandas.Series | polars.Series
+        Rolling residuals matching the input host library.
 
     Raises
     ------
@@ -464,12 +482,12 @@ def rolling_regression_residual(
     ...
 
 def risk_scaled_weights(
-    df: Any,
+    df: pd.DataFrame | pl.DataFrame,
     value: str,
     time_key: KeySelector | None = None,
     *,
     volatility: str,
-) -> Any:
+) -> pd.Series | pl.Series:
     """
     Convert a DataFrame signal column to inverse-risk-scaled weights.
 
@@ -479,12 +497,13 @@ def risk_scaled_weights(
 
     Parameters
     ----------
-    df : pandas.DataFrame
+    df : pandas.DataFrame | polars.DataFrame
         Source DataFrame.
     value : str
         Signal column.
     time_key : str or int, optional
-        Cross-section partition key. Omit for a ``DatetimeIndex``.
+        Cross-section partition key. Omit for a pandas ``DatetimeIndex`` or a
+        unique Polars ``Date``/``Datetime`` column.
     volatility : str
         Nonnegative volatility column in common units and horizon (required).
         Zero, missing, and non-finite estimates produce missing weights;
@@ -492,8 +511,8 @@ def risk_scaled_weights(
 
     Returns
     -------
-    pandas.Series
-        Gross-normalized weights aligned to ``df.index``.
+    pandas.Series | polars.Series
+        Gross-normalized weights matching the input host library.
 
     Raises
     ------
@@ -520,10 +539,10 @@ def risk_scaled_weights(
     ...
 
 def rank_to_weights(
-    df: Any,
+    df: pd.DataFrame | pl.DataFrame,
     value: str,
     time_key: KeySelector | None = None,
-) -> Any:
+) -> pd.Series | pl.Series:
     """
     Convert DataFrame signal ranks to gross-normalized long/short weights.
 
@@ -532,17 +551,18 @@ def rank_to_weights(
 
     Parameters
     ----------
-    df : pandas.DataFrame
+    df : pandas.DataFrame | polars.DataFrame
         Source DataFrame.
     value : str
         Signal column.
     time_key : str or int, optional
-        Cross-section partition key. Omit for a ``DatetimeIndex``.
+        Cross-section partition key. Omit for a pandas ``DatetimeIndex`` or a
+        unique Polars ``Date``/``Datetime`` column.
 
     Returns
     -------
-    pandas.Series
-        Long/short weights aligned to ``df.index``.
+    pandas.Series | polars.Series
+        Long/short weights matching the input host library.
 
     Raises
     ------
@@ -563,12 +583,12 @@ def rank_to_weights(
     ...
 
 def neutralize_and_zscore(
-    df: Any,
+    df: pd.DataFrame | pl.DataFrame,
     value: str,
     time_key: KeySelector | None = None,
     *,
     exposures: Sequence[str],
-) -> Any:
+) -> pd.Series | pl.Series:
     """
     Neutralize a DataFrame signal column against exposures, then z-score.
 
@@ -578,19 +598,20 @@ def neutralize_and_zscore(
 
     Parameters
     ----------
-    df : pandas.DataFrame
+    df : pandas.DataFrame | polars.DataFrame
         Source DataFrame.
     value : str
         Signal column.
     time_key : str or int, optional
-        Cross-section partition key. Omit for a ``DatetimeIndex``.
+        Cross-section partition key. Omit for a pandas ``DatetimeIndex`` or a
+        unique Polars ``Date``/``Datetime`` column.
     exposures : Sequence[str]
         Exposure columns regressed against ``value`` (required keyword-only).
 
     Returns
     -------
-    pandas.Series
-        Z-scored residual signal aligned to ``df.index``.
+    pandas.Series | polars.Series
+        Z-scored residual signal matching the input host library.
 
     Raises
     ------

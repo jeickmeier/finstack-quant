@@ -9,6 +9,7 @@ import pickle
 import pandas as pd
 import pytest
 
+from finstack_quant.core.table import LabeledSeries
 from finstack_quant.statements import ModelBuilder
 from finstack_quant.statements_analytics import (
     Exposure,
@@ -39,9 +40,13 @@ def test_zero_forecast_metrics_round_trip_through_json_and_pickle() -> None:
     assert ForecastMetrics.from_json(result.to_json()) == result
     assert pickle.loads(pickle.dumps(result)) == result  # noqa: S301 - trusted in-process round trip
     series = result.to_series()
-    assert isinstance(series, pd.Series)
-    assert pd.isna(series["mape"])
-    assert pd.isna(series["smape"])
+    assert isinstance(series, LabeledSeries)
+    assert series["mape"] is None
+    assert series["smape"] is None
+    pd_series = series.to_pandas()
+    assert isinstance(pd_series, pd.Series)
+    assert pd.isna(pd_series["mape"])
+    assert pd.isna(pd_series["smape"])
 
 
 def test_zero_actual_preserves_available_symmetric_percentage() -> None:

@@ -5,9 +5,11 @@ from __future__ import annotations
 import datetime
 from typing import Any
 from finstack_quant.core.dates import FiscalConfig
+from finstack_quant.core.table import ArrowTable, LabeledSeries
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import polars as pl
 
 # Value-object results
 
@@ -321,61 +323,97 @@ class PeriodStats:
         This accessor returns stored validated state and does not raise.
         """
 
-    def to_series(self) -> pd.Series:
+    def to_series(self) -> LabeledSeries:
         """
-        The twelve statistics as a ``pandas.Series`` named ``period_stats``.
+        The fifteen period statistics as a :class:`~finstack_quant.core.table.LabeledSeries` named ``period_stats``.
 
         Returns
         -------
-        pd.Series
-            Indexed by statistic name (``best``, ``worst``,
-            ``consecutive_wins``, ``consecutive_losses``, ``win_rate``,
+        LabeledSeries
+            Indexed by statistic name (``n_obs``, ``wins``, ``losses``, ``best``,
+            ``worst``, ``consecutive_wins``, ``consecutive_losses``, ``win_rate``,
             ``avg_return``, ``avg_win``, ``avg_loss``, ``payoff_ratio``,
-            ``profit_factor``, ``cpc_index``, ``kelly_risk_fraction``); streak
-            counts are cast to ``float``.
+            ``profit_factor``, ``cpc_index``, ``kelly_risk_fraction``); observation
+            and streak counts are cast to ``float``.
 
         Raises
         ------
         ValueError
-            If the values cannot be wrapped as a labelled pandas object.
+            If the labels and statistic values cannot be assembled as a series.
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        The twelve statistics as a single-row ``pandas.DataFrame``.
+        Export the fifteen period statistics as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Single-row Arrow table with integer count/streak columns and
+            ``Float64`` ratio and return statistics in :attr:`to_series` order.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the fifteen period statistics as a single-row ``pandas.DataFrame``.
 
         Returns
         -------
         pd.DataFrame
             One row, columns in :meth:`to_series` order; stack tickers with
             ``pd.concat``. Non-finite ratios remain native ``NaN`` / ``inf``
-            in ``float64`` columns; streak counts remain integers.
+            in ``float64`` columns; count and streak columns remain integers.
 
         Raises
         ------
-        ValueError
-            If the result cannot be represented as a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
-    def __repr__(self) -> str: ...
-    def _repr_html_(self) -> str | None:
+    def to_polars(self) -> pl.DataFrame:
         """
-        HTML table for Jupyter, rendered from :meth:`to_dataframe`.
+        Export the fifteen period statistics as a single-row ``polars.DataFrame``.
 
         Returns
         -------
-        str or None
-            pandas HTML markup, or ``None`` when the frame cannot be built
-            (IPython then falls back to ``__repr__``).
+        pl.DataFrame
+            One-row Polars DataFrame constructed via the Arrow PyCapsule interface.
 
-        Notes
-        -----
-        This method does not raise; failures degrade to ``None``.
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
         """
         ...
 
+    def to_pyarrow(self) -> Any:
+        """
+        Export the fifteen period statistics as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy PyArrow table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def __repr__(self) -> str: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
 
@@ -566,7 +604,24 @@ class BetaResult:
         This accessor does not raise; it returns the stored value.
         """
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export the beta point estimate and confidence interval as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Single-row Arrow table with ``beta``, ``std_err``, ``ci_lower``,
+            ``ci_upper``, ``n_obs`` (``Int64``), and ``confidence_level``.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export as a single-row pandas DataFrame.
 
@@ -575,7 +630,7 @@ class BetaResult:
         the bounds).
 
         One flat record describes one regression, so a one-row frame is the
-        right shape: ``pd.concat([r.to_dataframe() for r in results])`` stacks
+        right shape: ``pd.concat([r.to_pandas() for r in results])`` stacks
         every ticker's beta into one comparison table without reshaping.
 
         Undefined estimates from a degenerate regression remain ``NaN``
@@ -588,28 +643,47 @@ class BetaResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be represented as a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
-    def __repr__(self) -> str: ...
-    def _repr_html_(self) -> str | None:
+    def to_polars(self) -> pl.DataFrame:
         """
-        HTML table for Jupyter, rendered from :meth:`to_dataframe`.
+        Export as a single-row Polars DataFrame via Arrow PyCapsule interchange.
 
         Returns
         -------
-        str or None
-            pandas HTML markup, or ``None`` when the frame cannot be built
-            (IPython then falls back to ``__repr__``).
+        pl.DataFrame
+            Single-row Polars DataFrame matching :meth:`to_arrow`.
 
-        Notes
-        -----
-        This method does not raise; failures degrade to ``None``.
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
         """
         ...
 
+    def to_pyarrow(self) -> Any:
+        """
+        Export as a single-row ``pyarrow.Table`` via Arrow PyCapsule interchange.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row PyArrow table matching :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def __repr__(self) -> str: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
 
@@ -781,7 +855,24 @@ class GreeksResult:
         This accessor does not raise; it returns the stored value.
         """
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export alpha, beta, and fit statistics as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Single-row Arrow table with ``alpha``, ``beta``, ``r_squared``,
+            ``adjusted_r_squared``, and ``n_obs`` (``Int64``).
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export as a single-row pandas DataFrame.
 
@@ -789,7 +880,7 @@ class GreeksResult:
         ``n_obs`` (``int64`` observation count).
 
         One flat record describes one regression, so a one-row frame is the
-        right shape: ``pd.concat([r.to_dataframe() for r in results])`` stacks
+        right shape: ``pd.concat([r.to_pandas() for r in results])`` stacks
         every ticker's greeks into one comparison table without reshaping.
 
         Undefined estimates from a degenerate fit remain ``NaN`` in numeric
@@ -802,28 +893,47 @@ class GreeksResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be represented as a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
-    def __repr__(self) -> str: ...
-    def _repr_html_(self) -> str | None:
+    def to_polars(self) -> pl.DataFrame:
         """
-        HTML table for Jupyter, rendered from :meth:`to_dataframe`.
+        Export as a single-row Polars DataFrame via Arrow PyCapsule interchange.
 
         Returns
         -------
-        str or None
-            pandas HTML markup, or ``None`` when the frame cannot be built
-            (IPython then falls back to ``__repr__``).
+        pl.DataFrame
+            Single-row Polars DataFrame matching :meth:`to_arrow`.
 
-        Notes
-        -----
-        This method does not raise; failures degrade to ``None``.
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
         """
         ...
 
+    def to_pyarrow(self) -> Any:
+        """
+        Export as a single-row ``pyarrow.Table`` via Arrow PyCapsule interchange.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row PyArrow table matching :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def __repr__(self) -> str: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
 
@@ -965,40 +1075,75 @@ class RollingGreeks:
         This accessor does not raise; it returns the stored value.
         """
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Convert to a pandas DataFrame with a ``DatetimeIndex`` and ``alpha`` /
-        ``beta`` columns.
+        Export rolling regression estimates as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pd.DataFrame
-            DataFrame with columns ``alpha`` and ``beta``, indexed by date.
+        ArrowTable
+            Table with ``date`` (``Date32``), ``alpha`` (``Float64``), and
+            ``beta`` (``Float64``) columns.
 
         Raises
         ------
         ValueError
-            If the result cannot be represented as a pandas object.
+            If the underlying Arrow record batch cannot be built.
         """
         ...
 
-    def __repr__(self) -> str: ...
-    def _repr_html_(self) -> str | None:
+    def to_pandas(self) -> pd.DataFrame:
         """
-        HTML table for Jupyter, rendered from :meth:`to_dataframe`.
+        Convert to a pandas DataFrame indexed by ``date`` with ``alpha`` and ``beta`` columns.
 
         Returns
         -------
-        str or None
-            pandas HTML markup, or ``None`` when the frame cannot be built
-            (IPython then falls back to ``__repr__``).
+        pd.DataFrame
+            DataFrame with columns ``alpha`` and ``beta``, indexed by ``date``.
 
-        Notes
-        -----
-        This method does not raise; failures degrade to ``None``.
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Convert to a Polars DataFrame with ``date``, ``alpha``, and ``beta`` columns.
+
+        Returns
+        -------
+        pl.DataFrame
+            Polars DataFrame constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Convert to a ``pyarrow.Table`` with ``date``, ``alpha``, and ``beta`` columns.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy PyArrow table constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def __repr__(self) -> str: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
 
@@ -1188,7 +1333,32 @@ class MultiFactorResult:
         This accessor does not raise; it returns the stored value.
         """
 
-    def to_dataframe(self, factor_names: list[str] | None = None) -> pd.DataFrame:
+    def to_arrow(self, factor_names: list[str] | None = None) -> ArrowTable:
+        """
+        Export the factor loadings as an :class:`~finstack_quant.core.table.ArrowTable`, one row per factor.
+
+        Parameters
+        ----------
+        factor_names : list[str], optional
+            Labels for the ``factor`` column, positionally aligned with
+            :attr:`betas`. Defaults to ``factor_0``, ``factor_1``, ... because
+            the regression itself carries no names.
+
+        Returns
+        -------
+        ArrowTable
+            Table with ``factor``, ``beta``, ``alpha``, ``r_squared``,
+            ``adjusted_r_squared``, ``residual_vol``, and ``n_obs``.
+
+        Raises
+        ------
+        ValueError
+            If ``factor_names`` is supplied and its length differs from the
+            number of fitted betas.
+        """
+        ...
+
+    def to_pandas(self, factor_names: list[str] | None = None) -> pd.DataFrame:
         """
         Export the factor loadings as a pandas DataFrame, one row per factor.
 
@@ -1222,26 +1392,67 @@ class MultiFactorResult:
         ValueError
             If ``factor_names`` is supplied and its length differs from the
             number of fitted betas.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
-    def __repr__(self) -> str: ...
-    def _repr_html_(self) -> str | None:
+    def to_polars(self, factor_names: list[str] | None = None) -> pl.DataFrame:
         """
-        HTML table for Jupyter, rendered from :meth:`to_dataframe`.
+        Export the factor loadings as a Polars DataFrame, one row per factor.
+
+        Parameters
+        ----------
+        factor_names : list[str], optional
+            Labels for the ``factor`` column, positionally aligned with
+            :attr:`betas`. Defaults to ``factor_0``, ``factor_1``, ... because
+            the regression itself carries no names.
 
         Returns
         -------
-        str or None
-            pandas HTML markup, or ``None`` when the frame cannot be built
-            (IPython then falls back to ``__repr__``).
+        pl.DataFrame
+            One row per fitted factor constructed via Arrow PyCapsule interchange.
 
-        Notes
-        -----
-        This method does not raise; failures degrade to ``None``.
+        Raises
+        ------
+        ValueError
+            If ``factor_names`` is supplied and its length differs from the
+            number of fitted betas.
+        ImportError
+            If ``polars`` is not installed.
         """
         ...
 
+    def to_pyarrow(self, factor_names: list[str] | None = None) -> Any:
+        """
+        Export the factor loadings as a ``pyarrow.Table``, one row per factor.
+
+        Parameters
+        ----------
+        factor_names : list[str], optional
+            Labels for the ``factor`` column, positionally aligned with
+            :attr:`betas`. Defaults to ``factor_0``, ``factor_1``, ... because
+            the regression itself carries no names.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy PyArrow table with one row per fitted factor.
+
+        Raises
+        ------
+        ValueError
+            If ``factor_names`` is supplied and its length differs from the
+            number of fitted betas.
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def __repr__(self) -> str: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
 
@@ -1414,41 +1625,77 @@ class DrawdownEpisode:
         This accessor does not raise; it returns the stored value.
         """
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export the drawdown episode summary as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Single-row Arrow table with ``start``, ``valley``, ``end``
+            (nullable ``Date32``), ``duration_days`` (``Int64``), and ``max_drawdown``.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export as a single-row ``pandas.DataFrame``.
 
         Returns
         -------
         pd.DataFrame
-            Columns ``start``, ``valley``, ``end`` (``datetime64``; ``NaT``
-            while still in drawdown), ``duration_days`` and ``max_drawdown``. Stack
-            episodes with ``pd.concat([ep.to_dataframe() for ep in episodes])``.
+            Columns ``start``, ``valley``, ``end`` (dates; ``None`` while still
+            in drawdown), ``duration_days`` (``int64``) and ``max_drawdown``. Stack
+            episodes with ``pd.concat([ep.to_pandas() for ep in episodes])``.
 
         Raises
         ------
-        ValueError
-            If the result cannot be represented as a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
-    def __repr__(self) -> str: ...
-    def _repr_html_(self) -> str | None:
+    def to_polars(self) -> pl.DataFrame:
         """
-        HTML table for Jupyter, rendered from :meth:`to_dataframe`.
+        Export as a single-row ``polars.DataFrame`` via Arrow PyCapsule interchange.
 
         Returns
         -------
-        str or None
-            pandas HTML markup, or ``None`` when the frame cannot be built
-            (IPython then falls back to ``__repr__``).
+        pl.DataFrame
+            Single-row Polars DataFrame matching :meth:`to_arrow`.
 
-        Notes
-        -----
-        This method does not raise; failures degrade to ``None``.
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
         """
         ...
 
+    def to_pyarrow(self) -> Any:
+        """
+        Export as a single-row ``pyarrow.Table`` via Arrow PyCapsule interchange.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row PyArrow table matching :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def __repr__(self) -> str: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
 
@@ -1719,7 +1966,24 @@ class LookbackReturns:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export per-ticker lookback returns as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Table with ``ticker`` followed by ``mtd``, ``qtd``, ``ytd``, and
+            ``fytd`` ``Float64`` columns.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Convert to a pandas DataFrame indexed by :attr:`ticker_names`.
 
@@ -1733,28 +1997,47 @@ class LookbackReturns:
 
         Raises
         ------
-        ValueError
-            If the result cannot be represented as a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
-    def __repr__(self) -> str: ...
-    def _repr_html_(self) -> str | None:
+    def to_polars(self) -> pl.DataFrame:
         """
-        HTML table for Jupyter, rendered from :meth:`to_dataframe`.
+        Convert to a Polars DataFrame with explicit ``ticker`` and return columns.
 
         Returns
         -------
-        str or None
-            pandas HTML markup, or ``None`` when the frame cannot be built
-            (IPython then falls back to ``__repr__``).
+        pl.DataFrame
+            DataFrame with ``ticker``, ``mtd``, ``qtd``, ``ytd``, and ``fytd``.
 
-        Notes
-        -----
-        This method does not raise; failures degrade to ``None``.
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
         """
         ...
 
+    def to_pyarrow(self) -> Any:
+        """
+        Convert to a ``pyarrow.Table`` via Arrow PyCapsule interchange.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy PyArrow table matching :meth:`to_arrow`.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def __repr__(self) -> str: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
 
@@ -1884,8 +2167,7 @@ class DatedSeries:
     @property
     def value_column(self) -> str:
         """
-        Metric name of the series, also the column name used by
-        :meth:`to_dataframe`.
+        Metric name of the series, also the column name used by table exports.
 
         Returns
         -------
@@ -1898,9 +2180,26 @@ class DatedSeries:
         This accessor does not raise; it returns the stored value.
         """
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Convert to a pandas DataFrame with a ``DatetimeIndex`` and a value column.
+        Export the dated rolling series as a two-column :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Table with ``date`` (``Date32``) and :attr:`value_column`
+            (``Float64``) columns.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Convert to a pandas DataFrame indexed by ``date`` with a value column.
 
         The column is named after :attr:`value_column` (e.g. ``sharpe``,
         ``sortino``, ``volatility``, or ``return``).
@@ -1913,28 +2212,47 @@ class DatedSeries:
 
         Raises
         ------
-        ValueError
-            If the result cannot be represented as a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
-    def __repr__(self) -> str: ...
-    def _repr_html_(self) -> str | None:
+    def to_polars(self) -> pl.DataFrame:
         """
-        HTML table for Jupyter, rendered from :meth:`to_dataframe`.
+        Convert to a two-column Polars DataFrame (``date`` and :attr:`value_column`).
 
         Returns
         -------
-        str or None
-            pandas HTML markup, or ``None`` when the frame cannot be built
-            (IPython then falls back to ``__repr__``).
+        pl.DataFrame
+            DataFrame constructed via the Arrow PyCapsule interface.
 
-        Notes
-        -----
-        This method does not raise; failures degrade to ``None``.
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
         """
         ...
 
+    def to_pyarrow(self) -> Any:
+        """
+        Convert to a ``pyarrow.Table`` (``date`` and :attr:`value_column`).
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy PyArrow table constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def __repr__(self) -> str: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
 
@@ -2253,7 +2571,24 @@ class CorrelationResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export the correlation matrix as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Table with ``ticker`` (``Utf8``) followed by one ``Float64`` column
+            per ticker in :attr:`tickers` order.
+
+        Raises
+        ------
+        ValueError
+            If the stored matrix dimensions are inconsistent with :attr:`tickers`.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export the correlation matrix as a square ``pandas.DataFrame`` indexed and columned by :attr:`tickers`.
 
@@ -2268,28 +2603,52 @@ class CorrelationResult:
         Raises
         ------
         ValueError
-            If the stored matrix dimensions are inconsistent with :attr:`tickers`
-            or the result cannot be represented as a pandas object.
+            If the stored matrix dimensions are inconsistent with :attr:`tickers`.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
-    def __repr__(self) -> str: ...
-    def _repr_html_(self) -> str | None:
+    def to_polars(self) -> pl.DataFrame:
         """
-        HTML table for Jupyter, rendered from :meth:`to_dataframe`.
+        Export the correlation matrix as a ``polars.DataFrame`` with explicit ``ticker`` column.
 
         Returns
         -------
-        str or None
-            pandas HTML markup, or ``None`` when the frame cannot be built
-            (IPython then falls back to ``__repr__``).
+        pl.DataFrame
+            Polars DataFrame with ``ticker`` and one column per ticker.
 
-        Notes
-        -----
-        This method does not raise; failures degrade to ``None``.
+        Raises
+        ------
+        ValueError
+            If the stored matrix dimensions are inconsistent with :attr:`tickers`.
+        ImportError
+            If ``polars`` is not installed.
         """
         ...
 
+    def to_pyarrow(self) -> Any:
+        """
+        Export the correlation matrix as a ``pyarrow.Table`` via Arrow PyCapsule interchange.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy PyArrow table matching :meth:`to_arrow`.
+
+        Raises
+        ------
+        ValueError
+            If the stored matrix dimensions are inconsistent with :attr:`tickers`.
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def __repr__(self) -> str: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """
         Support pickle through canonical JSON restoration.

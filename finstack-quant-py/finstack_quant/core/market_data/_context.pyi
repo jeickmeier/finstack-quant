@@ -5,8 +5,10 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any, Optional, Union
 import pandas as pd
+import polars as pl
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.core.market_data import DateLike
 from finstack_quant.core.market_data._curves.credit import BaseCorrelationCurve, CreditIndexData
 from finstack_quant.core.market_data._curves.discount import DiscountCurve
@@ -122,7 +124,24 @@ class ConvertedMoney:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Columns ``amount`` (float), ``currency`` (ISO code), nullable
+            ``rate`` and nullable ``triangulated``.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Export as a single-row pandas DataFrame.
 
@@ -134,11 +153,45 @@ class ConvertedMoney:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export as a single-row ``polars.DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            Single-row Polars DataFrame constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
     def __eq__(self, other: object) -> bool: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...

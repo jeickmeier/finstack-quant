@@ -2,6 +2,9 @@
 
 use pyo3::prelude::*;
 
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::table_builders::TableBuilder;
+use crate::errors::value_error;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::PoolStats;
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_stats", "PoolStats")]
@@ -25,30 +28,8 @@ crate::bindings::macros::wire_methods!(
     to_dict
 );
 
-/// Column order of [`PyPoolStats::to_dataframe`] (the serde field order).
-const POOL_STATS_COLUMNS: &[&str] = &[
-    "wac",
-    "weighted_avg_spread_bp",
-    "weighted_avg_maturity",
-    "diversity_score",
-    "num_obligors",
-    "num_industries",
-    "defaulted_balance_pct",
-    "undrawn_commitment",
-];
-
 #[pymethods]
 impl PyPoolStats {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_stats", "PoolStats.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &self.inner,
-            POOL_STATS_COLUMNS,
-        )
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -60,6 +41,40 @@ impl PyPoolStats {
         )
     }
 }
+
+impl PyPoolStats {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let num_obligors = i64::try_from(self.inner.num_obligors)
+            .map_err(|_| value_error("num_obligors overflows i64"))?;
+        let num_industries = i64::try_from(self.inner.num_industries)
+            .map_err(|_| value_error("num_industries overflows i64"))?;
+        TableBuilder::new()
+            .nullable_f64("wac", vec![self.inner.wac])?
+            .nullable_f64(
+                "weighted_avg_spread_bp",
+                vec![self.inner.weighted_avg_spread_bp],
+            )?
+            .nullable_f64(
+                "weighted_avg_maturity",
+                vec![self.inner.weighted_avg_maturity],
+            )?
+            .nullable_f64("diversity_score", vec![self.inner.diversity_score])?
+            .i64("num_obligors", vec![num_obligors])?
+            .i64("num_industries", vec![num_industries])?
+            .f64(
+                "defaulted_balance_pct",
+                vec![self.inner.defaulted_balance_pct],
+            )?
+            .f64("undrawn_commitment", vec![self.inner.undrawn_commitment])?
+            .build()
+    }
+}
+
+crate::bindings::macros::tabular_methods!(
+    PyPoolStats,
+    "PoolStats",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.pool_stats"
+);
 
 crate::bindings::macros::py_getters!(PyPoolStats |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_stats", "PoolStats.wac")]

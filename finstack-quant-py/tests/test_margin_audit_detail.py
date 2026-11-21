@@ -67,7 +67,7 @@ def test_vm_result_exposes_every_step_of_the_call(
     assert result.unrounded_call == pytest.approx(expected_unrounded)
     assert result.collect_amount - result.post_amount == pytest.approx(expected_call)
 
-    row = result.to_dataframe().iloc[0]
+    row = result.to_pandas().iloc[0]
     for column in ("threshold", "independent_amount", "collateral_balance", "unrounded_call", "mta"):
         assert row[column] == pytest.approx(getattr(result, column))
     assert row["rounding_increment"] == pytest.approx(result.rounding_increment)

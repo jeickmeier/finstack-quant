@@ -8,19 +8,26 @@
 //! - [`PyCorkscrewExtension`] — execution entry point against a model + statement results.
 //! - [`PyCorkscrewReport`] — validation report (status, message, structured data, warnings, errors).
 
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
-    serde_rows_to_dataframe_with_schema,
-};
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::display_to_py;
 use finstack_quant_statements_analytics::extensions as rust_corkscrew;
 use pyo3::prelude::*;
 
-/// Column schema for [`PyCorkscrewReport::to_validations_dataframe`].
-const VALIDATION_COLUMNS: [ColumnSchema<'static>; 5] = [
+/// Column schema for [`PyCorkscrewReport`] summary tabular exports.
+const SUMMARY_COLUMNS: [(&str, &str); 5] = [
+    ("status", "str"),
+    ("message", "str"),
+    ("account_count", "int64"),
+    ("warning_count", "int64"),
+    ("error_count", "int64"),
+];
+
+/// Column schema for [`PyCorkscrewReport::to_validations_table`].
+const VALIDATION_COLUMNS: [(&str, &str); 5] = [
     ("account", "str"),
     ("type", "str"),
     ("periods_validated", "int64"),
@@ -299,7 +306,7 @@ impl PyCorkscrewReport {
     /// Structured data payload as a dict (per-account validations).
     #[getter]
     fn data<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.data)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.data)
     }
 
     /// Return the structured data payload as a JSON string (the wire form of
@@ -308,30 +315,7 @@ impl PyCorkscrewReport {
         serde_json::to_string(&self.inner.data).map_err(display_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.statements_analytics._corkscrew", "CorkscrewReport.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let row = serde_json::json!({
-            "status": self.status()?,
-            "message": self.inner.message,
-            "account_count": self.validations().len(),
-            "warning_count": self.inner.warnings.len(),
-            "error_count": self.inner.errors.len(),
-        });
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &[
-                "status",
-                "message",
-                "account_count",
-                "warning_count",
-                "error_count",
-            ],
-        )
-    }
-
-    /// Export the per-account roll-forward validations as a pandas
-    /// ``DataFrame``.
+    /// Export the per-account roll-forward validations as an ``ArrowTable``.
     ///
     /// Columns: ``account``, ``type``, ``periods_validated``, ``max_error``,
     /// ``is_valid``. One row per validated account, in configured order; a
@@ -342,8 +326,8 @@ impl PyCorkscrewReport {
     /// ``max_error`` is the largest absolute roll-forward break across those
     /// periods, in the balance node's own units. ``is_valid`` is ``False``
     /// when ``max_error`` exceeded the configured tolerance.
-    fn to_validations_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(py, &self.validations(), &VALIDATION_COLUMNS)
+    fn to_validations_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.validations(), &VALIDATION_COLUMNS)
     }
 
     fn __repr__(&self) -> PyResult<String> {
@@ -361,13 +345,23 @@ wire_methods!(
     rust_corkscrew::CorkscrewReport,
     "CorkscrewReport"
 );
-impl_repr_html_via_dataframe!(PyCorkscrewReport);
 
 impl PyCorkscrewReport {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let row = serde_json::json!({
+            "status": self.status()?,
+            "message": self.inner.message,
+            "account_count": self.validations().len(),
+            "warning_count": self.inner.warnings.len(),
+            "error_count": self.inner.errors.len(),
+        });
+        serde_rows_to_arrow_table(&[row], &SUMMARY_COLUMNS)
+    }
+
     /// Per-account validation records from the structured `data` payload.
     ///
     /// An absent or non-array `validations` entry yields an empty slice, so
-    /// the DataFrame builders degrade to a zero-row frame rather than raising.
+    /// the table builders degrade to a zero-row table rather than raising.
     fn validations(&self) -> Vec<serde_json::Value> {
         self.inner
             .data
@@ -377,6 +371,12 @@ impl PyCorkscrewReport {
             .unwrap_or_default()
     }
 }
+
+tabular_methods!(
+    PyCorkscrewReport,
+    "CorkscrewReport",
+    module = "finstack_quant.statements_analytics._corkscrew"
+);
 
 /// Corkscrew extension for balance-sheet roll-forward validation.
 #[pyclass(

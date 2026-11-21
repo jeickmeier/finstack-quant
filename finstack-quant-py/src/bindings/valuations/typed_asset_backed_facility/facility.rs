@@ -10,7 +10,7 @@ use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
-use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::valuations::convert::{
     attributes_from_py, day_count_from_py, money_from_py, money_to_py,
 };
@@ -335,15 +335,6 @@ impl PyFacilityProjection {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "FacilityProjection.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::core::table::envelope_to_pandas(
-            py,
-            &self.inner.to_table().map_err(crate::errors::core_to_py)?,
-        )
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -355,6 +346,19 @@ impl PyFacilityProjection {
         )
     }
 }
+
+impl PyFacilityProjection {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<crate::bindings::core::table::PyArrowTable> {
+        let table = self.inner.to_table().map_err(core_to_py)?;
+        crate::bindings::core::table::PyArrowTable::from_envelope(&table)
+    }
+}
+
+crate::bindings::macros::tabular_methods!(
+    PyFacilityProjection,
+    "FacilityProjection",
+    module = "finstack_quant.valuations.instruments._typed_asset_backed_facility.facility"
+);
 
 crate::bindings::macros::py_getters!(PyFacilityProjection |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_asset_backed_facility.facility", "FacilityProjection.facility")]

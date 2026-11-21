@@ -6,9 +6,11 @@ from collections.abc import Sequence
 from decimal import Decimal
 from datetime import date
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 
 from typing import Any, Literal, ClassVar, NotRequired, TypedDict
 import pandas as pd
+import polars as pl
 
 class EclBucket:
     """
@@ -188,9 +190,9 @@ class EclResult:
         Any
             Result metadata (numeric mode, rounding context) as a dict.
         """
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the buckets as a pandas ``DataFrame``.
+        Export the buckets as an ``ArrowTable``.
 
         Columns: ``t_start``, ``t_end`` (years), ``marginal_pd``, ``lgd``
         (decimals), ``ead``, ``ecl`` (base currency), ``discount_factor``.
@@ -198,16 +200,67 @@ class EclResult:
 
         Returns
         -------
+        ArrowTable
+            Bucket-level ECL schedule table.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to an Arrow table.
+        """
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the buckets as a pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`. One row per bucket in time order.
+
+        Returns
+        -------
         pd.DataFrame
-            Export the buckets as a pandas ``DataFrame``. Columns: ``t_start``, ``t_end`` (years), ``marginal_pd``, ``lgd`` (decimals), ``ead``, ``ecl`` (base currency), ``discount_factor``. One row per bucket in time order.
+            Bucket-level ECL schedule frame.
 
         Raises
         ------
         ImportError
             If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the result cannot be converted to a pandas DataFrame.
         """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the buckets as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Bucket-level ECL schedule frame.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export the buckets as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Bucket-level ECL schedule table.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to canonical JSON.
@@ -594,9 +647,9 @@ class Exposure:
         list[str]
             Portfolio segment keys.
         """
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the exposure as a single-row pandas ``DataFrame``.
+        Export the exposure as a single-row ``ArrowTable``.
 
         Columns: ``id``, ``ead``, ``undrawn``, ``ccf``, ``lgd``, ``eir``,
         ``remaining_maturity_years``, ``current_pd``, ``origination_pd``, ``days_past_due``,
@@ -607,16 +660,67 @@ class Exposure:
 
         Returns
         -------
+        ArrowTable
+            Single-row Arrow table representing the exposure.
+
+        Raises
+        ------
+        ValueError
+            If the exposure cannot be converted to an Arrow table.
+        """
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the exposure as a single-row pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`.
+
+        Returns
+        -------
         pd.DataFrame
-            Export the exposure as a single-row pandas ``DataFrame``. Columns: ``id``, ``ead``, ``undrawn``, ``ccf``, ``lgd``, ``eir``, ``remaining_maturity_years``, ``current_pd``, ``origination_pd``, ``days_past_due``, ``current_rating``, ``origination_rating``. Amounts are in the exposure's base currency; ``ccf``, ``lgd`` and the PDs are decimal fractions; ``eir`` is a decimal annual rate; ``remaining_maturity_years`` is in years; ``days_past_due`` is whole days.
+            Single-row DataFrame representing the exposure.
 
         Raises
         ------
         ImportError
             If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the exposure cannot be converted to a pandas DataFrame.
         """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the exposure as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Single-row Polars frame representing the exposure.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the exposure cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export the exposure as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row PyArrow table representing the exposure.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the exposure cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 class QualitativeFlags:
     """
@@ -1229,20 +1333,18 @@ class StagingConfig:
 class EclScenario:
     """Named cumulative-PD curve and optional scenario-specific LGD.
 
-        Examples
-        --------
-        >>> from decimal import Decimal
-    from datetime import date
-    from finstack_quant.core.money import Money
-        >>> from finstack_quant.statements_analytics import EclScenario
-        >>> downside = EclScenario(
-        ...     id="downside",
-        ...     weight=Decimal("0.2"),
-        ...     pd_schedule=[(0.0, 0.0), (1.0, 0.08)],
-        ...     lgd_override=0.55,
-        ... )
-        >>> isinstance(downside, EclScenario)
-        True
+    Examples
+    --------
+    >>> from decimal import Decimal
+    >>> from finstack_quant.statements_analytics import EclScenario
+    >>> downside = EclScenario(
+    ...     id="downside",
+    ...     weight=Decimal("0.2"),
+    ...     pd_schedule=[(0.0, 0.0), (1.0, 0.08)],
+    ...     lgd_override=0.55,
+    ... )
+    >>> isinstance(downside, EclScenario)
+    True
     """
 
     def __init__(
@@ -1399,7 +1501,7 @@ class WeightedEclResult:
     >>> result = compute_ecl(exp, [(1.0, 0.02), (3.0, 0.06)], stage="stage2")
     >>> result.stage.value
     'stage2'
-    >>> list(result.to_dataframe().columns)[:2]
+    >>> list(result.to_pandas().columns)[:2]
     ['scenario', 'weight']
     """
     @property
@@ -1462,9 +1564,9 @@ class WeightedEclResult:
         Any
             Result metadata (numeric mode, rounding context) as a dict.
         """
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the scenario x bucket audit trail as a pandas ``DataFrame``.
+        Export the scenario x bucket audit trail as an ``ArrowTable``.
 
         Columns: ``scenario`` (scenario id), ``weight`` (decimal probability string),
         ``t_start``, ``t_end`` (years), ``marginal_pd``, ``lgd`` (decimals),
@@ -1473,16 +1575,67 @@ class WeightedEclResult:
 
         Returns
         -------
+        ArrowTable
+            Scenario-by-bucket audit trail table.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted to an Arrow table.
+        """
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the scenario x bucket audit trail as a pandas ``DataFrame``.
+
+        Columns match :meth:`to_arrow`. One row per (scenario, bucket).
+
+        Returns
+        -------
         pd.DataFrame
-            Export the scenario x bucket audit trail as a pandas ``DataFrame``. Columns: ``scenario`` (scenario id), ``weight`` (decimal probability string), ``t_start``, ``t_end`` (years), ``marginal_pd``, ``lgd`` (decimals), ``ead``, ``ecl`` (base currency, unweighted per scenario), ``discount_factor``. One row per (scenario, bucket).
+            Scenario-by-bucket audit trail DataFrame.
 
         Raises
         ------
         ImportError
             If pandas is not installed in the running interpreter.
         ValueError
-            If the result cannot be converted to its wire form.
+            If the result cannot be converted to a pandas DataFrame.
         """
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the scenario x bucket audit trail as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Scenario-by-bucket audit trail Polars frame.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a Polars DataFrame.
+        """
+    def to_pyarrow(self) -> Any:
+        """
+        Export the scenario x bucket audit trail as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Scenario-by-bucket audit trail PyArrow table.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed in the running interpreter.
+        ValueError
+            If the result cannot be converted to a PyArrow table.
+        """
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def to_json(self) -> str:
         """
         Serialize to canonical JSON.
@@ -1607,7 +1760,7 @@ def compute_ecl(
     -------
     WeightedEclResult
         ``ecl`` in base currency, the ``stage`` used, and a one-scenario
-        ``scenario_breakdown`` with bucket detail (``to_dataframe()``).
+        ``scenario_breakdown`` with bucket detail (``to_pandas()`` / ``to_arrow()``).
 
     Raises
     ------
@@ -1689,9 +1842,9 @@ def compute_ecl_weighted(
 class ImpairedExposure:
     """Carry the sourced and dated exposure for an impaired recovery assessment.
 
-    >>> from decimal import Decimal
     Examples
     --------
+    >>> from decimal import Decimal
     >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.statements_analytics import ImpairedExposure
     >>> exposure = ImpairedExposure(
@@ -1772,6 +1925,7 @@ class ImpairedEclResult:
 
     Examples
     --------
+    >>> from decimal import Decimal
     >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.statements_analytics import ImpairedExposure, RecoveryEvidence, compute_impaired_ecl
     >>> exposure = ImpairedExposure(

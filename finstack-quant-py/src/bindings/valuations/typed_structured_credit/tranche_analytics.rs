@@ -8,12 +8,10 @@
 //! in this module; each wrapper's `to_json` still yields the wire payload,
 //! and `from_json` decodes it back.
 
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::{extract_instrument, extract_market};
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
-    serde_rows_to_dataframe_with_schema,
-};
-use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
+use crate::bindings::table_builders::{TableBuilder, serde_rows_to_arrow_table};
+use crate::errors::{core_to_py, display_to_py, serde_json_to_py, value_error};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     self as sc, OasConfig, OasResult, ScenarioGrid, ScenarioTable, StructuredCredit, TrancheMetrics,
 };
@@ -22,9 +20,9 @@ use pyo3::prelude::*;
 use pyo3::types::PyModule;
 use std::collections::BTreeMap;
 
-/// Column schema of [`PyScenarioTable::to_dataframe`], kept so a grid that
+/// Column schema of [`PyScenarioTable`] tabular exports, kept so a grid that
 /// evaluated no cells still exports the documented columns.
-const SCENARIO_CELL_COLUMNS: &[ColumnSchema<'static>] = &[
+const SCENARIO_CELL_COLUMNS: &[(&str, &str)] = &[
     ("tranche_id", "str"),
     ("cpr", "float64"),
     ("cdr", "float64"),
@@ -213,11 +211,6 @@ pub struct PyOasResult {
 
 #[pymethods]
 impl PyOasResult {
-    /// Jupyter rich display: delegates to ``to_dataframe()``.
-    fn _repr_html_<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        self.to_dataframe(py)?.call_method0("_repr_html_")
-    }
-
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "OasResult.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
@@ -238,22 +231,6 @@ impl PyOasResult {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "OasResult.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &self.inner,
-            &[
-                "oas",
-                "model_price",
-                "market_price",
-                "num_paths",
-                "price_std_error",
-            ],
-        )
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -262,6 +239,26 @@ impl PyOasResult {
         )
     }
 }
+
+impl PyOasResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let num_paths = i64::try_from(self.inner.num_paths)
+            .map_err(|_| value_error("num_paths overflows i64"))?;
+        TableBuilder::new()
+            .f64("oas", vec![self.inner.oas])?
+            .f64("model_price", vec![self.inner.model_price])?
+            .f64("market_price", vec![self.inner.market_price])?
+            .i64("num_paths", vec![num_paths])?
+            .f64("price_std_error", vec![self.inner.price_std_error])?
+            .build()
+    }
+}
+
+crate::bindings::macros::tabular_methods!(
+    PyOasResult,
+    "OasResult",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics"
+);
 
 crate::bindings::macros::py_getters!(PyOasResult |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "OasResult.oas")]
@@ -294,11 +291,6 @@ pub struct PyTrancheMetrics {
 
 #[pymethods]
 impl PyTrancheMetrics {
-    /// Jupyter rich display: delegates to ``to_dataframe()``.
-    fn _repr_html_<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        self.to_dataframe(py)?.call_method0("_repr_html_")
-    }
-
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
@@ -329,37 +321,6 @@ impl PyTrancheMetrics {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &self.inner,
-            &[
-                "tranche_id",
-                "currency",
-                "pv",
-                "clean_price_pct",
-                "dirty_price_pct",
-                "accrued",
-                "factor",
-                "wal",
-                "ytm",
-                "z_spread_bp",
-                "cs01",
-                "spread_duration",
-                "spread_convexity",
-                "effective_duration",
-                "effective_convexity",
-                "target_price_pct",
-                "wal_to_call",
-                "z_spread_to_call_bp",
-                "dm_to_call_bp",
-                "dm_bp",
-            ],
-        )
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -368,6 +329,39 @@ impl PyTrancheMetrics {
         )
     }
 }
+
+impl PyTrancheMetrics {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .utf8("tranche_id", vec![self.inner.tranche_id.clone()])?
+            .utf8("currency", vec![self.inner.currency.to_string()])?
+            .f64("pv", vec![self.inner.pv])?
+            .f64("clean_price_pct", vec![self.inner.clean_price_pct])?
+            .f64("dirty_price_pct", vec![self.inner.dirty_price_pct])?
+            .f64("accrued", vec![self.inner.accrued])?
+            .f64("factor", vec![self.inner.factor])?
+            .f64("wal", vec![self.inner.wal])?
+            .nullable_f64("ytm", vec![self.inner.ytm])?
+            .f64("z_spread_bp", vec![self.inner.z_spread_bp])?
+            .f64("cs01", vec![self.inner.cs01])?
+            .f64("spread_duration", vec![self.inner.spread_duration])?
+            .f64("spread_convexity", vec![self.inner.spread_convexity])?
+            .f64("effective_duration", vec![self.inner.effective_duration])?
+            .f64("effective_convexity", vec![self.inner.effective_convexity])?
+            .f64("target_price_pct", vec![self.inner.target_price_pct])?
+            .nullable_f64("wal_to_call", vec![self.inner.wal_to_call])?
+            .nullable_f64("z_spread_to_call_bp", vec![self.inner.z_spread_to_call_bp])?
+            .nullable_f64("dm_to_call_bp", vec![self.inner.dm_to_call_bp])?
+            .nullable_f64("dm_bp", vec![self.inner.dm_bp])?
+            .build()
+    }
+}
+
+crate::bindings::macros::tabular_methods!(
+    PyTrancheMetrics,
+    "TrancheMetrics",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics"
+);
 
 crate::bindings::macros::py_getters!(PyTrancheMetrics |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "TrancheMetrics.tranche_id")]
@@ -445,11 +439,6 @@ pub struct PyScenarioTable {
 
 #[pymethods]
 impl PyScenarioTable {
-    /// Jupyter rich display: delegates to ``to_dataframe()``.
-    fn _repr_html_<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        self.to_dataframe(py)?.call_method0("_repr_html_")
-    }
-
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "ScenarioTable.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
@@ -489,9 +478,18 @@ impl PyScenarioTable {
             .collect()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "ScenarioTable.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    /// Return ``repr(self)``.
+    fn __repr__(&self) -> String {
+        format!(
+            "ScenarioTable(tranche_id={:?}, cells={})",
+            self.inner.tranche_id,
+            self.inner.cells.len()
+        )
+    }
+}
+
+impl PyScenarioTable {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         let rows: Vec<serde_json::Value> = self
             .inner
             .cells
@@ -508,18 +506,15 @@ impl PyScenarioTable {
                 })
             })
             .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, SCENARIO_CELL_COLUMNS)
-    }
-
-    /// Return ``repr(self)``.
-    fn __repr__(&self) -> String {
-        format!(
-            "ScenarioTable(tranche_id={:?}, cells={})",
-            self.inner.tranche_id,
-            self.inner.cells.len()
-        )
+        serde_rows_to_arrow_table(&rows, SCENARIO_CELL_COLUMNS)
     }
 }
+
+crate::bindings::macros::tabular_methods!(
+    PyScenarioTable,
+    "ScenarioTable",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics"
+);
 
 crate::bindings::macros::py_getters!(PyScenarioTable |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche_analytics", "ScenarioTable.tranche_id")]

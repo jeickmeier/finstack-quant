@@ -30,10 +30,16 @@ from collections.abc import Sequence
 from types import ModuleType
 from typing import Any
 
+import numpy as np
+import numpy.typing as npt
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 TransformParams = dict[str, Any]
-KeyColumn = Sequence[str | datetime.date]
+KeyColumn = Sequence[str | datetime.date] | pd.Series | pl.Series | npt.NDArray[Any] | Any
+ValueColumn = Sequence[float | None] | npt.NDArray[np.float64] | pd.Series | pl.Series | Any
+ExposureColumns = Sequence[ValueColumn] | pd.DataFrame | pl.DataFrame | Any
 
 __all__ = [
     "CrossSectionalOp",
@@ -433,7 +439,7 @@ class PanelTransformSpec:
 
     def __init__(
         self,
-        values: Sequence[float | None],
+        values: ValueColumn,
         operations: Sequence[dict[str, Any]],
         entity: KeyColumn | None = None,
         order: KeyColumn | None = None,
@@ -444,8 +450,9 @@ class PanelTransformSpec:
 
         Parameters
         ----------
-        values : sequence of float or None
-            Input value column; ``None`` / NaN is missing.
+        values : ValueColumn
+            Input value column (sequence, NumPy array, ``pandas.Series``, or
+            ``polars.Series``); ``None`` / NaN is missing.
         operations : sequence of dict
             Ordered operations ``{"name", "family" ("timeseries" |
             "cross_sectional"), "op", "params"?, "input"?}``.
@@ -677,7 +684,23 @@ class PanelTransformResult:
         """
         ...
 
-    def to_dataframe(self, index: Any | None = None) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Export transform columns as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Arrow table with one ``Float64`` column per transform operation.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self, index: Any | None = None) -> pd.DataFrame:
         """
         Columns as a ``pandas.DataFrame`` (one float column per operation).
 
@@ -691,12 +714,48 @@ class PanelTransformResult:
         pandas.DataFrame
             ``None`` outputs become ``NaN``.
 
-        Notes
-        -----
-        This method does not raise.
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Columns as a ``polars.DataFrame`` (one float column per operation).
+
+        Returns
+        -------
+        polars.DataFrame
+            DataFrame constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Columns as a ``pyarrow.Table`` (one float column per operation).
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str: ...
 
 def transform_panel(spec: PanelTransformSpec | dict[str, Any] | str) -> PanelTransformResult:
@@ -715,7 +774,8 @@ def transform_panel(spec: PanelTransformSpec | dict[str, Any] | str) -> PanelTra
     Returns
     -------
     PanelTransformResult
-        Ordered output columns with ``get_column`` and ``to_dataframe``.
+        Ordered output columns with ``get_column`` and ``to_pandas`` /
+        ``to_polars`` / ``to_arrow``.
 
     Raises
     ------
@@ -737,7 +797,7 @@ def transform_panel(spec: PanelTransformSpec | dict[str, Any] | str) -> PanelTra
     ...
 
 def transform_timeseries(
-    values: list[float | None],
+    values: ValueColumn,
     entity: KeyColumn,
     order: KeyColumn,
     op: str | TimeSeriesOp,
@@ -832,7 +892,7 @@ def transform_timeseries(
     ...
 
 def transform_cross_sectional(
-    values: list[float | None],
+    values: ValueColumn,
     time_key: KeyColumn,
     op: str | CrossSectionalOp,
     params: TransformParams | None = None,
@@ -910,7 +970,7 @@ def transform_cross_sectional(
     ...
 
 def transform_cross_sectional_grouped(
-    values: list[float | None],
+    values: ValueColumn,
     time_key: KeyColumn,
     groups: KeyColumn,
     op: str | CrossSectionalOp,
@@ -971,9 +1031,9 @@ def transform_cross_sectional_grouped(
     ...
 
 def neutralize(
-    values: list[float | None],
+    values: ValueColumn,
     time_key: KeyColumn,
-    exposures: list[list[float | None]],
+    exposures: ExposureColumns,
     params: TransformParams | None = None,
 ) -> list[float | None]:
     """
@@ -1023,8 +1083,8 @@ def neutralize(
     ...
 
 def transform_timeseries_pairwise(
-    values: list[float | None],
-    other: list[float | None],
+    values: ValueColumn,
+    other: ValueColumn,
     entity: KeyColumn,
     order: KeyColumn,
     op: str | PairwiseOp,
@@ -1098,8 +1158,8 @@ def transform_timeseries_pairwise(
     ...
 
 def rolling_regression_residual(
-    values: list[float | None],
-    exposures: list[list[float | None]],
+    values: ValueColumn,
+    exposures: ExposureColumns,
     entity: KeyColumn,
     order: KeyColumn,
     params: TransformParams | None = None,
@@ -1165,9 +1225,9 @@ def rolling_regression_residual(
     ...
 
 def risk_scaled_weights(
-    values: list[float | None],
+    values: ValueColumn,
     time_key: KeyColumn,
-    volatility: list[float | None],
+    volatility: ValueColumn,
 ) -> list[float | None]:
     """
     Convert a signal to dollar-neutral inverse-risk-scaled weights.
@@ -1214,7 +1274,7 @@ def risk_scaled_weights(
     ...
 
 def rank_to_weights(
-    values: list[float | None],
+    values: ValueColumn,
     time_key: KeyColumn,
 ) -> list[float | None]:
     """
@@ -1253,9 +1313,9 @@ def rank_to_weights(
     ...
 
 def neutralize_and_zscore(
-    values: list[float | None],
+    values: ValueColumn,
     time_key: KeyColumn,
-    exposures: list[list[float | None]],
+    exposures: ExposureColumns,
 ) -> list[float | None]:
     """
     Neutralize a signal against exposures, then cross-sectional z-score.

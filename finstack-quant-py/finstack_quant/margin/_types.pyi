@@ -6,8 +6,10 @@ from finstack_quant.core.currency import Currency
 
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.config import FinstackConfig
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 
 class ImMethodology:
     """
@@ -1923,9 +1925,9 @@ class CsaSpec:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the commercial terms as a single-row pandas ``DataFrame``.
+        Export the commercial terms as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``id``, ``base_currency``, ``calendar_id``,
         ``collateral_curve_id``, ``vm_threshold``, ``vm_mta``, ``vm_rounding``,
@@ -1936,29 +1938,85 @@ class CsaSpec:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row describing the CSA.
 
         Raises
         ------
         ValueError
-            If the spec cannot be serialized into a pandas object.
+            If the spec cannot be serialized into an Arrow table.
 
         Examples
         --------
-        >>> float(CsaSpec.usd_regulatory().to_dataframe().iloc[0]["vm_threshold"])
+        >>> float(CsaSpec.usd_regulatory().to_arrow().to_dict()["vm_threshold"][0])
         0.0
         """
         ...
 
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the commercial terms as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row describing the CSA.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+
+        Examples
+        --------
+        >>> float(CsaSpec.usd_regulatory().to_pandas().iloc[0]["vm_threshold"])
+        0.0
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the commercial terms as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row describing the CSA.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the commercial terms as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row describing the CSA.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str: ...
 
 class EligibleCollateralSchedule:
     """
     Eligible collateral schedule with haircuts.
 
-    Answers "what can I post and at what haircut": ``to_dataframe`` lists
-    every eligible asset class with its haircut and constraints,
+    Answers "what can I post and at what haircut": ``to_arrow`` / ``to_pandas``
+    lists every eligible asset class with its haircut and constraints,
     ``haircut_for_maturity`` resolves the maturity-bucketed haircut for a
     bond, and ``check_concentration_limits`` flags a proposed collateral mix
     that breaches a concentration limit. Haircuts are decimal fractions
@@ -2284,7 +2342,7 @@ class EligibleCollateralSchedule:
         """
         ...
 
-    def check_concentration_limits(self, allocations: list[tuple[CollateralAssetClass | str, float]]) -> pd.DataFrame:
+    def check_concentration_limits(self, allocations: list[tuple[CollateralAssetClass | str, float]]) -> ArrowTable:
         """
         Check a proposed collateral mix against the concentration limits.
 
@@ -2296,9 +2354,9 @@ class EligibleCollateralSchedule:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             Columns ``asset_class``, ``fraction``, ``limit``, ``excess`` (all
-            decimal fractions), one row per breached limit; an empty frame
+            decimal fractions), one row per breached limit; an empty table
             means the mix is within limits.
 
         Raises
@@ -2309,14 +2367,14 @@ class EligibleCollateralSchedule:
         Examples
         --------
         >>> s = EligibleCollateralSchedule.bcbs_standard()
-        >>> s.check_concentration_limits([("cash", 100.0)]).empty
+        >>> len(s.check_concentration_limits([("cash", 100.0)])) == 0
         True
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the eligibility rows as a pandas ``DataFrame``.
+        Export the eligibility rows as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``asset_class``, ``min_rating``, ``min_remaining_years``,
         ``max_remaining_years``, ``haircut``, ``fx_haircut_addon``,
@@ -2326,21 +2384,77 @@ class EligibleCollateralSchedule:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per eligible collateral entry.
 
         Raises
         ------
         ValueError
-            If the schedule cannot be serialized into a pandas object.
+            If the schedule cannot be serialized into an Arrow table.
 
         Examples
         --------
-        >>> EligibleCollateralSchedule.cash_only().to_dataframe()["asset_class"].tolist()
+        >>> EligibleCollateralSchedule.cash_only().to_arrow().to_dict()["asset_class"]
         ['cash']
         """
         ...
 
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the eligibility rows as a pandas ``DataFrame``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per eligible collateral entry.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+
+        Examples
+        --------
+        >>> EligibleCollateralSchedule.cash_only().to_pandas()["asset_class"].tolist()
+        ['cash']
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the eligibility rows as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per eligible collateral entry.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the eligibility rows as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per eligible collateral entry.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str: ...
 
 class SimmCreditClassification:

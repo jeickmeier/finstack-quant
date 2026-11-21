@@ -44,14 +44,14 @@ class TestVarianceReport:
         Asserting the empty frame is merely "not all object" would still allow
         a mismatch that downgrades on concat, so compare the two directly.
         """
-        empty = _variance_report([]).to_dataframe()
-        populated = _variance_report([VARIANCE_ROW]).to_dataframe()
+        empty = _variance_report([]).to_pandas()
+        populated = _variance_report([VARIANCE_ROW]).to_pandas()
         assert list(empty.columns) == list(populated.columns)
         assert empty.dtypes.astype(str).to_dict() == populated.dtypes.astype(str).to_dict()
 
     def test_concat_preserves_numeric_dtypes(self) -> None:
-        empty = _variance_report([]).to_dataframe()
-        populated = _variance_report([VARIANCE_ROW]).to_dataframe()
+        empty = _variance_report([]).to_pandas()
+        populated = _variance_report([VARIANCE_ROW]).to_pandas()
         combined = pd.concat([empty, populated], ignore_index=True)
 
         assert len(combined) == 1
@@ -60,8 +60,8 @@ class TestVarianceReport:
 
     def test_concat_result_supports_arithmetic_aggregation(self) -> None:
         """The end the dtypes are a means to: numbers still behave like numbers."""
-        empty = _variance_report([]).to_dataframe()
-        populated = _variance_report([VARIANCE_ROW]).to_dataframe()
+        empty = _variance_report([]).to_pandas()
+        populated = _variance_report([VARIANCE_ROW]).to_pandas()
         combined = pd.concat([empty, populated], ignore_index=True)
 
         assert combined.groupby("metric")["baseline"].sum().loc["revenue"] == pytest.approx(100.0)
@@ -69,7 +69,7 @@ class TestVarianceReport:
 
     def test_empty_frame_columns_are_not_object(self) -> None:
         """Pins the specific regression: `pd.DataFrame([], columns=...)`."""
-        empty = _variance_report([]).to_dataframe()
+        empty = _variance_report([]).to_pandas()
         assert len(empty) == 0
         numeric = ["baseline", "comparison", "abs_var", "pct_var"]
         assert [str(empty.dtypes[c]) for c in numeric] == ["float64"] * len(numeric)
@@ -91,7 +91,7 @@ class TestIntegerAndBooleanColumns:
         )
 
     def test_empty_validations_frame_keeps_int_and_bool_dtypes(self) -> None:
-        empty = self._corkscrew([]).to_validations_dataframe()
+        empty = self._corkscrew([]).to_validations_table().to_pandas()
         assert str(empty.dtypes["periods_validated"]) == "int64"
         assert str(empty.dtypes["is_valid"]) == "bool"
         assert str(empty.dtypes["max_error"]) == "float64"
@@ -104,8 +104,8 @@ class TestIntegerAndBooleanColumns:
             "max_error": 0.5,
             "is_valid": True,
         }
-        empty = self._corkscrew([]).to_validations_dataframe()
-        populated = self._corkscrew([row]).to_validations_dataframe()
+        empty = self._corkscrew([]).to_validations_table().to_pandas()
+        populated = self._corkscrew([row]).to_validations_table().to_pandas()
         assert list(empty.columns) == list(populated.columns)
         combined = pd.concat([empty, populated], ignore_index=True)
         assert pd.api.types.is_integer_dtype(combined["periods_validated"])
@@ -132,8 +132,8 @@ class TestOtherSchemaFrames:
                 },
             })
         )
-        checks = report.to_dataframe()
-        findings = report.to_findings_dataframe()
+        checks = report.to_pandas()
+        findings = report.to_findings_table().to_pandas()
         assert str(checks.dtypes["outcome"]) == "str"
         assert str(checks.dtypes["finding_count"]) == "int64"
         assert str(findings.dtypes["materiality_absolute"]) == "float64"
@@ -141,6 +141,6 @@ class TestOtherSchemaFrames:
     def test_attribution_long_frame_is_typed_when_empty(self) -> None:
         fixture = Path(__file__).parent / "fixtures" / "attribution_baseline.json"
         baseline = json.loads(fixture.read_text())
-        empty = PnlAttribution.from_json(json.dumps(baseline)).to_long_dataframe()
+        empty = PnlAttribution.from_json(json.dumps(baseline)).to_long_table().to_pandas()
         assert len(empty) == 0
         assert str(empty.dtypes["amount"]) == "float64"

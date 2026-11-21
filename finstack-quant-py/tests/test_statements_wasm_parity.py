@@ -521,13 +521,18 @@ def test_dated_dcf_reuses_results_for_grid_and_paths() -> None:
     base = sa.evaluate_dcf_from_results(model, results, request).enterprise_value.amount
     assert base == pytest.approx(1249.77910868, abs=1e-7)
     axes = sa.DcfSensitivityGridSpec([0.09, 0.10], [0.015, 0.02, 0.095])
-    grid = sa.dcf_sensitivity_grid(model, results, request, axes).to_dataframe()
+    grid_res = sa.dcf_sensitivity_grid(model, results, request, axes)
+    grid = grid_res.to_pandas()
+    assert grid_res.to_arrow().num_rows == 2
+    assert grid_res.to_polars().height == 2
     assert grid.shape == (2, 3)
     assert grid.iloc[1, 1] == pytest.approx(base)
     assert grid.iloc[:, 2].isna().all()
     config = st.MonteCarloConfig(3, 7, ["ufcf"], [0.5], include_path_data=True)
     paths = evaluation.evaluate_monte_carlo(model, config, market, day, day)
-    sample = sa.evaluate_dcf_monte_carlo(model, results, paths, request).to_dataframe()
+    dist = sa.evaluate_dcf_monte_carlo(model, results, paths, request)
+    sample = dist.to_pandas()
+    assert dist.quantiles_to_table().num_rows == 1
     assert sample["path_id"].to_list() == [0, 1, 2]
     assert sample["enterprise_value"].to_list() == pytest.approx([base] * 3)
     replacement = MarketContext().insert_dividend_yield("NEW-QUOTE", 0.03)

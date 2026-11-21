@@ -6,9 +6,11 @@ from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import Any, Literal
 import pandas as pd
+import polars as pl
 
 from finstack_quant.core.money import Money
 from finstack_quant.core.currency import Currency
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.statements._builder import ModelBuilder
 
 class ForecastMethod:
@@ -1600,26 +1602,95 @@ class FinancialModelSpec:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export one descriptive row for each configured model node.
+        Export one descriptive row for each configured model node as an ``ArrowTable``.
 
         Returns
         -------
-        pd.DataFrame
-            Rows in declaration order with node_id, node_type, name, formula_text, forecast_method, value_type, currency, and where_text columns; optional fields are null.
+        ArrowTable
+            Rows in declaration order with ``node_id``, ``node_type``, ``name``,
+            ``formula_text``, ``forecast_method``, ``value_type``, ``currency``,
+            and ``where_text`` columns; optional fields are null.
 
         Raises
         ------
-        ImportError
-            If pandas is unavailable.
         ValueError
             If a node description cannot be converted to the documented column schema.
-
         RuntimeError
             If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export one descriptive row for each configured model node as a pandas ``DataFrame``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Rows in declaration order with ``node_id``, ``node_type``, ``name``,
+            ``formula_text``, ``forecast_method``, ``value_type``, ``currency``,
+            and ``where_text`` columns; optional fields are null.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If a node description cannot be converted to the documented column schema.
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export one descriptive row for each configured model node as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Rows in declaration order with ``node_id``, ``node_type``, ``name``,
+            ``formula_text``, ``forecast_method``, ``value_type``, ``currency``,
+            and ``where_text`` columns; optional fields are null.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If a node description cannot be converted to the documented column schema.
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export one descriptive row for each configured model node as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Rows in declaration order with ``node_id``, ``node_type``, ``name``,
+            ``formula_text``, ``forecast_method``, ``value_type``, ``currency``,
+            and ``where_text`` columns; optional fields are null.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If a node description cannot be converted to the documented column schema.
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
 
 class NodeSpec:
     """One node of a :class:`FinancialModelSpec`: type, values, formula, forecast.

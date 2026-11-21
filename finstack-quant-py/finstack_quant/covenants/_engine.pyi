@@ -5,6 +5,8 @@ from __future__ import annotations
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.covenants import DateLike
 from finstack_quant.covenants._report import CovenantReport
 from finstack_quant.covenants._spec import CovenantConsequence, CovenantSpec, CovenantWaiver
@@ -325,20 +327,20 @@ class CovenantEngine:
             expires before it takes effect, or windows overlap.
         """
 
-    def evaluate(self, metrics: dict[str, float] | str, as_of: DateLike) -> dict[str, CovenantReport]:
+    def evaluate(self, metrics: dict[str, float] | pd.Series | str, as_of: DateLike) -> dict[str, CovenantReport]:
         """
         Evaluate every applicable covenant on a date.
 
         Parameters
         ----------
-        metrics : dict[str, float] | str
-            Metric values keyed by metric id (or a JSON object string).
-            Ratios in turns, amounts in the reporting currency; ``bool``
-            values are rejected.
+        metrics : dict[str, float] | pd.Series | str
+            Metric values keyed by metric id (dict, ``pandas.Series`` indexed by
+            metric id, or a JSON object string). Ratios in turns, amounts in
+            the reporting currency; ``bool`` values are rejected.
         as_of : datetime.date | str
-            Test date (``datetime.date``, ``pandas.Timestamp`` or ISO string).
-            An amended waiver or step-down schedule in force on this date
-            changes the threshold used.
+            Test date (``datetime.date``, ``pandas.Timestamp``, ``numpy.datetime64``,
+            or ISO string). An amended waiver or step-down schedule in force on
+            this date changes the threshold used.
 
         Returns
         -------
@@ -355,8 +357,8 @@ class CovenantEngine:
             If the engine is invalid, two specs share a label, a metric value
             is not a number, or the date string is not ISO 8601.
         TypeError
-            If ``metrics`` is neither a dict nor a string, or ``as_of`` is
-            neither a string nor date-like.
+            If ``metrics`` is not a dict, ``pandas.Series``, or JSON string, or
+            ``as_of`` is neither a string nor date-like.
 
         Examples
         --------
@@ -370,7 +372,7 @@ class CovenantEngine:
         """
 
     def evaluate_and_track(
-        self, metrics: dict[str, float] | str, as_of: DateLike, scope: str
+        self, metrics: dict[str, float] | pd.Series | str, as_of: DateLike, scope: str
     ) -> dict[str, CovenantReport]:
         """
         Evaluate like :meth:`evaluate` and update :attr:`breach_history`.
@@ -383,8 +385,9 @@ class CovenantEngine:
 
         Parameters
         ----------
-        metrics : dict[str, float] | str
-            Metric values keyed by metric id (or a JSON object string).
+        metrics : dict[str, float] | pd.Series | str
+            Metric values keyed by metric id (dict, ``pandas.Series`` indexed by
+            metric id, or a JSON object string).
         as_of : datetime.date | str
             Test date.
         scope : str
@@ -413,30 +416,39 @@ class CovenantEngine:
         True
         """
 
-    def evaluate_series(self, metrics: pd.DataFrame) -> pd.DataFrame:
+    def evaluate_series(self, metrics: pd.DataFrame | pl.DataFrame | Any, *, date_col: str | None = None) -> ArrowTable:
         """
-        Evaluate the engine on every row of a date-indexed metrics frame.
+        Evaluate the engine on every row of a dated metrics table.
 
         Parameters
         ----------
-        metrics : pd.DataFrame
-            Index holds the test dates (``datetime.date``, ``Timestamp`` or
-            ISO strings); columns are metric ids; required cells must be finite. Duplicate metric columns are rejected.
+        metrics : pd.DataFrame | pl.DataFrame | Any
+            Pandas ``DataFrame`` (test dates in the index or in ``date_col``),
+            Polars ``DataFrame``, or Arrow table whose columns are unique metric
+            ids; required cells must be finite. Duplicate metric columns are rejected.
+        date_col : str | None, optional
+            Column name holding observation test dates. Auto-detects a unique
+            Polars/Arrow date or datetime column when ``None``; optional for
+            pandas ``DataFrame`` inputs to read dates from a column instead of
+            the row index.
 
         Returns
         -------
-        pd.DataFrame
-            Long frame with one row per (date, covenant) and columns
-            ``as_of`` (ISO string), ``covenant`` (label), ``covenant_type``,
-            ``passed``, ``actual_value``, ``threshold``, ``headroom``,
-            ``details``.
+        ArrowTable
+            Long :class:`~finstack_quant.core.table.ArrowTable` with one row per
+            ``(date, covenant)`` and columns ``as_of`` (ISO string), ``covenant``
+            (label), ``covenant_type``, ``passed``, ``actual_value``,
+            ``threshold``, ``headroom``, ``headroom_raw``, ``details``.
 
         Raises
         ------
         KeyError
-            If a required metric is missing on any date.
+            If ``date_col`` is missing or a required metric is missing on any date.
+        TypeError
+            If ``metrics`` is not a pandas/Polars DataFrame or Arrow table.
         ValueError
-            If the engine is invalid or the frame is not numeric.
+            If the engine is invalid, the frame has duplicate metric columns or
+            non-numeric values, or ``date_col`` cannot be resolved uniquely.
 
         Examples
         --------
@@ -447,7 +459,7 @@ class CovenantEngine:
         ...     {"total_leverage": [6.0, 7.5], "senior_leverage": [3.0, 3.5]},
         ...     index=pd.to_datetime(["2026-03-31", "2026-06-30"]),
         ... )
-        >>> out = engine.evaluate_series(frame)
+        >>> out = engine.evaluate_series(frame).to_pandas()
         >>> out.loc[out["covenant"] == "max_total_leverage", "passed"].tolist()
         [True, False]
         """
@@ -810,9 +822,9 @@ def covenant_template(template: CovenantTemplate) -> list[CovenantSpec]:
     4
     """
 
-def reports_to_dataframe(reports: dict[str, CovenantReport]) -> pd.DataFrame:
+def reports_table(reports: dict[str, CovenantReport]) -> ArrowTable:
     """
-    Flatten an ``evaluate`` result into one frame row per covenant.
+    Flatten an ``evaluate`` result into an :class:`~finstack_quant.core.table.ArrowTable` with one row per covenant.
 
     Parameters
     ----------
@@ -821,10 +833,10 @@ def reports_to_dataframe(reports: dict[str, CovenantReport]) -> pd.DataFrame:
 
     Returns
     -------
-    pd.DataFrame
+    ArrowTable
         Columns ``covenant`` (dict key), ``covenant_type``, ``passed``,
-        ``actual_value``, ``threshold``, ``headroom``, ``headroom_raw``, ``details``, in dict
-        order.
+        ``actual_value``, ``threshold``, ``headroom``, ``headroom_raw``,
+        ``details``, in dict order.
 
     Raises
     ------
@@ -833,9 +845,9 @@ def reports_to_dataframe(reports: dict[str, CovenantReport]) -> pd.DataFrame:
 
     Examples
     --------
-    >>> from finstack_quant.covenants import CovenantEngine, CovenantTemplate, covenant_template, reports_to_dataframe
+    >>> from finstack_quant.covenants import CovenantEngine, CovenantTemplate, covenant_template, reports_table
     >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.cov_lite(7.0, 4.5)))
-    >>> frame = reports_to_dataframe(engine.evaluate({"total_leverage": 5.0, "senior_leverage": 3.0}, "2026-03-31"))
-    >>> frame["covenant"].tolist()
+    >>> table = reports_table(engine.evaluate({"total_leverage": 5.0, "senior_leverage": 3.0}, "2026-03-31"))
+    >>> table.to_dict()["covenant"]
     ['max_total_leverage', 'max_senior_leverage', 'negative']
     """

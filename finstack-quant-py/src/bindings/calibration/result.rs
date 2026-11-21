@@ -1,16 +1,17 @@
 //! `CalibrationResultEnvelope`: calibrated market plus plan-level and per-step reports.
 
-use super::report::{PyCalibrationReport, quote_quality_dataframe};
+use super::report::{PyCalibrationReport, quote_quality_table};
 use crate::bindings::core::market_data::context::PyMarketContext;
-use crate::bindings::pandas_utils::dict_to_dataframe;
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::tabular_methods;
 use crate::bindings::pickle_support::reduce_via_json;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_calibration::api::schema::CalibrationResultEnvelope;
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::market_data::context::MarketContext;
-use numpy::PyArray1;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString};
+use pyo3::types::PyString;
 use std::sync::OnceLock;
 
 /// Result of a calibration plan execution.
@@ -208,7 +209,7 @@ impl PyCalibrationResult {
         Ok(PyCalibrationReport::from_inner(report.clone()))
     }
 
-    /// Per-quote residuals of one step as a pandas ``DataFrame``.
+    /// Per-quote residuals of one step as an ``ArrowTable``.
     ///
     /// Columns: ``quote_id``, ``quote_value``, ``residual``,
     /// ``sensitivity``. ``quote_value`` / ``sensitivity`` are ``NaN``
@@ -224,48 +225,9 @@ impl PyCalibrationResult {
     /// KeyError
     ///     If no step with the given ``step_id`` exists.
     #[pyo3(text_signature = "($self, step_id)")]
-    fn residuals<'py>(&self, py: Python<'py>, step_id: &str) -> PyResult<Bound<'py, PyAny>> {
+    fn residuals(&self, step_id: &str) -> PyResult<PyArrowTable> {
         let report = self.inner.result.step_report(step_id).map_err(core_to_py)?;
-        quote_quality_dataframe(py, &report.quote_rows())
-    }
-
-    /// Export the per-step summary as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``step_id``, ``success``, ``iterations``, ``max_residual``,
-    /// ``rmse`` (raw residual units of each step), ``worst_quote_id``,
-    /// ``convergence_reason``. Rows are ordered lexicographically by step ID.
-    /// The plan-level roll-ups (``max_residual_ratio``, ``rmse_ratio``) are on
-    /// ``result.report``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let n = self.inner.result.step_reports.len();
-        let mut ids: Vec<String> = Vec::with_capacity(n);
-        let mut successes: Vec<bool> = Vec::with_capacity(n);
-        let mut iters: Vec<usize> = Vec::with_capacity(n);
-        let mut max_res: Vec<f64> = Vec::with_capacity(n);
-        let mut rmses: Vec<f64> = Vec::with_capacity(n);
-        let mut worst: Vec<Option<String>> = Vec::with_capacity(n);
-        let mut reasons: Vec<String> = Vec::with_capacity(n);
-
-        for (id, report) in &self.inner.result.step_reports {
-            ids.push(id.clone());
-            successes.push(report.success);
-            iters.push(report.iterations);
-            max_res.push(report.max_residual);
-            rmses.push(report.rmse);
-            worst.push(report.worst_quote_id.clone());
-            reasons.push(report.convergence_reason.clone());
-        }
-
-        let data = PyDict::new(py);
-        data.set_item("step_id", ids)?;
-        data.set_item("success", successes)?;
-        data.set_item("iterations", iters)?;
-        data.set_item("max_residual", PyArray1::from_vec(py, max_res).into_any())?;
-        data.set_item("rmse", PyArray1::from_vec(py, rmses).into_any())?;
-        data.set_item("worst_quote_id", worst)?;
-        data.set_item("convergence_reason", reasons)?;
-        dict_to_dataframe(py, &data, None)
+        quote_quality_table(&report.quote_rows())
     }
 
     fn __repr__(&self) -> String {
@@ -286,3 +248,38 @@ impl PyCalibrationResult {
         )
     }
 }
+
+impl PyCalibrationResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let n = self.inner.result.step_reports.len();
+        let mut ids: Vec<String> = Vec::with_capacity(n);
+        let mut successes: Vec<bool> = Vec::with_capacity(n);
+        let mut iters: Vec<i64> = Vec::with_capacity(n);
+        let mut max_res: Vec<f64> = Vec::with_capacity(n);
+        let mut rmses: Vec<f64> = Vec::with_capacity(n);
+        let mut worst: Vec<Option<String>> = Vec::with_capacity(n);
+        let mut reasons: Vec<String> = Vec::with_capacity(n);
+
+        for (id, report) in &self.inner.result.step_reports {
+            ids.push(id.clone());
+            successes.push(report.success);
+            iters.push(i64::try_from(report.iterations).unwrap_or(i64::MAX));
+            max_res.push(report.max_residual);
+            rmses.push(report.rmse);
+            worst.push(report.worst_quote_id.clone());
+            reasons.push(report.convergence_reason.clone());
+        }
+
+        TableBuilder::new()
+            .utf8("step_id", ids)?
+            .bool("success", successes)?
+            .i64("iterations", iters)?
+            .f64("max_residual", max_res)?
+            .f64("rmse", rmses)?
+            .nullable_utf8("worst_quote_id", worst)?
+            .utf8("convergence_reason", reasons)?
+            .build()
+    }
+}
+
+tabular_methods!(PyCalibrationResult);

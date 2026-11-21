@@ -123,7 +123,7 @@ impl PyVarianceSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_variance_swap", "VarianceSwap.observation_frequency")]
     #[getter]
     fn observation_frequency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.observation_frequency)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.observation_frequency)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_variance_swap", "VarianceSwap.observation_calendar_id")]
@@ -147,7 +147,7 @@ impl PyVarianceSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_variance_swap", "VarianceSwap.realized_var_method")]
     #[getter]
     fn realized_var_method<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.realized_var_method)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.realized_var_method)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_variance_swap", "VarianceSwap.trading_days_per_year")]
@@ -159,7 +159,7 @@ impl PyVarianceSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_variance_swap", "VarianceSwap.price_series_policy")]
     #[getter]
     fn price_series_policy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.price_series_policy)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.price_series_policy)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_variance_swap", "VarianceSwap.open_series_id")]
@@ -198,7 +198,7 @@ impl PyVarianceSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_variance_swap", "VarianceSwap.side")]
     #[getter]
     fn side<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.side)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.side)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_variance_swap", "VarianceSwap.discount_curve_id")]

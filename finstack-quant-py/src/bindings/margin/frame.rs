@@ -1,7 +1,7 @@
 //! pandas ``DataFrame`` ingestion helpers shared by the margin bindings.
 //!
 //! The ``from_dataframe`` constructors accept the long-format frames the
-//! matching ``to_dataframe`` exits emit. Rows are pulled through
+//! matching ``to_pandas`` / ``to_arrow`` exits emit. Rows are pulled through
 //! ``DataFrame.to_dict("records")`` so the binding only touches plain Python
 //! dicts; all interpretation of the rows happens in Rust (the ``add_*`` adders
 //! and the sensitivity ``from_rows`` constructors).
@@ -10,17 +10,22 @@ use finstack_quant_margin::table::SensitivityRow;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-/// Materialise a ``DataFrame`` (or any object with ``to_dict``) as row dicts.
+/// Materialise a pandas `DataFrame`, Polars `DataFrame`, Arrow table, or any
+/// object exposing ``to_dict("records")`` as Python row dicts.
 pub(super) fn records<'py>(frame: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyDict>>> {
-    let rows = frame.call_method1(pyo3::intern!(frame.py(), "to_dict"), ("records",))?;
+    let rows = match crate::bindings::dataframe_utils::table_to_py_records(frame.py(), frame)? {
+        Some(rows) => rows,
+        None => frame.call_method1(pyo3::intern!(frame.py(), "to_dict"), ("records",))?,
+    };
     rows.try_iter()?
         .map(|row| row?.cast_into::<PyDict>().map_err(PyErr::from))
         .collect()
 }
 
-/// Whether a cell should be treated as missing (``None`` or a float ``NaN``).
+/// Whether a cell should be treated as missing (``None``, ``NaN``, ``pd.NA``,
+/// ``pd.NaT``, or ``np.datetime64('NaT')``).
 fn is_missing(value: &Bound<'_, PyAny>) -> bool {
-    value.is_none() || value.extract::<f64>().is_ok_and(f64::is_nan)
+    crate::bindings::dataframe_utils::is_missing_cell(value).unwrap_or(false)
 }
 
 /// Read an optional text cell; ``None``/``NaN`` become ``None``.
@@ -96,7 +101,20 @@ pub(super) fn req_date(
     }
 }
 
-/// Read an optional float cell; ``None``/``NaN`` become ``None``.
+/// Read an optional date-like cell; missing cells become ``None``.
+pub(super) fn opt_date(
+    row: &Bound<'_, PyDict>,
+    key: &str,
+) -> PyResult<Option<finstack_quant_core::dates::Date>> {
+    match row.get_item(key)? {
+        Some(value) if !is_missing(&value) => {
+            crate::bindings::date_utils::py_to_date(&value).map(Some)
+        }
+        _ => Ok(None),
+    }
+}
+
+/// Read an optional float cell; ``None``/``NaN``/``pd.NA`` become ``None``.
 fn opt_f64(row: &Bound<'_, PyDict>, key: &str) -> PyResult<Option<f64>> {
     match row.get_item(key)? {
         Some(value) if !is_missing(&value) => value.extract::<f64>().map(Some).map_err(|_| {
@@ -133,10 +151,15 @@ pub(super) fn sensitivity_rows(frame: &Bound<'_, PyAny>) -> PyResult<Vec<Sensiti
         .collect()
 }
 
-/// Read dated funding observations from explicit pairs or a pandas Series.
+/// Read dated funding observations from explicit pairs, a pandas Series,
+/// or a 2-column DataFrame/Arrow table.
 pub(super) fn dated_pairs_from_series_or_list(
     observations: &Bound<'_, PyAny>,
 ) -> PyResult<Vec<(finstack_quant_core::dates::Date, f64)>> {
+    use crate::bindings::dataframe_utils::{
+        extract_f64_vec, is_dataframe_like, is_polars_dataframe, table_column_names,
+        table_column_to_pylist,
+    };
     let read_pair = |item: Bound<'_, PyAny>| {
         let (date, spread): (Bound<'_, PyAny>, f64) = item.extract()?;
         Ok((crate::bindings::date_utils::py_to_date(&date)?, spread))
@@ -146,6 +169,30 @@ pub(super) fn dated_pairs_from_series_or_list(
             .call_method0("items")?
             .try_iter()?
             .map(|item| item.and_then(read_pair))
+            .collect();
+    }
+    if is_dataframe_like(observations)? {
+        let cols = table_column_names(observations)?;
+        if cols.len() != 2 {
+            return Err(crate::errors::value_error(format!(
+                "dated observations DataFrame must have 2 columns (date, value), got {}",
+                cols.len()
+            )));
+        }
+        let dates_py = table_column_to_pylist(observations, &cols[0])?.unwrap_or_default();
+        let vals = if is_polars_dataframe(observations)? {
+            extract_f64_vec(&observations.get_item(&cols[1])?, &cols[1])?
+        } else {
+            let vals_py = table_column_to_pylist(observations, &cols[1])?.unwrap_or_default();
+            vals_py
+                .into_iter()
+                .map(|v| v.extract::<f64>())
+                .collect::<PyResult<Vec<_>>>()?
+        };
+        return dates_py
+            .iter()
+            .zip(vals)
+            .map(|(d, v)| Ok((crate::bindings::date_utils::py_to_date(d)?, v)))
             .collect();
     }
     observations

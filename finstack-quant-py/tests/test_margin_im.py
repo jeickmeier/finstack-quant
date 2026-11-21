@@ -151,7 +151,7 @@ def test_simm_sensitivities_dataframe_round_trip_and_helpers() -> None:
     sens.add_commodity_vega("Crude", 750.0)
     sens.add_curvature(SimmCurvatureSensitivity("equity", "residual", "ACME", "1Y", 1_250.0))
 
-    restored = SimmSensitivities.from_dataframe(sens.to_dataframe(), "USD")
+    restored = SimmSensitivities.from_dataframe(sens.to_arrow(), "USD")
     assert json.loads(restored.to_json()) == json.loads(sens.to_json())
 
     assert sens.total_ir_delta() == pytest.approx(25_000.0)
@@ -178,12 +178,12 @@ def test_simm_dataframe_requires_and_keeps_the_base_currency() -> None:
     sens.add_ir_delta("EUR", "5Y", 1_000.0)
     sens.add_fx_vega("EUR", "USD", 2.0)
     with pytest.raises(TypeError):
-        SimmSensitivities.from_dataframe(sens.to_dataframe())  # type: ignore[call-arg]
-    restored = SimmSensitivities.from_dataframe(sens.to_dataframe(), "EUR")
+        SimmSensitivities.from_dataframe(sens.to_pandas())  # type: ignore[call-arg]
+    restored = SimmSensitivities.from_dataframe(sens.to_pandas(), "EUR")
     assert restored.base_currency == "EUR"
     assert json.loads(restored.to_json()) == json.loads(sens.to_json())
     with pytest.raises(ValueError, match="unsupported SIMM"):
-        SimmSensitivities.from_dataframe(sens.to_dataframe().assign(kind="gamma"), "EUR")
+        SimmSensitivities.from_dataframe(sens.to_pandas().assign(kind="gamma"), "EUR")
 
 
 def _margin_overlay(overlay: dict[str, object]) -> FinstackConfig:

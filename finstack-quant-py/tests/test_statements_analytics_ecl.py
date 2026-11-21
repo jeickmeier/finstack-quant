@@ -143,7 +143,9 @@ def test_weighted_result_exposes_bucket_audit_trail() -> None:
         [EclScenario(id="base", weight="1", pd_schedule=[(0.0, 0.0), (2.0, 0.04)])],
         stage="stage2",
     )
-    frame = result.to_dataframe()
+    frame = result.to_pandas()
+    assert result.to_arrow().column_names()[:2] == ["scenario", "weight"]
+    assert result.to_polars().height == len(frame)
     assert list(frame.columns)[:2] == ["scenario", "weight"]
     assert not frame.empty
     assert frame["ecl"].sum() == pytest.approx(result.ecl)

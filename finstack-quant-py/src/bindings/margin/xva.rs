@@ -1,10 +1,11 @@
 //! Python wrappers for XVA types (CVA/DVA/FVA configuration and results).
 
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::tabular_methods;
 use crate::bindings::module_utils::parse_currency;
-use crate::bindings::pandas_utils::{
-    dict_to_dataframe, serde_object_to_single_row_dataframe_with_schema, serde_to_py,
-};
+use crate::bindings::table_builders::{TableBuilder, serde_object_to_single_row_arrow_table};
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_margin::xva::types as xva;
 use pyo3::prelude::*;
@@ -259,22 +260,85 @@ impl PyExposureProfile {
     }
 
     #[staticmethod]
+    #[pyo3(signature = (frame, *, as_of=None, currency=None, basis=None, diagnostics=None, time_col=None))]
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.from_dataframe")]
-    fn from_dataframe(py: Python<'_>, frame: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let attributes = frame.getattr("attrs").map_err(|_| {
-            pyo3::exceptions::PyTypeError::new_err("expected an exposure DataFrame")
+    fn from_dataframe(
+        frame: &Bound<'_, PyAny>,
+        as_of: Option<&Bound<'_, PyAny>>,
+        currency: Option<&str>,
+        basis: Option<&Bound<'_, PyAny>>,
+        diagnostics: Option<&Bound<'_, PyAny>>,
+        time_col: Option<&str>,
+    ) -> PyResult<Self> {
+        use crate::bindings::dataframe_utils::{
+            is_dataframe_like, is_pandas_dataframe, table_column_to_pylist,
+        };
+        let py = frame.py();
+        if !is_dataframe_like(frame)? && !frame.hasattr("attrs")? {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "expected a pandas DataFrame, Polars DataFrame, or Arrow table",
+            ));
+        }
+        let fields = if frame.hasattr("attrs")? {
+            let attributes = frame.getattr("attrs")?;
+            if let Ok(metadata) = attributes.get_item("finstack_exposure") {
+                metadata.cast::<PyDict>()?.copy()?
+            } else {
+                PyDict::new(py)
+            }
+        } else {
+            PyDict::new(py)
+        };
+        if let Some(as_of) = as_of {
+            fields.set_item(
+                "as_of",
+                crate::bindings::date_utils::extract_date_iso(as_of)?,
+            )?;
+        }
+        if let Some(currency) = currency {
+            fields.set_item("currency", currency)?;
+        }
+        if let Some(basis) = basis {
+            fields.set_item("basis", basis)?;
+        }
+        if let Some(diagnostics) = diagnostics {
+            fields.set_item("diagnostics", diagnostics)?;
+        }
+        if fields.get_item("as_of")?.is_none() || fields.get_item("currency")?.is_none() {
+            return Err(crate::errors::value_error(
+                "exposure DataFrame has no finstack_exposure metadata; pass as_of=... and currency=...",
+            ));
+        }
+        let date_items = table_column_to_pylist(frame, "dates")?.ok_or_else(|| {
+            crate::errors::value_error("exposure DataFrame has no 'dates' column")
         })?;
-        let metadata = attributes.get_item("finstack_exposure").map_err(|_| {
-            crate::errors::value_error("exposure DataFrame has no finstack_exposure metadata")
-        })?;
-        let fields = metadata.cast::<PyDict>()?.copy()?;
-        for name in ["dates", "mtm_values", "epe", "ene"] {
-            let column = frame.get_item(name).map_err(|_| {
+        let iso_dates: Vec<String> = date_items
+            .iter()
+            .map(crate::bindings::date_utils::extract_date_iso)
+            .collect::<PyResult<_>>()?;
+        fields.set_item("dates", iso_dates)?;
+        for name in ["mtm_values", "epe", "ene"] {
+            let col_items = table_column_to_pylist(frame, name)?.ok_or_else(|| {
                 crate::errors::value_error(format!("exposure DataFrame has no '{name}' column"))
             })?;
-            fields.set_item(name, column.call_method0("tolist")?)?;
+            fields.set_item(name, col_items)?;
         }
-        fields.set_item("times", frame.getattr("index")?.call_method0("tolist")?)?;
+        if let Some(col_name) = time_col {
+            let time_items = table_column_to_pylist(frame, col_name)?.ok_or_else(|| {
+                pyo3::exceptions::PyKeyError::new_err(format!(
+                    "exposure DataFrame has no time_col {col_name:?}"
+                ))
+            })?;
+            fields.set_item("times", time_items)?;
+        } else if let Some(time_items) = table_column_to_pylist(frame, "times")? {
+            fields.set_item("times", time_items)?;
+        } else if is_pandas_dataframe(frame)? {
+            fields.set_item("times", frame.getattr("index")?.call_method0("tolist")?)?;
+        } else {
+            return Err(crate::errors::value_error(
+                "exposure DataFrame has no 'times' column; pass time_col=... or include a 'times' column",
+            ));
+        }
         let profile = Self::new(py, Some(&fields))?;
         profile.validate()?;
         Ok(profile)
@@ -372,15 +436,11 @@ impl PyExposureProfile {
         self.inner.times.len()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        data.set_item("dates", self.dates(py)?)?;
-        data.set_item("mtm_values", &self.inner.mtm_values)?;
-        data.set_item("epe", &self.inner.epe)?;
-        data.set_item("ene", &self.inner.ene)?;
-        let idx = self.inner.times.clone().into_pyobject(py)?.into_any();
-        let frame = dict_to_dataframe(py, &data, Some(idx))?;
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "ExposureProfile.to_pandas")]
+    fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let table_py = Bound::new(py, self.to_arrow_table()?)?;
+        let frame = PyArrowTable::to_pandas(&table_py, py)?;
+        let frame = frame.call_method1("set_index", ("times",))?;
         let metadata = PyDict::new(py);
         metadata.set_item("as_of", self.inner.as_of.to_string())?;
         metadata.set_item("currency", self.currency())?;
@@ -400,18 +460,26 @@ impl PyExposureProfile {
             self.inner.times.len()
         )
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyExposureProfile {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .f64("times", self.inner.times.clone())?
+            .date("dates", &self.inner.dates)?
+            .f64("mtm_values", self.inner.mtm_values.clone())?
+            .f64("epe", self.inner.epe.clone())?
+            .f64("ene", self.inner.ene.clone())?
+            .build()
     }
 }
+
+tabular_methods!(
+    PyExposureProfile,
+    "ExposureProfile",
+    module = "finstack_quant.margin._xva",
+    custom_pandas
+);
 
 /// Result of XVA calculations (CVA, DVA, FVA, MVA, exposure profiles).
 #[pyclass(
@@ -565,54 +633,24 @@ impl PyXvaResult {
     ///
     /// This is the default export; one row per result, so a portfolio of
     /// netting sets stacks with
-    /// ``pd.concat([r.to_dataframe() for r in results])``. The time-indexed
-    /// exposure profiles are a separate table — see ``to_profiles_dataframe``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        // Built explicitly rather than from `XvaResult`'s serde, which also
-        // carries the four profile vectors — a nested list per cell is not a
-        // scalar summary row.
-        let row = serde_json::json!({
-            "cva": self.inner.cva,
-            "dva": self.inner.dva,
-            "fva": self.inner.fva,
-            "mva": self.inner.mva,
-            "total_xva": self.inner.total_xva,
-            "max_epe": self.inner.max_epe,
-            "effective_epe": self.inner.effective_epe,
-        });
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &[
-                "cva",
-                "dva",
-                "fva",
-                "mva",
-                "total_xva",
-                "max_epe",
-                "effective_epe",
-            ],
-        )
-    }
-
-    /// Export exposure profiles as a pandas ``DataFrame``.
+    /// ``pd.concat([r.to_pandas() for r in results])``. The time-indexed
+    /// exposure profiles are a separate table — see ``to_profiles_table``.
+    /// Export exposure profiles as an :class:`~finstack_quant.core.table.ArrowTable`.
     ///
-    /// Columns: ``epe``, ``ene``, ``effective_epe`` — indexed by
-    /// time in years.  Time values are taken from the EPE profile.
-    fn to_profiles_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
+    /// Columns: ``times`` (year fractions), ``epe``, ``ene``, ``effective_epe``.
+    fn to_profiles_table(&self) -> PyResult<PyArrowTable> {
         let (times, epe_vals): (Vec<f64>, Vec<f64>) =
             self.inner.epe_profile.iter().copied().unzip();
         let (_, ene_vals): (Vec<f64>, Vec<f64>) = self.inner.ene_profile.iter().copied().unzip();
         let (_, eff_epe_vals): (Vec<f64>, Vec<f64>) =
             self.inner.effective_epe_profile.iter().copied().unzip();
 
-        data.set_item("epe", epe_vals)?;
-        data.set_item("ene", ene_vals)?;
-        data.set_item("effective_epe", eff_epe_vals)?;
-        let idx = times.into_pyobject(py)?.into_any();
-        dict_to_dataframe(py, &data, Some(idx))
+        TableBuilder::new()
+            .f64("times", times)?
+            .f64("epe", epe_vals)?
+            .f64("ene", ene_vals)?
+            .f64("effective_epe", eff_epe_vals)?
+            .build()
     }
 
     fn __repr__(&self) -> String {
@@ -629,18 +667,35 @@ impl PyXvaResult {
             self.inner.max_epe
         )
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyXvaResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let row = serde_json::json!({
+            "cva": self.inner.cva,
+            "dva": self.inner.dva,
+            "fva": self.inner.fva,
+            "mva": self.inner.mva,
+            "total_xva": self.inner.total_xva,
+            "max_epe": self.inner.max_epe,
+            "effective_epe": self.inner.effective_epe,
+        });
+        serde_object_to_single_row_arrow_table(
+            &row,
+            &[
+                ("cva", "float64"),
+                ("dva", "float64"),
+                ("fva", "float64"),
+                ("mva", "float64"),
+                ("total_xva", "float64"),
+                ("max_epe", "float64"),
+                ("effective_epe", "float64"),
+            ],
+        )
     }
 }
+
+tabular_methods!(PyXvaResult);
 
 /// Deterministic IM decay profile for MVA (Green 2015, ch. 10).
 #[pyclass(
@@ -900,29 +955,28 @@ impl PyImProfile {
     /// Export as a pandas ``DataFrame`` with time (years) as index.
     ///
     /// Columns: ``date`` and ``im``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        data.set_item("date", self.dates(py)?)?;
-        data.set_item("im", &self.inner.im_values)?;
-        let idx = self.inner.times().into_pyobject(py)?.into_any();
-        dict_to_dataframe(py, &data, Some(idx))
+    fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let table_py = Bound::new(py, self.to_arrow_table()?)?;
+        let frame = PyArrowTable::to_pandas(&table_py, py)?;
+        frame.call_method1("set_index", ("times",))
     }
 
     fn __repr__(&self) -> String {
         format!("ImProfile(points={})", self.inner.dates.len())
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyImProfile {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .f64("times", self.inner.times())?
+            .date("date", &self.inner.dates)?
+            .f64("im", self.inner.im_values.clone())?
+            .build()
     }
 }
+
+tabular_methods!(PyImProfile, custom_pandas);
 
 /// Result of an MVA computation.
 #[pyclass(
@@ -985,9 +1039,9 @@ impl PyMvaResult {
         serde_to_py(py, &self.inner.intervals)
     }
 
-    /// Export the observation profile with dates and IM indexed by time in years.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        self.im_profile().to_dataframe(py)
+    /// Export the observation profile with dates and IM as a pandas ``DataFrame`` indexed by time in years.
+    fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        self.im_profile().to_pandas(py)
     }
 
     fn __repr__(&self) -> String {
@@ -996,18 +1050,15 @@ impl PyMvaResult {
             self.inner.mva, self.inner.average_im
         )
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyMvaResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        self.im_profile().to_arrow_table()
     }
 }
+
+tabular_methods!(PyMvaResult, custom_pandas);
 
 #[pyfunction]
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.margin._xva", "im_profile_from_simm")]

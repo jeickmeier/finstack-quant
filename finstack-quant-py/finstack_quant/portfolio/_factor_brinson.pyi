@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
+import numpy as np
+import numpy.typing as npt
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable
 
 class FactorBrinsonResult:
     """
@@ -140,14 +145,30 @@ class FactorBrinsonResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Per-factor contributions as a pandas DataFrame.
+        Per-factor contributions as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``factor``, ``active_loading``, ``factor_return``, ``contribution``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
-        The primary frame is the factor axis; the per-asset selection
-        breakdown comes from :meth:`to_asset_contributions_dataframe`.
+        The primary table is the factor axis; the per-asset selection
+        breakdown comes from :meth:`to_asset_contributions_table`.
+
+        Returns
+        -------
+        ArrowTable
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Per-factor contributions as a pandas ``DataFrame``.
 
         Returns
         -------
@@ -156,27 +177,62 @@ class FactorBrinsonResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
-    def to_asset_contributions_dataframe(self) -> pd.DataFrame:
+    def to_polars(self) -> pl.DataFrame:
         """
-        Per-asset specific contributions as a pandas DataFrame.
+        Per-factor contributions as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Per-factor contributions as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per entry, with the pinned column schema above.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_asset_contributions_table(self) -> ArrowTable:
+        """
+        Per-asset specific contributions as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``asset``, ``specific_return``, ``active_weight``, ``contribution``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per entry, with the pinned column schema above.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be serialized into an Arrow table.
         """
         ...
 
@@ -229,7 +285,8 @@ class FactorBrinsonResult:
         ...
 
 def factor_brinson_attribution(
-    input: str | dict[str, Any] | list[Any] | pd.DataFrame, factor_returns: list[float]
+    input: str | dict[str, Any] | list[Any] | pd.DataFrame | pl.DataFrame | Any,
+    factor_returns: Sequence[float] | npt.NDArray[np.float64] | pd.Series | pl.Series | Any,
 ) -> FactorBrinsonResult:
     """
     Compute Jeet-Partani (2023) factor-Brinson unified attribution.
@@ -242,13 +299,13 @@ def factor_brinson_attribution(
 
     Parameters
     ----------
-    input : str | dict | list | pandas.DataFrame
-        JSON ``FactorBrinsonInput`` with ``asset_ids``, ``asset_returns``,
+    input : str | dict | list | pandas.DataFrame | polars.DataFrame | Any
+        ``FactorBrinsonInput`` with ``asset_ids``, ``asset_returns``,
         ``exposures`` (row-major ``n_assets x n_factors``), ``factor_names``,
         ``portfolio_weights`` and ``benchmark_weights``. Each weight vector
         must sum to ``1.0`` within ``1e-6``; weights may be negative (short
         positions).
-    factor_returns : list[float]
+    factor_returns : Sequence[float] | numpy.ndarray | pandas.Series | polars.Series | Any
         Caller-supplied benchmark factor returns ``f_b``, length
         ``input.factor_names``. Typically fit with
         :func:`finstack_quant.analytics.constrained_least_squares` (using

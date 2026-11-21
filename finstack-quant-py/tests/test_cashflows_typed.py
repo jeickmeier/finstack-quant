@@ -991,13 +991,14 @@ class TestCashFlowSchedule:
         )
         # Zero rate: PV == nominal sum per period. 2025Q2 holds the 90-day coupon.
         assert pv["2025Q2"]["USD"].amount == pytest.approx(12_500.0, abs=1e-6)
-        assert list(pv.to_dataframe().columns) == ["period", "currency", "amount"]
+        assert list(pv.to_pandas().columns) == ["period", "currency", "amount"]
 
     def test_to_dataframe(self) -> None:
         pd = pytest.importorskip("pandas")
+        pl = pytest.importorskip("polars")
 
         schedule = self._bond()
-        df = schedule.to_dataframe()
+        df = schedule.to_pandas()
         assert list(df.columns) == [
             "date",
             "reset_date",
@@ -1010,8 +1011,11 @@ class TestCashFlowSchedule:
             "principal_delta",
             "principal_date",
         ]
-        assert str(df["date"].dtype).startswith("datetime64")
-        assert "outstanding" in schedule.to_dataframe(outstanding=True).columns
+        assert isinstance(df["date"].iloc[0], dt.date)
+        pl_df = schedule.to_polars()
+        assert pl_df["date"].dtype == pl.Date
+        assert "outstanding" in schedule.to_pandas(outstanding=True).columns
+        assert "outstanding" in schedule.to_arrow(outstanding=True).column_names()
         assert len(df) == 6
         assert set(df["kind"]) == {"fixed", "notional"}
         assert set(df["currency"]) == {"USD"}
@@ -1031,7 +1035,7 @@ class TestCashFlowSchedule:
         schedule = CashFlowSchedule.from_flows(
             rows, Notional.par(100, "USD"), DayCount.ACT_360, CashFlowMeta(issue_date="2025-01-01")
         )
-        assert schedule.to_dataframe(outstanding=True)["outstanding"].tolist() == [100.0, 80.0, 80.0]
+        assert schedule.to_pandas(outstanding=True)["outstanding"].tolist() == [100.0, 80.0, 80.0]
 
     def test_json_round_trip_matches_json_bridge(self) -> None:
         from finstack_quant.cashflows import validate_cashflow_schedule_json
@@ -1219,9 +1223,11 @@ class TestAggregation:
         # Periods with no flows are omitted.
         assert "2025Q2" not in out
         assert out.periods == ["2025Q1", "2025Q3"]
-        frame = out.to_dataframe()
+        frame = out.to_pandas()
         assert list(frame.columns) == ["period", "currency", "amount"]
         assert len(frame) == 3
+        assert out.to_polars().height == 3
+        assert out.to_arrow().num_rows == 3
 
     def test_calendar_year_ladder(self) -> None:
         from finstack_quant.cashflows.aggregation import calendar_year_ladder
@@ -1398,12 +1404,13 @@ class TestTypedTwinsAndWire:
         from finstack_quant.core.dates import DayCount
 
         original = self._schedule()
-        frame = original.to_dataframe()
-        rebuilt = CashFlowSchedule.from_flows(frame, original.get_notional(), original.get_day_count())
-        assert [f.amount.amount for f in rebuilt.get_flows()] == pytest.approx([
-            f.amount.amount for f in original.get_flows()
-        ])
+        frame = original.to_pandas()
         assert isinstance(frame, pd.DataFrame)
+        for tbl in (frame, original.to_polars(), original.to_arrow()):
+            rebuilt = CashFlowSchedule.from_flows(tbl, original.get_notional(), original.get_day_count())
+            assert [f.amount.amount for f in rebuilt.get_flows()] == pytest.approx([
+                f.amount.amount for f in original.get_flows()
+            ])
         with pytest.raises(ValueError, match="missing required column"):
             CashFlowSchedule.from_flows(frame.drop(columns=["kind"]), Notional.par(1.0, "USD"), DayCount.ACT_360)
 
@@ -1457,9 +1464,12 @@ class TestTypedTwinsAndWire:
         pytest.importorskip("pandas")
         schedule = self._schedule()
         pvs = [f.amount.amount for f in schedule.get_flows()]
-        ladder = schedule.calendar_year_ladder(pvs)
+        ladder_tbl = schedule.calendar_year_ladder(pvs)
+        ladder = ladder_tbl.to_pandas()
+        assert ladder_tbl.column_names() == ["year", "non_principal", "principal", "pv"]
         assert list(ladder.columns) == ["year", "non_principal", "principal", "pv"]
         assert ladder["pv"].sum() == pytest.approx(sum(pvs))
+        assert ladder_tbl.to_polars()["pv"].sum() == pytest.approx(sum(pvs))
         with pytest.raises(ValueError, match="equal lengths"):
             schedule.calendar_year_ladder(pvs[:-1])
 
@@ -1638,20 +1648,21 @@ def test_cashflow_metadata_dataframe_roundtrip() -> None:
         ],
     }
     original = build_cashflow_schedule(spec)
-    rebuilt = CashFlowSchedule.from_flows(
-        original.to_dataframe(), original.get_notional(), original.get_day_count(), original.get_meta()
-    )
-    rebuilt_doc = json.loads(rebuilt.to_json())
     original_doc = json.loads(original.to_json())
-    for rebuilt_flow, original_flow in zip(rebuilt_doc["flows"], original_doc["flows"], strict=True):
-        assert float(rebuilt_flow["amount"]["amount"]) == pytest.approx(
-            float(original_flow["amount"]["amount"]), rel=1e-15, abs=0.0
+    for frame in (original.to_pandas(), original.to_polars(), original.to_arrow()):
+        rebuilt = CashFlowSchedule.from_flows(
+            frame, original.get_notional(), original.get_day_count(), original.get_meta()
         )
-        rebuilt_flow["amount"]["amount"] = original_flow["amount"]["amount"]
-    assert rebuilt_doc == original_doc
-    assert accrued_interest_amount(rebuilt, "2025-05-01").amount == pytest.approx(
-        accrued_interest_amount(original, "2025-05-01").amount
-    )
+        rebuilt_doc = json.loads(rebuilt.to_json())
+        for rebuilt_flow, original_flow in zip(rebuilt_doc["flows"], original_doc["flows"], strict=True):
+            assert float(rebuilt_flow["amount"]["amount"]) == pytest.approx(
+                float(original_flow["amount"]["amount"]), rel=1e-15, abs=0.0
+            )
+            rebuilt_flow["amount"]["amount"] = original_flow["amount"]["amount"]
+        assert rebuilt_doc == original_doc
+        assert accrued_interest_amount(rebuilt, "2025-05-01").amount == pytest.approx(
+            accrued_interest_amount(original, "2025-05-01").amount
+        )
     coupon = original.coupons()[0]
     assert coupon.accrual.start == dt.date(2025, 1, 1)
     assert coupon.accrual.context.calendar_id == "weekends_only"

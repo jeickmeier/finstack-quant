@@ -9,7 +9,7 @@ use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_c
 use super::convert::{enum_to_py_string, money_to_py};
 use super::instruments::PyBond;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::core::table::envelope_to_pandas;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
@@ -113,12 +113,6 @@ impl PyBondWorkoutLadder {
         date_to_py(py, self.inner.quote_date)
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._bond_workout", "BondWorkoutLadder.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        envelope_to_pandas(py, &self.inner.to_table())
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -129,6 +123,18 @@ impl PyBondWorkoutLadder {
         )
     }
 }
+
+impl PyBondWorkoutLadder {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        PyArrowTable::from_envelope(&self.inner.to_table())
+    }
+}
+
+crate::bindings::macros::tabular_methods!(
+    PyBondWorkoutLadder,
+    "BondWorkoutLadder",
+    module = "finstack_quant.valuations.instruments._bond_workout"
+);
 
 crate::bindings::macros::py_getters!(PyBondWorkoutLadder |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._bond_workout", "BondWorkoutLadder.instrument_id")]

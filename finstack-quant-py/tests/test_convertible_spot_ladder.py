@@ -59,9 +59,11 @@ def test_default_grid_runs_through_every_regime_and_marks_the_market() -> None:
     assert [row.spot for row in ladder.rows] == [25.0, 50.0, 75.0, 100.0, 125.0, 150.0, 200.0, 300.0]
     assert [row.spot for row in ladder.rows if row.is_market_spot] == [100.0]
     assert {row.regime for row in ladder.rows} == {"busted", "balanced", "equity_sensitive"}
-    frame = ladder.to_dataframe()
+    frame = ladder.to_pandas()
     assert list(frame["spot"]) == [row.spot for row in ladder.rows]
     assert list(frame["regime"]) == [row.regime for row in ladder.rows]
+    assert ladder.to_arrow().num_rows == len(frame)
+    assert ladder.to_polars().height == len(frame)
 
 
 @pytest.mark.parametrize("spots", [[], [0.0], [-1.0], [float("nan")], [float("inf")]])

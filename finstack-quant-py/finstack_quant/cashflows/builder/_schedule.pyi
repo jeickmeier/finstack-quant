@@ -5,12 +5,14 @@ from __future__ import annotations
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.cashflows.aggregation import PeriodAggregation
 from finstack_quant.cashflows.fixings import ProjectedFixing
 from finstack_quant.core.cashflow import CashFlow
 from finstack_quant.core.dates import DayCount, Period
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.cashflows.builder._orchestrator import CashFlowBuilder
 from finstack_quant.cashflows.builder._specs.amortization import Notional
 
@@ -502,8 +504,8 @@ class CashFlowSchedule:
         -------
         PeriodAggregation
             Read-only mapping from period id label (e.g. ``"2025Q1"``) to
-            per-currency present-value totals, with ``to_dataframe()``;
-            periods with no flows are omitted.
+            per-currency present-value totals, with ``to_pandas()`` /
+            ``to_polars()`` / ``to_arrow()``; periods with no flows are omitted.
 
         Raises
         ------
@@ -596,7 +598,36 @@ class CashFlowSchedule:
         """
         ...
 
-    def to_dataframe(self, outstanding: bool = False) -> pd.DataFrame:
+    def to_arrow(self, outstanding: bool = False) -> ArrowTable:
+        """
+        Flows as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Parameters
+        ----------
+        outstanding : bool, default False
+            Append an ``outstanding`` column with the principal balance (float,
+            notional currency) after all economic principal events on or before
+            each payment date. Before the first event, use the initial notional.
+
+        Returns
+        -------
+        ArrowTable
+            One row per flow, in schedule order, with columns ``date``
+            (``Date32``), ``reset_date`` (nullable ``Date32``), ``kind``,
+            ``amount`` (float), ``currency``, ``accrual_factor``, ``rate``
+            (nullable float), ``accrual`` (nullable JSON string),
+            ``principal_delta`` (nullable JSON string), ``principal_date``
+            (nullable ``Date32``), and optionally ``outstanding``.
+
+        Raises
+        ------
+        ValueError
+            If ``outstanding=True`` and principal flows mix currencies with
+            the notional.
+        """
+        ...
+
+    def to_pandas(self, outstanding: bool = False) -> pd.DataFrame:
         """
         Flows as a pandas DataFrame.
 
@@ -610,41 +641,87 @@ class CashFlowSchedule:
         Returns
         -------
         pandas.DataFrame
-            One row per flow, in schedule order, with columns ``date``
-            (``datetime64``), ``reset_date`` (``datetime64``, ``NaT`` when
-            absent), ``kind``, ``amount`` (float), ``currency``,
+            One row per flow, in schedule order, with columns ``date``,
+            ``reset_date``, ``kind``, ``amount`` (float), ``currency``,
             ``accrual_factor``, ``rate`` (``NaN`` when absent), ``accrual``
-            (canonical metadata dict or None), ``principal_date`` (optional economic date), ``principal_delta`` (canonical
-            money dict or None), and optionally
-            ``outstanding``.
+            (canonical JSON metadata string or ``None``), ``principal_delta``
+            (canonical JSON money string or ``None``), ``principal_date``,
+            and optionally ``outstanding``.
 
         Raises
         ------
         ValueError
             If ``outstanding=True`` and principal flows mix currencies with
             the notional.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
-    def _repr_html_(self) -> str | None:
+    def to_polars(self, outstanding: bool = False) -> pl.DataFrame:
         """
-        HTML table for Jupyter, delegating to ``to_dataframe()``.
+        Flows as a ``polars.DataFrame``.
+
+        Parameters
+        ----------
+        outstanding : bool, default False
+            Append an ``outstanding`` column with the principal balance (float,
+            notional currency) after all economic principal events on or before
+            each payment date.
 
         Returns
         -------
-        str or None
-            pandas HTML rendering, or ``None`` to fall back to ``__repr__``.
+        pl.DataFrame
+            Flows constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ValueError
+            If ``outstanding=True`` and principal flows mix currencies with
+            the notional.
+        ImportError
+            If ``polars`` is not installed.
         """
         ...
 
-    def calendar_year_ladder(self, pvs: list[float]) -> pd.DataFrame:
+    def to_pyarrow(self, outstanding: bool = False) -> Any:
+        """
+        Flows as a ``pyarrow.Table``.
+
+        Parameters
+        ----------
+        outstanding : bool, default False
+            Append an ``outstanding`` column with the principal balance (float,
+            notional currency) after all economic principal events on or before
+            each payment date.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ValueError
+            If ``outstanding=True`` and principal flows mix currencies with
+            the notional.
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def _repr_html_(self) -> str | None: ...
+    def calendar_year_ladder(self, pvs: list[float]) -> ArrowTable:
         """
         Calendar-year non-principal / principal / PV ladder of this schedule.
 
         The ladder counts cash only: non-cash rows (PIK capitalization,
         defaulted-notional write-down) are excluded from every column.
 
-        Returns a ``pandas.DataFrame`` view alongside :meth:`to_dataframe`; use
+        Returns an :class:`~finstack_quant.core.table.ArrowTable` view
+        alongside :meth:`to_pandas`; use
         :func:`finstack_quant.cashflows.aggregation.calendar_year_ladder` for raw
         ``(year, non_principal, principal, pv)`` tuples over parallel arrays.
 
@@ -656,7 +733,7 @@ class CashFlowSchedule:
 
         Returns
         -------
-        pandas.DataFrame
+        ArrowTable
             Columns ``year``, ``non_principal``, ``principal``, ``pv`` sorted
             by year.
 
@@ -712,28 +789,29 @@ class CashFlowSchedule:
 
     @staticmethod
     def from_flows(
-        flows: list[CashFlow] | pd.DataFrame,
+        flows: list[CashFlow] | pd.DataFrame | pl.DataFrame | Any,
         notional: Notional,
         day_count: DayCount,
         meta: CashFlowMeta | None = None,
     ) -> CashFlowSchedule:
         """
-        Build a schedule from ``CashFlow`` rows or a pandas DataFrame.
+        Build a schedule from ``CashFlow`` rows, a DataFrame, or an Arrow table.
 
-        ``CashFlow`` rows are valid by construction; each DataFrame row is
-        built as a ``CashFlow`` (and validated) before Rust
+        ``CashFlow`` rows are valid by construction; each tabular row is built
+        as a ``CashFlow`` (and validated) before Rust
         ``CashFlowSchedule::from_flows`` sorts them.
 
         Parameters
         ----------
-        flows : list[CashFlow] or pandas.DataFrame
-            Typed rows, or a frame with columns ``date``, ``amount`` (float,
-            native currency units), ``currency`` (ISO code), ``kind``
-            (``CFKind`` label), ``accrual_factor`` (float year fraction,
-            required; ``0.0`` for non-coupon rows) and optional
-            ``reset_date``, ``rate`` (``NaN`` / ``None`` = absent),
-            ``accrual`` and ``principal_date`` (optional economic date), ``principal_delta`` (canonical JSON-compatible dicts
-            or None). Exported metadata is preserved when rebuilding.
+        flows : list[CashFlow] or pandas.DataFrame or polars.DataFrame or Any
+            Typed rows, or a pandas/Polars DataFrame or Arrow table with columns
+            ``date``, ``amount`` (float, native currency units), ``currency``
+            (ISO code), ``kind`` (``CFKind`` label), ``accrual_factor`` (float
+            year fraction, required; ``0.0`` for non-coupon rows) and optional
+            ``reset_date``, ``rate`` (``NaN`` / ``None`` / ``null`` = absent),
+            ``accrual`` and ``principal_date`` (optional economic date),
+            ``principal_delta`` (canonical JSON-compatible dicts or None).
+            Exported metadata is preserved when rebuilding.
         notional : Notional
             Representative notional stamped on the schedule.
         day_count : DayCount

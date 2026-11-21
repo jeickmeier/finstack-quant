@@ -6,9 +6,9 @@
 //! All classes support JSON round-trip via `from_json`/`to_json`.
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::core::table::envelope_to_pandas;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::{label, parse_label};
-use crate::bindings::macros::wire_methods;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::errors::statements_to_py;
 use finstack_quant_statements::capital_structure::{
@@ -71,13 +71,13 @@ impl PyEcfSweepSpec {
     #[doc = pydoc!("finstack_quant.statements._capital_structure", "EcfSweepSpec.deductions")]
     #[getter]
     fn deductions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.deductions)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.deductions)
     }
 
     #[doc = pydoc!("finstack_quant.statements._capital_structure", "EcfSweepSpec.credits")]
     #[getter]
     fn credits<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.credits)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.credits)
     }
 
     /// Fraction of excess cash flow swept to debt paydown.
@@ -102,7 +102,7 @@ impl PyEcfSweepSpec {
     #[doc = pydoc!("finstack_quant.statements._capital_structure", "EcfSweepSpec.facilities")]
     #[getter]
     fn facilities<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.facilities)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.facilities)
     }
 
     /// Return the representation with the cash measure and sweep fraction.
@@ -165,7 +165,7 @@ impl PyPikToggleSpec {
     #[doc = pydoc!("finstack_quant.statements._capital_structure", "PikToggleSpec.elections")]
     #[getter]
     fn elections<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.elections)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.elections)
     }
 
     fn __repr__(&self) -> String {
@@ -418,7 +418,7 @@ impl PyWaterfallSpec {
         self.inner
             .mandatory_prepayment
             .as_ref()
-            .map(|spec| crate::bindings::pandas_utils::serde_to_py(py, spec))
+            .map(|spec| crate::bindings::json_bridge::serde_to_py(py, spec))
             .transpose()
     }
 
@@ -428,7 +428,7 @@ impl PyWaterfallSpec {
         self.inner
             .voluntary_prepayment
             .as_ref()
-            .map(|spec| crate::bindings::pandas_utils::serde_to_py(py, spec))
+            .map(|spec| crate::bindings::json_bridge::serde_to_py(py, spec))
             .transpose()
     }
 
@@ -543,14 +543,14 @@ impl PyCapitalStructureCashflows {
     ///
     /// Populated for every evaluation with capital-structure flows, including
     /// multi-currency structures without a reporting currency (where
-    /// ``to_totals_dataframe`` and the ``get_component(..., "total", ...)`` lookups have nothing
+    /// ``to_totals_table`` and the ``get_component(..., "total", ...)`` lookups have nothing
     /// to report).
     ///
     /// Returns
     /// -------
     /// dict[str, dict[str, dict[str, Money]]]
     ///     ISO currency code to period id to flow type (the ``flow_type``
-    ///     names of :meth:`to_dataframe`) to amount in that currency.
+    ///     names of :meth:`to_arrow`) to amount in that currency.
     #[getter]
     fn totals_by_currency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let out = PyDict::new(py);
@@ -581,19 +581,19 @@ impl PyCapitalStructureCashflows {
     #[doc = pydoc!("finstack_quant.statements._capital_structure", "CapitalStructureCashflows.prepayments")]
     #[getter]
     fn prepayments<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.prepayments)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.prepayments)
     }
 
     #[doc = pydoc!("finstack_quant.statements._capital_structure", "CapitalStructureCashflows.fx_conversions")]
     #[getter]
     fn fx_conversions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.fx_conversions)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.fx_conversions)
     }
 
     #[doc = pydoc!("finstack_quant.statements._capital_structure", "CapitalStructureCashflows.consolidation_unavailable")]
     #[getter]
     fn consolidation_unavailable<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.consolidation_unavailable)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.consolidation_unavailable)
     }
 
     #[doc = pydoc!("finstack_quant.statements._capital_structure", "CapitalStructureCashflows.retained_cash")]
@@ -619,39 +619,18 @@ impl PyCapitalStructureCashflows {
     #[doc = pydoc!("finstack_quant.statements._capital_structure", "CapitalStructureCashflows.distress_cash")]
     #[getter]
     fn distress_cash<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.distress_cash)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.distress_cash)
     }
 
-    /// Export per-instrument cashflows as a long pandas ``DataFrame``.
+    /// Export the cross-instrument totals as a long ``ArrowTable``.
     ///
-    /// Columns: ``instrument``, ``period`` (period id string),
-    /// ``flow_type`` (``interest_expense_cash``, ``interest_income_cash``
-    /// when present, ``interest_expense_pik``, ``principal_payment``,
-    /// ``fees``, ``debt_balance``, ``accrued_interest``, then — on
-    /// evaluator-produced cashflows — ``opening_balance`` and the four
-    /// sources of ``principal_payment``: ``scheduled_principal``,
-    /// ``mandatory_prepayment``, ``sweep_prepayment``,
-    /// ``voluntary_prepayment``, ``interest_arrears``, ``principal_pending``,
-    /// ``principal_arrears`` and ``principal_advance_reserve``), ``value`` (float64, positive debt-service
-    /// magnitude), ``amount`` (the exact amount as decimal text) and ``currency`` (ISO code of that instrument). Rows follow
-    /// instrument then period order.
-    ///
-    /// ``principal_payment`` equals the sum of its four source rows, so do
-    /// not add them together; ``opening_balance`` is the debt balance at
-    /// period start and ``debt_balance`` the balance at period end.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        envelope_to_pandas(py, &self.inner.to_table().map_err(statements_to_py)?)
-    }
-
-    /// Export the cross-instrument totals as a long pandas ``DataFrame``.
-    ///
-    /// Same columns as :meth:`to_dataframe`; ``instrument`` is
+    /// Same columns as :meth:`to_arrow`; ``instrument`` is
     /// ``"__total__"`` and ``currency`` is the reporting currency. Empty
     /// when no reporting currency is configured.
     #[pyo3(text_signature = "($self)")]
-    fn to_totals_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        envelope_to_pandas(py, &self.inner.to_totals_table().map_err(statements_to_py)?)
+    fn to_totals_table(&self) -> PyResult<PyArrowTable> {
+        let table = self.inner.to_totals_table().map_err(statements_to_py)?;
+        PyArrowTable::from_envelope(&table)
     }
 
     /// Return ``CapitalStructureCashflows(instruments=2, periods=4)``.
@@ -666,6 +645,15 @@ impl PyCapitalStructureCashflows {
         )
     }
 }
+
+impl PyCapitalStructureCashflows {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let table = self.inner.to_table().map_err(statements_to_py)?;
+        PyArrowTable::from_envelope(&table)
+    }
+}
+
+tabular_methods!(PyCapitalStructureCashflows);
 
 /// Register capital-structure classes.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {

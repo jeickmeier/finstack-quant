@@ -7,12 +7,13 @@
 
 use crate::bindings::core::currency::{PyCurrency, extract_currency};
 use crate::bindings::core::money::PyMoney;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::{extract_instrument, extract_market};
+use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::json_bridge::{deserialize_json_with_context, serialize_json_with_context};
 use crate::bindings::module_utils::opt_spec_from_py;
-use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
-use crate::bindings::pandas_utils::{ColumnSchema, serde_to_py};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::bindings::valuations::convert::{
     parse_typed_instrument_json, serialize_typed_instrument_json,
 };
@@ -30,13 +31,13 @@ use finstack_quant_valuations::results::composite::CompositeExposureReport;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
-const COMPOSITE_TRADE_COLUMNS: &[ColumnSchema<'static>] = &[
+const COMPOSITE_TRADE_COLUMNS: &[(&str, &str)] = &[
     ("instrument_id", "str"),
     ("instrument_type", "str"),
     ("quantity_delta", "float64"),
 ];
 
-const COMPOSITE_AGGREGATE_COLUMNS: &[ColumnSchema<'static>] = &[
+const COMPOSITE_AGGREGATE_COLUMNS: &[(&str, &str)] = &[
     ("instrument_id", "str"),
     ("instrument_type", "str"),
     ("net_quantity", "float64"),
@@ -46,7 +47,7 @@ const COMPOSITE_AGGREGATE_COLUMNS: &[ColumnSchema<'static>] = &[
     ("currency", "str"),
 ];
 
-const COMPOSITE_HISTORY_COLUMNS: &[ColumnSchema<'static>] = &[
+const COMPOSITE_HISTORY_COLUMNS: &[(&str, &str)] = &[
     ("date", "str"),
     ("value", "float64"),
     ("cashflows", "float64"),
@@ -364,7 +365,7 @@ impl PyCompositeSpec {
     #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeSpec.fx01_pair")]
     #[getter]
     fn fx01_pair<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.fx01_pair)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.fx01_pair)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeSpec.legs")]
@@ -573,18 +574,17 @@ impl PyCompositeInstrument {
         serde_to_py(py, &trades)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeInstrument.execution_trades_dataframe")]
+    #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeInstrument.execution_trades_table")]
     #[pyo3(signature = (previous=None))]
-    fn execution_trades_dataframe<'py>(
+    fn execution_trades_table(
         &self,
-        py: Python<'py>,
         previous: Option<&PyCompositeInstrument>,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    ) -> PyResult<PyArrowTable> {
         let trades = self
             .inner
             .execution_trades(previous.map(|value| &value.inner))
             .map_err(core_to_py)?;
-        serde_rows_to_dataframe_with_schema(py, &trades, COMPOSITE_TRADE_COLUMNS)
+        serde_rows_to_arrow_table(&trades, COMPOSITE_TRADE_COLUMNS)
     }
 
     /// Return ``repr(self)``.
@@ -635,11 +635,6 @@ impl PyCompositeRebalanceResult {
         serde_to_py(py, &self.inner.trades)
     }
 
-    #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeRebalanceResult.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(py, &self.inner.trades, COMPOSITE_TRADE_COLUMNS)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "CompositeRebalanceResult(instrument_id={:?}, trades={})",
@@ -648,6 +643,18 @@ impl PyCompositeRebalanceResult {
         )
     }
 }
+
+impl PyCompositeRebalanceResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.inner.trades, COMPOSITE_TRADE_COLUMNS)
+    }
+}
+
+crate::bindings::macros::tabular_methods!(
+    PyCompositeRebalanceResult,
+    "CompositeRebalanceResult",
+    module = "finstack_quant.valuations.composite"
+);
 
 crate::bindings::macros::py_getters!(PyCompositeRebalanceResult |s| {
     #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeRebalanceResult.instrument")]
@@ -675,8 +682,18 @@ impl PyCompositeExposureReport {
 
 #[pymethods]
 impl PyCompositeExposureReport {
-    #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeExposureReport.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn __repr__(&self) -> String {
+        format!(
+            "CompositeExposureReport(currency={}, paths={}, aggregates={})",
+            self.inner.reporting_currency,
+            self.inner.paths.len(),
+            self.inner.aggregates.len()
+        )
+    }
+}
+
+impl PyCompositeExposureReport {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         let rows = self
             .inner
             .aggregates
@@ -693,18 +710,15 @@ impl PyCompositeExposureReport {
                 })
             })
             .collect::<Vec<_>>();
-        serde_rows_to_dataframe_with_schema(py, &rows, COMPOSITE_AGGREGATE_COLUMNS)
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "CompositeExposureReport(currency={}, paths={}, aggregates={})",
-            self.inner.reporting_currency,
-            self.inner.paths.len(),
-            self.inner.aggregates.len()
-        )
+        serde_rows_to_arrow_table(&rows, COMPOSITE_AGGREGATE_COLUMNS)
     }
 }
+
+crate::bindings::macros::tabular_methods!(
+    PyCompositeExposureReport,
+    "CompositeExposureReport",
+    module = "finstack_quant.valuations.composite"
+);
 
 crate::bindings::macros::py_getters!(PyCompositeExposureReport |s| {
     #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeExposureReport.reporting_currency")]
@@ -738,7 +752,35 @@ impl PyCompositeHistoryResult {
             ))
         })
     }
+
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let rows = self
+            .inner
+            .iter()
+            .map(|row| {
+                serde_json::json!({
+                    "date": row.date.to_string(),
+                    "value": row.value.amount(),
+                    "cashflows": row.cashflows.amount(),
+                    "pnl": row.pnl.amount(),
+                    "currency": row.value.currency().to_string(),
+                    "period_return": row.period_return,
+                    "return_index": row.return_index,
+                    "held_state_effective_date": row.held_state_effective_date.to_string(),
+                    "next_state_effective_date": row.next_state_effective_date.map(|date| date.to_string()),
+                    "rebalance_trade_count": row.rebalance_trades.len(),
+                })
+            })
+            .collect::<Vec<_>>();
+        serde_rows_to_arrow_table(&rows, COMPOSITE_HISTORY_COLUMNS)
+    }
 }
+
+crate::bindings::macros::tabular_methods!(
+    PyCompositeHistoryResult,
+    "CompositeHistoryResult",
+    module = "finstack_quant.valuations.composite"
+);
 
 #[pymethods]
 impl PyCompositeHistoryResult {
@@ -761,29 +803,6 @@ impl PyCompositeHistoryResult {
     /// This accessor does not raise; an empty result has length ``0``.
     fn __len__(&self) -> usize {
         self.inner.len()
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeHistoryResult.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows = self
-            .inner
-            .iter()
-            .map(|row| {
-                serde_json::json!({
-                    "date": row.date.to_string(),
-                    "value": row.value.amount(),
-                    "cashflows": row.cashflows.amount(),
-                    "pnl": row.pnl.amount(),
-                    "currency": row.value.currency().to_string(),
-                    "period_return": row.period_return,
-                    "return_index": row.return_index,
-                    "held_state_effective_date": row.held_state_effective_date.to_string(),
-                    "next_state_effective_date": row.next_state_effective_date.map(|date| date.to_string()),
-                    "rebalance_trade_count": row.rebalance_trades.len(),
-                })
-            })
-            .collect::<Vec<_>>();
-        serde_rows_to_dataframe_with_schema(py, &rows, COMPOSITE_HISTORY_COLUMNS)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.composite", "CompositeHistoryResult.row")]

@@ -2,11 +2,12 @@
 
 use crate::bindings::attribution::pnl_attribution::{PyPnlAttribution, WIDE_COLUMNS};
 use crate::bindings::core::money::PyMoney;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref};
+use crate::bindings::macros::tabular_methods;
 use crate::bindings::module_utils::py_to_json_string;
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
-    serde_rows_to_dataframe_with_schema,
+use crate::bindings::table_builders::{
+    serde_object_to_single_row_arrow_table, serde_rows_to_arrow_table,
 };
 use crate::errors::{display_to_py, portfolio_to_py, serde_json_to_py};
 use pyo3::prelude::*;
@@ -59,18 +60,6 @@ impl PyReconciliationReport {
         self.inner.tolerance
     }
 
-    /// Single-row :class:`pandas.DataFrame` view of the report.
-    ///
-    /// Columns: ``total_residual``, ``is_reconciled``, ``tolerance``.
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &self.inner,
-            &["total_residual", "is_reconciled", "tolerance"],
-        )
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "ReconciliationReport(total_residual={}, is_reconciled={}, tolerance={})",
@@ -84,6 +73,21 @@ impl PyReconciliationReport {
         )
     }
 }
+
+impl PyReconciliationReport {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_object_to_single_row_arrow_table(
+            &self.inner,
+            &[
+                ("total_residual", "float64"),
+                ("is_reconciled", "bool"),
+                ("tolerance", "float64"),
+            ],
+        )
+    }
+}
+
+tabular_methods!(PyReconciliationReport);
 
 /// Portfolio-level P&L attribution result.
 ///
@@ -167,12 +171,13 @@ impl PyPortfolioAttribution {
     }
 
     /// Export the per-position native-currency attributions as a pandas
-    /// ``DataFrame``, one row per position.
+    /// Export per-position attributions as an :class:`~finstack_quant.core.table.ArrowTable`,
+    /// one row per position.
     ///
     /// Each row is ``position_id`` followed by the canonical Rust wide row
     /// (``finstack_quant_attribution::long_rows::pnl_attribution_wide_row``) of
     /// that position's attribution, the same columns as
-    /// :meth:`finstack_quant.attribution.PnlAttribution.to_dataframe`:
+    /// :meth:`finstack_quant.attribution.PnlAttribution.to_arrow`:
     /// ``instrument_id``, ``method``, ``t0``, ``t1``, ``currency`` (native),
     /// ``total_pnl``, ``mark_to_market_pnl``, ``pv_t0``, ``pv_t1``, ``carry``,
     /// ``rates_curves_pnl``, ``credit_curves_pnl``, ``inflation_curves_pnl``,
@@ -185,7 +190,7 @@ impl PyPortfolioAttribution {
     /// ValueError
     ///     If a position attribution mixes currencies across its factors.
     #[pyo3(text_signature = "(self)")]
-    fn to_position_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_position_table(&self) -> PyResult<PyArrowTable> {
         #[derive(serde::Serialize)]
         struct PositionRow<'a> {
             position_id: &'a str,
@@ -205,16 +210,16 @@ impl PyPortfolioAttribution {
                 })
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(crate::errors::core_to_py)?;
-        let columns: Vec<ColumnSchema<'static>> = std::iter::once(("position_id", "str"))
-            .chain(WIDE_COLUMNS)
+        let columns: Vec<(&str, &str)> = std::iter::once(("position_id", "str"))
+            .chain(WIDE_COLUMNS.iter().copied())
             .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, &columns)
+        serde_rows_to_arrow_table(&rows, &columns)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._attribution", "PortfolioAttribution.pct_of_total_by_bucket")]
     #[pyo3(text_signature = "($self)")]
     fn pct_of_total_by_bucket<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.pct_of_total_by_bucket())
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.pct_of_total_by_bucket())
     }
 
     /// Human-readable explanation tree of the portfolio-level buckets with
@@ -222,61 +227,6 @@ impl PyPortfolioAttribution {
     #[pyo3(text_signature = "(self)")]
     fn explain(&self) -> String {
         self.inner.explain()
-    }
-    /// Export the portfolio-level factor totals as a single-row pandas ``DataFrame``.
-    ///
-    /// Every ``Money`` aggregate is flattened to a float column plus one
-    /// shared ``currency`` column; the per-position nested breakdown stays on
-    /// :meth:`by_position_json`.
-    ///
-    /// Columns: ``currency``, ``total_pnl``, ``carry``, ``rates_curves_pnl``,
-    /// ``credit_curves_pnl``, ``inflation_curves_pnl``, ``correlations_pnl``,
-    /// ``fx_pnl``, ``fx_translation_pnl``, ``cross_factor_pnl``, ``vol_pnl``,
-    /// ``model_params_pnl``, ``market_scalars_pnl``, ``residual``,
-    /// ``result_invalid``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        // `currency` is taken from `total_pnl`; the aggregates are guaranteed
-        // currency-consistent by the Rust attribution engine.
-        let row = serde_json::json!({
-            "currency": self.inner.total_pnl.currency().to_string(),
-            "total_pnl": self.inner.total_pnl.amount(),
-            "carry": self.inner.carry.amount(),
-            "rates_curves_pnl": self.inner.rates_curves_pnl.amount(),
-            "credit_curves_pnl": self.inner.credit_curves_pnl.amount(),
-            "inflation_curves_pnl": self.inner.inflation_curves_pnl.amount(),
-            "correlations_pnl": self.inner.correlations_pnl.amount(),
-            "fx_pnl": self.inner.fx_pnl.amount(),
-            "fx_translation_pnl": self.inner.fx_translation_pnl.amount(),
-            "cross_factor_pnl": self.inner.cross_factor_pnl.amount(),
-            "vol_pnl": self.inner.vol_pnl.amount(),
-            "model_params_pnl": self.inner.model_params_pnl.amount(),
-            "market_scalars_pnl": self.inner.market_scalars_pnl.amount(),
-            "residual": self.inner.residual.amount(),
-            // Lets downstream pipelines refuse to aggregate attributions that
-            // Rust flagged invalid (non-finite sensitivities, residual failures).
-            "result_invalid": self.inner.result_invalid,
-        });
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &[
-                "currency",
-                "total_pnl",
-                "carry",
-                "rates_curves_pnl",
-                "credit_curves_pnl",
-                "inflation_curves_pnl",
-                "correlations_pnl",
-                "fx_pnl",
-                "fx_translation_pnl",
-                "cross_factor_pnl",
-                "vol_pnl",
-                "model_params_pnl",
-                "market_scalars_pnl",
-                "residual",
-                "result_invalid",
-            ],
-        )
     }
 
     /// Total portfolio P&L between the two market snapshots.
@@ -388,18 +338,51 @@ impl PyPortfolioAttribution {
             self.inner.result_invalid,
         )
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyPortfolioAttribution {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let row = serde_json::json!({
+            "currency": self.inner.total_pnl.currency().to_string(),
+            "total_pnl": self.inner.total_pnl.amount(),
+            "carry": self.inner.carry.amount(),
+            "rates_curves_pnl": self.inner.rates_curves_pnl.amount(),
+            "credit_curves_pnl": self.inner.credit_curves_pnl.amount(),
+            "inflation_curves_pnl": self.inner.inflation_curves_pnl.amount(),
+            "correlations_pnl": self.inner.correlations_pnl.amount(),
+            "fx_pnl": self.inner.fx_pnl.amount(),
+            "fx_translation_pnl": self.inner.fx_translation_pnl.amount(),
+            "cross_factor_pnl": self.inner.cross_factor_pnl.amount(),
+            "vol_pnl": self.inner.vol_pnl.amount(),
+            "model_params_pnl": self.inner.model_params_pnl.amount(),
+            "market_scalars_pnl": self.inner.market_scalars_pnl.amount(),
+            "residual": self.inner.residual.amount(),
+            "result_invalid": self.inner.result_invalid,
+        });
+        serde_object_to_single_row_arrow_table(
+            &row,
+            &[
+                ("currency", "str"),
+                ("total_pnl", "float64"),
+                ("carry", "float64"),
+                ("rates_curves_pnl", "float64"),
+                ("credit_curves_pnl", "float64"),
+                ("inflation_curves_pnl", "float64"),
+                ("correlations_pnl", "float64"),
+                ("fx_pnl", "float64"),
+                ("fx_translation_pnl", "float64"),
+                ("cross_factor_pnl", "float64"),
+                ("vol_pnl", "float64"),
+                ("model_params_pnl", "float64"),
+                ("market_scalars_pnl", "float64"),
+                ("residual", "float64"),
+                ("result_invalid", "bool"),
+            ],
+        )
     }
 }
+
+tabular_methods!(PyPortfolioAttribution);
 
 /// Attribute portfolio P&L between two market snapshots.
 ///

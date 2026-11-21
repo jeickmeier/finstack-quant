@@ -65,13 +65,13 @@ impl PyCallableRangeAccrual {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_callable_range_accrual", "CallableRangeAccrual.range_accrual")]
     #[getter]
     fn range_accrual<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.range_accrual)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.range_accrual)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_callable_range_accrual", "CallableRangeAccrual.call_provision")]
     #[getter]
     fn call_provision<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.call_provision)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.call_provision)
     }
 }
 

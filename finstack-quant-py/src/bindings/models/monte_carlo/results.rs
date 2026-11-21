@@ -1,16 +1,18 @@
 //! Result types for Monte Carlo simulations.
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
-use crate::bindings::pandas_utils::dict_to_dataframe;
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::TableBuilder;
+use crate::errors::value_error;
 use finstack_quant_models::monte_carlo::greeks::lrm::LrmGreeks;
 use finstack_quant_models::monte_carlo::pricer::lsmc::{ExerciseBoundaryPoint, LsmcResult};
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::simulate::PathSummary;
 use numpy::{PyArray1, PyArray3, PyArrayMethods};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyInt};
+use pyo3::types::PyInt;
 
 #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "PathSummary")]
 #[pyclass(
@@ -128,30 +130,12 @@ impl PyPathSummary {
         Ok(PyArray1::from_vec(py, values))
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "PathSummary.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let [_, _, dim] = self.validated_shape()?;
-        let summary = &self.inner;
-        let data = PyDict::new(py);
-        for (factor, name) in summary.factor_names.iter().enumerate() {
-            let column: Vec<f64> = summary
-                .values
-                .iter()
-                .skip(factor)
-                .step_by(dim)
-                .copied()
-                .collect();
-            data.set_item(name, PyArray1::from_vec(py, column))?;
-        }
-        let paths: Vec<usize> = (0..summary.num_simulated_paths).collect();
-        let kwargs = PyDict::new(py);
-        kwargs.set_item("names", ["path", "time"])?;
-        let index = py.import("pandas")?.getattr("MultiIndex")?.call_method(
-            "from_product",
-            ((paths, summary.times.clone()),),
-            Some(&kwargs),
-        )?;
-        dict_to_dataframe(py, &data, Some(index))
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "PathSummary.to_pandas")]
+    #[pyo3(text_signature = "($self)")]
+    fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let bound = Bound::new(py, self.to_arrow_table()?)?;
+        let frame = PyArrowTable::to_pandas(&bound, py)?;
+        frame.call_method1("set_index", (["path", "time"],))
     }
 
     fn __repr__(&self) -> String {
@@ -164,13 +148,50 @@ impl PyPathSummary {
     }
 }
 
+impl PyPathSummary {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let [paths, times, dim] = self.validated_shape()?;
+        let summary = &self.inner;
+        let total = paths * times;
+        let mut path_col = Vec::with_capacity(total);
+        let mut time_col = Vec::with_capacity(total);
+        for p in 0..paths {
+            let p_i64 =
+                i64::try_from(p).map_err(|e| value_error(format!("path index overflow: {e}")))?;
+            for &t in &summary.times {
+                path_col.push(p_i64);
+                time_col.push(t);
+            }
+        }
+        let mut builder = TableBuilder::new()
+            .i64("path", path_col)?
+            .f64("time", time_col)?;
+        for (factor, name) in summary.factor_names.iter().enumerate() {
+            let column: Vec<f64> = summary
+                .values
+                .iter()
+                .skip(factor)
+                .step_by(dim)
+                .copied()
+                .collect();
+            builder = builder.f64(name, column)?;
+        }
+        builder.build()
+    }
+}
+
+tabular_methods!(
+    PyPathSummary,
+    "PathSummary",
+    module = "finstack_quant.models.monte_carlo._results",
+    custom_pandas
+);
 wire_methods!(
     PyPathSummary,
     PathSummary,
     "PathSummary",
     module = "finstack_quant.models.monte_carlo._results"
 );
-impl_repr_html_via_dataframe!(PyPathSummary);
 
 #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "MoneyEstimate")]
 #[pyclass(
@@ -425,37 +446,14 @@ impl PyLrmGreeks {
         PyEstimate::from_inner(self.inner.vega.clone())
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "LrmGreeks.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let greeks = &self.inner;
-        let price = &greeks.price;
-        let rows = [
-            (
-                price.mean.amount(),
-                price.stderr,
-                price.ci_95.0.amount(),
-                price.ci_95.1.amount(),
-            ),
-            (
-                greeks.delta.mean,
-                greeks.delta.stderr,
-                greeks.delta.ci_95.0,
-                greeks.delta.ci_95.1,
-            ),
-            (
-                greeks.vega.mean,
-                greeks.vega.stderr,
-                greeks.vega.ci_95.0,
-                greeks.vega.ci_95.1,
-            ),
-        ];
-        let data = PyDict::new(py);
-        data.set_item("mean", rows.map(|row| row.0).to_vec())?;
-        data.set_item("stderr", rows.map(|row| row.1).to_vec())?;
-        data.set_item("ci_lower", rows.map(|row| row.2).to_vec())?;
-        data.set_item("ci_upper", rows.map(|row| row.3).to_vec())?;
-        let index = pyo3::types::PyList::new(py, ["price", "delta", "vega"])?;
-        dict_to_dataframe(py, &data, Some(index.into_any()))
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "LrmGreeks.to_pandas")]
+    #[pyo3(text_signature = "($self)")]
+    fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let bound = Bound::new(py, self.to_arrow_table()?)?;
+        let frame = PyArrowTable::to_pandas(&bound, py)?;
+        frame
+            .call_method1("set_index", ("metric",))?
+            .call_method1("rename_axis", (py.None(),))
     }
 
     fn __repr__(&self) -> String {
@@ -469,13 +467,55 @@ impl PyLrmGreeks {
     }
 }
 
+impl PyLrmGreeks {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let greeks = &self.inner;
+        let price = &greeks.price;
+        TableBuilder::new()
+            .utf8(
+                "metric",
+                vec!["price".to_string(), "delta".to_string(), "vega".to_string()],
+            )?
+            .f64(
+                "mean",
+                vec![price.mean.amount(), greeks.delta.mean, greeks.vega.mean],
+            )?
+            .f64(
+                "stderr",
+                vec![price.stderr, greeks.delta.stderr, greeks.vega.stderr],
+            )?
+            .f64(
+                "ci_lower",
+                vec![
+                    price.ci_95.0.amount(),
+                    greeks.delta.ci_95.0,
+                    greeks.vega.ci_95.0,
+                ],
+            )?
+            .f64(
+                "ci_upper",
+                vec![
+                    price.ci_95.1.amount(),
+                    greeks.delta.ci_95.1,
+                    greeks.vega.ci_95.1,
+                ],
+            )?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyLrmGreeks,
+    "LrmGreeks",
+    module = "finstack_quant.models.monte_carlo._results",
+    custom_pandas
+);
 wire_methods!(
     PyLrmGreeks,
     LrmGreeks,
     "LrmGreeks",
     module = "finstack_quant.models.monte_carlo._results"
 );
-impl_repr_html_via_dataframe!(PyLrmGreeks);
 
 #[doc = pydoc!("finstack_quant.models.monte_carlo._results", "ExerciseBoundaryPoint")]
 #[pyclass(

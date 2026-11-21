@@ -4,14 +4,13 @@
 //! probability utilities to Python under `finstack_quant.models.correlation`,
 //! mirroring the Rust module [`finstack_quant_models::correlation`].
 
-use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
-use crate::bindings::pandas_utils::{
-    dict_to_dataframe, serde_object_to_single_row_dataframe_with_schema,
-};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::{core_to_py, correlation_to_py};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyModule, PyType};
+use pyo3::types::{PyList, PyModule, PyType};
 
 use finstack_quant_core::math::linalg;
 use finstack_quant_core::math::probability::{self, CorrelatedBernoulli};
@@ -973,33 +972,17 @@ impl PyPortfolioLossResult {
         .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        data.set_item("loss", self.inner.losses.clone())?;
-        dict_to_dataframe(py, &data, None)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.to_summary_dataframe")]
-    fn to_summary_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let row = serde_json::json!({
-            "expected_loss": self.inner.expected_loss,
-            "var": self.inner.var,
-            "expected_shortfall": self.inner.expected_shortfall,
-            "confidence": self.inner.confidence,
-            "num_paths": self.inner.losses.len(),
-        });
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &[
-                "expected_loss",
-                "var",
-                "expected_shortfall",
-                "confidence",
-                "num_paths",
-            ],
-        )
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.to_summary_table")]
+    fn to_summary_table(&self) -> PyResult<PyArrowTable> {
+        let num_paths = i64::try_from(self.inner.losses.len())
+            .map_err(|e| crate::errors::value_error(format!("num_paths overflow: {e}")))?;
+        TableBuilder::new()
+            .f64("expected_loss", vec![self.inner.expected_loss])?
+            .f64("var", vec![self.inner.var])?
+            .f64("expected_shortfall", vec![self.inner.expected_shortfall])?
+            .f64("confidence", vec![self.inner.confidence])?
+            .i64("num_paths", vec![num_paths])?
+            .build()
     }
 
     fn __repr__(&self) -> String {
@@ -1007,6 +990,19 @@ impl PyPortfolioLossResult {
     }
 }
 
+impl PyPortfolioLossResult {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .f64("loss", self.inner.losses.clone())?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyPortfolioLossResult,
+    "PortfolioLossResult",
+    module = "finstack_quant.models.correlation"
+);
 wire_methods!(
     PyPortfolioLossResult,
     PortfolioLossResult,
@@ -1094,52 +1090,55 @@ impl PyTrancheLossStatistics {
         self.inner.prob_full_writedown
     }
 
-    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let row = serde_json::json!({
-            "attachment": self.inner.attachment,
-            "detachment": self.inner.detachment,
-            "tranche_notional": self.inner.tranche_notional,
-            "expected_loss_fraction": self.inner.expected_loss_fraction,
-            "expected_loss_amount": self.inner.expected_loss_amount,
-            "var_fraction": self.inner.var_fraction,
-            "var_amount": self.inner.var_amount,
-            "expected_shortfall_fraction": self.inner.expected_shortfall_fraction,
-            "expected_shortfall_amount": self.inner.expected_shortfall_amount,
-            "prob_attachment_breached": self.inner.prob_attachment_breached,
-            "prob_full_writedown": self.inner.prob_full_writedown,
-        });
-        serde_object_to_single_row_dataframe_with_schema(
-            py,
-            &row,
-            &[
-                "attachment",
-                "detachment",
-                "tranche_notional",
-                "expected_loss_fraction",
-                "expected_loss_amount",
-                "var_fraction",
-                "var_amount",
-                "expected_shortfall_fraction",
-                "expected_shortfall_amount",
-                "prob_attachment_breached",
-                "prob_full_writedown",
-            ],
-        )
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("TrancheLossStatistics", &self.inner)
     }
 }
 
+impl PyTrancheLossStatistics {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .f64("attachment", vec![self.inner.attachment])?
+            .f64("detachment", vec![self.inner.detachment])?
+            .f64("tranche_notional", vec![self.inner.tranche_notional])?
+            .f64(
+                "expected_loss_fraction",
+                vec![self.inner.expected_loss_fraction],
+            )?
+            .f64(
+                "expected_loss_amount",
+                vec![self.inner.expected_loss_amount],
+            )?
+            .f64("var_fraction", vec![self.inner.var_fraction])?
+            .f64("var_amount", vec![self.inner.var_amount])?
+            .f64(
+                "expected_shortfall_fraction",
+                vec![self.inner.expected_shortfall_fraction],
+            )?
+            .f64(
+                "expected_shortfall_amount",
+                vec![self.inner.expected_shortfall_amount],
+            )?
+            .f64(
+                "prob_attachment_breached",
+                vec![self.inner.prob_attachment_breached],
+            )?
+            .f64("prob_full_writedown", vec![self.inner.prob_full_writedown])?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyTrancheLossStatistics,
+    "TrancheLossStatistics",
+    module = "finstack_quant.models.correlation"
+);
 wire_methods!(
     PyTrancheLossStatistics,
     TrancheLossStatistics,
     "TrancheLossStatistics",
     module = "finstack_quant.models.correlation"
 );
-impl_repr_html_via_dataframe!(PyTrancheLossStatistics);
 
 /// Read exposures from a ``list[CreditExposure]`` or a ``pandas.DataFrame``.
 ///
@@ -1152,15 +1151,12 @@ fn extract_exposures(exposures: &Bound<'_, PyAny>) -> PyResult<Vec<CreditExposur
         return Ok(typed.into_iter().map(|exposure| exposure.inner).collect());
     }
     let py = exposures.py();
-    let df_type = py.import("pandas")?.getattr("DataFrame")?;
-    if !exposures.is_instance(&df_type)? {
-        return Err(pyo3::exceptions::PyTypeError::new_err(
-            "exposures must be a list of CreditExposure or a pandas DataFrame with columns \
-             id, notional, default_probability, lgd and factor_loadings",
-        ));
+    if let Some(records) = crate::bindings::dataframe_utils::table_to_py_records(py, exposures)? {
+        return crate::bindings::module_utils::py_to_serde(py, &records, "exposures");
     }
-    let records = exposures.call_method1("to_dict", ("records",))?;
-    crate::bindings::module_utils::py_to_serde(py, &records, "exposures")
+    Err(pyo3::exceptions::PyTypeError::new_err(
+        "exposures must be a list of CreditExposure or a pandas DataFrame, Polars DataFrame, or Arrow table with columns id, notional, default_probability, lgd and factor_loadings",
+    ))
 }
 
 #[doc = pydoc!("finstack_quant.models.correlation", "simulate_portfolio_loss")]

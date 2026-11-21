@@ -89,7 +89,7 @@ class TestPortfolioBuilder:
         assert pf.entity_ids == ["ACME"]
         assert pf.position_ids == ["P1"]
         assert pf.tags == {"desk": "rates"}
-        frame = pf.positions_to_dataframe()
+        frame = pf.positions_table().to_pandas()
         assert list(frame.columns) == [
             "position_id",
             "entity_id",
@@ -147,7 +147,7 @@ class TestValuationAndResult:
         assert valuation.fx_collapse_policy == "cashflow_date"
         with pytest.raises(KeyError):
             valuation.get_position_value("nope")
-        frame = valuation.to_dataframe()
+        frame = valuation.to_pandas()
         assert "risk_metrics_complete" in frame.columns
         assert "risk_error" in frame.columns
 
@@ -202,10 +202,10 @@ class TestCashflows:
         assert cfs.events
         assert cfs.by_position["P1"]
         assert cfs.issues == []
-        assert cfs.to_issues_dataframe().shape[0] == 0
+        assert cfs.to_issues_table().num_rows == 0
         net = cfs.net_in_currency_by_date("USD")
         assert net == net_in_currency_by_date(cfs, "USD") == net_in_currency_by_date(cfs.to_json(), "USD")
-        frame = cfs.collapse_to_base_by_date_kind(_market(), "USD", AS_OF)
+        frame = cfs.collapse_to_base_by_date_kind(_market(), "USD", AS_OF).to_pandas()
         assert list(frame.columns) == ["date", "kind", "amount", "currency"]
         ladder = json.loads(cfs.collapse_to_base_by_date_kind_json(_market(), "USD", AS_OF))
         assert len(ladder) == frame["date"].nunique()
@@ -395,7 +395,7 @@ class TestOptimizationAndResultsAudit:
         # that Portfolio.from_spec rejects; both now call PositionUnit::from_str.
         for unit in ("units", "face_value", "percentage"):
             builder = Portfolio.builder("book", "USD", AS_OF).position("P1", _bond(), 1.0, unit=unit)
-            assert builder.build().positions_to_dataframe().iloc[0]["unit"] == unit
+            assert builder.build().positions_table().to_pandas().iloc[0]["unit"] == unit
             assert CandidatePosition("C1", "ACME", _bond("B2"), unit=unit).to_json()
         message = r'unknown position unit "notional"; expected one of units, face_value, percentage'
         with pytest.raises(PortfolioError, match=message):
@@ -408,7 +408,7 @@ class TestOptimizationAndResultsAudit:
             Portfolio.from_spec(json.dumps(spec))
         for unit in ({"notional": "USD"}, {"notional": None}):
             pf = Portfolio.builder("book", "USD", AS_OF).position("P1", _bond(), 1.0, unit=unit).build()
-            assert json.loads(pf.positions_to_dataframe().iloc[0]["unit"]) == unit
+            assert json.loads(pf.positions_table().to_pandas().iloc[0]["unit"]) == unit
             assert CandidatePosition("C1", "ACME", _bond("B2"), unit=unit).to_json()
 
     def test_portfolio_result_meta_is_derived_from_the_valuation(self) -> None:

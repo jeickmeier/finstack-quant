@@ -65,7 +65,7 @@ impl PyTranche {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.to_dict")]
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.__reduce__")]
@@ -87,7 +87,7 @@ impl PyTranche {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.coupon")]
     #[getter]
     fn coupon<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.coupon)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.coupon)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.tranche", "Tranche.maturity")]
@@ -102,7 +102,7 @@ impl PyTranche {
         self.inner
             .oc_trigger
             .as_ref()
-            .map(|trigger| crate::bindings::pandas_utils::serde_to_py(py, trigger))
+            .map(|trigger| crate::bindings::json_bridge::serde_to_py(py, trigger))
             .transpose()
     }
 
@@ -112,7 +112,7 @@ impl PyTranche {
         self.inner
             .ic_trigger
             .as_ref()
-            .map(|trigger| crate::bindings::pandas_utils::serde_to_py(py, trigger))
+            .map(|trigger| crate::bindings::json_bridge::serde_to_py(py, trigger))
             .transpose()
     }
 

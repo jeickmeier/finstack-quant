@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 
 use crate::bindings::core::money::{PyMoney, decimal_from_py, decimal_to_py, is_python_decimal};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::json_bridge::serde_to_py;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;

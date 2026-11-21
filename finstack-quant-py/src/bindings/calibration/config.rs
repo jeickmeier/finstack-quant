@@ -1,8 +1,8 @@
 //! Typed calibration settings: `CalibrationConfig`, `SolverConfig`, `ValidationConfig`, `RateBounds`.
 
+use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::macros::wire_methods;
 use crate::bindings::module_utils::py_to_json_value;
-use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, serde_json_to_py};

@@ -1,12 +1,12 @@
 //! Python wrappers for scenario engine application.
 
 use crate::bindings::core::market_data::context::PyMarketContext;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::{extract_market, extract_model_ref};
-use crate::bindings::pandas_utils::{
-    serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
-    serde_to_py,
-};
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::tabular_methods;
 use crate::bindings::statements::types::PyFinancialModelSpec;
+use crate::bindings::table_builders::{TableBuilder, serde_rows_to_arrow_table};
 use crate::errors::{display_to_py, scenarios_to_py};
 use finstack_quant_scenarios::{ApplicationEnvelope, ApplicationReport};
 use finstack_quant_valuations::instruments::Instrument;
@@ -39,17 +39,34 @@ impl PyApplicationReport {
     pub(crate) fn from_inner(inner: ApplicationReport) -> Self {
         Self { inner }
     }
-}
 
-const REPORT_COLUMNS: [&str; 7] = [
-    "operations_applied",
-    "user_operations",
-    "expanded_operations",
-    "warning_count",
-    "as_of_changed",
-    "all_dirty",
-    "shock_count",
-];
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .i64(
+                "operations_applied",
+                vec![i64::try_from(self.inner.operations_applied).unwrap_or(i64::MAX)],
+            )?
+            .i64(
+                "user_operations",
+                vec![i64::try_from(self.inner.user_operations).unwrap_or(i64::MAX)],
+            )?
+            .i64(
+                "expanded_operations",
+                vec![i64::try_from(self.inner.expanded_operations).unwrap_or(i64::MAX)],
+            )?
+            .i64(
+                "warning_count",
+                vec![i64::try_from(self.inner.warnings.len()).unwrap_or(i64::MAX)],
+            )?
+            .bool("as_of_changed", vec![self.inner.changes.as_of_changed])?
+            .bool("all_dirty", vec![self.inner.changes.all_dirty])?
+            .i64(
+                "shock_count",
+                vec![i64::try_from(self.inner.applied_shocks.len()).unwrap_or(i64::MAX)],
+            )?
+            .build()
+    }
+}
 
 #[pymethods]
 impl PyApplicationReport {
@@ -128,36 +145,15 @@ impl PyApplicationReport {
             .transpose()
     }
 
-    /// Export the report counters as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``operations_applied``, ``user_operations``,
-    /// ``expanded_operations``, ``warning_count``, ``as_of_changed``,
-    /// ``all_dirty``, ``shock_count`` (number of ``applied_shocks``
-    /// entries). Use ``changes_to_dataframe()`` for the per-target change
-    /// manifest, ``applied_shocks`` for the size of each shock and
-    /// ``carry_to_dataframe()`` for time-roll carry.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let row = serde_json::json!({
-            "operations_applied": self.inner.operations_applied,
-            "user_operations": self.inner.user_operations,
-            "expanded_operations": self.inner.expanded_operations,
-            "warning_count": self.inner.warnings.len(),
-            "as_of_changed": self.inner.changes.as_of_changed,
-            "all_dirty": self.inner.changes.all_dirty,
-            "shock_count": self.inner.applied_shocks.len(),
-        });
-        serde_object_to_single_row_dataframe_with_schema(py, &row, &REPORT_COLUMNS)
-    }
-
-    /// Export the market targets the scenario actually changed, one row per
-    /// target.
+    /// Export the market targets the scenario actually changed as an
+    /// ``ArrowTable``, one row per target.
     ///
     /// Columns: ``kind`` (``curve``, ``volatility_index``,
     /// ``base_correlation``, ``vol_surface``, ``equity_price``, ``fx``),
     /// ``id`` (curve / surface / price identifier, or ``BASE/QUOTE`` for FX)
     /// and ``curve_kind`` (curve family for ``curve`` rows, else ``None``).
     /// Empty when nothing changed.
-    fn changes_to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_changes_table(&self) -> PyResult<PyArrowTable> {
         // `kind` and `curve_kind` are the target's own serde fields; only the
         // identifier needs the Rust display form (FX pairs have two fields).
         let rows = self
@@ -174,41 +170,36 @@ impl PyApplicationReport {
                 }))
             })
             .collect::<PyResult<Vec<serde_json::Value>>>()?;
-        serde_rows_to_dataframe_with_schema(
-            py,
+        serde_rows_to_arrow_table(
             &rows,
             &[("kind", "str"), ("id", "str"), ("curve_kind", "str")],
         )
     }
 
-    /// Export per-instrument carry from the time roll, one row per
-    /// instrument and currency.
+    /// Export per-instrument carry from the time roll as an ``ArrowTable``,
+    /// one row per instrument and currency.
     ///
     /// Columns: ``instrument_id``, ``amount`` (carry P&L as a float),
     /// ``currency``. Empty when the scenario had no ``time_roll_forward`` or
     /// no instruments were supplied.
-    fn carry_to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let mut rows = Vec::new();
+    fn to_carry_table(&self) -> PyResult<PyArrowTable> {
+        let mut ids = Vec::new();
+        let mut amounts = Vec::new();
+        let mut currencies = Vec::new();
         if let Some(roll) = &self.inner.time_roll {
             for (instrument_id, by_currency) in &roll.instrument_carry {
                 for (currency, money) in by_currency {
-                    rows.push(serde_json::json!({
-                        "instrument_id": instrument_id,
-                        "amount": money.amount(),
-                        "currency": currency.to_string(),
-                    }));
+                    ids.push(instrument_id.clone());
+                    amounts.push(money.amount());
+                    currencies.push(currency.to_string());
                 }
             }
         }
-        serde_rows_to_dataframe_with_schema(
-            py,
-            &rows,
-            &[
-                ("instrument_id", "str"),
-                ("amount", "float64"),
-                ("currency", "str"),
-            ],
-        )
+        TableBuilder::new()
+            .utf8("instrument_id", ids)?
+            .f64("amount", amounts)?
+            .utf8("currency", currencies)?
+            .build()
     }
 
     /// Serialize to a compact JSON string.
@@ -252,7 +243,7 @@ impl PyApplicationReport {
     }
 }
 
-crate::bindings::macros::impl_repr_html_via_dataframe!(PyApplicationReport);
+tabular_methods!(PyApplicationReport);
 
 /// Result of applying a scenario: the mutated market, the mutated model (when
 /// one was supplied), and the application report.
@@ -310,12 +301,6 @@ impl PyApplicationResult {
     #[getter]
     fn report(&self) -> PyApplicationReport {
         PyApplicationReport::from_inner(self.report.clone())
-    }
-
-    /// Export the application report counters as a single-row pandas
-    /// ``DataFrame`` (same columns as ``ApplicationReport.to_dataframe``).
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        PyApplicationReport::from_inner(self.report.clone()).to_dataframe(py)
     }
 
     /// Serialize to a compact JSON string.
@@ -390,6 +375,14 @@ impl PyApplicationResult {
         )
     }
 }
+
+impl PyApplicationResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        PyApplicationReport::from_inner(self.report.clone()).to_arrow_table()
+    }
+}
+
+tabular_methods!(PyApplicationResult);
 
 /// Apply a scenario to copied market data and an optional financial model.
 ///

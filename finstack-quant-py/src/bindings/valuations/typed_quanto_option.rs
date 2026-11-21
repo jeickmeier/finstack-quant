@@ -101,7 +101,7 @@ impl PyQuantoOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.option_type")]
     #[getter]
     fn option_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.option_type)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.option_type)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.expiry")]
@@ -143,7 +143,7 @@ impl PyQuantoOption {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.correlation")]
     #[getter]
     fn correlation<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.correlation)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.correlation)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_quanto_option", "QuantoOption.day_count")]

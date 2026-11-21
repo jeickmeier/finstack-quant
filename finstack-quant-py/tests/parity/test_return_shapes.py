@@ -89,7 +89,7 @@ ENTRY_SHAPES: list[tuple[str, str, str]] = [
 ]
 
 # Result classes that must carry the full accessor contract:
-# typed getters + to_json + from_json + to_dataframe.
+# typed getters + to_json + from_json + unified tabular exports (to_arrow/to_pandas/to_polars/to_pyarrow).
 RESULT_CLASSES: list[tuple[str, str]] = [
     ("finstack_quant.attribution", "AttributionResultEnvelope"),
     ("finstack_quant.attribution", "PnlAttribution"),
@@ -224,15 +224,12 @@ def test_result_class_has_typed_getters(module_name: str, class_name: str) -> No
 
 
 def test_statement_result_uses_orient_parameter() -> None:
-    """Orientation is a parameter, not a separate method name.
-
-    ``to_pandas_long`` / ``to_pandas_wide`` were the only ``to_pandas_*`` pair
-    in the codebase; they are now ``to_dataframe(orient=...)``.
-    """
+    """Orientation is a parameter on unified tabular exports, not separate method pairs."""
     cls = _resolve("finstack_quant.statements", "StatementResult")
-    assert hasattr(cls, "to_dataframe"), "StatementResult is missing to_dataframe()"
-    assert not hasattr(cls, "to_pandas_long"), "to_pandas_long survived the merge into to_dataframe(orient=...)"
-    assert not hasattr(cls, "to_pandas_wide"), "to_pandas_wide survived the merge into to_dataframe(orient=...)"
+    for method in ("to_arrow", "to_pandas", "to_polars", "to_pyarrow"):
+        assert hasattr(cls, method), f"StatementResult is missing {method}()"
+    for removed in ("to_dataframe", "to_arrow_long", "to_arrow_wide", "to_pandas_long", "to_pandas_wide"):
+        assert not hasattr(cls, removed), f"{removed} survived the unified orient=... migration"
 
 
 def test_json_round_trip_survives_non_finite_values() -> None:
@@ -267,3 +264,82 @@ def test_json_round_trip_survives_non_finite_values() -> None:
 
     # Round-tripping our own object, matching tests/test_pickle_roundtrip.py.
     assert pickle.loads(pickle.dumps(stats)).profit_factor == float("inf")  # noqa: S301
+
+
+_LEGACY_TABULAR_NAMES = {
+    "to_dataframe",
+    "to_arrow_long",
+    "to_arrow_wide",
+    "to_pandas_long",
+    "to_pandas_wide",
+    "to_polars_long",
+    "to_polars_wide",
+}
+_TABULAR_QUARTET = {"to_arrow", "to_pandas", "to_polars", "to_pyarrow"}
+
+
+def _iter_public_surface() -> tuple[dict[str, list[str]], list[type[Any]]]:
+    root = importlib.import_module("finstack_quant")
+    seen_modules: set[str] = set()
+    module_exports: dict[str, list[str]] = {}
+    classes: dict[tuple[str, str], type[Any]] = {}
+
+    def walk(module: Any, path: str) -> None:
+        if path in seen_modules:
+            return
+        seen_modules.add(path)
+        exports = list(getattr(module, "__all__", None) or [])
+        module_exports[path] = exports
+        for name in exports:
+            val = getattr(module, name)
+            if inspect.ismodule(val):
+                walk(val, f"{path}.{name}")
+            elif inspect.isclass(val):
+                classes.setdefault((val.__module__, val.__name__), val)
+
+    walk(root, "finstack_quant")
+    return module_exports, list(classes.values())
+
+
+def test_no_legacy_dataframe_exits_anywhere() -> None:
+    """No public module or class may re-introduce ``to_dataframe`` or orient-suffixed exits."""
+    module_exports, classes = _iter_public_surface()
+
+    def _is_legacy(name: str) -> bool:
+        return name in _LEGACY_TABULAR_NAMES or (name.startswith("to_") and name.endswith("_dataframe"))
+
+    offenders = [
+        f"{mod_path}.{name}" for mod_path, exports in module_exports.items() for name in exports if _is_legacy(name)
+    ]
+    offenders.extend(
+        f"{cls.__module__}.{cls.__name__}.{name}"
+        for cls in classes
+        for name in dir(cls)
+        if not name.startswith("_") and _is_legacy(name)
+    )
+    assert not offenders, f"legacy tabular exits found: {sorted(offenders)}"
+
+
+def test_tabular_classes_expose_complete_quartet() -> None:
+    """Every class exposing a tabular conversion exposes the full Arrow/pandas/Polars/PyArrow quartet."""
+    _, classes = _iter_public_surface()
+    incomplete: list[str] = []
+    for cls in classes:
+        names = set(dir(cls))
+        qualname = f"{cls.__module__}.{cls.__name__}"
+        if qualname == "finstack_quant.core.table.ArrowTable":
+            required = {"to_pandas", "to_polars", "to_pyarrow", "__arrow_c_stream__", "__arrow_c_schema__"}
+            missing = sorted(required - names)
+            if missing:
+                incomplete.append(f"{qualname} missing {missing}")
+            continue
+        if qualname == "finstack_quant.core.table.LabeledSeries":
+            required = _TABULAR_QUARTET | {"__arrow_c_stream__", "__arrow_c_schema__"}
+            missing = sorted(required - names)
+            if missing:
+                incomplete.append(f"{qualname} missing {missing}")
+            continue
+        present = _TABULAR_QUARTET & names
+        if present and present != _TABULAR_QUARTET:
+            incomplete.append(f"{qualname} missing {sorted(_TABULAR_QUARTET - present)}")
+    assert not incomplete, f"incomplete tabular accessors: {incomplete}"

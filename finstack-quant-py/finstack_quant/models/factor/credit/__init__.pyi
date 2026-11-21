@@ -19,14 +19,16 @@ True
 from __future__ import annotations
 
 import datetime
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from finstack_quant.models.factor.risk import RiskMeasure
 from typing import Any
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import polars as pl
 
+from finstack_quant.core.table import ArrowTable, LabeledSeries
 from finstack_quant.models.factor import FactorCovarianceMatrix, FactorModelConfig
 
 class CreditFactorModel:
@@ -309,29 +311,31 @@ class CreditFactorModel:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-            Export the per-issuer beta rows as a pandas DataFrame.
+        Export the per-issuer beta rows as an :class:`~finstack_quant.core.table.ArrowTable`.
 
-            Returns
-            -------
-            pd.DataFrame
-                One row per issuer, sorted by ``issuer_id``. Columns:
-                ``issuer_id``, ``tags`` (dict), ``mode`` (``"issuer_beta"`` /
-                ``"bucket_only"``), ``beta_pc``, ``beta_levels`` (list aligned with
-                ``level_names()``; ``0.0`` marks a folded level), ``adder_at_anchor``
-                (bp), ``adder_vol_annualized`` (bp per square-root year), ``adder_vol_source``,
-                ``r_squared`` and ``n_obs`` (``NaN`` for bucket-only rows) and
-                ``spread_duration`` (years).
+        Returns
+        -------
+        ArrowTable
+            One row per issuer, sorted by ``issuer_id``. Columns:
+            ``issuer_id``, ``tags`` (JSON-encoded string), ``mode``
+            (``"issuer_beta"`` / ``"bucket_only"``), ``beta_pc``,
+            ``beta_levels`` (JSON-encoded float array aligned with
+            ``level_names()``; ``0.0`` marks a folded level),
+            ``adder_at_anchor`` (bp), ``adder_vol_annualized`` (bp per
+            square-root year), ``adder_vol_source``, ``r_squared`` and
+            ``n_obs`` (null / ``NaN`` for bucket-only rows) and
+            ``spread_duration`` (years).
 
-            Raises
-            ------
-            ValueError
-                If a row cannot be serialized.
+        Raises
+        ------
+        ValueError
+            If a row cannot be serialized.
 
-            Examples
-            --------
-            >>> from finstack_quant.models.factor.credit import CreditCalibrator
+        Examples
+        --------
+        >>> from finstack_quant.models.factor.credit import CreditCalibrator
         >>> config = {"hierarchy": {"levels": []}, "covariance_strategy": "diagonal", "bucket_weighting": "equal"}
         >>> inputs = {
         ...     "history_panel": {"dates": ["2024-01-01", "2024-02-01"], "spreads": {"A": [0.010, 0.0101]}},
@@ -341,11 +345,93 @@ class CreditFactorModel:
         ...     "as_of_spreads": {"A": 0.0101},
         ...     "idiosyncratic_overrides": {},
         ... }
-            >>> list(CreditCalibrator(config).calibrate(inputs).to_dataframe()["issuer_id"])
-            ['A']
+        >>> CreditCalibrator(config).calibrate(inputs).to_arrow().num_rows
+        1
         """
         ...
 
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the per-issuer beta rows as a pandas ``DataFrame`` (lazily imports ``pandas``).
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per issuer, sorted by ``issuer_id``. Columns:
+            ``issuer_id``, ``tags`` (JSON-encoded string), ``mode``
+            (``"issuer_beta"`` / ``"bucket_only"``), ``beta_pc``,
+            ``beta_levels`` (JSON-encoded float array aligned with
+            ``level_names()``; ``0.0`` marks a folded level),
+            ``adder_at_anchor`` (bp), ``adder_vol_annualized`` (bp per
+            square-root year), ``adder_vol_source``, ``r_squared`` and
+            ``n_obs`` (``NaN`` for bucket-only rows) and ``spread_duration``
+            (years).
+
+        Raises
+        ------
+        ImportError
+            If pandas is not installed.
+        ValueError
+            If a row cannot be serialized.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.factor.credit import CreditCalibrator
+        >>> config = {"hierarchy": {"levels": []}, "covariance_strategy": "diagonal", "bucket_weighting": "equal"}
+        >>> inputs = {
+        ...     "history_panel": {"dates": ["2024-01-01", "2024-02-01"], "spreads": {"A": [0.010, 0.0101]}},
+        ...     "issuer_tags": {"tags": {"A": {}}},
+        ...     "generic_factor": {"spec": {"name": "G", "series_id": "G"}, "values": [0.010, 0.0101]},
+        ...     "as_of": "2024-02-01",
+        ...     "as_of_spreads": {"A": 0.0101},
+        ...     "idiosyncratic_overrides": {},
+        ... }
+        >>> list(CreditCalibrator(config).calibrate(inputs).to_pandas()["issuer_id"])
+        ['A']
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the per-issuer beta rows as a Polars ``DataFrame`` (lazily imports ``polars``).
+
+        Returns
+        -------
+        polars.DataFrame
+            One row per issuer, sorted by ``issuer_id``. Columns match
+            :meth:`to_arrow`, with ``tags`` and ``beta_levels`` as JSON strings.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed.
+        ValueError
+            If a row cannot be serialized.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the per-issuer beta rows as a ``pyarrow.Table`` (lazily imports ``pyarrow``).
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per issuer, sorted by ``issuer_id``. Columns match
+            :meth:`to_arrow`, with ``tags`` and ``beta_levels`` as JSON strings.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed.
+        ValueError
+            If a row cannot be serialized.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def level_names(self) -> list[str]:
         """
         Return hierarchy level names.
@@ -486,15 +572,17 @@ class CreditCalibrator:
 
     @staticmethod
     def from_dataframe(
-        spreads: pd.DataFrame,
-        tags: Mapping[str, Mapping[str, str]] | pd.DataFrame,
-        generic: pd.Series | list[float],
+        spreads: pd.DataFrame | pl.DataFrame | Any,
+        tags: Mapping[str, Mapping[str, str]] | pd.DataFrame | pl.DataFrame | Any,
+        generic: pd.Series | pl.Series | Sequence[float] | npt.NDArray[np.float64] | Any,
         generic_spec: Mapping[str, str] | str,
-        spread_durations: Mapping[str, float] | pd.Series | None = None,
+        spread_durations: Mapping[str, float] | pd.Series | pl.Series | pd.DataFrame | pl.DataFrame | Any | None = None,
         config: Mapping[str, Any] | str | None = None,
+        *,
+        date_col: str | None = None,
     ) -> CreditFactorModel:
         """
-        Calibrate straight from pandas objects.
+        Calibrate straight from pandas, Polars, or Arrow tabular objects.
 
         Converts the frames to the Rust panel types; Rust
         ``CreditCalibrationInputs::from_panel`` anchors the run at the last
@@ -503,26 +591,38 @@ class CreditCalibrator:
 
         Parameters
         ----------
-        spreads : pd.DataFrame
-            Decimal spreads (``0.01`` = 100 bp) with a date index (sorted,
-            regular grid) and one column per issuer; ``NaN`` marks a gap. The
-            last index date becomes the model's ``as_of``.
-        tags : Mapping[str, Mapping[str, str]] | pd.DataFrame
-            ``{issuer: {dimension_key: tag}}`` or a DataFrame indexed by
-            issuer with one column per hierarchy dimension (``"rating"``,
-            ``"region"``, ...).
-        generic : pd.Series | list[float]
-            Generic (PC) factor values aligned with ``spreads.index``, in
-            decimal units. A Series' ``name`` is not used.
+        spreads : pd.DataFrame | pl.DataFrame | Any
+            Decimal spreads (``0.01`` = 100 bp) in a pandas ``DataFrame``,
+            Polars ``DataFrame``, or Arrow table with one column per issuer and
+            ``NaN`` / ``null`` marking gaps. Dates come from the pandas index,
+            ``date_col``, or a unique Polars/Arrow date column. The last date
+            becomes the model's ``as_of``.
+        tags : Mapping[str, Mapping[str, str]] | pd.DataFrame | pl.DataFrame | Any
+            ``{issuer: {dimension_key: tag}}`` mapping or a pandas/Polars/Arrow
+            table of hierarchy dimension columns (``"rating"``, ``"region"``,
+            ...) keyed by the pandas index or an ``"issuer"``/``"issuer_id"``
+            column (or the first column).
+        generic : pd.Series | pl.Series | Sequence[float] | numpy.ndarray | Any
+            Generic (PC) factor values aligned with ``spreads`` rows, in
+            decimal units (accepts sequences, NumPy arrays, ``pandas.Series``,
+            ``polars.Series``, or single-column tables). A Series' ``name`` is
+            not used.
         generic_spec : Mapping[str, str] | str
             ``GenericFactorSpec`` dict or JSON string
             ``{"name": ..., "series_id": ...}`` identifying the generic series;
             persisted verbatim into the model artifact.
-        spread_durations : Mapping[str, float] | pd.Series | None
-            ``{issuer: years}``; required when ``bucket_weighting="dts"``.
+        spread_durations : Mapping[str, float] | pd.Series | pl.Series | pd.DataFrame | pl.DataFrame | Any | None
+            ``{issuer: years}`` mapping, ``pandas.Series`` indexed by issuer,
+            or two-column Polars/pandas/Arrow table of ``(issuer, duration)``;
+            required when ``bucket_weighting="dts"``.
         config : Mapping[str, Any] | str | None
             ``CreditCalibrationConfig`` dict / JSON string / ``None`` (see
             :meth:`__init__`).
+        date_col : str | None, optional
+            Column name holding observation dates in ``spreads`` (and optional
+            date column in ``generic``). Auto-detects a unique Polars/Arrow
+            date or datetime column when ``None``; optional for pandas
+            ``DataFrame`` inputs to select a date column instead of the index.
 
         Returns
         -------
@@ -718,9 +818,38 @@ class LevelsAtDate:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the per-level bucket values as a pandas DataFrame.
+        Export the per-level bucket values as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Columns: ``date``, ``level_index``, ``dimension``, ``bucket``,
+        ``value``.
+
+        One row per (level, bucket) pair. ``date`` repeats on every row as an
+        ISO string so tables concatenate cleanly across dates. Rows are ordered
+        by ``level_index``, then by ``bucket``.
+
+        The scalar ``generic`` factor and the per-issuer residuals are not
+        levels; read them from the ``generic`` property and :meth:`to_series`
+        respectively.
+
+        Returns
+        -------
+        ArrowTable
+            One row per (level, bucket) pair. A snapshot from a hierarchy with
+            no levels yields a zero-row table that still carries the columns
+            above.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the per-level bucket values as a pandas ``DataFrame`` (lazily imports ``pandas``).
 
         Columns: ``date``, ``level_index``, ``dimension``, ``bucket``,
         ``value``.
@@ -743,27 +872,69 @@ class LevelsAtDate:
 
         Raises
         ------
+        ImportError
+            If pandas is not installed.
         ValueError
             If the result cannot be serialized into a pandas object.
         """
         ...
 
-    def to_series(self) -> pd.Series:
+    def to_polars(self) -> pl.DataFrame:
         """
-        Export the per-issuer residual adders as a pandas Series.
+        Export the per-level bucket values as a Polars ``DataFrame`` (lazily imports ``polars``).
 
         Returns
         -------
-        pd.Series
-            Named ``adder``, indexed by issuer ID, holding the residual after
-            peeling the generic factor and every hierarchy level. Issuers are
-            in sorted order, so repeated exports and
-            ``pd.concat([...], axis=1)`` across dates align on the index.
+        polars.DataFrame
+            One row per (level, bucket) pair with columns ``date``,
+            ``level_index``, ``dimension``, ``bucket``, ``value``.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed.
+        ValueError
+            If the result cannot be converted into a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the per-level bucket values as a ``pyarrow.Table`` (lazily imports ``pyarrow``).
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per (level, bucket) pair with columns ``date``,
+            ``level_index``, ``dimension``, ``bucket``, ``value``.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed.
+        ValueError
+            If the result cannot be converted into a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_series(self) -> LabeledSeries:
+        """
+        Export the per-issuer residual adders as a :class:`~finstack_quant.core.table.LabeledSeries`.
+
+        Returns
+        -------
+        LabeledSeries
+            Named ``"adder"`` with index name ``"issuer_id"``, holding the
+            residual after peeling the generic factor and every hierarchy level
+            in sorted issuer order.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be converted into a series object.
         """
         ...
 
@@ -935,17 +1106,38 @@ class PeriodDecomposition:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the per-level bucket deltas as a pandas DataFrame.
+        Export the per-level bucket deltas as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``from_date``, ``to_date``, ``level_index``, ``dimension``,
         ``bucket``, ``delta``.
 
-        This is the default export and the same table as
-        :meth:`to_level_dataframe`. The per-issuer adder deltas are a
-        separate, differently-keyed table; see :meth:`to_adder_dataframe`. The
-        scalar ``d_generic`` is metadata and is not repeated per row.
+        This is the primary table export and matches :meth:`to_level_table`.
+        The per-issuer adder deltas are a separate, differently-keyed table;
+        see :meth:`to_adder_table`. The scalar ``d_generic`` is metadata and is
+        not repeated per row.
+
+        Returns
+        -------
+        ArrowTable
+            One row per (level, bucket) pair. A decomposition with no
+            hierarchy levels yields a zero-row table that still carries the
+            columns above.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted into an Arrow table.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the per-level bucket deltas as a pandas ``DataFrame`` (lazily imports ``pandas``).
+
+        Columns: ``from_date``, ``to_date``, ``level_index``, ``dimension``,
+        ``bucket``, ``delta``. Equivalent to ``to_level_table().to_pandas()``.
 
         Returns
         -------
@@ -956,62 +1148,104 @@ class PeriodDecomposition:
 
         Raises
         ------
+        ImportError
+            If pandas is not installed.
         ValueError
             If the result cannot be serialized into a pandas object.
         """
         ...
 
-    def to_level_dataframe(self) -> pd.DataFrame:
+    def to_polars(self) -> pl.DataFrame:
         """
-        Export the per-level bucket deltas as a pandas DataFrame.
+        Export the per-level bucket deltas as a Polars ``DataFrame`` (lazily imports ``polars``).
+
+        Returns
+        -------
+        polars.DataFrame
+            One row per (level, bucket) pair with columns ``from_date``,
+            ``to_date``, ``level_index``, ``dimension``, ``bucket``, ``delta``.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed.
+        ValueError
+            If the result cannot be converted into a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the per-level bucket deltas as a ``pyarrow.Table`` (lazily imports ``pyarrow``).
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per (level, bucket) pair with columns ``from_date``,
+            ``to_date``, ``level_index``, ``dimension``, ``bucket``, ``delta``.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed.
+        ValueError
+            If the result cannot be converted into a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_level_table(self) -> ArrowTable:
+        """
+        Export the per-level bucket deltas as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``from_date``, ``to_date``, ``level_index``, ``dimension``,
-        ``bucket``, ``delta``. Identical to :meth:`to_dataframe`.
+        ``bucket``, ``delta``. Identical to :meth:`to_arrow`.
 
         One row per (level, bucket) pair — the long format the level deltas
         naturally take, since each level has its own bucket set. The two dates
-        repeat on every row as ISO strings so a row survives ``pd.concat``
-        across periods. Rows are ordered by ``level_index``, then by
-        ``bucket`` — the deltas are a sorted map, so bucket order is the sorted
-        key order and repeated exports are identical.
+        repeat on every row as ISO strings so rows concatenate cleanly across
+        periods. Rows are ordered by ``level_index``, then by ``bucket``.
 
-        A decomposition with no hierarchy levels yields a zero-row frame that
+        A decomposition with no hierarchy levels yields a zero-row table that
         still carries the columns above.
 
         Returns
         -------
-        pd.DataFrame
-            Long-format frame of bucket deltas, one row per (level, bucket).
+        ArrowTable
+            Long-format table of bucket deltas, one row per (level, bucket).
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be converted into an Arrow table.
         """
         ...
 
-    def to_adder_dataframe(self) -> pd.DataFrame:
+    def to_adder_table(self) -> ArrowTable:
         """
-        Export the per-issuer adder deltas as a pandas DataFrame.
+        Export the per-issuer adder deltas as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``from_date``, ``to_date``, ``issuer_id``, ``d_adder``.
 
         One row per issuer. The two dates repeat on every row as ISO strings so
-        a row survives ``pd.concat`` across periods. Rows are ordered by
+        rows concatenate cleanly across periods. Rows are ordered by
         ``issuer_id`` — the adders are a sorted map, so this is the sorted key
         order and repeated exports are identical.
 
         A decomposition sharing no issuers between snapshots yields a zero-row
-        frame that still carries the columns above.
+        table that still carries the columns above.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per issuer present in both snapshots.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If the result cannot be converted into an Arrow table.
         """
         ...
 
@@ -1156,10 +1390,10 @@ class FactorCovarianceForecast:
 
 def decompose_levels(
     model: CreditFactorModel,
-    observed_spreads: Mapping[str, float] | pd.Series | str,
+    observed_spreads: Mapping[str, float] | pd.Series | pd.DataFrame | pl.DataFrame | str | Any,
     observed_generic: float,
     as_of: datetime.date | str,
-    runtime_tags: Mapping[str, Mapping[str, str]] | pd.DataFrame | str | None = None,
+    runtime_tags: Mapping[str, Mapping[str, str]] | pd.DataFrame | pl.DataFrame | str | Any | None = None,
 ) -> LevelsAtDate:
     """
     Decompose observed issuer spreads into hierarchy levels and adders.
@@ -1168,18 +1402,19 @@ def decompose_levels(
     ----------
     model : CreditFactorModel
         Calibrated hierarchy artifact.
-    observed_spreads : Mapping[str, float] | pd.Series | str
+    observed_spreads : Mapping[str, float] | pd.Series | pd.DataFrame | pl.DataFrame | str | Any
         Issuer ID to observed **decimal** spread (``0.01`` = 100 bp) — a dict,
-        a ``pandas.Series`` indexed by issuer, or a JSON string of the same
-        object.
+        a ``pandas.Series`` indexed by issuer, a two-column DataFrame / Arrow
+        table, or a JSON string of the same object.
     observed_generic : float
         Generic (PC) factor value at ``as_of``, decimal.
     as_of : datetime.date | str
         Observation date, either a date-like object or an ISO 8601 string.
-    runtime_tags : Mapping[str, Mapping[str, str]] | pd.DataFrame | str | None
+    runtime_tags : Mapping[str, Mapping[str, str]] | pd.DataFrame | pl.DataFrame | str | Any | None
         ``{issuer_id: {dimension_key: tag}}`` for issuers not present in the
-        model — a dict, a ``pandas.DataFrame`` indexed by issuer, or a JSON
-        string.
+        model — a dict, a ``pandas.DataFrame`` indexed by issuer, a Polars or
+        Arrow table keyed by ``"issuer"``/``"issuer_id"`` or first column, or a
+        JSON string.
 
     Returns
     -------

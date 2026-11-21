@@ -25,10 +25,12 @@ import datetime
 from typing import Any
 
 import pandas as pd
+import polars as pl
 
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import Period
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 
 __all__ = [
     "PeriodAggregation",
@@ -43,8 +45,9 @@ class PeriodAggregation:
     ``CashFlowSchedule.pv_by_period``.
 
     Read-only mapping ``{period_id_label: {currency_code: Money}}``
-    (``agg["2025Q1"]["USD"]``, ``"2025Q1" in agg``, ``len(agg)``) plus a tidy
-    ``to_dataframe()`` with one ``(period, currency, amount)`` row per cell.
+    (``agg["2025Q1"]["USD"]``, ``"2025Q1" in agg``, ``len(agg)``) plus tidy
+    ``to_arrow()``, ``to_pandas()``, ``to_polars()``, and ``to_pyarrow()``
+    exports with one ``(period, currency, amount)`` row per cell.
     Amounts are never FX-converted. Aggregators omit periods receiving no flows;
     empty buckets supplied through JSON remain present.
 
@@ -257,7 +260,25 @@ class PeriodAggregation:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Tidy :class:`~finstack_quant.core.table.ArrowTable` with columns ``period, currency, amount``.
+
+        Returns
+        -------
+        ArrowTable
+            One row per non-empty ``(period, currency)`` cell in
+            reporting-period order; ``amount`` is a float in ``currency``
+            units.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Tidy ``pandas.DataFrame`` with columns ``period, currency, amount``.
 
@@ -268,12 +289,48 @@ class PeriodAggregation:
             reporting-period order; ``amount`` is a float in ``currency``
             units.
 
-        Notes
-        -----
-        This method does not raise.
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Tidy ``polars.DataFrame`` with columns ``period, currency, amount``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Polars DataFrame constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Tidy ``pyarrow.Table`` with columns ``period, currency, amount``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str: ...
 
 def aggregate_by_period(
@@ -294,7 +351,7 @@ def aggregate_by_period(
     -------
     PeriodAggregation
         Mapping-like ``{period_id_label: {currency_code: nominal_sum}}`` with
-        ``to_dataframe()``; periods with no flows are omitted.
+        ``to_pandas()`` / ``to_polars()`` / ``to_arrow()``; periods with no flows are omitted.
 
     Raises
     ------

@@ -66,11 +66,13 @@ def test_what_does_not_apply_is_none_and_round_trips() -> None:
     assert quotes.discount_margin is None
     assert json.loads(quotes.to_json())["discount_margin"] is None
     assert BondQuoteSet.from_json(quotes.to_json()).to_dict() == quotes.to_dict()
-    frame = quotes.to_dataframe()
+    frame = quotes.to_pandas()
     assert len(frame) == 1
     assert frame["ytm"].iloc[0] == quotes.ytm
     assert frame["ytm"].dtype == "float64"
     assert math.isnan(frame["discount_margin"].iloc[0])
+    assert quotes.to_arrow().num_rows == 1
+    assert quotes.to_polars().height == 1
 
 
 @pytest.mark.parametrize(

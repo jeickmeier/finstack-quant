@@ -9,14 +9,15 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyModule};
 
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_rows_to_dataframe_with_schema, serde_to_py,
-};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::{portfolio_to_py, serde_json_to_py};
 
-/// Column schema for [`PyFactorBrinsonResult::to_dataframe`] (per-factor
+/// Column schema for [`PyFactorBrinsonResult::to_arrow_table`] (per-factor
 /// contributions).
-const FACTOR_CONTRIBUTION_COLUMNS: &[ColumnSchema<'static>] = &[
+const FACTOR_CONTRIBUTION_COLUMNS: &[(&str, &str)] = &[
     ("factor", "str"),
     ("active_loading", "float64"),
     ("factor_return", "float64"),
@@ -24,8 +25,8 @@ const FACTOR_CONTRIBUTION_COLUMNS: &[ColumnSchema<'static>] = &[
 ];
 
 /// Column schema for
-/// [`PyFactorBrinsonResult::to_asset_contributions_dataframe`].
-const ASSET_CONTRIBUTION_COLUMNS: &[ColumnSchema<'static>] = &[
+/// [`PyFactorBrinsonResult::to_asset_contributions_table`].
+const ASSET_CONTRIBUTION_COLUMNS: &[(&str, &str)] = &[
     ("asset", "str"),
     ("specific_return", "float64"),
     ("active_weight", "float64"),
@@ -98,34 +99,13 @@ impl PyFactorBrinsonResult {
         serde_to_py(py, &self.inner.asset_contributions)
     }
 
-    /// Per-factor contributions as a :class:`pandas.DataFrame`.
-    ///
-    /// The primary frame is the factor axis; the per-asset selection
-    /// breakdown is available from :meth:`to_asset_contributions_dataframe`.
-    ///
-    /// Columns: ``factor``, ``active_loading``, ``factor_return``,
-    /// ``contribution``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(
-            py,
-            &self.inner.factor_contributions,
-            FACTOR_CONTRIBUTION_COLUMNS,
-        )
-    }
-
-    /// Per-asset specific contributions as a :class:`pandas.DataFrame`.
+    /// Per-asset specific contributions as an
+    /// :class:`~finstack_quant.core.table.ArrowTable`.
     ///
     /// Columns: ``asset``, ``specific_return``, ``active_weight``,
     /// ``contribution``.
-    fn to_asset_contributions_dataframe<'py>(
-        &self,
-        py: Python<'py>,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(
-            py,
-            &self.inner.asset_contributions,
-            ASSET_CONTRIBUTION_COLUMNS,
-        )
+    fn to_asset_contributions_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.inner.asset_contributions, ASSET_CONTRIBUTION_COLUMNS)
     }
 
     fn __repr__(&self) -> String {
@@ -137,6 +117,17 @@ impl PyFactorBrinsonResult {
         )
     }
 }
+
+impl PyFactorBrinsonResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(
+            &self.inner.factor_contributions,
+            FACTOR_CONTRIBUTION_COLUMNS,
+        )
+    }
+}
+
+tabular_methods!(PyFactorBrinsonResult);
 
 /// Compute Jeet-Partani (2023) factor-Brinson unified attribution.
 ///
@@ -205,9 +196,11 @@ impl PyFactorBrinsonResult {
 fn factor_brinson_attribution(
     py: Python<'_>,
     input: &Bound<'_, PyAny>,
-    factor_returns: Vec<f64>,
+    factor_returns: &Bound<'_, PyAny>,
 ) -> PyResult<PyFactorBrinsonResult> {
     let input = crate::bindings::extract::extract_records_json(py, input, "input")?;
+    let factor_returns =
+        crate::bindings::dataframe_utils::extract_f64_vec(factor_returns, "factor_returns")?;
     Ok(PyFactorBrinsonResult {
         inner: py.detach(move || {
             let input: finstack_quant_portfolio::factor_brinson::FactorBrinsonInput =

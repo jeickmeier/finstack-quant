@@ -29,7 +29,7 @@ def _generator() -> migration.GeneratorMatrix:
 def test_default_probabilities_match_the_scalar_method() -> None:
     model = MertonModel(100.0, 0.25, 80.0, 0.05)
     grid = model.default_probabilities([1.0, 5.0])
-    assert list(grid) == [model.default_probability(1.0), model.default_probability(5.0)]
+    assert grid.values() == [model.default_probability(1.0), model.default_probability(5.0)]
 
 
 def test_transition_probability_by_index_rejects_an_index_outside_the_scale() -> None:
@@ -50,7 +50,7 @@ def test_seeded_migration_simulation_is_reproducible() -> None:
 
 def test_master_scale_batch_mapping_reports_the_first_bad_pd() -> None:
     scale = pd_models.MasterScale.default_calibration()
-    frame = scale.map_pds([0.001, 0.2])
+    frame = scale.map_pds([0.001, 0.2]).to_pandas()
     assert list(frame["input_pd"]) == [0.001, 0.2]
     with pytest.raises(ValueError, match="outside"):
         scale.map_pds([0.01, 5.0])

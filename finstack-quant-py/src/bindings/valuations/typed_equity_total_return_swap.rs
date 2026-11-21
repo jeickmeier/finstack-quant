@@ -72,25 +72,25 @@ impl PyEquityTotalReturnSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_total_return_swap", "EquityTotalReturnSwap.underlying")]
     #[getter]
     fn underlying<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.underlying)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.underlying)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_total_return_swap", "EquityTotalReturnSwap.financing_leg")]
     #[getter]
     fn financing_leg<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.financing_leg)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.financing_leg)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_total_return_swap", "EquityTotalReturnSwap.schedule")]
     #[getter]
     fn schedule<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.schedule)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.schedule)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_total_return_swap", "EquityTotalReturnSwap.side")]
     #[getter]
     fn side<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.side)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.side)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_total_return_swap", "EquityTotalReturnSwap.initial_level")]
@@ -112,7 +112,7 @@ impl PyEquityTotalReturnSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_total_return_swap", "EquityTotalReturnSwap.margin_spec")]
     #[getter]
     fn margin_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.margin_spec)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.margin_spec)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_total_return_swap", "EquityTotalReturnSwap.dividend_tax_rate")]
@@ -124,7 +124,7 @@ impl PyEquityTotalReturnSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_total_return_swap", "EquityTotalReturnSwap.dividend_settlement")]
     #[getter]
     fn dividend_settlement<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.dividend_settlement)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.dividend_settlement)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_equity_total_return_swap", "EquityTotalReturnSwap.discrete_dividends")]

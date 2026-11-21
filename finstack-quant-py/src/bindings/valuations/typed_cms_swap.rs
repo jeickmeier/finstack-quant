@@ -70,13 +70,13 @@ impl PyCmsSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.side")]
     #[getter]
     fn side<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.side)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.side)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.cms_tenor")]
     #[getter]
     fn cms_tenor<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.cms_tenor)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.cms_tenor)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.fixing_dates")]
@@ -106,7 +106,7 @@ impl PyCmsSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.accrual_fractions")]
     #[getter]
     fn accrual_fractions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.accrual_fractions)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.accrual_fractions)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.day_count")]
@@ -151,13 +151,13 @@ impl PyCmsSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.swap_fixed_frequency")]
     #[getter]
     fn swap_fixed_frequency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.swap_fixed_frequency)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.swap_fixed_frequency)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.swap_float_frequency")]
     #[getter]
     fn swap_float_frequency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.swap_float_frequency)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.swap_float_frequency)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.swap_fixed_day_count")]
@@ -179,7 +179,7 @@ impl PyCmsSwap {
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.funding_leg")]
     #[getter]
     fn funding_leg<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.funding_leg)
+        crate::bindings::json_bridge::serde_to_py(py, &self.inner.funding_leg)
     }
 
     #[doc = pydoc!("finstack_quant.valuations.instruments._typed_cms_swap", "CmsSwap.discount_curve_id")]

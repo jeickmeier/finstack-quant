@@ -18,7 +18,9 @@ from __future__ import annotations
 from typing import Any
 
 import pandas
+import polars as pl
 
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.models.credit import scoring
 
 __all__ = [
@@ -322,21 +324,75 @@ class MasterScaleResult:
             If serialization fails.
         """
         ...
-    def to_dataframe(self) -> pandas.DataFrame:
-        """
-        Single-row frame with ``grade``, ``grade_index``, ``input_pd``, ``central_pd``.
+    def to_arrow(self) -> ArrowTable:
+        """Export the mapped grade result as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            Single-row frame with ``grade``, ``grade_index``, ``input_pd``, ``central_pd``.
+        ArrowTable
+            Single-row table with ``grade``, ``grade_index``, ``input_pd``, and ``central_pd``.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized into a pandas object.
+            If the value cannot be represented as an Arrow table.
         """
         ...
+
+    def to_pandas(self) -> pandas.DataFrame:
+        """Export the mapped grade result as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Single-row frame with ``grade``, ``grade_index``, ``input_pd``, and ``central_pd``.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the value cannot be represented as a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Export the mapped grade result as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Single-row frame with ``grade``, ``grade_index``, ``input_pd``, and ``central_pd``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the value cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export the mapped grade result as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row table with ``grade``, ``grade_index``, ``input_pd``, and ``central_pd``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the value cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """
         Python-style representation rendered from the canonical fields.
@@ -463,9 +519,9 @@ class MasterScale:
         """
         ...
 
-    def map_pds(self, pds: list[float]) -> pandas.DataFrame:
+    def map_pds(self, pds: list[float]) -> ArrowTable:
         """
-        Map several PDs and return one grading table.
+        Map several PDs and return one grading :class:`~finstack_quant.core.table.ArrowTable`.
 
         Parameters
         ----------
@@ -474,8 +530,8 @@ class MasterScale:
 
         Returns
         -------
-        pandas.DataFrame
-            Columns ``grade``, ``grade_index``, ``input_pd``,
+        ArrowTable
+            Table with ``grade``, ``grade_index``, ``input_pd``, and
             ``central_pd``; one row per input in input order.
 
         Raises
@@ -538,21 +594,75 @@ class MasterScale:
         This accessor does not raise; it returns the stored or derived value.
         """
         ...
-    def to_dataframe(self) -> pandas.DataFrame:
-        """
-        Frame with ``label``, ``upper_pd``, ``central_pd``; one row per grade in ascending PD order.
+    def to_arrow(self) -> ArrowTable:
+        """Export the master scale grades as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            Frame with ``label``, ``upper_pd``, ``central_pd``; one row per grade in ascending PD order.
+        ArrowTable
+            Table with ``label``, ``upper_pd``, and ``central_pd``; one row per grade in ascending PD order.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized into a pandas object.
+            If the value cannot be represented as an Arrow table.
         """
         ...
+
+    def to_pandas(self) -> pandas.DataFrame:
+        """Export the master scale grades as a pandas ``DataFrame``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Frame with ``label``, ``upper_pd``, and ``central_pd``; one row per grade in ascending PD order.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the value cannot be represented as a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Export the master scale grades as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Frame with ``label``, ``upper_pd``, and ``central_pd``; one row per grade in ascending PD order.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the value cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export the master scale grades as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Table with ``label``, ``upper_pd``, and ``central_pd``; one row per grade in ascending PD order.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the value cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     @staticmethod
     def from_json(json: str) -> MasterScale:
         """

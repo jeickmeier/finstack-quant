@@ -9,9 +9,11 @@
 //! a typed `ArbitrageReport`.
 
 use crate::bindings::core::market_data::curves::PyVolSurface;
-use crate::bindings::macros::wire_methods;
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
 use crate::bindings::module_utils::spec_from_py;
 use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::TableBuilder;
 use finstack_quant_core::wire::serde_label;
 use finstack_quant_models::volatility::arbitrage::{
     self as model_arbitrage, ArbitrageCheckConfig, ArbitrageReport,
@@ -19,21 +21,8 @@ use finstack_quant_models::volatility::arbitrage::{
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
-use crate::bindings::pandas_utils::{serde_rows_to_dataframe, serde_to_py};
+use crate::bindings::json_bridge::serde_to_py;
 use crate::errors::core_to_py;
-
-/// Flatten one violation into a long-format row for ``to_dataframe``.
-#[derive(serde::Serialize)]
-struct ViolationRow<'a> {
-    violation_type: String,
-    severity: String,
-    strike: f64,
-    expiry: f64,
-    adjacent_expiry: Option<f64>,
-    magnitude: f64,
-    suggested_fix: Option<f64>,
-    description: &'a str,
-}
 
 #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "ArbitrageReport")]
 #[pyclass(
@@ -85,28 +74,6 @@ impl PyArbitrageReport {
         serde_to_py(py, &self.inner.counts_by_type)
     }
 
-    #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "ArbitrageReport.to_dataframe")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows = self
-            .inner
-            .violations
-            .iter()
-            .map(|v| {
-                Ok(ViolationRow {
-                    violation_type: serde_label(&v.violation_type).map_err(core_to_py)?,
-                    severity: serde_label(&v.severity).map_err(core_to_py)?,
-                    strike: v.location.strike,
-                    expiry: v.location.expiry,
-                    adjacent_expiry: v.location.adjacent_expiry,
-                    magnitude: v.magnitude,
-                    suggested_fix: v.suggested_fix,
-                    description: v.description.as_str(),
-                })
-            })
-            .collect::<PyResult<Vec<_>>>()?;
-        serde_rows_to_dataframe(py, &rows)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "ArbitrageReport(passed={}, total_violations={}, vol_surface_id='{}')",
@@ -117,6 +84,46 @@ impl PyArbitrageReport {
     }
 }
 
+impl PyArbitrageReport {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let mut violation_type = Vec::with_capacity(self.inner.violations.len());
+        let mut severity = Vec::with_capacity(self.inner.violations.len());
+        let mut strike = Vec::with_capacity(self.inner.violations.len());
+        let mut expiry = Vec::with_capacity(self.inner.violations.len());
+        let mut adjacent_expiry = Vec::with_capacity(self.inner.violations.len());
+        let mut magnitude = Vec::with_capacity(self.inner.violations.len());
+        let mut suggested_fix = Vec::with_capacity(self.inner.violations.len());
+        let mut description = Vec::with_capacity(self.inner.violations.len());
+
+        for v in &self.inner.violations {
+            violation_type.push(serde_label(&v.violation_type).map_err(core_to_py)?);
+            severity.push(serde_label(&v.severity).map_err(core_to_py)?);
+            strike.push(v.location.strike);
+            expiry.push(v.location.expiry);
+            adjacent_expiry.push(v.location.adjacent_expiry);
+            magnitude.push(v.magnitude);
+            suggested_fix.push(v.suggested_fix);
+            description.push(v.description.clone());
+        }
+
+        TableBuilder::new()
+            .utf8("violation_type", violation_type)?
+            .utf8("severity", severity)?
+            .f64("strike", strike)?
+            .f64("expiry", expiry)?
+            .nullable_f64("adjacent_expiry", adjacent_expiry)?
+            .f64("magnitude", magnitude)?
+            .nullable_f64("suggested_fix", suggested_fix)?
+            .utf8("description", description)?
+            .build()
+    }
+}
+
+tabular_methods!(
+    PyArbitrageReport,
+    "ArbitrageReport",
+    module = "finstack_quant.models.volatility._volatility_arbitrage"
+);
 wire_methods!(
     PyArbitrageReport,
     ArbitrageReport,

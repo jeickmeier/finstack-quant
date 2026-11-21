@@ -1,11 +1,12 @@
 //! Typed wrapper for return-contribution attribution results plus the
 //! spec extractor shared with the entry point.
 
+use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
 use crate::bindings::date_utils::extract_date_iso;
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::tabular_methods;
 use crate::bindings::module_utils::py_to_json_value;
-use crate::bindings::pandas_utils::{
-    ColumnSchema, labeled_values_to_series, serde_rows_to_dataframe_with_schema, serde_to_py,
-};
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::{display_to_py, serde_json_to_py, value_error};
 use finstack_quant_attribution::{ReturnContributionPosition, ReturnContributionSpec};
 use pyo3::exceptions::PyTypeError;
@@ -13,8 +14,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use std::collections::BTreeMap;
 
-/// Column schema of `ReturnContributionResult.to_dataframe`.
-const INSTRUMENT_COLUMNS: &[ColumnSchema<'static>] = &[
+/// Column schema of `ReturnContributionResult.to_arrow_table`.
+const INSTRUMENT_COLUMNS: &[(&str, &str)] = &[
     ("id", "str"),
     ("weight", "float64"),
     ("return", "float64"),
@@ -22,15 +23,15 @@ const INSTRUMENT_COLUMNS: &[ColumnSchema<'static>] = &[
     ("active_contribution", "float64"),
 ];
 
-/// Column schema of `ReturnContributionResult.to_group_dataframe`.
-const GROUP_COLUMNS: &[ColumnSchema<'static>] = &[
+/// Column schema of `ReturnContributionResult.to_group_table`.
+const GROUP_COLUMNS: &[(&str, &str)] = &[
     ("dimension", "str"),
     ("key", "str"),
     ("contribution", "float64"),
 ];
 
-/// Column schema of `ReturnContributionResult.to_factor_dataframe`.
-const FACTOR_COLUMNS: &[ColumnSchema<'static>] = &[
+/// Column schema of `ReturnContributionResult.to_factor_table`.
+const FACTOR_COLUMNS: &[(&str, &str)] = &[
     ("factor", "str"),
     ("exposure", "float64"),
     ("factor_return", "float64"),
@@ -43,7 +44,7 @@ fn optional_float(record: &Bound<'_, PyDict>, key: &str) -> PyResult<Option<f64>
     let Some(value) = record.get_item(key)? else {
         return Ok(None);
     };
-    if value.is_none() {
+    if crate::bindings::dataframe_utils::is_missing_cell(&value)? {
         return Ok(None);
     }
     let value: f64 = value.extract().map_err(|_| {
@@ -54,7 +55,7 @@ fn optional_float(record: &Bound<'_, PyDict>, key: &str) -> PyResult<Option<f64>
     Ok(if value.is_nan() { None } else { Some(value) })
 }
 
-/// Build one position row from a `DataFrame.to_dict("records")` entry.
+/// Build one position row from a DataFrame record entry.
 fn position_from_record(record: &Bound<'_, PyDict>) -> PyResult<ReturnContributionPosition> {
     let id = record
         .get_item("id")?
@@ -66,12 +67,7 @@ fn position_from_record(record: &Bound<'_, PyDict>) -> PyResult<ReturnContributi
     for (key, value) in record.iter() {
         let key: String = key.extract()?;
         if let Some(dimension) = key.strip_prefix("group:") {
-            if value.is_none() {
-                continue;
-            }
-            if let Ok(f) = value.extract::<f64>()
-                && f.is_nan()
-            {
+            if crate::bindings::dataframe_utils::is_missing_cell(&value)? {
                 continue;
             }
             groups.insert(dimension.to_owned(), value.str()?.extract()?);
@@ -88,33 +84,32 @@ fn position_from_record(record: &Bound<'_, PyDict>) -> PyResult<ReturnContributi
     })
 }
 
-/// Read typed position rows from a pandas ``DataFrame``.
+/// Read typed position rows from a pandas `DataFrame`, Polars `DataFrame`, or Arrow table.
 fn positions_from_dataframe(
     py: Python<'_>,
     frame: &Bound<'_, PyAny>,
 ) -> PyResult<Vec<ReturnContributionPosition>> {
-    let columns: Vec<String> = frame
-        .getattr("columns")?
-        .call_method0("tolist")?
-        .extract()?;
-    let frame = if columns.iter().any(|c| c == "id") {
-        frame.clone()
-    } else {
+    use crate::bindings::dataframe_utils::{
+        is_pandas_dataframe, table_column_names, table_to_py_records,
+    };
+    let columns = table_column_names(frame)?;
+    let frame = if !columns.iter().any(|c| c == "id") && is_pandas_dataframe(frame)? {
         let kwargs = PyDict::new(py);
         kwargs.set_item("names", "id")?;
         frame
             .call_method("rename_axis", (), Some(&kwargs))?
             .call_method0("reset_index")?
+    } else {
+        frame.clone()
     };
-    let kwargs = PyDict::new(py);
-    kwargs.set_item("orient", "records")?;
-    let records: Vec<Bound<'_, PyDict>> =
-        frame.call_method("to_dict", (), Some(&kwargs))?.extract()?;
+    let records: Vec<Bound<'_, PyDict>> = table_to_py_records(py, &frame)?
+        .ok_or_else(|| PyTypeError::new_err("expected a DataFrame or Arrow table of positions"))?
+        .extract()?;
     records.iter().map(position_from_record).collect()
 }
 
-/// Extract a [`ReturnContributionSpec`] from a dict, JSON string, or
-/// pandas ``DataFrame``.
+/// Extract a [`ReturnContributionSpec`] from a dict, JSON string,
+/// pandas ``DataFrame``, Polars ``DataFrame``, or Arrow table.
 ///
 /// DataFrame rows stay typed so non-finite values reach Rust validation.
 /// Dict/JSON inputs merge keywords before deserialization; duplicate fields
@@ -126,7 +121,17 @@ pub(crate) fn extract_return_contribution_spec(
     weighting: Option<&str>,
     factors: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<ReturnContributionSpec> {
-    let pd = py.import("pandas")?;
+    let extract_factors = |value: &Bound<'_, PyAny>| -> PyResult<_> {
+        let payload = if let Some(records) =
+            crate::bindings::dataframe_utils::table_to_py_records(py, value)?
+        {
+            py_to_json_value(py, &records, "factors")?
+        } else {
+            py_to_json_value(py, value, "factors")?
+        };
+        serde_json::from_value(payload)
+            .map_err(|e| serde_json_to_py(e, "invalid return contribution spec"))
+    };
     let value = match spec.extract::<String>() {
         Ok(json) => serde_json::from_str::<serde_json::Value>(&json)
             .map_err(|e| serde_json_to_py(e, "invalid return contribution JSON"))?,
@@ -141,9 +146,9 @@ pub(crate) fn extract_return_contribution_spec(
                 py_to_json_value(py, dict.as_any(), "spec")?
             }
             _ => {
-                if spec.is_instance(&pd.getattr("DataFrame")?)? {
+                if crate::bindings::dataframe_utils::is_dataframe_like(spec)? {
                     let as_of = as_of.ok_or_else(|| {
-                        value_error("as_of is required when spec is a pandas DataFrame")
+                        value_error("as_of is required when spec is a DataFrame or Arrow table")
                     })?;
                     return Ok(ReturnContributionSpec {
                         as_of: extract_date_iso(as_of)?,
@@ -156,18 +161,13 @@ pub(crate) fn extract_return_contribution_spec(
                             .map_err(|e| serde_json_to_py(e, "invalid return contribution spec"))?
                             .unwrap_or_default(),
                         factors: factors
-                            .map(|value| {
-                                serde_json::from_value(py_to_json_value(py, value, "factors")?)
-                                    .map_err(|e| {
-                                        serde_json_to_py(e, "invalid return contribution spec")
-                                    })
-                            })
+                            .map(extract_factors)
                             .transpose()?
                             .unwrap_or_default(),
                     });
                 } else {
                     return Err(PyTypeError::new_err(
-                        "spec must be a dict, a JSON str, or a pandas DataFrame of positions",
+                        "spec must be a dict, a JSON str, or a pandas DataFrame, Polars DataFrame, or Arrow table of positions",
                     ));
                 }
             }
@@ -177,6 +177,17 @@ pub(crate) fn extract_return_contribution_spec(
         return Err(value_error(
             "invalid return contribution spec: expected a JSON object",
         ));
+    };
+    let factors_json = match factors {
+        Some(value) => {
+            if let Some(records) = crate::bindings::dataframe_utils::table_to_py_records(py, value)?
+            {
+                Some(py_to_json_value(py, &records, "factors")?)
+            } else {
+                Some(py_to_json_value(py, value, "factors")?)
+            }
+        }
+        None => None,
     };
     let keywords = [
         (
@@ -189,12 +200,7 @@ pub(crate) fn extract_return_contribution_spec(
             "weighting",
             weighting.map(|label| serde_json::Value::String(label.to_owned())),
         ),
-        (
-            "factors",
-            factors
-                .map(|value| py_to_json_value(py, value, "factors"))
-                .transpose()?,
-        ),
+        ("factors", factors_json),
     ];
     for (key, keyword) in keywords {
         if let Some(keyword) = keyword {
@@ -226,7 +232,7 @@ pub(crate) fn extract_return_contribution_spec(
 /// ... )
 /// >>> round(res.portfolio_return, 6)
 /// 0.008
-/// >>> list(res.to_dataframe().columns)
+/// >>> list(res.to_pandas().columns)
 /// ['id', 'weight', 'return', 'contribution', 'active_contribution']
 #[pyclass(
     name = "ReturnContributionResult",
@@ -291,24 +297,12 @@ impl PyReturnContributionResult {
         self.inner.warnings.clone()
     }
 
-    /// Per-instrument contributions as a ``pandas.DataFrame``.
-    ///
-    /// Columns: ``id``, ``weight``, ``return``, ``contribution``,
-    /// ``active_contribution`` (``NaN`` when no benchmark was supplied).
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(
-            py,
-            &self.inner.instrument_contribution,
-            INSTRUMENT_COLUMNS,
-        )
-    }
-
-    /// Group-bucket contributions as a long ``pandas.DataFrame``.
+    /// Group-bucket contributions as a long ``ArrowTable``.
     ///
     /// Columns: ``dimension`` (the ``group:<dimension>`` label name),
     /// ``key`` (bucket), ``contribution``. Empty with schema columns when the
     /// spec carried no group labels.
-    fn to_group_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_group_table(&self) -> PyResult<PyArrowTable> {
         let rows: Vec<serde_json::Value> = self
             .inner
             .group_contribution
@@ -323,21 +317,21 @@ impl PyReturnContributionResult {
                 })
             })
             .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, GROUP_COLUMNS)
+        serde_rows_to_arrow_table(&rows, GROUP_COLUMNS)
     }
 
-    /// Factor contributions as a ``pandas.DataFrame``.
+    /// Factor contributions as an ``ArrowTable``.
     ///
     /// Columns: ``factor``, ``exposure``, ``factor_return``,
     /// ``contribution``. Empty with schema columns when no factor rows were
     /// supplied.
-    fn to_factor_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(py, &self.inner.factor_contribution, FACTOR_COLUMNS)
+    fn to_factor_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.inner.factor_contribution, FACTOR_COLUMNS)
     }
 
-    /// Per-instrument contributions as a ``pandas.Series`` named
+    /// Per-instrument contributions as a ``LabeledSeries`` named
     /// ``contribution`` and indexed by instrument id.
-    fn to_series<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_series(&self) -> PyResult<PyLabeledSeries> {
         let labels: Vec<String> = self
             .inner
             .instrument_contribution
@@ -350,7 +344,7 @@ impl PyReturnContributionResult {
             .iter()
             .map(|row| row.contribution)
             .collect();
-        labeled_values_to_series(py, &labels, values, "contribution")
+        Ok(PyLabeledSeries::from_f64("contribution", labels, values)?.with_index_name("id"))
     }
 
     /// Serialize to a compact JSON string.
@@ -384,11 +378,12 @@ impl PyReturnContributionResult {
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("ReturnContributionResult", &self.inner)
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks (delegates to
-    /// ``to_dataframe``; ``None`` falls back to ``__repr__``).
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyReturnContributionResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.inner.instrument_contribution, INSTRUMENT_COLUMNS)
     }
 }
+
+tabular_methods!(PyReturnContributionResult);

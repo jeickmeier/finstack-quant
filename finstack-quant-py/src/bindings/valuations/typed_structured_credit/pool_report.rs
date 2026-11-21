@@ -88,12 +88,6 @@ fn entries(rows: &[PoolConcentrationEntry]) -> Vec<PyPoolConcentrationEntry> {
 
 #[pymethods]
 impl PyPoolReport {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_report", "PoolReport.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::core::table::envelope_to_pandas(py, &self.inner.to_table())
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -106,6 +100,18 @@ impl PyPoolReport {
         )
     }
 }
+
+impl PyPoolReport {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<crate::bindings::core::table::PyArrowTable> {
+        crate::bindings::core::table::PyArrowTable::from_envelope(&self.inner.to_table())
+    }
+}
+
+crate::bindings::macros::tabular_methods!(
+    PyPoolReport,
+    "PoolReport",
+    module = "finstack_quant.valuations.instruments._typed_structured_credit.pool_report"
+);
 
 crate::bindings::macros::py_getters!(PyPoolReport |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_report", "PoolReport.total_balance")]

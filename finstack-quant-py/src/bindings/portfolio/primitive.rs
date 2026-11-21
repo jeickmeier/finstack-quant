@@ -7,13 +7,15 @@ use finstack_quant_portfolio::primitive::PortfolioPrimitiveExposureReport;
 use finstack_quant_valuations::metrics::MetricId;
 
 use crate::bindings::core::currency::PyCurrency;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref};
-use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::{core_to_py, portfolio_to_py};
 
 use crate::bindings::json_bridge::{deserialize_json, serialize_json};
 
-const AGGREGATE_COLUMNS: &[ColumnSchema<'static>] = &[
+const AGGREGATE_COLUMNS: &[(&str, &str)] = &[
     ("instrument_id", "str"),
     ("instrument_type", "str"),
     ("net_quantity", "float64"),
@@ -23,7 +25,7 @@ const AGGREGATE_COLUMNS: &[ColumnSchema<'static>] = &[
     ("currency", "str"),
 ];
 
-const PATH_COLUMNS: &[ColumnSchema<'static>] = &[
+const PATH_COLUMNS: &[(&str, &str)] = &[
     ("position_id", "str"),
     ("path", "str"),
     ("instrument_id", "str"),
@@ -98,39 +100,14 @@ impl PyPortfolioPrimitiveExposureReport {
         self.inner.aggregates.len()
     }
 
-    /// Export the net/gross aggregates as a pandas ``DataFrame``.
-    ///
-    /// One row per primitive instrument id, ordered by id. Columns:
-    /// ``instrument_id``, ``instrument_type``, ``net_quantity``,
-    /// ``gross_quantity``, ``net_value``, ``gross_value``, ``currency``.
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows = self
-            .inner
-            .aggregates
-            .iter()
-            .map(|aggregate| {
-                serde_json::json!({
-                    "instrument_id": aggregate.instrument_id.as_str(),
-                    "instrument_type": aggregate.instrument_type,
-                    "net_quantity": aggregate.net_quantity,
-                    "gross_quantity": aggregate.gross_quantity,
-                    "net_value": aggregate.net_value.amount(),
-                    "gross_value": aggregate.gross_value.amount(),
-                    "currency": aggregate.net_value.currency().to_string(),
-                })
-            })
-            .collect::<Vec<_>>();
-        serde_rows_to_dataframe_with_schema(py, &rows, AGGREGATE_COLUMNS)
-    }
-
-    /// Export the position-aware primitive paths as a pandas ``DataFrame``.
+    /// Export the position-aware primitive paths as an
+    /// :class:`~finstack_quant.core.table.ArrowTable`.
     ///
     /// One row per path. Columns: ``position_id``, ``path`` (composite and
     /// leg ids joined with ``/``), ``instrument_id``, ``instrument_type``,
     /// ``quantity``, ``value``, ``currency``.
     #[pyo3(text_signature = "(self)")]
-    fn to_paths_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn to_paths_table(&self) -> PyResult<PyArrowTable> {
         let rows = self
             .inner
             .paths
@@ -147,7 +124,7 @@ impl PyPortfolioPrimitiveExposureReport {
                 })
             })
             .collect::<Vec<_>>();
-        serde_rows_to_dataframe_with_schema(py, &rows, PATH_COLUMNS)
+        serde_rows_to_arrow_table(&rows, PATH_COLUMNS)
     }
 
     /// Support pickle through the canonical JSON round-trip.
@@ -165,6 +142,30 @@ impl PyPortfolioPrimitiveExposureReport {
         )
     }
 }
+
+impl PyPortfolioPrimitiveExposureReport {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let rows = self
+            .inner
+            .aggregates
+            .iter()
+            .map(|aggregate| {
+                serde_json::json!({
+                    "instrument_id": aggregate.instrument_id.as_str(),
+                    "instrument_type": aggregate.instrument_type,
+                    "net_quantity": aggregate.net_quantity,
+                    "gross_quantity": aggregate.gross_quantity,
+                    "net_value": aggregate.net_value.amount(),
+                    "gross_value": aggregate.gross_value.amount(),
+                    "currency": aggregate.net_value.currency().to_string(),
+                })
+            })
+            .collect::<Vec<_>>();
+        serde_rows_to_arrow_table(&rows, AGGREGATE_COLUMNS)
+    }
+}
+
+tabular_methods!(PyPortfolioPrimitiveExposureReport);
 
 /// Decompose every portfolio position into primitive economic exposures.
 ///

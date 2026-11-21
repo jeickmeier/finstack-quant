@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 import pandas as pd
+import polars as pl
+from finstack_quant.core.table import ArrowTable, LabeledSeries
 
 # Return Contribution
 
@@ -143,7 +145,25 @@ class ReturnContributionResult:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
+        """
+        Per-instrument contributions as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            One row per instrument with ``id``, ``weight``, ``return``,
+            ``contribution``, and ``active_contribution`` columns; schema columns
+            are present even for an empty result.
+
+        Raises
+        ------
+        ValueError
+            If the underlying Arrow record batch cannot be built.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
         """
         Per-instrument contributions as a pandas DataFrame.
 
@@ -157,18 +177,52 @@ class ReturnContributionResult:
 
         Raises
         ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
+        ImportError
+            If ``pandas`` is not installed.
         """
         ...
 
-    def to_group_dataframe(self) -> pd.DataFrame:
+    def to_polars(self) -> pl.DataFrame:
         """
-        Group-bucket contributions as a long pandas DataFrame.
+        Per-instrument contributions as a ``polars.DataFrame``.
 
         Returns
         -------
-        pd.DataFrame
+        pl.DataFrame
+            Per-instrument contributions constructed via the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Per-instrument contributions as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Zero-copy table built through the Arrow PyCapsule interface.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: Any | None = None) -> Any: ...
+    def __arrow_c_schema__(self) -> Any: ...
+    def to_group_table(self) -> ArrowTable:
+        """
+        Group-bucket contributions as a long :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
             Columns ``dimension`` (the ``group:<dimension>`` label name),
             ``key`` (bucket) and ``contribution``; empty with schema columns
             when the spec carried no group labels.
@@ -176,17 +230,17 @@ class ReturnContributionResult:
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be serialized into an Arrow table.
         """
         ...
 
-    def to_factor_dataframe(self) -> pd.DataFrame:
+    def to_factor_table(self) -> ArrowTable:
         """
-        Factor contributions as a pandas DataFrame.
+        Factor contributions as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             Columns ``factor``, ``exposure``, ``factor_return``,
             ``contribution``; empty with schema columns when no factor rows
             were supplied.
@@ -194,39 +248,24 @@ class ReturnContributionResult:
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be serialized into an Arrow table.
         """
         ...
 
-    def _repr_html_(self) -> str | None:
+    def _repr_html_(self) -> str | None: ...
+    def to_series(self) -> LabeledSeries:
         """
-        HTML table for Jupyter, rendered from :meth:`to_dataframe`.
+        Per-instrument contributions as a :class:`~finstack_quant.core.table.LabeledSeries` indexed by instrument id.
 
         Returns
         -------
-        str or None
-            pandas HTML markup, or ``None`` when the frame cannot be built
-            (IPython then falls back to ``__repr__``).
-
-        Notes
-        -----
-        This method does not raise; failures degrade to ``None``.
-        """
-        ...
-
-    def to_series(self) -> pd.Series:
-        """
-        Per-instrument contributions as a pandas Series indexed by instrument id.
-
-        Returns
-        -------
-        pd.Series
-            Named ``contribution``.
+        LabeledSeries
+            Named ``contribution`` with index ``id``.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the series cannot be constructed.
         """
         ...
 

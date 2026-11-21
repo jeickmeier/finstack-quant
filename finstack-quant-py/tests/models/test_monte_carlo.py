@@ -344,12 +344,12 @@ def test_lrm_greeks_round_trip_and_tabulate() -> None:
     with pytest.raises(ValueError, match="invalid LrmGreeks JSON"):
         LrmGreeks.from_json('{"price": 1.0}')
 
-    frame = greeks.to_dataframe()
+    frame = greeks.to_pandas()
     assert list(frame.index) == ["price", "delta", "vega"]
     assert list(frame.columns) == ["mean", "stderr", "ci_lower", "ci_upper"]
     assert frame.loc["delta", "mean"] == greeks.delta.mean
     assert frame.loc["price", "ci_upper"] == greeks.price.ci_upper.amount
-    assert "<table" in greeks._repr_html_()
+    assert "<table" in (greeks._repr_html_() or "")
     assert repr(greeks).startswith("LrmGreeks(price=")
 
 

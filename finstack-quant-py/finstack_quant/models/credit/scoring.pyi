@@ -25,6 +25,9 @@ from __future__ import annotations
 from typing import Any
 
 import pandas
+import polars as pl
+
+from finstack_quant.core.table import ArrowTable
 
 from .pd import MasterScaleResult
 
@@ -1278,21 +1281,75 @@ class ScoringResult:
             If serialization fails.
         """
         ...
-    def to_dataframe(self) -> pandas.DataFrame:
-        """
-        Single-row frame with ``model``, ``score``, ``zone``, ``implied_pd``.
+    def to_arrow(self) -> ArrowTable:
+        """Export the scoring result as a single-row :class:`~finstack_quant.core.table.ArrowTable`.
 
         Returns
         -------
-        pandas.DataFrame
-            Single-row frame with ``model``, ``score``, ``zone``, ``implied_pd``.
+        ArrowTable
+            Single-row table with ``model``, ``score``, ``zone``, and ``implied_pd``.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized into a pandas object.
+            If the value cannot be represented as an Arrow table.
         """
         ...
+
+    def to_pandas(self) -> pandas.DataFrame:
+        """Export the scoring result as a single-row pandas ``DataFrame``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Single-row frame with ``model``, ``score``, ``zone``, and ``implied_pd``.
+
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If the value cannot be represented as a pandas DataFrame.
+        """
+        ...
+
+    def to_polars(self) -> pl.DataFrame:
+        """Export the scoring result as a single-row Polars ``DataFrame``.
+
+        Returns
+        -------
+        polars.DataFrame
+            Single-row frame with ``model``, ``score``, ``zone``, and ``implied_pd``.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If the value cannot be represented as a Polars DataFrame.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """Export the scoring result as a single-row ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            Single-row table with ``model``, ``score``, ``zone``, and ``implied_pd``.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If the value cannot be represented as a PyArrow table.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """
         Python-style representation rendered from the canonical fields.

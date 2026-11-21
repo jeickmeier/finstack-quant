@@ -6,9 +6,11 @@ from collections.abc import Mapping
 import datetime
 from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.attribution._pnl_attribution import PnlAttribution
 from finstack_quant.attribution._result_envelope import AttributionResultEnvelope
 from finstack_quant.attribution._return_contribution import ReturnContributionResult
@@ -136,7 +138,7 @@ def attribute_pnl(instrument: object, inputs: AttributionInputs | Mapping[str, A
     -------
     PnlAttribution
         Typed attribution result. Use ``.to_json()`` for the wire form and
-        ``.to_dataframe()`` for a pandas view.
+        ``.to_pandas()`` / ``.to_polars()`` / ``.to_arrow()`` for tabular views.
 
     Examples
     --------
@@ -171,7 +173,7 @@ def attribute_pnl(instrument: object, inputs: AttributionInputs | Mapping[str, A
     """
     ...
 
-def attribute_pnl_many(inputs: AttributionInputs | Mapping[str, Any] | str, instruments: list[object]) -> pd.DataFrame:
+def attribute_pnl_many(inputs: AttributionInputs | Mapping[str, Any] | str, instruments: list[object]) -> ArrowTable:
     """
     Run one attribution set-up against many instruments and tabulate.
 
@@ -195,9 +197,9 @@ def attribute_pnl_many(inputs: AttributionInputs | Mapping[str, Any] | str, inst
 
     Returns
     -------
-    pd.DataFrame
+    ArrowTable
         One row per instrument with the columns of
-        :meth:`PnlAttribution.to_dataframe` (``instrument_id``, ``method``,
+        :meth:`PnlAttribution.to_arrow` (``instrument_id``, ``method``,
         ``t0``, ``t1``, ``currency``, ``total_pnl``, every factor P&L,
         ``residual``, ``residual_pct``, ``num_repricings``,
         ``result_invalid``); empty with schema columns for an empty list.
@@ -225,7 +227,7 @@ def attribute_pnl_many(inputs: AttributionInputs | Mapping[str, Any] | str, inst
     ...     "as_of_t1": "2025-01-16",
     ...     "method": "parallel",
     ... }
-    >>> list(attribute_pnl_many(inputs, []).columns[:3])
+    >>> attribute_pnl_many(inputs, []).column_names()[:3]
     ['instrument_id', 'method', 't0']
     """
     ...
@@ -329,36 +331,37 @@ def attribute_pnl_envelope(spec_json: str) -> AttributionResultEnvelope:
     ...
 
 def attribute_return_contribution(
-    spec: dict[str, Any] | str | pd.DataFrame,
+    spec: dict[str, Any] | str | pd.DataFrame | pl.DataFrame | Any,
     as_of: datetime.date | str | None = None,
     weighting: str | None = None,
-    factors: list[dict[str, Any]] | None = None,
+    factors: list[dict[str, Any]] | pd.DataFrame | pl.DataFrame | Any | None = None,
 ) -> ReturnContributionResult:
     """
     Compute single-period return contribution attribution.
 
     Parameters
     ----------
-    spec : dict[str, Any] or str or pandas.DataFrame
+    spec : dict[str, Any] or str or pandas.DataFrame or polars.DataFrame or Any
         A ``dict`` or JSON ``str`` carries ``as_of``, ``positions``, optional
         ``factors`` and ``weighting`` exactly as the wire schema (``as_of``
-        may be a ``datetime.date`` in the dict form). A ``DataFrame`` is one
-        position per row with columns ``id`` (or the index), exactly one of
-        ``market_value`` / ``weight``, ``return``, optional
-        ``benchmark_weight`` / ``benchmark_return``, and any number of
-        ``group:<dimension>`` label columns; missing optional cells may be
-        ``NaN``.
+        may be a ``datetime.date`` in the dict form). A DataFrame (pandas or
+        Polars) or Arrow table is one position per row with columns ``id`` (or
+        the pandas index), exactly one of ``market_value`` / ``weight``,
+        ``return``, optional ``benchmark_weight`` / ``benchmark_return``, and
+        any number of ``group:<dimension>`` label columns; missing optional
+        cells may be ``NaN`` / ``null``.
     as_of : datetime.date or str, optional
         Attribution date label, set as the spec's ``as_of`` field for every
-        form. Required with a ``DataFrame`` spec (which has no other place
-        for it).
+        form. Required with a DataFrame or Arrow table spec (which has no
+        other place for it).
     weighting : str, optional
         ``"gross"`` or ``"net_market_value"`` for market-value positions, set
         as the spec's ``weighting`` field for every form; when neither the
         keyword nor the spec gives it, the wire default ``"gross"`` applies.
-    factors : list[dict[str, Any]], optional
-        Factor rows ``{"factor", "exposure", "factor_return"}``, set as the
-        spec's ``factors`` field for every form.
+    factors : list[dict[str, Any]] or pandas.DataFrame or polars.DataFrame or Any, optional
+        Factor rows ``{"factor", "exposure", "factor_return"}`` (record list
+        or DataFrame/Arrow table), set as the spec's ``factors`` field for
+        every form.
 
     A keyword that duplicates a field the dict or JSON spec already carries
     raises ``ValueError``; pass each field once.
@@ -367,9 +370,9 @@ def attribute_return_contribution(
     -------
     ReturnContributionResult
         Typed result. Use ``.to_json()`` for the wire form,
-        ``.to_dataframe()`` / ``.to_group_dataframe()`` /
-        ``.to_factor_dataframe()`` for tabular views, and ``.to_series()``
-        for contributions indexed by instrument id.
+        ``.to_pandas()`` / ``.to_polars()`` / ``.to_arrow()`` /
+        ``.to_group_table()`` / ``.to_factor_table()`` for tabular views, and
+        ``.to_series()`` for contributions indexed by instrument id.
 
     Examples
     --------

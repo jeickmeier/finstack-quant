@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from typing import Any
 import pandas as pd
+import polars as pl
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.table import ArrowTable
 from finstack_quant.portfolio._container import Portfolio
 
 class PortfolioPrimitiveExposureReport:
@@ -118,12 +121,28 @@ class PortfolioPrimitiveExposureReport:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the net/gross aggregates as a pandas DataFrame.
+        Export the net/gross aggregates as an :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``instrument_id``, ``instrument_type``, ``net_quantity``,
         ``gross_quantity``, ``net_value``, ``gross_value``, ``currency``.
+
+        Returns
+        -------
+        ArrowTable
+            One row per primitive instrument id, ordered by id.
+
+        Raises
+        ------
+        ValueError
+            If the table cannot be constructed.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the net/gross aggregates as a pandas ``DataFrame``.
 
         Returns
         -------
@@ -133,13 +152,49 @@ class PortfolioPrimitiveExposureReport:
         Raises
         ------
         ImportError
-            If pandas is not installed.
+            If ``pandas`` is not installed.
         """
         ...
 
-    def to_paths_dataframe(self) -> pd.DataFrame:
+    def to_polars(self) -> pl.DataFrame:
         """
-        Export the position-aware primitive paths as a pandas DataFrame.
+        Export the net/gross aggregates as a Polars ``DataFrame``.
+
+        Returns
+        -------
+        pl.DataFrame
+            One row per primitive instrument id, ordered by id.
+
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the net/gross aggregates as a ``pyarrow.Table``.
+
+        Returns
+        -------
+        pyarrow.Table
+            One row per primitive instrument id, ordered by id.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
+    def to_paths_table(self) -> ArrowTable:
+        """
+        Export the position-aware primitive paths as an
+        :class:`~finstack_quant.core.table.ArrowTable`.
 
         Columns: ``position_id``, ``path`` (composite and leg ids joined with
         ``/``), ``instrument_id``, ``instrument_type``, ``quantity``,
@@ -147,13 +202,13 @@ class PortfolioPrimitiveExposureReport:
 
         Returns
         -------
-        pd.DataFrame
+        ArrowTable
             One row per primitive path.
 
         Raises
         ------
-        ImportError
-            If pandas is not installed.
+        ValueError
+            If the table cannot be constructed.
         """
         ...
 
@@ -235,7 +290,7 @@ def primitive_exposures(
     ...     })
     ... )
     >>> report = primitive_exposures(book, MarketContext(), [])
-    >>> report.to_dataframe()[["instrument_id", "net_quantity", "gross_value"]].values.tolist()
+    >>> report.to_pandas()[["instrument_id", "net_quantity", "gross_value"]].values.tolist()
     [['ACME', -2.0, 200.0]]
     """
     ...

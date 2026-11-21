@@ -6,9 +6,10 @@
 //! takes the quantile of the summed P&L, so diversification is preserved.
 
 use super::pricing::PyMarketHistory;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::{InstrumentArg, extract_instrument, extract_market};
 use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
-use crate::bindings::pandas_utils::dict_to_dataframe;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_valuations::metrics::risk::MarketHistory;
 use finstack_quant_valuations::metrics::risk::var_calculator::{
@@ -16,7 +17,6 @@ use finstack_quant_valuations::metrics::risk::var_calculator::{
 };
 use finstack_quant_valuations::pricer::PricingDispatch;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 
 /// Coerce ``MarketHistory | dict | str`` into the Rust history.
 fn extract_history(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<MarketHistory> {
@@ -71,6 +71,20 @@ fn calculate_var(
     .map_err(core_to_py)
 }
 
+impl PyVarResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .f64("pnl", self.inner.pnl_distribution.clone())?
+            .build()
+    }
+}
+
+crate::bindings::macros::tabular_methods!(
+    PyVarResult,
+    "VarResult",
+    module = "finstack_quant.valuations.instruments._var"
+);
+
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._var", "VarResult")]
 #[pyclass(
     name = "VarResult",
@@ -86,20 +100,6 @@ pub(crate) struct PyVarResult {
 
 #[pymethods]
 impl PyVarResult {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._var", "VarResult.to_dataframe")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        let series = py.import("pandas")?.getattr("Series")?;
-        let kwargs = PyDict::new(py);
-        kwargs.set_item("dtype", "float64")?;
-        data.set_item(
-            "pnl",
-            series.call((self.inner.pnl_distribution.clone(),), Some(&kwargs))?,
-        )?;
-        dict_to_dataframe(py, &data, None)
-    }
-
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._var", "VarResult.from_json")]
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]

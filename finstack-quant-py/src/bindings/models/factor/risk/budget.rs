@@ -1,12 +1,9 @@
 use super::contributions::PyPositionRiskDecomposition;
-use crate::bindings::macros::impl_repr_html_via_dataframe;
-use crate::bindings::pandas_utils::dict_to_dataframe;
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
-
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::table_builders::TableBuilder;
 use finstack_quant_factor::risk::{self as model_risk, PositionBudgetEntry, RiskBudgetResult};
-
-use crate::bindings::macros::wire_methods;
+use pyo3::prelude::*;
 
 /// Per-position budget comparison entry.
 #[pyclass(
@@ -73,31 +70,6 @@ impl PyPositionBudgetEntry {
         self.inner.excess
     }
 
-    /// Export this budget entry as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``position_id``, ``actual_component_var``,
-    /// ``target_component_var``, ``utilization``, ``excess``.
-    ///
-    /// Built from the typed fields rather than the wire form so a non-finite
-    /// ``utilization`` (zero-target breach) stays a float ``inf`` column
-    /// value instead of the JSON ``"inf"`` string sentinel.
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        data.set_item("position_id", vec![self.inner.position_id.as_str()])?;
-        data.set_item(
-            "actual_component_var",
-            vec![self.inner.actual_component_var],
-        )?;
-        data.set_item(
-            "target_component_var",
-            vec![self.inner.target_component_var],
-        )?;
-        data.set_item("utilization", vec![self.inner.utilization])?;
-        data.set_item("excess", vec![self.inner.excess])?;
-        dict_to_dataframe(py, &data, None)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "PositionBudgetEntry(position_id={:?}, actual={}, target={}, utilization={}, excess={})",
@@ -110,7 +82,28 @@ impl PyPositionBudgetEntry {
     }
 }
 
-impl_repr_html_via_dataframe!(PyPositionBudgetEntry);
+impl PyPositionBudgetEntry {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        TableBuilder::new()
+            .utf8(
+                "position_id",
+                vec![self.inner.position_id.as_str().to_owned()],
+            )?
+            .f64(
+                "actual_component_var",
+                vec![self.inner.actual_component_var],
+            )?
+            .f64(
+                "target_component_var",
+                vec![self.inner.target_component_var],
+            )?
+            .f64("utilization", vec![self.inner.utilization])?
+            .f64("excess", vec![self.inner.excess])?
+            .build()
+    }
+}
+
+tabular_methods!(PyPositionBudgetEntry);
 
 /// Budget evaluation result across positions.
 #[pyclass(
@@ -157,32 +150,6 @@ impl PyRiskBudgetResult {
             .collect()
     }
 
-    /// Export the per-position budget comparison as a pandas ``DataFrame``.
-    ///
-    /// One row per entry of :attr:`positions`. The scalars
-    /// :attr:`total_overbudget` and :attr:`has_breach` are header metadata and
-    /// are not repeated per row.
-    ///
-    /// Columns: ``position_id``, ``actual_component_var``,
-    /// ``target_component_var``, ``utilization`` (ratio, not percentage),
-    /// ``excess``.
-    #[pyo3(text_signature = "(self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows = &self.inner.positions;
-        let position_ids: Vec<&str> = rows.iter().map(|e| e.position_id.as_str()).collect();
-        let actual: Vec<f64> = rows.iter().map(|e| e.actual_component_var).collect();
-        let target: Vec<f64> = rows.iter().map(|e| e.target_component_var).collect();
-        let utilization: Vec<f64> = rows.iter().map(|e| e.utilization).collect();
-        let excess: Vec<f64> = rows.iter().map(|e| e.excess).collect();
-        let data = PyDict::new(py);
-        data.set_item("position_id", position_ids)?;
-        data.set_item("actual_component_var", actual)?;
-        data.set_item("target_component_var", target)?;
-        data.set_item("utilization", utilization)?;
-        data.set_item("excess", excess)?;
-        dict_to_dataframe(py, &data, None)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "RiskBudgetResult(positions={}, total_overbudget={}, has_breach={})",
@@ -197,7 +164,28 @@ impl PyRiskBudgetResult {
     }
 }
 
-impl_repr_html_via_dataframe!(PyRiskBudgetResult);
+impl PyRiskBudgetResult {
+    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let rows = &self.inner.positions;
+        let position_ids: Vec<String> = rows
+            .iter()
+            .map(|e| e.position_id.as_str().to_owned())
+            .collect();
+        let actual: Vec<f64> = rows.iter().map(|e| e.actual_component_var).collect();
+        let target: Vec<f64> = rows.iter().map(|e| e.target_component_var).collect();
+        let utilization: Vec<f64> = rows.iter().map(|e| e.utilization).collect();
+        let excess: Vec<f64> = rows.iter().map(|e| e.excess).collect();
+        TableBuilder::new()
+            .utf8("position_id", position_ids)?
+            .f64("actual_component_var", actual)?
+            .f64("target_component_var", target)?
+            .f64("utilization", utilization)?
+            .f64("excess", excess)?
+            .build()
+    }
+}
+
+tabular_methods!(PyRiskBudgetResult);
 
 /// Evaluate a per-position risk budget against actual component VaRs,
 /// returning a typed ``RiskBudgetResult``.

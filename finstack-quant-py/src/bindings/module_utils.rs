@@ -136,6 +136,30 @@ pub(crate) fn attach_submodule(
 ///
 /// Anything else raises the standard ``TypeError: Object of type ... is not
 /// JSON serializable``.
+static DECIMAL_CLASS: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+static DATETIME_DATE_CLASS: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+static JSON_MODULE: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+
+fn decimal_class<'py>(py: Python<'py>) -> PyResult<&'py Bound<'py, PyAny>> {
+    DECIMAL_CLASS
+        .get_or_try_init(py, || {
+            Ok(py.import("decimal")?.getattr("Decimal")?.unbind())
+        })
+        .map(|cls| cls.bind(py))
+}
+
+fn datetime_date_class<'py>(py: Python<'py>) -> PyResult<&'py Bound<'py, PyAny>> {
+    DATETIME_DATE_CLASS
+        .get_or_try_init(py, || Ok(py.import("datetime")?.getattr("date")?.unbind()))
+        .map(|cls| cls.bind(py))
+}
+
+fn json_module<'py>(py: Python<'py>) -> PyResult<&'py Bound<'py, PyAny>> {
+    JSON_MODULE
+        .get_or_try_init(py, || Ok(py.import("json")?.into_any().unbind()))
+        .map(|m| m.bind(py))
+}
+
 #[pyfunction]
 fn json_default<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     use crate::bindings::cashflows::builder::specs::{
@@ -146,7 +170,11 @@ fn json_default<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<Bound
     use crate::bindings::core::dates::daycount::PyDayCount;
     use crate::bindings::core::dates::schedule::PyStubKind;
     use crate::bindings::core::dates::tenor::PyTenor;
-    use crate::bindings::pandas_utils::serde_to_py;
+    use crate::bindings::dataframe_utils::{
+        arrow_to_pyarrow_table, has_arrow_c_stream, is_pandas_dataframe, is_pandas_series,
+        is_polars_dataframe, is_polars_series,
+    };
+    use crate::bindings::json_bridge::serde_to_py;
     use crate::bindings::statements::types::PyNodeType;
     use crate::bindings::statements_analytics::ecl::PyStage;
     use crate::bindings::statements_analytics::templates_real_estate::PyLeaseGrowthConvention;
@@ -182,17 +210,42 @@ fn json_default<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<Bound
     if let Ok(value) = obj.cast::<PyLeaseGrowthConvention>() {
         return serde_to_py(py, value.get());
     }
-    if obj.is_instance(&py.import("decimal")?.getattr("Decimal")?)? {
+    if obj.is_instance(decimal_class(py)?)? {
         return Ok(obj.str()?.into_any());
+    }
+    if is_polars_dataframe(obj)? {
+        return obj.call_method0("to_dicts");
+    }
+    if is_polars_series(obj)? {
+        return obj.call_method0("to_list");
+    }
+    if is_pandas_dataframe(obj)? {
+        return obj.call_method1("to_dict", ("records",));
+    }
+    if is_pandas_series(obj)? {
+        return obj.call_method0("tolist");
+    }
+    if obj.is_instance_of::<crate::bindings::core::table::PyArrowTable>() {
+        return obj.call_method0("to_records");
+    }
+    if obj.is_instance_of::<crate::bindings::core::table::PyLabeledSeries>() {
+        return obj.call_method0("to_dict");
+    }
+    if !obj.hasattr("to_arrow")? && has_arrow_c_stream(obj)? {
+        return arrow_to_pyarrow_table(py, obj)?.call_method0("to_pylist");
+    }
+    if obj.get_type().name()? == "datetime64" {
+        let iso = crate::bindings::date_utils::py_to_date(obj)?.to_string();
+        return Ok(iso.into_pyobject(py)?.into_any());
     }
     if obj.hasattr("to_dict")? {
         return obj.call_method0("to_dict");
     }
-    let json_mod = py.import("json")?;
+    let json_mod = json_module(py)?;
     if obj.hasattr("to_json")? {
         return json_mod.call_method1("loads", (obj.call_method0("to_json")?,));
     }
-    if obj.is_instance(&py.import("datetime")?.getattr("date")?)? {
+    if obj.is_instance(datetime_date_class(py)?)? {
         return obj.call_method0("isoformat");
     }
     if obj.hasattr("tolist")? {

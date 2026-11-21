@@ -56,7 +56,7 @@ def test_scoring_result_round_trips_and_exports() -> None:
     result = scoring.zmijewski_score(scoring.ZmijewskiInput(**ZMIJEWSKI))
     assert result.implied_pd is not None
     assert scoring.ScoringResult.from_json(result.to_json()) == result
-    frame = result.to_dataframe()
+    frame = result.to_pandas()
     assert list(frame.columns) == ["model", "score", "zone", "implied_pd"]
     assert frame["zone"].iloc[0] == result.zone
     assert repr(result).startswith("ScoringResult(")

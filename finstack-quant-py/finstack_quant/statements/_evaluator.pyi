@@ -5,10 +5,11 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Literal
 import pandas as pd
+import polars as pl
 from finstack_quant.core.dates import Period
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
-from finstack_quant.core.table import ArrowTable
+from finstack_quant.core.table import ArrowTable, LabeledSeries
 from finstack_quant.statements._capital_structure import CapitalStructureCashflows
 from finstack_quant.statements._checks import CheckReport, CheckSuiteSpec
 from finstack_quant.statements._monte_carlo import MonteCarloConfig, MonteCarloResults
@@ -745,19 +746,20 @@ class StatementResult:
         """
         ...
 
-    def to_dataframe(self, orient: Literal["long", "wide"] = "long") -> pd.DataFrame:
+    def to_arrow(self, orient: Literal["long", "wide"] = "long") -> ArrowTable:
         """
-        Export results as a pandas DataFrame.
+        Export results as an ``ArrowTable`` (zero-copy via ``__arrow_c_stream__``).
 
         Parameters
         ----------
         orient : {"long", "wide"}, default "long"
             ``"long"`` is the exact table: one row per node and period of the
             result's plan, including cells without a value, with columns
-            ``node_id``, ``period``, ``status``, ``value``, ``amount``,
+            ``node_id``, ``period_id``, ``status``, ``value``, ``amount``,
             ``currency``, ``value_type``, ``reason``, ``source``. ``"wide"``
-            is the approximate numeric view: node identifiers as rows and
-            period identifiers as columns.
+            puts one row per period (column ``period_id``) and one nullable
+            ``float64`` column per node whose field metadata carries its units
+            (``value_type`` and, for money, ``currency``).
 
         Notes
         -----
@@ -768,12 +770,12 @@ class StatementResult:
         value-less cells); ``reason`` says why an unavailable cell has no
         value; and ``source`` is the value source selected for the cell
         (``value``, ``forecast`` or ``formula``), null when none was. In wide
-        form a cell without a value is null (NaN), never zero.
+        form a cell without a value is null, never zero.
 
         Returns
         -------
-        pd.DataFrame
-            Long- or wide-format frame.
+        ArrowTable
+            Long- or wide-format Arrow table with field/schema metadata preserved.
 
         Raises
         ------
@@ -782,50 +784,86 @@ class StatementResult:
         """
         ...
 
-    def to_arrow_long(self) -> ArrowTable:
+    def to_pandas(self, orient: Literal["long", "wide"] = "long") -> pd.DataFrame:
         """
-        Export the long-format table via Arrow (zero-copy for consumers).
+        Export results as a pandas ``DataFrame``.
 
-        Returns an `ArrowTable` implementing ``__arrow_c_stream__``; pass it
-        to ``pyarrow.table(...)``, ``polars.DataFrame(...)``, or DuckDB.
-        Column values and monetary-mirror semantics match ``to_dataframe("long")``,
-        plus column roles and table metadata are preserved as Arrow
-        field/schema metadata. One column name differs: the period column
-        here is ``period_id`` (the table envelope's native name), whereas
-        ``to_dataframe("long")`` renames it to ``period``.
+        Parameters
+        ----------
+        orient : {"long", "wide"}, default "long"
+            ``"long"`` returns one row per node and period with columns
+            ``node_id``, ``period_id``, ``status``, ``value``, ``amount``,
+            ``currency``, ``value_type``, ``reason``, ``source``. ``"wide"``
+            is the approximate numeric view with node identifiers as rows and
+            period identifiers as columns.
 
         Returns
         -------
-        ArrowTable
-            Long-format Arrow table with one row per (node, period) pair.
+        pandas.DataFrame
+            Long- or wide-format frame.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ImportError
+            If ``pandas`` is not installed.
+        ValueError
+            If ``orient`` is not ``"long"`` or ``"wide"``.
         """
         ...
 
-    def to_arrow_wide(self) -> ArrowTable:
+    def to_polars(self, orient: Literal["long", "wide"] = "long") -> pl.DataFrame:
         """
-        Export the wide-format table via Arrow (zero-copy for consumers).
+        Export results as a Polars ``DataFrame``.
 
-        Rows are the periods of the result's plan (column ``period_id``), with
-        one nullable ``float64`` column per node whose field metadata carries
-        its units (``value_type`` and, for money, ``currency``). A cell
-        without a value is null. Matches ``to_dataframe("wide")`` before its
-        transpose.
+        Parameters
+        ----------
+        orient : {"long", "wide"}, default "long"
+            ``"long"`` returns one row per (node, period) pair with column
+            ``period_id``; ``"wide"`` returns one row per period (``period_id``)
+            with one float column per node.
 
         Returns
         -------
-        ArrowTable
-            Wide-format Arrow table with one row per period.
+        polars.DataFrame
+            Long- or wide-format Polars frame.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ImportError
+            If ``polars`` is not installed.
+        ValueError
+            If ``orient`` is not ``"long"`` or ``"wide"``.
         """
         ...
 
+    def to_pyarrow(self, orient: Literal["long", "wide"] = "long") -> Any:
+        """
+        Export results as a ``pyarrow.Table``.
+
+        Parameters
+        ----------
+        orient : {"long", "wide"}, default "long"
+            ``"long"`` returns one row per (node, period) pair with column
+            ``period_id``; ``"wide"`` returns one row per period (``period_id``)
+            with one float column per node.
+
+        Returns
+        -------
+        pyarrow.Table
+            Long- or wide-format PyArrow table with schema metadata preserved.
+
+        Raises
+        ------
+        ImportError
+            If ``pyarrow`` is not installed.
+        ValueError
+            If ``orient`` is not ``"long"`` or ``"wide"``.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __repr__(self) -> str:
         """Return a concise summary with node and period counts.
         Returns
@@ -849,8 +887,8 @@ class StatementResult:
         """
         ...
 
-    def to_series(self, node_id: str) -> pd.Series:
-        """Export one evaluated node as an ordered pandas Series.
+    def to_series(self, node_id: str) -> LabeledSeries:
+        """Export one evaluated node as an ordered ``LabeledSeries``.
 
         Parameters
         ----------
@@ -859,15 +897,15 @@ class StatementResult:
 
         Returns
         -------
-        pd.Series
-            Float64 node values indexed by period identifier, in the node's own units; a cell without a value is NaN. Use get_money for currency and fixed-point precision.
+        LabeledSeries
+            Float64 node values indexed by ``period_id`` (null where a cell has
+            no value), in the node's own units. Use ``get_money`` for currency
+            and fixed-point precision.
 
         Raises
         ------
         KeyError
             If the node is absent from the result.
-        ImportError
-            If pandas is unavailable.
         """
         ...
 

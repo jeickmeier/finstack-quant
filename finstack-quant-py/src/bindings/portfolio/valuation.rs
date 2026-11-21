@@ -2,10 +2,12 @@
 //! and `PositionValue`.
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::core::table::envelope_to_pandas;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::extract::extract_market_ref;
 use crate::bindings::extract::extract_portfolio_ref;
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::TableBuilder;
 use crate::bindings::valuations::PyValuationResult;
 use crate::errors::core_to_py;
 use crate::errors::display_to_py;
@@ -14,7 +16,6 @@ use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 use pyo3::types::PyDict;
-use pyo3::types::PyList;
 use pyo3::types::PyModule;
 
 /// Valuation of a single position inside a ``PortfolioValuation``.
@@ -288,67 +289,6 @@ impl PyPortfolioValuation {
             .ok_or_else(|| PyKeyError::new_err(format!("entity '{entity_id}' not valued")))
     }
 
-    /// Export per-position values via Arrow (zero-copy for consumers).
-    ///
-    /// Columns: ``position_id``, ``entity_id``, ``value_native``,
-    /// ``value_base``, ``currency_native``, ``currency_base``, ``fx_rate``,
-    /// ``risk_error`` (see
-    /// ``finstack_quant_portfolio::dataframe::positions_to_table``). Returns an
-    /// :class:`finstack_quant.core.table.ArrowTable`.
-    #[pyo3(text_signature = "($self)")]
-    fn to_arrow_positions(&self) -> PyResult<crate::bindings::core::table::PyArrowTable> {
-        let table = finstack_quant_portfolio::dataframe::positions_to_table(&self.inner)
-            .map_err(crate::errors::core_to_py)?;
-        crate::bindings::core::table::PyArrowTable::from_envelope(&table)
-    }
-
-    /// Export per-position values as a pandas ``DataFrame``.
-    ///
-    /// One row per entry of ``position_values``. Built from the same
-    /// ``positions_to_table`` envelope that backs :meth:`to_arrow_positions`
-    /// plus the two boolean risk diagnostics, which the table envelope cannot
-    /// carry (it has no boolean column type).
-    ///
-    /// Columns: ``position_id``, ``entity_id``, ``value_native``,
-    /// ``value_base``, ``currency_native``, ``currency_base``, ``fx_rate``
-    /// (base-currency units per native unit applied to the row; missing when
-    /// the native currency is the base currency), ``fx_triangulated``
-    /// (``True``/``False`` for a converted row, else ``None``),
-    /// ``risk_metrics_complete`` (bool), ``risk_error`` (``None`` unless the
-    /// position degraded to PV-only). Values are floats and the currency codes
-    /// are strings; use :meth:`to_arrow_positions` when a zero-copy handoff
-    /// matters more than pandas ergonomics.
-    #[pyo3(text_signature = "($self)")]
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let table = finstack_quant_portfolio::dataframe::positions_to_table(&self.inner)
-            .map_err(core_to_py)?;
-        let frame = envelope_to_pandas(py, &table)?;
-        let positions = self.inner.position_values.values();
-        let fx_triangulated: Vec<Option<bool>> =
-            positions.clone().map(|v| v.fx_triangulated).collect();
-        let complete: Vec<bool> = positions.map(|v| v.risk_metrics_complete).collect();
-        // `assign` returns a new frame. Appending with `set_item` instead trips
-        // pandas' copy-on-write heuristic (PyO3 holds an extra reference, so the
-        // refcount check reads as chained assignment) and warns on every call.
-        let columns = PyDict::new(py);
-        columns.set_item("fx_triangulated", fx_triangulated)?;
-        columns.set_item("risk_metrics_complete", complete)?;
-        let frame = frame.call_method("assign", (), Some(&columns))?;
-        let order = [
-            "position_id",
-            "entity_id",
-            "value_native",
-            "value_base",
-            "currency_native",
-            "currency_base",
-            "fx_rate",
-            "fx_triangulated",
-            "risk_metrics_complete",
-            "risk_error",
-        ];
-        frame.get_item(PyList::new(py, order)?)
-    }
-
     /// Number of position valuations in the result.
     fn __len__(&self) -> usize {
         self.inner.position_values.len()
@@ -364,18 +304,51 @@ impl PyPortfolioValuation {
             self.inner.degraded_positions.len(),
         )
     }
+}
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
+impl PyPortfolioValuation {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let n = self.inner.position_values.len();
+        let mut position_ids: Vec<String> = Vec::with_capacity(n);
+        let mut entity_ids: Vec<String> = Vec::with_capacity(n);
+        let mut values_native: Vec<f64> = Vec::with_capacity(n);
+        let mut values_base: Vec<f64> = Vec::with_capacity(n);
+        let mut currencies_native: Vec<String> = Vec::with_capacity(n);
+        let mut currencies_base: Vec<String> = Vec::with_capacity(n);
+        let mut fx_rates: Vec<Option<f64>> = Vec::with_capacity(n);
+        let mut fx_triangulated: Vec<Option<bool>> = Vec::with_capacity(n);
+        let mut risk_metrics_complete: Vec<bool> = Vec::with_capacity(n);
+        let mut risk_errors: Vec<Option<String>> = Vec::with_capacity(n);
+
+        for (position_id, value) in &self.inner.position_values {
+            position_ids.push(position_id.as_str().to_owned());
+            entity_ids.push(value.entity_id.as_str().to_owned());
+            values_native.push(value.value_native.amount());
+            values_base.push(value.value_base.amount());
+            currencies_native.push(value.value_native.currency().to_string());
+            currencies_base.push(value.value_base.currency().to_string());
+            fx_rates.push(value.fx_rate);
+            fx_triangulated.push(value.fx_triangulated);
+            risk_metrics_complete.push(value.risk_metrics_complete);
+            risk_errors.push(value.risk_error.clone());
+        }
+
+        TableBuilder::new()
+            .utf8("position_id", position_ids)?
+            .utf8("entity_id", entity_ids)?
+            .f64("value_native", values_native)?
+            .f64("value_base", values_base)?
+            .utf8("currency_native", currencies_native)?
+            .utf8("currency_base", currencies_base)?
+            .nullable_f64("fx_rate", fx_rates)?
+            .nullable_bool("fx_triangulated", fx_triangulated)?
+            .bool("risk_metrics_complete", risk_metrics_complete)?
+            .nullable_utf8("risk_error", risk_errors)?
+            .build()
     }
 }
+
+tabular_methods!(PyPortfolioValuation);
 
 /// Value a portfolio.
 ///

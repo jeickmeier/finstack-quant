@@ -231,6 +231,71 @@ impl PyModelBuilder {
         df: &Bound<'py, PyAny>,
         node_id_column: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
+        use crate::bindings::dataframe_utils::{
+            has_arrow_c_stream, is_missing_cell, is_polars_dataframe, table_column_names,
+            table_column_to_pylist,
+        };
+        if is_polars_dataframe(df)? || has_arrow_c_stream(df)? {
+            let cols = table_column_names(df)?;
+            if cols.is_empty() {
+                return Err(value_error("from_dataframe: DataFrame has no columns"));
+            }
+            let id_col = match node_id_column {
+                Some(c) => {
+                    if !cols.iter().any(|name| name == c) {
+                        return Err(pyo3::exceptions::PyKeyError::new_err(format!(
+                            "from_dataframe: node_id_column {c:?} not found"
+                        )));
+                    }
+                    c.to_owned()
+                }
+                None => cols
+                    .iter()
+                    .find(|c| c.as_str() == "node_id")
+                    .cloned()
+                    .unwrap_or_else(|| cols[0].clone()),
+            };
+            let id_items = table_column_to_pylist(df, &id_col)?.unwrap_or_default();
+            let node_ids: Vec<String> = id_items
+                .iter()
+                .map(|item| item.str()?.extract::<String>())
+                .collect::<PyResult<_>>()?;
+            let period_cols: Vec<String> = cols.into_iter().filter(|c| c != &id_col).collect();
+            let mut col_cells: Vec<Vec<Option<AmountOrScalar>>> =
+                Vec::with_capacity(period_cols.len());
+            for col in &period_cols {
+                let raw = table_column_to_pylist(df, col)?.unwrap_or_default();
+                let mut parsed = Vec::with_capacity(raw.len());
+                for (row_idx, cell) in raw.iter().enumerate() {
+                    if is_missing_cell(cell)? {
+                        parsed.push(None);
+                        continue;
+                    }
+                    let val: f64 = cell.extract().map_err(|_| {
+                        value_error(format!(
+                            "from_dataframe cell ({:?}, {col}) is not numeric",
+                            node_ids.get(row_idx).map(String::as_str).unwrap_or("?")
+                        ))
+                    })?;
+                    parsed.push((!val.is_nan()).then(|| AmountOrScalar::scalar(val)));
+                }
+                col_cells.push(parsed);
+            }
+            let rows: Vec<(NodeId, Vec<Option<AmountOrScalar>>)> = node_ids
+                .into_iter()
+                .enumerate()
+                .map(|(r, node_id)| {
+                    let cells = col_cells.iter().map(|col| col[r]).collect();
+                    (NodeId::new(node_id), cells)
+                })
+                .collect();
+            let labels: Vec<&str> = period_cols.iter().map(String::as_str).collect();
+            slf.builder_mut()?
+                .import_observations(&labels, &rows)
+                .map_err(statements_to_py)?;
+            return Ok(slf);
+        }
+
         let frame = match node_id_column {
             Some(column) => df.call_method1("set_index", (column,))?,
             None => df.clone(),
@@ -248,7 +313,7 @@ impl PyModelBuilder {
             let mut cells = Vec::with_capacity(columns.len());
             for item in series.call_method0("items")?.try_iter()? {
                 let (column, cell): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item?.extract()?;
-                if cell.is_none() {
+                if is_missing_cell(&cell)? {
                     cells.push(None);
                     continue;
                 }
@@ -257,7 +322,6 @@ impl PyModelBuilder {
                         "from_dataframe cell ({node_id:?}, {column}) is not numeric"
                     ))
                 })?;
-                // pandas stores a missing numeric cell as NaN.
                 cells.push((!value.is_nan()).then(|| AmountOrScalar::scalar(value)));
             }
             rows.push((NodeId::new(node_id), cells));

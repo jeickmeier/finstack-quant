@@ -170,12 +170,12 @@ def test_portfolio_primitive_exposures_net_composite_legs_against_direct_positio
 
     assert isinstance(report, PortfolioPrimitiveExposureReport)
     assert (str(report.base_currency), report.path_count, report.aggregate_count) == ("USD", 3, 2)
-    frame = report.to_dataframe().set_index("instrument_id")
+    frame = report.to_pandas().set_index("instrument_id")
     assert frame.loc["A", "net_quantity"] == 0.0
     assert frame.loc["A", "gross_quantity"] == 4.0
     assert frame.loc["A", "gross_value"] == pytest.approx(400.0)
     assert frame.loc["B", "net_quantity"] == -2.0
-    paths = report.to_paths_dataframe()
+    paths = report.to_paths_table().to_pandas()
     assert sorted(paths["position_id"].tolist()) == ["P-COMPOSITE", "P-COMPOSITE", "P-DIRECT"]
     restored = PortfolioPrimitiveExposureReport.from_json(report.to_json())
     assert restored.to_json() == report.to_json()

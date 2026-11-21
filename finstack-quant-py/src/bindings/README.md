@@ -42,8 +42,10 @@ for this crate.
 | `schema_registry.rs` | `pub(crate)` | `registry_index` / `find_artifact` / `render_profile` / `validate_against`, and the `schema_registry_functions!` macro that generates the identical `index` / `get` / `validate` trio for each `finstack_quant.<domain>.schema` |
 | `module_utils.rs` | `pub(crate)` | Submodule registration; also `py_to_json_value`, `py_to_json_string`, `py_to_serde`, `parse_currency`, `parse_date` |
 | `extract.rs` | `pub(crate)` | Polymorphic "typed object **or** canonical JSON string" extraction — the `*Access` enums (`ModelAccess`, `ResultAccess`, `MarketAccess`, `PortfolioAccess`, `ValuationAccess`, `PortfolioResultAccess`) deref to the borrowed Rust type so no clone or re-parse happens on the typed path |
-| `pandas_utils.rs` | `pub(crate)` | DataFrame/Series construction (`dict_to_dataframe`, `serde_rows_to_dataframe*`, `table_to_dataframe`, `labeled_values_to_series`, `dates_to_datetime_index`, …). Caches the `pandas.DataFrame` / `pandas.Series` constructors in `PyOnceLock` |
-| `date_utils.rs` | `pub(crate)` | `parse_iso_date_py`, `extract_date`, `extract_date_iso` — accept either an ISO string or any date-like Python object |
+| `date_utils.rs` | `pub(crate)` | `py_to_date`, `date_to_py`, `extract_date_iso`, `dates_to_pylist` — accept ISO strings or date-like Python objects and convert Rust dates cleanly |
+| `dataframe_utils.rs` | `pub(crate)` | Polymorphic DataFrame/Series/Arrow PyCapsule extraction (`is_dataframe_like`, `extract_dataframe_panel`, Polars/pandas/Arrow helpers without eager optional imports) |
+| `json_bridge.rs` | `pub(crate)` | GIL-releasing JSON helpers (`deserialize_json`, `serialize_json`) and `serde_to_py` |
+| `table_builders.rs` | `pub(crate)` | `TableBuilder` (`ArrowTable` column builder) and `serde_rows_to_arrow_table` / zero-dependency pandas/Polars/PyArrow/HTML conversions |
 | `pickle_support.rs` | `pub(crate)` | `reduce_via_json`: the shared `__reduce__` over `to_json`/`from_json`, with a guard that refuses payloads whose JSON does not round-trip |
 | `pydoc.rs` | `pub(crate)` | `pydoc!(module, qualname)`: the stub docstring `build.rs` extracted, as `&str`, for `#[doc = ...]` and module `__doc__`; a missing key is a compile error |
 | `repr_support.rs` | `pub(crate)` | `repr_from_serde`: renders `Name(field=value, …)` from a value's serde form, eliding past six fields |
@@ -129,14 +131,17 @@ pub struct PyCurrency {
   `scripts/check_pyo3_doc_placeholders.py` and `scripts/check_python_api_input_docs.py`,
   wired into `mise run python-lint`.
 - Result wrappers carry typed getters, `to_json`, a `#[staticmethod] from_json`, and
-  `to_dataframe()` (plus `to_series()` for 1-D labeled vectors). Computation entry
+  the unified tabular quartet (`to_arrow`, `to_pandas`, `to_polars`, `to_pyarrow`)
+  via `tabular_methods!` (plus `to_series()` returning `LabeledSeries` for 1-D
+  labeled vectors). Computation entry
   points return the typed wrapper, not a JSON string; only `*_json`-suffixed
   functions return JSON, and each must have a typed twin. See
   [`../../../.agents/skills/finstack-consistency-reviewer/conventions.md`](../../../.agents/skills/finstack-consistency-reviewer/conventions.md).
 - Reuse the shared helpers rather than hand-rolling: `reduce_via_json` for
-  `__reduce__`, `repr_from_serde` for `__repr__`, `pandas_utils::*` for every
-  DataFrame exit. All three are already used across a hundred-plus wrappers; a
-  hand-written variant is drift.
+  `__reduce__`, `repr_from_serde` for `__repr__`, `tabular_methods!` +
+  `TableBuilder` / `serde_rows_to_arrow_table` for every tabular exit. All
+  three are already used across a hundred-plus wrappers; a hand-written variant
+  is drift.
 - Accept `typed | str` through `extract.rs` where a pipeline function takes a model,
   market, portfolio, or result. The typed path borrows; the string path deserializes
   the same serde contract, so both observe identical payloads.

@@ -9,9 +9,11 @@
 
 use super::engine::{PyCovenantEngine, extract_metric_frame};
 use super::spec::PyCovenantSpec;
+use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
+use crate::bindings::macros::tabular_methods;
 use crate::bindings::repr_support::repr_from_serde;
+use crate::bindings::table_builders::TableBuilder;
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_covenants::{
     CovenantForecast, CovenantForecastConfig, DatedMetricSeries, FutureBreach,
@@ -22,8 +24,8 @@ use pyo3::prelude::*;
 ///
 /// Each frame row is one forecast period on its index date. Rows carry no
 /// period start, so Rust requires `reference_date` for stochastic forecasts.
-fn metric_series(frame: &Bound<'_, PyAny>) -> PyResult<DatedMetricSeries> {
-    DatedMetricSeries::new(extract_metric_frame(frame)?).map_err(core_to_py)
+fn metric_series(frame: &Bound<'_, PyAny>, date_col: Option<&str>) -> PyResult<DatedMetricSeries> {
+    DatedMetricSeries::new(extract_metric_frame(frame, date_col)?).map_err(core_to_py)
 }
 
 /// Forecast policy: deterministic pass/fail, or a lognormal stochastic
@@ -171,17 +173,6 @@ impl PyCovenantForecastConfig {
     }
 }
 
-/// Columns of `CovenantForecast.to_dataframe`.
-const FORECAST_COLUMNS: [ColumnSchema<'static>; 7] = [
-    ("test_date", "str"),
-    ("projected_value", "float64"),
-    ("threshold", "float64"),
-    ("headroom", "float64"),
-    ("headroom_raw", "float64"),
-    ("breach_probability", "float64"),
-    ("breach_probability_stderr", "float64"),
-];
-
 /// Forward compliance projection for one covenant across the forecast dates.
 ///
 /// Per date it carries the projected metric, the threshold in force (static
@@ -317,35 +308,6 @@ impl PyCovenantForecast {
         self.inner.min_headroom_value
     }
 
-    /// One row per test date with columns ``test_date`` (ISO string),
-    /// ``projected_value``, ``threshold``, ``headroom``, ``headroom_raw``,
-    /// ``breach_probability``, ``breach_probability_stderr``.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows: Vec<serde_json::Value> = (0..self.inner.test_dates.len())
-            .map(|i| {
-                serde_json::json!({
-                    "test_date": self.inner.test_dates[i].to_string(),
-                    "projected_value": self.inner.projected_values.get(i).copied().flatten(),
-                    "threshold": self.inner.thresholds.get(i).copied(),
-                    "headroom": self.inner.headroom.get(i).copied().flatten(),
-                    "headroom_raw": self.inner.headroom_raw.get(i).copied().flatten(),
-                    "breach_probability": self.inner.breach_probability.get(i).copied(),
-                    "breach_probability_stderr": self.inner.breach_probability_stderr.get(i).copied(),
-                })
-            })
-            .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, &FORECAST_COLUMNS)
-    }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`. Returns `None` if the frame
-    /// cannot be built, which makes IPython fall back to `__repr__`.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
-
     fn __len__(&self) -> usize {
         self.inner.test_dates.len()
     }
@@ -364,6 +326,60 @@ impl PyCovenantForecast {
         )
     }
 }
+
+impl PyCovenantForecast {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        let n = self.inner.test_dates.len();
+        TableBuilder::new()
+            .utf8(
+                "test_date",
+                self.inner
+                    .test_dates
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect(),
+            )?
+            .nullable_f64(
+                "projected_value",
+                (0..n)
+                    .map(|i| self.inner.projected_values.get(i).copied().flatten())
+                    .collect(),
+            )?
+            .nullable_f64(
+                "threshold",
+                (0..n)
+                    .map(|i| self.inner.thresholds.get(i).copied())
+                    .collect(),
+            )?
+            .nullable_f64(
+                "headroom",
+                (0..n)
+                    .map(|i| self.inner.headroom.get(i).copied().flatten())
+                    .collect(),
+            )?
+            .nullable_f64(
+                "headroom_raw",
+                (0..n)
+                    .map(|i| self.inner.headroom_raw.get(i).copied().flatten())
+                    .collect(),
+            )?
+            .nullable_f64(
+                "breach_probability",
+                (0..n)
+                    .map(|i| self.inner.breach_probability.get(i).copied())
+                    .collect(),
+            )?
+            .nullable_f64(
+                "breach_probability_stderr",
+                (0..n)
+                    .map(|i| self.inner.breach_probability_stderr.get(i).copied())
+                    .collect(),
+            )?
+            .build()
+    }
+}
+
+tabular_methods!(PyCovenantForecast);
 
 /// A projected covenant breach on one forecast date.
 #[pyclass(
@@ -469,14 +485,15 @@ impl PyFutureBreach {
 /// non-finite threshold, or an invalid config (for example stochastic mode
 /// without ``volatility``).
 #[pyfunction]
-#[pyo3(signature = (spec, metrics, config=None), text_signature = "(spec, metrics, config=None)")]
+#[pyo3(signature = (spec, metrics, config=None, *, date_col=None), text_signature = "(spec, metrics, config=None, *, date_col=None)")]
 pub(crate) fn forecast_covenant(
     py: Python<'_>,
     spec: PyRef<'_, PyCovenantSpec>,
     metrics: &Bound<'_, PyAny>,
     config: Option<PyRef<'_, PyCovenantForecastConfig>>,
+    date_col: Option<&str>,
 ) -> PyResult<PyCovenantForecast> {
-    let series = metric_series(metrics)?;
+    let series = metric_series(metrics, date_col)?;
     let config = config.map_or_else(CovenantForecastConfig::default, |c| c.inner.clone());
     let spec = spec.inner.clone();
     py.detach(|| {
@@ -498,14 +515,15 @@ pub(crate) fn forecast_covenant(
 /// Raises ``ValueError`` for an empty frame, an invalid engine, or an
 /// invalid config.
 #[pyfunction]
-#[pyo3(signature = (engine, metrics, config=None), text_signature = "(engine, metrics, config=None)")]
+#[pyo3(signature = (engine, metrics, config=None, *, date_col=None), text_signature = "(engine, metrics, config=None, *, date_col=None)")]
 pub(crate) fn forecast_breaches(
     py: Python<'_>,
     engine: PyRef<'_, PyCovenantEngine>,
     metrics: &Bound<'_, PyAny>,
     config: Option<PyRef<'_, PyCovenantForecastConfig>>,
+    date_col: Option<&str>,
 ) -> PyResult<Vec<PyFutureBreach>> {
-    let series = metric_series(metrics)?;
+    let series = metric_series(metrics, date_col)?;
     let config = config.map_or_else(CovenantForecastConfig::default, |c| c.inner.clone());
     let engine = engine.inner.clone();
     py.detach(|| {
@@ -520,44 +538,58 @@ pub(crate) fn forecast_breaches(
     })
 }
 
-/// Flatten a list of ``FutureBreach`` into one frame row per breach.
+/// Flatten a list of ``FutureBreach`` into an ``ArrowTable`` with one row per breach.
 ///
 /// Columns: ``covenant_id``, ``covenant_description``, ``breach_date`` (ISO
 /// string), ``projected_value``, ``threshold``, ``headroom``, ``headroom_raw``,
 /// ``breach_probability``.
 #[pyfunction]
 #[pyo3(text_signature = "(breaches)")]
-pub(crate) fn breaches_to_dataframe<'py>(
-    py: Python<'py>,
-    breaches: Vec<PyRef<'py, PyFutureBreach>>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let rows: Vec<serde_json::Value> = breaches
-        .iter()
-        .map(|b| {
-            serde_json::json!({
-                "covenant_id": b.inner.covenant_id,
-                "covenant_description": b.inner.covenant_description,
-                "breach_date": b.inner.breach_date.to_string(),
-                "projected_value": b.inner.projected_value,
-                "threshold": b.inner.threshold,
-                "headroom": b.inner.headroom,
-                "headroom_raw": b.inner.headroom_raw,
-                "breach_probability": b.inner.breach_probability,
-            })
-        })
-        .collect();
-    serde_rows_to_dataframe_with_schema(
-        py,
-        &rows,
-        &[
-            ("covenant_id", "str"),
-            ("covenant_description", "str"),
-            ("breach_date", "str"),
-            ("projected_value", "float64"),
-            ("threshold", "float64"),
-            ("headroom", "float64"),
-            ("headroom_raw", "float64"),
-            ("breach_probability", "float64"),
-        ],
-    )
+pub(crate) fn breaches_table(breaches: Vec<PyRef<'_, PyFutureBreach>>) -> PyResult<PyArrowTable> {
+    TableBuilder::new()
+        .utf8(
+            "covenant_id",
+            breaches
+                .iter()
+                .map(|b| b.inner.covenant_id.clone())
+                .collect(),
+        )?
+        .utf8(
+            "covenant_description",
+            breaches
+                .iter()
+                .map(|b| b.inner.covenant_description.clone())
+                .collect(),
+        )?
+        .utf8(
+            "breach_date",
+            breaches
+                .iter()
+                .map(|b| b.inner.breach_date.to_string())
+                .collect(),
+        )?
+        .nullable_f64(
+            "projected_value",
+            breaches.iter().map(|b| b.inner.projected_value).collect(),
+        )?
+        .f64(
+            "threshold",
+            breaches.iter().map(|b| b.inner.threshold).collect(),
+        )?
+        .nullable_f64(
+            "headroom",
+            breaches.iter().map(|b| b.inner.headroom).collect(),
+        )?
+        .nullable_f64(
+            "headroom_raw",
+            breaches.iter().map(|b| b.inner.headroom_raw).collect(),
+        )?
+        .f64(
+            "breach_probability",
+            breaches
+                .iter()
+                .map(|b| b.inner.breach_probability)
+                .collect(),
+        )?
+        .build()
 }

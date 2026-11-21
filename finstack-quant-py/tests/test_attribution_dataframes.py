@@ -41,9 +41,11 @@ def _patch_attribution(**overrides: object) -> PnlAttribution:
 def test_to_long_dataframe_is_empty_when_no_details() -> None:
     """No detail blocks populated → zero rows; schema columns must exist."""
     attr = PnlAttribution.from_json(json.dumps(_baseline_payload()))
-    df = attr.to_long_dataframe()
+    table = attr.to_long_table()
+    df = table.to_pandas()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 0
+    assert table.to_polars().height == 0
 
 
 def test_to_long_dataframe_carries_rates_by_curve_and_totals() -> None:
@@ -70,7 +72,7 @@ def test_to_long_dataframe_carries_rates_by_curve_and_totals() -> None:
         rates_curves_pnl={"amount": "300", "currency": "USD"},
         rates_detail=rates_detail,
     )
-    df = attr.to_long_dataframe()
+    df = attr.to_long_table().to_pandas()
 
     assert {"kind", "factor", "key_a", "key_b", "amount", "currency"} <= set(df.columns)
 
@@ -94,7 +96,7 @@ def test_to_long_dataframe_carries_vol_by_surface() -> None:
         vol_pnl={"amount": "42", "currency": "USD"},
         vol_detail=vol_detail,
     )
-    df = attr.to_long_dataframe()
+    df = attr.to_long_table().to_pandas()
 
     vol_rows = df[df["factor"] == "vol"]
     assert len(vol_rows) == 1
@@ -121,7 +123,7 @@ def test_to_long_dataframe_carries_cross_factor_by_pair() -> None:
         cross_factor_pnl={"amount": "10", "currency": "USD"},
         cross_factor_detail=cross_detail,
     )
-    df = attr.to_long_dataframe()
+    df = attr.to_long_table().to_pandas()
 
     cross_rows = df[df["factor"] == "cross_factor"]
     assert len(cross_rows) == 2
@@ -150,7 +152,7 @@ def test_to_carry_detail_dataframe_breakdown() -> None:
         carry={"amount": "15", "currency": "USD"},
         carry_detail=carry_detail,
     )
-    df = attr.to_carry_detail_dataframe()
+    df = attr.to_carry_detail_table().to_pandas()
 
     # Every row in the carry-detail DF must have factor == "carry".
     assert (df["factor"] == "carry").all()
@@ -200,7 +202,7 @@ def test_to_credit_factor_dataframe_includes_generic_levels_adder_curve_shape() 
         credit_curves_pnl={"amount": "100", "currency": "USD"},
         credit_factor_detail=credit_factor_detail,
     )
-    df = attr.to_credit_factor_dataframe()
+    df = attr.to_credit_factor_table().to_pandas()
 
     assert (df["factor"] == "credit_factor").all()
 
@@ -228,12 +230,12 @@ def test_to_credit_factor_dataframe_includes_generic_levels_adder_curve_shape() 
 def test_to_credit_factor_dataframe_is_empty_when_no_credit_model() -> None:
     """The baseline carries no credit_factor_detail → empty DataFrame."""
     attr = PnlAttribution.from_json(json.dumps(_baseline_payload()))
-    df = attr.to_credit_factor_dataframe()
+    df = attr.to_credit_factor_table().to_pandas()
     assert len(df) == 0
 
 
 def test_to_long_dataframe_folds_in_carry_and_credit_factor_rows() -> None:
-    """``to_long_dataframe()`` is a union of every detail breakdown.
+    """``to_long_table()`` is a union of every detail breakdown.
 
     Must include the carry and credit-factor rows alongside the by-curve
     breakdowns. ``carry.theta`` is no longer emitted; roll_down absorbs any
@@ -258,7 +260,7 @@ def test_to_long_dataframe_folds_in_carry_and_credit_factor_rows() -> None:
         credit_curves_pnl={"amount": "50", "currency": "USD"},
         credit_factor_detail=credit_factor_detail,
     )
-    df = attr.to_long_dataframe()
+    df = attr.to_long_table().to_pandas()
 
     factors = set(df["factor"])
     assert "carry" in factors
@@ -280,14 +282,16 @@ def test_payload_without_audit_fields_reads_as_absent() -> None:
     assert attr.waterfall_steps == []
     assert attr.sensitivity_steps == []
 
-    wide = attr.to_dataframe()
+    wide = attr.to_pandas()
     assert {"pv_t0", "pv_t1"} <= set(wide.columns)
     assert wide["pv_t0"].isna().all()
+    assert {"pv_t0", "pv_t1"} <= set(attr.to_polars().columns)
+    assert {"pv_t0", "pv_t1"} <= set(attr.to_arrow().column_names())
 
-    steps = attr.to_waterfall_steps_dataframe()
+    steps = attr.to_waterfall_steps_table().to_pandas()
     assert list(steps.columns) == ["step_index", "factor", "pv_before", "pv_after", "step_pnl", "currency"]
     assert len(steps) == 0
-    assert len(attr.to_sensitivity_steps_dataframe()) == 0
+    assert attr.to_sensitivity_steps_table().num_rows == 0
 
 
 def test_step_dataframes_flatten_injected_rows() -> None:
@@ -332,7 +336,7 @@ def test_step_dataframes_flatten_injected_rows() -> None:
     assert attr.pv_t1 == 100000.0
     assert attr.pv_t1 - attr.pv_t0 == attr.mark_to_market_pnl
 
-    steps = attr.to_waterfall_steps_dataframe()
+    steps = attr.to_waterfall_steps_table().to_pandas()
     assert steps.iloc[0].to_dict() == {
         "step_index": 0,
         "factor": "rates_curves",
@@ -342,7 +346,7 @@ def test_step_dataframes_flatten_injected_rows() -> None:
         "currency": "USD",
     }
 
-    frame = attr.to_sensitivity_steps_dataframe()
+    frame = attr.to_sensitivity_steps_table().to_pandas()
     assert len(frame) == 4  # two factor rows plus two rate buckets
     assert frame["explained_pnl"].sum() == 1300.0
     buckets = frame[frame["tenor_years"].notna()]
@@ -370,9 +374,11 @@ def test_step_dataframes_flatten_injected_rows() -> None:
 def test_compare_matches_wide_rows_and_preserves_the_empty_schema() -> None:
     first = _patch_attribution(instrument_id="BOND-1")
     second = _patch_attribution(instrument_id="BOND-2")
-    combined = PnlAttribution.compare([second, first])
-    expected = pd.concat([second.to_dataframe(), first.to_dataframe()], ignore_index=True)
+    combined_tbl = PnlAttribution.compare([second, first])
+    combined = combined_tbl.to_pandas()
+    expected = pd.concat([second.to_pandas(), first.to_pandas()], ignore_index=True)
     pd.testing.assert_frame_equal(combined, expected)
+    assert combined_tbl.to_polars().height == 2
     empty = PnlAttribution.compare([])
-    assert empty.empty
-    assert list(empty.columns) == list(expected.columns)
+    assert empty.num_rows == 0
+    assert empty.column_names() == list(expected.columns)

@@ -1,8 +1,9 @@
 //! Python bindings for lightweight strategy allocation.
 
-use crate::bindings::pandas_utils::{
-    ColumnSchema, serde_rows_to_dataframe_with_schema, serde_to_py,
-};
+use crate::bindings::core::table::PyArrowTable;
+use crate::bindings::json_bridge::serde_to_py;
+use crate::bindings::macros::tabular_methods;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::portfolio_to_py;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
@@ -61,12 +62,35 @@ impl PyWeightAllocationSpec {
     #[new]
     #[pyo3(signature = (scheme, total_capital, strategies, *, covariance=None, money_decimal_places=None))]
     fn new(
+        py: Python<'_>,
         scheme: &str,
         total_capital: f64,
         strategies: Vec<PyRef<'_, PyStrategyAllocationInput>>,
-        covariance: Option<Vec<Vec<f64>>>,
+        covariance: Option<&Bound<'_, PyAny>>,
         money_decimal_places: Option<u32>,
     ) -> PyResult<Self> {
+        let covariance = match covariance.filter(|cov| !cov.is_none()) {
+            Some(cov) => {
+                if let Some((flat, nrows, ncols)) =
+                    crate::bindings::dataframe_utils::extract_2d_f64(cov, "covariance")?
+                {
+                    if nrows != ncols {
+                        return Err(crate::errors::value_error(format!(
+                            "covariance must be square, got {nrows} x {ncols}"
+                        )));
+                    }
+                    Some(
+                        flat.chunks_exact(ncols)
+                            .map(|row| row.to_vec())
+                            .collect::<Vec<_>>(),
+                    )
+                } else {
+                    Some(cov.extract::<Vec<Vec<f64>>>()?)
+                }
+            }
+            None => None,
+        };
+        let _ = py;
         Ok(Self {
             inner: WeightAllocationSpec {
                 scheme: finstack_quant_core::wire::serde_parse(scheme)
@@ -84,8 +108,8 @@ impl PyWeightAllocationSpec {
     }
 }
 
-/// Column schema for [`PyWeightAllocationResult::to_dataframe`].
-const ALLOCATION_COLUMNS: &[ColumnSchema<'static>] = &[
+/// Column schema for [`PyWeightAllocationResult::to_arrow_table`].
+const ALLOCATION_COLUMNS: &[(&str, &str)] = &[
     ("id", "str"),
     ("weight", "float64"),
     ("capital", "float64"),
@@ -133,15 +157,6 @@ impl PyWeightAllocationResult {
         serde_to_py(py, &self.inner.diagnostics)
     }
 
-    /// Per-strategy allocations as a :class:`pandas.DataFrame`.
-    ///
-    /// Columns: ``id``, ``weight``, ``capital``, ``volatility``,
-    /// ``risk_contribution`` (the last two are null when the scheme does not
-    /// produce them).
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(py, &self.inner.allocations, ALLOCATION_COLUMNS)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "WeightAllocationResult(allocations={}, weights_sum={})",
@@ -150,6 +165,14 @@ impl PyWeightAllocationResult {
         )
     }
 }
+
+impl PyWeightAllocationResult {
+    pub(crate) fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
+        serde_rows_to_arrow_table(&self.inner.allocations, ALLOCATION_COLUMNS)
+    }
+}
+
+tabular_methods!(PyWeightAllocationResult);
 
 /// Allocate strategy weights from a typed specification.
 ///
@@ -169,7 +192,7 @@ impl PyWeightAllocationResult {
 /// -------
 /// WeightAllocationResult
 ///     Typed result with ``scheme``, ``allocations`` and ``diagnostics``
-///     getters plus ``to_dataframe()``; ``to_json()`` gives the wire form.
+///     getters plus ``to_pandas()`` / ``to_polars()`` / ``to_arrow()``; ``to_json()`` gives the wire form.
 ///     A spec that allocates without error is valid.
 ///
 /// Raises

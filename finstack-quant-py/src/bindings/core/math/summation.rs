@@ -10,7 +10,8 @@ use pyo3::types::{PyList, PyModule};
 /// For mixed-sign values, prefer :func:`neumaier_sum`.
 #[pyfunction]
 #[pyo3(text_signature = "(values)")]
-fn kahan_sum(values: Vec<f64>) -> PyResult<f64> {
+fn kahan_sum(values: &Bound<'_, PyAny>) -> PyResult<f64> {
+    let values = crate::bindings::dataframe_utils::extract_f64_vec(values, "values")?;
     summation::kahan_sum(values).map_err(crate::errors::core_to_py)
 }
 
@@ -19,7 +20,8 @@ fn kahan_sum(values: Vec<f64>) -> PyResult<f64> {
 /// Recommended for financial calculations with mixed-sign cashflows.
 #[pyfunction]
 #[pyo3(text_signature = "(values)")]
-fn neumaier_sum(values: Vec<f64>) -> PyResult<f64> {
+fn neumaier_sum(values: &Bound<'_, PyAny>) -> PyResult<f64> {
+    let values = crate::bindings::dataframe_utils::extract_f64_vec(values, "values")?;
     summation::neumaier_sum(values).map_err(crate::errors::core_to_py)
 }
 

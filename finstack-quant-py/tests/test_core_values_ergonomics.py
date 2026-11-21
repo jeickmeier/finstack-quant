@@ -225,7 +225,9 @@ class TestRatingScales:
         assert [level.name for level in scale] == ["A", "B"]
         assert scale[-1] == RatingLevel("B", 70.0, 0.0)
         assert scale == ScorecardScale.from_json(scale.to_json())
-        assert list(scale.to_dataframe()["name"]) == ["A", "B"]
+        assert list(scale.to_pandas()["name"]) == ["A", "B"]
+        assert scale.to_polars()["name"].to_list() == ["A", "B"]
+        assert scale.to_arrow().column_names() == ["name", "score", "min_score"]
 
     def test_registry_scale_ids(self) -> None:
         scale = ScorecardScale("ok", [RatingLevel("A", 90.0, 85.0), RatingLevel("B", 70.0, 0.0)])
@@ -347,9 +349,11 @@ class TestConvertedMoney:
         converted = self._market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02", "cashflow_date")
         assert ConvertedMoney.from_json(converted.to_json()) == converted
         assert pickle.loads(pickle.dumps(converted)) == converted  # noqa: S301
-        frame = converted.to_dataframe()
+        frame = converted.to_pandas()
         assert list(frame.columns) == ["amount", "currency", "rate", "triangulated"]
         assert frame.iloc[0]["currency"] == "USD"
+        assert converted.to_polars().height == 1
+        assert converted.to_arrow().column_names() == ["amount", "currency", "rate", "triangulated"]
         with pytest.raises(ValueError, match="ConvertedMoney"):
             ConvertedMoney.from_json('{"amount": {"amount": "1", "currency": "USD"}, "rate": null, "x": 1}')
 

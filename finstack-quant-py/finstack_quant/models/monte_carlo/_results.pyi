@@ -6,7 +6,9 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 import pandas as pd
+import polars as pl
 from finstack_quant.core.money import Money
+from finstack_quant.core.table import ArrowTable
 
 class ExerciseBoundaryPoint:
     """Interior Longstaff–Schwartz exercise diagnostics for one date.
@@ -862,7 +864,7 @@ class LrmGreeks:
     ... )
     >>> (greeks.price.num_paths, greeks.delta.num_paths, greeks.vega.num_paths)
     (2000, 2000, 2000)
-    >>> list(greeks.to_dataframe().index)
+    >>> list(greeks.to_pandas().index)
     ['price', 'delta', 'vega']
     """
 
@@ -974,9 +976,28 @@ class LrmGreeks:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Tabulate the three estimates as a pandas DataFrame.
+        Tabulate the three estimates as an :class:`~finstack_quant.core.table.ArrowTable`.
+
+        Returns
+        -------
+        ArrowTable
+            Three rows (``"price"``, ``"delta"``, ``"vega"``) with string
+            column ``metric`` and float64 columns ``mean``, ``stderr``,
+            ``ci_lower``, ``ci_upper``. The price row is in units of the price
+            currency.
+
+        Raises
+        ------
+        ValueError
+            If the Arrow table cannot be constructed.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Tabulate the three estimates as a pandas ``DataFrame`` (lazily imports ``pandas``).
 
         Returns
         -------
@@ -1006,12 +1027,51 @@ class LrmGreeks:
         ...         "option_type": "call",
         ...     },
         ...     num_steps=12,
-        ... ).to_dataframe()
+        ... ).to_pandas()
         >>> list(frame.columns)
         ['mean', 'stderr', 'ci_lower', 'ci_upper']
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Tabulate the three estimates as a Polars ``DataFrame`` (lazily imports ``polars``).
+
+        Returns
+        -------
+        polars.DataFrame
+            Three rows with string column ``metric`` and float64 columns
+            ``mean``, ``stderr``, ``ci_lower`` and ``ci_upper``. The price row
+            is in units of the price currency.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Tabulate the three estimates as a ``pyarrow.Table`` (lazily imports ``pyarrow``).
+
+        Returns
+        -------
+        pyarrow.Table
+            Three rows with string column ``metric`` and float64 columns
+            ``mean``, ``stderr``, ``ci_lower`` and ``ci_upper``. The price row
+            is in units of the price currency.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Reconstruct this value for ``pickle`` through its canonical JSON form.
 
@@ -1033,7 +1093,7 @@ class PathSummary:
     Simulated paths of one built-in process on a shared time grid.
 
     Returned by :func:`simulate_paths`. ``values`` holds every state in
-    row-major ``[path][time][factor]`` order; :meth:`to_dataframe` reshapes it
+    row-major ``[path][time][factor]`` order; :meth:`to_arrow` / :meth:`to_pandas` reshapes it
     into one row per path and time.
 
     Examples
@@ -1049,7 +1109,7 @@ class PathSummary:
     >>> paths = simulate_paths(spec)
     >>> (paths.num_simulated_paths, paths.times, paths.factor_names)
     (3, [0.0, 0.5, 1.0], ['spot'])
-    >>> paths.to_dataframe().shape
+    >>> paths.to_pandas().shape
     (9, 1)
     """
 
@@ -1248,9 +1308,31 @@ class PathSummary:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_arrow(self) -> ArrowTable:
         """
-        Export the paths as a long pandas DataFrame.
+        Export the paths as a long :class:`~finstack_quant.core.table.ArrowTable`.
+
+        One row per stored path and time in the order Rust produced, with
+        integer column ``path``, float64 column ``time``, and one float64
+        column per entry of ``factor_names``.
+
+        Returns
+        -------
+        ArrowTable
+            ``num_simulated_paths * len(times)`` rows and ``2 + dim`` columns.
+
+        Raises
+        ------
+        ValueError
+            If ``values`` does not hold ``num_simulated_paths * len(times) *
+            len(factor_names)`` entries, which is only possible for a summary
+            rebuilt from inconsistent JSON.
+        """
+        ...
+
+    def to_pandas(self) -> pd.DataFrame:
+        """
+        Export the paths as a long pandas ``DataFrame`` (lazily imports ``pandas``).
 
         One row per stored path and time, indexed by a ``(path, time)``
         ``MultiIndex`` in the order Rust produced (``path`` is the zero-based
@@ -1266,6 +1348,8 @@ class PathSummary:
 
         Raises
         ------
+        ImportError
+            If pandas is not installed.
         ValueError
             If ``values`` does not hold ``num_simulated_paths * len(times) *
             len(factor_names)`` entries, which is only possible for a summary
@@ -1273,6 +1357,55 @@ class PathSummary:
         """
         ...
 
+    def to_polars(self) -> pl.DataFrame:
+        """
+        Export the paths as a long Polars ``DataFrame`` (lazily imports ``polars``).
+
+        One row per stored path and time, with integer column ``path``,
+        float64 column ``time``, and one float64 column per entry of
+        ``factor_names``.
+
+        Returns
+        -------
+        polars.DataFrame
+            ``num_simulated_paths * len(times)`` rows and ``2 + dim`` columns.
+
+        Raises
+        ------
+        ImportError
+            If polars is not installed.
+        ValueError
+            If ``values`` does not hold ``num_simulated_paths * len(times) *
+            len(factor_names)`` entries.
+        """
+        ...
+
+    def to_pyarrow(self) -> Any:
+        """
+        Export the paths as a long ``pyarrow.Table`` (lazily imports ``pyarrow``).
+
+        One row per stored path and time, with integer column ``path``,
+        float64 column ``time``, and one float64 column per entry of
+        ``factor_names``.
+
+        Returns
+        -------
+        pyarrow.Table
+            ``num_simulated_paths * len(times)`` rows and ``2 + dim`` columns.
+
+        Raises
+        ------
+        ImportError
+            If pyarrow is not installed.
+        ValueError
+            If ``values`` does not hold ``num_simulated_paths * len(times) *
+            len(factor_names)`` entries.
+        """
+        ...
+
+    def __arrow_c_stream__(self, requested_schema: object | None = None) -> object: ...
+    def __arrow_c_schema__(self) -> object: ...
+    def _repr_html_(self) -> str | None: ...
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Reconstruct this value for ``pickle`` through its canonical JSON form.
 
