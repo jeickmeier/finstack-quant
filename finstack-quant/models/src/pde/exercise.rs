@@ -5,7 +5,7 @@
 //! is violated. This is simpler than PSOR and works naturally with all theta
 //! schemes without inner iteration tuning.
 
-use super::error::{PdeError, PdeResult};
+use super::error::PdeError;
 
 /// Early exercise constraint enforced via the penalty method.
 ///
@@ -79,7 +79,7 @@ impl PenaltyExercise {
     }
 
     /// Check the obstacle shape and penalty settings before any state is changed.
-    pub(super) fn validate(&self, interior_nodes: usize) -> PdeResult<()> {
+    pub(super) fn validate(&self, interior_nodes: usize) -> Result<(), PdeError> {
         if self.payoff_values.len() != interior_nodes {
             return Err(PdeError::PayoffLength {
                 expected: interior_nodes,
@@ -124,7 +124,7 @@ impl PenaltyExercise {
     /// Returns [`PdeError`] for a length mismatch, non-finite payoff or
     /// continuation value, invalid penalty settings, or invalid `dt`. All
     /// validation occurs before modifying `u`.
-    pub fn apply(&self, u: &mut [f64], dt: f64) -> PdeResult<Vec<usize>> {
+    pub fn apply(&self, u: &mut [f64], dt: f64) -> Result<Vec<usize>, PdeError> {
         self.validate(u.len())?;
         if !dt.is_finite() || dt <= 0.0 {
             return Err(PdeError::InvalidExerciseTimeStep { dt });

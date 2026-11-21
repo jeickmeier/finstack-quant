@@ -6,7 +6,7 @@
 //! the resulting system in O(n) time.
 
 use super::boundary::BoundaryCondition;
-use super::error::{PdeError, PdeResult};
+use super::error::PdeError;
 use super::grid::Grid1D;
 use super::problem::PdeProblem1D;
 
@@ -25,7 +25,7 @@ const THOMAS_PIVOT_REL_EPS: f64 = 1e-12;
 /// Returns [`PdeError::DegeneratePivot`] if `d` is non-finite or its
 /// magnitude has collapsed below [`THOMAS_PIVOT_REL_EPS`] times the row scale.
 #[inline]
-fn check_pivot(d: f64, term_a: f64, term_b: f64, row: usize, n: usize) -> PdeResult<()> {
+fn check_pivot(d: f64, term_a: f64, term_b: f64, row: usize, n: usize) -> Result<(), PdeError> {
     // Row scale: largest constituent magnitude, floored at 1.0 so that a row
     // whose terms are all genuinely tiny still requires a non-zero pivot.
     let row_scale = term_a.abs().max(term_b.abs()).max(1.0);
@@ -249,7 +249,7 @@ impl TridiagOperator {
     /// degenerate pivot (a sign that `(I - alpha*A)` has lost diagonal
     /// dominance, e.g. via a boundary-condition modification). Without the
     /// guard such a pivot would yield a silent `inf` / `NaN` solution.
-    pub fn solve_thomas(&self, alpha: f64, rhs: &[f64]) -> PdeResult<Vec<f64>> {
+    pub fn solve_thomas(&self, alpha: f64, rhs: &[f64]) -> Result<Vec<f64>, PdeError> {
         let mut x = vec![0.0; self.n];
         let mut scratch = vec![0.0; self.n];
         self.solve_thomas_into(alpha, rhs, &mut x, &mut scratch)?;
@@ -276,7 +276,7 @@ impl TridiagOperator {
         rhs: &[f64],
         out: &mut [f64],
         scratch: &mut [f64],
-    ) -> PdeResult<()> {
+    ) -> Result<(), PdeError> {
         debug_assert_eq!(rhs.len(), self.n);
         debug_assert_eq!(out.len(), self.n);
         debug_assert_eq!(scratch.len(), self.n);

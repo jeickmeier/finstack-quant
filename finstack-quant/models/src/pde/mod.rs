@@ -73,7 +73,7 @@ pub use adi::McsStepper;
 pub use boundary::BoundaryCondition;
 pub use bridge::BlackScholesPde;
 pub use bridge2d::HestonPde;
-pub use error::{PdeError, PdeResult};
+pub use error::PdeError;
 pub use grid::Grid1D;
 pub use grid2d::Grid2D;
 pub use problem::PdeProblem1D;

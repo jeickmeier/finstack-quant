@@ -57,7 +57,7 @@
 //! - Craig, I. J. D. & Sneyd, A. D. (1988). "An alternating-direction implicit
 //!   scheme for parabolic equations with mixed derivatives."
 
-use super::error::{PdeError, PdeResult};
+use super::error::PdeError;
 use super::grid2d::Grid2D;
 use super::operator2d::{Operators2D, apply_cross_derivative};
 use super::problem2d::PdeProblem2D;
@@ -270,7 +270,7 @@ impl McsStepper {
         (t_from, t_to): (f64, f64),
         step_index: usize,
         buffers: &mut AdiWorkBuffers,
-    ) -> PdeResult<()> {
+    ) -> Result<(), PdeError> {
         let dt = t_from - t_to;
         // A non-positive or non-finite dt would otherwise propagate as silent
         // NaN / inf in release builds (the previous `debug_assert` was
@@ -318,7 +318,7 @@ impl McsStepper {
         (t_from, t_to): (f64, f64),
         damping: bool,
         buffers: &mut AdiWorkBuffers,
-    ) -> PdeResult<()> {
+    ) -> Result<(), PdeError> {
         let dt = t_from - t_to;
         if !dt.is_finite() || dt <= 0.0 {
             return Err(PdeError::NonPositiveStep { dt, t_from, t_to });
@@ -589,7 +589,7 @@ fn implicit_x_sweep(
     (nx_int, ny_int): (usize, usize),
     line: &mut LineScratch<'_>,
     out: &mut [f64],
-) -> PdeResult<()> {
+) -> Result<(), PdeError> {
     let LineScratch {
         rhs: rhs_buf,
         thomas: scratch,
@@ -623,7 +623,7 @@ fn implicit_y_sweep(
     (nx_int, ny_int): (usize, usize),
     line: &mut LineScratch<'_>,
     out: &mut [f64],
-) -> PdeResult<()> {
+) -> Result<(), PdeError> {
     let LineScratch {
         rhs: rhs_buf,
         thomas: scratch,

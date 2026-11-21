@@ -1,8 +1,5 @@
 //! Unified error type for 1D and 2D finite-difference PDE solvers.
 
-/// Result alias using [`PdeError`].
-pub type PdeResult<T> = std::result::Result<T, PdeError>;
-
 /// Errors returned by finite-difference grids, operators, steppers, and solvers.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 #[non_exhaustive]

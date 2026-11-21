@@ -6,7 +6,7 @@
 //! Greeks (delta, gamma) read directly from the grid.
 
 use super::boundary::BoundaryCondition;
-use super::error::{PdeError, PdeResult};
+use super::error::PdeError;
 use super::exercise::{ExerciseType, PenaltyExercise};
 use super::grid::{Grid1D, find_nearest};
 use super::problem::PdeProblem1D;
@@ -81,7 +81,7 @@ impl Solver1DBuilder {
     }
 
     /// Build the solver. Returns an error if grid or stepper is missing.
-    pub fn build(self) -> PdeResult<Solver1D> {
+    pub fn build(self) -> Result<Solver1D, PdeError> {
         let grid = self.grid.ok_or(PdeError::MissingGrid)?;
         let stepper = self.stepper.ok_or(PdeError::MissingStepper)?;
         if let Some(exercise) = &self.exercise {
@@ -141,7 +141,11 @@ impl Solver1D {
     ///   step violates the CFL stability condition, or a degenerate tridiagonal
     ///   solve. Implicit and Crank-Nicolson schemes are unconditionally
     ///   stable and never trigger the CFL case.
-    pub fn solve(&self, problem: &dyn PdeProblem1D, maturity: f64) -> PdeResult<PdeSolution> {
+    pub fn solve(
+        &self,
+        problem: &dyn PdeProblem1D,
+        maturity: f64,
+    ) -> Result<PdeSolution, PdeError> {
         // Validate maturity / step count up front — a non-positive or
         // non-finite maturity, or zero steps, would otherwise yield a
         // degenerate "solution" (a NaN time grid, or the bare terminal payoff

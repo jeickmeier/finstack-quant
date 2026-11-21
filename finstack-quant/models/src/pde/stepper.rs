@@ -4,7 +4,7 @@
 //! and Rannacher smoothing (implicit start + CN continuation) to eliminate
 //! spurious oscillations near payoff discontinuities.
 
-use super::error::{PdeError, PdeResult};
+use super::error::PdeError;
 use super::grid::Grid1D;
 use super::operator::TridiagOperator;
 use super::problem::PdeProblem1D;
@@ -143,7 +143,7 @@ impl ThetaStepper {
         t_from: f64,
         t_to: f64,
         step_index: usize,
-    ) -> PdeResult<()> {
+    ) -> Result<(), PdeError> {
         self.step_with_cached_op(problem, grid, u, (t_from, t_to), step_index, None)
     }
 
@@ -155,7 +155,7 @@ impl ThetaStepper {
         (t_from, t_to): (f64, f64),
         step_index: usize,
         cached_op: Option<&mut TridiagOperator>,
-    ) -> PdeResult<()> {
+    ) -> Result<(), PdeError> {
         let theta = if step_index < self.implicit_steps {
             1.0
         } else {
@@ -293,7 +293,7 @@ fn theta_step(
     t_to: f64,
     theta: f64,
     cached_op: Option<&mut TridiagOperator>,
-) -> PdeResult<()> {
+) -> Result<(), PdeError> {
     let dt = t_from - t_to;
     // A non-positive or non-finite dt would otherwise propagate as silent
     // NaN / inf in release builds (the previous `debug_assert` was compiled

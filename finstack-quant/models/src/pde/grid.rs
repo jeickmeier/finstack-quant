@@ -4,7 +4,7 @@
 //! Grid concentration near strikes/barriers dramatically improves FD accuracy
 //! without increasing the total number of nodes.
 
-use super::error::{PdeError, PdeResult};
+use super::error::PdeError;
 
 /// A sorted one-dimensional grid of spatial points.
 ///
@@ -30,7 +30,7 @@ impl Grid1D {
     /// * `x_min` - Finite lower bound of the numerical state grid.
     /// * `x_max` - Finite upper bound of the numerical state grid.
     /// * `n` - Count of elements, paths, or periods requested by the caller
-    pub fn uniform(x_min: f64, x_max: f64, n: usize) -> PdeResult<Self> {
+    pub fn uniform(x_min: f64, x_max: f64, n: usize) -> Result<Self, PdeError> {
         if n < 3 {
             return Err(PdeError::TooFewPoints { n, min: 3 });
         }
@@ -72,7 +72,7 @@ impl Grid1D {
         n: usize,
         center: f64,
         intensity: f64,
-    ) -> PdeResult<Self> {
+    ) -> Result<Self, PdeError> {
         if n < 3 {
             return Err(PdeError::TooFewPoints { n, min: 3 });
         }
@@ -150,7 +150,7 @@ impl Grid1D {
     /// Create a grid from user-supplied points.
     ///
     /// Points must be sorted in strictly increasing order with at least 3 elements.
-    pub fn from_points(points: Vec<f64>) -> PdeResult<Self> {
+    pub fn from_points(points: Vec<f64>) -> Result<Self, PdeError> {
         if points.len() < 3 {
             return Err(PdeError::TooFewPoints {
                 n: points.len(),

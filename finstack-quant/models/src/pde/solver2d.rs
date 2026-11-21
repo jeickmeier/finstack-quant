@@ -6,7 +6,7 @@
 //! Greeks.
 
 use super::adi::{AdiWorkBuffers, McsStepper, fill_boundaries};
-use super::error::{PdeError, PdeResult};
+use super::error::PdeError;
 use super::grid::find_nearest;
 use super::grid2d::Grid2D;
 use super::problem2d::PdeProblem2D;
@@ -50,7 +50,11 @@ impl Solver2D {
     ///   (the backward march would never run).
     /// - [`PdeError::NonPositiveStep`] / [`PdeError::DegeneratePivot`] if a
     ///   Modified Craig-Sneyd ADI step fails.
-    pub fn solve(&self, problem: &dyn PdeProblem2D, maturity: f64) -> PdeResult<PdeSolution2D> {
+    pub fn solve(
+        &self,
+        problem: &dyn PdeProblem2D,
+        maturity: f64,
+    ) -> Result<PdeSolution2D, PdeError> {
         // Validate maturity / step count up front — a non-positive or
         // non-finite maturity, or zero steps, would otherwise yield a
         // degenerate "solution" (NaN time grid, or the bare terminal payoff
