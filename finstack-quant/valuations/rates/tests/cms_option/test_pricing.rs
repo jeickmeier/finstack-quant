@@ -763,3 +763,66 @@ fn vanna_skips_seasoned_fixed_period() {
     let expected = vanna_oracle(&inst, &market, as_of);
     assert!((seasoned - expected).abs() < 1e-6 * expected.abs());
 }
+
+#[test]
+fn test_single_curve_cms_option_dv01_uses_discount_curve_only() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let mut inst = CmsOption::example().expect("example");
+    inst.forward_curve_id = inst.discount_curve_id.clone();
+
+    let deps = inst
+        .market_dependencies()
+        .expect("single-curve CMS option dependencies");
+    assert!(
+        deps.curves.forward_curves.is_empty(),
+        "single-curve CMS option must not require a separate forward curve: {:?}",
+        deps.curves.forward_curves
+    );
+
+    let knots = vec![
+        (0.0, 1.0),
+        (1.0, (-0.03 * 1.0f64).exp()),
+        (5.0, (-0.03 * 5.0f64).exp()),
+        (10.0, (-0.03 * 10.0f64).exp()),
+        (30.0, (-0.03 * 30.0f64).exp()),
+    ];
+    let discount_curve = DiscountCurve::builder(CurveId::new("USD-OIS"))
+        .base_date(as_of)
+        .day_count(DayCount::Act365F)
+        .knots(knots)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+        .build()
+        .unwrap();
+    let strikes = vec![0.01, 0.02, 0.03, 0.04, 0.05];
+    let expiries = vec![0.5, 1.0, 5.0, 10.0, 20.0];
+    let flat_row = vec![0.20; 5];
+    let mut builder = VolSurface::builder(CurveId::new("USD-CMS10Y-VOL"))
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
+        .expiries(&expiries)
+        .secondary_values(&strikes);
+    for _ in 0..expiries.len() {
+        builder = builder.row(&flat_row);
+    }
+    let vol_surface = builder.build().unwrap();
+    let market = MarketContext::new()
+        .try_insert(discount_curve)
+        .expect("insert discount curve")
+        .insert_surface(vol_surface);
+
+    let result = inst
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Dv01],
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
+        )
+        .expect("single-curve CMS option DV01 should succeed without a ForwardCurve");
+    let dv01 = *result.measures.get("dv01").expect("dv01 measure");
+    assert!(
+        dv01.is_finite() && dv01.abs() > 0.0,
+        "DV01 must be finite and non-zero, got {dv01}"
+    );
+}

@@ -188,3 +188,38 @@ fn test_dv01_increases_with_tenor() {
         "Longer tenor should have higher DV01 magnitude"
     );
 }
+
+#[test]
+fn test_single_curve_swaption_dv01_uses_discount_curve_only() {
+    let (as_of, expiry, swap_start, swap_end) = standard_dates();
+    let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
+    swaption.underlying_float_leg.forward_curve_id = swaption.get_discount_curve_id().clone();
+
+    let deps = swaption
+        .market_dependencies()
+        .expect("single-curve swaption dependencies");
+    assert!(
+        deps.curves.forward_curves.is_empty(),
+        "single-curve swaption must not require a separate forward curve: {:?}",
+        deps.curves.forward_curves
+    );
+
+    let market = finstack_quant_core::market_data::context::MarketContext::new()
+        .try_insert(build_flat_discount_curve(0.05, as_of, "USD_OIS"))
+        .expect("insert discount curve")
+        .insert_surface(build_flat_vol_surface(0.30, as_of, "USD_SWAPTION_VOL"));
+
+    let result = swaption
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Dv01],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("single-curve swaption DV01 should succeed without a ForwardCurve");
+    let dv01 = *result.measures.get("dv01").expect("dv01 measure");
+    assert!(
+        dv01.is_finite() && dv01.abs() > 0.0,
+        "DV01 must be finite and non-zero, got {dv01}"
+    );
+}

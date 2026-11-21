@@ -278,7 +278,9 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsOption {
         self.validate()?;
         let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
-        deps.add_forward_curve(self.forward_curve_id.clone());
+        if self.forward_curve_id != self.discount_curve_id {
+            deps.add_forward_curve(self.forward_curve_id.clone());
+        }
         deps.add_volatility_dependency(
             finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),

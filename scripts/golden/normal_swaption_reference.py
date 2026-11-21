@@ -3,8 +3,10 @@
 Run with ``uv run --no-sync python scripts/golden/normal_swaption_reference.py``;
 add ``--write`` to refresh this internal formula fixture's reference values.
 Curve calibration, underlying forward projection, and cube evaluation are canonical
-Rust inputs. The fixed-leg annuity, Bachelier price/vega, and central parallel rate
-shock are calculated independently here with Python math (not the library pricer).
+Rust inputs. The fixed-leg annuity, Bachelier price/vega, and central parallel
+quote-shock DV01 (re-bootstrapping the discount and forward curves under +/-1bp
+rate-quote shifts while holding the normal vol fixed) are calculated independently
+here with Python math (not the library pricer).
 This is a fixture-specific reference, not a general swaption pricing implementation.
 Formula: QuantLib ql/pricingengines/blackformula.cpp, bachelierBlackFormula.
 https://github.com/lballabio/QuantLib/blob/master/ql/pricingengines/blackformula.cpp
@@ -18,7 +20,6 @@ import math
 from pathlib import Path
 
 from finstack_quant.calibration import calibrate
-from finstack_quant.core.market_data import MarketContext
 from finstack_quant.models.volatility import get_cube_vol_clamped
 from finstack_quant.valuations.instruments import Swaption, price_instrument
 
@@ -28,8 +29,7 @@ fixture_path = (
     / "finstack-quant/valuations/tests/golden/data/pricing/regression_goldens/swaption/usd_swaption_normal_vol_self_test.json"
 )
 f = json.loads(fixture_path.read_text())
-snapshot = json.loads(calibrate(json.dumps(f["market"]["envelope"])).market.to_json())
-market = MarketContext.from_json(json.dumps(snapshot))
+market = calibrate(json.dumps(f["market"]["envelope"])).market
 option = Swaption.from_json(json.dumps(f["instrument"]))
 as_of = date.fromisoformat(f["metadata"]["valuation_date"])
 spec = f["instrument"]["instrument"]["spec"]
@@ -88,51 +88,21 @@ def value(m):
 base = value(market)
 
 
-CURVE_CLOCKS = {"discount": ("act_365f", 365), "forward": ("act_360", 360)}
-
-
 def bumped(bp):
-    """Apply a continuous shock exp(-bp * 1e-4 * t) to every curve's factors.
+    """Apply a +/-bp quote shock to the rate curves and re-bootstrap.
 
-    Each curve keeps its own clock (ACT/365F discount, ACT/360 projection) and
-    its own interpolation. Rebuilding interpolation through shocked pillars
-    would change the shock between pillars, so the original interpolation is
-    retained and its value multiplied by exp(-bp * 1e-4 * t).
+    Matches Finstack's ``RateDv01(false)`` quote-shock DV01 on calibrated
+    swaption markets: all ``rate_quote`` inputs for the discount and forward
+    curves are shifted by ``bp * 1e-4`` while holding the calibrated normal
+    volatility fixed.
     """
-    s = copy.deepcopy(snapshot)
-    for c in s["curves"]:
-        day_count, _ = CURVE_CLOCKS[c["type"]]
-        if c["base"] != as_of.isoformat() or c["day_count"] != day_count or c.get("transform"):
-            raise ValueError(f"reference requires an untransformed {day_count} {c['type']} curve based on as_of")
-        c["transform"] = {
-            "source_base_date": c["base"],
-            "source_points": copy.deepcopy(c["knot_points"]),
-            "adjustment": {"initial_value": -bp * 1e-4, "segments": []},
-        }
-        c["knot_points"] = [[t, p * math.exp(-bp * 1e-4 * t)] for t, p in c["knot_points"]]
-    shifted_market = MarketContext.from_json(json.dumps(s))
-    # Off-pillar checks guard against accidentally restoring pillar-only shocks.
-    checks = [
-        (
-            "discount",
-            market.get_discount("USD-OIS"),
-            shifted_market.get_discount("USD-OIS"),
-            [p for _, _, p in periods],
-        ),
-        (
-            "forward",
-            market.get_forward("USD-SOFR-3M"),
-            shifted_market.get_forward("USD-SOFR-3M"),
-            [d for start, end, _ in periods for d in (start, end)],
-        ),
-    ]
-    for kind, original, shifted, dates in checks:
-        basis = CURVE_CLOCKS[kind][1]
-        for d in dates:
-            expected = original.df_between_dates(as_of, d) * math.exp(-bp * 1e-4 * (d - as_of).days / basis)
-            if abs(shifted.df_between_dates(as_of, d) - expected) > 1e-14:
-                raise AssertionError(f"{kind} shock must equal P(t) * exp(-bp * 1e-4 * t) between pillars")
-    return shifted_market
+    env = copy.deepcopy(f["market"]["envelope"])
+    env["plan"]["steps"] = [s for s in env["plan"]["steps"] if s["kind"] in ("discount", "forward")]
+    delta = bp * 1e-4
+    for datum in env["market_data"]:
+        if datum.get("kind") == "rate_quote":
+            datum["rate"] += delta
+    return calibrate(json.dumps(env)).market
 
 
 dv01 = (value(bumped(1))[0] - value(bumped(-1))[0]) / 2
@@ -154,24 +124,17 @@ if parser.parse_args().write:
             "the original market envelope and takes its forward and normal cube quote as inputs. It independently "
             "sums contractual ACT/360 annual fixed accruals times payment-date discount factors, computes receiver "
             "Bachelier N*A*((K-F)*Phi(-d)+sigmaN*sqrt(T)*phi(d)) with Python math.erfc, computes vega per 0.01 "
-            "normal-vol change, and centrally reprices +/-1bp continuous factor shocks of both curves using that same "
-            "independent formula. Each shock preserves the curve's source interpolation and multiplies its factor "
-            "P(t) by exp(-dr*t) on the curve's own clock (ACT/365F discount, ACT/360 projection); off-pillar "
-            "identities are checked during regeneration. Formula reference: "
+            "normal-vol change, and centrally reprices +/-1bp parallel rate-quote shocks (re-bootstrapping USD-OIS "
+            "and USD-SOFR-3M with the base normal vol held fixed, matching RateDv01(false)) using that same "
+            "independent formula. Formula reference: "
             "https://github.com/lballabio/QuantLib/blob/master/ql/pricingengines/blackformula.cpp "
             f"(bachelierBlackFormula). Inputs: F={base[2]}, K={strike}, sigmaN={sigma} decimal rate/sqrt(year), "
             f"T={t} ACT/365F, A={base[3]} years, N={notional:.0f} USD. Reference NPV={base[0]} USD, "
-            f"vega={base[1]} USD per 100bp normal vol, signed DV01={dv01} USD per 1bp. "
+            f"vega={base[1]} USD per 100bp normal vol, signed quote-shock DV01={dv01} USD per 1bp. "
             "This reference isolates option quote-unit/pricing/risk correctness; its calibration and underlying "
-            "forward are not an independent external curve benchmark. This recapture follows the factor-native "
-            "ForwardCurve change: the projection curve stores positive factors P(t) instead of rate knots. The "
-            "forward step's rate-space 'linear' interpolation became 'log_linear' factors with 'extend' "
-            "extrapolation, i.e. piecewise-flat forwards and a flat-forward tail, preserving the flat tail the "
-            "previous FlatZero rate curve held. The fixture's FRA quotes end at t=1.02y while the underlying swap "
-            "runs 2027-2032, so its forward is extrapolation-dominated: F moved from 0.05339268554469429 to the "
-            "value above and the SABR normal vol refitted, while the discount curve and annuity are unchanged. "
-            "DV01 now shifts projection factors rather than adding to forward rates, so the simple 3M forward "
-            "moves by (1+F*tau) bp per bp. "
+            "forward are not an independent external curve benchmark. Following commit 4d8466caa1, Swaption Dv01 "
+            "uses RateDv01(false) (quote-shock re-bootstrap parallel DV01 when rate_calibration recipes are present, "
+            "reconciling with BucketedDv01 and matching IRS/FRA/CapFloor). "
             "Contract terms, market quotes, and tolerances are unchanged. "
             "Old self-captured million-dollar price used a lognormal-equivalent vol as a normal quote."
         ),

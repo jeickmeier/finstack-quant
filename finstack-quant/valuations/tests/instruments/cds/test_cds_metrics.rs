@@ -450,10 +450,28 @@ fn bucketed_cs01_quote_uses_each_off_grid_replay_pillar_once() {
         ],
     )
     .expect("off-grid hazard calibration should succeed");
-    let recipe = hazard
+    use finstack_quant_valuations::recalibration::RecalibrationProvider;
+    let replay_buckets =
+        finstack_quant_calibration::recalibration::CachedRecalibrationProvider::default()
+            .hazard_spread_risk_buckets(&hazard)
+            .expect("replay buckets");
+    let expected_bucket_count = hazard
         .hazard_calibration()
-        .expect("replayable hazard curve");
-    let expected_bucket_count = recipe.spread_risk_inputs().len();
+        .expect("replayable hazard curve")
+        .spread_risk_inputs()
+        .len();
+    assert_eq!(
+        replay_buckets.len(),
+        expected_bucket_count,
+        "replay buckets must match spread-risk inputs"
+    );
+    let four_year_date = as_of + time::Duration::days(4 * 365);
+    let four_year_label = replay_buckets
+        .iter()
+        .find(|bucket| bucket.pillar_date == four_year_date)
+        .expect("the off-grid 4 * 365-day replay pillar must exist")
+        .get_metric_label(&replay_buckets);
+    assert_eq!(four_year_label, "49m");
     let market = source.try_insert(hazard).expect("insert market curve");
     let cds = create_test_cds(as_of, maturity);
 
@@ -478,11 +496,21 @@ fn bucketed_cs01_quote_uses_each_off_grid_replay_pillar_once() {
         expected_bucket_count,
         "each replay quote must produce exactly one bucket: {buckets:?}"
     );
+    for replay_bucket in &replay_buckets {
+        let expected_key = format!(
+            "bucketed_cs01::CORP::{}",
+            replay_bucket.get_metric_label(&replay_buckets)
+        );
+        assert!(
+            buckets.iter().any(|(key, _)| key.as_str() == expected_key),
+            "missing replay bucket {expected_key}: {buckets:?}"
+        );
+    }
     assert!(
         buckets
             .iter()
-            .any(|(key, _)| key.as_str() == "bucketed_cs01::CORP::4y"),
-        "the off-grid 4Y replay quote must not disappear: {buckets:?}"
+            .any(|(key, _)| key.as_str() == "bucketed_cs01::CORP::49m"),
+        "the off-grid 4 * 365-day (49m Act/360) replay quote must not disappear: {buckets:?}"
     );
     assert!(
         buckets
