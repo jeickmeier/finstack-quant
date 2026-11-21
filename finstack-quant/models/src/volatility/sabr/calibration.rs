@@ -112,56 +112,80 @@ fn normalized_quote_weights(
 }
 
 // Check each candidate before selecting the best weighted fit. A small weighted
-// norm alone can conceal a bad quote at a low-vega strike.
-fn candidate_fits_quotes(
-    parameters: &SabrParameters,
+struct PreparedSabrFit<'a> {
     forward: f64,
-    strikes: &[f64],
-    market_vols: &[f64],
+    strikes: &'a [f64],
+    market_vols: &'a [f64],
     time_to_expiry: f64,
-    tolerance: f64,
     quote_type: VolQuoteType,
-) -> bool {
-    strikes.iter().zip(market_vols).all(|(&strike, &quote)| {
-        parameters
-            .implied_vol(forward, strike, time_to_expiry, quote_type)
-            .is_ok_and(|vol| vol.is_finite() && (vol - quote).abs() <= tolerance * quote)
-    })
+    tolerance: f64,
+    weights: Vec<f64>,
+    atm_vol: f64,
+    starts: Vec<[f64; 3]>,
+    prepared: Vec<super::expansion::PreparedSabrStrike>,
+    solver: LevenbergMarquardtSolver,
 }
 
-fn validate_quote_fit(
-    mut outcome: SabrCalibrationOutcome,
-    forward: f64,
-    strikes: &[f64],
-    market_vols: &[f64],
-    time_to_expiry: f64,
-    tolerance: f64,
-    quote_type: VolQuoteType,
-) -> Result<SabrCalibrationOutcome> {
-    outcome.quote_errors = strikes
-        .iter()
-        .zip(market_vols)
-        .map(|(&strike, &market_vol)| {
-            outcome
-                .parameters
-                .implied_vol(forward, strike, time_to_expiry, quote_type)
-                .map(|v| v - market_vol)
-        })
-        .collect::<Result<Vec<_>>>()?;
-    outcome.max_relative_quote_error = outcome
-        .quote_errors
-        .iter()
-        .zip(market_vols)
-        .map(|(&error, &quote)| error.abs() / quote)
-        .fold(0.0_f64, f64::max);
-    if !outcome.max_relative_quote_error.is_finite() || outcome.max_relative_quote_error > tolerance
-    {
-        return Err(Error::Validation(format!(
-            "SABR final maximum relative quote error {} exceeds tolerance {tolerance}; quote errors {:?}",
-            outcome.max_relative_quote_error, outcome.quote_errors
-        )));
+impl PreparedSabrFit<'_> {
+    fn evaluate_residuals(
+        &self,
+        parameters: &SabrParameters,
+        output: &mut [f64],
+    ) -> finstack_quant_core::Result<()> {
+        for (index, (strike, &market_vol)) in self.prepared.iter().zip(self.market_vols).enumerate()
+        {
+            let model_vol = strike.evaluate(parameters)?;
+            output[index] = self.weights[index] * (model_vol - market_vol);
+        }
+        Ok(())
     }
-    Ok(outcome)
+
+    // Check every individual quote error against the budget since weighted L2
+    // norm alone can conceal a bad quote at a low-vega strike.
+    fn candidate_fits(&self, parameters: &SabrParameters) -> bool {
+        self.strikes
+            .iter()
+            .zip(self.market_vols)
+            .all(|(&strike, &quote)| {
+                parameters
+                    .implied_vol(self.forward, strike, self.time_to_expiry, self.quote_type)
+                    .is_ok_and(|vol| {
+                        vol.is_finite() && (vol - quote).abs() <= self.tolerance * quote
+                    })
+            })
+    }
+
+    fn validate_quote_fit(
+        &self,
+        mut outcome: SabrCalibrationOutcome,
+    ) -> Result<SabrCalibrationOutcome> {
+        outcome.quote_errors = self
+            .strikes
+            .iter()
+            .zip(self.market_vols)
+            .map(|(&strike, &market_vol)| {
+                outcome
+                    .parameters
+                    .implied_vol(self.forward, strike, self.time_to_expiry, self.quote_type)
+                    .map(|v| v - market_vol)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        outcome.max_relative_quote_error = outcome
+            .quote_errors
+            .iter()
+            .zip(self.market_vols)
+            .map(|(&error, &quote)| error.abs() / quote)
+            .fold(0.0_f64, f64::max);
+        if !outcome.max_relative_quote_error.is_finite()
+            || outcome.max_relative_quote_error > self.tolerance
+        {
+            return Err(Error::Validation(format!(
+                "SABR final maximum relative quote error {} exceeds tolerance {}; quote errors {:?}",
+                outcome.max_relative_quote_error, self.tolerance, outcome.quote_errors
+            )));
+        }
+        Ok(outcome)
+    }
 }
 
 /// Leading ATM term of the selected SABR expansion.
@@ -850,16 +874,15 @@ impl SabrCalibrator {
         }
     }
 
-    /// Fit alpha, nu, and rho freely (no ATM pinning) on positive inputs.
-    fn fit_free(
+    fn prepare_sabr_fit<'a>(
         &self,
         forward: f64,
-        strikes: &[f64],
-        market_vols: &[f64],
+        strikes: &'a [f64],
+        market_vols: &'a [f64],
         time_to_expiry: f64,
         beta: f64,
         quote_type: VolQuoteType,
-    ) -> Result<SabrCalibrationOutcome> {
+    ) -> Result<PreparedSabrFit<'a>> {
         let weights = normalized_quote_weights(
             forward,
             strikes,
@@ -869,12 +892,8 @@ impl SabrCalibrator {
             quote_type,
         )?;
         self.validate_settings()?;
-        let residual_tolerance = self.tolerance;
-        let solver = LevenbergMarquardtSolver::new(
-            residual_tolerance.min(1e-10),
-            1e-12,
-            self.max_iterations,
-        )?;
+        let solver =
+            LevenbergMarquardtSolver::new(self.tolerance.min(1e-10), 1e-12, self.max_iterations)?;
         let atm_vol = self.find_atm_vol(forward, strikes, market_vols)?;
         let alpha_start = initial_alpha_guess(atm_vol, forward, beta, quote_type);
         let starts = deterministic_sabr_starts(alpha_start);
@@ -891,9 +910,42 @@ impl SabrCalibrator {
                 )
             })
             .collect::<Result<_>>()?;
-        let outcome = run_deterministic_sabr_starts(
+        Ok(PreparedSabrFit {
+            forward,
+            strikes,
+            market_vols,
+            time_to_expiry,
+            quote_type,
+            tolerance: self.tolerance,
+            weights,
+            atm_vol,
             starts,
-            residual_tolerance,
+            prepared,
+            solver,
+        })
+    }
+
+    /// Fit alpha, nu, and rho freely (no ATM pinning) on positive inputs.
+    fn fit_free(
+        &self,
+        forward: f64,
+        strikes: &[f64],
+        market_vols: &[f64],
+        time_to_expiry: f64,
+        beta: f64,
+        quote_type: VolQuoteType,
+    ) -> Result<SabrCalibrationOutcome> {
+        let fit = self.prepare_sabr_fit(
+            forward,
+            strikes,
+            market_vols,
+            time_to_expiry,
+            beta,
+            quote_type,
+        )?;
+        let outcome = run_deterministic_sabr_starts(
+            fit.starts.clone(),
+            fit.tolerance,
             "SABR",
             beta,
             |physical_start| {
@@ -911,27 +963,22 @@ impl SabrCalibrator {
                     let nu = unconstrained_to_bounded(unconstrained[1], 0.001, 2.0);
                     let rho = unconstrained_to_bounded(unconstrained[2], -0.99, 0.99);
                     let parameters = SabrParameters::new(alpha, beta, nu, rho)?;
-                    for (index, (strike, &market_vol)) in
-                        prepared.iter().zip(market_vols).enumerate()
-                    {
-                        let weight = weights[index];
-                        let model_vol = strike.evaluate(&parameters)?;
-                        output[index] = weight * (model_vol - market_vol);
-                    }
-                    Ok(())
+                    fit.evaluate_residuals(&parameters, output)
                 };
-                let jacobian =
-                    |coordinates: &[f64], output: &mut [f64]| -> finstack_quant_core::Result<()> {
-                        compute_sabr_jacobian(&prepared, &weights, beta, coordinates, output)
-                    };
+                let jacobian = |coordinates: &[f64],
+                                output: &mut [f64]|
+                 -> finstack_quant_core::Result<()> {
+                    compute_sabr_jacobian(&fit.prepared, &fit.weights, beta, coordinates, output)
+                };
                 let solution = if quote_type == VolQuoteType::Normal && beta > 0.0 {
-                    solver.solve_least_squares(residuals, &initial, prepared.len())
+                    fit.solver
+                        .solve_least_squares(residuals, &initial, fit.prepared.len())
                 } else {
-                    solver.solve_least_squares_with_jacobian(
+                    fit.solver.solve_least_squares_with_jacobian(
                         residuals,
                         jacobian,
                         &initial,
-                        prepared.len(),
+                        fit.prepared.len(),
                     )
                 };
                 (solution, calls.get())
@@ -942,33 +989,13 @@ impl SabrCalibrator {
                     unconstrained_to_bounded(solution.params[1], 0.001, 2.0),
                     unconstrained_to_bounded(solution.params[2], -0.99, 0.99),
                 ];
-                let Ok(parameters) =
-                    SabrParameters::new(physical[0], beta, physical[1], physical[2])
-                else {
-                    return None;
-                };
-                candidate_fits_quotes(
-                    &parameters,
-                    forward,
-                    strikes,
-                    market_vols,
-                    time_to_expiry,
-                    self.tolerance,
-                    quote_type,
-                )
-                .then_some(physical)
+                let parameters =
+                    SabrParameters::new(physical[0], beta, physical[1], physical[2]).ok()?;
+                fit.candidate_fits(&parameters).then_some(physical)
             },
         )?
         .into_outcome();
-        validate_quote_fit(
-            outcome,
-            forward,
-            strikes,
-            market_vols,
-            time_to_expiry,
-            self.tolerance,
-            quote_type,
-        )
+        fit.validate_quote_fit(outcome)
     }
 
     /// Find the ATM volatility (volatility at `strike == forward`) from a
@@ -1059,7 +1086,7 @@ impl SabrCalibrator {
         beta: f64,
         quote_type: VolQuoteType,
     ) -> Result<SabrCalibrationOutcome> {
-        let weights = normalized_quote_weights(
+        let fit = self.prepare_sabr_fit(
             forward,
             strikes,
             market_vols,
@@ -1067,32 +1094,9 @@ impl SabrCalibrator {
             beta,
             quote_type,
         )?;
-        self.validate_settings()?;
-        let atm_vol = self.find_atm_vol(forward, strikes, market_vols)?;
-        let alpha_start = initial_alpha_guess(atm_vol, forward, beta, quote_type);
-        let starts = deterministic_sabr_starts(alpha_start);
-        let template = SabrParameters::new(1.0, beta, 0.4, 0.0)?;
-        let prepared: Vec<_> = strikes
-            .iter()
-            .map(|&strike| {
-                super::expansion::PreparedSabrStrike::new(
-                    &template,
-                    forward,
-                    strike,
-                    time_to_expiry,
-                    quote_type,
-                )
-            })
-            .collect::<Result<_>>()?;
-        let residual_tolerance = self.tolerance;
-        let solver = LevenbergMarquardtSolver::new(
-            residual_tolerance.min(1e-10),
-            1e-12,
-            self.max_iterations,
-        )?;
         let outcome = run_deterministic_sabr_starts(
-            starts,
-            residual_tolerance,
+            fit.starts.clone(),
+            fit.tolerance,
             "ATM-pinned SABR",
             beta,
             |physical_start| {
@@ -1109,22 +1113,18 @@ impl SabrCalibrator {
                     let rho = unconstrained_to_bounded(unconstrained[1], -0.99, 0.99);
                     let alpha = solve_alpha_for_atm(
                         forward,
-                        atm_vol,
+                        fit.atm_vol,
                         time_to_expiry,
                         [beta, nu, rho],
                         self.tolerance.min(1e-10),
                         quote_type,
                     )?;
                     let parameters = SabrParameters::new(alpha, beta, nu, rho)?;
-                    for (index, (strike, &market_vol)) in
-                        prepared.iter().zip(market_vols).enumerate()
-                    {
-                        let model_vol = strike.evaluate(&parameters)?;
-                        output[index] = weights[index] * (model_vol - market_vol);
-                    }
-                    Ok(())
+                    fit.evaluate_residuals(&parameters, output)
                 };
-                let solution = solver.solve_least_squares(residuals, &initial, market_vols.len());
+                let solution =
+                    fit.solver
+                        .solve_least_squares(residuals, &initial, market_vols.len());
                 (solution, calls.get())
             },
             |solution| {
@@ -1132,7 +1132,7 @@ impl SabrCalibrator {
                 let rho = unconstrained_to_bounded(solution.params[1], -0.99, 0.99);
                 solve_alpha_for_atm(
                     forward,
-                    atm_vol,
+                    fit.atm_vol,
                     time_to_expiry,
                     [beta, nu, rho],
                     self.tolerance.min(1e-10),
@@ -1141,33 +1141,14 @@ impl SabrCalibrator {
                 .ok()
                 .map(|alpha| [alpha, nu, rho])
                 .filter(|&physical| {
-                    let Ok(parameters) =
-                        SabrParameters::new(physical[0], beta, physical[1], physical[2])
-                    else {
-                        return false;
-                    };
-                    candidate_fits_quotes(
-                        &parameters,
-                        forward,
-                        strikes,
-                        market_vols,
-                        time_to_expiry,
-                        self.tolerance,
-                        quote_type,
-                    )
+                    SabrParameters::new(physical[0], beta, physical[1], physical[2])
+                        .ok()
+                        .is_some_and(|parameters| fit.candidate_fits(&parameters))
                 })
             },
         )?
         .into_outcome();
-        validate_quote_fit(
-            outcome,
-            forward,
-            strikes,
-            market_vols,
-            time_to_expiry,
-            self.tolerance,
-            quote_type,
-        )
+        fit.validate_quote_fit(outcome)
     }
 }
 

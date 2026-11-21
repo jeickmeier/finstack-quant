@@ -37,9 +37,11 @@
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
 
-use finstack_quant_core::{Error, Result};
+use finstack_quant_core::Result;
 
-use super::vanilla::{checked_closed_form_value, require_finite};
+use super::vanilla::{
+    checked_closed_form_value, require_finite, require_finite_non_negative, require_finite_positive,
+};
 use super::{
     bachelier_call, bachelier_delta_call, bachelier_delta_put, bachelier_gamma, bachelier_put,
     bachelier_vega, black_call, black_delta_call, black_delta_put, black_gamma, black_put,
@@ -89,60 +91,20 @@ impl ForwardGreeks {
     }
 }
 
-fn require_all_finite(model: &str, inputs: &[(&str, f64)]) -> Result<()> {
-    inputs
-        .iter()
-        .try_for_each(|&(name, value)| require_finite(model, name, value))
-}
-
-fn require_positive(model: &str, name: &str, value: f64) -> Result<()> {
-    if value <= 0.0 {
-        return Err(Error::Validation(format!(
-            "{model} {name} must be positive, got {value}"
-        )));
-    }
-    Ok(())
-}
-
-fn require_non_negative(model: &str, name: &str, value: f64) -> Result<()> {
-    if value < 0.0 {
-        return Err(Error::Validation(format!(
-            "{model} {name} must be non-negative, got {value}"
-        )));
-    }
-    Ok(())
-}
-
 fn validate_black76(forward: f64, strike: f64, vol: f64, expiry: f64) -> Result<()> {
     const MODEL: &str = "Black-76";
-    require_all_finite(
-        MODEL,
-        &[
-            ("forward", forward),
-            ("strike", strike),
-            ("vol", vol),
-            ("expiry", expiry),
-        ],
-    )?;
-    require_positive(MODEL, "forward", forward)?;
-    require_positive(MODEL, "strike", strike)?;
-    require_non_negative(MODEL, "vol", vol)?;
-    require_non_negative(MODEL, "expiry", expiry)
+    require_finite_positive(MODEL, "forward", forward)?;
+    require_finite_positive(MODEL, "strike", strike)?;
+    require_finite_non_negative(MODEL, "vol", vol)?;
+    require_finite_non_negative(MODEL, "expiry", expiry)
 }
 
 fn validate_bachelier(forward: f64, strike: f64, normal_vol: f64, expiry: f64) -> Result<()> {
     const MODEL: &str = "Bachelier";
-    require_all_finite(
-        MODEL,
-        &[
-            ("forward", forward),
-            ("strike", strike),
-            ("normal_vol", normal_vol),
-            ("expiry", expiry),
-        ],
-    )?;
-    require_non_negative(MODEL, "normal_vol", normal_vol)?;
-    require_non_negative(MODEL, "expiry", expiry)
+    require_finite(MODEL, "forward", forward)?;
+    require_finite(MODEL, "strike", strike)?;
+    require_finite_non_negative(MODEL, "normal_vol", normal_vol)?;
+    require_finite_non_negative(MODEL, "expiry", expiry)
 }
 
 fn validate_black_shifted(
@@ -153,22 +115,13 @@ fn validate_black_shifted(
     shift: f64,
 ) -> Result<()> {
     const MODEL: &str = "shifted Black";
-    require_all_finite(
-        MODEL,
-        &[
-            ("forward", forward),
-            ("strike", strike),
-            ("vol", vol),
-            ("expiry", expiry),
-            ("shift", shift),
-            ("forward + shift", forward + shift),
-            ("strike + shift", strike + shift),
-        ],
-    )?;
-    require_positive(MODEL, "forward + shift", forward + shift)?;
-    require_positive(MODEL, "strike + shift", strike + shift)?;
-    require_non_negative(MODEL, "vol", vol)?;
-    require_non_negative(MODEL, "expiry", expiry)
+    require_finite(MODEL, "forward", forward)?;
+    require_finite(MODEL, "strike", strike)?;
+    require_finite(MODEL, "shift", shift)?;
+    require_finite_positive(MODEL, "forward + shift", forward + shift)?;
+    require_finite_positive(MODEL, "strike + shift", strike + shift)?;
+    require_finite_non_negative(MODEL, "vol", vol)?;
+    require_finite_non_negative(MODEL, "expiry", expiry)
 }
 
 /// Discounted Black-76 price of a European option on a forward.
@@ -206,8 +159,7 @@ pub fn black76_price(
     option_type: OptionType,
 ) -> Result<f64> {
     validate_black76(forward, strike, vol, expiry)?;
-    require_finite("Black-76", "df", df)?;
-    require_positive("Black-76", "df", df)?;
+    require_finite_positive("Black-76", "df", df)?;
     let undiscounted = match option_type {
         OptionType::Call => black_call(forward, strike, vol, expiry),
         OptionType::Put => black_put(forward, strike, vol, expiry),
@@ -419,6 +371,7 @@ mod tests {
 
     use super::*;
     use crate::closed_form::black76_implied_vol;
+    use finstack_quant_core::Error;
 
     #[test]
     fn black76_price_matches_discounted_leaf_formula() {

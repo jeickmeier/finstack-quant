@@ -15,6 +15,57 @@ use crate::volatility::implied_vol_black;
 /// Error returned when implied volatility inputs contain non-finite values.
 const NON_FINITE_MSG: &str = "Implied volatility solver received non-finite input parameters";
 
+fn check_positive_implied_vol_inputs(
+    all_finite: bool,
+    expiry: f64,
+    positive_inputs: &[f64],
+    positive_msg: &str,
+) -> Result<()> {
+    if !all_finite {
+        return Err(finstack_quant_core::Error::Validation(
+            NON_FINITE_MSG.into(),
+        ));
+    }
+    if expiry <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "implied vol requires a positive time to expiry, got {expiry}; an expired option \
+             has no implied volatility"
+        )));
+    }
+    if positive_inputs.iter().any(|&v| v <= 0.0) {
+        return Err(finstack_quant_core::Error::Validation(positive_msg.into()));
+    }
+    Ok(())
+}
+
+fn invert_discounted_black(
+    discounted_forward: f64,
+    discounted_strike: f64,
+    expiry: f64,
+    price: f64,
+    option_type: OptionType,
+    sub_intrinsic_msg: impl FnOnce(f64) -> String,
+) -> Result<f64> {
+    if !discounted_forward.is_finite() || !discounted_strike.is_finite() {
+        return Err(finstack_quant_core::Error::Validation(
+            NON_FINITE_MSG.into(),
+        ));
+    }
+    let intrinsic = option_type.intrinsic(discounted_forward, discounted_strike);
+    if price <= intrinsic {
+        return Err(finstack_quant_core::Error::Validation(sub_intrinsic_msg(
+            intrinsic,
+        )));
+    }
+    implied_vol_black(
+        price,
+        discounted_forward,
+        discounted_strike,
+        expiry,
+        option_type == OptionType::Call,
+    )
+}
+
 /// Solve for Black–Scholes / Garman–Kohlhagen implied volatility.
 ///
 /// Finds \(\sigma\) such that `bs_price(&market_with_volatility) == price`.
@@ -44,55 +95,34 @@ pub fn bs_implied_vol(
     price: f64,
     option_type: OptionType,
 ) -> Result<f64> {
-    if !spot.is_finite()
-        || !strike.is_finite()
-        || !rate.is_finite()
-        || !div_yield.is_finite()
-        || !expiry.is_finite()
-        || !price.is_finite()
-    {
-        return Err(finstack_quant_core::Error::Validation(
-            NON_FINITE_MSG.into(),
-        ));
-    }
-    if expiry <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "implied vol requires a positive time to expiry, got {expiry}; an expired option \
-             has no implied volatility"
-        )));
-    }
-    if price <= 0.0 || spot <= 0.0 || strike <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(
-            "implied vol requires positive spot, strike, and price".into(),
-        ));
-    }
-
-    // Intrinsic lower bound (per unit) for continuous compounding.
-    let intrinsic = match option_type {
-        OptionType::Call => {
-            (spot * (-div_yield * expiry).exp() - strike * (-rate * expiry).exp()).max(0.0)
-        }
-        OptionType::Put => {
-            (strike * (-rate * expiry).exp() - spot * (-div_yield * expiry).exp()).max(0.0)
-        }
-    };
-    if price <= intrinsic {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Implied vol: target price {price:.6} is at or below intrinsic value \
-             {intrinsic:.6} for spot={spot}, strike={strike}, rate={rate}, div_yield={div_yield}, expiry={expiry}. \
-             A positive-volatility inversion requires a premium strictly above discounted intrinsic."
-        )));
-    }
+    check_positive_implied_vol_inputs(
+        spot.is_finite()
+            && strike.is_finite()
+            && rate.is_finite()
+            && div_yield.is_finite()
+            && expiry.is_finite()
+            && price.is_finite(),
+        expiry,
+        &[spot, strike, price],
+        "implied vol requires positive spot, strike, and price",
+    )?;
 
     // Black prices are homogeneous in forward and strike. Discounting both
     // coordinates keeps the target in its original premium units and avoids
     // constructing a potentially overflowing forward S * exp((r - q) * T).
-    implied_vol_black(
-        price,
+    invert_discounted_black(
         spot * (-div_yield * expiry).exp(),
         strike * (-rate * expiry).exp(),
         expiry,
-        option_type == OptionType::Call,
+        price,
+        option_type,
+        |intrinsic| {
+            format!(
+                "Implied vol: target price {price:.6} is at or below intrinsic value \
+                 {intrinsic:.6} for spot={spot}, strike={strike}, rate={rate}, div_yield={div_yield}, expiry={expiry}. \
+                 A positive-volatility inversion requires a premium strictly above discounted intrinsic."
+            )
+        },
     )
 }
 
@@ -122,44 +152,24 @@ pub fn black76_implied_vol(
     price: f64,
     option_type: OptionType,
 ) -> Result<f64> {
-    if !forward.is_finite()
-        || !strike.is_finite()
-        || !df.is_finite()
-        || !expiry.is_finite()
-        || !price.is_finite()
-    {
-        return Err(finstack_quant_core::Error::Validation(
-            NON_FINITE_MSG.into(),
-        ));
-    }
-    if expiry <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "implied vol requires a positive time to expiry, got {expiry}; an expired option \
-             has no implied volatility"
-        )));
-    }
-    if price <= 0.0 || forward <= 0.0 || strike <= 0.0 || df <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(
-            "implied vol requires positive forward, strike, df, and price".into(),
-        ));
-    }
+    check_positive_implied_vol_inputs(
+        forward.is_finite()
+            && strike.is_finite()
+            && df.is_finite()
+            && expiry.is_finite()
+            && price.is_finite(),
+        expiry,
+        &[forward, strike, df, price],
+        "implied vol requires positive forward, strike, df, and price",
+    )?;
 
-    let intrinsic = match option_type {
-        OptionType::Call => (forward - strike).max(0.0) * df,
-        OptionType::Put => (strike - forward).max(0.0) * df,
-    };
-    if price <= intrinsic {
-        return Err(finstack_quant_core::Error::Validation(
-            "Implied vol requires a premium strictly above discounted intrinsic".into(),
-        ));
-    }
-
-    implied_vol_black(
-        price,
+    invert_discounted_black(
         df * forward,
         df * strike,
         expiry,
-        option_type == OptionType::Call,
+        price,
+        option_type,
+        |_| "Implied vol requires a premium strictly above discounted intrinsic".to_string(),
     )
 }
 
