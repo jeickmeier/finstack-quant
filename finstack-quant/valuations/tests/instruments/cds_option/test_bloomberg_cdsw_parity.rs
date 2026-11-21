@@ -66,7 +66,7 @@ fn cdx_ig_46_linked_spot_cds_reconciliation() {
     par_cds.premium_leg.coupon_bp = Decimal::new(536_264, 4);
     let par_pv = par_cds.value_raw(&market, as_of).expect("par CDS PV");
     assert!(
-        par_pv.abs() < 10.0,
+        par_pv.abs() < 0.01,
         "clean par PV should be near zero at 53.6264 bp, got {par_pv}"
     );
 }

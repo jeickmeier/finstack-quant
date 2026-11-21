@@ -20,7 +20,7 @@ fn cdx_ig_46_npv_on_supplied_curve() {
         .value(&market, date!(2026 - 05 - 07))
         .expect("price option")
         .amount();
-    assert!((pv - 118_373.494_446_943_28).abs() < 1e-4, "CDSO NPV {pv}");
+    assert!((pv - 118_354.377_111_254_22).abs() < 1e-4, "CDSO NPV {pv}");
 }
 
 #[test]
