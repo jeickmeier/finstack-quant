@@ -59,6 +59,7 @@ pub use credit_rates::{
     PSA_RAMP_MONTHS, PSA_TERMINAL_CPR, SDA_PEAK_CDR, abs_to_smm, annual_to_monthly,
     monthly_to_annual, psa_cpr,
 };
+pub use date_generation::{icma_reference_period, icma_year_fraction};
 pub use floating_replay::{
     CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod,
     FloatingCouponReplayState, FloatingCouponSettlement, FloatingRateObservation,

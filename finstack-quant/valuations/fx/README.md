@@ -57,9 +57,9 @@ option's `BarrierDirection` and `PayoutTiming` are `finstack_quant_core::types`.
 Family-path-only types include `fx_option::{FxDeltaConvention,
 FxDeltaConventionKind, FxOptionBuilder}`,
 `fx_forward::FxForwardBuilder`, `fx_variance_swap::FxVarianceSwapBuilder` and
-`ndf::NdfFixingSource`; `NdfQuoteConvention` and the barrier `Monitoring` are
-valuations-core types at `finstack_quant_valuations::instruments`. Monte Carlo payoff kernels and
-pricers are crate-private.
+`ndf::NdfFixingSource`; `ndf::NdfQuoteConvention` and the barrier `Monitoring`
+are re-exported at `finstack_quant_valuations::instruments` (`Monitoring`
+lives in valuations-core). Monte Carlo payoff kernels and pricers are crate-private.
 
 `PayReceive` lives only at `instruments::`.
 
@@ -87,9 +87,10 @@ reached through the standard metric registry.
   explicit `FxPairConvention` for the instrument's ordered pair.
 - **Two clocks.** Option pricers combine a vol-surface clock with a
   discount-curve clock; the model rate must satisfy `exp(-r·t_vol) = df`.
-  `common_impl::helpers::zero_rate_from_df` derives that rate and
-  `instruments::pricing::time` supplies the curve-consistent lookups. Never
-  divide `ln(df)` by a year fraction measured on a different day count.
+  `common_impl::helpers::zero_rate_from_df` derives that rate and core curve
+  methods (`DiscountCurve::df_between_dates`, `ForwardCurve::rate_between_dates`)
+  supply curve-consistent lookups. Never divide `ln(df)` by a year fraction
+  measured on a different day count.
 - **Volatility precedence.** Surface-driven pricers resolve σ through
   `common_impl::vol_resolution::resolve_sigma_at`, so
   `MarketQuoteOverrides::implied_volatility` behaves as a flat σ across tenor

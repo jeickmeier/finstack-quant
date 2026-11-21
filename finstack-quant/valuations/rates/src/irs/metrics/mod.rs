@@ -46,7 +46,7 @@
 //! ```
 
 use crate::irs::InterestRateSwap;
-use finstack_quant_valuations_core::instruments::pricing::swap_legs::ANNUITY_EPSILON;
+use finstack_quant_valuations_core::constants::ANNUITY_EPSILON;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricId;

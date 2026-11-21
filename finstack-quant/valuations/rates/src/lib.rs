@@ -149,6 +149,8 @@ pub mod ir_future;
 pub mod ir_future_option;
 /// IRS module - Interest rate swaps.
 pub mod irs;
+/// Interest-rate-specific overnight arithmetic averaging and final-fixing helpers.
+pub(crate) mod overnight;
 /// Deposit module - Money market deposits.
 mod rate_bucketed_dv01;
 /// Rate-magnitude checks shared by the rates instruments.
@@ -167,6 +169,11 @@ pub mod xccy_swap;
 mod family;
 mod schedule_pv;
 pub use family::RATES;
+
+/// Finite-difference step for Hull-White short-rate σ sensitivities
+/// (`MetricId::HwSigmaVega`): an **absolute** shift of 1e-4 (1bp of annual
+/// short-rate volatility). Results are reported per 0.01 absolute σ.
+pub(crate) const HW_SIGMA_BUMP: f64 = 1e-4;
 pub use schedule_pv::schedule_pv_raw;
 pub use swap_legs::{FixedLegSpec, FloatLegSpec, simple_average_unsupported};
 pub use vol_resolution::VolatilityModel;

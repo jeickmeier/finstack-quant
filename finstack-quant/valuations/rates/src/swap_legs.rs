@@ -1,9 +1,32 @@
 //! Fixed and floating swap leg specifications shared across rate derivatives.
 
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor};
 use finstack_quant_core::types::CurveId;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+
+/// Add a business-day payment delay to `date`, using `calendar_id` or `weekends_only`.
+///
+/// Zero or negative delays leave `date` unchanged. Positive delays step forward
+/// by business days on the resolved calendar.
+///
+/// # Arguments
+///
+/// * `date` - Base date before payment lag adjustment.
+/// * `delay_days` - Number of business days to add (non-positive skips adjustment).
+/// * `calendar_id` - Optional holiday calendar identifier (`"weekends_only"` when `None`).
+pub fn add_payment_delay(
+    date: Date,
+    delay_days: i32,
+    calendar_id: Option<&str>,
+) -> finstack_quant_core::Result<Date> {
+    if delay_days <= 0 {
+        return Ok(date);
+    }
+    let cal_id = calendar_id.unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID);
+    let calendar = finstack_quant_core::dates::calendar_by_id_strict(cal_id)?;
+    date.add_business_days(delay_days, calendar)
+}
 
 /// Error for a swap float leg set to `simple_average`, which the swap
 /// projectors do not implement (they compound or take one term forward).
@@ -343,6 +366,31 @@ mod tests {
                 .expect_err("simple_average must be rejected")
                 .to_string()
                 .contains("simple_average")
+        );
+    }
+
+    #[test]
+    fn test_add_payment_delay_zero_days() {
+        let d = date!(2025 - 01 - 15);
+        let result = add_payment_delay(d, 0, None).expect("should succeed");
+        assert_eq!(result, d);
+    }
+
+    #[test]
+    fn test_add_payment_delay_positive_days() {
+        let d = date!(2025 - 01 - 17); // Friday
+        let result = add_payment_delay(d, 2, None).expect("should succeed");
+        // Friday + 2 business days = Tuesday (skipping Sat/Sun)
+        assert_eq!(result, date!(2025 - 01 - 21));
+    }
+
+    #[test]
+    fn test_add_payment_delay_invalid_calendar_errors() {
+        let d = date!(2025 - 01 - 15);
+        let result = add_payment_delay(d, 2, Some("nonexistent_calendar"));
+        assert!(
+            result.is_err(),
+            "add_payment_delay with nonexistent calendar must return Err"
         );
     }
 }

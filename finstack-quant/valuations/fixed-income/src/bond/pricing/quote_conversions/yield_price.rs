@@ -7,12 +7,12 @@ use crate::bond::pricing::tree::BondValuator;
 use crate::bond::pricing::ytm_solver::{YtmPricingSpec, solve_bond_ytm};
 use finstack_quant_cashflows::accrual::AccrualIndex;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::builder::{icma_reference_period, icma_year_fraction};
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period;
 use rust_decimal::prelude::ToPrimitive;
 
 /// Actual payment date, yield time in years and native-currency payment.
@@ -142,13 +142,7 @@ pub(crate) fn flow_times(
             let time = if date <= as_of {
                 0.0
             } else {
-                finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_year_fraction(
-                    day_count,
-                    Some(frequency),
-                    ref_period,
-                    as_of,
-                    date,
-                )?
+                icma_year_fraction(day_count, Some(frequency), ref_period, as_of, date)?
             };
             Ok((date, time, amount))
         })

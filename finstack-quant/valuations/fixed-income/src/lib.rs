@@ -80,6 +80,9 @@ use crate as fi;
 #[path = "../tests/performance/cashflow_accrual_support.rs"]
 mod cashflow_accrual_support;
 
+pub(crate) mod floating_reset_descriptors;
+pub(crate) mod rates_credit;
+
 /// Bond module - Fixed and floating rate bonds.
 pub mod bond;
 /// Bond future module - Bond futures contracts.

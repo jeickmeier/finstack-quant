@@ -443,13 +443,15 @@ impl InterestRateFuture {
         context: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<RateFutureProjection> {
+        use crate::overnight::{
+            OvernightArithmeticProjectionInput, project_arithmetic_overnight_rate,
+        };
         use finstack_quant_cashflows::builder::FloatingLegCompounding;
         use finstack_quant_core::market_data::fixings::{
             get_fixing_series, require_fixing_value_exact,
         };
         use finstack_quant_valuations_core::instruments::pricing::overnight::{
-            OvernightArithmeticProjectionInput, OvernightCouponProjectionInput,
-            OvernightProjectionCurve, project_arithmetic_overnight_rate, project_overnight_coupon,
+            OvernightCouponProjectionInput, OvernightProjectionCurve, project_overnight_coupon,
             resolve_overnight_fixing_calendar,
         };
 

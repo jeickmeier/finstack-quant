@@ -235,12 +235,9 @@ impl SnowballDiscountingPricer {
             let projection_start = start.max(as_of);
             let proj_accrual = coupon_accrual_fraction(inst, projection_start, end)?;
             let floating_rate =
-                finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_for_period(
-                    forward_curve.as_ref(),
-                    projection_start,
-                    end,
-                    proj_accrual,
-                )?;
+                forward_curve
+                    .as_ref()
+                    .rate_between_dates(projection_start, end, proj_accrual)?;
             let coupon_rate = spec.compute_coupon(floating_rate, prev_coupon);
             pv += coupon_rate * accrual_fraction * inst.notional.amount() * discount_factor;
             prev_coupon = coupon_rate;
@@ -477,13 +474,10 @@ fn coupon_events(
             let tenor = inst.index_tenor.to_years_approx();
             let coeffs = term_forward.period_coeffs(fixing_time, tenor)?;
             let discount_forward = term_forward.curve_forward(fixing_time, tenor)?;
-            let basis =
-                finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_for_period(
-                    forward_curve.as_ref(),
-                    start,
-                    end,
-                    accrual_fraction,
-                )? - discount_forward;
+            let basis = forward_curve
+                .as_ref()
+                .rate_between_dates(start, end, accrual_fraction)?
+                - discount_forward;
             (coeffs.with_additive_spread(basis), true)
         } else {
             // At inception the first fixing is projected from the explicit
@@ -492,12 +486,9 @@ fn coupon_events(
             let proj_start = start.max(as_of);
             let proj_accrual = coupon_accrual_fraction(inst, proj_start, end)?;
             let seasoned_rate =
-                finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_for_period(
-                    forward_curve.as_ref(),
-                    proj_start,
-                    end,
-                    proj_accrual,
-                )?;
+                forward_curve
+                    .as_ref()
+                    .rate_between_dates(proj_start, end, proj_accrual)?;
             (
                 PeriodForwardCoeffs::from_flat_rate(seasoned_rate, accrual_fraction),
                 false,

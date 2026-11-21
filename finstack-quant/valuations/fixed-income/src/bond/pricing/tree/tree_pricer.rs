@@ -9,6 +9,7 @@ use super::bond_valuator::BondValuator;
 use super::config::{TreeModelChoice, TreePricerConfig, resolve_rates_credit_config};
 use super::lsmc::{BondLsmcConfig, price_bond_lsmc};
 use crate::bond::Bond;
+use crate::rates_credit::build_daily_bond_rates_credit_targets;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{Error, Result};
@@ -16,7 +17,6 @@ use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTree
 use finstack_quant_models::trees::short_rate_tree::TreeCalibrationResult;
 use finstack_quant_models::trees::short_rate_tree::{ShortRateTree, ShortRateTreeConfig};
 use finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree;
-use finstack_quant_valuations_core::instruments::pricing::rates_credit::build_daily_bond_rates_credit_targets;
 use std::borrow::Cow;
 
 /// Tree-based pricer for bonds with embedded options and OAS calculations.

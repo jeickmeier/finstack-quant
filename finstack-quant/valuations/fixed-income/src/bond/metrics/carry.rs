@@ -3,9 +3,9 @@
 use crate::bond::Bond;
 use crate::bond::pricing::quote_conversions::{YieldCompounding, df_from_yield};
 use crate::bond::pricing::time_basis::{act365l_year_fraction, bond_coupon_periods};
+use finstack_quant_cashflows::builder::{icma_reference_period, icma_year_fraction};
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCount};
-use finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::sensitivities::carry_decomposition::YieldClock;
 
@@ -37,7 +37,7 @@ impl YieldClock for BondYieldClock {
         let tau = if day_count == DayCount::Act365L {
             act365l_year_fraction(&bond_coupon_periods(bond)?, context.as_of, rolled_date)?
         } else {
-            finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_year_fraction(
+            icma_year_fraction(
                 day_count,
                 Some(frequency),
                 ref_period,

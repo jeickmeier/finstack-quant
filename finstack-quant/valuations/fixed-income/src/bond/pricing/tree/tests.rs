@@ -414,16 +414,15 @@ fn test_rates_credit_default_lowers_price() {
         steps,
         ..Default::default()
     });
-    let low_targets =
-        finstack_quant_valuations_core::instruments::pricing::rates_credit::build_rates_credit_targets(
-            disc_low.as_ref(),
-            low_hc_ref.as_ref(),
-            as_of,
-            maturity,
-            time_to_maturity,
-            steps,
-        )
-        .expect("low targets");
+    let low_targets = crate::rates_credit::build_rates_credit_targets(
+        disc_low.as_ref(),
+        low_hc_ref.as_ref(),
+        as_of,
+        maturity,
+        time_to_maturity,
+        steps,
+    )
+    .expect("low targets");
     tree_low.calibrate(&low_targets).expect("calibration low");
 
     let disc_high = ctx_high
@@ -436,16 +435,15 @@ fn test_rates_credit_default_lowers_price() {
         steps,
         ..Default::default()
     });
-    let high_targets =
-        finstack_quant_valuations_core::instruments::pricing::rates_credit::build_rates_credit_targets(
-            disc_high.as_ref(),
-            high_hc_ref.as_ref(),
-            as_of,
-            maturity,
-            time_to_maturity,
-            steps,
-        )
-        .expect("high targets");
+    let high_targets = crate::rates_credit::build_rates_credit_targets(
+        disc_high.as_ref(),
+        high_hc_ref.as_ref(),
+        as_of,
+        maturity,
+        time_to_maturity,
+        steps,
+    )
+    .expect("high targets");
     tree_high
         .calibrate(&high_targets)
         .expect("calibration high");

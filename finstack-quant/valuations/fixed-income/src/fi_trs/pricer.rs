@@ -29,9 +29,8 @@ use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::pricing::{FinancingLegFlows, PeriodReturnInputs};
 use finstack_quant_valuations_core::instruments::{
-    TotalReturnLegParams, TrsEngine, TrsReturnModel,
+    FinancingLegFlows, PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
 };
 
 /// Extracts index yield from market data.
@@ -224,8 +223,6 @@ pub(crate) fn pv_total_return_leg(
         schedule: &trs.schedule,
         notional: trs.notional,
         discount_curve_id: trs.financing_leg.discount_curve_id.as_str(),
-        // The notional alone sizes both legs of an FI index TRS.
-        initial_level: trs.initial_level,
     };
 
     let model = FiIndexReturnModel { trs, index_yield };
@@ -248,7 +245,6 @@ pub(crate) fn net_cashflows(
         schedule: &trs.schedule,
         notional: trs.notional,
         discount_curve_id: trs.financing_leg.discount_curve_id.as_str(),
-        initial_level: trs.initial_level,
     };
     let mut flows = std::collections::BTreeMap::<Date, f64>::new();
     let sign = trs.side.sign();

@@ -309,21 +309,6 @@ const NOTIONAL_EPSILON: f64 = 1e-6;
 /// are far beyond any reasonable market scenario.
 const MAX_RATE_MAGNITUDE: f64 = 100.0;
 
-/// Look up the conventions of the rate index projected on `forward_curve_id`.
-///
-/// Returns `Ok(None)` if the global registry is initialized but does not contain
-/// the index (legitimate for curves whose id isn't a registered convention key);
-/// returns `Err` only if the registry itself isn't initialized. Callers that need
-/// to RESOLVE a sentinel value MUST treat the `None` case as a hard error.
-fn rate_index_conventions(
-    index_id: &IndexId,
-) -> finstack_quant_core::Result<
-    Option<finstack_quant_valuations_core::market::conventions::RateIndexConventions>,
-> {
-    let registry = ConventionRegistry::try_global()?;
-    Ok(registry.require_rate_index(index_id).ok().cloned())
-}
-
 /// Resolve a swap fixed leg, applying convention defaults for sentinel values.
 ///
 /// A negative lag (e.g. `payment_lag_days < 0`) is a sentinel meaning "use the
@@ -351,13 +336,14 @@ pub(crate) fn resolve_fixed_leg(
     // case (lags resolved at construction time) should not pay for a registry lookup
     // and `RateIndexConventions` clone.
     if fixed.payment_lag_days < 0 {
-        let conv = rate_index_conventions(index_id)?.ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "{owner}: fixed-leg payment_lag_days sentinel {} requires resolution \
+        let conv =
+            overnight_conventions::rate_index_conventions(index_id.as_str())?.ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "{owner}: fixed-leg payment_lag_days sentinel {} requires resolution \
                  but rate index '{index_id}' is not registered in the convention registry",
-                fixed.payment_lag_days
-            ))
-        })?;
+                    fixed.payment_lag_days
+                ))
+            })?;
         fixed.payment_lag_days = conv.default_payment_lag_days;
     }
     Ok(fixed)
@@ -382,13 +368,14 @@ pub(crate) fn resolve_float_leg(
         float.end_of_month = true;
     }
     if float.reset_lag_days < 0 || float.payment_lag_days < 0 {
-        let conv = rate_index_conventions(&float.index_id)?.ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "{owner}: float-leg sentinel(s) (reset_lag={}, payment_lag={}) require \
+        let conv = overnight_conventions::rate_index_conventions(float.index_id.as_str())?
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "{owner}: float-leg sentinel(s) (reset_lag={}, payment_lag={}) require \
                  resolution but rate index '{}' is not registered in the convention registry",
-                float.reset_lag_days, float.payment_lag_days, float.index_id
-            ))
-        })?;
+                    float.reset_lag_days, float.payment_lag_days, float.index_id
+                ))
+            })?;
         if float.reset_lag_days < 0 {
             float.reset_lag_days = conv.default_reset_lag_days;
         }

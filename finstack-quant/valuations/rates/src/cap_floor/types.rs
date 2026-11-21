@@ -642,12 +642,11 @@ impl CapFloor {
                         ..DayCountContext::default()
                     },
                 )?;
-                period.payment_date =
-                    finstack_quant_valuations_core::instruments::pricing::swap_legs::add_payment_delay(
-                        period.accrual_end,
-                        terms.payment_lag_days,
-                        payment_calendar_id,
-                    )?;
+                period.payment_date = crate::swap_legs::add_payment_delay(
+                    period.accrual_end,
+                    terms.payment_lag_days,
+                    payment_calendar_id,
+                )?;
             }
         }
         Ok(periods)
@@ -672,7 +671,7 @@ impl CapFloor {
                 self.notional.currency(),
                 &format!("CapFloor '{}'", self.id),
             )?;
-        finstack_quant_valuations_core::instruments::pricing::overnight::final_overnight_fixing_date(
+        crate::overnight::final_overnight_fixing_date(
             period.accrual_start,
             period.accrual_end,
             &terms.compounding,

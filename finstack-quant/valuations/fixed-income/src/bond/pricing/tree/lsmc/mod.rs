@@ -14,6 +14,7 @@
 use super::bond_valuator::BondValuator;
 use crate::bond::pricing::return_floor::realized_distributions;
 use crate::bond::{Bond, CallPut, CashflowSpec, ProtectionWindow, ReturnFloorKind};
+use crate::rates_credit::continuous_frp_weight;
 use finstack_quant_cashflows::builder::{
     CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod,
     FloatingCouponReplayState, FloatingRateObservation, OvernightObservationSchedule,
@@ -37,7 +38,6 @@ use finstack_quant_models::trees::two_factor_rates_credit::{
     BandTable, RatesCreditPathCheckpoint, RatesCreditPathState, RatesCreditTree,
 };
 use finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_mc_paths;
-use finstack_quant_valuations_core::instruments::pricing::rates_credit::continuous_frp_weight;
 use rust_decimal::prelude::ToPrimitive;
 use smallvec::SmallVec;
 use std::collections::{BTreeMap, BTreeSet};

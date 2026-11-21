@@ -458,7 +458,7 @@ impl InflationLinkedBond {
             let accrual_factor = period.accrual_year_fraction.max(0.0);
             let coupon_period = if self.day_count == DayCount::ActActIsma {
                 if matches!(self.stub, StubKind::ShortFront | StubKind::LongFront) {
-                    finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period(
+                    finstack_quant_cashflows::builder::icma_reference_period(
                         self.day_count,
                         self.frequency,
                         [period.unadjusted_end],
@@ -703,13 +703,13 @@ impl InflationLinkedBond {
         //   df = (1 + y/f)^(-f*t)  then  r_ann = df^(-1/t) - 1
         //
         // For annual frequency, Periodic(1) == Annual, so no correction is applied.
-        let ref_period = finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period(
+        let ref_period = finstack_quant_cashflows::builder::icma_reference_period(
             self.day_count,
             self.frequency,
             [self.maturity],
             as_of,
         );
-        let t = finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_year_fraction(
+        let t = finstack_quant_cashflows::builder::icma_year_fraction(
             self.day_count,
             Some(self.frequency),
             ref_period,

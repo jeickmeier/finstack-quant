@@ -332,15 +332,13 @@ impl BondZSpreadPricingKernel {
                     // hard-error; ignored by ACT/30-360 conventions.
                     let t = if day_count == finstack_quant_core::dates::DayCount::Act365L {
                         crate::bond::pricing::time_basis::act365l_year_fraction(
-                            &periods,
-                            quote_date,
-                            *date,
+                            &periods, quote_date, *date,
                         )?
                     } else {
-                        finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_year_fraction(
+                        finstack_quant_cashflows::builder::icma_year_fraction(
                             day_count,
                             Some(bond.cashflow_spec.frequency()),
-                            finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period(
+                            finstack_quant_cashflows::builder::icma_reference_period(
                                 day_count,
                                 bond.cashflow_spec.frequency(),
                                 spread_flows.iter().map(|(d, _)| *d),

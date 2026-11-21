@@ -6,13 +6,13 @@
 //! use the discount curve's own base date and day count at actual payment dates.
 
 use crate::bond::Bond;
+use finstack_quant_cashflows::builder::{icma_reference_period, icma_year_fraction};
 use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period;
 
 /// Payment dates and actual coupon boundaries for ACT/365L bond timing.
 ///
@@ -206,13 +206,7 @@ pub(crate) fn bond_model_schedule(bond: &Bond, as_of: Date) -> Result<BondModelS
         if day_count == DayCount::Act365L {
             Ok(finstack_quant_models::rates::clock::model_time(as_of, date))
         } else {
-            finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_year_fraction(
-                day_count,
-                Some(frequency),
-                ref_period,
-                as_of,
-                date,
-            )
+            icma_year_fraction(day_count, Some(frequency), ref_period, as_of, date)
         }
     };
     let horizon = coupon_flows

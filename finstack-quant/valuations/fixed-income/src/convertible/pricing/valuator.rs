@@ -139,17 +139,16 @@ impl ConvertibleBondValuator {
             } else {
                 &mut coupon_map
             };
-            let tail_recovery = if cf.get_kind().is_principal_like()
-                && cf.get_date() > bond.maturity
-            {
-                bond.recovery_rate.unwrap_or(0.0)
-                    * finstack_quant_valuations_core::instruments::pricing::rates_credit::continuous_frp_weight(
-                        rf_curve.df_between_dates(bond.maturity, cf.get_date())?,
-                        survival_between(bond.maturity, cf.get_date())?,
-                    )?
-            } else {
-                0.0
-            };
+            let tail_recovery =
+                if cf.get_kind().is_principal_like() && cf.get_date() > bond.maturity {
+                    bond.recovery_rate.unwrap_or(0.0)
+                        * crate::rates_credit::continuous_frp_weight(
+                            rf_curve.df_between_dates(bond.maturity, cf.get_date())?,
+                            survival_between(bond.maturity, cf.get_date())?,
+                        )?
+                } else {
+                    0.0
+                };
             *target.entry(step).or_insert(0.0) +=
                 cf.get_amount().amount() * (correction + tail_recovery);
         }
@@ -346,11 +345,10 @@ impl ConvertibleBondValuator {
                     .find(|(date, _)| *date <= left)
                     .map_or(bond.notional.amount(), |(_, balance)| balance.amount())
                     .max(0.0);
-                let weight =
-                    finstack_quant_valuations_core::instruments::pricing::rates_credit::continuous_frp_weight(
-                        rf_curve.df_between_dates(left, right)?,
-                        survival_between(left, right)?,
-                    )?;
+                let weight = crate::rates_credit::continuous_frp_weight(
+                    rf_curve.df_between_dates(left, right)?,
+                    survival_between(left, right)?,
+                )?;
                 recovery_pv += recovery
                     * principal
                     * weight

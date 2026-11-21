@@ -10,7 +10,6 @@ use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -328,6 +327,33 @@ pub(super) struct RevolverFloatingProjection<'a> {
     pub fixings: Option<&'a ScalarTimeSeries>,
 }
 
+/// Resolve overnight compounding from a floating index id and explicit override.
+///
+/// An explicit compounding setting wins: overnight variants return `Some`,
+/// `Simple` returns `None`, and `SimpleAverage` returns a validation error.
+/// When absent, looks up `index_id` via
+/// [`overnight_conventions::compounding_from_index_id`].
+pub(crate) fn resolved_overnight_compounding_for_index(
+    index_id: &str,
+    explicit: Option<&FloatingLegCompounding>,
+) -> Result<Option<FloatingLegCompounding>> {
+    if let Some(method) = explicit {
+        return match method {
+            FloatingLegCompounding::SimpleAverage => Err(finstack_quant_core::Error::Validation(
+                "SimpleAverage overnight coupons are not supported by the shared \
+                 compounded-in-arrears projector"
+                    .to_string(),
+            )),
+            FloatingLegCompounding::Simple => Ok(None),
+            other => Ok(Some(*other)),
+        };
+    }
+    match overnight_conventions::compounding_from_index_id(index_id)? {
+        Some(FloatingLegCompounding::Simple) | None => Ok(None),
+        Some(compounding) => Ok(Some(compounding)),
+    }
+}
+
 /// Resolve overnight compounding for a revolver floating spec.
 ///
 /// Explicit `compounding` wins. Otherwise a registered overnight RFR
@@ -336,7 +362,7 @@ pub(super) struct RevolverFloatingProjection<'a> {
 pub(super) fn resolved_overnight_compounding(
     spec: &finstack_quant_cashflows::builder::FloatingRateSpec,
 ) -> Result<Option<FloatingLegCompounding>> {
-    overnight_conventions::resolved_overnight_compounding(
+    resolved_overnight_compounding_for_index(
         spec.forward_curve_id.as_str(),
         spec.compounding.as_ref(),
     )
@@ -432,13 +458,7 @@ pub(super) fn project_revolver_floating_rate(
         need_observation_exposures: projected_fixings.is_some() || daily_constraints,
     })?;
     if let Some(out) = projected_fixings {
-        out.extend(projection.observation_exposures.iter().map(|observation| {
-            finstack_quant_cashflows::fixings::ProjectedFixing {
-                series_id: fixing_series_id(input.spec.index_id.as_str()),
-                date: observation.observation_start,
-                value: Some(observation.projected_rate),
-            }
-        }));
+        out.extend(projection.projected_fixings(input.spec.index_id.as_str()));
     }
     let index_rate = if daily_constraints {
         let bound = |rate: f64| {
@@ -1070,6 +1090,41 @@ mod tests {
                 .expect_err("should fail")
                 .to_string()
                 .contains("exceed commitment")
+        );
+    }
+
+    #[test]
+    fn resolved_overnight_compounding_prefers_explicit_then_index_id() {
+        let explicit = FloatingLegCompounding::CompoundedInArrears { lookback_days: 5 };
+        assert_eq!(
+            resolved_overnight_compounding_for_index("USD-SOFR-3M", Some(&explicit))
+                .expect("explicit"),
+            Some(explicit)
+        );
+        assert_eq!(
+            resolved_overnight_compounding_for_index(
+                "USD-SOFR-OIS",
+                Some(&FloatingLegCompounding::Simple)
+            )
+            .expect("explicit simple overrides index"),
+            None
+        );
+        assert!(
+            resolved_overnight_compounding_for_index(
+                "USD-SOFR-OIS",
+                Some(&FloatingLegCompounding::SimpleAverage),
+            )
+            .is_err()
+        );
+        assert_eq!(
+            resolved_overnight_compounding_for_index("USD-SOFR-OIS", None)
+                .expect("registered overnight index"),
+            Some(FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 })
+        );
+        assert_eq!(
+            resolved_overnight_compounding_for_index("USD-SOFR-3M", None)
+                .expect("registered term index"),
+            None
         );
     }
 }

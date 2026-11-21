@@ -21,10 +21,10 @@
 //! Floating-rate bonds and OIS/term swaps whose horizon crosses a fixing
 //! therefore reprice instead of failing on the unpublished fixing.
 
-use crate::instruments::pricing::coupon_period::icma_reference_period;
 use crate::metrics::period_cash::collect_period_cash_cached;
 use crate::metrics::sensitivities::theta::{calculate_theta_date, theta_termination_date};
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_cashflows::builder::{icma_reference_period, icma_year_fraction};
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::traits::Discounting;
@@ -74,7 +74,7 @@ impl YieldClock for AnnualYieldClock {
                 context.as_of,
             )
         });
-        let tau = crate::instruments::pricing::coupon_period::icma_year_fraction(
+        let tau = icma_year_fraction(
             day_count,
             Some(frequency),
             ref_period,

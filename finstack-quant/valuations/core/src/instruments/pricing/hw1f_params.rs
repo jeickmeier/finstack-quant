@@ -13,11 +13,6 @@ use finstack_quant_models::rates::hull_white::{
     HullWhiteCalibrationParams, capfloor_hw1f_scalar_keys, hw1f_scalar_keys,
 };
 
-/// Finite-difference step for Hull-White short-rate σ sensitivities
-/// (`MetricId::HwSigmaVega`): an **absolute** shift of 1e-4 (1bp of annual
-/// short-rate volatility). Results are reported per 0.01 absolute σ.
-pub const HW_SIGMA_BUMP: f64 = 1e-4;
-
 /// Parameter family that determines the market-scalar key convention.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Hw1fParamFamily {
@@ -36,11 +31,19 @@ impl Hw1fParamFamily {
     }
 }
 
-fn scalar_as_positive_f64(scalar: &MarketScalar) -> Option<f64> {
-    let value = scalar
-        .get_unitless()
-        .or_else(|| scalar.get_price().map(|money| money.amount()))?;
-    (value.is_finite() && value > 0.0).then_some(value)
+fn scalar_as_unitless_positive_f64(scalar: &MarketScalar, key: &str, context: &str) -> Result<f64> {
+    let Some(value) = scalar.get_unitless() else {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{context}: calibrated HW1F scalar '{key}' must be unitless, got Money"
+        )));
+    };
+    if value.is_finite() && value > 0.0 {
+        Ok(value)
+    } else {
+        Err(finstack_quant_core::Error::Validation(format!(
+            "{context}: calibrated HW1F scalar '{key}' must be positive and finite, got {value}"
+        )))
+    }
 }
 
 fn override_positive_f64(value: Option<f64>, key: &str) -> Result<Option<f64>> {
@@ -108,18 +111,20 @@ pub fn resolve_hw1f_params(
         }
     }
     if let Some(params) = fallback {
-        return Ok(params);
+        return HullWhiteCalibrationParams::new(params.kappa, params.sigma);
     }
 
     let (kappa_key, sigma_key) = family.scalar_keys(curve_id);
     let kappa = market
         .get_price(&kappa_key)
         .ok()
-        .and_then(scalar_as_positive_f64);
+        .map(|scalar| scalar_as_unitless_positive_f64(scalar, &kappa_key, context))
+        .transpose()?;
     let sigma = market
         .get_price(&sigma_key)
         .ok()
-        .and_then(scalar_as_positive_f64);
+        .map(|scalar| scalar_as_unitless_positive_f64(scalar, &sigma_key, context))
+        .transpose()?;
     match (kappa, sigma) {
         (Some(kappa), Some(sigma)) => HullWhiteCalibrationParams::new(kappa, sigma),
         (None, None) => Err(finstack_quant_core::Error::Validation(format!(
@@ -229,5 +234,46 @@ mod tests {
             params,
             HullWhiteCalibrationParams::new(0.04, 0.009).expect("valid")
         );
+    }
+
+    #[test]
+    fn money_and_non_positive_market_scalars_are_rejected_explicitly() {
+        use finstack_quant_core::currency::Currency;
+        use finstack_quant_core::money::Money;
+
+        let (kappa_key, sigma_key) = hw1f_scalar_keys("USD-OIS");
+        let price_market = MarketContext::new()
+            .insert_price(
+                &kappa_key,
+                MarketScalar::price(Money::from((1_i64, Currency::USD))),
+            )
+            .insert_price(&sigma_key, MarketScalar::unitless(0.01).expect("valid"));
+        let price_err = resolve(&ModelConfig::default(), None, &price_market)
+            .expect_err("Money scalar must be rejected");
+        assert!(price_err.to_string().contains("must be unitless"));
+
+        for bad in [0.0, -0.01] {
+            let mut bad_market = MarketContext::new()
+                .insert_price(&kappa_key, MarketScalar::unitless(0.03).expect("valid"));
+            bad_market = bad_market.insert_price(
+                &sigma_key,
+                MarketScalar::unitless(bad).expect("finite unitless scalar"),
+            );
+            let err = resolve(&ModelConfig::default(), None, &bad_market)
+                .expect_err("non-positive scalar must fail explicitly");
+            assert!(err.to_string().contains("must be positive and finite"));
+        }
+
+        let bad_fallback = HullWhiteCalibrationParams {
+            kappa: -0.05,
+            sigma: 0.01,
+        };
+        let fallback_err = resolve(
+            &ModelConfig::default(),
+            Some(bad_fallback),
+            &MarketContext::new(),
+        )
+        .expect_err("invalid fallback pair must fail");
+        assert!(!fallback_err.to_string().is_empty());
     }
 }

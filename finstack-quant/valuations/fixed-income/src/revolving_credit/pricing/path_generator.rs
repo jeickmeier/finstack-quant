@@ -131,10 +131,11 @@ pub(crate) fn generate_three_factor_paths(
     ) = match &facility.rate {
         RateSpec::Fixed { rate } => (InterestRateSpec::Fixed { rate: *rate }, None, 0.0),
         RateSpec::Floating(spec) => {
-            let overnight = finstack_quant_valuations_core::instruments::pricing::overnight_conventions::resolved_overnight_compounding(
-                spec.forward_curve_id.as_str(),
-                spec.compounding.as_ref(),
-            )?;
+            let overnight =
+                crate::revolving_credit::utils::resolved_overnight_compounding_for_index(
+                    spec.forward_curve_id.as_str(),
+                    spec.compounding.as_ref(),
+                )?;
             if overnight.is_some()
                 && matches!(
                     &mc_config.interest_rate_process,

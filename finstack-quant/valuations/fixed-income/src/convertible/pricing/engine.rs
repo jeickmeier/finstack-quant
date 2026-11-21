@@ -359,9 +359,7 @@ fn resolved_value(
         // Pending fixed cash has its own contractual principal; the extinguished
         // bond notional must never be recovered again.
         let recovery = bond.recovery_rate.unwrap_or(0.0)
-            * finstack_quant_valuations_core::instruments::pricing::rates_credit::continuous_frp_weight(
-                df, survival,
-            )?;
+            * crate::rates_credit::continuous_frp_weight(df, survival)?;
         let shares_value = if claim.shares > 0.0 {
             let spot = bond.spot_value(market.get_price(&bond.spot_id)?)?;
             let tau =
@@ -416,9 +414,7 @@ fn resolved_value(
             let df = discount.df_between_dates(as_of, cf.get_date())?;
             let recovery = if pending_redemption {
                 bond.recovery_rate.unwrap_or(0.0)
-                    * finstack_quant_valuations_core::instruments::pricing::rates_credit::continuous_frp_weight(
-                        df, survival,
-                    )?
+                    * crate::rates_credit::continuous_frp_weight(df, survival)?
             } else {
                 0.0
             };
@@ -465,8 +461,10 @@ fn price_convertible_bond_with_inputs(
             let df = discount.df_between_dates(as_of, cf.get_date())?;
             if cf.get_kind().is_principal_like() {
                 principal += cf.get_amount().amount();
-                redemption_pv += cf.get_amount().amount() * (df * survival + bond.recovery_rate.unwrap_or(0.0)
-                    * finstack_quant_valuations_core::instruments::pricing::rates_credit::continuous_frp_weight(df, survival)?);
+                redemption_pv += cf.get_amount().amount()
+                    * (df * survival
+                        + bond.recovery_rate.unwrap_or(0.0)
+                            * crate::rates_credit::continuous_frp_weight(df, survival)?);
             } else {
                 maturity_coupon += cf.get_amount().amount() * df * survival;
             }

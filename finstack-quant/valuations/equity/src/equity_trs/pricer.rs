@@ -10,9 +10,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::pricing::{FinancingLegFlows, PeriodReturnInputs};
 use finstack_quant_valuations_core::instruments::{
-    TotalReturnLegParams, TrsEngine, TrsReturnModel,
+    FinancingLegFlows, PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
 };
 
 /// Extracts spot price and dividend yield from market data.
@@ -116,7 +115,6 @@ impl TrsReturnModel for EquityReturnModel<'_> {
             period_end,
             t_start,
             t_end,
-            initial_level: _,
         } = *inputs;
         let disc = context.get_discount(self.trs.financing_leg.discount_curve_id.as_str())?;
 
@@ -336,7 +334,6 @@ fn total_return_leg<'a>(
         schedule: &trs.schedule,
         notional: trs.notional,
         discount_curve_id: trs.financing_leg.discount_curve_id.as_str(),
-        initial_level: Some(initial),
     };
 
     let model = EquityReturnModel {
@@ -394,7 +391,6 @@ mod tests {
                 period_end,
                 t_start: 31.0 / 365.0,
                 t_end: 59.0 / 365.0,
-                initial_level: 100.0,
             },
             &market,
         )
@@ -443,7 +439,6 @@ mod tests {
                     period_end,
                     t_start: 0.0,
                     t_end: 1.0,
-                    initial_level: 100.0,
                 },
                 &context,
             )
@@ -494,7 +489,6 @@ mod tests {
             period_end,
             t_start: 0.0,
             t_end: 0.5,
-            initial_level: 100.0,
         };
         let ret_with = EquityReturnModel {
             trs: &with_div,

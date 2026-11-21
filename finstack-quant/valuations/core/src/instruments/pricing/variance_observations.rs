@@ -1,8 +1,8 @@
 //! Shared observation schedule generation for realized-variance instruments.
 
 use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, DateExt, HolidayCalendar, Schedule, StubKind, Tenor, TenorUnit,
-    adjust, calendar_by_id_strict,
+    BusinessDayConvention, Date, DateExt, Schedule, StubKind, Tenor, TenorUnit, adjust,
+    calendar_by_id_strict,
 };
 use finstack_quant_core::math::stats::RealizedVarMethod;
 
@@ -17,19 +17,6 @@ pub enum VarianceCalendar<'a> {
         /// Calendar id of the quote currency.
         quote: &'a str,
     },
-}
-
-struct ResolvedVarianceCalendar(&'static dyn HolidayCalendar);
-
-impl ResolvedVarianceCalendar {
-    fn resolve(spec: VarianceCalendar<'_>) -> finstack_quant_core::Result<Self> {
-        match spec {
-            VarianceCalendar::Single(id) => Ok(Self(calendar_by_id_strict(id)?)),
-            VarianceCalendar::Joint { base, quote } => {
-                Ok(Self(calendar_by_id_strict(&format!("{base}+{quote}"))?))
-            }
-        }
-    }
 }
 
 /// Resolve the exact closing fixing preceding a Yang–Zhang swap window.
@@ -82,24 +69,26 @@ pub fn variance_observation_dates(
     end_of_month: bool,
     calendar: VarianceCalendar<'_>,
 ) -> finstack_quant_core::Result<Vec<Date>> {
-    if frequency.count() == 0 {
-        return Err(finstack_quant_core::InputError::InvalidTenor {
-            tenor: format!("0{:?}", frequency.unit()),
-            reason: "count must be positive".to_string(),
+    let calendar = match calendar {
+        VarianceCalendar::Single(id) => calendar_by_id_strict(id)?,
+        VarianceCalendar::Joint { base, quote } => {
+            calendar_by_id_strict(&format!("{base}+{quote}"))?
         }
-        .into());
-    }
-    let calendar = ResolvedVarianceCalendar::resolve(calendar)?;
+    };
 
     let mut dates = if frequency.unit() == TenorUnit::Days {
         let mut dates = Vec::new();
-        // A day tenor counts at most `MAX_TENOR_DAYS` (73,200), so the cast is exact.
-        let step = frequency.count() as i32;
-        let mut current = adjust(start, business_day_convention, calendar.0)?;
-        let end = adjust(maturity, business_day_convention, calendar.0)?;
+        let step = i32::try_from(frequency.count()).map_err(|_| {
+            finstack_quant_core::Error::Validation(format!(
+                "variance observation day step {} exceeds i32::MAX",
+                frequency.count()
+            ))
+        })?;
+        let mut current = adjust(start, business_day_convention, calendar)?;
+        let end = adjust(maturity, business_day_convention, calendar)?;
         while current <= end {
             dates.push(current);
-            current = current.add_business_days(step, calendar.0)?;
+            current = current.add_business_days(step, calendar)?;
         }
         if dates.last() != Some(&end) {
             dates.push(end);
@@ -119,7 +108,7 @@ pub fn variance_observation_dates(
             .unadjusted()
             .build()?
             .into_iter()
-            .map(|date| adjust(date, business_day_convention, calendar.0))
+            .map(|date| adjust(date, business_day_convention, calendar))
             .collect::<finstack_quant_core::Result<Vec<_>>>()?
     };
 

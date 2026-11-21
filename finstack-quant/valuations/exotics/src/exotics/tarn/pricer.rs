@@ -360,12 +360,10 @@ impl Hw1fNote for Tarn {
                 let coeffs = term_forward.period_coeffs(fixing_time, tenor)?;
                 let discount_forward = term_forward.curve_forward(fixing_time, tenor)?;
                 let basis =
-                    finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_for_period(
-                        forward_curve.as_ref(),
-                        start,
-                        end,
-                        accrual_fraction,
-                    )? - discount_forward;
+                    forward_curve
+                        .as_ref()
+                        .rate_between_dates(start, end, accrual_fraction)?
+                        - discount_forward;
                 events.push(CouponEvent {
                     accrual_fraction,
                     discount_factor,
@@ -383,12 +381,9 @@ impl Hw1fNote for Tarn {
                     inst.day_count
                         .year_fraction(proj_start, end, DayCountContext::default())?;
                 let projected_rate =
-                    finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_for_period(
-                        forward_curve.as_ref(),
-                        proj_start,
-                        end,
-                        proj_accrual,
-                    )?;
+                    forward_curve
+                        .as_ref()
+                        .rate_between_dates(proj_start, end, proj_accrual)?;
                 PeriodForwardCoeffs::from_flat_rate(projected_rate, accrual_fraction)
             };
 

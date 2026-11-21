@@ -8,8 +8,7 @@ the umbrella crate [`finstack-quant-valuations`](../README.md) as
 is unchanged. Depends on `finstack-quant-core`, `finstack-quant-cashflows`,
 `finstack-quant-models`, `finstack-quant-margin` (the `Marginable` impls of
 `InterestRateSwap` and `Repo`) and valuations-core only; no other instrument
-family. The term-fixing helpers the TARN and snowball notes share with the
-CMS products live in valuations-core (`instruments::pricing::term_fixings`).
+family. Term-index tenor validation lives in valuations-core (`instruments::pricing::term_fixings`).
 
 Interest-rate and inflation instruments, from money-market deposits to Bermudan
 swaptions, under the post-2008 multi-curve framework: an OIS discount curve plus
@@ -109,8 +108,8 @@ items surface through each leaf's `pub use`. Genuinely public submodules are
   `ForwardCurve::curve_time`, `ForwardCurve::rate_between_dates`,
   `ForwardCurve::rate_period_between_dates`); do not call `disc.df(t)` with an
   instrument-derived `t`.
-- **Leg pricing is shared.** `instruments::pricing::swap_legs` owns fixed-leg
-  valuation and payment-delay handling. Floating coupons use the canonical
+- **Leg pricing is shared.** `crate::swap_legs` owns swap leg specifications
+  and payment-delay handling. Floating coupons use the canonical
   cashflow builder; `instruments::pricing::overnight` supplies compounded-RFR
   projection (lookback, observation shift, cutoff, fixings) for IRS, cap/floor
   and their risk paths. New swap-like legs reuse these kernels.

@@ -616,13 +616,7 @@ impl XccySwap {
                     need_observation_exposures: projected_fixings.is_some(),
                 })?;
                 if let Some(out) = projected_fixings {
-                    out.extend(projection.observation_exposures.iter().map(|observation| {
-                        finstack_quant_cashflows::fixings::ProjectedFixing {
-                            series_id: fixing_series_id(leg.leg.index_id.as_str()),
-                            date: observation.observation_start,
-                            value: Some(observation.projected_rate),
-                        }
-                    }));
+                    out.extend(projection.projected_fixings(leg.leg.index_id.as_str()));
                 }
                 ProjectedXccyPeriod {
                     rate: projection.rate,

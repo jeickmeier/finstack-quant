@@ -31,7 +31,7 @@ use time::Duration;
 /// # Errors
 ///
 /// Returns [`Error::Validation`] for an invalid factor.
-pub fn continuous_frp_weight(discount: f64, survival: f64) -> Result<f64> {
+pub(crate) fn continuous_frp_weight(discount: f64, survival: f64) -> Result<f64> {
     if !discount.is_finite() || discount <= 0.0 {
         return Err(Error::Validation(format!(
             "FRP interval discount factor must be positive and finite, got {discount}"
@@ -79,7 +79,7 @@ pub fn continuous_frp_weight(discount: f64, survival: f64) -> Result<f64> {
 /// Returns [`Error::Validation`] when the date range is empty, the requested
 /// step count is zero, the resulting grid overflows, or a curve target is not
 /// positive and finite.
-pub fn build_daily_bond_rates_credit_targets(
+pub(crate) fn build_daily_bond_rates_credit_targets(
     discount: &dyn Discounting,
     hazard: &HazardCurve,
     origin: Date,
@@ -131,7 +131,7 @@ pub fn build_daily_bond_rates_credit_targets(
 ///
 /// Returns [`Error::Validation`] when the grid is empty or reversed, or when
 /// either curve produces a non-positive or non-finite target.
-pub fn build_rates_credit_targets(
+pub(crate) fn build_rates_credit_targets(
     discount: &dyn Discounting,
     hazard: &HazardCurve,
     origin: Date,
@@ -167,8 +167,13 @@ pub fn build_rates_credit_targets(
         let weight = position - lower_days as f64;
         let lower_index = dates.len();
         dates.push(lower);
-        let upper_index = dates.len();
-        dates.push(upper);
+        let upper_index = if upper == lower {
+            lower_index
+        } else {
+            let idx = dates.len();
+            dates.push(upper);
+            idx
+        };
         brackets.push((lower_index, upper_index, weight));
     }
 
@@ -180,19 +185,23 @@ pub fn build_rates_credit_targets(
     let mut survival_probabilities = Vec::with_capacity(steps + 1);
     for &(lower_index, upper_index, weight) in &brackets {
         let lower_date = dates[lower_index];
-        let upper_date = dates[upper_index];
         let lower_df = discount.df_between_dates(origin, lower_date)?;
-        let upper_df = discount.df_between_dates(origin, upper_date)?;
         validate_positive_target("discount factor", lower_df)?;
-        validate_positive_target("discount factor", upper_df)?;
-
         let lower_survival = unconditional_survival[lower_index] / origin_survival;
-        let upper_survival = unconditional_survival[upper_index] / origin_survival;
         validate_positive_target("conditional survival probability", lower_survival)?;
-        validate_positive_target("conditional survival probability", upper_survival)?;
 
-        discount_factors.push(log_interpolate(lower_df, upper_df, weight));
-        survival_probabilities.push(log_interpolate(lower_survival, upper_survival, weight));
+        if upper_index == lower_index {
+            discount_factors.push(lower_df);
+            survival_probabilities.push(lower_survival);
+        } else {
+            let upper_df = discount.df_between_dates(origin, dates[upper_index])?;
+            validate_positive_target("discount factor", upper_df)?;
+            let upper_survival = unconditional_survival[upper_index] / origin_survival;
+            validate_positive_target("conditional survival probability", upper_survival)?;
+
+            discount_factors.push(log_interpolate(lower_df, upper_df, weight));
+            survival_probabilities.push(log_interpolate(lower_survival, upper_survival, weight));
+        }
     }
 
     // Pin the origin exactly. Besides being the financial definition of a

@@ -82,8 +82,7 @@
 //!
 //! - **Public**: `finstack_quant_valuations::instruments::*` — instrument types, shared traits
 //!   (`Instrument`, ...), parameter types, and the `pricing`
-//!   submodule for shared pricing infrastructure used by this crate and by
-//!   `finstack-quant-calibration` (`swap_legs`, overnight conventions, time helpers).
+//!   submodule for shared pricing infrastructure (`overnight_conventions`, `hw1f_params`, `term_fixings`).
 //! - **Framework**: the trait, options, parameters and shared kernels are defined in
 //!   `finstack-quant-valuations-core` and re-exported here unchanged; `common_impl` is
 //!   public but hidden from the rendered docs.

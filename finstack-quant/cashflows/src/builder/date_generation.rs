@@ -136,6 +136,86 @@ fn step_nominal_grid(
     })
 }
 
+/// Infer an ACT/ACT (ICMA) reference coupon period from the cashflow schedule.
+///
+/// Returns the EOM-preserving quasi-coupon period `(first_flow − frequency, first_flow)`
+/// surrounding `as_of`, where `first_flow` is the first cashflow date strictly
+/// after `as_of`. Callers evaluate multi-period spans on this quasi-coupon grid
+/// through [`icma_year_fraction`].
+///
+/// # Arguments
+///
+/// * `day_count` - Bond coupon day-count convention; only
+///   [`DayCount::ActActIsma`] yields a period.
+/// * `frequency` - Contractual coupon frequency defining the quasi-coupon grid;
+///   week/day frequencies are unsupported by ICMA and yield `None`.
+/// * `payment_dates` - Coupon payment dates in ascending order; the first date
+///   strictly after `as_of` anchors the grid.
+/// * `as_of` - Settlement/valuation date the reference period must surround.
+///
+/// # Returns
+///
+/// `None` for non-ICMA day counts, week/day frequencies, or when no flow falls
+/// strictly after `as_of`.
+pub fn icma_reference_period(
+    day_count: DayCount,
+    frequency: Tenor,
+    payment_dates: impl IntoIterator<Item = Date>,
+    as_of: Date,
+) -> Option<(Date, Date)> {
+    if day_count != DayCount::ActActIsma {
+        return None;
+    }
+    let months = match frequency.unit() {
+        TenorUnit::Months => i32::try_from(frequency.count()).ok()?,
+        TenorUnit::Years => i32::try_from(frequency.count()).ok()?.checked_mul(12)?,
+        TenorUnit::Weeks | TenorUnit::Days => return None,
+    };
+    if months <= 0 {
+        return None;
+    }
+    let next = payment_dates.into_iter().find(|d| *d > as_of)?;
+    let mut prev = next.add_months(-months).ok()?;
+    // Preserve the end-of-month roll so the quasi-coupon grid matches an EOM schedule.
+    if next == next.end_of_month() {
+        prev = prev.end_of_month();
+    }
+    (prev < next).then_some((prev, next))
+}
+
+/// Compute a year fraction over `[start, end)`, slicing ACT/ACT (ICMA) across
+/// multi-period intervals along the quasi-coupon grid.
+///
+/// For non-ICMA day counts, delegates directly to [`DayCount::year_fraction`].
+/// For [`DayCount::ActActIsma`], decomposes `[start, end)` across consecutive
+/// quasi-coupon periods derived from `coupon_period` and `frequency`.
+///
+/// # Arguments
+///
+/// * `day_count` - Day-count convention applied to `[start, end)`.
+/// * `frequency` - Optional contractual coupon frequency (required for ACT/ACT ICMA).
+/// * `coupon_period` - Optional `(ref_start, ref_end)` enclosing quasi-coupon bounds for ICMA.
+/// * `start` - Start date (inclusive) of the accrual or discounting interval.
+/// * `end` - End date (exclusive) of the accrual or discounting interval (`end >= start`).
+pub fn icma_year_fraction(
+    day_count: DayCount,
+    frequency: Option<Tenor>,
+    coupon_period: Option<(Date, Date)>,
+    start: Date,
+    end: Date,
+) -> finstack_quant_core::Result<f64> {
+    let context = finstack_quant_core::dates::DayCountContext {
+        frequency,
+        coupon_period,
+        ..finstack_quant_core::dates::DayCountContext::default()
+    };
+    if day_count == DayCount::ActActIsma {
+        icma_sliced_year_fraction(start, end, context, None, None)
+    } else {
+        day_count.year_fraction(start, end, context)
+    }
+}
+
 /// ACT/ACT ICMA quasi-coupon reference anchored on the contractual stub side.
 ///
 /// # Arguments
@@ -866,5 +946,57 @@ mod tests {
         .expect("schedule should build");
 
         assert_eq!(periods[0].payment_date, d(2030, 5, 8));
+    }
+
+    #[test]
+    fn icma_reference_period_and_sliced_year_fraction() {
+        let as_of = d(2025, 3, 1);
+        let maturity = d(2027, 1, 15);
+        assert!(
+            icma_reference_period(DayCount::Act365F, Tenor::semi_annual(), [maturity], as_of)
+                .is_none()
+        );
+        assert!(
+            icma_reference_period(DayCount::ActActIsma, Tenor::weekly(), [maturity], as_of)
+                .is_none()
+        );
+        let ref_period = icma_reference_period(
+            DayCount::ActActIsma,
+            Tenor::semi_annual(),
+            [maturity],
+            as_of,
+        );
+        assert_eq!(ref_period, Some((d(2026, 7, 15), d(2027, 1, 15))));
+
+        let eom_ref = icma_reference_period(
+            DayCount::ActActIsma,
+            Tenor::semi_annual(),
+            [d(2027, 2, 28)],
+            as_of,
+        );
+        assert_eq!(eom_ref, Some((d(2026, 8, 31), d(2027, 2, 28))));
+
+        let yf = icma_year_fraction(
+            DayCount::ActActIsma,
+            Some(Tenor::semi_annual()),
+            ref_period,
+            as_of,
+            maturity,
+        )
+        .expect("multi-period ICMA year fraction");
+        // From 2025-03-01 to 2025-07-15 (136/181 of 0.5) + 3 regular semi-annual periods (1.5)
+        let first_stub = 136.0 / (2.0 * 181.0);
+        assert!((yf - (first_stub + 1.5)).abs() < 1e-12);
+        assert_eq!(
+            icma_year_fraction(
+                DayCount::ActActIsma,
+                Some(Tenor::semi_annual()),
+                ref_period,
+                as_of,
+                as_of,
+            )
+            .expect("zero span"),
+            0.0
+        );
     }
 }

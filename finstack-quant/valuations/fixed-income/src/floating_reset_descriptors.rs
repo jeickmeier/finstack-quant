@@ -42,7 +42,7 @@ fn ceil_step(time_steps: &[f64], t: f64) -> usize {
 }
 
 /// Inputs for [`build_node_coupons`].
-pub struct NodeCouponBuildInputs<'a> {
+pub(crate) struct NodeCouponBuildInputs<'a> {
     /// Canonical emitted schedule (already projected off today's curves).
     pub schedule: &'a CashFlowSchedule,
     /// Instrument-level floating-rate composition parameters.
@@ -75,10 +75,15 @@ pub struct NodeCouponBuildInputs<'a> {
 /// Returns [`Error::Validation`] when a future floating coupon's reset and
 /// payment dates snap to the same tree slice (grid too coarse) or a
 /// year-fraction computation fails.
-pub fn build_node_coupons(
+pub(crate) fn build_node_coupons(
     inputs: &NodeCouponBuildInputs<'_>,
     notional_at_step: impl Fn(usize) -> f64,
 ) -> Result<Vec<NodeCoupon>> {
+    if inputs.time_steps.len() < 2 {
+        return Err(Error::Validation(
+            "build_node_coupons requires at least two time steps".into(),
+        ));
+    }
     let steps = inputs.time_steps.len() - 1;
     let mut coupons = Vec::new();
 
@@ -175,7 +180,7 @@ pub fn build_node_coupons(
 /// principal, making outstanding balance, recovery, and redemption
 /// path-dependent. The engines reject that combination in stochastic-rate
 /// mode rather than misstate principal.
-pub fn has_future_pik(schedule: &CashFlowSchedule, grid_origin: Date) -> bool {
+pub(crate) fn has_future_pik(schedule: &CashFlowSchedule, grid_origin: Date) -> bool {
     schedule
         .get_flows()
         .iter()
@@ -193,5 +198,39 @@ mod tests {
         assert_eq!(ceil_step(&grid, 0.50), 1);
         assert_eq!(ceil_step(&grid, -0.1), 0);
         assert_eq!(ceil_step(&grid, 9.0), 4);
+    }
+
+    #[test]
+    fn build_node_coupons_rejects_degenerate_time_grid() {
+        use finstack_quant_core::currency::Currency;
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+        use finstack_quant_core::money::Money;
+        use time::macros::date;
+
+        let origin = date!(2025 - 01 - 15);
+        let maturity = date!(2026 - 01 - 15);
+        let schedule = CashFlowSchedule::builder()
+            .principal(Money::from((100_i64, Currency::USD)), origin, maturity)
+            .build(None)
+            .expect("schedule");
+        let discount =
+            DiscountCurve::flat("USD-OIS", origin, 0.04, DayCount::Act365F).expect("flat discount");
+        let params = finstack_quant_cashflows::builder::FloatingRateParams::default();
+        for time_steps in [&[][..], &[0.0][..]] {
+            let err = build_node_coupons(
+                &NodeCouponBuildInputs {
+                    schedule: &schedule,
+                    params: params.clone(),
+                    grid_origin: origin,
+                    time_steps,
+                    day_count: DayCount::Act365F,
+                    discount: &discount,
+                    strip_index_constraints: false,
+                },
+                |_| 100.0,
+            )
+            .expect_err("degenerate time grid must error");
+            assert!(err.to_string().contains("at least two time steps"));
+        }
     }
 }

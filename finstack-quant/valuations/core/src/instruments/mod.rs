@@ -101,7 +101,9 @@ pub use common_impl::traits::{
     GreekBumps, Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
     OptionGreeksRequest, PricingOptions,
 };
-pub use pricing::trs::{TotalReturnLegParams, TrsEngine, TrsReturnModel};
+pub use pricing::trs::{
+    FinancingLegFlows, PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
+};
 
 pub use common_impl::parameters::conventions::NotionalExchange;
 pub use common_impl::parameters::conventions::ResettingSide;

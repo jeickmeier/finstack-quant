@@ -53,7 +53,7 @@ pub fn fixed_leg_annuity(
     }
 
     let ref_period = frequency.and_then(|frequency| {
-        finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period(
+        finstack_quant_cashflows::builder::icma_reference_period(
             day_count,
             frequency,
             schedule.iter().copied(),
@@ -74,7 +74,7 @@ pub fn fixed_leg_annuity(
                 },
             )?
         } else {
-            finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_year_fraction(
+            finstack_quant_cashflows::builder::icma_year_fraction(
                 day_count, frequency, ref_period, prev, d,
             )?
         };

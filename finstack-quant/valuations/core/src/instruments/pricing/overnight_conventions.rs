@@ -117,52 +117,6 @@ fn reject_simple_overnight_kind(
 /// `Simple` projects one term forward, which the builder expresses as `None`;
 /// every overnight variant passes through unchanged.
 ///
-/// # Arguments
-///
-/// * `compounding` - Canonical floating-leg compounding of the leg.
-pub fn builder_overnight_method(
-    compounding: FloatingLegCompounding,
-) -> Option<FloatingLegCompounding> {
-    compounding.is_overnight().then_some(compounding)
-}
-
-/// Resolve overnight compounding from an explicit spec field or the registry.
-///
-/// An explicit `compounding` wins (`simple` keeps term projection). Otherwise
-/// a registered overnight RFR index supplies its OIS convention. Term and
-/// unknown ids return `None` so the caller keeps term-style projection.
-///
-/// # Arguments
-///
-/// * `index_id` - Index or forward-curve identifier.
-/// * `explicit` - Optional `FloatingRateSpec.compounding` from the instrument.
-///
-/// # Errors
-///
-/// Returns a validation error for `simple_average` (the shared overnight
-/// projector compounds; it does not arithmetic-average) and propagates
-/// registry errors.
-pub fn resolved_overnight_compounding(
-    index_id: &str,
-    explicit: Option<&FloatingLegCompounding>,
-) -> Result<Option<FloatingLegCompounding>> {
-    if let Some(method) = explicit {
-        return match method {
-            FloatingLegCompounding::SimpleAverage => Err(finstack_quant_core::Error::Validation(
-                "SimpleAverage overnight coupons are not supported by the shared \
-                 compounded-in-arrears projector"
-                    .to_string(),
-            )),
-            FloatingLegCompounding::Simple => Ok(None),
-            other => Ok(Some(*other)),
-        };
-    }
-    match compounding_from_index_id(index_id)? {
-        Some(FloatingLegCompounding::Simple) | None => Ok(None),
-        Some(compounding) => Ok(Some(compounding)),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -224,38 +178,5 @@ mod tests {
     fn allow_simple_on_unknown_index() {
         reject_simple_overnight("CUSTOM-FWD", &FloatingLegCompounding::Simple)
             .expect("unknown ids must not guess overnight");
-    }
-
-    #[test]
-    fn explicit_lookback_wins_over_term_index() {
-        let compounding = resolved_overnight_compounding(
-            "USD-SOFR-3M",
-            Some(&FloatingLegCompounding::CompoundedInArrears { lookback_days: 5 }),
-        )
-        .expect("explicit method")
-        .expect("overnight");
-        assert_eq!(
-            compounding,
-            FloatingLegCompounding::CompoundedInArrears { lookback_days: 5 }
-        );
-    }
-
-    #[test]
-    fn sofr_ois_without_explicit_method_is_overnight() {
-        let compounding = resolved_overnight_compounding("USD-SOFR-OIS", None)
-            .expect("registry")
-            .expect("overnight");
-        assert!(!matches!(compounding, FloatingLegCompounding::Simple));
-    }
-
-    #[test]
-    fn rate_cutoff_maps_to_overnight_lockout() {
-        let method = builder_overnight_method(FloatingLegCompounding::CompoundedWithRateCutoff {
-            cutoff_days: 1,
-        });
-        assert_eq!(
-            method,
-            Some(FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 })
-        );
     }
 }

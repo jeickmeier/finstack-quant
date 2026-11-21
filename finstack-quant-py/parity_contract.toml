@@ -817,7 +817,7 @@ status = "exists"
 [crates.valuations.modules]
 # Top-level public modules. Symbol-level pinning for non-submodule public names
 # lives in [crates.valuations.symbols] below.
-instruments  = { python = "finstack_quant.valuations.instruments",  status = "exists", note = "Instrument JSON validation and pricing helpers live under finstack_quant.valuations.instruments. The public Rust instruments::pricing facade remains Rust-only cross-crate infrastructure: coupon_period, floating_reset_descriptors, heston_market, hw1f_params, overnight, overnight_conventions, rates_credit, swap_legs, term_fixings, variance_observations and GenericInstrumentPricer. Hosts consume these through canonical Rust instrument and calibration entry points." }
+instruments  = { python = "finstack_quant.valuations.instruments",  status = "exists", note = "Instrument JSON validation and pricing helpers live under finstack_quant.valuations.instruments. The public Rust instruments::pricing facade remains Rust-only cross-crate infrastructure: heston_market, hw1f_params, overnight, overnight_conventions, term_fixings, variance_observations and GenericInstrumentPricer. Hosts consume these through canonical Rust instrument and calibration entry points." }
 composite    = { python = "finstack_quant.valuations.composite",    status = "exists", note = "Resolved generic composite instruments, primitive exposure reports, explicit rebalancing, and dated history." }
 schema       = { python = "finstack_quant.valuations.schema",       status = "exists", note = "Compiled-in JSON Schema accessors and envelope/type validators; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 # Rust-only infrastructure modules, listed for completeness so the module

@@ -68,13 +68,13 @@ impl MetricCalculator for BreakevenInflationCalculator {
         // ACT/ACT (ISMA) discount-curve day count slices cleanly across periods;
         // ignored by other conventions.
         let t = if context.as_of < ilb.maturity {
-            let ref_period = finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period(
+            let ref_period = finstack_quant_cashflows::builder::icma_reference_period(
                 day_count,
                 ilb.frequency,
                 [ilb.maturity],
                 context.as_of,
             );
-            finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_year_fraction(
+            finstack_quant_cashflows::builder::icma_year_fraction(
                 day_count,
                 Some(ilb.frequency),
                 ref_period,

@@ -22,8 +22,8 @@ documentation implements it for a one-payment note.
 | `breakeven.rs` | `BreakevenConfig`, `BreakevenMode`, `BreakevenTarget` |
 
 `instruments::pricing` is the public sub-namespace for the shared pricing
-infrastructure the calibration crate also uses (`swap_legs`, overnight
-conventions, `hw1f_params`, the generic pricer).
+infrastructure (`overnight_conventions`, `hw1f_params`, `heston_market`,
+`term_fixings`, the generic pricer).
 
 ## Core trait
 

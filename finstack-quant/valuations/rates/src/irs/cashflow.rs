@@ -18,6 +18,7 @@ use finstack_quant_core::Result;
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::dates::{Date, DateExt, StubKind, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
+#[cfg(test)]
 use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
@@ -32,7 +33,6 @@ use finstack_quant_cashflows::builder::{
     build_periods, merge_cashflow_schedules,
 };
 use finstack_quant_valuations_core::instruments::PayReceive;
-use finstack_quant_valuations_core::instruments::pricing::overnight_conventions::builder_overnight_method;
 
 /// Coupon spec for one float leg. The caller chooses the calendar, the
 /// accrual-date adjustment and the fallback; every other field follows the leg.
@@ -58,7 +58,7 @@ pub(crate) fn float_leg_coupon_spec(
             index_tenor: None,
             reset_lag_days: leg.reset_lag_days,
             fixing_calendar_id: leg.fixing_calendar_id.clone(),
-            compounding: builder_overnight_method(leg.compounding),
+            compounding: leg.compounding.is_overnight().then_some(leg.compounding),
             overnight_basis: None,
             fallback,
         },
@@ -276,24 +276,16 @@ pub(crate) fn projected_compounded_float_leg_schedule(
                 },
             )?;
         if include_projected_fixings {
-            projected_fixings.extend(projection.observation_exposures.iter().map(|observation| {
-                finstack_quant_cashflows::fixings::ProjectedFixing {
-                    series_id: fixing_series_id(float.index_id.as_str()),
-                    date: observation.observation_start,
-                    value: Some(observation.projected_rate),
-                }
-            }));
+            projected_fixings.extend(projection.projected_fixings(float.index_id.as_str()));
         }
         let compound_factor = projection.compound_factor;
         let accrual_year_fraction = projection.accrual_year_fraction;
 
         let spread_bp = float.spread_bp.as_f64();
-        let coupon_amount =
-            finstack_quant_valuations_core::instruments::pricing::overnight::overnight_coupon_amount(
-                irs.notional.amount(),
-                &projection,
-                spread_bp * finstack_quant_core::math::units::ONE_BASIS_POINT,
-            );
+        let coupon_amount = projection.coupon_amount(
+            irs.notional.amount(),
+            spread_bp * finstack_quant_core::math::units::ONE_BASIS_POINT,
+        );
         let all_in_rate = if accrual_year_fraction.abs() > f64::EPSILON {
             (compound_factor - 1.0) / accrual_year_fraction
                 + spread_bp * finstack_quant_core::math::units::ONE_BASIS_POINT

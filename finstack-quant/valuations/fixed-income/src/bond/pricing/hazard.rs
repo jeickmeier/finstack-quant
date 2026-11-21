@@ -40,10 +40,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::money::Money;
 
+use crate::rates_credit::{build_daily_bond_rates_credit_targets, continuous_frp_weight};
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_valuations_core::instruments::pricing::rates_credit::{
-    build_daily_bond_rates_credit_targets, continuous_frp_weight,
-};
 
 use crate::bond::Bond;
 
