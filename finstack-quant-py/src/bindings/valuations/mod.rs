@@ -146,29 +146,15 @@ crate::bindings::macros::tabular_methods!(
     module = "finstack_quant.valuations"
 );
 
+crate::bindings::macros::wire_methods!(
+    PyValuationResult,
+    finstack_quant_valuations::results::ValuationResult,
+    "ValuationResult",
+    module = "finstack_quant.valuations"
+);
+
 #[pymethods]
 impl PyValuationResult {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult.__reduce__")]
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult.from_json")]
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_valuations::results::ValuationResult = serde_json::from_str(json)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid ValuationResult JSON"))?;
-        Ok(Self { inner })
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult.to_json")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations", "ValuationResult.as_of")]
     #[getter]
     fn as_of<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {

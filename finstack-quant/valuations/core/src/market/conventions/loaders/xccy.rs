@@ -5,7 +5,7 @@ use crate::market::conventions::ids::XccyConventionId;
 use finstack_quant_core::Error;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
+use finstack_quant_core::dates::{BusinessDayConvention, DayCount};
 use finstack_quant_core::types::IndexId;
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -38,12 +38,8 @@ impl XccyConventionRecord {
             )));
         }
 
-        let payment_frequency = Tenor::parse(&self.payment_frequency).map_err(|e| {
-            Error::Validation(format!(
-                "Invalid `payment_frequency` in XCCY conventions registry: '{}': {}",
-                self.payment_frequency, e
-            ))
-        })?;
+        let payment_frequency =
+            super::json::parse_tenor_field(&self.payment_frequency, "payment_frequency", "XCCY")?;
 
         Ok(XccyConventions {
             base_currency: self.base_currency,
@@ -92,14 +88,22 @@ mod mtm_reset_loader_tests {
     }
 
     #[test]
-    fn xccy_convention_falls_back_to_initial_and_final_when_field_absent() {
-        // If a future JSON entry omits `notional_exchange`, the default must be
-        // `InitialAndFinal` (matches today's behaviour). This is exercised by
-        // the serde default; we just confirm the type-level default here.
-        assert_eq!(
-            NotionalExchange::default(),
-            NotionalExchange::InitialAndFinal,
-        );
+    fn xccy_convention_record_requires_explicit_notional_exchange() {
+        let json_missing = r#"{
+            "base_currency": "EUR",
+            "quote_currency": "USD",
+            "base_index_id": "EUR-ESTR-OIS",
+            "quote_index_id": "USD-SOFR-OIS",
+            "settlement_days": 2,
+            "payment_frequency": "3M",
+            "day_count": "act_360",
+            "business_day_convention": "modified_following",
+            "base_calendar_id": "target2",
+            "quote_calendar_id": "usny"
+        }"#;
+        let err = serde_json::from_str::<XccyConventionRecord>(json_missing)
+            .expect_err("notional_exchange must be explicit in registry JSON");
+        assert!(err.to_string().contains("notional_exchange"));
     }
 }
 

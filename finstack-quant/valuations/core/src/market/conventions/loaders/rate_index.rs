@@ -5,7 +5,7 @@ use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::Error;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
+use finstack_quant_core::dates::{BusinessDayConvention, DayCount};
 use finstack_quant_core::types::IndexId;
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -30,34 +30,23 @@ struct RateIndexConventionsRecord {
 
 impl RateIndexConventionsRecord {
     fn into_conventions(self) -> Result<RateIndexConventions, Error> {
-        let tenor = match self.tenor {
-            Some(s) => Some(Tenor::parse(&s).map_err(|e| {
-                Error::Validation(format!(
-                    "Invalid `tenor` in rate index conventions registry: '{}': {}",
-                    s, e
-                ))
-            })?),
-            None => None,
-        };
+        let tenor = self
+            .tenor
+            .as_deref()
+            .map(|s| super::json::parse_tenor_field(s, "tenor", "rate index"))
+            .transpose()?;
 
-        let default_payment_frequency = Tenor::parse(&self.default_payment_frequency).map_err(
-            |e| {
-                Error::Validation(format!(
-                    "Invalid `default_payment_frequency` in rate index conventions registry: '{}': {}",
-                    self.default_payment_frequency, e
-                ))
-            },
+        let default_payment_frequency = super::json::parse_tenor_field(
+            &self.default_payment_frequency,
+            "default_payment_frequency",
+            "rate index",
         )?;
 
-        let default_fixed_leg_frequency =
-            Tenor::parse(&self.default_fixed_leg_frequency).map_err(|e| {
-                Error::Validation(format!(
-                    "Invalid `default_fixed_leg_frequency` in rate index conventions registry: '{}': {}",
-                    self.default_fixed_leg_frequency, e
-                ))
-            })?;
-
-        let ois_compounding = self.ois_compounding;
+        let default_fixed_leg_frequency = super::json::parse_tenor_field(
+            &self.default_fixed_leg_frequency,
+            "default_fixed_leg_frequency",
+            "rate index",
+        )?;
 
         // Basic invariants
         match self.kind {
@@ -67,7 +56,7 @@ impl RateIndexConventionsRecord {
                         "Overnight RFR index conventions must not specify a tenor".to_string(),
                     ));
                 }
-                if ois_compounding.is_none() {
+                if self.ois_compounding.is_none() {
                     return Err(Error::Validation(
                         "Overnight RFR index conventions must specify `ois_compounding`"
                             .to_string(),
@@ -75,7 +64,12 @@ impl RateIndexConventionsRecord {
                 }
             }
             RateIndexKind::Term => {
-                if ois_compounding.is_some() {
+                if tenor.is_none() {
+                    return Err(Error::Validation(
+                        "Term index conventions must specify `tenor`".to_string(),
+                    ));
+                }
+                if self.ois_compounding.is_some() {
                     return Err(Error::Validation(
                         "Term index conventions must not specify `ois_compounding`".to_string(),
                     ));
@@ -106,7 +100,7 @@ impl RateIndexConventionsRecord {
             default_payment_frequency,
             default_payment_lag_days: self.default_payment_lag_days,
             default_reset_lag_days: self.default_reset_lag_days,
-            ois_compounding,
+            ois_compounding: self.ois_compounding,
             market_calendar_id: self.market_calendar_id,
             market_settlement_days: self.market_settlement_days,
             market_business_day_convention: self.market_business_day_convention,
@@ -130,6 +124,7 @@ pub(crate) fn load_registry() -> Result<FxHashMap<IndexId, RateIndexConventions>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_core::dates::Tenor;
 
     #[test]
     fn chf_saron_uses_true_observation_shift() {

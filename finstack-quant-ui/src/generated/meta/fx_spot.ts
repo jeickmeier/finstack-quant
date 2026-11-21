@@ -4714,7 +4714,7 @@ export default [
   {
     "path": "#/$defs/d_e49387f97c0f9d510642",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/VarConfig",
-    "description": "Configuration for VaR calculation.\n\nControls statistical properties such as confidence level and pricing method.\nThe historical window/observation count is derived from [`MarketHistory`]."
+    "description": "Configuration for VaR calculation.\n\nControls statistical properties such as confidence level and pricing method.\nThe historical window/observation count is derived from\n[`crate::metrics::risk::MarketHistory`]."
   },
   {
     "path": "#/$defs/d_e49387f97c0f9d510642/properties/confidence_level",

@@ -5,9 +5,8 @@ use crate::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use crate::market::conventions::{CdsConvention, CdsConventionSpec};
 use finstack_quant_core::Error;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
+use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind};
 use finstack_quant_core::{FxHashMap, FxHashSet};
-use std::str::FromStr;
 
 /// Parsed CDS convention tables used to build [`ConventionRegistry`].
 #[derive(Debug)]
@@ -40,12 +39,8 @@ impl CdsConventionsRecord {
                 self.doc_clause
             ))
         })?;
-        let payment_frequency = Tenor::parse(&self.payment_frequency).map_err(|e| {
-            Error::Validation(format!(
-                "Invalid `payment_frequency` in CDS conventions registry: '{}': {}",
-                self.payment_frequency, e
-            ))
-        })?;
+        let payment_frequency =
+            super::json::parse_tenor_field(&self.payment_frequency, "payment_frequency", "CDS")?;
 
         Ok(CdsConventionSpec {
             family,
@@ -57,10 +52,6 @@ impl CdsConventionsRecord {
             frequency: payment_frequency,
         })
     }
-}
-
-fn parse_doc_clause(clause_str: &str) -> Result<CdsDocClause, Error> {
-    CdsDocClause::from_str(clause_str).map_err(Error::Validation)
 }
 
 /// Load the CDS conventions from the embedded JSON registry.
@@ -88,7 +79,8 @@ fn load_registry_from_str(json: &str) -> Result<CdsRegistryTables, Error> {
     let mut seen_ids: FxHashSet<String> = FxHashSet::default();
 
     for entry in file.entries {
-        let spec = entry.record.clone().into_spec()?;
+        let expected_doc_clause = entry.record.doc_clause;
+        let spec = entry.record.into_spec()?;
         for id in entry.ids {
             let key_str = normalize_registry_id(&id);
             if !seen_ids.insert(key_str.clone()) {
@@ -111,23 +103,19 @@ fn load_registry_from_str(json: &str) -> Result<CdsRegistryTables, Error> {
                 )));
             }
 
+            let clause = clause_str
+                .parse::<CdsDocClause>()
+                .map_err(Error::Validation)?;
+            if clause != expected_doc_clause {
+                return Err(Error::Validation(format!(
+                    "CDS convention registry id '{}' doc clause does not match record doc_clause {:?}",
+                    key_str, expected_doc_clause
+                )));
+            }
+
             if prefix.eq_ignore_ascii_case("ANY") {
-                let clause = parse_doc_clause(clause_str)?;
-                if clause != entry.record.doc_clause {
-                    return Err(Error::Validation(format!(
-                        "CDS convention registry id '{}' doc clause does not match record doc_clause {:?}",
-                        key_str, entry.record.doc_clause
-                    )));
-                }
                 any.insert(spec.family, spec.clone());
             } else if let Ok(currency) = prefix.parse::<Currency>() {
-                let clause = parse_doc_clause(clause_str)?;
-                if clause != entry.record.doc_clause {
-                    return Err(Error::Validation(format!(
-                        "CDS convention registry id '{}' doc clause does not match record doc_clause {:?}",
-                        key_str, entry.record.doc_clause
-                    )));
-                }
                 if spec.family != CdsConvention::Custom {
                     primary_family.entry(currency).or_insert(spec.family);
                 }

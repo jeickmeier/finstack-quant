@@ -17,7 +17,7 @@ use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::json_bridge::serde_to_py;
-use crate::errors::{core_to_py, display_to_py};
+use crate::errors::core_to_py;
 
 use super::convert::{enum_to_py_string, opt_repr};
 
@@ -54,34 +54,6 @@ impl PyFixedLegSpec {
             fields_with_decimal_from_py(py, fields, "FixedLegSpec", "rate", decimal_rate_from_any)?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.__reduce__")]
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.from_json")]
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_valuations::instruments::FixedLegSpec =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.to_json")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.to_dict")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.start")]
@@ -186,34 +158,6 @@ impl PyFloatLegSpec {
             )?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.__reduce__")]
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.from_json")]
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_valuations::instruments::FloatLegSpec =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.to_json")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.to_dict")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.start")]
@@ -346,33 +290,6 @@ impl PyPremiumLegSpec {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.__reduce__")]
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.from_json")]
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_valuations::instruments::PremiumLegSpec =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.to_json")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.to_dict")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner)
-    }
-
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.start")]
     #[getter]
     fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -458,35 +375,6 @@ impl PyProtectionLegSpec {
         Ok(Self { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "ProtectionLegSpec.__reduce__")]
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "ProtectionLegSpec.from_json")]
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_valuations::instruments::ProtectionLegSpec =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        finstack_quant_core::validation::validate_recovery_rate(inner.recovery_rate)
-            .map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "ProtectionLegSpec.to_json")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "ProtectionLegSpec.to_dict")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner)
-    }
-
     /// Return ``repr(self)``.
     pub(crate) fn __repr__(&self) -> String {
         format!(
@@ -497,6 +385,41 @@ impl PyProtectionLegSpec {
         )
     }
 }
+
+crate::bindings::macros::wire_methods!(
+    PyFixedLegSpec,
+    finstack_quant_valuations::instruments::FixedLegSpec,
+    "FixedLegSpec",
+    module = "finstack_quant.valuations.instruments._typed_legs",
+    validate,
+    to_dict
+);
+
+crate::bindings::macros::wire_methods!(
+    PyFloatLegSpec,
+    finstack_quant_valuations::instruments::FloatLegSpec,
+    "FloatLegSpec",
+    module = "finstack_quant.valuations.instruments._typed_legs",
+    validate,
+    to_dict
+);
+
+crate::bindings::macros::wire_methods!(
+    PyPremiumLegSpec,
+    finstack_quant_valuations::instruments::PremiumLegSpec,
+    "PremiumLegSpec",
+    module = "finstack_quant.valuations.instruments._typed_legs",
+    to_dict
+);
+
+crate::bindings::macros::wire_methods!(
+    PyProtectionLegSpec,
+    finstack_quant_valuations::instruments::ProtectionLegSpec,
+    "ProtectionLegSpec",
+    module = "finstack_quant.valuations.instruments._typed_legs",
+    validate,
+    to_dict
+);
 
 crate::bindings::macros::py_getters!(PyProtectionLegSpec |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "ProtectionLegSpec.credit_curve_id")]

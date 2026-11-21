@@ -3807,7 +3807,7 @@
     },
     "d_e49387f97c0f9d510642": {
       "additionalProperties": false,
-      "description": "Configuration for VaR calculation.\n\nControls statistical properties such as confidence level and pricing method.\nThe historical window/observation count is derived from [`MarketHistory`].",
+      "description": "Configuration for VaR calculation.\n\nControls statistical properties such as confidence level and pricing method.\nThe historical window/observation count is derived from\n[`crate::metrics::risk::MarketHistory`].",
       "properties": {
         "confidence_level": {
           "$ref": "#/$defs/d_7e19cc4df9954b864180",

@@ -62,7 +62,7 @@ impl JsConventionRegistry {
 
     /// CDS conventions for a currency and documentation clause (mirrors Rust `ConventionRegistry::resolve_cds`).
     /// @param currency - ISO-4217 currency code of the contract, e.g. `"USD"`.
-    /// @param docClause - Documentation clause: `cr14`, `mr14`, `mm14`, `xr14`, `isda_na`, `isda_eu`, `isda_as`, `isda_au`, or `isda_nz`.
+    /// @param docClause - Documentation clause: `cr14`, `mr14`, `mm14`, `xr14`, `isda_na`, `isda_eu`, `isda_as`, `isda_au`, `isda_nz`, or `custom`.
     /// @returns `CdsConventionSpec` plain object: convention family, calendar, day count, business-day convention, stub rule, settlement lag and frequency.
     /// @throws Error - Throws with kind `validation` if `currency` or `docClause` is not recognized, kind `not_found` if the pair has no registered conventions, and kind `invalid_type` for a non-string argument.
     #[wasm_bindgen(js_name = resolveCds, unchecked_return_type = "generated.valuations.CdsConventionSpec")]

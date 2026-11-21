@@ -8029,7 +8029,7 @@ export default [
   {
     "path": "#/$defs/d_ba1770ec18c0e3f8979e",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/VarConfig",
-    "description": "Configuration for VaR calculation.\n\nControls statistical properties such as confidence level and pricing method.\nThe historical window/observation count is derived from [`MarketHistory`]."
+    "description": "Configuration for VaR calculation.\n\nControls statistical properties such as confidence level and pricing method.\nThe historical window/observation count is derived from\n[`crate::metrics::risk::MarketHistory`]."
   },
   {
     "path": "#/$defs/d_ba1770ec18c0e3f8979e/properties/confidence_level",

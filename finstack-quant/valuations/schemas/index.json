@@ -218,7 +218,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/ir_future_conventions.schema.json",
-      "bytes": 9145,
+      "bytes": 9178,
       "kind": "component",
       "path": "schemas/common/1/ir_future_conventions.schema.json",
       "summary": "Contract conventions of one interest-rate future.",
@@ -353,7 +353,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/xccy_conventions.schema.json",
-      "bytes": 5918,
+      "bytes": 5937,
       "kind": "component",
       "path": "schemas/common/1/xccy_conventions.schema.json",
       "summary": "Market conventions of one cross-currency swap pair.",

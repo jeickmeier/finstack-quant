@@ -352,6 +352,12 @@ def test_convention_registry_lookups_return_typed_records() -> None:
     assert pickle.loads(pickle.dumps(sofr)) == sofr  # noqa: S301
     assert sofr.to_dict() == json.loads(sofr.to_json())
     assert repr(sofr).startswith("RateIndexConventions(currency='USD'")
+    assert isinstance(sofr.ois_compounding, dict)
+    assert sofr.tenor is None
+
+    euribor = registry.require_rate_index("EUR-EURIBOR-3M")
+    assert euribor.tenor == "3M"
+    assert euribor.ois_compounding is None
 
     cds = registry.resolve_cds("USD", "cr14")
     assert isinstance(cds, CdsConventionSpec)
@@ -362,9 +368,14 @@ def test_convention_registry_lookups_return_typed_records() -> None:
 
     assert registry.require_swaption("USD").float_leg_index
     assert registry.require_inflation_swap("USD-CPI").inflation_lag
-    assert registry.require_ir_future("CME:SR3").face_value > 0
+    sr3 = registry.require_ir_future("CME:SR3")
+    assert sr3.face_value > 0
+    assert isinstance(sr3.compounding, dict)
+    euribor_fut = registry.require_ir_future("ICE:ER")
+    assert euribor_fut.compounding == "simple"
     xccy = registry.require_xccy("EUR/USD-XCCY")
     assert {xccy.base_currency, xccy.quote_currency} == {"EUR", "USD"}
+    assert xccy.notional_exchange == {"mtm_resetting": {"resetting_side": "leg2"}}
 
 
 def test_convention_registry_errors() -> None:

@@ -53,13 +53,6 @@ pub(crate) fn money_to_py(value: finstack_quant_core::money::Money) -> PyMoney {
     PyMoney { inner: value }
 }
 
-/// Render a serde-string enum (or any `Serialize` value that serializes as a
-/// JSON string) as the bare Python string the matching setter accepts.
-///
-/// # Arguments
-///
-/// * `value` - Enum value whose serde representation is a JSON string
-///   (`"pay"`, `"modified_following"`, `"isda_na"`, …).
 /// Parse a yield basis label (`"act_365f"` or `"act_360"`).
 ///
 /// # Arguments
@@ -77,6 +70,13 @@ pub(crate) fn yield_basis_from_str(
     })
 }
 
+/// Render a serde-string enum (or any `Serialize` value that serializes as a
+/// JSON string) as the bare Python string the matching setter accepts.
+///
+/// # Arguments
+///
+/// * `value` - Enum value whose serde representation is a JSON string
+///   (`"pay"`, `"modified_following"`, `"isda_na"`, …).
 pub(crate) fn enum_to_py_string<T: serde::Serialize>(value: &T) -> PyResult<String> {
     let json = serde_json::to_value(value).map_err(crate::errors::display_to_py)?;
     match json {

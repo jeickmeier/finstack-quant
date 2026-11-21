@@ -43,7 +43,7 @@
 //!
 //! - [`crate::instruments`]: the [`Instrument`](crate::instruments::Instrument) trait, pricing
 //!   options and overrides, shared parameter types, the generic pricer and the cashflow exporter.
-//! - [`crate::market`]: market quotes and conventions.
+//! - [`crate::market`]: market conventions and option-volatility resolution policy.
 //! - [`crate::pricer`]: pricing dispatch, registries and the [`Family`](crate::pricer::Family)
 //!   registration unit.
 //! - [`crate::metrics`]: risk metric identifiers, calculators, and registries.

@@ -10,7 +10,7 @@ use crate::bindings::core::table::PyArrowTable;
 use crate::bindings::extract::{InstrumentArg, extract_instrument, extract_market};
 use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
 use crate::bindings::table_builders::TableBuilder;
-use crate::errors::{core_to_py, display_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_valuations::metrics::risk::MarketHistory;
 use finstack_quant_valuations::metrics::risk::var_calculator::{
     VarConfig, VarResult, calculate_var as rust_calculate_var,
@@ -98,30 +98,15 @@ pub(crate) struct PyVarResult {
     pub(crate) inner: VarResult,
 }
 
+crate::bindings::macros::wire_methods!(
+    PyVarResult,
+    VarResult,
+    "VarResult",
+    module = "finstack_quant.valuations.instruments._var"
+);
+
 #[pymethods]
 impl PyVarResult {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._var", "VarResult.from_json")]
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|e| crate::errors::serde_json_to_py(e, "invalid VarResult JSON"))?,
-        })
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._var", "VarResult.to_json")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._var", "VarResult.__reduce__")]
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "VarResult(var={}, expected_shortfall={}, num_scenarios={}, confidence_level={})",

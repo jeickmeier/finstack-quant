@@ -4,7 +4,7 @@ use crate::market::conventions::InflationSwapConventions;
 use crate::market::conventions::ids::InflationSwapConventionId;
 use finstack_quant_core::Error;
 use finstack_quant_core::FxHashMap;
-use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
+use finstack_quant_core::dates::{BusinessDayConvention, DayCount};
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -19,12 +19,8 @@ struct InflationSwapConventionRecord {
 
 impl InflationSwapConventionRecord {
     fn into_conventions(self) -> Result<InflationSwapConventions, Error> {
-        let lag = Tenor::parse(&self.inflation_lag).map_err(|e| {
-            Error::Validation(format!(
-                "Invalid `inflation_lag` in Inflation Swap conventions: '{}': {}",
-                self.inflation_lag, e
-            ))
-        })?;
+        let lag =
+            super::json::parse_tenor_field(&self.inflation_lag, "inflation_lag", "Inflation Swap")?;
         Ok(InflationSwapConventions {
             calendar_id: self.calendar_id,
             settlement_days: self.settlement_days,

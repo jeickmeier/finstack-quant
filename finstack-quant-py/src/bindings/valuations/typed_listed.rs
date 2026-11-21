@@ -4,7 +4,7 @@ use crate::bindings::core::currency::extract_currency;
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pydoc::pydoc;
-use crate::errors::{core_to_py, serde_json_to_py, value_error};
+use crate::errors::{core_to_py, value_error};
 use finstack_quant_valuations::instruments::ListedFutureTerms;
 use pyo3::prelude::*;
 
@@ -74,27 +74,15 @@ impl PyListedFutureTerms {
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_listed", "ListedFutureTerms.__reduce__")]
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_listed", "ListedFutureTerms.to_json")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "listed future terms"))
-    }
-
-    #[doc = pydoc!("finstack_quant.valuations.instruments._typed_listed", "ListedFutureTerms.from_json")]
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: ListedFutureTerms =
-            serde_json::from_str(json).map_err(|e| serde_json_to_py(e, "listed future terms"))?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
 }
+
+crate::bindings::macros::wire_methods!(
+    PyListedFutureTerms,
+    ListedFutureTerms,
+    "ListedFutureTerms",
+    module = "finstack_quant.valuations.instruments._typed_listed",
+    validate
+);
 
 #[doc = pydoc!("finstack_quant.valuations.instruments._typed_listed", "FutureOptionTerms")]
 #[pyclass(

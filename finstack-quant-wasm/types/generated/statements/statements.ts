@@ -4134,7 +4134,8 @@ export interface BumpConfig {
  * Configuration for VaR calculation.
  *
  * Controls statistical properties such as confidence level and pricing method.
- * The historical window/observation count is derived from [`MarketHistory`].
+ * The historical window/observation count is derived from
+ * [`crate::metrics::risk::MarketHistory`].
  */
 export interface VarConfig {
   /**

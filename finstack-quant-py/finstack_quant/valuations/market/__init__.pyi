@@ -33,7 +33,7 @@ __all__ = [
     "listed_product_catalog",
 ]
 
-CdsDocClause = Literal["cr14", "mr14", "mm14", "xr14", "isda_na", "isda_eu", "isda_as", "isda_au", "isda_nz"]
+CdsDocClause = Literal["cr14", "mr14", "mm14", "xr14", "isda_na", "isda_eu", "isda_as", "isda_au", "isda_nz", "custom"]
 
 class RateIndexConventions:
     """
@@ -151,7 +151,7 @@ class RateIndexConventions:
         Returns
         -------
         str
-            e.g. ``"overnight_rfr"`` or ``"term_ibor"``.
+            e.g. ``"overnight_rfr"`` or ``"term"``.
 
         This accessor does not raise; it returns the stored convention value.
         """
@@ -228,14 +228,14 @@ class RateIndexConventions:
         ...
 
     @property
-    def ois_compounding(self) -> str | None:
+    def ois_compounding(self) -> dict[str, Any] | str | None:
         """
         OIS compounding style for overnight indices, or ``None``.
 
         Returns
         -------
-        str | None
-            Serde string of ``FloatingLegCompounding``.
+        dict[str, Any] | str | None
+            Canonical serde shape of ``FloatingLegCompounding`` (string variant or tagged dict).
 
         This accessor does not raise; it returns the stored convention value.
         """
@@ -1157,14 +1157,14 @@ class XccyConventions:
         ...
 
     @property
-    def notional_exchange(self) -> str:
+    def notional_exchange(self) -> dict[str, Any] | str:
         """
-        Notional-exchange style (serde string of ``NotionalExchange``).
+        Notional-exchange style (canonical serde shape of ``NotionalExchange``).
 
         Returns
         -------
-        str
-            Serde variant name.
+        dict[str, Any] | str
+            Serde string variant or tagged dict (e.g. ``{"mtm_resetting": {"resetting_side": "leg2"}}``).
 
         This accessor does not raise; it returns the stored convention value.
         """
@@ -1296,16 +1296,16 @@ class IrFutureConventions:
         ...
 
     @property
-    def compounding(self) -> str:
+    def compounding(self) -> dict[str, Any] | str:
         """
         Reference-rate compounding over the reference period.
 
         Returns
         -------
-        str
-            ``"simple"``, ``"simple_average"``, or the JSON text of a
+        dict[str, Any] | str
+            ``"simple"``, ``"simple_average"``, or the tagged dict of a
             compounded ``FloatingLegCompounding`` variant such as
-            ``{"compounded_in_arrears":{"lookback_days":0}}``.
+            ``{"compounded_in_arrears": {"lookback_days": 0}}``.
 
         This accessor does not raise; it returns the stored convention value.
         """
@@ -1512,7 +1512,7 @@ class ConventionRegistry:
         ----------
         currency : str
             ISO-4217 code of the contract currency (``"USD"``, ``"EUR"``).
-        doc_clause : {"cr14", "mr14", "mm14", "xr14", "isda_na", "isda_eu", "isda_as", "isda_au", "isda_nz"}
+        doc_clause : {"cr14", "mr14", "mm14", "xr14", "isda_na", "isda_eu", "isda_as", "isda_au", "isda_nz", "custom"}
             ISDA doc clause or family name. The 2014 clauses map to the
             currency's primary family; ``"isda_na"`` is the SNAC /
             post-Big-Bang North American standard.

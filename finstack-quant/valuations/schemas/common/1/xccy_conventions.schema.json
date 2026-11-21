@@ -106,7 +106,7 @@
     },
     "notional_exchange": {
       "$ref": "#/$defs/NotionalExchange",
-      "description": "Notional-exchange behaviour for this currency pair.\n\nFor G10 pairs against USD (where `quote_currency = USD`) the dealer convention\nis `MtmResetting { resetting_side: Leg1 }`: the base-currency leg (leg1) has its\nnotional re-marked each period to match the constant quote-currency (leg2)\nnotional in current FX. Pair conventions registered the other way around (USD\nas base) must invert this to `Leg2`. Registry entries must state it\nexplicitly."
+      "description": "Notional-exchange behaviour for this currency pair.\n\nFor G10 pairs quoted against USD (where `quote_currency = USD`, such as\n`EUR/USD`), the embedded registry uses `MtmResetting { resetting_side: Leg2 }`:\nthe quote-currency leg (`Leg2`) has its notional re-marked each period against\nthe base-currency leg (`Leg1`) in current FX. Pair conventions registered with\nUSD as `base_currency` must invert this to `Leg1`. Registry entries must state\nthis field explicitly."
     },
     "payment_frequency": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",

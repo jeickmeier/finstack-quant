@@ -144,12 +144,12 @@ class ValuationResult:
 
     def to_json(self) -> str:
         """
-        Serialize this result to pretty-printed JSON.
+        Serialize this result to compact canonical JSON.
 
         Returns
         -------
         str
-            Pretty-printed JSON string.
+            Compact canonical JSON string accepted by :meth:`from_json`.
 
         Raises
         ------

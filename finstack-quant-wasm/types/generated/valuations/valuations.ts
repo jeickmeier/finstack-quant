@@ -5299,7 +5299,8 @@ export interface Tenor {
  * Configuration for VaR calculation.
  *
  * Controls statistical properties such as confidence level and pricing method.
- * The historical window/observation count is derived from [`MarketHistory`].
+ * The historical window/observation count is derived from
+ * [`crate::metrics::risk::MarketHistory`].
  */
 export interface VarConfig {
   /**
@@ -20877,7 +20878,6 @@ export interface IrFutureConventions {
    * Tick value in currency units.
    */
   tick_value: number;
-  [k: string]: unknown;
 }
 /**
  * Listed-product catalog coverage for one exchange product.
@@ -21943,12 +21943,12 @@ export interface XccyConventions {
   /**
    * Notional-exchange behaviour for this currency pair.
    *
-   * For G10 pairs against USD (where `quote_currency = USD`) the dealer convention
-   * is `MtmResetting { resetting_side: Leg1 }`: the base-currency leg (leg1) has its
-   * notional re-marked each period to match the constant quote-currency (leg2)
-   * notional in current FX. Pair conventions registered the other way around (USD
-   * as base) must invert this to `Leg2`. Registry entries must state it
-   * explicitly.
+   * For G10 pairs quoted against USD (where `quote_currency = USD`, such as
+   * `EUR/USD`), the embedded registry uses `MtmResetting { resetting_side: Leg2 }`:
+   * the quote-currency leg (`Leg2`) has its notional re-marked each period against
+   * the base-currency leg (`Leg1`) in current FX. Pair conventions registered with
+   * USD as `base_currency` must invert this to `Leg1`. Registry entries must state
+   * this field explicitly.
    */
   notional_exchange: NotionalExchange;
   /**

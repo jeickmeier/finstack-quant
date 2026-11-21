@@ -17,6 +17,10 @@ macro_rules! define_convention_id {
 
         impl $name {
             /// Create a new identifier from a string.
+            ///
+            /// # Arguments
+            ///
+            /// * `s` - String identifier stored in the wrapper without normalization.
             pub fn new(s: impl Into<String>) -> Self { Self(s.into()) }
 
             /// View the inner string representation.

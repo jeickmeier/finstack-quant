@@ -84,14 +84,18 @@ impl ConventionRegistry {
     /// # }
     /// ```
     pub fn try_global() -> Result<&'static Self> {
-        static REGISTRY: OnceLock<ConventionRegistry> = OnceLock::new();
-        if let Some(reg) = REGISTRY.get() {
-            return Ok(reg);
+        static REGISTRY: OnceLock<std::result::Result<ConventionRegistry, String>> =
+            OnceLock::new();
+        match REGISTRY.get_or_init(|| Self::build_global().map_err(|e| e.to_string())) {
+            Ok(reg) => Ok(reg),
+            Err(msg) => Err(Error::Validation(msg.clone())),
         }
+    }
 
+    fn build_global() -> Result<Self> {
         tracing::debug!("initializing ConventionRegistry from embedded JSON");
         let cds_tables = super::loaders::cds::load_registry()?;
-        let built = ConventionRegistry {
+        Ok(ConventionRegistry {
             rate_index: super::loaders::rate_index::load_registry()?,
             cds: cds_tables.entries,
             cds_any: cds_tables.any,
@@ -100,11 +104,6 @@ impl ConventionRegistry {
             inflation_swap: super::loaders::inflation_swap::load_registry()?,
             ir_future: super::loaders::ir_future::load_registry()?,
             xccy: super::loaders::xccy::load_registry()?,
-        };
-        let _ = REGISTRY.set(built);
-
-        REGISTRY.get().ok_or_else(|| {
-            Error::Validation("ConventionRegistry::try_global failed to initialize".to_string())
         })
     }
 
@@ -273,6 +272,14 @@ impl ConventionRegistry {
     }
 
     /// Resolve conventions for a cross-currency swap pair.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The cross-currency convention identifier (e.g., `"EUR/USD-XCCY"`).
+    ///
+    /// # Returns
+    ///
+    /// `Ok(&XccyConventions)` if found, or `Err` with an `InputError::NotFound` if missing.
     pub fn require_xccy(&self, id: &XccyConventionId) -> Result<&XccyConventions> {
         self.xccy
             .get(id)

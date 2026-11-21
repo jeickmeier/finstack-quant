@@ -4,7 +4,7 @@ use crate::market::conventions::SwaptionConventions;
 use crate::market::conventions::ids::SwaptionConventionId;
 use finstack_quant_core::Error;
 use finstack_quant_core::FxHashMap;
-use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
+use finstack_quant_core::dates::{BusinessDayConvention, DayCount};
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -19,12 +19,11 @@ struct SwaptionConventionRecord {
 
 impl SwaptionConventionRecord {
     fn into_conventions(self) -> Result<SwaptionConventions, Error> {
-        let fixed_leg_frequency = Tenor::parse(&self.fixed_leg_frequency).map_err(|e| {
-            Error::Validation(format!(
-                "Invalid `fixed_leg_frequency` in Swaption conventions: '{}': {}",
-                self.fixed_leg_frequency, e
-            ))
-        })?;
+        let fixed_leg_frequency = super::json::parse_tenor_field(
+            &self.fixed_leg_frequency,
+            "fixed_leg_frequency",
+            "Swaption",
+        )?;
         Ok(SwaptionConventions {
             calendar_id: self.calendar_id,
             settlement_days: self.settlement_days,

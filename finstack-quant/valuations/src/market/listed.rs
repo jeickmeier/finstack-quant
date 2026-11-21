@@ -256,27 +256,6 @@ pub fn listed_product_catalog(
         .collect())
 }
 
-/// Serialize the maintained listed-product coverage catalog as stable JSON.
-///
-/// # Arguments
-///
-/// * `exchange` - Optional venue filter; `None` returns all four exchanges.
-///
-/// # Errors
-///
-/// Returns an error if the embedded sidecar cannot be loaded or the filtered
-/// rows cannot be serialized.
-pub fn listed_product_catalog_json(
-    exchange: Option<ListedExchange>,
-) -> finstack_quant_core::Result<String> {
-    let rows = listed_product_catalog(exchange)?;
-    serde_json::to_string(&rows).map_err(|error| {
-        finstack_quant_core::Error::Validation(format!(
-            "failed to serialize listed-product catalog: {error}"
-        ))
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -301,18 +280,21 @@ mod tests {
     }
 
     #[test]
-    fn venue_filter_is_exact_and_json_is_stable() {
+    fn venue_filter_is_exact() {
         let mx = listed_product_catalog(Some(ListedExchange::Montreal))
             .expect("embedded Montréal catalog");
         assert!(
             mx.iter()
                 .all(|row| row.exchange == ListedExchange::Montreal)
         );
-        let json = listed_product_catalog_json(Some(ListedExchange::Montreal))
-            .expect("json")
-            .to_lowercase();
-        assert!(json.contains("three-month corra"));
-        assert!(!json.contains("three-month sofr"));
+        assert!(
+            mx.iter()
+                .any(|row| row.name.to_lowercase().contains("three-month corra"))
+        );
+        assert!(
+            !mx.iter()
+                .any(|row| row.name.to_lowercase().contains("three-month sofr"))
+        );
     }
 
     #[test]

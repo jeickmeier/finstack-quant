@@ -4821,7 +4821,8 @@ export interface D_7986A62Fa15B0B1420C9 {
  * Configuration for VaR calculation.
  *
  * Controls statistical properties such as confidence level and pricing method.
- * The historical window/observation count is derived from [`MarketHistory`].
+ * The historical window/observation count is derived from
+ * [`crate::metrics::risk::MarketHistory`].
  */
 export interface DBa1770Ec18C0E3F8979E {
   /**

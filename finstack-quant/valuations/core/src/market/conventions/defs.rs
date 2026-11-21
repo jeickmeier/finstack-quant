@@ -265,12 +265,12 @@ pub struct XccyConventions {
     pub quote_calendar_id: String,
     /// Notional-exchange behaviour for this currency pair.
     ///
-    /// For G10 pairs against USD (where `quote_currency = USD`) the dealer convention
-    /// is `MtmResetting { resetting_side: Leg1 }`: the base-currency leg (leg1) has its
-    /// notional re-marked each period to match the constant quote-currency (leg2)
-    /// notional in current FX. Pair conventions registered the other way around (USD
-    /// as base) must invert this to `Leg2`. Registry entries must state it
-    /// explicitly.
+    /// For G10 pairs quoted against USD (where `quote_currency = USD`, such as
+    /// `EUR/USD`), the embedded registry uses `MtmResetting { resetting_side: Leg2 }`:
+    /// the quote-currency leg (`Leg2`) has its notional re-marked each period against
+    /// the base-currency leg (`Leg1`) in current FX. Pair conventions registered with
+    /// USD as `base_currency` must invert this to `Leg1`. Registry entries must state
+    /// this field explicitly.
     pub notional_exchange: crate::instruments::NotionalExchange,
 }
 
@@ -300,6 +300,7 @@ pub enum IrFutureReferencePeriod {
 /// adjustments.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct IrFutureConventions {
     /// Underlying rate index identifier.
     pub index_id: IndexId,

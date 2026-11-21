@@ -40,7 +40,7 @@
 //! ## Pricing Workflow
 //!
 //! - [`crate::instruments`]: instrument definitions and the common pricing contract.
-//! - [`crate::market`]: market quotes and conventions.
+//! - [`crate::market`]: market conventions, exchange-listed product catalog, and option-volatility resolution policy.
 //! - [`crate::pricer`]: pricing dispatch and registry infrastructure.
 //! - [`crate::metrics`]: risk metric identifiers, calculators, and registries.
 //! - [`crate::results`]: valuation result envelopes and metadata.
@@ -99,7 +99,9 @@ pub use finstack_quant_valuations_core::{
 
 #[doc(hidden)]
 pub use finstack_quant_valuations_core::serde_defaults;
-pub use finstack_quant_valuations_core::{constants, margin, market, recalibration};
+pub use finstack_quant_valuations_core::{constants, margin, recalibration};
+/// Market conventions, exchange-listed product catalog, and volatility resolution.
+pub mod market;
 /// Metrics framework, registry, aggregation, and Historical VaR.
 pub mod metrics;
 /// Pricing dispatch and registry infrastructure.

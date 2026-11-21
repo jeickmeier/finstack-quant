@@ -136,29 +136,6 @@ impl PyMetricPricingOverrides {
             .transpose()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MetricPricingOverrides.from_json")]
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: MetricPricingOverrides = serde_json::from_str(json).map_err(|e| {
-            crate::errors::serde_json_to_py(e, "invalid MetricPricingOverrides JSON")
-        })?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MetricPricingOverrides.to_json")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MetricPricingOverrides.__reduce__")]
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> PyResult<String> {
         let quoted = |value: &Option<String>| match value {
             Some(s) => format!("'{s}'"),
@@ -262,28 +239,6 @@ impl PyMarketHistory {
         self.inner.len()
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MarketHistory.from_json")]
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|e| crate::errors::serde_json_to_py(e, "invalid MarketHistory JSON"))?,
-        })
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MarketHistory.to_json")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MarketHistory.__reduce__")]
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "MarketHistory(base_date={}, window_days={}, scenarios=<{} items>)",
@@ -293,6 +248,21 @@ impl PyMarketHistory {
         )
     }
 }
+
+crate::bindings::macros::wire_methods!(
+    PyMetricPricingOverrides,
+    MetricPricingOverrides,
+    "MetricPricingOverrides",
+    module = "finstack_quant.valuations.instruments._pricing",
+    validate
+);
+
+crate::bindings::macros::wire_methods!(
+    PyMarketHistory,
+    MarketHistory,
+    "MarketHistory",
+    module = "finstack_quant.valuations.instruments._pricing"
+);
 
 crate::bindings::macros::py_getters!(PyMarketHistory |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "MarketHistory.window_days")]
@@ -744,29 +714,6 @@ impl PyInstrumentCashflowEnvelope {
         frame.call_method("assign", (), Some(&parsed))
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.from_json")]
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json).map_err(|e| {
-                crate::errors::serde_json_to_py(e, "invalid InstrumentCashflowEnvelope JSON")
-            })?,
-        })
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.to_json")]
-    #[pyo3(text_signature = "($self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.__reduce__")]
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "InstrumentCashflowEnvelope(instrument_id={:?}, model={:?}, flows=<{} rows>, total_pv={})",
@@ -777,6 +724,13 @@ impl PyInstrumentCashflowEnvelope {
         )
     }
 }
+
+crate::bindings::macros::wire_methods!(
+    PyInstrumentCashflowEnvelope,
+    InstrumentCashflowEnvelope,
+    "InstrumentCashflowEnvelope",
+    module = "finstack_quant.valuations.instruments._pricing"
+);
 
 crate::bindings::macros::py_getters!(PyInstrumentCashflowEnvelope |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "InstrumentCashflowEnvelope.instrument_id")]

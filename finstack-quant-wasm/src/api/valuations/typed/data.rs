@@ -235,28 +235,9 @@ impl JsMertonMcConfig {
     pub fn to_dict(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner)
     }
-
-    /// Deserialize a configuration from its JSON form.
-    /// @param json - `MertonMcConfig` JSON string or plain object.
-    /// @returns The configuration.
-    /// @throws Error - Throws with kind `validation` if `json` does not match the `MertonMcConfig` schema.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(
-        #[wasm_bindgen(unchecked_param_type = "generated.valuations.MertonMcConfig | string")] json: JsValue,
-    ) -> Result<JsMertonMcConfig, JsValue> {
-        Ok(Self {
-            inner: from_js_json(&json, "json")?,
-        })
-    }
-
-    /// Serialize the configuration to JSON.
-    /// @returns Compact `MertonMcConfig` JSON accepted by `fromJson`.
-    /// @throws Error - Throws if the configuration cannot be serialized.
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
 }
+
+json_round_trip!(JsMertonMcConfig, MertonMcConfig);
 
 /// The PIK mode in force at a time (mirrors Rust `PikSchedule::mode_at`).
 /// @param schedule - `PikSchedule` plain object or JSON string.

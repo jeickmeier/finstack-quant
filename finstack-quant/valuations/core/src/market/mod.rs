@@ -6,10 +6,7 @@
 //!    data. Conventions define day count, business day adjustments, payment frequencies, and
 //!    other market-standard parameters required for instrument construction.
 //!
-//! 2. **Listed catalog** (`listed`): Maintained exchange product-family coverage and routing
-//!    metadata for canonical asset-class instruments.
-//!
-//! 3. **Volatility resolution**: Pricing-time selection of already-built
+//! 2. **Volatility resolution**: Pricing-time selection of already-built
 //!    volatility inputs.
 //!
 //! # Documentation Rules For Market APIs
@@ -31,8 +28,6 @@
 
 /// Market conventions and registries.
 pub mod conventions;
-/// Exchange-listed product-family coverage and valuation routes.
-pub mod listed;
 mod volatility;
 
 pub use volatility::resolve_vol_source;

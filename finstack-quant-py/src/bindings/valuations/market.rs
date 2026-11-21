@@ -13,7 +13,7 @@ use pyo3::types::PyModule;
 use crate::bindings::json_bridge::serde_to_py;
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::valuations::convert::{enum_to_py_string, opt_repr};
-use crate::errors::{core_to_py, display_to_py, value_error};
+use crate::errors::{core_to_py, value_error};
 use finstack_quant_valuations::market::conventions::ids::{
     CdsConventionKey, CdsDocClause, InflationSwapConventionId, IrFutureContractId,
     SwaptionConventionId, XccyConventionId,
@@ -35,42 +35,6 @@ pub(crate) const EXPORTS: &[&str] = &[
     "XccyConventions",
 ];
 
-/// Shared `to_json` / `from_json` / `__reduce__` / `to_dict` plumbing for the
-/// serde-backed convention records; `$name` is the Python class name keying
-/// the per-class stub docstrings.
-macro_rules! convention_record_methods {
-    ($py:ty, $rust:ty, $name:literal) => {
-        #[pymethods]
-        impl $py {
-            #[doc = pydoc!("finstack_quant.valuations.market", concat!($name, ".from_json"))]
-            #[staticmethod]
-            #[pyo3(text_signature = "(json)")]
-            fn from_json(json: &str) -> PyResult<Self> {
-                let inner: $rust = serde_json::from_str(json).map_err(display_to_py)?;
-                Ok(Self { inner })
-            }
-
-            #[doc = pydoc!("finstack_quant.valuations.market", concat!($name, ".to_json"))]
-            #[pyo3(text_signature = "($self)")]
-            fn to_json(&self) -> PyResult<String> {
-                serde_json::to_string(&self.inner).map_err(display_to_py)
-            }
-
-            #[doc = pydoc!("finstack_quant.valuations.market", concat!($name, ".to_dict"))]
-            #[pyo3(text_signature = "($self)")]
-            fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-                serde_to_py(py, &self.inner)
-            }
-
-            #[doc = pydoc!("finstack_quant.valuations.market", concat!($name, ".__reduce__"))]
-            fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-                let from_json = py.get_type::<Self>().getattr("from_json")?;
-                crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-            }
-        }
-    };
-}
-
 #[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions")]
 #[pyclass(
     module = "finstack_quant.valuations.market",
@@ -84,21 +48,23 @@ pub struct PyRateIndexConventions {
     pub(crate) inner: RateIndexConventions,
 }
 
-convention_record_methods!(
+crate::bindings::macros::wire_methods!(
     PyRateIndexConventions,
     RateIndexConventions,
-    "RateIndexConventions"
+    "RateIndexConventions",
+    module = "finstack_quant.valuations.market",
+    to_dict
 );
 
 #[pymethods]
 impl PyRateIndexConventions {
     #[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions.ois_compounding")]
     #[getter]
-    fn ois_compounding(&self) -> PyResult<Option<String>> {
+    fn ois_compounding<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
             .ois_compounding
             .as_ref()
-            .map(enum_to_py_string)
+            .map(|c| serde_to_py(py, c))
             .transpose()
     }
 
@@ -108,13 +74,7 @@ impl PyRateIndexConventions {
             "RateIndexConventions(currency='{}', kind='{}', tenor={}, day_count='{}', reset_lag_days={}, payment_lag_days={})",
             self.inner.currency,
             enum_to_py_string(&self.inner.kind).unwrap_or_default(),
-            opt_repr(
-                self.inner
-                    .tenor
-                    .as_ref()
-                    .and_then(|t| enum_to_py_string(t).ok())
-                    .map(|t| format!("'{t}'"))
-            ),
+            opt_repr(self.inner.tenor.map(|t| format!("'{t}'"))),
             enum_to_py_string(&self.inner.day_count).unwrap_or_default(),
             self.inner.default_reset_lag_days,
             self.inner.default_payment_lag_days,
@@ -130,7 +90,7 @@ crate::bindings::macros::py_getters!(PyRateIndexConventions |s| {
     kind -> PyResult<String> = enum_to_py_string(&s.inner.kind);
 
     #[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions.tenor")]
-    tenor -> PyResult<Option<String>> = s.inner.tenor.as_ref().map(enum_to_py_string).transpose();
+    tenor -> Option<String> = s.inner.tenor.map(|t| t.to_string());
 
     #[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions.day_count")]
     day_count -> PyResult<String> = enum_to_py_string(&s.inner.day_count);
@@ -175,7 +135,13 @@ pub struct PyCdsConventionSpec {
     pub(crate) inner: CdsConventionSpec,
 }
 
-convention_record_methods!(PyCdsConventionSpec, CdsConventionSpec, "CdsConventionSpec");
+crate::bindings::macros::wire_methods!(
+    PyCdsConventionSpec,
+    CdsConventionSpec,
+    "CdsConventionSpec",
+    module = "finstack_quant.valuations.market",
+    to_dict
+);
 
 #[pymethods]
 impl PyCdsConventionSpec {
@@ -229,10 +195,12 @@ pub struct PySwaptionConventions {
     pub(crate) inner: SwaptionConventions,
 }
 
-convention_record_methods!(
+crate::bindings::macros::wire_methods!(
     PySwaptionConventions,
     SwaptionConventions,
-    "SwaptionConventions"
+    "SwaptionConventions",
+    module = "finstack_quant.valuations.market",
+    to_dict
 );
 
 #[pymethods]
@@ -283,10 +251,12 @@ pub struct PyInflationSwapConventions {
     pub(crate) inner: InflationSwapConventions,
 }
 
-convention_record_methods!(
+crate::bindings::macros::wire_methods!(
     PyInflationSwapConventions,
     InflationSwapConventions,
-    "InflationSwapConventions"
+    "InflationSwapConventions",
+    module = "finstack_quant.valuations.market",
+    to_dict
 );
 
 #[pymethods]
@@ -337,10 +307,22 @@ pub struct PyXccyConventions {
     pub(crate) inner: XccyConventions,
 }
 
-convention_record_methods!(PyXccyConventions, XccyConventions, "XccyConventions");
+crate::bindings::macros::wire_methods!(
+    PyXccyConventions,
+    XccyConventions,
+    "XccyConventions",
+    module = "finstack_quant.valuations.market",
+    to_dict
+);
 
 #[pymethods]
 impl PyXccyConventions {
+    #[doc = pydoc!("finstack_quant.valuations.market", "XccyConventions.notional_exchange")]
+    #[getter]
+    fn notional_exchange<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.notional_exchange)
+    }
+
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -385,9 +367,6 @@ crate::bindings::macros::py_getters!(PyXccyConventions |s| {
 
     #[doc = pydoc!("finstack_quant.valuations.market", "XccyConventions.quote_calendar_id")]
     quote_calendar_id -> String = s.inner.quote_calendar_id.clone();
-
-    #[doc = pydoc!("finstack_quant.valuations.market", "XccyConventions.notional_exchange")]
-    notional_exchange -> PyResult<String> = enum_to_py_string(&s.inner.notional_exchange);
 });
 
 #[doc = pydoc!("finstack_quant.valuations.market", "IrFutureConventions")]
@@ -403,14 +382,22 @@ pub struct PyIrFutureConventions {
     pub(crate) inner: IrFutureConventions,
 }
 
-convention_record_methods!(
+crate::bindings::macros::wire_methods!(
     PyIrFutureConventions,
     IrFutureConventions,
-    "IrFutureConventions"
+    "IrFutureConventions",
+    module = "finstack_quant.valuations.market",
+    to_dict
 );
 
 #[pymethods]
 impl PyIrFutureConventions {
+    #[doc = pydoc!("finstack_quant.valuations.market", "IrFutureConventions.compounding")]
+    #[getter]
+    fn compounding<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.compounding)
+    }
+
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -427,9 +414,6 @@ impl PyIrFutureConventions {
 crate::bindings::macros::py_getters!(PyIrFutureConventions |s| {
     #[doc = pydoc!("finstack_quant.valuations.market", "IrFutureConventions.index_id")]
     index_id -> String = s.inner.index_id.to_string();
-
-    #[doc = pydoc!("finstack_quant.valuations.market", "IrFutureConventions.compounding")]
-    compounding -> PyResult<String> = enum_to_py_string(&s.inner.compounding);
 
     #[doc = pydoc!("finstack_quant.valuations.market", "IrFutureConventions.reference_period")]
     reference_period -> PyResult<String> = enum_to_py_string(&s.inner.reference_period);
@@ -500,7 +484,7 @@ impl PyConventionRegistry {
         let currency = crate::bindings::module_utils::parse_currency(currency)?;
         let doc_clause: CdsDocClause = doc_clause.parse().map_err(|_| {
             crate::errors::value_error(format!(
-                "unknown CDS doc clause '{doc_clause}'; expected one of cr14, mr14, mm14, xr14, isda_na, isda_eu, isda_as, isda_au, isda_nz"
+                "unknown CDS doc clause '{doc_clause}'; expected one of cr14, mr14, mm14, xr14, isda_na, isda_eu, isda_as, isda_au, isda_nz, custom"
             ))
         })?;
         let key = CdsConventionKey {

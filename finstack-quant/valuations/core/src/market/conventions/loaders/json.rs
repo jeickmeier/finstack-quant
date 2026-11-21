@@ -1,6 +1,7 @@
 //! Shared JSON registry loader helpers.
 
 use finstack_quant_core::Error;
+use finstack_quant_core::dates::Tenor;
 use finstack_quant_core::{FxHashMap, FxHashSet};
 
 const SUPPORTED_REGISTRY_SCHEMA_MAJOR: u32 = 2;
@@ -10,11 +11,11 @@ const SUPPORTED_REGISTRY_SCHEMA_MAJOR: u32 = 2;
 #[serde(deny_unknown_fields)]
 pub(crate) struct RegistryFile<R> {
     /// Schema identifier.
-    pub(crate) schema: Option<String>,
+    pub(crate) schema: String,
     /// Namespace identifier.
-    pub(crate) namespace: Option<String>,
+    pub(crate) namespace: String,
     /// Version number.
-    pub(crate) version: Option<u32>,
+    pub(crate) version: u32,
     /// Registry entries.
     pub(crate) entries: Vec<RegistryEntry<R>>,
 }
@@ -22,20 +23,16 @@ pub(crate) struct RegistryFile<R> {
 impl<R> RegistryFile<R> {
     /// Validate registry metadata before consuming embedded convention data.
     pub(crate) fn validate_metadata(&self, registry_name: &str) -> Result<(), Error> {
-        let schema = self.schema.as_deref().ok_or_else(|| {
-            Error::Validation(format!(
-                "Embedded {registry_name} conventions registry is missing `schema`"
-            ))
-        })?;
-        if schema.trim().is_empty() {
+        if self.schema.trim().is_empty() {
             return Err(Error::Validation(format!(
                 "Embedded {registry_name} conventions registry has an empty `schema`"
             )));
         }
 
-        let schema_major = parse_schema_major(schema).ok_or_else(|| {
+        let schema_major = parse_schema_major(&self.schema).ok_or_else(|| {
             Error::Validation(format!(
-                "Embedded {registry_name} conventions registry has unsupported schema identifier `{schema}`"
+                "Embedded {registry_name} conventions registry has unsupported schema identifier `{}`",
+                self.schema
             ))
         })?;
         if schema_major > SUPPORTED_REGISTRY_SCHEMA_MAJOR {
@@ -45,23 +42,13 @@ impl<R> RegistryFile<R> {
             )));
         }
 
-        let namespace = self.namespace.as_deref().ok_or_else(|| {
-            Error::Validation(format!(
-                "Embedded {registry_name} conventions registry is missing `namespace`"
-            ))
-        })?;
-        if namespace.trim().is_empty() {
+        if self.namespace.trim().is_empty() {
             return Err(Error::Validation(format!(
                 "Embedded {registry_name} conventions registry has an empty `namespace`"
             )));
         }
 
-        let version = self.version.ok_or_else(|| {
-            Error::Validation(format!(
-                "Embedded {registry_name} conventions registry is missing `version`"
-            ))
-        })?;
-        if version == 0 {
+        if self.version == 0 {
             return Err(Error::Validation(format!(
                 "Embedded {registry_name} conventions registry `version` must be positive"
             )));
@@ -69,6 +56,19 @@ impl<R> RegistryFile<R> {
 
         Ok(())
     }
+}
+
+/// Parse a tenor string from an embedded convention registry with field context.
+pub(crate) fn parse_tenor_field(
+    raw: &str,
+    field: &str,
+    registry_name: &str,
+) -> Result<Tenor, Error> {
+    Tenor::parse(raw).map_err(|e| {
+        Error::Validation(format!(
+            "Invalid `{field}` in {registry_name} conventions registry: '{raw}': {e}"
+        ))
+    })
 }
 
 fn parse_schema_major(schema: &str) -> Option<u32> {
