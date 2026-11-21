@@ -21,11 +21,10 @@ use finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpol
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::{
-    FixedLegSpec, FloatLegSpec, Instrument, PayReceive, PricingOptions,
-};
+use finstack_quant_valuations_core::instruments::{Instrument, PayReceive, PricingOptions};
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_rates::irs::InterestRateSwap;
+use finstack_quant_valuations_rates::{FixedLegSpec, FloatLegSpec};
 use rust_decimal_macros::dec;
 use serde_json::{Value, json};
 use time::Month;

@@ -5,18 +5,7 @@ use finstack_quant_core::dates::Date;
 /// Bermudan call provision for callable exotics.
 ///
 /// Allows the issuer to terminate the note on specified call dates
-/// at a specified call price (typically par). Currently consumed by the
-/// Callable Range Accrual note (PRDC is not implemented, and the Snowball
-/// pricer rejects callable provisions).
-///
-/// # Fields
-///
-/// - `call_dates`: Sorted ascending dates on which the issuer may call.
-/// - `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,
-///   `102.0` = callable at 102).
-/// - `lockout_end`: Optional end of the no-call period; call dates on or
-///   before it are not exercisable (exclusive bound, matching
-///   `BermudanSchedule.lockout_end` on Bermudan swaptions).
+/// at a specified call price (typically par).
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -63,7 +52,7 @@ impl BermudanCallProvision {
     /// Checks:
     /// - At least one call date
     /// - Call dates are sorted ascending
-    /// - Call price is positive
+    /// - Call price is finite and positive
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         use finstack_quant_core::validation;
 
@@ -73,12 +62,15 @@ impl BermudanCallProvision {
 
         validation::validate_sorted_strict(&self.call_dates, "BermudanCallProvision call_dates")?;
 
-        validation::require_with(self.price_pct_of_par > 0.0, || {
-            format!(
-                "call_provision.price_pct_of_par ({}) must be a positive percent of par",
-                self.price_pct_of_par
-            )
-        })?;
+        validation::require_with(
+            self.price_pct_of_par.is_finite() && self.price_pct_of_par > 0.0,
+            || {
+                format!(
+                    "call_provision.price_pct_of_par ({}) must be a finite positive percent of par",
+                    self.price_pct_of_par
+                )
+            },
+        )?;
 
         Ok(())
     }
@@ -122,9 +114,11 @@ mod tests {
     }
 
     #[test]
-    fn negative_price_pct_of_par_fails() {
-        let prov = BermudanCallProvision::new(make_dates(), -50.0, None);
-        assert!(prov.validate().is_err());
+    fn non_finite_or_negative_price_pct_of_par_fails() {
+        for bad in [-50.0, 0.0, f64::INFINITY, f64::NAN] {
+            let prov = BermudanCallProvision::new(make_dates(), bad, None);
+            assert!(prov.validate().is_err(), "expected rejection for {bad}");
+        }
     }
 
     #[test]
@@ -154,10 +148,8 @@ mod tests {
     #[test]
     fn eligible_dates_respect_lockout() {
         let call_dates = make_dates();
-        // The lockout bound is exclusive: the call date equal to it is dropped.
         let prov = BermudanCallProvision::new(call_dates.clone(), 100.0, Some(call_dates[0]));
-        let eligible = prov.eligible_call_dates();
-        assert_eq!(eligible, call_dates[1..].to_vec());
+        assert_eq!(prov.eligible_call_dates(), call_dates[1..].to_vec());
         let open = BermudanCallProvision::new(call_dates.clone(), 100.0, None);
         assert_eq!(open.eligible_call_dates(), call_dates);
     }

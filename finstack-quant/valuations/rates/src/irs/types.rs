@@ -24,7 +24,8 @@ use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 
-use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec, PayReceive};
+use crate::{FixedLegSpec, FloatLegSpec};
+use finstack_quant_valuations_core::instruments::PayReceive;
 
 /// Leg-level conventions for building a vanilla fixed-vs-float IRS.
 ///
@@ -562,7 +563,7 @@ impl InterestRateSwap {
             .id(InstrumentId::new("IRS-5Y-USD-STD"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(PayReceive::Pay)
-            .fixed_leg(finstack_quant_valuations_core::instruments::FixedLegSpec {
+            .fixed_leg(crate::FixedLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
                 rate: Decimal::new(4, 2),
                 frequency: Tenor::semi_annual(),
@@ -576,7 +577,7 @@ impl InterestRateSwap {
                 payment_lag_days: 0,
                 end_of_month: false,
             })
-            .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
+            .float_leg(crate::FloatLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
                 index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),

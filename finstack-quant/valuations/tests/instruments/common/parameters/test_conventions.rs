@@ -16,7 +16,6 @@ fn test_bond_convention_us_treasury() {
         conv.business_day_convention(),
         BusinessDayConvention::Following
     );
-    assert_eq!(conv.discount_curve_id(), "USD-TREASURY");
 }
 
 #[test]

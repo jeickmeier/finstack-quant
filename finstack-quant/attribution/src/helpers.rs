@@ -6,6 +6,7 @@
 
 use crate::AttributionRequest;
 use crate::factors::MarketRestoreFlags;
+use crate::model_params::{ModelParamsSnapshot, instrument_with_model_params};
 use crate::{
     AttributionFactor, AttributionMethod, CarryDetail, ExecutionPolicy, MoveUnit, PnlAttribution,
     SensitivityBucket, SensitivityStep, SourceLine,
@@ -28,7 +29,6 @@ use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::{
     YieldCompounding, df_from_yield,
 };
-use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::metrics::collect_period_cash;
 use std::sync::Arc;
@@ -289,7 +289,7 @@ pub(crate) fn instrument_at_t0(
 ) -> Result<Arc<dyn Instrument>> {
     match model_params_t0 {
         None | Some(ModelParamsSnapshot::None) => Ok(Arc::clone(instrument)),
-        Some(params) => instrument.with_model_params(params).map(Arc::from),
+        Some(params) => instrument_with_model_params(instrument, params),
     }
 }
 

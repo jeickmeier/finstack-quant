@@ -5,7 +5,7 @@
 
 use finstack_quant_attribution::{
     AttributionConfig, AttributionEnvelope, AttributionFactor, AttributionMethod,
-    AttributionSchema, AttributionSpec, ExecutionPolicy,
+    AttributionSchema, AttributionSpec, ExecutionPolicy, ModelParamsSnapshot,
 };
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::currency::Currency;
@@ -14,7 +14,6 @@ use finstack_quant_core::market_data::context::MarketContextState;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
-use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations::instruments::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
 };

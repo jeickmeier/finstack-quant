@@ -4,6 +4,7 @@
 //! price exchange contracts. One party pays a fixed price per unit while
 //! the other pays a floating price based on an index.
 
+use crate::CommodityUnderlyingParams;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CashFlowAccrual;
@@ -16,7 +17,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations_core::instruments::PayReceive;
 
 /// Commodity swap (fixed-for-floating commodity price exchange).
@@ -36,7 +36,7 @@ use finstack_quant_valuations_core::instruments::PayReceive;
 ///
 /// ```rust
 /// use finstack_quant_valuations_exotics::commodity::commodity_swap::CommoditySwap;
-/// use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
+/// use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
 /// use finstack_quant_valuations_core::instruments::PayReceive;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};
@@ -489,9 +489,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommoditySwap {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CommodityUnderlyingParams;
     use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
-    use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
     use finstack_quant_valuations_core::instruments::Instrument;
     use time::Month;
 

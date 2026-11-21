@@ -8,9 +8,9 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{currency::Currency::USD, math::interp::InterpStyle};
-use finstack_quant_valuations_core::instruments::FloatLegSpec;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_rates::FloatLegSpec;
 use finstack_quant_valuations_rates::basis_swap::BasisSwap;
 use rust_decimal::Decimal;
 use time::Month;

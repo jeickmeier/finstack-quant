@@ -42,7 +42,7 @@ fn create_swap(as_of: Date, end: Date) -> InterestRateSwap {
         id: "IRS_BUCKETED_DV01_TEST".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed_leg: finstack_quant_valuations_core::instruments::FixedLegSpec {
+        fixed_leg: finstack_quant_valuations_rates::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -56,7 +56,7 @@ fn create_swap(as_of: Date, end: Date) -> InterestRateSwap {
             start: as_of,
             end,
         },
-        float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
+        float_leg: finstack_quant_valuations_rates::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
             index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),

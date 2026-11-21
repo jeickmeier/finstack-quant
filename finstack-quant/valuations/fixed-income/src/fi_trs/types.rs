@@ -1,5 +1,6 @@
 //! Fixed-income index total-return swap contract.
 
+use crate::IndexUnderlyingParams;
 use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::{
@@ -12,9 +13,7 @@ use finstack_quant_core::{
 };
 use finstack_quant_margin::types::OtcMarginSpec;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::{
-    FinancingLegSpec, IndexUnderlyingParams, PayReceive, TrsScheduleSpec,
-};
+use finstack_quant_valuations_core::instruments::{FinancingLegSpec, PayReceive, TrsScheduleSpec};
 use rust_decimal::Decimal;
 
 /// Fixed-income index total-return swap priced with a carry analytic.
@@ -48,7 +47,8 @@ use rust_decimal::Decimal;
 ///     currency::Currency, dates::DayCount, money::Money, types::InstrumentId,
 /// };
 /// use finstack_quant_cashflows::builder::ScheduleParams;
-/// use finstack_quant_valuations_core::instruments::{FinancingLegSpec, IndexUnderlyingParams, PayReceive};
+/// use finstack_quant_valuations_core::instruments::{FinancingLegSpec, PayReceive};
+/// use finstack_quant_valuations_fixed_income::IndexUnderlyingParams;
 /// use finstack_quant_core::types::Attributes;
 /// use finstack_quant_valuations_fixed_income::fi_trs::FiIndexTotalReturnSwap;
 /// use finstack_quant_valuations_core::instruments::TrsScheduleSpec;

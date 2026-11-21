@@ -18,6 +18,7 @@
 //! - d1 = [ln(F/K) + 0.5*sigma^2*T] / (sigma*sqrt(T))
 //! - d2 = d1 - sigma*sqrt(T)
 
+use crate::CommodityUnderlyingParams;
 use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, DayCountContext, Tenor};
@@ -28,7 +29,6 @@ use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
 
 /// Commodity swaption (option on a fixed-for-floating commodity swap).
 ///
@@ -51,7 +51,7 @@ use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
 ///
 /// ```rust
 /// use finstack_quant_valuations_exotics::commodity::commodity_swaption::CommoditySwaption;
-/// use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
+/// use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
 /// use finstack_quant_models::types::OptionType;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::{Date, Tenor, TenorUnit};

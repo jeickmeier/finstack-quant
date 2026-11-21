@@ -13,8 +13,8 @@ use finstack_quant_core::{Error, Result};
 use crate::convertible::{
     ConvertibleBond, ConvertibleGreeks, market_inputs::resolve_dividend_yield,
 };
+use crate::{ConversionEvent, ConversionPolicy};
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_valuations_core::instruments::{ConversionEvent, ConversionPolicy};
 use finstack_quant_valuations_core::instruments::{GreekBumps, Instrument};
 use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
 
@@ -35,7 +35,7 @@ use super::valuator::ConvertibleBondValuator;
 ///
 /// This is the **instantaneous** conversion value at the valuation date:
 /// dividend-protection ratio accretion (`exp(q * t)`, see
-/// [`DividendAdjustment`](finstack_quant_valuations_core::instruments::DividendAdjustment))
+/// [`DividendAdjustment`](finstack_quant_valuations_fixed_income::DividendAdjustment))
 /// is 1.0 at `t = 0` and is applied per tree step inside the pricer, not here.
 pub(crate) fn compute_conversion_value(bond: &ConvertibleBond, spot: f64) -> Result<f64> {
     match &bond.conversion.policy {

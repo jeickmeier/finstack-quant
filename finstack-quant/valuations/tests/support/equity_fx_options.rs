@@ -12,9 +12,7 @@ use finstack_quant_valuations::instruments::fx::fx_option::{
     FxDeltaConvention, FxDeltaConventionKind,
 };
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::instruments::{
-    EquityUnderlyingParams, FxUnderlyingParams, SettlementType,
-};
+use finstack_quant_valuations::instruments::{EquityUnderlyingParams, SettlementType};
 
 /// Create an Equity European call option using the builder pattern.
 pub fn equity_option_european_call(
@@ -122,15 +120,8 @@ pub fn fx_option_european_call(
     notional: Money,
     vol_surface_id: impl Into<CurveId>,
 ) -> finstack_quant_core::Result<FxOption> {
-    let fx_underlying = if quote_currency == Currency::USD && base_currency == Currency::EUR {
-        FxUnderlyingParams::usd_eur()
-    } else if quote_currency == Currency::USD && base_currency == Currency::GBP {
-        FxUnderlyingParams::gbp_usd()
-    } else {
-        let domestic = CurveId::new(format!("{}-OIS", quote_currency));
-        let foreign = CurveId::new(format!("{}-OIS", base_currency));
-        FxUnderlyingParams::new(base_currency, quote_currency, domestic, foreign)
-    };
+    let domestic = CurveId::new(format!("{}-OIS", quote_currency));
+    let foreign = CurveId::new(format!("{}-OIS", base_currency));
 
     FxOption::builder()
         .spot_basis(finstack_quant_valuations::instruments::fx::fx_option::FxSpotBasis::Cash)
@@ -138,8 +129,8 @@ pub fn fx_option_european_call(
             finstack_quant_valuations::instruments::fx::fx_option::FxOptionDelivery::CashAtExpiry,
         )
         .id(id.into())
-        .base_currency(fx_underlying.base_currency)
-        .quote_currency(fx_underlying.quote_currency)
+        .base_currency(base_currency)
+        .quote_currency(quote_currency)
         .strike(strike)
         .option_type(OptionType::Call)
         .delta_convention(
@@ -149,8 +140,8 @@ pub fn fx_option_european_call(
         .expiry(expiry)
         .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .notional(notional)
-        .domestic_discount_curve_id(fx_underlying.domestic_discount_curve_id)
-        .foreign_discount_curve_id(fx_underlying.foreign_discount_curve_id)
+        .domestic_discount_curve_id(domestic)
+        .foreign_discount_curve_id(foreign)
         .vol_surface_id(vol_surface_id.into())
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
@@ -167,15 +158,8 @@ pub fn fx_option_european_put(
     notional: Money,
     vol_surface_id: impl Into<CurveId>,
 ) -> finstack_quant_core::Result<FxOption> {
-    let fx_underlying = if quote_currency == Currency::USD && base_currency == Currency::EUR {
-        FxUnderlyingParams::usd_eur()
-    } else if quote_currency == Currency::USD && base_currency == Currency::GBP {
-        FxUnderlyingParams::gbp_usd()
-    } else {
-        let domestic = CurveId::new(format!("{}-OIS", quote_currency));
-        let foreign = CurveId::new(format!("{}-OIS", base_currency));
-        FxUnderlyingParams::new(base_currency, quote_currency, domestic, foreign)
-    };
+    let domestic = CurveId::new(format!("{}-OIS", quote_currency));
+    let foreign = CurveId::new(format!("{}-OIS", base_currency));
 
     FxOption::builder()
         .spot_basis(finstack_quant_valuations::instruments::fx::fx_option::FxSpotBasis::Cash)
@@ -183,8 +167,8 @@ pub fn fx_option_european_put(
             finstack_quant_valuations::instruments::fx::fx_option::FxOptionDelivery::CashAtExpiry,
         )
         .id(id.into())
-        .base_currency(fx_underlying.base_currency)
-        .quote_currency(fx_underlying.quote_currency)
+        .base_currency(base_currency)
+        .quote_currency(quote_currency)
         .strike(strike)
         .option_type(OptionType::Put)
         .delta_convention(
@@ -194,8 +178,8 @@ pub fn fx_option_european_put(
         .expiry(expiry)
         .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .notional(notional)
-        .domestic_discount_curve_id(fx_underlying.domestic_discount_curve_id)
-        .foreign_discount_curve_id(fx_underlying.foreign_discount_curve_id)
+        .domestic_discount_curve_id(domestic)
+        .foreign_discount_curve_id(foreign)
         .vol_surface_id(vol_surface_id.into())
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())

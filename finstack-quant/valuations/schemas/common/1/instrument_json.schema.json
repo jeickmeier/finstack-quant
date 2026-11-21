@@ -759,7 +759,7 @@
       ]
     },
     "AntiDilutionPolicy": {
-      "description": "Anti-dilution protection applied to conversion terms.\n\nWhen dilutive events occur (stock splits, below-market issuances, special\ndividends), the conversion ratio is adjusted to protect bondholders from\nvalue erosion.\n\n# Industry Practice\n\nMost convertible bonds use **Weighted Average** anti-dilution, which is\nless protective but more issuer-friendly. **Full Ratchet** is mainly seen\nin private placements and venture-style convertibles.",
+      "description": "Anti-dilution protection applied to conversion terms.",
       "oneOf": [
         {
           "const": "none",
@@ -768,12 +768,12 @@
         },
         {
           "const": "full_ratchet",
-          "description": "Full ratchet: conversion price is reduced to the new issue price\nregardless of how many shares were issued. Most protective for holders.\n\nFormula: `new_conversion_price = min(current_conversion_price, new_issue_price)`",
+          "description": "Full ratchet: conversion price is reduced to the new issue price\nregardless of how many shares were issued.",
           "type": "string"
         },
         {
           "const": "weighted_average",
-          "description": "Broad-based weighted average: conversion price is adjusted based on the\nweighted average of the old and new share prices, factoring in the number\nof shares. Less dilutive to existing shareholders than full ratchet.\n\nFormula:\n```text\nnew_cp = old_cp × (shares_outstanding + new_money / old_cp)\n                 / (shares_outstanding + new_shares_issued)\n```",
+          "description": "Broad-based weighted average: conversion price is adjusted based on the\nweighted average of the old and new share prices, factoring in shares.",
           "type": "string"
         }
       ]
@@ -2265,7 +2265,7 @@
     },
     "BasisSwap": {
       "additionalProperties": false,
-      "description": "Basis swap instrument that exchanges two floating rate payments with different tenors.\n\nA basis swap allows parties to exchange floating rate payments based on different\nreference rates (e.g., 3M SOFR vs 6M SOFR) plus an optional spread on one leg.\nThe primary leg typically receives the spread, while the reference leg pays flat.\n\nEach leg owns its own dates, discount curve, calendar, and stub conventions,\nfollowing the IRS leg-centric pattern.\n\n# Cross-Currency (XCCY) Basis Swaps\n\n**Important**: This implementation supports **single-currency** basis swaps only.\nFor cross-currency basis swaps, use `XccySwap` instead.\n\n# Examples\n```rust\nuse finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};\nuse finstack_quant_valuations_rates::basis_swap::BasisSwap;\nuse finstack_quant_valuations_core::instruments::FloatLegSpec;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::January, 3).expect(\"valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 3).expect(\"valid date\");\n\nlet primary_leg = FloatLegSpec {\n    index_id: \"3M-SOFR\".into(),\n    forward_curve_id: CurveId::new(\"3M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::quarterly(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::from(5),\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet reference_leg = FloatLegSpec {\n    index_id: \"6M-SOFR\".into(),\n    forward_curve_id: CurveId::new(\"6M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::semi_annual(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::ZERO,\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet swap = BasisSwap::builder()\n    .id(\"BASIS_SWAP_001\".into())\n    .notional(Money::from((1_000_000_i64, Currency::USD)))\n    .primary_leg(primary_leg)\n    .reference_leg(reference_leg)\n    .allow_calendar_fallback(true)\n    .attributes(Default::default())\n    .build().expect(\"valid basis swap\");\n```",
+      "description": "Basis swap instrument that exchanges two floating rate payments with different tenors.\n\nA basis swap allows parties to exchange floating rate payments based on different\nreference rates (e.g., 3M SOFR vs 6M SOFR) plus an optional spread on one leg.\nThe primary leg typically receives the spread, while the reference leg pays flat.\n\nEach leg owns its own dates, discount curve, calendar, and stub conventions,\nfollowing the IRS leg-centric pattern.\n\n# Cross-Currency (XCCY) Basis Swaps\n\n**Important**: This implementation supports **single-currency** basis swaps only.\nFor cross-currency basis swaps, use `XccySwap` instead.\n\n# Examples\n```rust\nuse finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};\nuse finstack_quant_valuations_rates::basis_swap::BasisSwap;\nuse finstack_quant_valuations_rates::FloatLegSpec;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::January, 3).expect(\"valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 3).expect(\"valid date\");\n\nlet primary_leg = FloatLegSpec {\n    index_id: \"3M-SOFR\".into(),\n    forward_curve_id: CurveId::new(\"3M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::quarterly(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::from(5),\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet reference_leg = FloatLegSpec {\n    index_id: \"6M-SOFR\".into(),\n    forward_curve_id: CurveId::new(\"6M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::semi_annual(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::ZERO,\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet swap = BasisSwap::builder()\n    .id(\"BASIS_SWAP_001\".into())\n    .notional(Money::from((1_000_000_i64, Currency::USD)))\n    .primary_leg(primary_leg)\n    .reference_leg(reference_leg)\n    .allow_calendar_fallback(true)\n    .attributes(Default::default())\n    .build().expect(\"valid basis swap\");\n```",
       "properties": {
         "allow_calendar_fallback": {
           "default": false,
@@ -2518,7 +2518,7 @@
     },
     "BermudanCallProvision": {
       "additionalProperties": false,
-      "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,\n  `102.0` = callable at 102).\n- `lockout_end`: Optional end of the no-call period; call dates on or\n  before it are not exercisable (exclusive bound, matching\n  `BermudanSchedule.lockout_end` on Bermudan swaptions).",
+      "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par).",
       "properties": {
         "call_dates": {
           "description": "Dates on which the issuer can call (must be sorted ascending).",
@@ -4059,7 +4059,7 @@
       ]
     },
     "CdsDateRegime": {
-      "description": "Named contractual date regime of a CDS product (record\nCALIBRATION-FRAMEWORK-007, O7).\n\nThe regime owns how the premium grid, its stub and its endpoints are\nderived; no regime is inferred and none is a default.",
+      "description": "Named contractual date regime of a CDS product.\n\nThe regime owns how the premium grid, its stub and its endpoints are\nderived; no regime is inferred and none is a default.",
       "oneOf": [
         {
           "const": "standard",
@@ -5842,7 +5842,7 @@
       "type": "object"
     },
     "CommodityConvention": {
-      "description": "Standard commodity market conventions by product type.\n\nEach variant provides market-standard defaults for settlement days,\nbusiness day convention, and calendar. Use when constructing commodity\nforwards, options, or swaps without explicitly specifying these parameters.\n\n# Market Standards Reference\n\n| Convention | Settlement | BDC | Calendar | Exchange |\n|------------|------------|-----|----------|----------|\n| WTI Crude | T+2 | Following | NYMEX | NYMEX/CME |\n| Brent Crude | T+2 | Following | ICE | ICE |\n| Natural Gas | T+2 | Following | NYMEX | NYMEX/CME |\n| Gold | T+2 | Modified Following | COMEX | CME |\n| Silver | T+2 | Modified Following | COMEX | CME |\n| Copper | T+2 | Following | LME | LME |\n| Corn/Wheat | T+2 | Following | CBOT | CME |\n| Power | T+1 | Modified Following | NERC | Various |\n\n# Sources\n\n- CME Group rulebooks\n- ICE Futures exchange rules\n- LME trading procedures",
+      "description": "Standard commodity market conventions by product type.\n\nEach variant provides market-standard defaults for settlement days and\nbusiness day convention. Use when constructing commodity forwards, options,\nor swaps without explicitly specifying these parameters.",
       "oneOf": [
         {
           "const": "wti_crude",
@@ -5888,7 +5888,7 @@
     },
     "CommodityForward": {
       "additionalProperties": false,
-      "description": "Commodity forward or futures contract.\n\nRepresents a commitment to buy or sell a commodity at a specified future\ndate at a predetermined price. Can be physically settled (delivery) or\ncash settled (price difference).\n\n# Pricing\n\nForward value is calculated as:\n```text\nNPV = sign(position) × (F - K) × Q × M × DF(T)\n```\nwhere:\n- sign = +1.0 for Long, -1.0 for Short\n- F = Forward price from price curve (or quoted_forward if provided)\n- K = Contract price (entry price). If None, treated as at-market (K = F)\n- Q = Quantity\n- M = Contract multiplier\n- DF(T_pay) = Discount factor to the payment date (see below)\n\n# Settlement\n\nThe forward fixes on `maturity` (the last pricing date) and pays\n[`CommodityForward::payment_date`]: `maturity` plus the effective settlement\nlag in business days on the effective settlement calendar, adjusted by the\neffective business-day convention (for example T+2 on the CME calendar for\nWTI). The value is zero once the payment date is before `as_of`.\n\n# At-Market vs Off-Market\n\n- **At-market**: `contract_price = None` → NPV ≈ 0 (like entering a new futures position)\n- **Off-market**: `contract_price = Some(K)` → NPV reflects mark-to-market vs K\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_exotics::commodity::commodity_forward::CommodityForward;\nuse finstack_quant_valuations_core::instruments::Position;\nuse finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\n// At-market long forward (NPV ≈ 0)\nlet at_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    // Illustrative contract settlement calendar; real contracts state theirs.\n    .settlement_calendar_id_opt(Some(\"usny\".into()))\n    .build()\n    .expect(\"Valid forward\");\n\n// Off-market forward with specific contract price\nlet off_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03-TRADE\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .contract_price_opt(Some(72.0)) // Entry price\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    // Illustrative contract settlement calendar; real contracts state theirs.\n    .settlement_calendar_id_opt(Some(\"usny\".into()))\n    .build()\n    .expect(\"Valid forward\");\n```",
+      "description": "Commodity forward or futures contract.\n\nRepresents a commitment to buy or sell a commodity at a specified future\ndate at a predetermined price. Can be physically settled (delivery) or\ncash settled (price difference).\n\n# Pricing\n\nForward value is calculated as:\n```text\nNPV = sign(position) × (F - K) × Q × M × DF(T)\n```\nwhere:\n- sign = +1.0 for Long, -1.0 for Short\n- F = Forward price from price curve (or quoted_forward if provided)\n- K = Contract price (entry price). If None, treated as at-market (K = F)\n- Q = Quantity\n- M = Contract multiplier\n- DF(T_pay) = Discount factor to the payment date (see below)\n\n# Settlement\n\nThe forward fixes on `maturity` (the last pricing date) and pays\n[`CommodityForward::payment_date`]: `maturity` plus the effective settlement\nlag in business days on the effective settlement calendar, adjusted by the\neffective business-day convention (for example T+2 on the CME calendar for\nWTI). The value is zero once the payment date is before `as_of`.\n\n# At-Market vs Off-Market\n\n- **At-market**: `contract_price = None` → NPV ≈ 0 (like entering a new futures position)\n- **Off-market**: `contract_price = Some(K)` → NPV reflects mark-to-market vs K\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_exotics::commodity::commodity_forward::CommodityForward;\nuse finstack_quant_valuations_core::instruments::Position;\nuse finstack_quant_valuations_exotics::CommodityUnderlyingParams;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\n// At-market long forward (NPV ≈ 0)\nlet at_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    // Illustrative contract settlement calendar; real contracts state theirs.\n    .settlement_calendar_id_opt(Some(\"usny\".into()))\n    .build()\n    .expect(\"Valid forward\");\n\n// Off-market forward with specific contract price\nlet off_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03-TRADE\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .contract_price_opt(Some(72.0)) // Entry price\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    // Illustrative contract settlement calendar; real contracts state theirs.\n    .settlement_calendar_id_opt(Some(\"usny\".into()))\n    .build()\n    .expect(\"Valid forward\");\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -6206,7 +6206,7 @@
         },
         "terms": {
           "$ref": "#/$defs/FutureOptionTerms",
-          "description": "Caller-supplied option-on-future pricing and settlement terms."
+          "description": "Complete listed or bilateral option-on-future terms."
         }
       },
       "required": [
@@ -6485,7 +6485,7 @@
     },
     "CommoditySwap": {
       "additionalProperties": false,
-      "description": "Commodity swap (fixed-for-floating commodity price exchange).\n\nOne party pays a fixed price per unit, the other pays a floating price\ndetermined by an index or average of spot prices over the period.\n\n# Pricing\n\nFixed leg: ∑ Q × P_fixed × DF(t_i)\nFloating leg: ∑ Q × E[P_float(t_i)] × DF(t_i)\n\nFor a payer of fixed:\nNPV = Floating leg PV - Fixed leg PV\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_exotics::commodity::commodity_swap::CommoditySwap;\nuse finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;\nuse finstack_quant_valuations_core::instruments::PayReceive;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swap = CommoditySwap::builder()\n    .id(InstrumentId::new(\"NG-SWAP-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .quantity(10000.0)\n    .fixed_price(3.50)\n    .forward_curve_id(CurveId::new(\"NG-SPOT-AVG\"))\n    .side(PayReceive::Pay)\n    .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::December, 31).unwrap())\n    .frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid swap\");\n```",
+      "description": "Commodity swap (fixed-for-floating commodity price exchange).\n\nOne party pays a fixed price per unit, the other pays a floating price\ndetermined by an index or average of spot prices over the period.\n\n# Pricing\n\nFixed leg: ∑ Q × P_fixed × DF(t_i)\nFloating leg: ∑ Q × E[P_float(t_i)] × DF(t_i)\n\nFor a payer of fixed:\nNPV = Floating leg PV - Fixed leg PV\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_exotics::commodity::commodity_swap::CommoditySwap;\nuse finstack_quant_valuations_exotics::CommodityUnderlyingParams;\nuse finstack_quant_valuations_core::instruments::PayReceive;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swap = CommoditySwap::builder()\n    .id(InstrumentId::new(\"NG-SWAP-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .quantity(10000.0)\n    .fixed_price(3.50)\n    .forward_curve_id(CurveId::new(\"NG-SPOT-AVG\"))\n    .side(PayReceive::Pay)\n    .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::December, 31).unwrap())\n    .frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid swap\");\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -6620,7 +6620,7 @@
     },
     "CommoditySwaption": {
       "additionalProperties": false,
-      "description": "Commodity swaption (option on a fixed-for-floating commodity swap).\n\nThe holder has the right to enter a commodity swap at expiry, paying\n(or receiving) a fixed price in exchange for floating commodity prices.\n\n# Pricing\n\nBlack-76 model on the forward swap rate:\n- Forward swap rate is the weighted average of forward commodity prices\n  over the swap period\n- Annuity factor captures the present value of a unit payment stream\n\nAnalytical delta measures currency per unit change in the annuity-weighted\nforward price, holding rates and volatility fixed. At zero volatility or\nexpiry, delta uses the intrinsic-payoff derivative and is defined as zero\nexactly at the strike, where that derivative does not exist.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_exotics::commodity::commodity_swaption::CommoditySwaption;\nuse finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;\nuse finstack_quant_models::types::OptionType;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swaption = CommoditySwaption::builder()\n    .id(InstrumentId::new(\"NG-SWAPTION-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .option_type(OptionType::Call)\n    .expiry(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .underlying_start_date(Date::from_calendar_date(2025, Month::July, 1).unwrap())\n    .underlying_maturity(Date::from_calendar_date(2026, Month::June, 30).unwrap())\n    .swap_frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .fixed_price(3.50)\n    .quantity(10000.0)\n    .forward_curve_id(CurveId::new(\"NG-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_surface_id(CurveId::new(\"NG-VOL\"))\n    .build()\n    .expect(\"Valid swaption\");\n```",
+      "description": "Commodity swaption (option on a fixed-for-floating commodity swap).\n\nThe holder has the right to enter a commodity swap at expiry, paying\n(or receiving) a fixed price in exchange for floating commodity prices.\n\n# Pricing\n\nBlack-76 model on the forward swap rate:\n- Forward swap rate is the weighted average of forward commodity prices\n  over the swap period\n- Annuity factor captures the present value of a unit payment stream\n\nAnalytical delta measures currency per unit change in the annuity-weighted\nforward price, holding rates and volatility fixed. At zero volatility or\nexpiry, delta uses the intrinsic-payoff derivative and is defined as zero\nexactly at the strike, where that derivative does not exist.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_exotics::commodity::commodity_swaption::CommoditySwaption;\nuse finstack_quant_valuations_exotics::CommodityUnderlyingParams;\nuse finstack_quant_models::types::OptionType;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swaption = CommoditySwaption::builder()\n    .id(InstrumentId::new(\"NG-SWAPTION-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .option_type(OptionType::Call)\n    .expiry(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .underlying_start_date(Date::from_calendar_date(2025, Month::July, 1).unwrap())\n    .underlying_maturity(Date::from_calendar_date(2026, Month::June, 30).unwrap())\n    .swap_frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .fixed_price(3.50)\n    .quantity(10000.0)\n    .forward_curve_id(CurveId::new(\"NG-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_surface_id(CurveId::new(\"NG-VOL\"))\n    .build()\n    .expect(\"Valid swaption\");\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -7068,7 +7068,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Bond will mandatorily convert on the specified date.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from this date; early voluntary conversion before\nthe mandatory date is not modeled. Forced conversion takes precedence\nover coincident call/put rights, and the scheduled coupon remains payable.",
+          "description": "Bond will mandatorily convert on the specified date.",
           "properties": {
             "mandatory_on": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
@@ -7121,7 +7121,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Mandatory conversion with variable delivery ratio (PERCS / DECS / ACES).\n\nAt `conversion_date`, the delivery ratio depends on the stock price:\n- If `spot <= lower_conversion_price`: ratio = face / lower_price (max shares, loss)\n- If `lower < spot <= upper`: ratio = face / spot (variable, delivers face value)\n- If `spot > upper_conversion_price`: ratio = face / upper_price (min shares, capped)\n\n# Industry Practice\n\nPERCS (Preference Equity Redemption Cumulative Stock) cap the upside.\nDECS (Dividend Enhanced Convertible Stock) have a dead zone between prices.\nACES (Automatically Convertible Equity Securities) are similar to DECS.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from `conversion_date`; early voluntary conversion\nbefore that date (offered by some mandatory structures) is not modeled.\nForced conversion takes precedence over coincident call/put rights,\nand the scheduled coupon remains payable.",
+          "description": "Mandatory conversion with variable delivery ratio (PERCS / DECS / ACES).",
           "properties": {
             "mandatory_variable": {
               "properties": {
@@ -7165,7 +7165,7 @@
         },
         "dilution_events": {
           "default": [],
-          "description": "Historical dilution events that affect the conversion ratio, recorded\nin chronological (non-decreasing date) order and applied in that\norder. Validation rejects out-of-order events.",
+          "description": "Historical dilution events recorded in chronological order.",
           "items": {
             "$ref": "#/$defs/DilutionEvent"
           },
@@ -7927,19 +7927,19 @@
     },
     "CreditParams": {
       "additionalProperties": false,
-      "description": "Credit parameters for CDS instruments",
+      "description": "Issuer/reference entity credit parameters.",
       "properties": {
         "credit_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Credit curve identifier"
+          "description": "Credit curve identifier."
         },
         "recovery_rate": {
-          "description": "Recovery rate (0.0 to 1.0)",
+          "description": "Recovery rate (`0.0` to `1.0`).",
           "format": "double",
           "type": "number"
         },
         "reference_entity": {
-          "description": "Reference entity (issuer being protected)",
+          "description": "Reference entity (issuer being protected).",
           "type": "string"
         }
       },
@@ -8688,7 +8688,7 @@
     },
     "DilutionEvent": {
       "additionalProperties": false,
-      "description": "A dilutive event that triggers anti-dilution adjustment.\n\nRecords details of an equity issuance or corporate action that may\naffect the conversion ratio under the bond's anti-dilution provisions.",
+      "description": "A dilutive event that triggers anti-dilution adjustment.",
       "properties": {
         "date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -8882,7 +8882,7 @@
       "type": "object"
     },
     "DividendAdjustment": {
-      "description": "How dividends affect conversion terms (dividend protection).\n\nDividend protection compensates the holder for dividends paid on the\nunderlying, which otherwise leak value from the conversion option (the\nstock drifts at `r - q` under the risk-neutral measure). The variants\ncarry no threshold parameter, so protection is **full**: the entire\ncontinuous dividend yield `q` is protected.\n\n# Pricing model (continuous-yield accretion)\n\nUnder the continuous dividend yield `q` used by the tree pricer, each\nprotected dividend payment bumps the conversion ratio by the dividend\nfraction; the continuous limit is exponential accretion from the\nvaluation date:\n\n```text\nAdjustRatio:  ratio(t)  = ratio_0 * exp(q * t)\nAdjustPrice:  K_conv(t) = K_0 * exp(-q * t)\n```\n\nSince `ratio = notional / K_conv`, the price decay is mathematically the\nsame ratio accretion — the pricer implements both variants through the\nsingle ratio-accretion mechanism. Accretion composes multiplicatively on\ntop of any anti-dilution adjustments from\n`ConvertibleBond::effective_conversion_ratio`.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::instruments::{AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment};\n\nlet conversion = ConversionSpec {\n    ratio: Some(25.0),\n    price: None,\n    policy: ConversionPolicy::Voluntary,\n    anti_dilution: AntiDilutionPolicy::None,\n    dividend_adjustment: DividendAdjustment::AdjustRatio,\n    dilution_events: Vec::new(),\n};\nassert!(conversion.dividend_adjustment.is_protected());\n```",
+      "description": "How dividends affect conversion terms (dividend protection).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::convertible::{\n    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,\n};\n\nlet conversion = ConversionSpec {\n    ratio: Some(25.0),\n    price: None,\n    policy: ConversionPolicy::Voluntary,\n    anti_dilution: AntiDilutionPolicy::None,\n    dividend_adjustment: DividendAdjustment::AdjustRatio,\n    dilution_events: Vec::new(),\n};\nassert!(conversion.dividend_adjustment.is_protected());\n```",
       "oneOf": [
         {
           "const": "none",
@@ -9520,7 +9520,7 @@
         },
         "terms": {
           "$ref": "#/$defs/FutureOptionTerms",
-          "description": "Caller-supplied option-on-future pricing and settlement terms."
+          "description": "Complete listed or bilateral option-on-future terms."
         }
       },
       "required": [
@@ -9791,7 +9791,7 @@
     },
     "EquityTotalReturnSwap": {
       "additionalProperties": false,
-      "description": "Equity total-return swap exchanging price and net dividend return against\nfloating-rate financing plus a contractual spread.\n\nSeasoned trades require the observed level at the current period start in\n`past_fixings`, except that `initial_level` may anchor the first period.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations_core::instruments::{EquityUnderlyingParams, FinancingLegSpec, PayReceive};\nuse finstack_quant_core::types::Attributes;\nuse finstack_quant_valuations_equity::equity_trs::{EquityTotalReturnSwap, TrsDividendSettlement};\nuse finstack_quant_valuations_core::instruments::TrsScheduleSpec;\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = EquityTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"SPX-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        EquityUnderlyingParams::new(\"SPX\", \"SPX-SPOT\", Currency::USD)\n            .with_div_yield_id(\"SPX-DIV\"),\n    )\n    .financing_leg(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(50), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(PayReceive::Receive)\n    .dividend_settlement(TrsDividendSettlement::OnDividendDate)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
+      "description": "Equity total-return swap exchanging price and net dividend return against\nfloating-rate financing plus a contractual spread.\n\nSeasoned trades require the observed level at the current period start in\n`past_fixings`, except that `initial_level` may anchor the first period.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations_core::instruments::{FinancingLegSpec, PayReceive};\nuse finstack_quant_valuations_equity::EquityUnderlyingParams;\nuse finstack_quant_core::types::Attributes;\nuse finstack_quant_valuations_equity::equity_trs::{EquityTotalReturnSwap, TrsDividendSettlement};\nuse finstack_quant_valuations_core::instruments::TrsScheduleSpec;\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = EquityTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"SPX-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        EquityUnderlyingParams::new(\"SPX\", \"SPX-SPOT\", Currency::USD)\n            .with_div_yield_id(\"SPX-DIV\"),\n    )\n    .financing_leg(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(50), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(PayReceive::Receive)\n    .dividend_settlement(TrsDividendSettlement::OnDividendDate)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -9917,7 +9917,7 @@
       "properties": {
         "currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Base currency for pricing"
+          "description": "Base currency for pricing."
         },
         "div_yield_id": {
           "anyOf": [
@@ -9928,14 +9928,14 @@
               "type": "null"
             }
           ],
-          "description": "Optional dividend yield identifier"
+          "description": "Optional dividend yield identifier."
         },
         "spot_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Spot price identifier in market data"
+          "description": "Spot price identifier in market data."
         },
         "ticker": {
-          "description": "Underlying ticker/identifier",
+          "description": "Underlying ticker/identifier.",
           "type": "string"
         }
       },
@@ -10248,7 +10248,7 @@
     },
     "FiIndexTotalReturnSwap": {
       "additionalProperties": false,
-      "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each wholly future scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits roll-down, underlying rate/spread\nmark-to-market, stochastic credit, constituent decomposition, early\ntermination, and bespoke fees. The period in progress on the valuation\ndate is valued from the live index level (`underlying.index_id`) against\nits historical reset level, then carried at the index yield to period end; a period\nthat has ended but is not yet paid uses the exact historical start and end\nlevels from `fixing_series_id`. Missing historical endpoints are errors.\nCashflow-schedule APIs\nreturn projected or fixed net payments using the same calculations as\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations_core::instruments::{FinancingLegSpec, IndexUnderlyingParams, PayReceive};\nuse finstack_quant_core::types::Attributes;\nuse finstack_quant_valuations_fixed_income::fi_trs::FiIndexTotalReturnSwap;\nuse finstack_quant_valuations_core::instruments::TrsScheduleSpec;\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FiIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield_id(\"US-CORP-YIELD\")\n            .with_duration_id(\"US-CORP-DURATION\"),\n    )\n    .financing_leg(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(PayReceive::Receive)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
+      "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each wholly future scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits roll-down, underlying rate/spread\nmark-to-market, stochastic credit, constituent decomposition, early\ntermination, and bespoke fees. The period in progress on the valuation\ndate is valued from the live index level (`underlying.index_id`) against\nits historical reset level, then carried at the index yield to period end; a period\nthat has ended but is not yet paid uses the exact historical start and end\nlevels from `fixing_series_id`. Missing historical endpoints are errors.\nCashflow-schedule APIs\nreturn projected or fixed net payments using the same calculations as\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations_core::instruments::{FinancingLegSpec, PayReceive};\nuse finstack_quant_valuations_fixed_income::IndexUnderlyingParams;\nuse finstack_quant_core::types::Attributes;\nuse finstack_quant_valuations_fixed_income::fi_trs::FiIndexTotalReturnSwap;\nuse finstack_quant_valuations_core::instruments::TrsScheduleSpec;\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FiIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield_id(\"US-CORP-YIELD\")\n            .with_duration_id(\"US-CORP-DURATION\"),\n    )\n    .financing_leg(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(PayReceive::Receive)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -10447,12 +10447,12 @@
     },
     "FixedLegSpec": {
       "additionalProperties": false,
-      "description": "Specification for fixed rate legs in interest rate swaps",
+      "description": "Specification for fixed rate legs in interest rate swaps.",
       "properties": {
         "business_day_convention": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
           "default": "modified_following",
-          "description": "Business day convention for payment dates"
+          "description": "Business day convention for payment dates."
         },
         "calendar_id": {
           "anyOf": [
@@ -10463,47 +10463,47 @@
               "type": "null"
             }
           ],
-          "description": "Optional calendar for business day adjustments"
+          "description": "Optional calendar for business day adjustments."
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention for accrual"
+          "description": "Day count convention for accrual."
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve identifier for pricing"
+          "description": "Discount curve identifier for pricing."
         },
         "end": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "End date of the fixed leg"
+          "description": "End date of the fixed leg."
         },
         "end_of_month": {
           "default": false,
-          "description": "End-of-month roll convention (default: false).\n\nWhen `true`, if the start date falls on the last business day of a month,\nall subsequent roll dates will also fall on the last business day of their\nrespective months. This matches QuantLib's `MakeOIS` default behavior.\n\n# Market Standard\n\nPer ISDA 2006 Definitions Section 4.18, the End-of-Month convention should\nbe applied when the effective date is the last business day of a month.\nMost professional systems (QuantLib, Bloomberg SWDF) default to `true`.",
+          "description": "End-of-month roll convention (default: false).",
           "type": "boolean"
         },
         "frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-          "description": "Payment frequency"
+          "description": "Payment frequency."
         },
         "payment_lag_days": {
           "default": 0,
-          "description": "Payment lag in business days after period end (default: 0).\n\nBloomberg OIS swaps typically use 2 business days payment lag.\nThe actual payment date is adjusted from the period end date by\nthis many business days using the leg's calendar.",
+          "description": "Payment lag in business days after period end (default: 0).",
           "format": "int32",
           "type": "integer"
         },
         "rate": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-          "description": "Fixed rate (e.g., 0.05 for 5%)"
+          "description": "Fixed rate (e.g., 0.05 for 5%)."
         },
         "start": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Start date of the fixed leg"
+          "description": "Start date of the fixed leg."
         },
         "stub": {
           "$ref": "#/$defs/StubKind",
           "default": "short_front",
-          "description": "Stub period handling rule"
+          "description": "Stub period handling rule."
         }
       },
       "required": [
@@ -10518,12 +10518,12 @@
     },
     "FloatLegSpec": {
       "additionalProperties": false,
-      "description": "Specification for floating rate legs in interest rate swaps",
+      "description": "Specification for floating rate legs in interest rate swaps.",
       "properties": {
         "business_day_convention": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
           "default": "modified_following",
-          "description": "Business day convention for payment dates"
+          "description": "Business day convention for payment dates."
         },
         "calendar_id": {
           "anyOf": [
@@ -10534,28 +10534,28 @@
               "type": "null"
             }
           ],
-          "description": "Optional calendar for business day adjustments"
+          "description": "Optional calendar for business day adjustments."
         },
         "compounding": {
           "$ref": "#/$defs/FloatingLegCompounding",
           "default": "simple",
-          "description": "Compounding method for floating coupons.\n\nDetermines how floating rate coupons are calculated:\n- `simple` (default): one term forward per period\n- `compounded_*`: SOFR/SONIA-style daily compounding\n- `simple_average` is rejected by [`Self::validate`]\n\n# Implementation Notes\n\nCompounded-in-arrears is implemented for IRS pricing in `instruments::irs` with\nsupport for lookback and observation shift conventions. For seasoned (already\nstarted) compounded swaps, pricing requires explicit fixings for observation\ndates prior to `as_of`."
+          "description": "Compounding method for floating coupons."
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention for accrual"
+          "description": "Day count convention for accrual."
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve identifier for pricing"
+          "description": "Discount curve identifier for pricing."
         },
         "end": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "End date of the floating leg"
+          "description": "End date of the floating leg."
         },
         "end_of_month": {
           "default": false,
-          "description": "End-of-month roll convention (default: false).\n\nWhen `true`, if the start date falls on the last business day of a month,\nall subsequent roll dates will also fall on the last business day of their\nrespective months. This matches QuantLib's `MakeOIS` default behavior.\n\n# Market Standard\n\nPer ISDA 2006 Definitions Section 4.18, the End-of-Month convention should\nbe applied when the effective date is the last business day of a month.\nMost professional systems (QuantLib, Bloomberg SWDF) default to `true`.",
+          "description": "End-of-month roll convention (default: false).",
           "type": "boolean"
         },
         "fixing_calendar_id": {
@@ -10568,15 +10568,15 @@
             }
           ],
           "default": null,
-          "description": "Optional calendar for rate fixing (reset lag)"
+          "description": "Optional calendar for rate fixing (reset lag)."
         },
         "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Forward curve identifier for rate projections"
+          "description": "Forward curve identifier for rate projections."
         },
         "frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-          "description": "Payment frequency"
+          "description": "Payment frequency."
         },
         "index_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -10584,28 +10584,28 @@
         },
         "payment_lag_days": {
           "default": 0,
-          "description": "Payment lag in business days after period end (default: 0).\n\nBloomberg OIS swaps typically use 2 business days payment lag.\nThe actual payment date is adjusted from the period end date by\nthis many business days using the leg's calendar.",
+          "description": "Payment lag in business days after period end (default: 0).",
           "format": "int32",
           "type": "integer"
         },
         "reset_lag_days": {
           "default": 0,
-          "description": "Reset lag in business days for floating rate fixing (default: 0).\n\n- **0** (default): fixing on the accrual start date. A swap whose first\n  accrual period starts on or after the valuation date then prices off\n  the forward curve without historical fixings.\n- **Positive** (e.g., 2): T-2 fixing (2 business days before accrual\n  start). Use `RateIndexConventions::default_reset_lag_days` (or\n  `InterestRateSwap::from_conventions`) for the market default of a\n  given index.\n- **Negative** (e.g., -1): resolved at pricing time to the registered\n  index convention default; rejected when the forward curve id is not a\n  registered rate index.",
+          "description": "Reset lag in business days for floating rate fixing (default: 0).",
           "format": "int32",
           "type": "integer"
         },
         "spread_bp": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-          "description": "Spread in basis points added to the forward rate"
+          "description": "Spread in basis points added to the forward rate."
         },
         "start": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Start date of the floating leg"
+          "description": "Start date of the floating leg."
         },
         "stub": {
           "$ref": "#/$defs/StubKind",
           "default": "short_front",
-          "description": "Stub period handling rule"
+          "description": "Stub period handling rule."
         }
       },
       "required": [
@@ -12299,7 +12299,7 @@
         },
         "terms": {
           "$ref": "#/$defs/FutureOptionTerms",
-          "description": "Caller-supplied option-on-future pricing and settlement terms."
+          "description": "Complete listed or bilateral option-on-future terms."
         }
       },
       "required": [
@@ -13181,7 +13181,7 @@
               "type": "null"
             }
           ],
-          "description": "Market scalar identifier for signed index duration in years. Required when\nrequesting FI TRS duration risk; the scalar must be unitless and finite. No duration is inferred from index name or maturity."
+          "description": "Market scalar identifier for signed index duration in years. Required when\nrequesting FI TRS duration risk; the scalar must be unitless and finite."
         },
         "index_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -14930,7 +14930,7 @@
     },
     "Ndf": {
       "additionalProperties": false,
-      "description": "Non-Deliverable Forward (NDF) instrument.\n\nRepresents a cash-settled forward contract on a restricted currency pair.\nThe position is long base currency (restricted) and short settlement currency.\n\n# Quote Convention\n\nNDFs support two quote conventions via the `quote_convention` field:\n\n- **BasePerSettlement** (default): Rate quoted as base per settlement (e.g., 7.25 CNY/USD)\n- **SettlementPerBase**: Rate quoted as settlement per base (e.g., 0.138 USD/CNY)\n\nSee [`NdfQuoteConvention`] for details on the settlement formulas.\n\n# Pricing\n\n## Pre-Fixing (observed_fixing = None)\nForward rate uses the explicit override or covered interest rate parity\nwith both currency curves.\n\n## Post-Fixing (observed_fixing = Some)\nUses the observed fixing rate for settlement calculation.\n\nThe settlement formula depends on `quote_convention`:\n\n**BasePerSettlement:**\n```text\nSettlement = Notional_base × (1/F_fixing - 1/F_contract)\nPV = Settlement × DF_settlement(T)\n```\n\n**SettlementPerBase:**\n```text\nSettlement = Notional_base × (F_fixing - F_contract)\nPV = Settlement × DF_settlement(T)\n```\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fx::ndf::Ndf;\nuse finstack_quant_valuations_core::instruments::NdfQuoteConvention;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet ndf = Ndf::builder()\n    .id(InstrumentId::new(\"USDCNY-NDF-3M\"))\n    .base_currency(Currency::CNY)\n    .settlement_currency(Currency::USD)\n    .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .notional(Money::from((10_000_000_i64, Currency::CNY)))\n    .contract_rate(7.25)\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .quote_convention(NdfQuoteConvention::BasePerSettlement)\n    .build()\n    .expect(\"Valid NDF\");\n```",
+      "description": "Non-Deliverable Forward (NDF) instrument.\n\nRepresents a cash-settled forward contract on a restricted currency pair.\nThe position is long base currency (restricted) and short settlement currency.\n\n# Quote Convention\n\nNDFs support two quote conventions via the `quote_convention` field:\n\n- **BasePerSettlement** (default): Rate quoted as base per settlement (e.g., 7.25 CNY/USD)\n- **SettlementPerBase**: Rate quoted as settlement per base (e.g., 0.138 USD/CNY)\n\nSee [`NdfQuoteConvention`] for details on the settlement formulas.\n\n# Pricing\n\n## Pre-Fixing (observed_fixing = None)\nForward rate uses the explicit override or covered interest rate parity\nwith both currency curves.\n\n## Post-Fixing (observed_fixing = Some)\nUses the observed fixing rate for settlement calculation.\n\nThe settlement formula depends on `quote_convention`:\n\n**BasePerSettlement:**\n```text\nSettlement = Notional_base × (1/F_fixing - 1/F_contract)\nPV = Settlement × DF_settlement(T)\n```\n\n**SettlementPerBase:**\n```text\nSettlement = Notional_base × (F_fixing - F_contract)\nPV = Settlement × DF_settlement(T)\n```\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fx::ndf::Ndf;\nuse finstack_quant_valuations_fx::NdfQuoteConvention;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet ndf = Ndf::builder()\n    .id(InstrumentId::new(\"USDCNY-NDF-3M\"))\n    .base_currency(Currency::CNY)\n    .settlement_currency(Currency::USD)\n    .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .notional(Money::from((10_000_000_i64, Currency::CNY)))\n    .contract_rate(7.25)\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .quote_convention(NdfQuoteConvention::BasePerSettlement)\n    .build()\n    .expect(\"Valid NDF\");\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -15071,7 +15071,7 @@
       "type": "object"
     },
     "NdfFixingSource": {
-      "description": "Official NDF fixing source/benchmark.\n\nNDF settlements reference official fixing rates published by central banks\nor designated fixing bodies. Using the correct fixing source is critical\nfor proper settlement calculations.\n\n# Market Standards\n\n| Currency | Fixing Source | Publisher | Settlement |\n|----------|---------------|-----------|------------|\n| CNY | PBOC | People's Bank of China | USD T+2 |\n| CNH | CNHFIX | Treasury Markets Association (HK) | USD T+2 |\n| INR | RBI | Reserve Bank of India | USD T+2 |\n| KRW | KFTC | Korea Financial Telecommunications | USD T+1 |\n| BRL | PTAX | Banco Central do Brasil | USD T+2 |\n| TWD | TAIFX | Taipei Forex Inc. | USD T+2 |\n| PHP | PHP BVAL | Bankers Association of the Philippines | USD T+1 |\n| IDR | JISDOR | Bank Indonesia | USD T+2 |\n| MYR | BNM | Bank Negara Malaysia | USD T+2 |\n\n# Example\n\n```rust\nuse finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource};\nuse finstack_quant_valuations_core::instruments::NdfQuoteConvention;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet ndf = Ndf::builder()\n    .id(InstrumentId::new(\"USDCNY-NDF\"))\n    .base_currency(Currency::CNY)\n    .settlement_currency(Currency::USD)\n    .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .notional(Money::from((10_000_000_i64, Currency::CNY)))\n    .contract_rate(7.25)\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .quote_convention(NdfQuoteConvention::BasePerSettlement)\n    .fixing_source_opt(Some(NdfFixingSource::Pboc))\n    .build()\n    .expect(\"Valid NDF\");\n```",
+      "description": "Official NDF fixing source/benchmark.\n\nNDF settlements reference official fixing rates published by central banks\nor designated fixing bodies. Using the correct fixing source is critical\nfor proper settlement calculations.\n\n# Market Standards\n\n| Currency | Fixing Source | Publisher | Settlement |\n|----------|---------------|-----------|------------|\n| CNY | PBOC | People's Bank of China | USD T+2 |\n| CNH | CNHFIX | Treasury Markets Association (HK) | USD T+2 |\n| INR | RBI | Reserve Bank of India | USD T+2 |\n| KRW | KFTC | Korea Financial Telecommunications | USD T+1 |\n| BRL | PTAX | Banco Central do Brasil | USD T+2 |\n| TWD | TAIFX | Taipei Forex Inc. | USD T+2 |\n| PHP | PHP BVAL | Bankers Association of the Philippines | USD T+1 |\n| IDR | JISDOR | Bank Indonesia | USD T+2 |\n| MYR | BNM | Bank Negara Malaysia | USD T+2 |\n\n# Example\n\n```rust\nuse finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource};\nuse finstack_quant_valuations_fx::NdfQuoteConvention;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet ndf = Ndf::builder()\n    .id(InstrumentId::new(\"USDCNY-NDF\"))\n    .base_currency(Currency::CNY)\n    .settlement_currency(Currency::USD)\n    .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .notional(Money::from((10_000_000_i64, Currency::CNY)))\n    .contract_rate(7.25)\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .quote_convention(NdfQuoteConvention::BasePerSettlement)\n    .fixing_source_opt(Some(NdfFixingSource::Pboc))\n    .build()\n    .expect(\"Valid NDF\");\n```",
       "oneOf": [
         {
           "const": "pboc",
@@ -15126,7 +15126,7 @@
       ]
     },
     "NdfQuoteConvention": {
-      "description": "Quote convention for NDF contract rates.\n\nNDFs can be quoted in two conventions depending on the market:\n\n# BasePerSettlement (default)\n\nRate is quoted as units of base currency per one unit of settlement currency.\nExample: USD/CNY = 7.25 means 7.25 CNY per 1 USD.\n\nSettlement formula:\n```text\nSettlement = Notional_base × (1/F_fixing - 1/F_contract)\n```\n\nThis is the standard convention for most Asian NDF markets (CNY, KRW, INR, etc.)\nwhere the restricted currency is the base and USD is the settlement currency.\n\n# SettlementPerBase\n\nRate is quoted as units of settlement currency per one unit of base currency.\nExample: CNY/USD = 0.138 means 0.138 USD per 1 CNY.\n\nSettlement formula:\n```text\nSettlement = Notional_base × (F_fixing - F_contract)\n```\n\nThis is less common but may be used in some markets or for consistency with\nother FX instruments that quote in this direction.",
+      "description": "Non-Deliverable Forward (NDF) rate quote convention.\n\nDetermines how fixing and contracted forward rates are expressed and settled.",
       "oneOf": [
         {
           "const": "base_per_settlement",
@@ -15160,7 +15160,7 @@
       "type": "object"
     },
     "NotionalExchange": {
-      "description": "Notional exchange convention for XCCY swaps.",
+      "description": "Principal exchange schedule options for cross-currency swaps.",
       "oneOf": [
         {
           "const": "none",
@@ -16378,12 +16378,12 @@
     },
     "PremiumLegSpec": {
       "additionalProperties": false,
-      "description": "Specification for CDS premium legs",
+      "description": "Specification for CDS premium legs.",
       "properties": {
         "business_day_convention": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
           "default": "modified_following",
-          "description": "Business day convention"
+          "description": "Business day convention."
         },
         "calendar_id": {
           "anyOf": [
@@ -16394,7 +16394,7 @@
               "type": "null"
             }
           ],
-          "description": "Holiday calendar identifier"
+          "description": "Holiday calendar identifier."
         },
         "coupon_bp": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
@@ -16406,23 +16406,23 @@
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention"
+          "description": "Day count convention."
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve identifier"
+          "description": "Discount curve identifier."
         },
         "end": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "End date of protection"
+          "description": "End date of protection."
         },
         "frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-          "description": "Payment frequency"
+          "description": "Payment frequency."
         },
         "start": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Start date of protection"
+          "description": "Start date of protection."
         },
         "stub": {
           "$ref": "#/$defs/StubKind",
@@ -16581,7 +16581,7 @@
     },
     "PriceTrigger": {
       "additionalProperties": false,
-      "description": "Share-price trigger of a convertible bond: the last sale price must be at\nleast `threshold_pct` of the conversion price on `required_days_above` of\n`observation_days` consecutive trading days.\n\nUsed for the issuer's soft call (`ConvertibleBond::soft_call_trigger`) and\nthe holder's contingent conversion\n(`ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(..))`).\n\n# Industry Practice\n\nThe standard trigger is 130% of the conversion price on 20 of 30\nconsecutive trading days; some issues use 120% or 150%.\n\n# Modeling scope\n\nThe tree evaluates the trigger on the instantaneous node spot. The soft\ncall applies a Broadie-Glasserman-Kou-style barrier shift scaled by\n`required_days_above / observation_days`; contingent conversion compares\nthe node spot with the nominal level and does not model the observation\nwindow.",
+      "description": "Share-price trigger of a convertible bond: the last sale price must be at\nleast `threshold_pct` of the conversion price on `required_days_above` of\n`observation_days` consecutive trading days.",
       "properties": {
         "observation_days": {
           "description": "Number of trading days in the observation window (e.g., 30).",
@@ -16708,19 +16708,19 @@
     },
     "ProtectionLegSpec": {
       "additionalProperties": false,
-      "description": "Specification for CDS protection legs",
+      "description": "Specification for CDS protection legs.",
       "properties": {
         "credit_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Hazard curve identifier for default probabilities"
+          "description": "Hazard curve identifier for default probabilities."
         },
         "recovery_rate": {
-          "description": "Recovery rate as a decimal fraction in `[0.0, 1.0)`",
+          "description": "Recovery rate as a decimal fraction in `[0.0, 1.0)`.",
           "format": "double",
           "type": "number"
         },
         "settlement_delay": {
-          "description": "Settlement delay in business days",
+          "description": "Settlement delay in business days.",
           "format": "uint16",
           "maximum": 65535,
           "minimum": 0,
@@ -21871,7 +21871,7 @@
         },
         "terms": {
           "$ref": "#/$defs/FutureOptionTerms",
-          "description": "Caller-supplied option-on-future pricing and settlement terms."
+          "description": "Complete listed or bilateral option-on-future terms."
         }
       },
       "required": [

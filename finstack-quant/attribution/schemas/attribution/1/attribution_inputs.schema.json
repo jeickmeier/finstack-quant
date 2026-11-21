@@ -44,7 +44,7 @@
       ]
     },
     "AntiDilutionPolicy": {
-      "description": "Anti-dilution protection applied to conversion terms.\n\nWhen dilutive events occur (stock splits, below-market issuances, special\ndividends), the conversion ratio is adjusted to protect bondholders from\nvalue erosion.\n\n# Industry Practice\n\nMost convertible bonds use **Weighted Average** anti-dilution, which is\nless protective but more issuer-friendly. **Full Ratchet** is mainly seen\nin private placements and venture-style convertibles.",
+      "description": "Anti-dilution protection applied to conversion terms.",
       "oneOf": [
         {
           "const": "none",
@@ -53,12 +53,12 @@
         },
         {
           "const": "full_ratchet",
-          "description": "Full ratchet: conversion price is reduced to the new issue price\nregardless of how many shares were issued. Most protective for holders.\n\nFormula: `new_conversion_price = min(current_conversion_price, new_issue_price)`",
+          "description": "Full ratchet: conversion price is reduced to the new issue price\nregardless of how many shares were issued.",
           "type": "string"
         },
         {
           "const": "weighted_average",
-          "description": "Broad-based weighted average: conversion price is adjusted based on the\nweighted average of the old and new share prices, factoring in the number\nof shares. Less dilutive to existing shareholders than full ratchet.\n\nFormula:\n```text\nnew_cp = old_cp × (shares_outstanding + new_money / old_cp)\n                 / (shares_outstanding + new_shares_issued)\n```",
+          "description": "Broad-based weighted average: conversion price is adjusted based on the\nweighted average of the old and new share prices, factoring in shares.",
           "type": "string"
         }
       ]
@@ -391,7 +391,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Bond will mandatorily convert on the specified date.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from this date; early voluntary conversion before\nthe mandatory date is not modeled. Forced conversion takes precedence\nover coincident call/put rights, and the scheduled coupon remains payable.",
+          "description": "Bond will mandatorily convert on the specified date.",
           "properties": {
             "mandatory_on": {
               "$ref": "#/$defs/DateWire"
@@ -444,7 +444,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Mandatory conversion with variable delivery ratio (PERCS / DECS / ACES).\n\nAt `conversion_date`, the delivery ratio depends on the stock price:\n- If `spot <= lower_conversion_price`: ratio = face / lower_price (max shares, loss)\n- If `lower < spot <= upper`: ratio = face / spot (variable, delivers face value)\n- If `spot > upper_conversion_price`: ratio = face / upper_price (min shares, capped)\n\n# Industry Practice\n\nPERCS (Preference Equity Redemption Cumulative Stock) cap the upside.\nDECS (Dividend Enhanced Convertible Stock) have a dead zone between prices.\nACES (Automatically Convertible Equity Securities) are similar to DECS.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from `conversion_date`; early voluntary conversion\nbefore that date (offered by some mandatory structures) is not modeled.\nForced conversion takes precedence over coincident call/put rights,\nand the scheduled coupon remains payable.",
+          "description": "Mandatory conversion with variable delivery ratio (PERCS / DECS / ACES).",
           "properties": {
             "mandatory_variable": {
               "properties": {
@@ -488,7 +488,7 @@
         },
         "dilution_events": {
           "default": [],
-          "description": "Historical dilution events that affect the conversion ratio, recorded\nin chronological (non-decreasing date) order and applied in that\norder. Validation rejects out-of-order events.",
+          "description": "Historical dilution events recorded in chronological order.",
           "items": {
             "$ref": "#/$defs/DilutionEvent"
           },
@@ -2656,7 +2656,7 @@
     },
     "DilutionEvent": {
       "additionalProperties": false,
-      "description": "A dilutive event that triggers anti-dilution adjustment.\n\nRecords details of an equity issuance or corporate action that may\naffect the conversion ratio under the bond's anti-dilution provisions.",
+      "description": "A dilutive event that triggers anti-dilution adjustment.",
       "properties": {
         "date": {
           "$ref": "#/$defs/DateWire",
@@ -2726,7 +2726,7 @@
       "type": "object"
     },
     "DividendAdjustment": {
-      "description": "How dividends affect conversion terms (dividend protection).\n\nDividend protection compensates the holder for dividends paid on the\nunderlying, which otherwise leak value from the conversion option (the\nstock drifts at `r - q` under the risk-neutral measure). The variants\ncarry no threshold parameter, so protection is **full**: the entire\ncontinuous dividend yield `q` is protected.\n\n# Pricing model (continuous-yield accretion)\n\nUnder the continuous dividend yield `q` used by the tree pricer, each\nprotected dividend payment bumps the conversion ratio by the dividend\nfraction; the continuous limit is exponential accretion from the\nvaluation date:\n\n```text\nAdjustRatio:  ratio(t)  = ratio_0 * exp(q * t)\nAdjustPrice:  K_conv(t) = K_0 * exp(-q * t)\n```\n\nSince `ratio = notional / K_conv`, the price decay is mathematically the\nsame ratio accretion — the pricer implements both variants through the\nsingle ratio-accretion mechanism. Accretion composes multiplicatively on\ntop of any anti-dilution adjustments from\n`ConvertibleBond::effective_conversion_ratio`.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::instruments::{AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment};\n\nlet conversion = ConversionSpec {\n    ratio: Some(25.0),\n    price: None,\n    policy: ConversionPolicy::Voluntary,\n    anti_dilution: AntiDilutionPolicy::None,\n    dividend_adjustment: DividendAdjustment::AdjustRatio,\n    dilution_events: Vec::new(),\n};\nassert!(conversion.dividend_adjustment.is_protected());\n```",
+      "description": "How dividends affect conversion terms (dividend protection).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::convertible::{\n    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,\n};\n\nlet conversion = ConversionSpec {\n    ratio: Some(25.0),\n    price: None,\n    policy: ConversionPolicy::Voluntary,\n    anti_dilution: AntiDilutionPolicy::None,\n    dividend_adjustment: DividendAdjustment::AdjustRatio,\n    dilution_events: Vec::new(),\n};\nassert!(conversion.dividend_adjustment.is_protected());\n```",
       "oneOf": [
         {
           "const": "none",
@@ -5059,7 +5059,7 @@
     },
     "PriceTrigger": {
       "additionalProperties": false,
-      "description": "Share-price trigger of a convertible bond: the last sale price must be at\nleast `threshold_pct` of the conversion price on `required_days_above` of\n`observation_days` consecutive trading days.\n\nUsed for the issuer's soft call (`ConvertibleBond::soft_call_trigger`) and\nthe holder's contingent conversion\n(`ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(..))`).\n\n# Industry Practice\n\nThe standard trigger is 130% of the conversion price on 20 of 30\nconsecutive trading days; some issues use 120% or 150%.\n\n# Modeling scope\n\nThe tree evaluates the trigger on the instantaneous node spot. The soft\ncall applies a Broadie-Glasserman-Kou-style barrier shift scaled by\n`required_days_above / observation_days`; contingent conversion compares\nthe node spot with the nominal level and does not model the observation\nwindow.",
+      "description": "Share-price trigger of a convertible bond: the last sale price must be at\nleast `threshold_pct` of the conversion price on `required_days_above` of\n`observation_days` consecutive trading days.",
       "properties": {
         "observation_days": {
           "description": "Number of trading days in the observation window (e.g., 30).",

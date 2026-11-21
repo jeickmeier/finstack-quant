@@ -1,6 +1,11 @@
 //! Pricing and metric helpers for interest-rate instruments.
 //!
 use crate::irs::{InterestRateSwap, resolve_fixed_leg, resolve_float_leg};
+use crate::{FixedLegSpec, FloatLegSpec};
+use crate::{
+    vol_resolution::ResolvedVolatility, vol_resolution::VolatilityRequest,
+    vol_resolution::resolve_volatility,
+};
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
@@ -18,16 +23,15 @@ use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::VolatilityConvention;
 use finstack_quant_models::volatility::sabr::SabrParameters;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
-    ResolvedVolatility, VolatilityRequest, resolve_volatility, validate_sigma,
-};
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::validate_sigma;
 use finstack_quant_valuations_core::instruments::pricing_overrides::VolSurfaceExtrapolation;
-use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec, PayReceive};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 
 use super::definitions::CashSettlementMethod;
-use finstack_quant_valuations_core::instruments::{SettlementType, VolatilityModel};
+use crate::VolatilityModel;
+use finstack_quant_valuations_core::instruments::SettlementType;
 
 /// European swaption instrument
 ///

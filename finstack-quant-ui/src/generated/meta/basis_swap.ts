@@ -435,7 +435,7 @@ export default [
     "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/adaptive_bumps",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/adaptive_bumps",
     "default": false,
-    "description": "Enable adaptive bump sizes based on volatility and moneyness\n\nWhen true, bump sizes are scaled based on:\n- Volatility level (higher vol → larger bumps)\n- Time to expiry (longer dated → larger bumps)\n- Moneyness (deep ITM/OTM → smaller bumps)\n\nDefault: false (use fixed bump sizes)"
+    "description": "Enable adaptive bump sizes based on volatility and moneyness.\n\nWhen true, bump sizes are scaled based on:\n- Volatility level (higher vol → larger bumps)\n- Time to expiry (longer dated → larger bumps)\n- Moneyness (deep ITM/OTM → smaller bumps)\n\nDefault: false (use fixed bump sizes)"
   },
   {
     "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/credit_spread_bump_bp",
@@ -792,7 +792,7 @@ export default [
   {
     "path": "#/$defs/d_4ac4dad3ab3a5d25d3f9",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolSurfaceExtrapolation",
-    "description": "Policy for evaluating volatility surfaces outside their calibrated grid.\n\nMarket-standard production systems typically make this choice explicit because\nextrapolation can materially affect PV and greeks.\n\n# Market Standards\n\n- **Error**: Conservative approach for production systems; forces explicit handling.\n- **Clamp**: Simple flat extrapolation; common for quick prototyping.\n- **LinearInVariance**: Market-standard for equity/FX; preserves no-arbitrage conditions\n  better than linear-in-vol by extrapolating in total variance space (σ²T)."
+    "description": "Policy for evaluating volatility surfaces outside their calibrated grid.\n\nMarket-standard production systems typically make this choice explicit because\nextrapolation can materially affect PV and greeks.\n\n# Market Standards\n\n- **Error**: Conservative approach for production systems; forces explicit handling.\n- **Clamp**: Simple flat extrapolation; common for quick prototyping."
   },
   {
     "path": "#/$defs/d_4ac4dad3ab3a5d25d3f9/oneOf/0",
@@ -805,12 +805,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolSurfaceExtrapolation/oneOf/1",
     "const": "clamp",
     "description": "Flat extrapolation to the nearest edge (clamp to grid)."
-  },
-  {
-    "path": "#/$defs/d_4ac4dad3ab3a5d25d3f9/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolSurfaceExtrapolation/oneOf/2",
-    "const": "linear_in_variance",
-    "description": "Linear extrapolation in total variance space (σ²T).\n\nThis is the market-standard approach for equity and FX volatility surfaces\nbecause it preserves the no-arbitrage condition that total variance must\nincrease with time. The extrapolated volatility is computed as:\n\n```text\nσ(T_extrap) = sqrt(σ²(T_edge) * T_edge / T_extrap + slope * (T_extrap - T_edge) / T_extrap)\n```\n\nwhere `slope` is derived from the variance gradient at the edge.\n\n# When to Use\n\n- Long-dated option pricing where expiries exceed the calibrated grid\n- Scenario analysis requiring extrapolation to extreme tenors\n- Bootstrapping procedures that need consistent variance behavior\n\n# References\n\n- Gatheral, J. (2006). *The Volatility Surface*. Chapter 3. `docs/REFERENCES.md#gatheral-volatility-surface`\n- Fengler, M. R. (2009). \"Arbitrage-free smoothing of the implied volatility surface.\""
   },
   {
     "path": "#/$defs/d_4ba43030fede59fe5993",
@@ -895,19 +889,19 @@ export default [
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/bdt_sigma",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bdt_sigma",
-    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
+    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).",
     "format": "double"
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/bk_mean_reversion",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bk_mean_reversion",
-    "description": "Black-Karasinski mean-reversion speed (κ) of the log short rate, in\nannualised units (`0.03` = 3% per year).\n\nCompanion to [`Self::bk_sigma`]: read only by the rates-only bond tree\nwhen `tree_model = black_karasinski`, where it is required. Must be\nfinite and strictly positive; typical values are 0.01–0.10. A lognormal\nshort rate without mean reversion is `tree_model = black_derman_toy`\nwith [`Self::bdt_sigma`].",
+    "description": "Black-Karasinski mean-reversion speed (κ) of the log short rate, in\nannualised units (`0.03` = 3% per year).",
     "format": "double"
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/bk_sigma",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bk_sigma",
-    "description": "Black-Karasinski lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_karasinski`,\nwhere it is required together with [`Self::bk_mean_reversion`]. It is\na relative (lognormal) volatility on the same scale as\n[`Self::bdt_sigma`], unlike the absolute [`Self::hw1f_sigma`]; typical\nvalues are 0.10–0.40. Must be finite and non-negative; `0.0` prices on\nthe deterministic curve.",
+    "description": "Black-Karasinski lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).",
     "format": "double"
   },
   {
@@ -1008,8 +1002,8 @@ export default [
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/merton_mc_config/anyOf/0",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/merton_mc_config/anyOf/0",
-    "ref": "#/$defs/MertonMcOverride",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcOverride"
+    "ref": "#/$defs/MertonMcConfig",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig"
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/merton_mc_config/anyOf/1",
@@ -1078,7 +1072,7 @@ export default [
     "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_steps",
     "default": null,
-    "description": "Number of time steps for tree-based pricing (e.g., 100)",
+    "description": "Number of time steps for tree-based pricing (e.g., 100).",
     "format": "uint",
     "minimum": 0
   },
@@ -3571,20 +3565,20 @@ export default [
   {
     "path": "#/$defs/d_bcb4883b54741a29b14f",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/FloatLegSpec",
-    "description": "Specification for floating rate legs in interest rate swaps"
+    "description": "Specification for floating rate legs in interest rate swaps."
   },
   {
     "path": "#/$defs/d_bcb4883b54741a29b14f/properties/business_day_convention",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/FloatLegSpec/properties/business_day_convention",
     "default": "modified_following",
-    "description": "Business day convention for payment dates",
+    "description": "Business day convention for payment dates.",
     "ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#"
   },
   {
     "path": "#/$defs/d_bcb4883b54741a29b14f/properties/calendar_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/FloatLegSpec/properties/calendar_id",
-    "description": "Optional calendar for business day adjustments"
+    "description": "Optional calendar for business day adjustments."
   },
   {
     "path": "#/$defs/d_bcb4883b54741a29b14f/properties/calendar_id/anyOf/0",
@@ -3600,28 +3594,28 @@ export default [
     "path": "#/$defs/d_bcb4883b54741a29b14f/properties/compounding",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/FloatLegSpec/properties/compounding",
     "default": "simple",
-    "description": "Compounding method for floating coupons.\n\nDetermines how floating rate coupons are calculated:\n- `simple` (default): one term forward per period\n- `compounded_*`: SOFR/SONIA-style daily compounding\n- `simple_average` is rejected by [`Self::validate`]\n\n# Implementation Notes\n\nCompounded-in-arrears is implemented for IRS pricing in `instruments::irs` with\nsupport for lookback and observation shift conventions. For seasoned (already\nstarted) compounded swaps, pricing requires explicit fixings for observation\ndates prior to `as_of`.",
+    "description": "Compounding method for floating coupons.",
     "ref": "#/$defs/FloatingLegCompounding",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/FloatingLegCompounding"
   },
   {
     "path": "#/$defs/d_bcb4883b54741a29b14f/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/FloatLegSpec/properties/day_count",
-    "description": "Day count convention for accrual",
+    "description": "Day count convention for accrual.",
     "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
   },
   {
     "path": "#/$defs/d_bcb4883b54741a29b14f/properties/discount_curve_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/FloatLegSpec/properties/discount_curve_id",
-    "description": "Discount curve identifier for pricing",
+    "description": "Discount curve identifier for pricing.",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_bcb4883b54741a29b14f/properties/end",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/FloatLegSpec/properties/end",
-    "description": "End date of the floating leg",
+    "description": "End date of the floating leg.",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
@@ -3629,13 +3623,13 @@ export default [
     "path": "#/$defs/d_bcb4883b54741a29b14f/properties/end_of_month",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/FloatLegSpec/properties/end_of_month",
     "default": false,
-    "description": "End-of-month roll convention (default: false).\n\nWhen `true`, if the start date falls on the last business day of a month,\nall subsequent roll dates will also fall on the last business day of their\nrespective months. This matches QuantLib's `MakeOIS` default behavior.\n\n# Market Standard\n\nPer ISDA 2006 Definitions Section 4.18, the End-of-Month convention should\nbe applied when the effective date is the last business day of a month.\nMost professional systems (QuantLib, Bloomberg SWDF) default to `true`."
+    "description": "End-of-month roll convention (default: false)."
   },
   {
     "path": "#/$defs/d_bcb4883b54741a29b14f/properties/fixing_calendar_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/FloatLegSpec/properties/fixing_calendar_id",
     "default": null,
-    "description": "Optional calendar for rate fixing (reset lag)"
+    "description": "Optional calendar for rate fixing (reset lag)."
   },
   {
     "path": "#/$defs/d_bcb4883b54741a29b14f/properties/fixing_calendar_id/anyOf/0",
@@ -3650,14 +3644,14 @@ export default [
   {
     "path": "#/$defs/d_bcb4883b54741a29b14f/properties/forward_curve_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/FloatLegSpec/properties/forward_curve_id",
-    "description": "Forward curve identifier for rate projections",
+    "description": "Forward curve identifier for rate projections.",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_bcb4883b54741a29b14f/properties/frequency",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/FloatLegSpec/properties/frequency",
-    "description": "Payment frequency",
+    "description": "Payment frequency.",
     "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
   },
@@ -3672,27 +3666,27 @@ export default [
     "path": "#/$defs/d_bcb4883b54741a29b14f/properties/payment_lag_days",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/FloatLegSpec/properties/payment_lag_days",
     "default": 0,
-    "description": "Payment lag in business days after period end (default: 0).\n\nBloomberg OIS swaps typically use 2 business days payment lag.\nThe actual payment date is adjusted from the period end date by\nthis many business days using the leg's calendar.",
+    "description": "Payment lag in business days after period end (default: 0).",
     "format": "int32"
   },
   {
     "path": "#/$defs/d_bcb4883b54741a29b14f/properties/reset_lag_days",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/FloatLegSpec/properties/reset_lag_days",
     "default": 0,
-    "description": "Reset lag in business days for floating rate fixing (default: 0).\n\n- **0** (default): fixing on the accrual start date. A swap whose first\n  accrual period starts on or after the valuation date then prices off\n  the forward curve without historical fixings.\n- **Positive** (e.g., 2): T-2 fixing (2 business days before accrual\n  start). Use `RateIndexConventions::default_reset_lag_days` (or\n  `InterestRateSwap::from_conventions`) for the market default of a\n  given index.\n- **Negative** (e.g., -1): resolved at pricing time to the registered\n  index convention default; rejected when the forward curve id is not a\n  registered rate index.",
+    "description": "Reset lag in business days for floating rate fixing (default: 0).",
     "format": "int32"
   },
   {
     "path": "#/$defs/d_bcb4883b54741a29b14f/properties/spread_bp",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/FloatLegSpec/properties/spread_bp",
-    "description": "Spread in basis points added to the forward rate",
+    "description": "Spread in basis points added to the forward rate.",
     "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
     "path": "#/$defs/d_bcb4883b54741a29b14f/properties/start",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/FloatLegSpec/properties/start",
-    "description": "Start date of the floating leg",
+    "description": "Start date of the floating leg.",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
@@ -3700,7 +3694,7 @@ export default [
     "path": "#/$defs/d_bcb4883b54741a29b14f/properties/stub",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/FloatLegSpec/properties/stub",
     "default": "short_front",
-    "description": "Stub period handling rule",
+    "description": "Stub period handling rule.",
     "ref": "#/$defs/StubKind",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/StubKind"
   },
@@ -3709,13 +3703,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/money.schema.json#/$defs/DecimalWire",
     "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
     "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"
-  },
-  {
-    "path": "#/$defs/d_bffef9e684ff0c351c83",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcOverride",
-    "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`].",
-    "ref": "#/$defs/MertonMcConfig",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65",
@@ -4235,7 +4222,7 @@ export default [
   {
     "path": "#/$defs/d_f2becfb3409f67ce2d6f",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json#/$defs/BasisSwap",
-    "description": "Basis swap instrument that exchanges two floating rate payments with different tenors.\n\nA basis swap allows parties to exchange floating rate payments based on different\nreference rates (e.g., 3M SOFR vs 6M SOFR) plus an optional spread on one leg.\nThe primary leg typically receives the spread, while the reference leg pays flat.\n\nEach leg owns its own dates, discount curve, calendar, and stub conventions,\nfollowing the IRS leg-centric pattern.\n\n# Cross-Currency (XCCY) Basis Swaps\n\n**Important**: This implementation supports **single-currency** basis swaps only.\nFor cross-currency basis swaps, use `XccySwap` instead.\n\n# Examples\n```rust\nuse finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};\nuse finstack_quant_valuations_rates::basis_swap::BasisSwap;\nuse finstack_quant_valuations_core::instruments::FloatLegSpec;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::January, 3).expect(\"valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 3).expect(\"valid date\");\n\nlet primary_leg = FloatLegSpec {\n    index_id: \"3M-SOFR\".into(),\n    forward_curve_id: CurveId::new(\"3M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::quarterly(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::from(5),\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet reference_leg = FloatLegSpec {\n    index_id: \"6M-SOFR\".into(),\n    forward_curve_id: CurveId::new(\"6M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::semi_annual(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::ZERO,\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet swap = BasisSwap::builder()\n    .id(\"BASIS_SWAP_001\".into())\n    .notional(Money::from((1_000_000_i64, Currency::USD)))\n    .primary_leg(primary_leg)\n    .reference_leg(reference_leg)\n    .allow_calendar_fallback(true)\n    .attributes(Default::default())\n    .build().expect(\"valid basis swap\");\n```"
+    "description": "Basis swap instrument that exchanges two floating rate payments with different tenors.\n\nA basis swap allows parties to exchange floating rate payments based on different\nreference rates (e.g., 3M SOFR vs 6M SOFR) plus an optional spread on one leg.\nThe primary leg typically receives the spread, while the reference leg pays flat.\n\nEach leg owns its own dates, discount curve, calendar, and stub conventions,\nfollowing the IRS leg-centric pattern.\n\n# Cross-Currency (XCCY) Basis Swaps\n\n**Important**: This implementation supports **single-currency** basis swaps only.\nFor cross-currency basis swaps, use `XccySwap` instead.\n\n# Examples\n```rust\nuse finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};\nuse finstack_quant_valuations_rates::basis_swap::BasisSwap;\nuse finstack_quant_valuations_rates::FloatLegSpec;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::January, 3).expect(\"valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 3).expect(\"valid date\");\n\nlet primary_leg = FloatLegSpec {\n    index_id: \"3M-SOFR\".into(),\n    forward_curve_id: CurveId::new(\"3M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::quarterly(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::from(5),\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet reference_leg = FloatLegSpec {\n    index_id: \"6M-SOFR\".into(),\n    forward_curve_id: CurveId::new(\"6M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::semi_annual(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::ZERO,\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet swap = BasisSwap::builder()\n    .id(\"BASIS_SWAP_001\".into())\n    .notional(Money::from((1_000_000_i64, Currency::USD)))\n    .primary_leg(primary_leg)\n    .reference_leg(reference_leg)\n    .allow_calendar_fallback(true)\n    .attributes(Default::default())\n    .build().expect(\"valid basis swap\");\n```"
   },
   {
     "path": "#/$defs/d_f2becfb3409f67ce2d6f/properties/allow_calendar_fallback",
@@ -4349,7 +4336,7 @@ export default [
   {
     "path": "#/$defs/d_fd618cd5743ec18a168f",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BondRiskBasis",
-    "description": "Basis used for bond duration, convexity, and DV01-style risk metrics."
+    "description": "Risk calculation basis for callable/putable bonds.\n\nSelects whether analytical risk metrics (duration, convexity, DV01) evaluate\nthe maturity/workout cashflow path under quoted yields or reprice the embedded\noption via the callable OAS/tree model."
   },
   {
     "path": "#/$defs/d_fd618cd5743ec18a168f/oneOf/0",

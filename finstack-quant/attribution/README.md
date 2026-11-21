@@ -65,7 +65,7 @@ finer breakdowns:
   waterfall also classify declared scalar volatility quotes here.
 - **ModelParameters** — prepayment, default, recovery, conversion-policy and
   other model inputs snapshotted via
-  `finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot`.
+  `finstack_quant_attribution::ModelParamsSnapshot`.
 - **MarketScalars** — dividends and equity/commodity spots.
 
 ## Layout

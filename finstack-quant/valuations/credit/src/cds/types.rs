@@ -67,7 +67,8 @@ use time::macros::date;
 use crate::cds::pricing::CdsPricer;
 use finstack_quant_valuations_core::impl_instrument_base;
 
-use finstack_quant_valuations_core::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
+use crate::{PremiumLegSpec, ProtectionLegSpec};
+use finstack_quant_valuations_core::instruments::PayReceive;
 
 /// Resolve a meta documentation clause (e.g., `IsdaNa`, `IsdaEu`) to its
 /// concrete restructuring variant. Concrete clauses pass through unchanged.
@@ -369,7 +370,7 @@ impl CreditDefaultSwap {
             .side(PayReceive::Pay)
             .convention(convention)
             .premium_leg(PremiumLegSpec {
-                date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+                date_regime: crate::CdsDateRegime::Standard,
                 start: date!(2024 - 03 - 20),
                 end: date!(2029 - 03 - 20),
                 frequency,
@@ -440,7 +441,7 @@ impl CreditDefaultSwap {
             include_valuation_date_cashflows,
             convention,
             premium_leg: PremiumLegSpec {
-                date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+                date_regime: crate::CdsDateRegime::Standard,
                 start,
                 end,
                 frequency,
@@ -493,7 +494,8 @@ impl CreditDefaultSwap {
     /// use finstack_quant_valuations_credit::constants::isda::STANDARD_RECOVERY_SENIOR;
     /// use finstack_quant_valuations_core::market::conventions::CdsConvention;
     /// use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
-    /// use finstack_quant_valuations_core::instruments::{CdsDateRegime, PayReceive, PremiumLegSpec, ProtectionLegSpec};
+    /// use finstack_quant_valuations_core::instruments::PayReceive;
+    /// use finstack_quant_valuations_credit::{CdsDateRegime, PremiumLegSpec, ProtectionLegSpec};
     /// use finstack_quant_core::types::Attributes;
     /// use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     /// use rust_decimal::Decimal;

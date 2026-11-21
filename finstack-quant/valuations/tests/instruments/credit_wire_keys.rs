@@ -135,7 +135,7 @@ fn cds_tranche_new_carries_schedule_stub_and_date_regime() {
         "TR-STUB",
         &params,
         &schedule,
-        finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
+        finstack_quant_valuations::instruments::CdsDateRegime::Bespoke,
         "USD-OIS",
         "CDX.NA.IG.HAZARD",
         PayReceive::Pay,
@@ -144,13 +144,13 @@ fn cds_tranche_new_carries_schedule_stub_and_date_regime() {
     assert_eq!(tranche.stub, StubKind::LongFront);
     assert_eq!(
         tranche.date_regime,
-        finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke
+        finstack_quant_valuations::instruments::CdsDateRegime::Bespoke
     );
 
     let standard = CdsTranche::example().expect("example");
     assert_eq!(
         standard.date_regime,
-        finstack_quant_valuations_core::instruments::CdsDateRegime::Standard
+        finstack_quant_valuations::instruments::CdsDateRegime::Standard
     );
 
     // The tranche grid comes from its date regime, never a cashflows roll rule.
@@ -160,7 +160,7 @@ fn cds_tranche_new_carries_schedule_stub_and_date_regime() {
             "TR-IMM",
             &params,
             &schedule,
-            finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
+            finstack_quant_valuations::instruments::CdsDateRegime::Bespoke,
             "USD-OIS",
             "CDX.NA.IG.HAZARD",
             PayReceive::Pay,

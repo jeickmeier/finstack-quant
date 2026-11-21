@@ -230,7 +230,7 @@ pub fn cds_buy_protection(
         .side(PayReceive::Pay)
         .convention(convention)
         .premium_leg(PremiumLegSpec {
-            date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+            date_regime: finstack_quant_valuations::instruments::CdsDateRegime::Standard,
             start,
             end: maturity,
             frequency,
@@ -295,7 +295,7 @@ pub fn cds_sell_protection(
         .side(PayReceive::Receive)
         .convention(convention)
         .premium_leg(PremiumLegSpec {
-            date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+            date_regime: finstack_quant_valuations::instruments::CdsDateRegime::Standard,
             start,
             end: maturity,
             frequency,

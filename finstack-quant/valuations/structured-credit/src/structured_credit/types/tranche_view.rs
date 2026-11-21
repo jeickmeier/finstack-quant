@@ -9,7 +9,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{Attributes, InstrumentId};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations_core::metrics::{MetricContext, MetricSeed};
 use serde::{Deserialize, Serialize};
 
@@ -95,6 +94,14 @@ impl StructuredCreditTranche {
     /// Originating collateral and waterfall for the selected note.
     pub fn deal(&self) -> &StructuredCredit {
         &self.deal
+    }
+
+    /// Clone this note with a replacement originating deal, preserving its identity and tranche.
+    ///
+    /// # Arguments
+    /// * `deal` - Replacement collateral pool and waterfall deal containing `self.tranche_id()`.
+    pub fn with_deal(&self, deal: StructuredCredit) -> Result<Self> {
+        Self::new(self.id.clone(), deal, self.tranche_id.clone())
     }
 
     /// Apply a collateral correlation change to the note's originating deal.
@@ -245,31 +252,6 @@ impl Instrument for StructuredCreditTranche {
             .require(&self.tranche_id)
             .ok()
             .map(|note| note.current_balance);
-    }
-
-    fn model_params_snapshot(&self) -> ModelParamsSnapshot {
-        self.deal.model_params_snapshot()
-    }
-
-    fn with_model_params(
-        &self,
-        params: &ModelParamsSnapshot,
-    ) -> finstack_quant_core::Result<Box<dyn Instrument>> {
-        let deal = self.deal.with_model_params(params)?;
-        let deal = deal
-            .as_any()
-            .downcast_ref::<StructuredCredit>()
-            .cloned()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(
-                    "structured-credit model parameters must produce a StructuredCredit".into(),
-                )
-            })?;
-        Ok(Box::new(Self::new(
-            self.id.clone(),
-            deal,
-            self.tranche_id.clone(),
-        )?))
     }
 
     fn get_instrument_pricing_overrides(

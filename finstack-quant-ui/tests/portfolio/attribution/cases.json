@@ -8020,7 +8020,7 @@
       "method": "parallel",
       "ok": false,
       "kind": "validation",
-      "message": "Valuation error for position 'IRS-A': Attribution T1 valuation failed: instrument 'IRS-A' failed PV-only fallback (Validation error: Validation error: Seasoned instrument requires fixings for index 'USD-SOFR-3M' on 2023-12-28. Provide a ScalarTimeSeries with id 'FIXING:USD-SOFR-3M'. (valuation date: 2024-01-29)) after canonical pricing also failed (Invalid input: Validation error: Seasoned instrument requires fixings for index 'USD-SOFR-3M' on 2023-12-28. Provide a ScalarTimeSeries with id 'FIXING:USD-SOFR-3M'. (valuation date: 2024-01-29) [instrument=IRS-A, type=Irs, model=Discounting])"
+      "message": "Valuation error for position 'IRS-A': Attribution T1 valuation failed: instrument 'IRS-A' failed PV-only fallback (Validation error: Validation error: Seasoned instrument requires fixings for index 'USD-SOFR-3M' on 2023-12-28. Provide a ScalarTimeSeries with id 'FIXING:USD-SOFR-3M'. (valuation date: 2024-01-29)) after canonical pricing also failed (Invalid input: Validation error: Seasoned instrument requires fixings for index 'USD-SOFR-3M' on 2023-12-28. Provide a ScalarTimeSeries with id 'FIXING:USD-SOFR-3M'. (valuation date: 2024-01-29) [instrument=IRS-A, type=interest_rate_swap, model=discounting])"
     },
     {
       "scenario": "roll-1m-25bp",
@@ -8040,7 +8040,7 @@
       },
       "ok": false,
       "kind": "validation",
-      "message": "Valuation error for position 'IRS-A': Attribution T1 valuation failed: instrument 'IRS-A' failed PV-only fallback (Validation error: Validation error: Seasoned instrument requires fixings for index 'USD-SOFR-3M' on 2023-12-28. Provide a ScalarTimeSeries with id 'FIXING:USD-SOFR-3M'. (valuation date: 2024-01-29)) after canonical pricing also failed (Invalid input: Validation error: Seasoned instrument requires fixings for index 'USD-SOFR-3M' on 2023-12-28. Provide a ScalarTimeSeries with id 'FIXING:USD-SOFR-3M'. (valuation date: 2024-01-29) [instrument=IRS-A, type=Irs, model=Discounting])"
+      "message": "Valuation error for position 'IRS-A': Attribution T1 valuation failed: instrument 'IRS-A' failed PV-only fallback (Validation error: Validation error: Seasoned instrument requires fixings for index 'USD-SOFR-3M' on 2023-12-28. Provide a ScalarTimeSeries with id 'FIXING:USD-SOFR-3M'. (valuation date: 2024-01-29)) after canonical pricing also failed (Invalid input: Validation error: Seasoned instrument requires fixings for index 'USD-SOFR-3M' on 2023-12-28. Provide a ScalarTimeSeries with id 'FIXING:USD-SOFR-3M'. (valuation date: 2024-01-29) [instrument=IRS-A, type=interest_rate_swap, model=discounting])"
     },
     {
       "scenario": "roll-1m-25bp",
@@ -8048,7 +8048,7 @@
       "method": "metrics_based",
       "ok": false,
       "kind": "validation",
-      "message": "Valuation error for position 'IRS-A': Attribution T1 valuation failed: Invalid input: Validation error: Seasoned instrument requires fixings for index 'USD-SOFR-3M' on 2023-12-28. Provide a ScalarTimeSeries with id 'FIXING:USD-SOFR-3M'. (valuation date: 2024-01-29) [instrument=IRS-A, type=Irs, model=Discounting]"
+      "message": "Valuation error for position 'IRS-A': Attribution T1 valuation failed: Invalid input: Validation error: Seasoned instrument requires fixings for index 'USD-SOFR-3M' on 2023-12-28. Provide a ScalarTimeSeries with id 'FIXING:USD-SOFR-3M'. (valuation date: 2024-01-29) [instrument=IRS-A, type=interest_rate_swap, model=discounting]"
     },
     {
       "scenario": "roll-1m-25bp",
@@ -8058,7 +8058,7 @@
       },
       "ok": false,
       "kind": "validation",
-      "message": "Valuation error for position 'IRS-A': Attribution T1 valuation failed: instrument 'IRS-A' failed PV-only fallback (Validation error: Validation error: Seasoned instrument requires fixings for index 'USD-SOFR-3M' on 2023-12-28. Provide a ScalarTimeSeries with id 'FIXING:USD-SOFR-3M'. (valuation date: 2024-01-29)) after canonical pricing also failed (Invalid input: Validation error: Seasoned instrument requires fixings for index 'USD-SOFR-3M' on 2023-12-28. Provide a ScalarTimeSeries with id 'FIXING:USD-SOFR-3M'. (valuation date: 2024-01-29) [instrument=IRS-A, type=Irs, model=Discounting])"
+      "message": "Valuation error for position 'IRS-A': Attribution T1 valuation failed: instrument 'IRS-A' failed PV-only fallback (Validation error: Validation error: Seasoned instrument requires fixings for index 'USD-SOFR-3M' on 2023-12-28. Provide a ScalarTimeSeries with id 'FIXING:USD-SOFR-3M'. (valuation date: 2024-01-29)) after canonical pricing also failed (Invalid input: Validation error: Seasoned instrument requires fixings for index 'USD-SOFR-3M' on 2023-12-28. Provide a ScalarTimeSeries with id 'FIXING:USD-SOFR-3M'. (valuation date: 2024-01-29) [instrument=IRS-A, type=interest_rate_swap, model=discounting])"
     }
   ],
   "exact": {

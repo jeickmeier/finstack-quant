@@ -45,7 +45,7 @@ fn test_irs_builder_pattern() {
         .id("IRS-CUSTOM".into())
         .notional(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
-        .fixed_leg(finstack_quant_valuations_core::instruments::FixedLegSpec {
+        .fixed_leg(finstack_quant_valuations_rates::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.0325).expect("valid"),
             frequency: Tenor::semi_annual(),
@@ -59,7 +59,7 @@ fn test_irs_builder_pattern() {
             payment_lag_days: 0,
             end_of_month: false,
         })
-        .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
+        .float_leg(finstack_quant_valuations_rates::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
             index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
@@ -199,7 +199,7 @@ fn test_irs_different_leg_frequencies() {
         .id("IRS-DIFF-FREQ".into())
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
-        .fixed_leg(finstack_quant_valuations_core::instruments::FixedLegSpec {
+        .fixed_leg(finstack_quant_valuations_rates::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::semi_annual(),
@@ -213,7 +213,7 @@ fn test_irs_different_leg_frequencies() {
             payment_lag_days: 0,
             end_of_month: false,
         })
-        .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
+        .float_leg(finstack_quant_valuations_rates::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
             index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
@@ -271,7 +271,7 @@ fn test_irs_calendar_specification() {
         .id("IRS-CAL".into())
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
-        .fixed_leg(finstack_quant_valuations_core::instruments::FixedLegSpec {
+        .fixed_leg(finstack_quant_valuations_rates::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::semi_annual(),
@@ -285,7 +285,7 @@ fn test_irs_calendar_specification() {
             payment_lag_days: 0,
             end_of_month: false,
         })
-        .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
+        .float_leg(finstack_quant_valuations_rates::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
             index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
@@ -316,7 +316,7 @@ fn test_irs_stub_specification() {
         .id("IRS-STUB".into())
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
-        .fixed_leg(finstack_quant_valuations_core::instruments::FixedLegSpec {
+        .fixed_leg(finstack_quant_valuations_rates::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::semi_annual(),
@@ -330,7 +330,7 @@ fn test_irs_stub_specification() {
             payment_lag_days: 0,
             end_of_month: false,
         })
-        .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
+        .float_leg(finstack_quant_valuations_rates::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
             index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),

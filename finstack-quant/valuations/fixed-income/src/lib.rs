@@ -104,6 +104,13 @@ pub mod tba;
 /// Term loan module.
 pub mod term_loan;
 
+pub use bond::BondConvention;
+pub use convertible::{
+    AntiDilutionPolicy, ConversionEvent, ConversionPolicy, ConversionSpec, DilutionEvent,
+    DividendAdjustment, PriceTrigger,
+};
+pub use fi_trs::IndexUnderlyingParams;
+
 mod family;
 pub use family::FIXED_INCOME;
 

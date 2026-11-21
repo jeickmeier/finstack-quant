@@ -2,7 +2,7 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
- * Credit curve identifier
+ * Credit curve identifier.
  */
 export type Id = string;
 /**
@@ -310,7 +310,11 @@ export type DA43F3D027De0527C6928 =
       risk_class: "non_qualifying";
     };
 /**
- * Basis used for bond duration, convexity, and DV01-style risk metrics.
+ * Risk calculation basis for callable/putable bonds.
+ *
+ * Selects whether analytical risk metrics (duration, convexity, DV01) evaluate
+ * the maturity/workout cashflow path under quoted yields or reprice the embedded
+ * option via the callable OAS/tree model.
  */
 export type DFd618Cd5743Ec18A168F = "bullet_discountable" | "callable_oas";
 /**
@@ -486,7 +490,7 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZWG"
   | "ZWL";
 /**
- * Business day convention
+ * Business day convention.
  */
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
@@ -500,7 +504,7 @@ export type Id3 = string;
  */
 export type Decimal = string;
 /**
- * Day count convention
+ * Day count convention.
  */
 export type DayCount =
   | "one_one"
@@ -522,11 +526,11 @@ export type DayCount =
  */
 export type Id4 = string;
 /**
- * End date of protection
+ * End date of protection.
  */
 export type Date = string;
 /**
- * Start date of protection
+ * Start date of protection.
  */
 export type Date1 = string;
 /**
@@ -683,11 +687,11 @@ export interface D_80E139D6F4D92C281A38 {
 export interface D_6565F7C25972C77D1Ceb {
   credit_curve_id: Id;
   /**
-   * Recovery rate (0.0 to 1.0)
+   * Recovery rate (`0.0` to `1.0`).
    */
   recovery_rate: number;
   /**
-   * Reference entity (issuer being protected)
+   * Reference entity (issuer being protected).
    */
   reference_entity: string;
 }
@@ -789,36 +793,16 @@ export interface D_572Ad1Befb7D94914652 {
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
-   *
-   * Read only by the rates-only bond tree when `tree_model = black_derman_toy` selects
-   * BDT for a bond with embedded exercise rights, where it is required.
-   * It is a relative (lognormal) volatility, unlike the absolute
-   * [`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has
-   * no mean reversion. Must be finite and non-negative; `0.0` prices on the
-   * deterministic curve.
    */
   bdt_sigma?: number | null;
   /**
    * Black-Karasinski mean-reversion speed (κ) of the log short rate, in
    * annualised units (`0.03` = 3% per year).
-   *
-   * Companion to [`Self::bk_sigma`]: read only by the rates-only bond tree
-   * when `tree_model = black_karasinski`, where it is required. Must be
-   * finite and strictly positive; typical values are 0.01–0.10. A lognormal
-   * short rate without mean reversion is `tree_model = black_derman_toy`
-   * with [`Self::bdt_sigma`].
    */
   bk_mean_reversion?: number | null;
   /**
    * Black-Karasinski lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
-   *
-   * Read only by the rates-only bond tree when `tree_model = black_karasinski`,
-   * where it is required together with [`Self::bk_mean_reversion`]. It is
-   * a relative (lognormal) volatility on the same scale as
-   * [`Self::bdt_sigma`], unlike the absolute [`Self::hw1f_sigma`]; typical
-   * values are 0.10–0.40. Must be finite and non-negative; `0.0` prices on
-   * the deterministic curve.
    */
   bk_sigma?: number | null;
   /**
@@ -982,7 +966,7 @@ export interface D_572Ad1Befb7D94914652 {
    * model and grid; the path count, antithetic flag and seed label come from
    * `mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config.
    */
-  merton_mc_config?: DBffef9E684Ff0C351C83 | null;
+  merton_mc_config?: D_10A2B628165F3F3E10E7 | null;
   /**
    * Quote compounding convention for OAS inputs and outputs.
    *
@@ -1034,13 +1018,13 @@ export interface D_572Ad1Befb7D94914652 {
    */
   tree_model?: D_948Cdc4Db846A21357A4 | null;
   /**
-   * Number of time steps for tree-based pricing (e.g., 100)
+   * Number of time steps for tree-based pricing (e.g., 100).
    */
   tree_steps?: number | null;
   /**
    * Volatility surface extrapolation policy when `implied_volatility` is not set.
    */
-  vol_surface_extrapolation?: "error" | "clamp" | "linear_in_variance";
+  vol_surface_extrapolation?: "error" | "clamp";
 }
 /**
  * A finite, right-continuous piecewise-constant curve.
@@ -1056,14 +1040,9 @@ export interface DCdb8Fddc0106047270C4 {
   values: [number, ...number[]];
 }
 /**
- * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
- *
- * This is a wrapper around
- * [`crate::instruments::MertonMcConfig`]
- * that allows the pricer registry to access the MC configuration from
- * [`InstrumentPricingOverrides`].
+ * Configuration for Monte Carlo PIK bond pricing.
  */
-export interface DBffef9E684Ff0C351C83 {
+export interface D_10A2B628165F3F3E10E7 {
   /**
    * Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.
    *
@@ -2855,7 +2834,7 @@ export interface DD962Ef8Db4Edf11Dc092 {
  */
 export interface D_1D0C1815F8Dd0715Bd12 {
   /**
-   * Enable adaptive bump sizes based on volatility and moneyness
+   * Enable adaptive bump sizes based on volatility and moneyness.
    *
    * When true, bump sizes are scaled based on:
    * - Volatility level (higher vol → larger bumps)
@@ -3147,7 +3126,7 @@ export interface Money6 {
 export interface D_8E49754Fd6F989211584 {
   business_day_convention?: BusinessDayConvention;
   /**
-   * Holiday calendar identifier
+   * Holiday calendar identifier.
    */
   calendar_id?: Id3 | null;
   coupon_bp: Decimal;
@@ -3168,7 +3147,7 @@ export interface D_8E49754Fd6F989211584 {
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
 /**
- * Payment frequency
+ * Payment frequency.
  */
 export interface Tenor {
   /**
@@ -3188,11 +3167,11 @@ export interface Tenor {
 export interface DF5C0F558F1Edaf8D4A5F {
   credit_curve_id: Id5;
   /**
-   * Recovery rate as a decimal fraction in `[0.0, 1.0)`
+   * Recovery rate as a decimal fraction in `[0.0, 1.0)`.
    */
   recovery_rate: number;
   /**
-   * Settlement delay in business days
+   * Settlement delay in business days.
    */
   settlement_delay: number;
 }

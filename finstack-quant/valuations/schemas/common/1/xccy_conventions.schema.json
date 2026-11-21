@@ -1,7 +1,7 @@
 {
   "$defs": {
     "NotionalExchange": {
-      "description": "Notional exchange convention for XCCY swaps.",
+      "description": "Principal exchange schedule options for cross-currency swaps.",
       "oneOf": [
         {
           "const": "none",

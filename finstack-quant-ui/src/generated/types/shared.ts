@@ -186,7 +186,11 @@ export type Date1 = string;
  */
 export type Date2 = string;
 /**
- * Basis used for bond duration, convexity, and DV01-style risk metrics.
+ * Risk calculation basis for callable/putable bonds.
+ *
+ * Selects whether analytical risk metrics (duration, convexity, DV01) evaluate
+ * the maturity/workout cashflow path under quoted yields or reprice the embedded
+ * option via the callable OAS/tree model.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "d_fd618cd5743ec18a168f".
@@ -615,16 +619,6 @@ export type Date6 = string;
 export type Date7 = string;
 /**
  * Anti-dilution protection applied to conversion terms.
- *
- * When dilutive events occur (stock splits, below-market issuances, special
- * dividends), the conversion ratio is adjusted to protect bondholders from
- * value erosion.
- *
- * # Industry Practice
- *
- * Most convertible bonds use **Weighted Average** anti-dilution, which is
- * less protective but more issuer-friendly. **Full Ratchet** is mainly seen
- * in private placements and venture-style convertibles.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "AntiDilutionPolicy".
@@ -3069,7 +3063,7 @@ export type BarrierType = "up_and_out" | "up_and_in" | "down_and_out" | "down_an
  */
 export type Id39 = string;
 /**
- * Business day convention for payment dates
+ * Business day convention for payment dates.
  */
 export type BusinessDayConvention5 =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
@@ -3558,7 +3552,7 @@ export type Id50 = string;
  */
 export type Id51 = string;
 /**
- * Business day convention for payment dates
+ * Business day convention for payment dates.
  */
 export type BusinessDayConvention7 =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
@@ -6972,7 +6966,7 @@ export type Date100 = string;
  *
  * ```rust
  * use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource};
- * use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
+ * use finstack_quant_valuations_fx::NdfQuoteConvention;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::money::Money;
@@ -9987,28 +9981,9 @@ export type Id170 = string;
 /**
  * Standard commodity market conventions by product type.
  *
- * Each variant provides market-standard defaults for settlement days,
- * business day convention, and calendar. Use when constructing commodity
- * forwards, options, or swaps without explicitly specifying these parameters.
- *
- * # Market Standards Reference
- *
- * | Convention | Settlement | BDC | Calendar | Exchange |
- * |------------|------------|-----|----------|----------|
- * | WTI Crude | T+2 | Following | NYMEX | NYMEX/CME |
- * | Brent Crude | T+2 | Following | ICE | ICE |
- * | Natural Gas | T+2 | Following | NYMEX | NYMEX/CME |
- * | Gold | T+2 | Modified Following | COMEX | CME |
- * | Silver | T+2 | Modified Following | COMEX | CME |
- * | Copper | T+2 | Following | LME | LME |
- * | Corn/Wheat | T+2 | Following | CBOT | CME |
- * | Power | T+1 | Modified Following | NERC | Various |
- *
- * # Sources
- *
- * - CME Group rulebooks
- * - ICE Futures exchange rules
- * - LME trading procedures
+ * Each variant provides market-standard defaults for settlement days and
+ * business day convention. Use when constructing commodity forwards, options,
+ * or swaps without explicitly specifying these parameters.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "CommodityConvention".
@@ -11678,7 +11653,7 @@ export type DayCount53 =
  */
 export type Date129 = string;
 /**
- * Base currency for pricing
+ * Base currency for pricing.
  */
 export type Currency41 =
   | "AED"
@@ -14396,8 +14371,7 @@ export type CatchUpMode = "full" | "partial";
  */
 export type CdsConvention = "isda_na" | "isda_eu" | "isda_as" | "custom";
 /**
- * Named contractual date regime of a CDS product (record
- * CALIBRATION-FRAMEWORK-007, O7).
+ * Named contractual date regime of a CDS product.
  *
  * The regime owns how the premium grid, its stub and its endpoints are
  * derived; no regime is inferred and none is a default.
@@ -14822,34 +14796,12 @@ export type DigitalPayoutType = "cash_or_nothing" | "asset_or_nothing";
 /**
  * How dividends affect conversion terms (dividend protection).
  *
- * Dividend protection compensates the holder for dividends paid on the
- * underlying, which otherwise leak value from the conversion option (the
- * stock drifts at `r - q` under the risk-neutral measure). The variants
- * carry no threshold parameter, so protection is **full**: the entire
- * continuous dividend yield `q` is protected.
- *
- * # Pricing model (continuous-yield accretion)
- *
- * Under the continuous dividend yield `q` used by the tree pricer, each
- * protected dividend payment bumps the conversion ratio by the dividend
- * fraction; the continuous limit is exponential accretion from the
- * valuation date:
- *
- * ```text
- * AdjustRatio:  ratio(t)  = ratio_0 * exp(q * t)
- * AdjustPrice:  K_conv(t) = K_0 * exp(-q * t)
- * ```
- *
- * Since `ratio = notional / K_conv`, the price decay is mathematically the
- * same ratio accretion — the pricer implements both variants through the
- * single ratio-accretion mechanism. Accretion composes multiplicatively on
- * top of any anti-dilution adjustments from
- * `ConvertibleBond::effective_conversion_ratio`.
- *
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations_core::instruments::{AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment};
+ * use finstack_quant_valuations_fixed_income::convertible::{
+ *     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
+ * };
  *
  * let conversion = ConversionSpec {
  *     ratio: Some(25.0),
@@ -15327,42 +15279,16 @@ export type Monitoring =
       type: "discrete";
     };
 /**
- * Quote convention for NDF contract rates.
+ * Non-Deliverable Forward (NDF) rate quote convention.
  *
- * NDFs can be quoted in two conventions depending on the market:
- *
- * # BasePerSettlement (default)
- *
- * Rate is quoted as units of base currency per one unit of settlement currency.
- * Example: USD/CNY = 7.25 means 7.25 CNY per 1 USD.
- *
- * Settlement formula:
- * ```text
- * Settlement = Notional_base × (1/F_fixing - 1/F_contract)
- * ```
- *
- * This is the standard convention for most Asian NDF markets (CNY, KRW, INR, etc.)
- * where the restricted currency is the base and USD is the settlement currency.
- *
- * # SettlementPerBase
- *
- * Rate is quoted as units of settlement currency per one unit of base currency.
- * Example: CNY/USD = 0.138 means 0.138 USD per 1 CNY.
- *
- * Settlement formula:
- * ```text
- * Settlement = Notional_base × (F_fixing - F_contract)
- * ```
- *
- * This is less common but may be used in some markets or for consistency with
- * other FX instruments that quote in this direction.
+ * Determines how fixing and contracted forward rates are expressed and settled.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "NdfQuoteConvention".
  */
 export type NdfQuoteConvention = "base_per_settlement" | "settlement_per_base";
 /**
- * Notional exchange convention for XCCY swaps.
+ * Principal exchange schedule options for cross-currency swaps.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "NotionalExchange".
@@ -16399,13 +16325,11 @@ export type D_46455Be5Cce6B8020E50 =
  *
  * - **Error**: Conservative approach for production systems; forces explicit handling.
  * - **Clamp**: Simple flat extrapolation; common for quick prototyping.
- * - **LinearInVariance**: Market-standard for equity/FX; preserves no-arbitrage conditions
- *   better than linear-in-vol by extrapolating in total variance space (σ²T).
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "d_4ac4dad3ab3a5d25d3f9".
  */
-export type D_4Ac4Dad3Ab3A5D25D3F9 = "error" | "clamp" | "linear_in_variance";
+export type D_4Ac4Dad3Ab3A5D25D3F9 = "error" | "clamp";
 /**
  * Compounding convention for interest rates.
  *
@@ -18086,36 +18010,16 @@ export interface D_572Ad1Befb7D94914652 {
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
-   *
-   * Read only by the rates-only bond tree when `tree_model = black_derman_toy` selects
-   * BDT for a bond with embedded exercise rights, where it is required.
-   * It is a relative (lognormal) volatility, unlike the absolute
-   * [`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has
-   * no mean reversion. Must be finite and non-negative; `0.0` prices on the
-   * deterministic curve.
    */
   bdt_sigma?: number | null;
   /**
    * Black-Karasinski mean-reversion speed (κ) of the log short rate, in
    * annualised units (`0.03` = 3% per year).
-   *
-   * Companion to [`Self::bk_sigma`]: read only by the rates-only bond tree
-   * when `tree_model = black_karasinski`, where it is required. Must be
-   * finite and strictly positive; typical values are 0.01–0.10. A lognormal
-   * short rate without mean reversion is `tree_model = black_derman_toy`
-   * with [`Self::bdt_sigma`].
    */
   bk_mean_reversion?: number | null;
   /**
    * Black-Karasinski lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
-   *
-   * Read only by the rates-only bond tree when `tree_model = black_karasinski`,
-   * where it is required together with [`Self::bk_mean_reversion`]. It is
-   * a relative (lognormal) volatility on the same scale as
-   * [`Self::bdt_sigma`], unlike the absolute [`Self::hw1f_sigma`]; typical
-   * values are 0.10–0.40. Must be finite and non-negative; `0.0` prices on
-   * the deterministic curve.
    */
   bk_sigma?: number | null;
   /**
@@ -18279,7 +18183,7 @@ export interface D_572Ad1Befb7D94914652 {
    * model and grid; the path count, antithetic flag and seed label come from
    * `mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config.
    */
-  merton_mc_config?: DBffef9E684Ff0C351C83 | null;
+  merton_mc_config?: D_10A2B628165F3F3E10E7 | null;
   /**
    * Quote compounding convention for OAS inputs and outputs.
    *
@@ -18331,13 +18235,13 @@ export interface D_572Ad1Befb7D94914652 {
    */
   tree_model?: D_948Cdc4Db846A21357A4 | null;
   /**
-   * Number of time steps for tree-based pricing (e.g., 100)
+   * Number of time steps for tree-based pricing (e.g., 100).
    */
   tree_steps?: number | null;
   /**
    * Volatility surface extrapolation policy when `implied_volatility` is not set.
    */
-  vol_surface_extrapolation?: "error" | "clamp" | "linear_in_variance";
+  vol_surface_extrapolation?: "error" | "clamp";
 }
 /**
  * A finite, right-continuous piecewise-constant curve.
@@ -18356,14 +18260,12 @@ export interface DCdb8Fddc0106047270C4 {
   values: [number, ...number[]];
 }
 /**
- * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
+ * Configuration for Monte Carlo PIK bond pricing.
  *
- * This is a wrapper around
- * [`crate::instruments::MertonMcConfig`]
- * that allows the pricer registry to access the MC configuration from
- * [`InstrumentPricingOverrides`].
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "d_10a2b628165f3f3e10e7".
  */
-export interface DBffef9E684Ff0C351C83 {
+export interface D_10A2B628165F3F3E10E7 {
   /**
    * Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.
    *
@@ -18832,7 +18734,7 @@ export interface DD962Ef8Db4Edf11Dc092 {
  */
 export interface D_1D0C1815F8Dd0715Bd12 {
   /**
-   * Enable adaptive bump sizes based on volatility and moneyness
+   * Enable adaptive bump sizes based on volatility and moneyness.
    *
    * When true, bump sizes are scaled based on:
    * - Volatility level (higher vol → larger bumps)
@@ -30163,7 +30065,7 @@ export interface ScenarioPricingOverrides9 {
  * ```rust
  * use finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};
  * use finstack_quant_valuations_rates::basis_swap::BasisSwap;
- * use finstack_quant_valuations_core::instruments::FloatLegSpec;
+ * use finstack_quant_valuations_rates::FloatLegSpec;
  * use time::Month;
  *
  * let start = Date::from_calendar_date(2024, Month::January, 3).expect("valid date");
@@ -30481,7 +30383,7 @@ export interface Money35 {
 export interface FloatLegSpec {
   business_day_convention?: BusinessDayConvention5;
   /**
-   * Optional calendar for business day adjustments
+   * Optional calendar for business day adjustments.
    */
   calendar_id?: Id9 | null;
   /**
@@ -30554,20 +30456,10 @@ export interface FloatLegSpec {
   end: Date44;
   /**
    * End-of-month roll convention (default: false).
-   *
-   * When `true`, if the start date falls on the last business day of a month,
-   * all subsequent roll dates will also fall on the last business day of their
-   * respective months. This matches QuantLib's `MakeOIS` default behavior.
-   *
-   * # Market Standard
-   *
-   * Per ISDA 2006 Definitions Section 4.18, the End-of-Month convention should
-   * be applied when the effective date is the last business day of a month.
-   * Most professional systems (QuantLib, Bloomberg SWDF) default to `true`.
    */
   end_of_month?: boolean;
   /**
-   * Optional calendar for rate fixing (reset lag)
+   * Optional calendar for rate fixing (reset lag).
    */
   fixing_calendar_id?: Id9 | null;
   forward_curve_id: Id41;
@@ -30575,31 +30467,16 @@ export interface FloatLegSpec {
   index_id: Id42;
   /**
    * Payment lag in business days after period end (default: 0).
-   *
-   * Bloomberg OIS swaps typically use 2 business days payment lag.
-   * The actual payment date is adjusted from the period end date by
-   * this many business days using the leg's calendar.
    */
   payment_lag_days?: number;
   /**
    * Reset lag in business days for floating rate fixing (default: 0).
-   *
-   * - **0** (default): fixing on the accrual start date. A swap whose first
-   *   accrual period starts on or after the valuation date then prices off
-   *   the forward curve without historical fixings.
-   * - **Positive** (e.g., 2): T-2 fixing (2 business days before accrual
-   *   start). Use `RateIndexConventions::default_reset_lag_days` (or
-   *   `InterestRateSwap::from_conventions`) for the market default of a
-   *   given index.
-   * - **Negative** (e.g., -1): resolved at pricing time to the registered
-   *   index convention default; rejected when the forward curve id is not a
-   *   registered rate index.
    */
   reset_lag_days?: number;
   spread_bp: Decimal16;
   start: Date45;
   /**
-   * Stub period handling rule
+   * Stub period handling rule.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
@@ -30624,7 +30501,7 @@ export interface Tenor8 {
 export interface FloatLegSpec1 {
   business_day_convention?: BusinessDayConvention5;
   /**
-   * Optional calendar for business day adjustments
+   * Optional calendar for business day adjustments.
    */
   calendar_id?: Id9 | null;
   /**
@@ -30697,20 +30574,10 @@ export interface FloatLegSpec1 {
   end: Date44;
   /**
    * End-of-month roll convention (default: false).
-   *
-   * When `true`, if the start date falls on the last business day of a month,
-   * all subsequent roll dates will also fall on the last business day of their
-   * respective months. This matches QuantLib's `MakeOIS` default behavior.
-   *
-   * # Market Standard
-   *
-   * Per ISDA 2006 Definitions Section 4.18, the End-of-Month convention should
-   * be applied when the effective date is the last business day of a month.
-   * Most professional systems (QuantLib, Bloomberg SWDF) default to `true`.
    */
   end_of_month?: boolean;
   /**
-   * Optional calendar for rate fixing (reset lag)
+   * Optional calendar for rate fixing (reset lag).
    */
   fixing_calendar_id?: Id9 | null;
   forward_curve_id: Id41;
@@ -30718,31 +30585,16 @@ export interface FloatLegSpec1 {
   index_id: Id42;
   /**
    * Payment lag in business days after period end (default: 0).
-   *
-   * Bloomberg OIS swaps typically use 2 business days payment lag.
-   * The actual payment date is adjusted from the period end date by
-   * this many business days using the leg's calendar.
    */
   payment_lag_days?: number;
   /**
    * Reset lag in business days for floating rate fixing (default: 0).
-   *
-   * - **0** (default): fixing on the accrual start date. A swap whose first
-   *   accrual period starts on or after the valuation date then prices off
-   *   the forward curve without historical fixings.
-   * - **Positive** (e.g., 2): T-2 fixing (2 business days before accrual
-   *   start). Use `RateIndexConventions::default_reset_lag_days` (or
-   *   `InterestRateSwap::from_conventions`) for the market default of a
-   *   given index.
-   * - **Negative** (e.g., -1): resolved at pricing time to the registered
-   *   index convention default; rejected when the forward curve id is not a
-   *   registered rate index.
    */
   reset_lag_days?: number;
   spread_bp: Decimal16;
   start: Date45;
   /**
-   * Stub period handling rule
+   * Stub period handling rule.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
@@ -31047,22 +30899,10 @@ export interface Attributes12 {
 export interface ConversionSpec {
   /**
    * Anti-dilution protection applied to conversion terms.
-   *
-   * When dilutive events occur (stock splits, below-market issuances, special
-   * dividends), the conversion ratio is adjusted to protect bondholders from
-   * value erosion.
-   *
-   * # Industry Practice
-   *
-   * Most convertible bonds use **Weighted Average** anti-dilution, which is
-   * less protective but more issuer-friendly. **Full Ratchet** is mainly seen
-   * in private placements and venture-style convertibles.
    */
   anti_dilution: "none" | "full_ratchet" | "weighted_average";
   /**
-   * Historical dilution events that affect the conversion ratio, recorded
-   * in chronological (non-decreasing date) order and applied in that
-   * order. Validation rejects out-of-order events.
+   * Historical dilution events recorded in chronological order.
    */
   dilution_events?: DilutionEvent[];
   /**
@@ -31113,9 +30953,6 @@ export interface ConversionSpec {
 /**
  * A dilutive event that triggers anti-dilution adjustment.
  *
- * Records details of an equity issuance or corporate action that may
- * affect the conversion ratio under the bond's anti-dilution provisions.
- *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "DilutionEvent".
  */
@@ -31138,23 +30975,6 @@ export interface DilutionEvent {
  * Share-price trigger of a convertible bond: the last sale price must be at
  * least `threshold_pct` of the conversion price on `required_days_above` of
  * `observation_days` consecutive trading days.
- *
- * Used for the issuer's soft call (`ConvertibleBond::soft_call_trigger`) and
- * the holder's contingent conversion
- * (`ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(..))`).
- *
- * # Industry Practice
- *
- * The standard trigger is 130% of the conversion price on 20 of 30
- * consecutive trading days; some issues use 120% or 150%.
- *
- * # Modeling scope
- *
- * The tree evaluates the trigger on the instantaneous node spot. The soft
- * call applies a Broadie-Glasserman-Kou-style barrier shift scaled by
- * `required_days_above / observation_days`; contingent conversion compares
- * the node spot with the nominal level and does not model the observation
- * window.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "PriceTrigger".
@@ -32640,7 +32460,7 @@ export interface Attributes15 {
 export interface FixedLegSpec {
   business_day_convention?: BusinessDayConvention7;
   /**
-   * Optional calendar for business day adjustments
+   * Optional calendar for business day adjustments.
    */
   calendar_id?: Id9 | null;
   day_count: DayCount17;
@@ -32648,31 +32468,17 @@ export interface FixedLegSpec {
   end: Date57;
   /**
    * End-of-month roll convention (default: false).
-   *
-   * When `true`, if the start date falls on the last business day of a month,
-   * all subsequent roll dates will also fall on the last business day of their
-   * respective months. This matches QuantLib's `MakeOIS` default behavior.
-   *
-   * # Market Standard
-   *
-   * Per ISDA 2006 Definitions Section 4.18, the End-of-Month convention should
-   * be applied when the effective date is the last business day of a month.
-   * Most professional systems (QuantLib, Bloomberg SWDF) default to `true`.
    */
   end_of_month?: boolean;
   frequency: Tenor10;
   /**
    * Payment lag in business days after period end (default: 0).
-   *
-   * Bloomberg OIS swaps typically use 2 business days payment lag.
-   * The actual payment date is adjusted from the period end date by
-   * this many business days using the leg's calendar.
    */
   payment_lag_days?: number;
   rate: Decimal18;
   start: Date58;
   /**
-   * Stub period handling rule
+   * Stub period handling rule.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
@@ -32697,7 +32503,7 @@ export interface Tenor10 {
 export interface FloatLegSpec2 {
   business_day_convention?: BusinessDayConvention5;
   /**
-   * Optional calendar for business day adjustments
+   * Optional calendar for business day adjustments.
    */
   calendar_id?: Id9 | null;
   /**
@@ -32770,20 +32576,10 @@ export interface FloatLegSpec2 {
   end: Date44;
   /**
    * End-of-month roll convention (default: false).
-   *
-   * When `true`, if the start date falls on the last business day of a month,
-   * all subsequent roll dates will also fall on the last business day of their
-   * respective months. This matches QuantLib's `MakeOIS` default behavior.
-   *
-   * # Market Standard
-   *
-   * Per ISDA 2006 Definitions Section 4.18, the End-of-Month convention should
-   * be applied when the effective date is the last business day of a month.
-   * Most professional systems (QuantLib, Bloomberg SWDF) default to `true`.
    */
   end_of_month?: boolean;
   /**
-   * Optional calendar for rate fixing (reset lag)
+   * Optional calendar for rate fixing (reset lag).
    */
   fixing_calendar_id?: Id9 | null;
   forward_curve_id: Id41;
@@ -32791,31 +32587,16 @@ export interface FloatLegSpec2 {
   index_id: Id42;
   /**
    * Payment lag in business days after period end (default: 0).
-   *
-   * Bloomberg OIS swaps typically use 2 business days payment lag.
-   * The actual payment date is adjusted from the period end date by
-   * this many business days using the leg's calendar.
    */
   payment_lag_days?: number;
   /**
    * Reset lag in business days for floating rate fixing (default: 0).
-   *
-   * - **0** (default): fixing on the accrual start date. A swap whose first
-   *   accrual period starts on or after the valuation date then prices off
-   *   the forward curve without historical fixings.
-   * - **Positive** (e.g., 2): T-2 fixing (2 business days before accrual
-   *   start). Use `RateIndexConventions::default_reset_lag_days` (or
-   *   `InterestRateSwap::from_conventions`) for the market default of a
-   *   given index.
-   * - **Negative** (e.g., -1): resolved at pricing time to the registered
-   *   index convention default; rejected when the forward curve id is not a
-   *   registered rate index.
    */
   reset_lag_days?: number;
   spread_bp: Decimal16;
   start: Date45;
   /**
-   * Stub period handling rule
+   * Stub period handling rule.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
@@ -34483,7 +34264,7 @@ export interface XccySwapLeg {
 export interface FloatLegSpec3 {
   business_day_convention?: BusinessDayConvention5;
   /**
-   * Optional calendar for business day adjustments
+   * Optional calendar for business day adjustments.
    */
   calendar_id?: Id9 | null;
   /**
@@ -34556,20 +34337,10 @@ export interface FloatLegSpec3 {
   end: Date44;
   /**
    * End-of-month roll convention (default: false).
-   *
-   * When `true`, if the start date falls on the last business day of a month,
-   * all subsequent roll dates will also fall on the last business day of their
-   * respective months. This matches QuantLib's `MakeOIS` default behavior.
-   *
-   * # Market Standard
-   *
-   * Per ISDA 2006 Definitions Section 4.18, the End-of-Month convention should
-   * be applied when the effective date is the last business day of a month.
-   * Most professional systems (QuantLib, Bloomberg SWDF) default to `true`.
    */
   end_of_month?: boolean;
   /**
-   * Optional calendar for rate fixing (reset lag)
+   * Optional calendar for rate fixing (reset lag).
    */
   fixing_calendar_id?: Id9 | null;
   forward_curve_id: Id41;
@@ -34577,31 +34348,16 @@ export interface FloatLegSpec3 {
   index_id: Id42;
   /**
    * Payment lag in business days after period end (default: 0).
-   *
-   * Bloomberg OIS swaps typically use 2 business days payment lag.
-   * The actual payment date is adjusted from the period end date by
-   * this many business days using the leg's calendar.
    */
   payment_lag_days?: number;
   /**
    * Reset lag in business days for floating rate fixing (default: 0).
-   *
-   * - **0** (default): fixing on the accrual start date. A swap whose first
-   *   accrual period starts on or after the valuation date then prices off
-   *   the forward curve without historical fixings.
-   * - **Positive** (e.g., 2): T-2 fixing (2 business days before accrual
-   *   start). Use `RateIndexConventions::default_reset_lag_days` (or
-   *   `InterestRateSwap::from_conventions`) for the market default of a
-   *   given index.
-   * - **Negative** (e.g., -1): resolved at pricing time to the registered
-   *   index convention default; rejected when the forward curve id is not a
-   *   registered rate index.
    */
   reset_lag_days?: number;
   spread_bp: Decimal16;
   start: Date45;
   /**
-   * Stub period handling rule
+   * Stub period handling rule.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
@@ -36470,7 +36226,7 @@ export interface ScenarioPricingOverrides20 {
 export interface FixedLegSpec1 {
   business_day_convention?: BusinessDayConvention7;
   /**
-   * Optional calendar for business day adjustments
+   * Optional calendar for business day adjustments.
    */
   calendar_id?: Id9 | null;
   day_count: DayCount17;
@@ -36478,31 +36234,17 @@ export interface FixedLegSpec1 {
   end: Date57;
   /**
    * End-of-month roll convention (default: false).
-   *
-   * When `true`, if the start date falls on the last business day of a month,
-   * all subsequent roll dates will also fall on the last business day of their
-   * respective months. This matches QuantLib's `MakeOIS` default behavior.
-   *
-   * # Market Standard
-   *
-   * Per ISDA 2006 Definitions Section 4.18, the End-of-Month convention should
-   * be applied when the effective date is the last business day of a month.
-   * Most professional systems (QuantLib, Bloomberg SWDF) default to `true`.
    */
   end_of_month?: boolean;
   frequency: Tenor10;
   /**
    * Payment lag in business days after period end (default: 0).
-   *
-   * Bloomberg OIS swaps typically use 2 business days payment lag.
-   * The actual payment date is adjusted from the period end date by
-   * this many business days using the leg's calendar.
    */
   payment_lag_days?: number;
   rate: Decimal18;
   start: Date58;
   /**
-   * Stub period handling rule
+   * Stub period handling rule.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
@@ -36512,7 +36254,7 @@ export interface FixedLegSpec1 {
 export interface FloatLegSpec4 {
   business_day_convention?: BusinessDayConvention5;
   /**
-   * Optional calendar for business day adjustments
+   * Optional calendar for business day adjustments.
    */
   calendar_id?: Id9 | null;
   /**
@@ -36585,20 +36327,10 @@ export interface FloatLegSpec4 {
   end: Date44;
   /**
    * End-of-month roll convention (default: false).
-   *
-   * When `true`, if the start date falls on the last business day of a month,
-   * all subsequent roll dates will also fall on the last business day of their
-   * respective months. This matches QuantLib's `MakeOIS` default behavior.
-   *
-   * # Market Standard
-   *
-   * Per ISDA 2006 Definitions Section 4.18, the End-of-Month convention should
-   * be applied when the effective date is the last business day of a month.
-   * Most professional systems (QuantLib, Bloomberg SWDF) default to `true`.
    */
   end_of_month?: boolean;
   /**
-   * Optional calendar for rate fixing (reset lag)
+   * Optional calendar for rate fixing (reset lag).
    */
   fixing_calendar_id?: Id9 | null;
   forward_curve_id: Id41;
@@ -36606,31 +36338,16 @@ export interface FloatLegSpec4 {
   index_id: Id42;
   /**
    * Payment lag in business days after period end (default: 0).
-   *
-   * Bloomberg OIS swaps typically use 2 business days payment lag.
-   * The actual payment date is adjusted from the period end date by
-   * this many business days using the leg's calendar.
    */
   payment_lag_days?: number;
   /**
    * Reset lag in business days for floating rate fixing (default: 0).
-   *
-   * - **0** (default): fixing on the accrual start date. A swap whose first
-   *   accrual period starts on or after the valuation date then prices off
-   *   the forward curve without historical fixings.
-   * - **Positive** (e.g., 2): T-2 fixing (2 business days before accrual
-   *   start). Use `RateIndexConventions::default_reset_lag_days` (or
-   *   `InterestRateSwap::from_conventions`) for the market default of a
-   *   given index.
-   * - **Negative** (e.g., -1): resolved at pricing time to the registered
-   *   index convention default; rejected when the forward curve id is not a
-   *   registered rate index.
    */
   reset_lag_days?: number;
   spread_bp: Decimal16;
   start: Date45;
   /**
-   * Stub period handling rule
+   * Stub period handling rule.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
@@ -36970,7 +36687,7 @@ export interface ScenarioPricingOverrides21 {
 export interface FixedLegSpec2 {
   business_day_convention?: BusinessDayConvention7;
   /**
-   * Optional calendar for business day adjustments
+   * Optional calendar for business day adjustments.
    */
   calendar_id?: Id9 | null;
   day_count: DayCount17;
@@ -36978,31 +36695,17 @@ export interface FixedLegSpec2 {
   end: Date57;
   /**
    * End-of-month roll convention (default: false).
-   *
-   * When `true`, if the start date falls on the last business day of a month,
-   * all subsequent roll dates will also fall on the last business day of their
-   * respective months. This matches QuantLib's `MakeOIS` default behavior.
-   *
-   * # Market Standard
-   *
-   * Per ISDA 2006 Definitions Section 4.18, the End-of-Month convention should
-   * be applied when the effective date is the last business day of a month.
-   * Most professional systems (QuantLib, Bloomberg SWDF) default to `true`.
    */
   end_of_month?: boolean;
   frequency: Tenor10;
   /**
    * Payment lag in business days after period end (default: 0).
-   *
-   * Bloomberg OIS swaps typically use 2 business days payment lag.
-   * The actual payment date is adjusted from the period end date by
-   * this many business days using the leg's calendar.
    */
   payment_lag_days?: number;
   rate: Decimal18;
   start: Date58;
   /**
-   * Stub period handling rule
+   * Stub period handling rule.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
@@ -37012,7 +36715,7 @@ export interface FixedLegSpec2 {
 export interface FloatLegSpec5 {
   business_day_convention?: BusinessDayConvention5;
   /**
-   * Optional calendar for business day adjustments
+   * Optional calendar for business day adjustments.
    */
   calendar_id?: Id9 | null;
   /**
@@ -37085,20 +36788,10 @@ export interface FloatLegSpec5 {
   end: Date44;
   /**
    * End-of-month roll convention (default: false).
-   *
-   * When `true`, if the start date falls on the last business day of a month,
-   * all subsequent roll dates will also fall on the last business day of their
-   * respective months. This matches QuantLib's `MakeOIS` default behavior.
-   *
-   * # Market Standard
-   *
-   * Per ISDA 2006 Definitions Section 4.18, the End-of-Month convention should
-   * be applied when the effective date is the last business day of a month.
-   * Most professional systems (QuantLib, Bloomberg SWDF) default to `true`.
    */
   end_of_month?: boolean;
   /**
-   * Optional calendar for rate fixing (reset lag)
+   * Optional calendar for rate fixing (reset lag).
    */
   fixing_calendar_id?: Id9 | null;
   forward_curve_id: Id41;
@@ -37106,31 +36799,16 @@ export interface FloatLegSpec5 {
   index_id: Id42;
   /**
    * Payment lag in business days after period end (default: 0).
-   *
-   * Bloomberg OIS swaps typically use 2 business days payment lag.
-   * The actual payment date is adjusted from the period end date by
-   * this many business days using the leg's calendar.
    */
   payment_lag_days?: number;
   /**
    * Reset lag in business days for floating rate fixing (default: 0).
-   *
-   * - **0** (default): fixing on the accrual start date. A swap whose first
-   *   accrual period starts on or after the valuation date then prices off
-   *   the forward curve without historical fixings.
-   * - **Positive** (e.g., 2): T-2 fixing (2 business days before accrual
-   *   start). Use `RateIndexConventions::default_reset_lag_days` (or
-   *   `InterestRateSwap::from_conventions`) for the market default of a
-   *   given index.
-   * - **Negative** (e.g., -1): resolved at pricing time to the registered
-   *   index convention default; rejected when the forward curve id is not a
-   *   registered rate index.
    */
   reset_lag_days?: number;
   spread_bp: Decimal16;
   start: Date45;
   /**
-   * Stub period handling rule
+   * Stub period handling rule.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
@@ -39943,7 +39621,7 @@ export interface Money60 {
 export interface PremiumLegSpec {
   business_day_convention?: BusinessDayConvention15;
   /**
-   * Holiday calendar identifier
+   * Holiday calendar identifier.
    */
   calendar_id?: Id9 | null;
   coupon_bp: Decimal30;
@@ -39984,11 +39662,11 @@ export interface Tenor16 {
 export interface ProtectionLegSpec {
   credit_curve_id: Id99;
   /**
-   * Recovery rate as a decimal fraction in `[0.0, 1.0)`
+   * Recovery rate as a decimal fraction in `[0.0, 1.0)`.
    */
   recovery_rate: number;
   /**
-   * Settlement delay in business days
+   * Settlement delay in business days.
    */
   settlement_delay: number;
 }
@@ -40156,11 +39834,11 @@ export interface CdsIndexConstituent {
 export interface CreditParams {
   credit_curve_id: Id100;
   /**
-   * Recovery rate (0.0 to 1.0)
+   * Recovery rate (`0.0` to `1.0`).
    */
   recovery_rate: number;
   /**
-   * Reference entity (issuer being protected)
+   * Reference entity (issuer being protected).
    */
   reference_entity: string;
 }
@@ -40384,7 +40062,7 @@ export interface Money61 {
 export interface PremiumLegSpec1 {
   business_day_convention?: BusinessDayConvention15;
   /**
-   * Holiday calendar identifier
+   * Holiday calendar identifier.
    */
   calendar_id?: Id9 | null;
   coupon_bp: Decimal30;
@@ -40410,11 +40088,11 @@ export interface PremiumLegSpec1 {
 export interface ProtectionLegSpec1 {
   credit_curve_id: Id99;
   /**
-   * Recovery rate as a decimal fraction in `[0.0, 1.0)`
+   * Recovery rate as a decimal fraction in `[0.0, 1.0)`.
    */
   recovery_rate: number;
   /**
-   * Settlement delay in business days
+   * Settlement delay in business days.
    */
   settlement_delay: number;
 }
@@ -42390,7 +42068,7 @@ export interface ScenarioPricingOverrides38 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
- * Caller-supplied option-on-future pricing and settlement terms.
+ * Complete listed or bilateral option-on-future terms.
  */
 export interface FutureOptionTerms1 {
   /**
@@ -43483,7 +43161,7 @@ export interface ScenarioPricingOverrides41 {
  *
  * ```rust
  * use finstack_quant_valuations_fx::ndf::Ndf;
- * use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
+ * use finstack_quant_valuations_fx::NdfQuoteConvention;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::money::Money;
@@ -46474,7 +46152,7 @@ export interface ScenarioPricingOverrides50 {
  * ```rust
  * use finstack_quant_valuations_exotics::commodity::commodity_forward::CommodityForward;
  * use finstack_quant_valuations_core::instruments::Position;
- * use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
+ * use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -46728,7 +46406,7 @@ export interface ScenarioPricingOverrides51 {
  *
  * ```rust
  * use finstack_quant_valuations_exotics::commodity::commodity_swap::CommoditySwap;
- * use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
+ * use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
  * use finstack_quant_valuations_core::instruments::PayReceive;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};
@@ -46928,7 +46606,7 @@ export interface ScenarioPricingOverrides52 {
  *
  * ```rust
  * use finstack_quant_valuations_exotics::commodity::commodity_swaption::CommoditySwaption;
- * use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
+ * use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
  * use finstack_quant_models::types::OptionType;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::{Date, Tenor, TenorUnit};
@@ -47531,7 +47209,7 @@ export interface ScenarioPricingOverrides56 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
- * Caller-supplied option-on-future pricing and settlement terms.
+ * Complete listed or bilateral option-on-future terms.
  */
 export interface FutureOptionTerms2 {
   /**
@@ -47876,7 +47554,7 @@ export interface ScenarioPricingOverrides58 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
- * Caller-supplied option-on-future pricing and settlement terms.
+ * Complete listed or bilateral option-on-future terms.
  */
 export interface FutureOptionTerms3 {
   /**
@@ -48247,7 +47925,7 @@ export interface ScenarioPricingOverrides60 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
- * Caller-supplied option-on-future pricing and settlement terms.
+ * Complete listed or bilateral option-on-future terms.
  */
 export interface FutureOptionTerms4 {
   /**
@@ -49625,18 +49303,7 @@ export interface Attributes66 {
  * Bermudan call provision for callable exotics.
  *
  * Allows the issuer to terminate the note on specified call dates
- * at a specified call price (typically par). Currently consumed by the
- * Callable Range Accrual note (PRDC is not implemented, and the Snowball
- * pricer rejects callable provisions).
- *
- * # Fields
- *
- * - `call_dates`: Sorted ascending dates on which the issuer may call.
- * - `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,
- *   `102.0` = callable at 102).
- * - `lockout_end`: Optional end of the no-call period; call dates on or
- *   before it are not exercisable (exclusive bound, matching
- *   `BermudanSchedule.lockout_end` on Bermudan swaptions).
+ * at a specified call price (typically par).
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "BermudanCallProvision".
@@ -50309,7 +49976,8 @@ export interface Tenor25 {
  *     currency::Currency, dates::DayCount, money::Money, types::InstrumentId,
  * };
  * use finstack_quant_cashflows::builder::ScheduleParams;
- * use finstack_quant_valuations_core::instruments::{EquityUnderlyingParams, FinancingLegSpec, PayReceive};
+ * use finstack_quant_valuations_core::instruments::{FinancingLegSpec, PayReceive};
+ * use finstack_quant_valuations_equity::EquityUnderlyingParams;
  * use finstack_quant_core::types::Attributes;
  * use finstack_quant_valuations_equity::equity_trs::{EquityTotalReturnSwap, TrsDividendSettlement};
  * use finstack_quant_valuations_core::instruments::TrsScheduleSpec;
@@ -50832,12 +50500,12 @@ export interface Tenor26 {
 export interface EquityUnderlyingParams {
   currency: Currency41;
   /**
-   * Optional dividend yield identifier
+   * Optional dividend yield identifier.
    */
   div_yield_id?: Id9 | null;
   spot_id: Id229;
   /**
-   * Underlying ticker/identifier
+   * Underlying ticker/identifier.
    */
   ticker: string;
 }
@@ -50873,7 +50541,8 @@ export interface EquityUnderlyingParams {
  *     currency::Currency, dates::DayCount, money::Money, types::InstrumentId,
  * };
  * use finstack_quant_cashflows::builder::ScheduleParams;
- * use finstack_quant_valuations_core::instruments::{FinancingLegSpec, IndexUnderlyingParams, PayReceive};
+ * use finstack_quant_valuations_core::instruments::{FinancingLegSpec, PayReceive};
+ * use finstack_quant_valuations_fixed_income::IndexUnderlyingParams;
  * use finstack_quant_core::types::Attributes;
  * use finstack_quant_valuations_fixed_income::fi_trs::FiIndexTotalReturnSwap;
  * use finstack_quant_valuations_core::instruments::TrsScheduleSpec;
@@ -51291,7 +50960,7 @@ export interface IndexUnderlyingParams {
   currency: Currency42;
   /**
    * Market scalar identifier for signed index duration in years. Required when
-   * requesting FI TRS duration risk; the scalar must be unitless and finite. No duration is inferred from index name or maturity.
+   * requesting FI TRS duration risk; the scalar must be unitless and finite.
    */
   duration_id?: Id9 | null;
   index_id: Id231;
@@ -52179,18 +51848,7 @@ export interface Attributes73 {
  * Bermudan call provision for callable exotics.
  *
  * Allows the issuer to terminate the note on specified call dates
- * at a specified call price (typically par). Currently consumed by the
- * Callable Range Accrual note (PRDC is not implemented, and the Snowball
- * pricer rejects callable provisions).
- *
- * # Fields
- *
- * - `call_dates`: Sorted ascending dates on which the issuer may call.
- * - `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,
- *   `102.0` = callable at 102).
- * - `lockout_end`: Optional end of the no-call period; call dates on or
- *   before it are not exercisable (exclusive bound, matching
- *   `BermudanSchedule.lockout_end` on Bermudan swaptions).
+ * at a specified call price (typically par).
  */
 export interface BermudanCallProvision1 {
   /**
@@ -52541,8 +52199,7 @@ export interface ScenarioPricingOverrides72 {
  * ```rust
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::types::{CurveId, InstrumentId};
- * use finstack_quant_valuations_fixed_income::bond_future::{BondFuture, DeliverableBond};
- * use finstack_quant_valuations_core::contract_specs::BondFutureSpecs;
+ * use finstack_quant_valuations_fixed_income::bond_future::{BondFuture, BondFutureSpecs, DeliverableBond};
  * use finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};
  * use finstack_quant_core::types::Attributes;
  * use time::macros::date;
@@ -52642,17 +52299,15 @@ export interface Attributes74 {
  */
 export interface BondFutureSpecs {
   /**
-   * Day-count convention for implied repo rate annualization.
-   *
-   * Bond-future repo supports `act_360` and `act_365f`.
+   * Day-count convention for implied repo rate annualization (`act_360` or `act_365f`).
    */
   repo_day_count?: "act_360" | "act_365f";
   /**
-   * Standard coupon rate for conversion factor calculation (e.g., 0.06 for 6%)
+   * Standard coupon rate for conversion factor calculation (e.g., 0.06 for 6%).
    */
   standard_coupon: number;
   /**
-   * Standard maturity in years for conversion factor calculation
+   * Standard maturity in years for conversion factor calculation.
    */
   standard_maturity_years: number;
 }
@@ -57961,10 +57616,9 @@ export interface BermudanSchedule1 {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations_core::contract_specs::BondFutureSpecs;
+ * use finstack_quant_valuations_fixed_income::bond_future::BondFutureSpecs;
  *
- * // UST 10-year contract specs
- * let specs = BondFutureSpecs::default(); // UST 10Y defaults
+ * let specs = BondFutureSpecs::default();
  * assert_eq!(specs.standard_coupon, 0.06);
  * ```
  *
@@ -57973,17 +57627,15 @@ export interface BermudanSchedule1 {
  */
 export interface BondFutureSpecs1 {
   /**
-   * Day-count convention for implied repo rate annualization.
-   *
-   * Bond-future repo supports `act_360` and `act_365f`.
+   * Day-count convention for implied repo rate annualization (`act_360` or `act_365f`).
    */
   repo_day_count?: "act_360" | "act_365f";
   /**
-   * Standard coupon rate for conversion factor calculation (e.g., 0.06 for 6%)
+   * Standard coupon rate for conversion factor calculation (e.g., 0.06 for 6%).
    */
   standard_coupon: number;
   /**
-   * Standard maturity in years for conversion factor calculation
+   * Standard maturity in years for conversion factor calculation.
    */
   standard_maturity_years: number;
 }
@@ -58229,22 +57881,10 @@ export interface CompositeState1 {
 export interface ConversionSpec1 {
   /**
    * Anti-dilution protection applied to conversion terms.
-   *
-   * When dilutive events occur (stock splits, below-market issuances, special
-   * dividends), the conversion ratio is adjusted to protect bondholders from
-   * value erosion.
-   *
-   * # Industry Practice
-   *
-   * Most convertible bonds use **Weighted Average** anti-dilution, which is
-   * less protective but more issuer-friendly. **Full Ratchet** is mainly seen
-   * in private placements and venture-style convertibles.
    */
   anti_dilution: "none" | "full_ratchet" | "weighted_average";
   /**
-   * Historical dilution events that affect the conversion ratio, recorded
-   * in chronological (non-decreasing date) order and applied in that
-   * order. Validation rejects out-of-order events.
+   * Historical dilution events recorded in chronological order.
    */
   dilution_events?: DilutionEvent[];
   /**
@@ -58293,7 +57933,7 @@ export interface ConversionSpec1 {
   ratio?: number | null;
 }
 /**
- * Credit parameters for CDS instruments
+ * Issuer/reference entity credit parameters.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "CreditParams".
@@ -58301,11 +57941,11 @@ export interface ConversionSpec1 {
 export interface CreditParams1 {
   credit_curve_id: Id100;
   /**
-   * Recovery rate (0.0 to 1.0)
+   * Recovery rate (`0.0` to `1.0`).
    */
   recovery_rate: number;
   /**
-   * Reference entity (issuer being protected)
+   * Reference entity (issuer being protected).
    */
   reference_entity: string;
 }
@@ -58498,12 +58138,12 @@ export interface EquityBridge1 {
 export interface EquityUnderlyingParams1 {
   currency: Currency41;
   /**
-   * Optional dividend yield identifier
+   * Optional dividend yield identifier.
    */
   div_yield_id?: Id9 | null;
   spot_id: Id229;
   /**
-   * Underlying ticker/identifier
+   * Underlying ticker/identifier.
    */
   ticker: string;
 }
@@ -58585,7 +58225,7 @@ export interface FinancingLegSpec2 {
   spread_bp: Decimal34;
 }
 /**
- * Specification for fixed rate legs in interest rate swaps
+ * Specification for fixed rate legs in interest rate swaps.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "FixedLegSpec".
@@ -58593,7 +58233,7 @@ export interface FinancingLegSpec2 {
 export interface FixedLegSpec3 {
   business_day_convention?: BusinessDayConvention7;
   /**
-   * Optional calendar for business day adjustments
+   * Optional calendar for business day adjustments.
    */
   calendar_id?: Id9 | null;
   day_count: DayCount17;
@@ -58601,36 +58241,22 @@ export interface FixedLegSpec3 {
   end: Date57;
   /**
    * End-of-month roll convention (default: false).
-   *
-   * When `true`, if the start date falls on the last business day of a month,
-   * all subsequent roll dates will also fall on the last business day of their
-   * respective months. This matches QuantLib's `MakeOIS` default behavior.
-   *
-   * # Market Standard
-   *
-   * Per ISDA 2006 Definitions Section 4.18, the End-of-Month convention should
-   * be applied when the effective date is the last business day of a month.
-   * Most professional systems (QuantLib, Bloomberg SWDF) default to `true`.
    */
   end_of_month?: boolean;
   frequency: Tenor10;
   /**
    * Payment lag in business days after period end (default: 0).
-   *
-   * Bloomberg OIS swaps typically use 2 business days payment lag.
-   * The actual payment date is adjusted from the period end date by
-   * this many business days using the leg's calendar.
    */
   payment_lag_days?: number;
   rate: Decimal18;
   start: Date58;
   /**
-   * Stub period handling rule
+   * Stub period handling rule.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
 /**
- * Specification for floating rate legs in interest rate swaps
+ * Specification for floating rate legs in interest rate swaps.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "FloatLegSpec".
@@ -58638,7 +58264,7 @@ export interface FixedLegSpec3 {
 export interface FloatLegSpec6 {
   business_day_convention?: BusinessDayConvention5;
   /**
-   * Optional calendar for business day adjustments
+   * Optional calendar for business day adjustments.
    */
   calendar_id?: Id9 | null;
   /**
@@ -58711,20 +58337,10 @@ export interface FloatLegSpec6 {
   end: Date44;
   /**
    * End-of-month roll convention (default: false).
-   *
-   * When `true`, if the start date falls on the last business day of a month,
-   * all subsequent roll dates will also fall on the last business day of their
-   * respective months. This matches QuantLib's `MakeOIS` default behavior.
-   *
-   * # Market Standard
-   *
-   * Per ISDA 2006 Definitions Section 4.18, the End-of-Month convention should
-   * be applied when the effective date is the last business day of a month.
-   * Most professional systems (QuantLib, Bloomberg SWDF) default to `true`.
    */
   end_of_month?: boolean;
   /**
-   * Optional calendar for rate fixing (reset lag)
+   * Optional calendar for rate fixing (reset lag).
    */
   fixing_calendar_id?: Id9 | null;
   forward_curve_id: Id41;
@@ -58732,31 +58348,16 @@ export interface FloatLegSpec6 {
   index_id: Id42;
   /**
    * Payment lag in business days after period end (default: 0).
-   *
-   * Bloomberg OIS swaps typically use 2 business days payment lag.
-   * The actual payment date is adjusted from the period end date by
-   * this many business days using the leg's calendar.
    */
   payment_lag_days?: number;
   /**
    * Reset lag in business days for floating rate fixing (default: 0).
-   *
-   * - **0** (default): fixing on the accrual start date. A swap whose first
-   *   accrual period starts on or after the valuation date then prices off
-   *   the forward curve without historical fixings.
-   * - **Positive** (e.g., 2): T-2 fixing (2 business days before accrual
-   *   start). Use `RateIndexConventions::default_reset_lag_days` (or
-   *   `InterestRateSwap::from_conventions`) for the market default of a
-   *   given index.
-   * - **Negative** (e.g., -1): resolved at pricing time to the registered
-   *   index convention default; rejected when the forward curve id is not a
-   *   registered rate index.
    */
   reset_lag_days?: number;
   spread_bp: Decimal16;
   start: Date45;
   /**
-   * Stub period handling rule
+   * Stub period handling rule.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
@@ -58919,7 +58520,7 @@ export interface IndexUnderlyingParams1 {
   currency: Currency42;
   /**
    * Market scalar identifier for signed index duration in years. Required when
-   * requesting FI TRS duration risk; the scalar must be unitless and finite. No duration is inferred from index name or maturity.
+   * requesting FI TRS duration risk; the scalar must be unitless and finite.
    */
   duration_id?: Id9 | null;
   index_id: Id231;
@@ -59157,7 +58758,7 @@ export interface PeFundWaterfallSpec1 {
   tranches: PeFundWaterfallTranche[];
 }
 /**
- * Specification for CDS premium legs
+ * Specification for CDS premium legs.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "PremiumLegSpec".
@@ -59165,7 +58766,7 @@ export interface PeFundWaterfallSpec1 {
 export interface PremiumLegSpec2 {
   business_day_convention?: BusinessDayConvention15;
   /**
-   * Holiday calendar identifier
+   * Holiday calendar identifier.
    */
   calendar_id?: Id9 | null;
   coupon_bp: Decimal30;
@@ -59186,7 +58787,7 @@ export interface PremiumLegSpec2 {
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
 /**
- * Specification for CDS protection legs
+ * Specification for CDS protection legs.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "ProtectionLegSpec".
@@ -59194,11 +58795,11 @@ export interface PremiumLegSpec2 {
 export interface ProtectionLegSpec2 {
   credit_curve_id: Id99;
   /**
-   * Recovery rate as a decimal fraction in `[0.0, 1.0)`
+   * Recovery rate as a decimal fraction in `[0.0, 1.0)`.
    */
   recovery_rate: number;
   /**
-   * Settlement delay in business days
+   * Settlement delay in business days.
    */
   settlement_delay: number;
 }
@@ -59539,80 +59140,6 @@ export interface MetricPricingOverrides78 {
   var_config?: DE49387F97C0F9D510642 | null;
 }
 /**
- * Configuration for Monte Carlo PIK bond pricing.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_10a2b628165f3f3e10e7".
- */
-export interface D_10A2B628165F3F3E10E7 {
-  /**
-   * Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.
-   *
-   * Default: `BrownianBridge` when the Merton model uses `FirstPassage`,
-   * otherwise `Discrete`.
-   */
-  barrier_crossing: "discrete" | "brownian_bridge";
-  /**
-   * Optional market-calibration specification.
-   *
-   * When set, the pricer first calibrates a structural parameter
-   * (barrier or asset vol) to match a market quote using low-path MC
-   * with common random numbers, then re-prices with full paths.
-   */
-  calibration?: DD760Eef55C5Bd7D5B1F6 | null;
-  /**
-   * Pre-computed discount factors for term-structure cashflow discounting.
-   *
-   * Each entry is `(year_fraction, discount_factor)`, sorted by time.
-   * When set, cashflows are discounted using log-linear interpolation of
-   * these factors instead of the flat `discount_rate`. The flat rate is
-   * still used for the Merton risk-neutral drift.
-   */
-  cashflow_dfs?: [number, number][] | null;
-  /**
-   * Optional dynamic (notional-dependent) recovery rate model.
-   *
-   * Recovery on default is evaluated pathwise as
-   * `DynamicRecoverySpec::recovery_at_notional(N(τ))`, which hard-clamps
-   * the result to `[0, base_recovery]`. The clamp introduces a small kink
-   * in recovery as a function of the accreted notional; paths far into
-   * the clamped region all contribute the same (floored/capped) recovery.
-   * No smoothed (e.g. logistic) recovery rule is applied.
-   */
-  dynamic_recovery?: D_16451E0Bf3B6B78178D8 | null;
-  /**
-   * Optional endogenous (leverage-dependent) hazard rate model.
-   */
-  endogenous_hazard?: DCc8Ed166Abbb10Ad4451 | null;
-  merton: DEe4323Acfdb49E4Fe15B;
-  /**
-   * PIK schedule controlling per-coupon cash/PIK/toggle behavior.
-   */
-  pik_schedule:
-    | {
-        uniform: D_7F97Be2823A694F2735D;
-      }
-    | {
-        stepped: [number, D_7F97Be2823A694F2735D][];
-      };
-  /**
-   * Recovery on default as a decimal fraction in `[0, 1]`.
-   *
-   * `dynamic_recovery`, when set, takes precedence over this flat rate.
-   */
-  recovery_rate: number;
-  /**
-   * Time steps per year for the simulation grid.
-   */
-  steps_per_year: number;
-  /**
-   * Optional toggle exercise model for PIK/cash coupon decisions.
-   * Active only for coupon dates where [`PikSchedule`] resolves to
-   * [`PikMode::Toggle`].
-   */
-  toggle_model?: D_2701Caf4934336A2Dd86 | null;
-}
-/**
  * Cashflow schedule construction parameters.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -59678,7 +59205,7 @@ export interface ScheduleParams1 {
  */
 export interface D_1D0C1815F8Dd0715Bd121 {
   /**
-   * Enable adaptive bump sizes based on volatility and moneyness
+   * Enable adaptive bump sizes based on volatility and moneyness.
    *
    * When true, bump sizes are scaled based on:
    * - Volatility level (higher vol → larger bumps)
@@ -59767,36 +59294,16 @@ export interface D_572Ad1Befb7D949146521 {
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
-   *
-   * Read only by the rates-only bond tree when `tree_model = black_derman_toy` selects
-   * BDT for a bond with embedded exercise rights, where it is required.
-   * It is a relative (lognormal) volatility, unlike the absolute
-   * [`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has
-   * no mean reversion. Must be finite and non-negative; `0.0` prices on the
-   * deterministic curve.
    */
   bdt_sigma?: number | null;
   /**
    * Black-Karasinski mean-reversion speed (κ) of the log short rate, in
    * annualised units (`0.03` = 3% per year).
-   *
-   * Companion to [`Self::bk_sigma`]: read only by the rates-only bond tree
-   * when `tree_model = black_karasinski`, where it is required. Must be
-   * finite and strictly positive; typical values are 0.01–0.10. A lognormal
-   * short rate without mean reversion is `tree_model = black_derman_toy`
-   * with [`Self::bdt_sigma`].
    */
   bk_mean_reversion?: number | null;
   /**
    * Black-Karasinski lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
-   *
-   * Read only by the rates-only bond tree when `tree_model = black_karasinski`,
-   * where it is required together with [`Self::bk_mean_reversion`]. It is
-   * a relative (lognormal) volatility on the same scale as
-   * [`Self::bdt_sigma`], unlike the absolute [`Self::hw1f_sigma`]; typical
-   * values are 0.10–0.40. Must be finite and non-negative; `0.0` prices on
-   * the deterministic curve.
    */
   bk_sigma?: number | null;
   /**
@@ -59960,7 +59467,7 @@ export interface D_572Ad1Befb7D949146521 {
    * model and grid; the path count, antithetic flag and seed label come from
    * `mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config.
    */
-  merton_mc_config?: DBffef9E684Ff0C351C83 | null;
+  merton_mc_config?: D_10A2B628165F3F3E10E7 | null;
   /**
    * Quote compounding convention for OAS inputs and outputs.
    *
@@ -60012,13 +59519,13 @@ export interface D_572Ad1Befb7D949146521 {
    */
   tree_model?: D_948Cdc4Db846A21357A4 | null;
   /**
-   * Number of time steps for tree-based pricing (e.g., 100)
+   * Number of time steps for tree-based pricing (e.g., 100).
    */
   tree_steps?: number | null;
   /**
    * Volatility surface extrapolation policy when `implied_volatility` is not set.
    */
-  vol_surface_extrapolation?: "error" | "clamp" | "linear_in_variance";
+  vol_surface_extrapolation?: "error" | "clamp";
 }
 /**
  * Cashflow recovery-model specification.
@@ -60135,85 +59642,6 @@ export interface DB0A5Fc543381Da6A57221 {
    * Quoted Z-spread in decimal (e.g., `0.0125` = 125bp).
    */
   quoted_z_spread?: number | null;
-}
-/**
- * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
- *
- * This is a wrapper around
- * [`crate::instruments::MertonMcConfig`]
- * that allows the pricer registry to access the MC configuration from
- * [`InstrumentPricingOverrides`].
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_bffef9e684ff0c351c83".
- */
-export interface D_10A2B628165F3F3E10E71 {
-  /**
-   * Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.
-   *
-   * Default: `BrownianBridge` when the Merton model uses `FirstPassage`,
-   * otherwise `Discrete`.
-   */
-  barrier_crossing: "discrete" | "brownian_bridge";
-  /**
-   * Optional market-calibration specification.
-   *
-   * When set, the pricer first calibrates a structural parameter
-   * (barrier or asset vol) to match a market quote using low-path MC
-   * with common random numbers, then re-prices with full paths.
-   */
-  calibration?: DD760Eef55C5Bd7D5B1F6 | null;
-  /**
-   * Pre-computed discount factors for term-structure cashflow discounting.
-   *
-   * Each entry is `(year_fraction, discount_factor)`, sorted by time.
-   * When set, cashflows are discounted using log-linear interpolation of
-   * these factors instead of the flat `discount_rate`. The flat rate is
-   * still used for the Merton risk-neutral drift.
-   */
-  cashflow_dfs?: [number, number][] | null;
-  /**
-   * Optional dynamic (notional-dependent) recovery rate model.
-   *
-   * Recovery on default is evaluated pathwise as
-   * `DynamicRecoverySpec::recovery_at_notional(N(τ))`, which hard-clamps
-   * the result to `[0, base_recovery]`. The clamp introduces a small kink
-   * in recovery as a function of the accreted notional; paths far into
-   * the clamped region all contribute the same (floored/capped) recovery.
-   * No smoothed (e.g. logistic) recovery rule is applied.
-   */
-  dynamic_recovery?: D_16451E0Bf3B6B78178D8 | null;
-  /**
-   * Optional endogenous (leverage-dependent) hazard rate model.
-   */
-  endogenous_hazard?: DCc8Ed166Abbb10Ad4451 | null;
-  merton: DEe4323Acfdb49E4Fe15B;
-  /**
-   * PIK schedule controlling per-coupon cash/PIK/toggle behavior.
-   */
-  pik_schedule:
-    | {
-        uniform: D_7F97Be2823A694F2735D;
-      }
-    | {
-        stepped: [number, D_7F97Be2823A694F2735D][];
-      };
-  /**
-   * Recovery on default as a decimal fraction in `[0, 1]`.
-   *
-   * `dynamic_recovery`, when set, takes precedence over this flat rate.
-   */
-  recovery_rate: number;
-  /**
-   * Time steps per year for the simulation grid.
-   */
-  steps_per_year: number;
-  /**
-   * Optional toggle exercise model for PIK/cash coupon decisions.
-   * Active only for coupon dates where [`PikSchedule`] resolves to
-   * [`PikMode::Toggle`].
-   */
-  toggle_model?: D_2701Caf4934336A2Dd86 | null;
 }
 /**
  * Instrument-owned market quote and model configuration overrides.

@@ -328,7 +328,7 @@ pub fn instrument_cashflows(
         market,
         requested_as_of,
         &[],
-        crate::instruments::PricingOptions::default().mark_instrument_validated(),
+        crate::instruments::PricingOptions::default(),
     )?;
     envelope_for_priced(instrument, market, model_key, &canonical_result)
 }
@@ -464,13 +464,6 @@ impl CashflowExportTerms {
             );
         }
         Ok(self)
-    }
-
-    /// Outstanding principal `(before, after)` per flow, aligned with
-    /// `schedule`; `None` unless [`Self::with_schedule_balances`] replayed them.
-    #[must_use]
-    pub fn get_flow_balances(&self) -> Option<&[(f64, f64)]> {
-        self.flow_balances.as_deref()
     }
 }
 
@@ -687,11 +680,6 @@ fn envelope_for_priced(
             })
             .transpose()?;
 
-        // A missing inflation index ratio is indistinguishable from a data
-        // outage when it lands in the export as a blank cell, so log loudly
-        // when the lookup fails on an instrument that carries an inflation
-        // link. (Instruments with no inflation bond keep the column empty by
-        // design.)
         let inflation_index_ratio = terms
             .index_ratios
             .as_ref()
@@ -910,5 +898,31 @@ mod tests {
         let total = sum_pvs([1.0e16, 1.0, -1.0e16]).expect("finite pvs");
 
         assert_eq!(total, 1.0);
+    }
+
+    #[test]
+    fn schedule_balances_stay_empty_without_an_outstanding_principal() {
+        let terms = super::CashflowExportTerms::from_schedule(
+            finstack_quant_cashflows::schedule_from_dated_flows(
+                vec![(
+                    finstack_quant_core::dates::Date::from_calendar_date(
+                        2025,
+                        time::Month::June,
+                        2,
+                    )
+                    .expect("date"),
+                    finstack_quant_core::money::Money::from((100_i64, Currency::USD)),
+                )],
+                finstack_quant_core::cashflow::CFKind::Fixed,
+                finstack_quant_core::dates::DayCount::Act360,
+                finstack_quant_cashflows::ScheduleBuildOpts::default(),
+            )
+            .expect("schedule"),
+        );
+        assert!(terms.flow_balances.is_none());
+        let no_issue_date = terms
+            .with_schedule_balances()
+            .expect("no issue date is not an error");
+        assert!(no_issue_date.flow_balances.is_none());
     }
 }

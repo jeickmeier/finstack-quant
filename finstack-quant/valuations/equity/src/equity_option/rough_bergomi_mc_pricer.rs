@@ -60,7 +60,7 @@ impl EquityOptionRoughBergomiMcPricer {
 
 impl Default for EquityOptionRoughBergomiMcPricer {
     fn default() -> Self {
-        use finstack_quant_valuations_core::instruments::common_impl::helpers::mc_defaults;
+        use crate::mc_defaults;
         Self::new(
             mc_defaults::DEFAULT_MC_PATHS,
             mc_defaults::DEFAULT_ROUGH_VOL_STEPS,

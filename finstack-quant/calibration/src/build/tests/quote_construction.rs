@@ -234,7 +234,7 @@ fn test_all_quote_types_instrument_construction() {
         }
         if let MarketQuote::CdsTranche(tranche) = q {
             let overrides = CdsTrancheBuildOverrides::for_regime(
-                finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+                finstack_quant_valuations_credit::CdsDateRegime::Standard,
             );
             build_cds_tranche_instrument(tranche, &build_ctx, &overrides)
                 .expect("cds tranche instrument build");

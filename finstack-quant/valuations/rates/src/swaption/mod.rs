@@ -100,7 +100,7 @@
 //! - swaption metrics module for risk metrics
 //! - [`crate::swaption::SimpleSwaptionBlackPricer`] for Black-76 pricing
 //! - [`crate::swaption::SimpleSwaptionNormalPricer`] for Bachelier pricing
-//! - [`finstack_quant_valuations_core::instruments::VolatilityModel`] for selecting Black vs Normal
+//! - [`finstack_quant_valuations_rates::VolatilityModel`] for selecting Black vs Normal
 
 use finstack_quant_core::dates::Date;
 

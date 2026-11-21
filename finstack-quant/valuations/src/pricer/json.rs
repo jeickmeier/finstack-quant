@@ -564,7 +564,6 @@ pub fn price_instrument(
         Some(history) => pricing_options.with_market_history(Arc::new(history.clone())),
         None => pricing_options,
     };
-    let pricing_options = pricing_options.mark_instrument_validated();
     registry
         .price_with_metrics(
             instrument,

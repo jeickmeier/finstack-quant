@@ -52,6 +52,8 @@ pub mod commodity;
 pub mod exotics;
 
 mod family;
+pub use commodity::{CommodityConvention, CommodityUnderlyingParams};
+pub use exotics::BermudanCallProvision;
 pub use family::EXOTICS;
 
 /// Compiles the crate `README.md` Rust samples as doctests.

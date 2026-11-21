@@ -736,13 +736,13 @@ mod tests {
     use finstack_quant_valuations_test_support::discount_forward_curves as discount_forward_curve_support;
 
     use super::*;
+    use crate::CreditParams;
     use crate::cds_index::CdsIndexConstituent;
     use date_support::date;
     use discount_forward_curve_support::flat_discount_with_tenor;
     use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::term_structures::HazardCurve;
-    use finstack_quant_valuations_core::instruments::CreditParams;
 
     fn sample_market(as_of: Date) -> MarketContext {
         let hazard = HazardCurve::builder("CDX.NA.IG.HAZARD")

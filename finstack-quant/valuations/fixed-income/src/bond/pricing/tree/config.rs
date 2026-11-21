@@ -7,6 +7,108 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
     Hw1fParamFamily, resolve_hw1f_params,
 };
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+
+/// Resolve explicit rates-credit lattice inputs from valuation pricing overrides.
+pub(crate) fn resolve_rates_credit_config(
+    overrides: &InstrumentPricingOverrides,
+    steps: usize,
+) -> finstack_quant_core::Result<
+    finstack_quant_models::trees::two_factor_rates_credit::RatesCreditConfig,
+> {
+    use finstack_quant_models::trees::two_factor_rates_credit::{KAPPA_MAX, RatesCreditConfig};
+
+    let model = &overrides.model_config;
+    let quotes = &overrides.market_quotes;
+    if model.hw1f_sigma_schedule.is_some() {
+        return Err(finstack_quant_core::Error::Validation(
+            "hw1f_sigma_schedule is not supported on the rates-credit callable path: the \
+             two-factor lattice carries a single scalar short-rate volatility. Set \
+             hw1f_sigma instead, or price without a credit curve to use a term-structure \
+             Hull-White tree."
+                .to_string(),
+        ));
+    }
+    if model.hw1f_sigma.is_none() && quotes.implied_volatility.is_some() {
+        return Err(finstack_quant_core::Error::Validation(
+            "the rates-credit callable path reads short-rate volatility from \
+             instrument_pricing_overrides.model_config.hw1f_sigma, not \
+             instrument_pricing_overrides.market_quotes.implied_volatility"
+                .to_string(),
+        ));
+    }
+    if model.bdt_sigma.is_some() {
+        return Err(finstack_quant_core::Error::Validation(
+            "instrument_pricing_overrides.model_config.bdt_sigma is a Black-Derman-Toy input; \
+             the rates-credit callable path is a Hull-White lattice and reads \
+             instrument_pricing_overrides.model_config.hw1f_sigma"
+                .to_string(),
+        ));
+    }
+    for (name, value) in [
+        ("bk_sigma", model.bk_sigma),
+        ("bk_mean_reversion", model.bk_mean_reversion),
+    ] {
+        if value.is_some() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "instrument_pricing_overrides.model_config.{name} is a Black-Karasinski input; \
+                 the rates-credit callable path is a Hull-White lattice and reads \
+                 instrument_pricing_overrides.model_config.hw1f_sigma and hw1f_mean_reversion"
+            )));
+        }
+    }
+
+    let rate_vol = model.hw1f_sigma.unwrap_or(0.0);
+    let hazard_vol = model.hazard_sigma.unwrap_or(0.0);
+    let rate_mean_reversion = model.hw1f_mean_reversion.unwrap_or(0.0);
+    let hazard_mean_reversion = model.hazard_mean_reversion.unwrap_or(0.0);
+    let correlation = model.rate_credit_correlation.unwrap_or(0.0);
+
+    for (label, value) in [
+        ("hw1f_sigma", rate_vol),
+        ("hazard_sigma", hazard_vol),
+        ("hw1f_mean_reversion", rate_mean_reversion),
+        ("hazard_mean_reversion", hazard_mean_reversion),
+    ] {
+        if !value.is_finite() || value < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{label} must be finite and non-negative on the rates-credit path, got {value}"
+            )));
+        }
+    }
+    for (label, value) in [
+        ("hw1f_mean_reversion", rate_mean_reversion),
+        ("hazard_mean_reversion", hazard_mean_reversion),
+    ] {
+        if value > KAPPA_MAX {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{label} = {value:.4} exceeds the rates-credit binomial-lattice limit \
+                 (KAPPA_MAX = {KAPPA_MAX}); reduce it or use HullWhiteTree"
+            )));
+        }
+    }
+    if !correlation.is_finite() || !(-1.0..=1.0).contains(&correlation) {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "rate_credit_correlation must be finite and in [-1, 1], got {correlation}"
+        )));
+    }
+    if correlation != 0.0 && (rate_vol <= 0.0 || hazard_vol <= 0.0) {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "rate_credit_correlation = {correlation} is inert because hw1f_sigma = \
+             {rate_vol} and hazard_sigma = {hazard_vol}; set both volatilities \
+             positive or leave correlation unset"
+        )));
+    }
+
+    Ok(RatesCreditConfig {
+        steps,
+        rate_vol,
+        hazard_vol,
+        correlation,
+        rate_mean_reversion,
+        hazard_mean_reversion,
+    })
+}
 
 /// Choice of short-rate model for the bond pricing tree.
 ///
@@ -649,5 +751,121 @@ mod tests {
             config.tree_model,
             TreeModelChoice::BlackDermanToy { sigma, .. } if (sigma - 0.20).abs() < 1e-12
         ));
+    }
+
+    fn rates_credit_overrides(
+        rate_vol: Option<f64>,
+        hazard_vol: Option<f64>,
+        correlation: Option<f64>,
+    ) -> InstrumentPricingOverrides {
+        let mut overrides = InstrumentPricingOverrides::default();
+        overrides.model_config.hw1f_sigma = rate_vol;
+        overrides.model_config.hazard_sigma = hazard_vol;
+        overrides.model_config.rate_credit_correlation = correlation;
+        overrides
+    }
+
+    #[test]
+    fn resolver_maps_all_four_volatility_regimes() {
+        for (rate, hazard, expected_rate, expected_hazard) in [
+            (None, None, 0.0, 0.0),
+            (Some(0.012), None, 0.012, 0.0),
+            (None, Some(0.02), 0.0, 0.02),
+            (Some(0.012), Some(0.02), 0.012, 0.02),
+        ] {
+            let config =
+                super::resolve_rates_credit_config(&rates_credit_overrides(rate, hazard, None), 64)
+                    .expect("valid rates-credit regime");
+            assert_eq!(config.steps, 64);
+            assert_eq!(config.rate_vol, expected_rate);
+            assert_eq!(config.hazard_vol, expected_hazard);
+        }
+    }
+
+    #[test]
+    fn resolver_rejects_invalid_and_inert_inputs() {
+        for (overrides, expected) in [
+            (
+                rates_credit_overrides(Some(-0.01), None, None),
+                "hw1f_sigma",
+            ),
+            (
+                rates_credit_overrides(Some(0.01), Some(f64::NAN), None),
+                "hazard_sigma",
+            ),
+            (
+                rates_credit_overrides(Some(0.01), Some(0.02), Some(1.5)),
+                "rate_credit_correlation",
+            ),
+            (rates_credit_overrides(None, Some(0.02), Some(0.5)), "inert"),
+        ] {
+            let error = super::resolve_rates_credit_config(&overrides, 32)
+                .expect_err("invalid rates-credit configuration must fail");
+            assert!(error.to_string().contains(expected));
+        }
+
+        let mut scheduled = rates_credit_overrides(Some(0.01), None, None);
+        scheduled.model_config.hw1f_sigma_schedule = Some(
+            finstack_quant_core::math::piecewise::PiecewiseConstantCurve::new(
+                vec![0.0, 5.0],
+                vec![0.01, 0.012],
+            )
+            .expect("valid schedule fixture"),
+        );
+        assert!(
+            super::resolve_rates_credit_config(&scheduled, 32)
+                .expect_err("unsupported schedule must fail")
+                .to_string()
+                .contains("hw1f_sigma_schedule")
+        );
+    }
+
+    #[test]
+    fn resolver_rejects_legacy_channels_without_canonical_counterpart() {
+        let mut legacy_vol = InstrumentPricingOverrides::default();
+        legacy_vol.market_quotes.implied_volatility = Some(0.01);
+        assert!(
+            super::resolve_rates_credit_config(&legacy_vol, 32)
+                .expect_err("legacy vol must fail")
+                .to_string()
+                .contains("implied_volatility")
+        );
+
+        let mut bdt = InstrumentPricingOverrides::default();
+        bdt.model_config.bdt_sigma = Some(0.20);
+        assert!(
+            super::resolve_rates_credit_config(&bdt, 32)
+                .expect_err("a BDT volatility is not a rates-credit input")
+                .to_string()
+                .contains("instrument_pricing_overrides.model_config.bdt_sigma")
+        );
+
+        for field in ["bk_sigma", "bk_mean_reversion"] {
+            let mut bk = InstrumentPricingOverrides::default();
+            match field {
+                "bk_sigma" => bk.model_config.bk_sigma = Some(0.20),
+                _ => bk.model_config.bk_mean_reversion = Some(0.03),
+            }
+            assert!(
+                super::resolve_rates_credit_config(&bk, 32)
+                    .expect_err("a Black-Karasinski input is not a rates-credit input")
+                    .to_string()
+                    .contains(&format!(
+                        "instrument_pricing_overrides.model_config.{field}"
+                    ))
+            );
+        }
+    }
+
+    #[test]
+    fn canonical_fields_win_when_both_channels_are_set() {
+        let mut overrides = InstrumentPricingOverrides::default();
+        overrides.market_quotes.implied_volatility = Some(0.35);
+        overrides.model_config.hw1f_sigma = Some(0.011);
+        overrides.model_config.hw1f_mean_reversion = Some(0.05);
+        let config = super::resolve_rates_credit_config(&overrides, 48)
+            .expect("canonical channels must take precedence");
+        assert_eq!(config.rate_vol, 0.011);
+        assert_eq!(config.rate_mean_reversion, 0.05);
     }
 }

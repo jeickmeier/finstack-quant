@@ -551,12 +551,11 @@ pub(super) fn cms_embedded_option_value(
     time_to_fixing: f64,
     option_type: finstack_quant_models::types::OptionType,
 ) -> Result<f64> {
+    use crate::vol_resolution::ResolvedVolatility;
     use finstack_quant_models::closed_form::{black_call, black_put};
     use finstack_quant_models::types::OptionType;
     use finstack_quant_models::volatility::VolatilityConvention;
-    use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
-        ResolvedVolatility, validate_sigma,
-    };
+    use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::validate_sigma;
     if time_to_fixing <= 0.0 {
         return Ok(match option_type {
             OptionType::Call => (adjusted_forward - strike).max(0.0),

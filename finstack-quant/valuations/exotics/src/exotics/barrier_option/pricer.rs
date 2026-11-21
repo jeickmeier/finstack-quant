@@ -25,12 +25,9 @@ pub(crate) fn collect_barrier_inputs(
     inst: &BarrierOption,
     curves: &MarketContext,
     as_of: Date,
-) -> finstack_quant_core::Result<
-    finstack_quant_valuations_core::instruments::common_impl::helpers::BlackScholesInputsDf,
-> {
-    use finstack_quant_valuations_core::instruments::common_impl::helpers::{
-        BlackScholesInputsDf, resolve_optional_dividend_yield,
-    };
+) -> finstack_quant_core::Result<crate::exotics::bs_gbm::BlackScholesInputsDf> {
+    use crate::exotics::bs_gbm::BlackScholesInputsDf;
+    use finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield;
     let t = inst.day_count.year_fraction(
         as_of,
         inst.expiry,
@@ -133,7 +130,7 @@ pub(crate) fn settled_barrier_value(
 /// [`settled_barrier_value`]); `None` when no breach was observed.
 pub(crate) fn knocked_in_vanilla_value(
     inst: &BarrierOption,
-    inputs: &finstack_quant_valuations_core::instruments::common_impl::helpers::BlackScholesInputsDf,
+    inputs: &crate::exotics::bs_gbm::BlackScholesInputsDf,
 ) -> finstack_quant_core::Result<Option<Money>> {
     if inst.observed_barrier_breached != Some(true) {
         return Ok(None);
@@ -141,7 +138,7 @@ pub(crate) fn knocked_in_vanilla_value(
     let unit = finstack_quant_models::closed_form::bs_price_unchecked(
         inputs.spot,
         inst.strike,
-        inputs.r_eff(),
+        inputs.r_eff()?,
         inputs.q,
         inputs.sigma,
         inputs.t,
@@ -219,7 +216,7 @@ impl BarrierOptionMcPricer {
         }
         let (spot, q, sigma, t_vol, discount_factor) =
             (inputs.spot, inputs.q, inputs.sigma, inputs.t, inputs.df);
-        let r = inputs.r_eff();
+        let r = inputs.r_eff()?;
 
         let gbm_params = GbmParams::new(r, q, sigma)?;
         let process = GbmProcess::new(gbm_params)

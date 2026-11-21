@@ -113,12 +113,14 @@
 //! - bond metrics module for bond-specific risk metrics
 
 mod cashflow_spec;
+pub mod conventions;
 pub(crate) mod metrics;
 /// Bond pricing engines including tree-based and analytical methods.
 pub mod pricing;
 mod types;
 
 pub use cashflow_spec::CashflowSpec;
+pub use conventions::BondConvention;
 #[doc(hidden)]
 pub use metrics::price_yield_spread::asw::{asw_market_with_forward, asw_par_with_forward};
 #[doc(hidden)]
@@ -137,6 +139,7 @@ pub use types::ReturnFloorSpec;
 
 #[cfg(test)]
 mod tests {
+    use crate::BondConvention;
     use crate::bond::{Bond, BondSettlementConvention, CashflowSpec, pricing::settlement};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
@@ -144,7 +147,6 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations_core::instruments::BondConvention;
     use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::instruments::pricing_overrides::{
         InstrumentPricingOverrides, MetricPricingOverrides, ScenarioPricingOverrides,

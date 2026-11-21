@@ -2,6 +2,7 @@
 //! full NPV on `CdsPricer`.
 
 use super::engine::{AodInputs, CdsPricer, CouponPeriod};
+use crate::CdsDateRegime;
 use crate::cds::CreditDefaultSwap;
 use crate::constants::{credit, numerical};
 use finstack_quant_core::dates::{Date, DayCountContext, Schedule, StubKind, Tenor};
@@ -9,7 +10,6 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::{BASIS_POINTS_PER_UNIT, ONE_BASIS_POINT};
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::instruments::CdsDateRegime;
 use rust_decimal::prelude::ToPrimitive;
 
 impl CdsPricer {

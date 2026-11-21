@@ -35,7 +35,7 @@ fn test_irs_at_par_npv_zero() {
         id: "SWAP_PAR".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed_leg: finstack_quant_valuations_core::instruments::FixedLegSpec {
+        fixed_leg: finstack_quant_valuations_rates::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -49,7 +49,7 @@ fn test_irs_at_par_npv_zero() {
             start: as_of,
             end,
         },
-        float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
+        float_leg: finstack_quant_valuations_rates::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
@@ -98,7 +98,7 @@ fn test_irs_receive_fixed_below_market() {
         id: "SWAP_OFF_MARKET".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed_leg: finstack_quant_valuations_core::instruments::FixedLegSpec {
+        fixed_leg: finstack_quant_valuations_rates::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.03).expect("valid"), // Below market
             frequency: Tenor::quarterly(),
@@ -112,7 +112,7 @@ fn test_irs_receive_fixed_below_market() {
             start: as_of,
             end,
         },
-        float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
+        float_leg: finstack_quant_valuations_rates::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
@@ -160,7 +160,7 @@ fn test_irs_receive_fixed_above_market() {
         id: "SWAP_ABOVE_MARKET".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed_leg: finstack_quant_valuations_core::instruments::FixedLegSpec {
+        fixed_leg: finstack_quant_valuations_rates::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.07).expect("valid"), // Above market
             frequency: Tenor::quarterly(),
@@ -174,7 +174,7 @@ fn test_irs_receive_fixed_above_market() {
             start: as_of,
             end,
         },
-        float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
+        float_leg: finstack_quant_valuations_rates::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
@@ -217,7 +217,7 @@ fn test_irs_pay_vs_receive_opposite_signs() {
     // Off-market: discount at 5%, forward at 6%
     let market = usd_swap_market_split(as_of, 0.05, 0.06);
 
-    let fixed_leg = finstack_quant_valuations_core::instruments::FixedLegSpec {
+    let fixed_leg = finstack_quant_valuations_rates::FixedLegSpec {
         discount_curve_id: "USD-OIS".into(),
         rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
         frequency: Tenor::quarterly(),
@@ -232,7 +232,7 @@ fn test_irs_pay_vs_receive_opposite_signs() {
         end,
     };
 
-    let float_leg = finstack_quant_valuations_core::instruments::FloatLegSpec {
+    let float_leg = finstack_quant_valuations_rates::FloatLegSpec {
         discount_curve_id: "USD-OIS".into(),
         index_id: "USD-SOFR-3M".into(),
         forward_curve_id: "USD-SOFR-3M".into(),

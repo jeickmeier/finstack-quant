@@ -1,5 +1,6 @@
 //! Commodity option instrument definition and pricing logic.
 
+use crate::CommodityUnderlyingParams;
 use crate::commodity::bump_price_curve_pct;
 use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
@@ -15,7 +16,6 @@ use finstack_quant_models::trees::binomial_tree::BinomialTree;
 use finstack_quant_models::types::OptionMarketParams;
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::SettlementType;
 

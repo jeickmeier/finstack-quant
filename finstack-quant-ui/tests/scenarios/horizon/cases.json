@@ -894,7 +894,7 @@
             },
             "execution_policy": "parallel",
             "notes": [
-              "Taylor bucketed credit sensitivities failed: Model failure: Metric 'bucketed_cs01' calculation failed: Calibration error: quote-space bucketed CS01 requires a lossless calibration recipe for hazard curve 'HZ' (a curve produced by the calibration pipeline, not one built directly from hazard rates) [instrument=US912828XG33, type=Bond, model=RatesCredit]",
+              "Taylor bucketed credit sensitivities failed: Model failure: Metric 'bucketed_cs01' calculation failed: Calibration error: quote-space bucketed CS01 requires a lossless calibration recipe for hazard curve 'HZ' (a curve produced by the calibration pipeline, not one built directly from hazard rates) [instrument=US912828XG33, type=bond, model=rates_credit]",
               "Taylor credit factor 'HZ' failed: Validation error: credit risk unavailable after bucket validation failed",
               "Taylor attribution: 0.98% residual (2 factors, 26 repricings)",
               "Taylor coverage: rates/credit/vol/FX-exposure/inflation/correlations/market-scalars/model-parameters/theta. Restore-and-reprice families (FX, inflation, correlations, scalars, model parameters) isolate the full family P&L; rates/credit/vol remain sensitivity × observed move."

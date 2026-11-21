@@ -11,62 +11,18 @@
 
 use crate::instruments::pricing_overrides::MarketQuoteOverrides;
 use crate::market::resolve_vol_source;
-use finstack_quant_core::dates::{Date, VolatilityClock};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::money::fx::CurrencyPair;
-
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::volatility::{VolSource, VolatilityConvention};
 
-/// Coordinates and pricing convention for one volatility resolution.
-pub struct VolatilityRequest {
-    /// Positive option time in years.
-    pub expiry: f64,
-    /// Underlying contract tenor in years when required by the selected source.
-    pub tenor: f64,
-    /// Strike in the source's quoted units.
-    pub strike: f64,
-    /// `None` selects source metadata. Explicit models retain their quote units.
-    pub convention: Option<VolatilityConvention>,
-    /// Whether to use the source's clamped lookup.
-    pub clamp: bool,
-    /// Required expiry clock for a dated, source-backed SABR cube lookup.
-    /// The cube must declare the same reference date, day count and context.
-    /// Numeric lookups omit this requirement.
-    pub required_cube_clock: Option<VolatilityClock>,
-}
-
-/// One validated quote together with the convention needed by prices and Greeks.
-#[derive(Clone, Copy)]
-pub struct ResolvedVolatility {
-    pub sigma: f64,
-    pub convention: VolatilityConvention,
-}
-
-impl ResolvedVolatility {
-    /// Validate and transform both model coordinates using the resolved shift.
-    pub fn model_rates(self, forward: f64, strike: f64) -> Result<(f64, f64)> {
-        if !forward.is_finite() || !strike.is_finite() {
-            return Err(Error::Validation(
-                "option forward and strike must be finite".to_owned(),
-            ));
-        }
-        let shift = match self.convention {
-            VolatilityConvention::Normal => return Ok((forward, strike)),
-            VolatilityConvention::Lognormal => 0.0,
-            VolatilityConvention::ShiftedLognormal { shift } => shift,
-        };
-        let (forward, strike) = (forward + shift, strike + shift);
-        if !shift.is_finite() || forward <= 0.0 || strike <= 0.0 {
-            return Err(Error::Validation(format!(
-                "Black pricing requires positive forward and strike after displacement {shift}: forward={forward}, strike={strike}"
-            )));
-        }
-        Ok((forward, strike))
-    }
-}
-
+/// Validate that a resolved volatility quote is finite and non-negative.
+///
+/// # Arguments
+///
+/// * `sigma` - Volatility quote to check in the caller's volatility unit.
 pub fn validate_sigma(sigma: f64) -> Result<f64> {
     if sigma.is_finite() && sigma >= 0.0 {
         Ok(sigma)
@@ -77,117 +33,19 @@ pub fn validate_sigma(sigma: f64) -> Result<f64> {
     }
 }
 
-/// Resolve the active quote, retaining units and displacement throughout pricing.
+/// Resolve unshifted Black volatility for equity/FX-style surface consumers.
+///
+/// Uses `overrides.implied_volatility` when present (still rejecting a displaced
+/// surface with `VolQuoteType::ShiftedBlackLognormal`), otherwise queries the
+/// volatility surface at `(t, strike)` with edge clamping.
 ///
 /// # Arguments
 ///
-/// * `overrides` - Optional explicit implied volatility in the selected quote convention.
-/// * `curves` - Market context containing computational volatility sources.
-/// * `vol_surface_id` - Identifier used to resolve the active volatility source.
-/// * `request` - Model coordinates, convention and lookup policy. Dated SABR
-///   consumers also specify their required source expiry clock.
-///
-/// # Errors
-///
-/// Returns an error when the source cannot be resolved, the quote conventions
-/// or required cube clock disagree, or the selected quote is invalid.
-pub fn resolve_volatility(
-    overrides: &MarketQuoteOverrides,
-    curves: &MarketContext,
-    vol_surface_id: &str,
-    request: VolatilityRequest,
-) -> Result<ResolvedVolatility> {
-    let has_cube_tenor = request.tenor.is_finite() && request.tenor > 0.0;
-    let source = if overrides.implied_volatility.is_some() && request.convention.is_some() {
-        // A cube can supply displacement only when the product has a tenor.
-        resolve_vol_source(curves, vol_surface_id)
-            .ok()
-            .filter(|source| has_cube_tenor || !matches!(source, VolSource::Cube(_)))
-    } else {
-        Some(resolve_vol_source(curves, vol_surface_id)?)
-    };
-    if let (Some(VolSource::Cube(cube)), Some(required_clock)) =
-        (&source, &request.required_cube_clock)
-        && overrides.implied_volatility.is_none()
-    {
-        let clock = cube.expiry_clock().ok_or_else(|| {
-            Error::Validation(format!(
-                "SABR cube '{}' requires an explicit expiry_clock for dated valuation",
-                cube.id()
-            ))
-        })?;
-        if clock != required_clock {
-            return Err(Error::Validation(format!(
-                "SABR cube '{}' expiry_clock {clock:?} does not match the required model clock {required_clock:?}",
-                cube.id()
-            )));
-        }
-    }
-    let source_convention = source
-        .as_ref()
-        .map(|source| {
-            if matches!(source, VolSource::Cube(_)) {
-                if !has_cube_tenor {
-                    return Err(Error::Validation(format!(
-                        "SABR cube '{}' requires a finite positive underlying tenor",
-                        source.get_id()
-                    )));
-                }
-                let requested = request.convention.ok_or_else(|| {
-                    Error::Validation("SABR cube requires explicit output quote convention".into())
-                })?;
-                source.get_cube_convention(request.expiry, request.tenor, requested, request.clamp)
-            } else {
-                source.get_convention(request.expiry, request.tenor)
-            }
-        })
-        .transpose()?;
-    let mut convention = request.convention.or(source_convention).ok_or_else(|| {
-        Error::Validation("Auto volatility requires source convention metadata".to_owned())
-    })?;
-    if let (
-        VolatilityConvention::Lognormal,
-        Some(VolatilityConvention::ShiftedLognormal { shift }),
-    ) = (convention, source_convention)
-    {
-        convention = VolatilityConvention::ShiftedLognormal { shift };
-    }
-    if let (
-        VolatilityConvention::ShiftedLognormal { shift },
-        Some(VolatilityConvention::ShiftedLognormal {
-            shift: source_shift,
-        }),
-    ) = (convention, source_convention)
-        && (shift - source_shift).abs() > 1e-12
-    {
-        return Err(Error::Validation(format!(
-            "configured volatility displacement {shift} differs from source displacement {source_shift}"
-        )));
-    }
-    let sigma = if let Some(sigma) = overrides.implied_volatility {
-        sigma
-    } else {
-        let source = source
-            .as_ref()
-            .ok_or_else(|| Error::Internal("volatility source missing".into()))?;
-        match (convention, request.clamp) {
-            (VolatilityConvention::Normal, true) => {
-                source.get_normal_vol_clamped(request.expiry, request.tenor, request.strike)?
-            }
-            (VolatilityConvention::Normal, false) => {
-                source.get_normal_vol(request.expiry, request.tenor, request.strike)?
-            }
-            (_, true) => source.get_vol_clamped(request.expiry, request.tenor, request.strike)?,
-            (_, false) => source.get_vol(request.expiry, request.tenor, request.strike)?,
-        }
-    };
-    Ok(ResolvedVolatility {
-        sigma: validate_sigma(sigma)?,
-        convention,
-    })
-}
-
-/// Resolve unshifted Black volatility for equity/FX-style surface consumers.
+/// * `overrides` - Instrument-level market quote overrides (explicit `implied_volatility` wins).
+/// * `curves` - Market context holding volatility surfaces.
+/// * `vol_surface_id` - Identifier of the target volatility surface.
+/// * `t` - Time to expiry in years on the consumer's model clock.
+/// * `strike` - Option strike in the surface's quoted strike units.
 #[inline]
 pub fn resolve_sigma_at(
     overrides: &MarketQuoteOverrides,
@@ -196,31 +54,38 @@ pub fn resolve_sigma_at(
     t: f64,
     strike: f64,
 ) -> Result<f64> {
-    if overrides.implied_volatility.is_none() {
-        let source = resolve_vol_source(curves, vol_surface_id)?;
-        if let finstack_quant_models::volatility::VolSource::Surface(surface) = source {
+    if let Some(sigma) = overrides.implied_volatility {
+        if let Ok(VolSource::Surface(surface)) = resolve_vol_source(curves, vol_surface_id)
+            && surface.quote_type() == VolQuoteType::ShiftedBlackLognormal
+        {
+            return Err(Error::Validation(
+                "unshifted Black consumer cannot use a displaced volatility source".to_owned(),
+            ));
+        }
+        return validate_sigma(sigma);
+    }
+
+    let source = resolve_vol_source(curves, vol_surface_id)?;
+    match &source {
+        VolSource::Cube(_) => {
+            return Err(Error::Validation(format!(
+                "SABR cube '{}' requires a finite positive underlying tenor",
+                source.get_id()
+            )));
+        }
+        VolSource::Surface(surface) => {
             surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
         }
+        VolSource::FxDelta(_) | VolSource::CubeExpirySlice(_) => {}
     }
-    let resolved = resolve_volatility(
-        overrides,
-        curves,
-        vol_surface_id,
-        VolatilityRequest {
-            expiry: t,
-            tenor: 0.0,
-            strike,
-            convention: Some(VolatilityConvention::Lognormal),
-            clamp: true,
-            required_cube_clock: None,
-        },
-    )?;
-    if resolved.convention != VolatilityConvention::Lognormal {
+
+    if source.get_convention(t, 0.0)? != VolatilityConvention::Lognormal {
         return Err(Error::Validation(
             "unshifted Black consumer cannot use a displaced volatility source".to_owned(),
         ));
     }
-    Ok(resolved.sigma)
+
+    validate_sigma(source.get_vol_clamped(t, 0.0, strike)?)
 }
 
 /// Qualified FX option volatility lookup parameters (`ADR 0045`, `CORE-MARKET-15`).
@@ -243,6 +108,42 @@ pub struct FxVolatilityRequest<'a> {
     pub strike: f64,
     /// Strictly positive delivery-aligned FX forward in `quote` per `base`.
     pub forward: f64,
+}
+
+fn resolve_clocked_fx_sigma(
+    source: &VolSource,
+    label: &str,
+    clock: &finstack_quant_core::dates::VolatilityClock,
+    request: &FxVolatilityRequest<'_>,
+    check_lognormal: bool,
+) -> Result<f64> {
+    if clock.get_reference_date() != request.as_of {
+        return Err(Error::Validation(format!(
+            "{label} '{}' expiry_clock reference_date {} does not match valuation as_of {}",
+            request.vol_surface_id,
+            clock.get_reference_date(),
+            request.as_of
+        )));
+    }
+    let t_source = clock.expiry_time(request.expiry)?;
+    if !t_source.is_finite() || t_source <= 0.0 {
+        return Err(Error::Validation(format!(
+            "{label} '{}' expiry_clock mapped {} -> {} to non-positive time {t_source}",
+            request.vol_surface_id, request.as_of, request.expiry
+        )));
+    }
+    if check_lognormal && source.get_convention(t_source, 0.0)? != VolatilityConvention::Lognormal {
+        return Err(Error::Validation(
+            "FX Black pricing requires unshifted lognormal volatility".to_owned(),
+        ));
+    }
+    let sigma_source =
+        validate_sigma(source.get_fx_vol_clamped(t_source, request.strike, request.forward)?)?;
+    if sigma_source == 0.0 || t_source.total_cmp(&request.model_time).is_eq() {
+        Ok(sigma_source)
+    } else {
+        validate_sigma(sigma_source * (t_source / request.model_time).sqrt())
+    }
 }
 
 /// Resolve unshifted Black volatility for FX consumers using an explicit currency pair,
@@ -310,75 +211,16 @@ pub fn resolve_fx_sigma(request: FxVolatilityRequest<'_>) -> Result<f64> {
                     request.vol_surface_id
                 ))
             })?;
-            if clock.get_reference_date() != request.as_of {
-                return Err(Error::Validation(format!(
-                    "FX delta surface '{}' expiry_clock reference_date {} does not match valuation as_of {}",
-                    request.vol_surface_id,
-                    clock.get_reference_date(),
-                    request.as_of
-                )));
-            }
-            let t_source = clock.expiry_time(request.expiry)?;
-            if !t_source.is_finite() || t_source <= 0.0 {
-                return Err(Error::Validation(format!(
-                    "FX delta surface '{}' expiry_clock mapped {} -> {} to non-positive time {}",
-                    request.vol_surface_id, request.as_of, request.expiry, t_source
-                )));
-            }
-            let sigma_source = validate_sigma(source.get_fx_vol_clamped(
-                t_source,
-                request.strike,
-                request.forward,
-            )?)?;
-            if sigma_source == 0.0 || t_source.total_cmp(&request.model_time).is_eq() {
-                Ok(sigma_source)
-            } else {
-                validate_sigma(sigma_source * (t_source / request.model_time).sqrt())
-            }
+            resolve_clocked_fx_sigma(&source, "FX delta surface", clock, &request, false)
         }
         VolSource::Surface(surface) => {
             surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
             if let Some(clock) = surface.expiry_clock() {
-                if clock.get_reference_date() != request.as_of {
-                    return Err(Error::Validation(format!(
-                        "volatility surface '{}' expiry_clock reference_date {} does not match valuation as_of {}",
-                        request.vol_surface_id,
-                        clock.get_reference_date(),
-                        request.as_of
-                    )));
-                }
-                let t_source = clock.expiry_time(request.expiry)?;
-                if !t_source.is_finite() || t_source <= 0.0 {
-                    return Err(Error::Validation(format!(
-                        "volatility surface '{}' expiry_clock mapped {} -> {} to non-positive time {}",
-                        request.vol_surface_id, request.as_of, request.expiry, t_source
-                    )));
-                }
-                if !request.model_time.is_finite() || request.model_time <= 0.0 {
-                    return Err(Error::Validation(format!(
-                        "FX model_time must be finite and strictly positive, got {}",
-                        request.model_time
-                    )));
-                }
-                let convention = source.get_convention(t_source, 0.0)?;
-                if convention != VolatilityConvention::Lognormal {
-                    return Err(Error::Validation(
-                        "FX Black pricing requires unshifted lognormal volatility".to_owned(),
-                    ));
-                }
-                let sigma_source = validate_sigma(source.get_fx_vol_clamped(
-                    t_source,
-                    request.strike,
-                    request.forward,
-                )?)?;
-                if sigma_source == 0.0 || t_source.total_cmp(&request.model_time).is_eq() {
-                    Ok(sigma_source)
-                } else {
-                    validate_sigma(sigma_source * (t_source / request.model_time).sqrt())
-                }
+                resolve_clocked_fx_sigma(&source, "volatility surface", clock, &request, true)
             } else {
-                let convention = source.get_convention(request.model_time, 0.0)?;
-                if convention != VolatilityConvention::Lognormal {
+                if source.get_convention(request.model_time, 0.0)?
+                    != VolatilityConvention::Lognormal
+                {
                     return Err(Error::Validation(
                         "FX Black pricing requires unshifted lognormal volatility".to_owned(),
                     ));

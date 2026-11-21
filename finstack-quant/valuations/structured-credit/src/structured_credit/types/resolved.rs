@@ -27,6 +27,25 @@ impl StructuredCredit {
         Ok(deal)
     }
 
+    /// Clone this deal with a normalized pool and updated credit model assumptions.
+    ///
+    /// # Arguments
+    /// * `prepayment_spec` - Replacement pool prepayment assumption.
+    /// * `default_spec` - Replacement pool default assumption.
+    /// * `recovery_spec` - Replacement pool recovery rate and lag assumption.
+    pub fn with_model_assumptions(
+        &self,
+        prepayment_spec: finstack_quant_cashflows::builder::PrepaymentModelSpec,
+        default_spec: finstack_quant_cashflows::builder::DefaultModelSpec,
+        recovery_spec: finstack_quant_cashflows::builder::RecoveryModelSpec,
+    ) -> Result<Self> {
+        let mut modified = self.resolved_for_pricing()?;
+        modified.credit_model.prepayment_spec = prepayment_spec;
+        modified.credit_model.default_spec = default_spec;
+        modified.credit_model.recovery_spec = recovery_spec;
+        Ok(modified)
+    }
+
     /// Run every check [`Self::resolved_for_pricing`] runs without copying
     /// the deal (the pool is borrowed unless it must be normalized from
     /// representative lines or instrument collateral).

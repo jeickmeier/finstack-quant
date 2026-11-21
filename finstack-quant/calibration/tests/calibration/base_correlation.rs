@@ -116,7 +116,7 @@ fn build_tranche(quote: &CdsTrancheQuote, base_date: Date, notional: f64) -> Cds
             prev_cds_date(base_date).expect("prior quarterly roll"),
         ))
         .realized_loss(0.0)
-        .date_regime(finstack_quant_valuations_core::instruments::CdsDateRegime::Standard)
+        .date_regime(finstack_quant_valuations_credit::CdsDateRegime::Standard)
         .stub(convention.stub)
         .attributes(Attributes::new())
         .build()
@@ -221,8 +221,7 @@ fn envelope(
                     business_day_convention: None,
                     calendar_id: None,
                     detachment_points: quotes.iter().map(|q| q.detachment).collect(),
-                    date_regime:
-                        finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+                    date_regime: finstack_quant_valuations_credit::CdsDateRegime::Standard,
                 }),
             }],
         },

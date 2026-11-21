@@ -2,74 +2,23 @@
 
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations_core::instruments::FutureOptionTerms;
 
-/// Option on an arbitrary interest-rate futures price.
-///
-/// One instrument covers exchange-listed contracts and bilateral/OTC trades.
-/// All economics are caller-supplied; no exchange symbol or contract definition
-/// is embedded in the type.
-#[derive(
-    Clone,
-    Debug,
-    PartialEq,
-    finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct InterestRateFutureOption {
-    /// Unique instrument identifier.
-    pub id: InstrumentId,
-    /// Complete listed or bilateral option-on-future terms.
-    pub terms: FutureOptionTerms,
-    /// Instrument-owned pricing inputs: the flat option volatility in
-    /// `market_quotes.implied_volatility` (required while live) and optional
-    /// tree-step overrides.
-    #[builder(default)]
-    #[serde(
-        default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
-    )]
-    pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
-    /// Metric-time pricing configuration.
-    #[builder(default)]
-    #[serde(
-        default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
-    )]
-    pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
-    /// Scenario-only pricing adjustments.
-    #[builder(default)]
-    #[serde(
-        default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
-    )]
-    pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
-    /// Attributes for selection and reporting.
-    #[builder(default)]
-    #[serde(default)]
-    pub attributes: Attributes,
+finstack_quant_valuations_core::define_future_option! {
+    /// Option on an arbitrary interest-rate futures price.
+    ///
+    /// One instrument covers exchange-listed contracts and bilateral/OTC trades.
+    /// All economics are caller-supplied; no exchange symbol or contract definition
+    /// is embedded in the type.
+    pub struct InterestRateFutureOption;
+    builder: InterestRateFutureOptionBuilder,
+    instrument_type: finstack_quant_valuations_core::pricer::InstrumentType::InterestRateFutureOption,
+    family: crate::RATES,
+    require_rate_risk: true,
 }
 
 impl InterestRateFutureOption {
-    /// Copy the terms and overrides into an independent contract builder.
-    pub fn to_builder(&self) -> InterestRateFutureOptionBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .terms(self.terms.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-            .attributes(self.attributes.clone())
-    }
-
     /// Create a neutral schema and serialization example.
     pub fn example() -> finstack_quant_core::Result<Self> {
         Ok(Self {
@@ -141,13 +90,6 @@ impl InterestRateFutureOption {
         Ok(delta_channel + discount_channel)
     }
 }
-
-finstack_quant_valuations_core::impl_future_option_instrument!(
-    InterestRateFutureOption,
-    finstack_quant_valuations_core::pricer::InstrumentType::InterestRateFutureOption,
-    crate::RATES,
-    require_rate_risk = true
-);
 
 #[cfg(test)]
 mod tests {

@@ -1739,8 +1739,7 @@ export type SwaptionVolConvention =
       };
     };
 /**
- * Named contractual date regime of a CDS product (record
- * CALIBRATION-FRAMEWORK-007, O7).
+ * Named contractual date regime of a CDS product.
  *
  * The regime owns how the premium grid, its stub and its endpoints are
  * derived; no regime is inferred and none is a default.

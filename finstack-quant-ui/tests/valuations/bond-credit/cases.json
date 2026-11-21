@@ -344,7 +344,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'g_spread' calculation failed: Validation error: g_spread for bond 'US912828XG33' requires a government curve: set instrument_pricing_overrides.model_config.government_curve_id [instrument=US912828XG33, type=Bond, model=Discounting]",
+              "message": "Validation error: Metric 'g_spread' calculation failed: Validation error: g_spread for bond 'US912828XG33' requires a government curve: set instrument_pricing_overrides.model_config.government_curve_id [instrument=US912828XG33, type=bond, model=discounting]",
               "kind": "validation"
             }
           }
@@ -380,7 +380,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'discount_margin' calculation failed: Validation error: discount margin is only defined for bonds with floating coupons [instrument=US912828XG33, type=Bond, model=Discounting]",
+              "message": "Validation error: Metric 'discount_margin' calculation failed: Validation error: discount margin is only defined for bonds with floating coupons [instrument=US912828XG33, type=bond, model=discounting]",
               "kind": "validation"
             }
           }
@@ -433,7 +433,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for bond 'US912828XG33' requires hazard pricing: a credit_curve_id and the 'hazard_rate' or 'rates_credit' model (active model 'discounting') [instrument=US912828XG33, type=Bond, model=Discounting]",
+              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for bond 'US912828XG33' requires hazard pricing: a credit_curve_id and the 'hazard_rate' or 'rates_credit' model (active model 'discounting') [instrument=US912828XG33, type=bond, model=discounting]",
               "kind": "validation"
             }
           }
@@ -444,7 +444,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for bond 'US912828XG33' requires hazard pricing: a credit_curve_id and the 'hazard_rate' or 'rates_credit' model (active model 'discounting') [instrument=US912828XG33, type=Bond, model=Discounting]",
+              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for bond 'US912828XG33' requires hazard pricing: a credit_curve_id and the 'hazard_rate' or 'rates_credit' model (active model 'discounting') [instrument=US912828XG33, type=bond, model=discounting]",
               "kind": "validation"
             }
           }
@@ -609,7 +609,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'discount_margin' calculation failed: Validation error: discount margin is only defined for bonds with floating coupons [instrument=US912828XG33, type=Bond, model=Discounting]",
+              "message": "Validation error: Metric 'discount_margin' calculation failed: Validation error: discount margin is only defined for bonds with floating coupons [instrument=US912828XG33, type=bond, model=discounting]",
               "kind": "validation"
             }
           }
@@ -662,7 +662,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for bond 'US912828XG33' requires hazard pricing: a credit_curve_id and the 'hazard_rate' or 'rates_credit' model (active model 'discounting') [instrument=US912828XG33, type=Bond, model=Discounting]",
+              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for bond 'US912828XG33' requires hazard pricing: a credit_curve_id and the 'hazard_rate' or 'rates_credit' model (active model 'discounting') [instrument=US912828XG33, type=bond, model=discounting]",
               "kind": "validation"
             }
           }
@@ -673,7 +673,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for bond 'US912828XG33' requires hazard pricing: a credit_curve_id and the 'hazard_rate' or 'rates_credit' model (active model 'discounting') [instrument=US912828XG33, type=Bond, model=Discounting]",
+              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for bond 'US912828XG33' requires hazard pricing: a credit_curve_id and the 'hazard_rate' or 'rates_credit' model (active model 'discounting') [instrument=US912828XG33, type=bond, model=discounting]",
               "kind": "validation"
             }
           }
@@ -806,7 +806,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'g_spread' calculation failed: Validation error: g_spread for bond 'US912828XG33' requires a government curve: set instrument_pricing_overrides.model_config.government_curve_id [instrument=US912828XG33, type=Bond, model=Tree]",
+              "message": "Validation error: Metric 'g_spread' calculation failed: Validation error: g_spread for bond 'US912828XG33' requires a government curve: set instrument_pricing_overrides.model_config.government_curve_id [instrument=US912828XG33, type=bond, model=tree]",
               "kind": "validation"
             }
           }
@@ -838,7 +838,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'discount_margin' calculation failed: Validation error: discount margin is only defined for bonds with floating coupons [instrument=US912828XG33, type=Bond, model=Tree]",
+              "message": "Validation error: Metric 'discount_margin' calculation failed: Validation error: discount margin is only defined for bonds with floating coupons [instrument=US912828XG33, type=bond, model=tree]",
               "kind": "validation"
             }
           }
@@ -891,7 +891,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for bond 'US912828XG33' requires hazard pricing: a credit_curve_id and the 'hazard_rate' or 'rates_credit' model (active model 'tree') [instrument=US912828XG33, type=Bond, model=Tree]",
+              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for bond 'US912828XG33' requires hazard pricing: a credit_curve_id and the 'hazard_rate' or 'rates_credit' model (active model 'tree') [instrument=US912828XG33, type=bond, model=tree]",
               "kind": "validation"
             }
           }
@@ -902,7 +902,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for bond 'US912828XG33' requires hazard pricing: a credit_curve_id and the 'hazard_rate' or 'rates_credit' model (active model 'tree') [instrument=US912828XG33, type=Bond, model=Tree]",
+              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for bond 'US912828XG33' requires hazard pricing: a credit_curve_id and the 'hazard_rate' or 'rates_credit' model (active model 'tree') [instrument=US912828XG33, type=bond, model=tree]",
               "kind": "validation"
             }
           }
@@ -1035,7 +1035,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'g_spread' calculation failed: Validation error: g_spread for bond 'US912828XG33' requires a government curve: set instrument_pricing_overrides.model_config.government_curve_id [instrument=US912828XG33, type=Bond, model=HazardRate]",
+              "message": "Validation error: Metric 'g_spread' calculation failed: Validation error: g_spread for bond 'US912828XG33' requires a government curve: set instrument_pricing_overrides.model_config.government_curve_id [instrument=US912828XG33, type=bond, model=hazard_rate]",
               "kind": "validation"
             }
           }
@@ -1071,7 +1071,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'discount_margin' calculation failed: Validation error: discount margin is only defined for bonds with floating coupons [instrument=US912828XG33, type=Bond, model=HazardRate]",
+              "message": "Validation error: Metric 'discount_margin' calculation failed: Validation error: discount margin is only defined for bonds with floating coupons [instrument=US912828XG33, type=bond, model=hazard_rate]",
               "kind": "validation"
             }
           }
@@ -1117,7 +1117,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Calibration error: Metric 'cs01' calculation failed: Calibration error: quote-space CS01 requires a lossless calibration recipe for hazard curve 'ACME-HAZARD' (a curve produced by the calibration pipeline, not one built directly from hazard rates) [instrument=US912828XG33, type=Bond, model=HazardRate]",
+              "message": "Calibration error: Metric 'cs01' calculation failed: Calibration error: quote-space CS01 requires a lossless calibration recipe for hazard curve 'ACME-HAZARD' (a curve produced by the calibration pipeline, not one built directly from hazard rates) [instrument=US912828XG33, type=bond, model=hazard_rate]",
               "kind": "computation"
             }
           }
@@ -1205,7 +1205,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Calibration error: Metric 'cs01' calculation failed: Calibration error: quote-space CS01 requires a lossless calibration recipe for hazard curve 'ACME-HAZARD' (a curve produced by the calibration pipeline, not one built directly from hazard rates) [instrument=US912828XG33, type=Bond, model=HazardRate]",
+              "message": "Calibration error: Metric 'cs01' calculation failed: Calibration error: quote-space CS01 requires a lossless calibration recipe for hazard curve 'ACME-HAZARD' (a curve produced by the calibration pipeline, not one built directly from hazard rates) [instrument=US912828XG33, type=bond, model=hazard_rate]",
               "kind": "computation"
             }
           }
@@ -1268,7 +1268,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'g_spread' calculation failed: Validation error: g_spread for bond 'FRN-USD-SOFR-5Y' requires a government curve: set instrument_pricing_overrides.model_config.government_curve_id [instrument=FRN-USD-SOFR-5Y, type=Bond, model=Discounting]",
+              "message": "Validation error: Metric 'g_spread' calculation failed: Validation error: g_spread for bond 'FRN-USD-SOFR-5Y' requires a government curve: set instrument_pricing_overrides.model_config.government_curve_id [instrument=FRN-USD-SOFR-5Y, type=bond, model=discounting]",
               "kind": "validation"
             }
           }
@@ -1286,7 +1286,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'asw_par' calculation failed: Validation error: asset swap spread requires a plain fixed coupon rate [instrument=FRN-USD-SOFR-5Y, type=Bond, model=Discounting]",
+              "message": "Validation error: Metric 'asw_par' calculation failed: Validation error: asset swap spread requires a plain fixed coupon rate [instrument=FRN-USD-SOFR-5Y, type=bond, model=discounting]",
               "kind": "validation"
             }
           }
@@ -1353,7 +1353,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for bond 'FRN-USD-SOFR-5Y' requires hazard pricing: a credit_curve_id and the 'hazard_rate' or 'rates_credit' model (active model 'discounting') [instrument=FRN-USD-SOFR-5Y, type=Bond, model=Discounting]",
+              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for bond 'FRN-USD-SOFR-5Y' requires hazard pricing: a credit_curve_id and the 'hazard_rate' or 'rates_credit' model (active model 'discounting') [instrument=FRN-USD-SOFR-5Y, type=bond, model=discounting]",
               "kind": "validation"
             }
           }
@@ -1364,7 +1364,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for bond 'FRN-USD-SOFR-5Y' requires hazard pricing: a credit_curve_id and the 'hazard_rate' or 'rates_credit' model (active model 'discounting') [instrument=FRN-USD-SOFR-5Y, type=Bond, model=Discounting]",
+              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for bond 'FRN-USD-SOFR-5Y' requires hazard pricing: a credit_curve_id and the 'hazard_rate' or 'rates_credit' model (active model 'discounting') [instrument=FRN-USD-SOFR-5Y, type=bond, model=discounting]",
               "kind": "validation"
             }
           }

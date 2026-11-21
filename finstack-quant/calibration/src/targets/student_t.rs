@@ -216,7 +216,7 @@ impl StudentTTarget {
             &tranche_quote,
             &build_context,
             &CdsTrancheBuildOverrides::for_regime(
-                finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+                finstack_quant_valuations_credit::CdsDateRegime::Standard,
             ),
         )?;
 
@@ -462,7 +462,7 @@ mod tests {
                 curve_ids,
             ),
             &CdsTrancheBuildOverrides::for_regime(
-                finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+                finstack_quant_valuations_credit::CdsDateRegime::Standard,
             ),
         )
         .expect("quote-built unit-notional tranche")

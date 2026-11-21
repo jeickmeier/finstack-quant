@@ -4,6 +4,8 @@
 //! commodity forward contracts. Pricing uses curve-based forward interpolation
 //! with an optional quoted forward override (`quoted_forward`).
 
+use crate::CommodityUnderlyingParams;
+use crate::commodity::CommodityConvention;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CFKind;
@@ -15,9 +17,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations_core::instruments::Position;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::CommodityConvention;
 
 use finstack_quant_valuations_core::instruments::SettlementType;
 
@@ -59,7 +59,7 @@ use finstack_quant_valuations_core::instruments::SettlementType;
 /// ```rust
 /// use finstack_quant_valuations_exotics::commodity::commodity_forward::CommodityForward;
 /// use finstack_quant_valuations_core::instruments::Position;
-/// use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
+/// use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -646,9 +646,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommodityForward {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CommodityUnderlyingParams;
     use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
-    use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
     use finstack_quant_valuations_core::instruments::Instrument;
     use time::Month;
     use time::macros::date;

@@ -416,6 +416,7 @@ mod performance_accuracy;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CommodityUnderlyingParams;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::surfaces::{
@@ -423,7 +424,6 @@ mod tests {
     };
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
     use time::Month;
 
     fn date(year: i32, month: u8, day: u8) -> Date {

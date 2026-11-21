@@ -25,7 +25,7 @@
 //! - `TreePricerConfig` for configuration options
 
 mod bond_valuator;
-mod config;
+pub(crate) mod config;
 pub(crate) mod lsmc;
 #[cfg(test)]
 mod tests;

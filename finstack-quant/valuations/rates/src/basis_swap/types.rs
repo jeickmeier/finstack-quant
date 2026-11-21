@@ -34,8 +34,8 @@ use finstack_quant_core::validation;
 use finstack_quant_valuations_core::impl_instrument_base;
 use rust_decimal::Decimal;
 
+use crate::FloatLegSpec;
 use crate::irs::cashflow::float_leg_coupon_spec;
-use finstack_quant_valuations_core::instruments::FloatLegSpec;
 
 /// Basis swap instrument that exchanges two floating rate payments with different tenors.
 ///
@@ -55,7 +55,7 @@ use finstack_quant_valuations_core::instruments::FloatLegSpec;
 /// ```rust
 /// use finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};
 /// use finstack_quant_valuations_rates::basis_swap::BasisSwap;
-/// use finstack_quant_valuations_core::instruments::FloatLegSpec;
+/// use finstack_quant_valuations_rates::FloatLegSpec;
 /// use time::Month;
 ///
 /// let start = Date::from_calendar_date(2024, Month::January, 3).expect("valid date");

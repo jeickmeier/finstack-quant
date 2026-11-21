@@ -130,8 +130,9 @@ pub fn create_standard_payer_swaption(
         .expect("valid swaption");
     // Tests intentionally exercise OTM/ITM strikes; opt in to flat extrapolation
     // to avoid making results depend on the surface strike grid.
-    swaption.instrument_pricing_overrides = InstrumentPricingOverrides::default()
-        .with_vol_surface_extrapolation(VolSurfaceExtrapolation::Clamp);
+    let mut overrides = InstrumentPricingOverrides::default();
+    overrides.model_config.vol_surface_extrapolation = VolSurfaceExtrapolation::Clamp;
+    swaption.instrument_pricing_overrides = overrides;
     swaption
 }
 

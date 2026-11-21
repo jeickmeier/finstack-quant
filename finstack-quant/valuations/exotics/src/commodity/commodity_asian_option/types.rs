@@ -17,6 +17,7 @@
 //! - Turnbull, S. M., & Wakeman, L. M. (1991). "A Quick Algorithm for Pricing
 //!   European Average Options." `docs/REFERENCES.md#turnbull-wakeman-1991`
 
+use crate::CommodityUnderlyingParams;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -26,7 +27,6 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
 
 /// Commodity Asian option: option on the arithmetic or geometric average of
 /// commodity prices.

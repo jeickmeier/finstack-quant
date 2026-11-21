@@ -342,25 +342,26 @@ fn conversion_change_spec(
         finstack_quant_core::market_data::context::MarketContextState::try_from(&market(150.0))
             .expect("coherent market snapshot");
     finstack_quant_attribution::AttributionSpec {
-        instrument: finstack_quant_valuations::instruments::json_loader::InstrumentJson::ConvertibleBond(
-            closing,
-        ),
+        instrument:
+            finstack_quant_valuations::instruments::json_loader::InstrumentJson::ConvertibleBond(
+                closing,
+            ),
         inputs: finstack_quant_attribution::AttributionInputs {
-        market_t0: state.clone(),
-        market_t1: state,
-        as_of_t0: t0(),
-        as_of_t1: t0(),
-        method,
-        model_params_t0: Some(
-            finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot::Convertible {
-                conversion_spec: opening_conversion,
-            },
-        ),
-        config: None,
-        credit_factor_model: None,
-        credit_factor_detail_options: Default::default(),
-        full_cross_attribution: false,
-    },
+            market_t0: state.clone(),
+            market_t1: state,
+            as_of_t0: t0(),
+            as_of_t1: t0(),
+            method,
+            model_params_t0: Some(
+                finstack_quant_attribution::ModelParamsSnapshot::Convertible {
+                    conversion_spec: opening_conversion,
+                },
+            ),
+            config: None,
+            credit_factor_model: None,
+            credit_factor_detail_options: Default::default(),
+            full_cross_attribution: false,
+        },
     }
 }
 

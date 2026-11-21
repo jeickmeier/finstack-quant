@@ -860,13 +860,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CreditParams;
     use crate::cds_option::parameters::CdsOptionParams;
     use crate::cds_option::pricer::synthetic_underlying_cds;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DateExt;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
-    use finstack_quant_valuations_core::instruments::CreditParams;
     use rust_decimal::Decimal;
     use time::macros::date;
 

@@ -162,7 +162,7 @@ impl QuantoOption {
             .underlying_ticker("NKY".to_string())
             .strike(35_000.0)
             .option_type(finstack_quant_models::types::OptionType::Call)
-            .expiry(finstack_quant_valuations_core::instruments::common_impl::example_constants::FAR_EXPIRY)
+            .expiry(crate::shared::FAR_EXPIRY)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .quantity_opt(Some(4_000.0))
             .payoff_fx_rate_opt(Some(1.0 / 140.0))

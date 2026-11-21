@@ -572,13 +572,13 @@ fn deterministic_estimate(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::BermudanCallProvision;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DateExt, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
-    use finstack_quant_valuations_core::instruments::BermudanCallProvision;
     use time::Month;
 
     fn date(year: i32, month: Month, day: u8) -> Date {

@@ -68,12 +68,12 @@ impl MetricCalculator for ExpectedLossCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CreditParams;
     use crate::cds_index::CdsIndexConstituent;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::{context::MarketContext, term_structures::HazardCurve};
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations_core::instruments::CreditParams;
     use std::sync::Arc;
     use time::macros::date;
 

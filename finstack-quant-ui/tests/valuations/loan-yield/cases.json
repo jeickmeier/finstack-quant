@@ -14,7 +14,7 @@
       "sha256": "9199e3197ac1576ea82e0195430f69085c95344d8189c5a8ec1acced641ade1d"
     }
   ],
-  "wholeRequestError": "Validation error: Metric 'discount_margin' calculation failed: Validation error: discount margin is only defined for floating-rate loans [instrument=TERM-LOAN-USD-5Y, type=TermLoan, model=Discounting]",
+  "wholeRequestError": "Validation error: Metric 'discount_margin' calculation failed: Validation error: discount margin is only defined for floating-rate loans [instrument=TERM-LOAN-USD-5Y, type=term_loan, model=discounting]",
   "cases": {
     "quotedTree": {
       "type": "term_loan",
@@ -273,7 +273,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for term loan 'TLB-USD-2028' requires hazard pricing: a credit_curve_id and the 'tree' model [instrument=TLB-USD-2028, type=TermLoan, model=Tree]",
+              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for term loan 'TLB-USD-2028' requires hazard pricing: a credit_curve_id and the 'tree' model [instrument=TLB-USD-2028, type=term_loan, model=tree]",
               "kind": "validation"
             }
           }
@@ -284,7 +284,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for term loan 'TLB-USD-2028' requires hazard pricing: a credit_curve_id and the 'tree' model [instrument=TLB-USD-2028, type=TermLoan, model=Tree]",
+              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for term loan 'TLB-USD-2028' requires hazard pricing: a credit_curve_id and the 'tree' model [instrument=TLB-USD-2028, type=term_loan, model=tree]",
               "kind": "validation"
             }
           }
@@ -541,7 +541,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'embedded_option_value' calculation failed: Validation error: TermLoan 'TLB-USD-2028' OAS and embedded option value require the Tree model [instrument=TLB-USD-2028, type=TermLoan, model=Discounting]",
+              "message": "Validation error: Metric 'embedded_option_value' calculation failed: Validation error: TermLoan 'TLB-USD-2028' OAS and embedded option value require the Tree model [instrument=TLB-USD-2028, type=term_loan, model=discounting]",
               "kind": "validation"
             }
           }
@@ -552,7 +552,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for term loan 'TLB-USD-2028' requires hazard pricing: a credit_curve_id and the 'tree' model [instrument=TLB-USD-2028, type=TermLoan, model=Discounting]",
+              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for term loan 'TLB-USD-2028' requires hazard pricing: a credit_curve_id and the 'tree' model [instrument=TLB-USD-2028, type=term_loan, model=discounting]",
               "kind": "validation"
             }
           }
@@ -563,7 +563,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for term loan 'TLB-USD-2028' requires hazard pricing: a credit_curve_id and the 'tree' model [instrument=TLB-USD-2028, type=TermLoan, model=Discounting]",
+              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for term loan 'TLB-USD-2028' requires hazard pricing: a credit_curve_id and the 'tree' model [instrument=TLB-USD-2028, type=term_loan, model=discounting]",
               "kind": "validation"
             }
           }
@@ -792,7 +792,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'discount_margin' calculation failed: Validation error: DiscountMargin requires quoted_clean_price_pct for callable loans [instrument=TLB-USD-2028, type=TermLoan, model=Tree]",
+              "message": "Validation error: Metric 'discount_margin' calculation failed: Validation error: DiscountMargin requires quoted_clean_price_pct for callable loans [instrument=TLB-USD-2028, type=term_loan, model=tree]",
               "kind": "validation"
             }
           }
@@ -831,7 +831,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for term loan 'TLB-USD-2028' requires hazard pricing: a credit_curve_id and the 'tree' model [instrument=TLB-USD-2028, type=TermLoan, model=Tree]",
+              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for term loan 'TLB-USD-2028' requires hazard pricing: a credit_curve_id and the 'tree' model [instrument=TLB-USD-2028, type=term_loan, model=tree]",
               "kind": "validation"
             }
           }
@@ -842,7 +842,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for term loan 'TLB-USD-2028' requires hazard pricing: a credit_curve_id and the 'tree' model [instrument=TLB-USD-2028, type=TermLoan, model=Tree]",
+              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for term loan 'TLB-USD-2028' requires hazard pricing: a credit_curve_id and the 'tree' model [instrument=TLB-USD-2028, type=term_loan, model=tree]",
               "kind": "validation"
             }
           }
@@ -1071,7 +1071,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'discount_margin' calculation failed: Validation error: discount margin is only defined for floating-rate loans [instrument=TERM-LOAN-USD-5Y, type=TermLoan, model=Discounting]",
+              "message": "Validation error: Metric 'discount_margin' calculation failed: Validation error: discount margin is only defined for floating-rate loans [instrument=TERM-LOAN-USD-5Y, type=term_loan, model=discounting]",
               "kind": "validation"
             }
           }
@@ -1110,7 +1110,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for term loan 'TERM-LOAN-USD-5Y' requires hazard pricing: a credit_curve_id and the 'tree' model [instrument=TERM-LOAN-USD-5Y, type=TermLoan, model=Discounting]",
+              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for term loan 'TERM-LOAN-USD-5Y' requires hazard pricing: a credit_curve_id and the 'tree' model [instrument=TERM-LOAN-USD-5Y, type=term_loan, model=discounting]",
               "kind": "validation"
             }
           }
@@ -1121,7 +1121,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for term loan 'TERM-LOAN-USD-5Y' requires hazard pricing: a credit_curve_id and the 'tree' model [instrument=TERM-LOAN-USD-5Y, type=TermLoan, model=Discounting]",
+              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for term loan 'TERM-LOAN-USD-5Y' requires hazard pricing: a credit_curve_id and the 'tree' model [instrument=TERM-LOAN-USD-5Y, type=term_loan, model=discounting]",
               "kind": "validation"
             }
           }
@@ -1293,7 +1293,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for revolving credit 'RCF-USD-3Y' requires hazard pricing: a credit_curve_id and a deterministic draw schedule [instrument=RCF-USD-3Y, type=RevolvingCredit, model=Discounting]",
+              "message": "Validation error: Metric 'recovery01' calculation failed: Validation error: recovery01 for revolving credit 'RCF-USD-3Y' requires hazard pricing: a credit_curve_id and a deterministic draw schedule [instrument=RCF-USD-3Y, type=revolving_credit, model=discounting]",
               "kind": "validation"
             }
           }
@@ -1304,7 +1304,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for revolving credit 'RCF-USD-3Y' requires hazard pricing: a credit_curve_id and a deterministic draw schedule [instrument=RCF-USD-3Y, type=RevolvingCredit, model=Discounting]",
+              "message": "Validation error: Metric 'jump_to_default' calculation failed: Validation error: jump_to_default for revolving credit 'RCF-USD-3Y' requires hazard pricing: a credit_curve_id and a deterministic draw schedule [instrument=RCF-USD-3Y, type=revolving_credit, model=discounting]",
               "kind": "validation"
             }
           }
@@ -1533,7 +1533,7 @@
             "ok": false,
             "error": {
               "name": "FinstackError",
-              "message": "Validation error: Metric 'discount_margin' calculation failed: Validation error: discount margin is only defined for floating-rate loans [instrument=TERM-LOAN-USD-5Y, type=TermLoan, model=Tree]",
+              "message": "Validation error: Metric 'discount_margin' calculation failed: Validation error: discount margin is only defined for floating-rate loans [instrument=TERM-LOAN-USD-5Y, type=term_loan, model=tree]",
               "kind": "validation"
             }
           }

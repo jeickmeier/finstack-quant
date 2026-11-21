@@ -15,7 +15,38 @@ use finstack_quant_margin::types::SimmSensitivities;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::common_impl::margin::assign_ir_tenor_bucket;
 use finstack_quant_valuations_core::instruments::common_impl::margin::netting_set_id_from_spec;
-use finstack_quant_valuations_core::instruments::common_impl::margin::repriced_bucketed_dv01;
+
+fn repriced_bucketed_dv01(
+    instrument: &dyn Instrument,
+    market: &MarketContext,
+    as_of: Date,
+    curve_ids: &[finstack_quant_core::types::CurveId],
+) -> Vec<(f64, f64)> {
+    let Ok(result) = instrument.price_with_metrics(
+        market,
+        as_of,
+        &[finstack_quant_valuations_core::metrics::MetricId::BucketedDv01],
+        finstack_quant_valuations_core::instruments::PricingOptions::default(),
+    ) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for curve_id in curve_ids {
+        for (&tenor, label) in finstack_quant_valuations_core::metrics::STANDARD_BUCKETS_YEARS
+            .iter()
+            .zip(finstack_quant_valuations_core::metrics::STANDARD_BUCKET_LABELS.iter())
+        {
+            let key = finstack_quant_valuations_core::metrics::MetricId::composite(
+                &finstack_quant_valuations_core::metrics::MetricId::BucketedDv01,
+                &[curve_id.as_str(), label],
+            );
+            if let Some(&dv01) = result.measures.get(key.as_str()) {
+                out.push((tenor, dv01));
+            }
+        }
+    }
+    out
+}
 
 impl Marginable for InterestRateSwap {
     fn id(&self) -> &str {

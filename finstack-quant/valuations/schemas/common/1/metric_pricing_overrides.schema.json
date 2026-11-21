@@ -1,7 +1,7 @@
 {
   "$defs": {
     "BondRiskBasis": {
-      "description": "Basis used for bond duration, convexity, and DV01-style risk metrics.",
+      "description": "Risk calculation basis for callable/putable bonds.\n\nSelects whether analytical risk metrics (duration, convexity, DV01) evaluate\nthe maturity/workout cashflow path under quoted yields or reprice the embedded\noption via the callable OAS/tree model.",
       "oneOf": [
         {
           "const": "bullet_discountable",
@@ -85,7 +85,7 @@
       "properties": {
         "adaptive_bumps": {
           "default": false,
-          "description": "Enable adaptive bump sizes based on volatility and moneyness\n\nWhen true, bump sizes are scaled based on:\n- Volatility level (higher vol → larger bumps)\n- Time to expiry (longer dated → larger bumps)\n- Moneyness (deep ITM/OTM → smaller bumps)\n\nDefault: false (use fixed bump sizes)",
+          "description": "Enable adaptive bump sizes based on volatility and moneyness.\n\nWhen true, bump sizes are scaled based on:\n- Volatility level (higher vol → larger bumps)\n- Time to expiry (longer dated → larger bumps)\n- Moneyness (deep ITM/OTM → smaller bumps)\n\nDefault: false (use fixed bump sizes)",
           "type": "boolean"
         },
         "credit_spread_bump_bp": {

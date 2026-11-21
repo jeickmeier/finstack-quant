@@ -487,6 +487,7 @@ fn initial_short_rate(inst: &CallableRangeAccrual, market: &MarketContext) -> Re
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::BermudanCallProvision;
     use crate::exotics::range_accrual::{BoundsType, RangeAccrualTerms};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
@@ -497,7 +498,6 @@ mod tests {
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
     use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
-    use finstack_quant_valuations_core::instruments::BermudanCallProvision;
     use finstack_quant_valuations_core::pricer::Pricer;
     use time::Month;
 

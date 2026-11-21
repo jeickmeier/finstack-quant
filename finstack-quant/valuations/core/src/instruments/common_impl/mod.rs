@@ -12,19 +12,6 @@ pub(crate) mod traits;
 // Unified dependency representation
 pub(crate) mod dependencies;
 
-/// Stable date constants for `example()` constructors. Defined once so all
-/// instrument examples can rotate forward together.
-pub mod example_constants {
-    use finstack_quant_core::dates::Date;
-    use time::macros::date;
-
-    /// Far-future expiry used by long-dated examples (FX options, equity
-    /// options, etc.). Currently `2030-06-21`. When this approaches the
-    /// present, bump to the next round date and regenerate any docs that
-    /// pin numeric outputs against examples.
-    pub const FAR_EXPIRY: Date = date!(2030 - 06 - 21);
-}
-
 // Shared utilities and helper functions
 pub mod helpers;
 // Listed future / future-option terms (public at `instruments::*`)

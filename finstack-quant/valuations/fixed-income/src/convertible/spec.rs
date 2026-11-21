@@ -1,33 +1,11 @@
 //! Conversion vocabulary of convertible bonds: conversion policy and events,
-//! share-price triggers, anti-dilution and dividend protection, and the
-//! [`ConversionSpec`] that bundles them.
-//!
-//! These are plain data types shared by the convertible instrument, its
-//! pricers and the model-parameter snapshot; the pricing logic that
-//! interprets them lives with the convertible bond.
+//! share-price triggers, anti-dilution and dividend protection, and [`ConversionSpec`].
 
 use finstack_quant_core::dates::Date;
 
 /// Share-price trigger of a convertible bond: the last sale price must be at
 /// least `threshold_pct` of the conversion price on `required_days_above` of
 /// `observation_days` consecutive trading days.
-///
-/// Used for the issuer's soft call (`ConvertibleBond::soft_call_trigger`) and
-/// the holder's contingent conversion
-/// (`ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(..))`).
-///
-/// # Industry Practice
-///
-/// The standard trigger is 130% of the conversion price on 20 of 30
-/// consecutive trading days; some issues use 120% or 150%.
-///
-/// # Modeling scope
-///
-/// The tree evaluates the trigger on the instantaneous node spot. The soft
-/// call applies a Broadie-Glasserman-Kou-style barrier shift scaled by
-/// `required_days_above / observation_days`; contingent conversion compares
-/// the node spot with the nominal level and does not model the observation
-/// window.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -65,11 +43,6 @@ impl PriceTrigger {
     }
 
     /// Validate the trigger parameters.
-    ///
-    /// - `threshold_pct` must be finite and exceed 100% (otherwise the trigger
-    ///   is trivially satisfied).
-    /// - `observation_days` and `required_days_above` must be non-zero.
-    /// - `required_days_above` cannot exceed `observation_days`.
     ///
     /// # Arguments
     ///
@@ -114,11 +87,6 @@ pub enum ConversionPolicy {
     /// Holder may convert at any time (subject to window, if any).
     Voluntary,
     /// Bond will mandatorily convert on the specified date.
-    ///
-    /// **Modeling scope**: the tree pricer models conversion only at the
-    /// single step mapped from this date; early voluntary conversion before
-    /// the mandatory date is not modeled. Forced conversion takes precedence
-    /// over coincident call/put rights, and the scheduled coupon remains payable.
     MandatoryOn(
         #[cfg_attr(
             feature = "json-schema",
@@ -144,23 +112,6 @@ pub enum ConversionPolicy {
     /// Conversion tied to an external event or condition.
     UponEvent(ConversionEvent),
     /// Mandatory conversion with variable delivery ratio (PERCS / DECS / ACES).
-    ///
-    /// At `conversion_date`, the delivery ratio depends on the stock price:
-    /// - If `spot <= lower_conversion_price`: ratio = face / lower_price (max shares, loss)
-    /// - If `lower < spot <= upper`: ratio = face / spot (variable, delivers face value)
-    /// - If `spot > upper_conversion_price`: ratio = face / upper_price (min shares, capped)
-    ///
-    /// # Industry Practice
-    ///
-    /// PERCS (Preference Equity Redemption Cumulative Stock) cap the upside.
-    /// DECS (Dividend Enhanced Convertible Stock) have a dead zone between prices.
-    /// ACES (Automatically Convertible Equity Securities) are similar to DECS.
-    ///
-    /// **Modeling scope**: the tree pricer models conversion only at the
-    /// single step mapped from `conversion_date`; early voluntary conversion
-    /// before that date (offered by some mandatory structures) is not modeled.
-    /// Forced conversion takes precedence over coincident call/put rights,
-    /// and the scheduled coupon remains payable.
     MandatoryVariable {
         /// Date of mandatory conversion.
         #[cfg_attr(
@@ -190,16 +141,6 @@ pub enum ConversionEvent {
 }
 
 /// Anti-dilution protection applied to conversion terms.
-///
-/// When dilutive events occur (stock splits, below-market issuances, special
-/// dividends), the conversion ratio is adjusted to protect bondholders from
-/// value erosion.
-///
-/// # Industry Practice
-///
-/// Most convertible bonds use **Weighted Average** anti-dilution, which is
-/// less protective but more issuer-friendly. **Full Ratchet** is mainly seen
-/// in private placements and venture-style convertibles.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -207,52 +148,21 @@ pub enum AntiDilutionPolicy {
     /// No anti-dilution protection.
     None,
     /// Full ratchet: conversion price is reduced to the new issue price
-    /// regardless of how many shares were issued. Most protective for holders.
-    ///
-    /// Formula: `new_conversion_price = min(current_conversion_price, new_issue_price)`
+    /// regardless of how many shares were issued.
     FullRatchet,
     /// Broad-based weighted average: conversion price is adjusted based on the
-    /// weighted average of the old and new share prices, factoring in the number
-    /// of shares. Less dilutive to existing shareholders than full ratchet.
-    ///
-    /// Formula:
-    /// ```text
-    /// new_cp = old_cp × (shares_outstanding + new_money / old_cp)
-    ///                  / (shares_outstanding + new_shares_issued)
-    /// ```
+    /// weighted average of the old and new share prices, factoring in shares.
     WeightedAverage,
 }
 
 /// How dividends affect conversion terms (dividend protection).
 ///
-/// Dividend protection compensates the holder for dividends paid on the
-/// underlying, which otherwise leak value from the conversion option (the
-/// stock drifts at `r - q` under the risk-neutral measure). The variants
-/// carry no threshold parameter, so protection is **full**: the entire
-/// continuous dividend yield `q` is protected.
-///
-/// # Pricing model (continuous-yield accretion)
-///
-/// Under the continuous dividend yield `q` used by the tree pricer, each
-/// protected dividend payment bumps the conversion ratio by the dividend
-/// fraction; the continuous limit is exponential accretion from the
-/// valuation date:
-///
-/// ```text
-/// AdjustRatio:  ratio(t)  = ratio_0 * exp(q * t)
-/// AdjustPrice:  K_conv(t) = K_0 * exp(-q * t)
-/// ```
-///
-/// Since `ratio = notional / K_conv`, the price decay is mathematically the
-/// same ratio accretion — the pricer implements both variants through the
-/// single ratio-accretion mechanism. Accretion composes multiplicatively on
-/// top of any anti-dilution adjustments from
-/// `ConvertibleBond::effective_conversion_ratio`.
-///
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_valuations_core::instruments::{AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment};
+/// use finstack_quant_valuations_fixed_income::convertible::{
+///     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
+/// };
 ///
 /// let conversion = ConversionSpec {
 ///     ratio: Some(25.0),
@@ -278,18 +188,12 @@ pub enum DividendAdjustment {
 
 impl DividendAdjustment {
     /// Whether this adjustment provides dividend protection.
-    ///
-    /// `AdjustPrice` and `AdjustRatio` are economically equivalent under the
-    /// continuous-yield model (see the enum docs) and both return `true`.
     pub fn is_protected(&self) -> bool {
         !matches!(self, DividendAdjustment::None)
     }
 }
 
 /// A dilutive event that triggers anti-dilution adjustment.
-///
-/// Records details of an equity issuance or corporate action that may
-/// affect the conversion ratio under the bond's anti-dilution provisions.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -323,9 +227,7 @@ pub struct ConversionSpec {
     pub anti_dilution: AntiDilutionPolicy,
     /// Dividend adjustment mechanism.
     pub dividend_adjustment: DividendAdjustment,
-    /// Historical dilution events that affect the conversion ratio, recorded
-    /// in chronological (non-decreasing date) order and applied in that
-    /// order. Validation rejects out-of-order events.
+    /// Historical dilution events recorded in chronological order.
     #[serde(default)]
     pub dilution_events: Vec<DilutionEvent>,
 }

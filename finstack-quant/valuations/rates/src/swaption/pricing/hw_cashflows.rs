@@ -1,6 +1,7 @@
 //! Contractual exercise cashflows shared by European and Bermudan HW trees.
 use crate::irs::{resolve_fixed_leg, resolve_float_leg};
 use crate::swaption::CashSettlementMethod;
+use crate::{FixedLegSpec, FloatLegSpec};
 use finstack_quant_cashflows::builder::{build_periods, period_accrual};
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
@@ -12,7 +13,6 @@ use finstack_quant_models::rates::hull_white::{
 use finstack_quant_models::trees::hull_white_tree::HullWhiteTree;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::SettlementType;
-use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec};
 
 /// Annuity an exercise pays against, fixed when the cashflows are built.
 #[derive(Clone, Copy, Debug, PartialEq)]

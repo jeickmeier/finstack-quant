@@ -6,13 +6,14 @@
 //! share price. Price, delta, parity, conversion value, premium and floor are
 //! the same definitions as the metrics of those names.
 
+use crate::ConversionPolicy;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::instruments::{ConversionPolicy, GreekBumps, Instrument};
+use finstack_quant_valuations_core::instruments::{GreekBumps, Instrument};
 use finstack_quant_valuations_core::metrics::sensitivities::config as sensitivities;
 use serde::{Deserialize, Serialize};
 
@@ -308,6 +309,7 @@ fn ladder_spots(market_spot: f64, spots: Option<&[f64]>) -> Result<Vec<f64>> {
 mod tests {
     use super::*;
     use crate::bond::CashflowSpec;
+    use crate::{AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment};
     use finstack_quant_cashflows::builder::{
         CouponType, FixedCouponSpec, RollRule, ScheduleParams,
     };
@@ -315,9 +317,6 @@ mod tests {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations_core::instruments::{
-        AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
-    };
     use time::macros::date;
 
     const AS_OF: Date = date!(2025 - 01 - 01);

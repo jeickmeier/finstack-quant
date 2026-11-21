@@ -80,13 +80,6 @@ export default [
     "description": "Intentionally empty because no future dated cashflows remain."
   },
   {
-    "path": "#/$defs/d_05b629a957173cab6ad8",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcOverride",
-    "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`].",
-    "ref": "#/$defs/MertonMcConfig",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcConfig"
-  },
-  {
     "path": "#/$defs/d_085e3ec82eb8695eaf89",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/UpfrontFee",
     "description": "Upfront (arrangement or original-issue-discount) fee of a facility.\n\nPaid by the borrower to the lender on the issue date. Enters the\npresent value only while the commitment date lies after the valuation\ndate, and the effective-interest-rate metrics always."
@@ -1431,7 +1424,7 @@ export default [
   {
     "path": "#/$defs/d_2bf34fd81f4504c2b2b7",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PriceTrigger",
-    "description": "Share-price trigger of a convertible bond: the last sale price must be at\nleast `threshold_pct` of the conversion price on `required_days_above` of\n`observation_days` consecutive trading days.\n\nUsed for the issuer's soft call (`ConvertibleBond::soft_call_trigger`) and\nthe holder's contingent conversion\n(`ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(..))`).\n\n# Industry Practice\n\nThe standard trigger is 130% of the conversion price on 20 of 30\nconsecutive trading days; some issues use 120% or 150%.\n\n# Modeling scope\n\nThe tree evaluates the trigger on the instantaneous node spot. The soft\ncall applies a Broadie-Glasserman-Kou-style barrier shift scaled by\n`required_days_above / observation_days`; contingent conversion compares\nthe node spot with the nominal level and does not model the observation\nwindow."
+    "description": "Share-price trigger of a convertible bond: the last sale price must be at\nleast `threshold_pct` of the conversion price on `required_days_above` of\n`observation_days` consecutive trading days."
   },
   {
     "path": "#/$defs/d_2bf34fd81f4504c2b2b7/properties/observation_days",
@@ -2711,7 +2704,7 @@ export default [
   {
     "path": "#/$defs/d_3e49743aaeaf3fd23293",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/VolSurfaceExtrapolation",
-    "description": "Policy for evaluating volatility surfaces outside their calibrated grid.\n\nMarket-standard production systems typically make this choice explicit because\nextrapolation can materially affect PV and greeks.\n\n# Market Standards\n\n- **Error**: Conservative approach for production systems; forces explicit handling.\n- **Clamp**: Simple flat extrapolation; common for quick prototyping.\n- **LinearInVariance**: Market-standard for equity/FX; preserves no-arbitrage conditions\n  better than linear-in-vol by extrapolating in total variance space (σ²T)."
+    "description": "Policy for evaluating volatility surfaces outside their calibrated grid.\n\nMarket-standard production systems typically make this choice explicit because\nextrapolation can materially affect PV and greeks.\n\n# Market Standards\n\n- **Error**: Conservative approach for production systems; forces explicit handling.\n- **Clamp**: Simple flat extrapolation; common for quick prototyping."
   },
   {
     "path": "#/$defs/d_3e49743aaeaf3fd23293/oneOf/0",
@@ -2724,12 +2717,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/VolSurfaceExtrapolation/oneOf/1",
     "const": "clamp",
     "description": "Flat extrapolation to the nearest edge (clamp to grid)."
-  },
-  {
-    "path": "#/$defs/d_3e49743aaeaf3fd23293/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/VolSurfaceExtrapolation/oneOf/2",
-    "const": "linear_in_variance",
-    "description": "Linear extrapolation in total variance space (σ²T).\n\nThis is the market-standard approach for equity and FX volatility surfaces\nbecause it preserves the no-arbitrage condition that total variance must\nincrease with time. The extrapolated volatility is computed as:\n\n```text\nσ(T_extrap) = sqrt(σ²(T_edge) * T_edge / T_extrap + slope * (T_extrap - T_edge) / T_extrap)\n```\n\nwhere `slope` is derived from the variance gradient at the edge.\n\n# When to Use\n\n- Long-dated option pricing where expiries exceed the calibrated grid\n- Scenario analysis requiring extrapolation to extreme tenors\n- Bootstrapping procedures that need consistent variance behavior\n\n# References\n\n- Gatheral, J. (2006). *The Volatility Surface*. Chapter 3. `docs/REFERENCES.md#gatheral-volatility-surface`\n- Fengler, M. R. (2009). \"Arbitrage-free smoothing of the implied volatility surface.\""
   },
   {
     "path": "#/$defs/d_3f29d0342feb1dd850d3",
@@ -3015,20 +3002,20 @@ export default [
   {
     "path": "#/$defs/d_450829dac3a74a5c8761",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec",
-    "description": "Specification for floating rate legs in interest rate swaps"
+    "description": "Specification for floating rate legs in interest rate swaps."
   },
   {
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/business_day_convention",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec/properties/business_day_convention",
     "default": "modified_following",
-    "description": "Business day convention for payment dates",
+    "description": "Business day convention for payment dates.",
     "ref": "#/$defs/BusinessDayConvention",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BusinessDayConvention"
   },
   {
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/calendar_id",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec/properties/calendar_id",
-    "description": "Optional calendar for business day adjustments"
+    "description": "Optional calendar for business day adjustments."
   },
   {
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/calendar_id/anyOf/0",
@@ -3044,28 +3031,28 @@ export default [
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/compounding",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec/properties/compounding",
     "default": "simple",
-    "description": "Compounding method for floating coupons.\n\nDetermines how floating rate coupons are calculated:\n- `simple` (default): one term forward per period\n- `compounded_*`: SOFR/SONIA-style daily compounding\n- `simple_average` is rejected by [`Self::validate`]\n\n# Implementation Notes\n\nCompounded-in-arrears is implemented for IRS pricing in `instruments::irs` with\nsupport for lookback and observation shift conventions. For seasoned (already\nstarted) compounded swaps, pricing requires explicit fixings for observation\ndates prior to `as_of`.",
+    "description": "Compounding method for floating coupons.",
     "ref": "#/$defs/FloatingLegCompounding",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatingLegCompounding"
   },
   {
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec/properties/day_count",
-    "description": "Day count convention for accrual",
+    "description": "Day count convention for accrual.",
     "ref": "#/$defs/DayCount",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DayCount"
   },
   {
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/discount_curve_id",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec/properties/discount_curve_id",
-    "description": "Discount curve identifier for pricing",
+    "description": "Discount curve identifier for pricing.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Id"
   },
   {
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/end",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec/properties/end",
-    "description": "End date of the floating leg",
+    "description": "End date of the floating leg.",
     "ref": "#/$defs/DateWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
   },
@@ -3073,13 +3060,13 @@ export default [
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/end_of_month",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec/properties/end_of_month",
     "default": false,
-    "description": "End-of-month roll convention (default: false).\n\nWhen `true`, if the start date falls on the last business day of a month,\nall subsequent roll dates will also fall on the last business day of their\nrespective months. This matches QuantLib's `MakeOIS` default behavior.\n\n# Market Standard\n\nPer ISDA 2006 Definitions Section 4.18, the End-of-Month convention should\nbe applied when the effective date is the last business day of a month.\nMost professional systems (QuantLib, Bloomberg SWDF) default to `true`."
+    "description": "End-of-month roll convention (default: false)."
   },
   {
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/fixing_calendar_id",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec/properties/fixing_calendar_id",
     "default": null,
-    "description": "Optional calendar for rate fixing (reset lag)"
+    "description": "Optional calendar for rate fixing (reset lag)."
   },
   {
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/fixing_calendar_id/anyOf/0",
@@ -3094,14 +3081,14 @@ export default [
   {
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/forward_curve_id",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec/properties/forward_curve_id",
-    "description": "Forward curve identifier for rate projections",
+    "description": "Forward curve identifier for rate projections.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Id"
   },
   {
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/frequency",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec/properties/frequency",
-    "description": "Payment frequency",
+    "description": "Payment frequency.",
     "ref": "#/$defs/Tenor",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Tenor"
   },
@@ -3116,27 +3103,27 @@ export default [
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/payment_lag_days",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec/properties/payment_lag_days",
     "default": 0,
-    "description": "Payment lag in business days after period end (default: 0).\n\nBloomberg OIS swaps typically use 2 business days payment lag.\nThe actual payment date is adjusted from the period end date by\nthis many business days using the leg's calendar.",
+    "description": "Payment lag in business days after period end (default: 0).",
     "format": "int32"
   },
   {
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/reset_lag_days",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec/properties/reset_lag_days",
     "default": 0,
-    "description": "Reset lag in business days for floating rate fixing (default: 0).\n\n- **0** (default): fixing on the accrual start date. A swap whose first\n  accrual period starts on or after the valuation date then prices off\n  the forward curve without historical fixings.\n- **Positive** (e.g., 2): T-2 fixing (2 business days before accrual\n  start). Use `RateIndexConventions::default_reset_lag_days` (or\n  `InterestRateSwap::from_conventions`) for the market default of a\n  given index.\n- **Negative** (e.g., -1): resolved at pricing time to the registered\n  index convention default; rejected when the forward curve id is not a\n  registered rate index.",
+    "description": "Reset lag in business days for floating rate fixing (default: 0).",
     "format": "int32"
   },
   {
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/spread_bp",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec/properties/spread_bp",
-    "description": "Spread in basis points added to the forward rate",
+    "description": "Spread in basis points added to the forward rate.",
     "ref": "#/$defs/DecimalWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DecimalWire"
   },
   {
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/start",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec/properties/start",
-    "description": "Start date of the floating leg",
+    "description": "Start date of the floating leg.",
     "ref": "#/$defs/DateWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
   },
@@ -3144,7 +3131,7 @@ export default [
     "path": "#/$defs/d_450829dac3a74a5c8761/properties/stub",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec/properties/stub",
     "default": "short_front",
-    "description": "Stub period handling rule",
+    "description": "Stub period handling rule.",
     "ref": "#/$defs/StubKind",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/StubKind"
   },
@@ -3952,19 +3939,19 @@ export default [
   {
     "path": "#/$defs/d_65b0652ed08913529246/properties/bdt_sigma",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/bdt_sigma",
-    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
+    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).",
     "format": "double"
   },
   {
     "path": "#/$defs/d_65b0652ed08913529246/properties/bk_mean_reversion",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/bk_mean_reversion",
-    "description": "Black-Karasinski mean-reversion speed (κ) of the log short rate, in\nannualised units (`0.03` = 3% per year).\n\nCompanion to [`Self::bk_sigma`]: read only by the rates-only bond tree\nwhen `tree_model = black_karasinski`, where it is required. Must be\nfinite and strictly positive; typical values are 0.01–0.10. A lognormal\nshort rate without mean reversion is `tree_model = black_derman_toy`\nwith [`Self::bdt_sigma`].",
+    "description": "Black-Karasinski mean-reversion speed (κ) of the log short rate, in\nannualised units (`0.03` = 3% per year).",
     "format": "double"
   },
   {
     "path": "#/$defs/d_65b0652ed08913529246/properties/bk_sigma",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/bk_sigma",
-    "description": "Black-Karasinski lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_karasinski`,\nwhere it is required together with [`Self::bk_mean_reversion`]. It is\na relative (lognormal) volatility on the same scale as\n[`Self::bdt_sigma`], unlike the absolute [`Self::hw1f_sigma`]; typical\nvalues are 0.10–0.40. Must be finite and non-negative; `0.0` prices on\nthe deterministic curve.",
+    "description": "Black-Karasinski lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).",
     "format": "double"
   },
   {
@@ -4065,8 +4052,8 @@ export default [
   {
     "path": "#/$defs/d_65b0652ed08913529246/properties/merton_mc_config/anyOf/0",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/merton_mc_config/anyOf/0",
-    "ref": "#/$defs/MertonMcOverride",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcOverride"
+    "ref": "#/$defs/MertonMcConfig",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcConfig"
   },
   {
     "path": "#/$defs/d_65b0652ed08913529246/properties/merton_mc_config/anyOf/1",
@@ -4135,7 +4122,7 @@ export default [
     "path": "#/$defs/d_65b0652ed08913529246/properties/tree_steps",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/tree_steps",
     "default": null,
-    "description": "Number of time steps for tree-based pricing (e.g., 100)",
+    "description": "Number of time steps for tree-based pricing (e.g., 100).",
     "format": "uint",
     "minimum": 0
   },
@@ -4298,7 +4285,7 @@ export default [
   {
     "path": "#/$defs/d_696482bd20f57f99f7e9",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DividendAdjustment",
-    "description": "How dividends affect conversion terms (dividend protection).\n\nDividend protection compensates the holder for dividends paid on the\nunderlying, which otherwise leak value from the conversion option (the\nstock drifts at `r - q` under the risk-neutral measure). The variants\ncarry no threshold parameter, so protection is **full**: the entire\ncontinuous dividend yield `q` is protected.\n\n# Pricing model (continuous-yield accretion)\n\nUnder the continuous dividend yield `q` used by the tree pricer, each\nprotected dividend payment bumps the conversion ratio by the dividend\nfraction; the continuous limit is exponential accretion from the\nvaluation date:\n\n```text\nAdjustRatio:  ratio(t)  = ratio_0 * exp(q * t)\nAdjustPrice:  K_conv(t) = K_0 * exp(-q * t)\n```\n\nSince `ratio = notional / K_conv`, the price decay is mathematically the\nsame ratio accretion — the pricer implements both variants through the\nsingle ratio-accretion mechanism. Accretion composes multiplicatively on\ntop of any anti-dilution adjustments from\n`ConvertibleBond::effective_conversion_ratio`.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::instruments::{AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment};\n\nlet conversion = ConversionSpec {\n    ratio: Some(25.0),\n    price: None,\n    policy: ConversionPolicy::Voluntary,\n    anti_dilution: AntiDilutionPolicy::None,\n    dividend_adjustment: DividendAdjustment::AdjustRatio,\n    dilution_events: Vec::new(),\n};\nassert!(conversion.dividend_adjustment.is_protected());\n```"
+    "description": "How dividends affect conversion terms (dividend protection).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::convertible::{\n    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,\n};\n\nlet conversion = ConversionSpec {\n    ratio: Some(25.0),\n    price: None,\n    policy: ConversionPolicy::Voluntary,\n    anti_dilution: AntiDilutionPolicy::None,\n    dividend_adjustment: DividendAdjustment::AdjustRatio,\n    dilution_events: Vec::new(),\n};\nassert!(conversion.dividend_adjustment.is_protected());\n```"
   },
   {
     "path": "#/$defs/d_696482bd20f57f99f7e9/oneOf/0",
@@ -5128,7 +5115,7 @@ export default [
     "path": "#/$defs/d_7986a62fa15b0b1420c9/properties/adaptive_bumps",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BumpConfig/properties/adaptive_bumps",
     "default": false,
-    "description": "Enable adaptive bump sizes based on volatility and moneyness\n\nWhen true, bump sizes are scaled based on:\n- Volatility level (higher vol → larger bumps)\n- Time to expiry (longer dated → larger bumps)\n- Moneyness (deep ITM/OTM → smaller bumps)\n\nDefault: false (use fixed bump sizes)"
+    "description": "Enable adaptive bump sizes based on volatility and moneyness.\n\nWhen true, bump sizes are scaled based on:\n- Volatility level (higher vol → larger bumps)\n- Time to expiry (longer dated → larger bumps)\n- Moneyness (deep ITM/OTM → smaller bumps)\n\nDefault: false (use fixed bump sizes)"
   },
   {
     "path": "#/$defs/d_7986a62fa15b0b1420c9/properties/credit_spread_bump_bp",
@@ -6969,7 +6956,7 @@ export default [
   {
     "path": "#/$defs/d_9bafa017148b87bfdedd/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConversionPolicy/oneOf/1",
-    "description": "Bond will mandatorily convert on the specified date.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from this date; early voluntary conversion before\nthe mandatory date is not modeled. Forced conversion takes precedence\nover coincident call/put rights, and the scheduled coupon remains payable."
+    "description": "Bond will mandatorily convert on the specified date."
   },
   {
     "path": "#/$defs/d_9bafa017148b87bfdedd/oneOf/1/properties/mandatory_on",
@@ -7014,7 +7001,7 @@ export default [
   {
     "path": "#/$defs/d_9bafa017148b87bfdedd/oneOf/4",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConversionPolicy/oneOf/4",
-    "description": "Mandatory conversion with variable delivery ratio (PERCS / DECS / ACES).\n\nAt `conversion_date`, the delivery ratio depends on the stock price:\n- If `spot <= lower_conversion_price`: ratio = face / lower_price (max shares, loss)\n- If `lower < spot <= upper`: ratio = face / spot (variable, delivers face value)\n- If `spot > upper_conversion_price`: ratio = face / upper_price (min shares, capped)\n\n# Industry Practice\n\nPERCS (Preference Equity Redemption Cumulative Stock) cap the upside.\nDECS (Dividend Enhanced Convertible Stock) have a dead zone between prices.\nACES (Automatically Convertible Equity Securities) are similar to DECS.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from `conversion_date`; early voluntary conversion\nbefore that date (offered by some mandatory structures) is not modeled.\nForced conversion takes precedence over coincident call/put rights,\nand the scheduled coupon remains payable."
+    "description": "Mandatory conversion with variable delivery ratio (PERCS / DECS / ACES)."
   },
   {
     "path": "#/$defs/d_9bafa017148b87bfdedd/oneOf/4/properties/mandatory_variable",
@@ -7087,7 +7074,7 @@ export default [
   {
     "path": "#/$defs/d_9c78ba93c3eb6e36de08",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DilutionEvent",
-    "description": "A dilutive event that triggers anti-dilution adjustment.\n\nRecords details of an equity issuance or corporate action that may\naffect the conversion ratio under the bond's anti-dilution provisions."
+    "description": "A dilutive event that triggers anti-dilution adjustment."
   },
   {
     "path": "#/$defs/d_9c78ba93c3eb6e36de08/properties/date",
@@ -7352,7 +7339,7 @@ export default [
   {
     "path": "#/$defs/d_ac8cc8b1c0238b654c35",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BondRiskBasis",
-    "description": "Basis used for bond duration, convexity, and DV01-style risk metrics."
+    "description": "Risk calculation basis for callable/putable bonds.\n\nSelects whether analytical risk metrics (duration, convexity, DV01) evaluate\nthe maturity/workout cashflow path under quoted yields or reprice the embedded\noption via the callable OAS/tree model."
   },
   {
     "path": "#/$defs/d_ac8cc8b1c0238b654c35/oneOf/0",
@@ -8292,7 +8279,7 @@ export default [
     "path": "#/$defs/d_cda814224ddf8b157fc6/properties/dilution_events",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConversionSpec/properties/dilution_events",
     "default": [],
-    "description": "Historical dilution events that affect the conversion ratio, recorded\nin chronological (non-decreasing date) order and applied in that\norder. Validation rejects out-of-order events."
+    "description": "Historical dilution events recorded in chronological order."
   },
   {
     "path": "#/$defs/d_cda814224ddf8b157fc6/properties/dilution_events/items",
@@ -9003,7 +8990,7 @@ export default [
   {
     "path": "#/$defs/d_e5a9e3252f11bc2a9d20",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/AntiDilutionPolicy",
-    "description": "Anti-dilution protection applied to conversion terms.\n\nWhen dilutive events occur (stock splits, below-market issuances, special\ndividends), the conversion ratio is adjusted to protect bondholders from\nvalue erosion.\n\n# Industry Practice\n\nMost convertible bonds use **Weighted Average** anti-dilution, which is\nless protective but more issuer-friendly. **Full Ratchet** is mainly seen\nin private placements and venture-style convertibles."
+    "description": "Anti-dilution protection applied to conversion terms."
   },
   {
     "path": "#/$defs/d_e5a9e3252f11bc2a9d20/oneOf/0",
@@ -9015,13 +9002,13 @@ export default [
     "path": "#/$defs/d_e5a9e3252f11bc2a9d20/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/AntiDilutionPolicy/oneOf/1",
     "const": "full_ratchet",
-    "description": "Full ratchet: conversion price is reduced to the new issue price\nregardless of how many shares were issued. Most protective for holders.\n\nFormula: `new_conversion_price = min(current_conversion_price, new_issue_price)`"
+    "description": "Full ratchet: conversion price is reduced to the new issue price\nregardless of how many shares were issued."
   },
   {
     "path": "#/$defs/d_e5a9e3252f11bc2a9d20/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/AntiDilutionPolicy/oneOf/2",
     "const": "weighted_average",
-    "description": "Broad-based weighted average: conversion price is adjusted based on the\nweighted average of the old and new share prices, factoring in the number\nof shares. Less dilutive to existing shareholders than full ratchet.\n\nFormula:\n```text\nnew_cp = old_cp × (shares_outstanding + new_money / old_cp)\n                 / (shares_outstanding + new_shares_issued)\n```"
+    "description": "Broad-based weighted average: conversion price is adjusted based on the\nweighted average of the old and new share prices, factoring in shares."
   },
   {
     "path": "#/$defs/d_ead8055e75e6ac0353b0",
@@ -9261,20 +9248,20 @@ export default [
   {
     "path": "#/$defs/d_f6da7f7ae3129fc74f07",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FixedLegSpec",
-    "description": "Specification for fixed rate legs in interest rate swaps"
+    "description": "Specification for fixed rate legs in interest rate swaps."
   },
   {
     "path": "#/$defs/d_f6da7f7ae3129fc74f07/properties/business_day_convention",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FixedLegSpec/properties/business_day_convention",
     "default": "modified_following",
-    "description": "Business day convention for payment dates",
+    "description": "Business day convention for payment dates.",
     "ref": "#/$defs/BusinessDayConvention",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BusinessDayConvention"
   },
   {
     "path": "#/$defs/d_f6da7f7ae3129fc74f07/properties/calendar_id",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FixedLegSpec/properties/calendar_id",
-    "description": "Optional calendar for business day adjustments"
+    "description": "Optional calendar for business day adjustments."
   },
   {
     "path": "#/$defs/d_f6da7f7ae3129fc74f07/properties/calendar_id/anyOf/0",
@@ -9289,21 +9276,21 @@ export default [
   {
     "path": "#/$defs/d_f6da7f7ae3129fc74f07/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FixedLegSpec/properties/day_count",
-    "description": "Day count convention for accrual",
+    "description": "Day count convention for accrual.",
     "ref": "#/$defs/DayCount",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DayCount"
   },
   {
     "path": "#/$defs/d_f6da7f7ae3129fc74f07/properties/discount_curve_id",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FixedLegSpec/properties/discount_curve_id",
-    "description": "Discount curve identifier for pricing",
+    "description": "Discount curve identifier for pricing.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Id"
   },
   {
     "path": "#/$defs/d_f6da7f7ae3129fc74f07/properties/end",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FixedLegSpec/properties/end",
-    "description": "End date of the fixed leg",
+    "description": "End date of the fixed leg.",
     "ref": "#/$defs/DateWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
   },
@@ -9311,12 +9298,12 @@ export default [
     "path": "#/$defs/d_f6da7f7ae3129fc74f07/properties/end_of_month",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FixedLegSpec/properties/end_of_month",
     "default": false,
-    "description": "End-of-month roll convention (default: false).\n\nWhen `true`, if the start date falls on the last business day of a month,\nall subsequent roll dates will also fall on the last business day of their\nrespective months. This matches QuantLib's `MakeOIS` default behavior.\n\n# Market Standard\n\nPer ISDA 2006 Definitions Section 4.18, the End-of-Month convention should\nbe applied when the effective date is the last business day of a month.\nMost professional systems (QuantLib, Bloomberg SWDF) default to `true`."
+    "description": "End-of-month roll convention (default: false)."
   },
   {
     "path": "#/$defs/d_f6da7f7ae3129fc74f07/properties/frequency",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FixedLegSpec/properties/frequency",
-    "description": "Payment frequency",
+    "description": "Payment frequency.",
     "ref": "#/$defs/Tenor",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Tenor"
   },
@@ -9324,20 +9311,20 @@ export default [
     "path": "#/$defs/d_f6da7f7ae3129fc74f07/properties/payment_lag_days",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FixedLegSpec/properties/payment_lag_days",
     "default": 0,
-    "description": "Payment lag in business days after period end (default: 0).\n\nBloomberg OIS swaps typically use 2 business days payment lag.\nThe actual payment date is adjusted from the period end date by\nthis many business days using the leg's calendar.",
+    "description": "Payment lag in business days after period end (default: 0).",
     "format": "int32"
   },
   {
     "path": "#/$defs/d_f6da7f7ae3129fc74f07/properties/rate",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FixedLegSpec/properties/rate",
-    "description": "Fixed rate (e.g., 0.05 for 5%)",
+    "description": "Fixed rate (e.g., 0.05 for 5%).",
     "ref": "#/$defs/DecimalWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DecimalWire"
   },
   {
     "path": "#/$defs/d_f6da7f7ae3129fc74f07/properties/start",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FixedLegSpec/properties/start",
-    "description": "Start date of the fixed leg",
+    "description": "Start date of the fixed leg.",
     "ref": "#/$defs/DateWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
   },
@@ -9345,7 +9332,7 @@ export default [
     "path": "#/$defs/d_f6da7f7ae3129fc74f07/properties/stub",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FixedLegSpec/properties/stub",
     "default": "short_front",
-    "description": "Stub period handling rule",
+    "description": "Stub period handling rule.",
     "ref": "#/$defs/StubKind",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/StubKind"
   },

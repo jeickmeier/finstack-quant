@@ -4,6 +4,7 @@
 //! restricted currencies. Supports both pre-fixing (forward rate estimation)
 //! and post-fixing (observed rate) valuation modes.
 
+use crate::NdfQuoteConvention;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CFKind;
@@ -15,7 +16,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
 
 /// Official NDF fixing source/benchmark.
 ///
@@ -41,7 +41,7 @@ use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
 ///
 /// ```rust
 /// use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource};
-/// use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
+/// use finstack_quant_valuations_fx::NdfQuoteConvention;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::money::Money;
@@ -197,7 +197,7 @@ impl std::str::FromStr for NdfFixingSource {
 ///
 /// ```rust
 /// use finstack_quant_valuations_fx::ndf::Ndf;
-/// use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
+/// use finstack_quant_valuations_fx::NdfQuoteConvention;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::money::Money;
@@ -429,7 +429,7 @@ impl Ndf {
     ///
     /// ```rust
     /// use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource};
-    /// use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
+    /// use finstack_quant_valuations_fx::NdfQuoteConvention;
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::dates::Date;
     /// use finstack_quant_core::money::Money;

@@ -29,12 +29,12 @@
 //! decimal form (e.g. 0.30 for 30%) for both strike conventions. The
 //! Bloomberg CDSO terminal expects the same.
 
+use crate::CreditParams;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::types::OptionType;
-use finstack_quant_valuations_core::instruments::CreditParams;
 use finstack_quant_valuations_core::instruments::SettlementType;
 use rust_decimal::Decimal;
 
@@ -410,11 +410,7 @@ impl CdsOption {
             date!(2030 - 06 - 20),
             Money::from((10_000_000_i64, Currency::USD)),
         )?;
-        let credit_params =
-            finstack_quant_valuations_core::instruments::CreditParams::corporate_standard(
-                "CORP",
-                "CORP-HAZARD",
-            );
+        let credit_params = crate::CreditParams::corporate_standard("CORP", "CORP-HAZARD");
         CdsOption::new(
             InstrumentId::new("CDSOPT-CALL-CORP-5Y"),
             &option_params,

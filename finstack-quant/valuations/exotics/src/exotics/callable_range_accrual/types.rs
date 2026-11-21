@@ -1,12 +1,12 @@
 //! Callable Range Accrual instrument definition.
 
+use crate::BermudanCallProvision;
 use crate::exotics::range_accrual::{BoundsType, RangeAccrualTerms};
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::BermudanCallProvision;
 
 /// Callable Range Accrual.
 ///

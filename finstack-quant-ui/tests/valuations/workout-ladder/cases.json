@@ -362,10 +362,10 @@
         ]
       },
       "ytw": {
-        "error": "Validation error: Metric 'ytw' calculation failed: Validation error: metric output must be finite, got -inf [instrument=US912828XG33, type=Bond, model=Tree]"
+        "error": "Validation error: Metric 'ytw' calculation failed: Validation error: metric output must be finite, got -inf [instrument=US912828XG33, type=bond, model=tree]"
       },
       "iSpread": {
-        "error": "Validation error: Metric 'i_spread' calculation failed: Invalid date range: start must be before end [instrument=US912828XG33, type=Bond, model=Tree]"
+        "error": "Validation error: Metric 'i_spread' calculation failed: Invalid date range: start must be before end [instrument=US912828XG33, type=bond, model=tree]"
       }
     }
   }

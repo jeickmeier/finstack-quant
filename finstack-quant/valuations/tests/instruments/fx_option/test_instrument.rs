@@ -10,7 +10,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::types::OptionType;
-use finstack_quant_valuations::instruments::FxUnderlyingParams;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fx::fx_option::{
     FxDeltaConvention, FxDeltaConventionKind, FxOption,
@@ -94,9 +93,12 @@ fn test_european_put_convenience_constructor() {
 }
 
 #[test]
-fn test_builder_with_underlying_params() {
+fn test_builder_with_explicit_pair_fields() {
     // Arrange
-    let underlying_params = FxUnderlyingParams::usd_eur();
+    let base_currency = Currency::EUR;
+    let quote_currency = Currency::USD;
+    let domestic_discount_curve_id = CurveId::new("USD-OIS");
+    let foreign_discount_curve_id = CurveId::new("EUR-OIS");
 
     // Act
     let option = FxOption::builder()
@@ -105,8 +107,8 @@ fn test_builder_with_underlying_params() {
             finstack_quant_valuations::instruments::fx::fx_option::FxOptionDelivery::CashAtExpiry,
         )
         .id("TEST_OPTION".into())
-        .base_currency(underlying_params.base_currency)
-        .quote_currency(underlying_params.quote_currency)
+        .base_currency(base_currency)
+        .quote_currency(quote_currency)
         .strike(1.20)
         .option_type(OptionType::Call)
         .delta_convention(
@@ -116,8 +118,8 @@ fn test_builder_with_underlying_params() {
         .expiry(date!(2025 - 01 - 01))
         .day_count(DayCount::Act365F)
         .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
-        .domestic_discount_curve_id(underlying_params.domestic_discount_curve_id.clone())
-        .foreign_discount_curve_id(underlying_params.foreign_discount_curve_id.clone())
+        .domestic_discount_curve_id(domestic_discount_curve_id)
+        .foreign_discount_curve_id(foreign_discount_curve_id)
         .vol_surface_id(CurveId::new("EURUSD-VOL"))
         .attributes(Attributes::new())
         .build()
@@ -125,8 +127,8 @@ fn test_builder_with_underlying_params() {
 
     // Assert
     assert_eq!(option.id.as_str(), "TEST_OPTION");
-    assert_eq!(option.base_currency, underlying_params.base_currency);
-    assert_eq!(option.quote_currency, underlying_params.quote_currency);
+    assert_eq!(option.base_currency, Currency::EUR);
+    assert_eq!(option.quote_currency, Currency::USD);
     assert_eq!(option.strike, 1.20);
     assert_eq!(option.option_type, OptionType::Call);
 }

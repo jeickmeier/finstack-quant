@@ -12,6 +12,7 @@
 //!   legs (`compounding` other than Simple) use the shared daily compounded
 //!   projector. Historical fixings are required once the fixing date is past.
 
+use crate::FloatLegSpec;
 use finstack_quant_cashflows::builder::{CashFlowSchedule, Notional, merge_cashflow_schedules};
 use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CFKind;
@@ -25,7 +26,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::FloatLegSpec;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::instruments::{NotionalExchange, ResettingSide};
 use rust_decimal::Decimal;

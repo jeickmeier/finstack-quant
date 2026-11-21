@@ -169,7 +169,7 @@ fn credit_coupon_anchors_follow_trade_date_across_all_quarterly_rolls() {
                 &tranche_quote,
                 &ctx,
                 &CdsTrancheBuildOverrides::for_regime(
-                    finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+                    finstack_quant_valuations_credit::CdsDateRegime::Standard,
                 ),
             )
             .unwrap();

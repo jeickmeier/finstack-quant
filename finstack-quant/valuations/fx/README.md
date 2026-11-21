@@ -61,7 +61,7 @@ FxDeltaConventionKind, FxOptionBuilder}`,
 valuations-core types at `finstack_quant_valuations::instruments`. Monte Carlo payoff kernels and
 pricers are crate-private.
 
-`PayReceive` and `FxUnderlyingParams` live only at `instruments::`.
+`PayReceive` lives only at `instruments::`.
 
 Inside a leaf, `metrics/`, `pricer.rs`, `types.rs` and Monte Carlo payoff
 adapters are `pub(crate)` or private; supported items surface through each

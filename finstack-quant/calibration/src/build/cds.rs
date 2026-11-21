@@ -11,9 +11,10 @@ use finstack_quant_core::dates::{
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations_core::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
+use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::market::conventions::{CdsConventionSpec, ConventionRegistry};
 use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
+use finstack_quant_valuations_credit::{PremiumLegSpec, ProtectionLegSpec};
 
 /// Resolved CDS dates used by both builders and calibration prepared quotes.
 #[derive(Debug, Clone, Copy)]
@@ -206,7 +207,7 @@ pub(crate) fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<C
         side: PayReceive::Pay,
         convention: conv.family,
         premium_leg: PremiumLegSpec {
-            date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+            date_regime: finstack_quant_valuations_credit::CdsDateRegime::Standard,
             start: dates.start,
             end: dates.maturity,
             frequency: conv.frequency,

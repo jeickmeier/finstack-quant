@@ -24,14 +24,15 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 
+use crate::FloatLegSpec;
 use crate::irs::InterestRateSwap;
 use finstack_quant_cashflows::builder::{
     CashFlowSchedule, CouponType, FloatingCouponSpec, FloatingLegCompounding, FloatingRateFallback,
     FloatingRateSpec, Notional, PrincipalExchange, RollRule, ScheduleParams, SchedulePeriod,
     build_periods, merge_cashflow_schedules,
 };
+use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::instruments::pricing::overnight_conventions::builder_overnight_method;
-use finstack_quant_valuations_core::instruments::{FloatLegSpec, PayReceive};
 
 /// Coupon spec for one float leg. The caller chooses the calendar, the
 /// accrual-date adjustment and the fallback; every other field follows the leg.
@@ -109,7 +110,7 @@ fn uses_observation_shift_dcf(compounding: FloatingLegCompounding) -> bool {
 
 fn is_irregular_fixed_period(
     period: &SchedulePeriod,
-    fixed: &finstack_quant_valuations_core::instruments::FixedLegSpec,
+    fixed: &crate::FixedLegSpec,
     index: usize,
     period_count: usize,
 ) -> Result<bool> {
@@ -983,12 +984,12 @@ mod tests {
     /// must differ.
     #[test]
     fn single_curve_ois_rate_cutoff_differs_from_no_cutoff() {
+        use crate::{FixedLegSpec, FloatLegSpec};
         use finstack_quant_core::currency::Currency;
         use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
         use finstack_quant_core::market_data::term_structures::DiscountCurve;
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
-        use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec};
         use rust_decimal::Decimal;
         use time::Month;
 

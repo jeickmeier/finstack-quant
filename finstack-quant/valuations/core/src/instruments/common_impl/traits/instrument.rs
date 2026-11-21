@@ -1,13 +1,12 @@
 //! Instrument implementation used by the traits subsystem.
 //!
 use crate::instruments::MarketDependencies;
-use crate::instruments::model_params::ModelParamsSnapshot;
 use crate::metrics::MetricId;
 use crate::pricer::{Family, InstrumentType, ModelKey};
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::Attributes;
-use finstack_quant_core::{Error, currency::Currency, dates::Date, money::Money, types::CurveId};
+use finstack_quant_core::{currency::Currency, dates::Date, money::Money, types::CurveId};
 use std::any::Any;
 
 use super::pricing_options::PricingOptions;
@@ -201,35 +200,6 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// `None`, indicating that the instrument does not support margin calculations.
     fn as_marginable(&self) -> Option<&dyn finstack_quant_margin::Marginable> {
         None
-    }
-
-    /// Snapshot model parameters that can be isolated during attribution.
-    ///
-    /// The default implementation returns [`ModelParamsSnapshot::None`].
-    /// Instruments with model inputs that attribution can revalue independently
-    /// should override this method and return their concrete snapshot variant.
-    fn model_params_snapshot(&self) -> ModelParamsSnapshot {
-        ModelParamsSnapshot::None
-    }
-
-    /// Clone this instrument with replacement model parameters.
-    ///
-    /// The default implementation accepts [`ModelParamsSnapshot::None`] and
-    /// returns a normal clone. Concrete snapshots are rejected unless the
-    /// instrument overrides this hook, keeping model-parameter attribution
-    /// dispatch behind the instrument contract.
-    fn with_model_params(
-        &self,
-        params: &ModelParamsSnapshot,
-    ) -> finstack_quant_core::Result<Box<dyn Instrument>> {
-        match params {
-            ModelParamsSnapshot::None => Ok(self.clone_box()),
-            _ => Err(Error::Validation(format!(
-                "Instrument '{}' ({:?}) does not support model parameter replacement",
-                self.id(),
-                self.key()
-            ))),
-        }
     }
 
     /// Get immutable reference to instrument attributes.
@@ -675,7 +645,6 @@ pub trait Instrument: CashflowProvider + Send + Sync {
             metric_registry,
             recalibration_provider,
             explain,
-            instrument_validated: _,
         } = options;
         let model = model.unwrap_or_else(|| self.default_model());
         let registry = registry.unwrap_or_else(|| self.family().shared_pricers());
@@ -688,7 +657,6 @@ pub trait Instrument: CashflowProvider + Send + Sync {
             metric_registry,
             recalibration_provider,
             explain,
-            instrument_validated: false,
         };
 
         registry.price_with_metrics(

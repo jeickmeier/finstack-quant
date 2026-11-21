@@ -72,7 +72,7 @@ impl Bond {
             Rate::from_decimal(0.0425)?,
             date!(2024 - 01 - 15),
             date!(2034 - 01 - 15),
-            finstack_quant_valuations_core::instruments::BondConvention::UsTreasury,
+            crate::BondConvention::UsTreasury,
             "USD-TREASURY",
         )
     }
@@ -80,7 +80,7 @@ impl Bond {
     /// Create a standard fixed-rate bond (most common use case).
     ///
     /// Delegates to [`Self::with_convention`] with
-    /// [`finstack_quant_valuations_core::instruments::BondConvention::UsCorporate`]:
+    /// [`finstack_quant_valuations_fixed_income::BondConvention::UsCorporate`]:
     /// 30/360, semi-annual, T+1, Modified Following, `usny`. For EUR corporates
     /// use `BondConvention::EurCorporate` (ACT/ACT ICMA, annual, T+2, TARGET2).
     ///
@@ -199,7 +199,7 @@ impl Bond {
             coupon_rate,
             issue_date,
             maturity,
-            finstack_quant_valuations_core::instruments::BondConvention::UsCorporate,
+            crate::BondConvention::UsCorporate,
             discount_curve_id,
         )?;
         Ok(bond.with_stub(stub))
@@ -233,7 +233,7 @@ impl Bond {
     /// # Example
     /// ```
     /// use finstack_quant_valuations_fixed_income::bond::Bond;
-    /// use finstack_quant_valuations_core::instruments::BondConvention;
+    /// use finstack_quant_valuations_fixed_income::BondConvention;
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::currency::Currency;
     /// use time::macros::date;
@@ -261,7 +261,7 @@ impl Bond {
         coupon_rate: impl Into<Rate>,
         issue_date: Date,
         maturity: Date,
-        convention: finstack_quant_valuations_core::instruments::BondConvention,
+        convention: crate::BondConvention,
         discount_curve_id: impl Into<CurveId>,
     ) -> finstack_quant_core::Result<Self> {
         let coupon_rate = coupon_rate.into();
@@ -316,7 +316,7 @@ impl Bond {
     /// Creates a bond with floating-rate coupons linked to a forward index
     /// (e.g., SOFR, EURIBOR) plus a margin. Settlement, calendar, and
     /// business-day convention come from a currency →
-    /// [`finstack_quant_valuations_core::instruments::BondConvention`] map:
+    /// [`finstack_quant_valuations_fixed_income::BondConvention`] map:
     ///
     /// - `USD` → `UsCorporate` (T+1, Modified Following, `usny`)
     /// - `EUR` → `EurCorporate` (T+2, Modified Following, `target2`)
@@ -366,7 +366,7 @@ impl Bond {
     /// Returns an error if the notional currency has no mapped settlement
     /// convention, or if the builder fails validation.
     pub fn floating(params: FloatingBondParams) -> finstack_quant_core::Result<Self> {
-        use finstack_quant_valuations_core::instruments::BondConvention;
+        use crate::BondConvention;
         let convention = match params.notional.currency() {
             Currency::USD => BondConvention::UsCorporate,
             Currency::EUR => BondConvention::EurCorporate,
@@ -401,7 +401,7 @@ impl Bond {
     /// # Example
     /// ```
     /// use finstack_quant_valuations_fixed_income::bond::{Bond, FloatingBondParams};
-    /// use finstack_quant_valuations_core::instruments::BondConvention;
+    /// use finstack_quant_valuations_fixed_income::BondConvention;
     /// use finstack_quant_core::dates::{DayCount, Tenor};
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::currency::Currency;
@@ -427,7 +427,7 @@ impl Bond {
     /// ```
     pub fn floating_with_convention(
         params: FloatingBondParams,
-        convention: finstack_quant_valuations_core::instruments::BondConvention,
+        convention: crate::BondConvention,
     ) -> finstack_quant_core::Result<Self> {
         let FloatingBondParams {
             id,
@@ -1091,9 +1091,7 @@ impl Bond {
 }
 
 /// Settlement and ex-coupon terms a bond market convention implies.
-fn convention_settlement(
-    convention: finstack_quant_valuations_core::instruments::BondConvention,
-) -> BondSettlementConvention {
+fn convention_settlement(convention: crate::BondConvention) -> BondSettlementConvention {
     BondSettlementConvention {
         settlement_days: convention.settlement_days(),
         ex_coupon_days: convention.ex_coupon_days().unwrap_or(0),

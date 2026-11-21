@@ -9,48 +9,46 @@ Each item has exactly one public path:
   `instruments::*`. Family crates import `finstack_quant_valuations_core::instruments::X`.
 - The `#[macro_export]` macros are public only at the crate root
   (`finstack_quant_valuations_core::impl_instrument_base!`).
-- The family-facing kernels `helpers`, `margin`, `vol_resolution` and
-  `example_constants` stay `pub` (hidden from the rendered docs) under
-  `common_impl::`, their only path.
+- The family-facing kernels `helpers`, `margin`, and `vol_resolution`
+  stay `pub` (hidden from the rendered docs) under `common_impl::`, their
+  only path.
 - The shared pricing kernels live in the public module `instruments::pricing`
   (`instruments/pricing/`), not here.
 
 Add items here when two or more instruments need them.
 
 This is the layer every instrument implements against: the `Instrument` trait
-and its boilerplate macros, the shared parameter vocabulary (leg specs,
-underlying params, market conventions), and the validation / numeric helpers
+and its boilerplate macros, the shared parameter vocabulary (`PayReceive`,
+`FinancingLegSpec`, market conventions), and the validation / numeric helpers
 that keep instrument invariants uniform.
 
 ## Layout
 
 | Path | Responsibility |
 |------|----------------|
-| `mod.rs` | Module declarations; `example_constants::FAR_EXPIRY`, the single date every long-dated `example()` constructor rolls forward from |
+| `mod.rs` | Module declarations for the shared instrument plumbing |
 | `traits/` | The `Instrument` trait, `Attributes`, `PricingOptions`, `OptionGreeks*`, and the `impl_*` macros |
 | `traits/instrument.rs` | `Instrument` definition — required methods, default methods, and the override contract for each |
 | `traits/macros.rs` | `impl_instrument_base!`, `impl_focused_pricing_overrides!`, `impl_empty_cashflow_provider!` |
 | `traits/pricing_options.rs` | `PricingOptions` — config, market history, model override, registry override, plus the optional recalibration-provider port |
 | `traits/option_greeks.rs` | `OptionGreekKind`, `OptionGreeksRequest`, `OptionGreeks`, `OptionGreeksProvider` |
 | `parameters/` | Shared parameter types (see table below) |
-| `listed/` | Listed future and future-option terms, and `impl_future_option_instrument!` |
+| `listed/` | Listed future and future-option terms, `define_future_option!`, and `impl_future_option_instrument!` |
 | `dependencies.rs` | `MarketDependencies`, `InstrumentCurves`, `RatesCurveKind`, `FxPair`, `VolatilityDependency` |
-| `margin.rs` | Helpers shared by the instruments' `Marginable` impls: repriced DV01 / CS01 lookups, SIMM tenor buckets, reference-entity parsing, credit-delta classification, netting-set ids |
-| `helpers.rs` | `ValidatedPricingLifecycle`, metric-context construction, `schedule_pv*`, GBM drift schedules, market-scalar lookups, Black-Scholes input collection, inflation-lag resolution |
-| `vol_resolution.rs` | `resolve_sigma_at` — the override-then-surface σ lookup precedence |
+| `margin.rs` | Multi-family `Marginable` helpers: SIMM IR tenor buckets and netting-set ids |
+| `helpers/` | `ValidatedPricingLifecycle`, metric-context construction, `schedule_pv`, market-scalar lookups, optional dividend resolution, inflation-lag resolution |
+| `vol_resolution.rs` | `resolve_sigma_at` and `resolve_fx_sigma` — override-then-surface σ lookup precedence |
 
 ### `parameters/`
 
 | File | Contents |
 |------|----------|
-| `legs.rs` | `PayReceive`, `FixedLegSpec`, `FloatLegSpec`, `PremiumLegSpec`, `ProtectionLegSpec`, `FinancingLegSpec`, `TotalReturnLegSpec` |
-| `underlying.rs` | `FxUnderlyingParams`, `EquityUnderlyingParams`, `CommodityUnderlyingParams`, `IndexUnderlyingParams` |
-| `market.rs` | `OptionType`, `ExerciseStyle`, `SettlementType`, `CreditParams` |
-| `conventions.rs` | `BondConvention`, `CommodityConvention`, `NdfQuoteConvention`, `NotionalExchange`, `ResettingSide` |
-| `convertible.rs` | `ConversionSpec`, `ConversionPolicy`, `ConversionEvent`, `AntiDilutionPolicy`, `DividendAdjustment`, `DilutionEvent`, `PriceTrigger` |
+| `../legs.rs` | `PayReceive`, `FinancingLegSpec` |
+| `market.rs` | `SettlementType` (`OptionType` and `ExerciseStyle` live in `finstack-quant-models`) |
+| `conventions.rs` | `NotionalExchange`, `ResettingSide` |
 | `merton_mc.rs` | `MertonMcConfig`, `MertonMcCalibrationSpec`, `CalibrationParameter`, `BarrierCrossing`, `PikMode`, `PikSchedule` |
 | `bond_quote.rs` | `BondQuoteInput` |
-| `bermudan_call.rs`, `monitoring.rs`, `quanto.rs`, `volatility.rs` | `BermudanCallProvision`, `Monitoring`, `QuantoSpec` (validated correlation in `[-1, 1]`), `VolatilityModel` |
+| `monitoring.rs`, `quanto.rs` | `Monitoring`, `QuantoSpec` (validated correlation in `[-1, 1]`) |
 | `trs_common.rs` | `TrsScheduleSpec` — shared by equity and fixed-income TRS |
 
 `OptionMarketParams` is re-exported directly from `finstack-quant-models`, its
@@ -105,7 +103,6 @@ Optional hooks with defaults worth knowing about:
 | `seed_metric_context()` | no-op | Cashflow generation is expensive and the metrics pipeline would redo it |
 | `metrics_equivalent()` | `None` | Spread and yield metrics need a normalized cashflow basis (PIK → cash) |
 | `as_marginable()` | `None` | The type implements `finstack_quant_margin::Marginable` (the impl lives in the instrument's own `marginable.rs`; shared helpers in `margin.rs`) |
-| `model_params_snapshot()` / `with_model_params()` | `ModelParamsSnapshot::None` (the variant, not `Option::None`) / clone-or-error | Attribution must revalue the instrument with isolated model parameters |
 | `scenario_spread_shock_supported()` | `false` | The pricer consumes `scenario_spread_shock_bp` exactly, with no silent no-op |
 | `fx_exposure()`, `expiry()`, `repo_curve_id()`, `to_instrument_json()` | `None` | The instrument has the corresponding concept |
 
@@ -140,8 +137,6 @@ methods.
 - **Volatility precedence.** Surface-driven pricers call
   `vol_resolution::resolve_sigma_at` so the `MarketQuoteOverrides::implied_volatility`
   override always wins uniformly.
-- **Example dates.** `example()` constructors that need a far expiry use
-  `example_constants::FAR_EXPIRY` so they all roll forward together.
 
 ## Adding an instrument
 

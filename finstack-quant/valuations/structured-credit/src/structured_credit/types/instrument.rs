@@ -7,7 +7,6 @@ use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::{
     CashflowProvider, ScheduleBuildOpts, schedule_from_classified_flows,
 };
-use finstack_quant_core::Error;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::dates::{Date, DateExt};
@@ -16,7 +15,6 @@ use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations_core::metrics::{MetricContext, MetricSeed};
 
 impl CashflowScheduleSource for StructuredCredit {
@@ -289,37 +287,6 @@ impl Instrument for StructuredCredit {
         }
         if let Ok(results) = self.run_simulation(market, as_of).map(|run| run.tranches) {
             SimulationMetricSeed::from_run(results).install(context);
-        }
-    }
-
-    fn model_params_snapshot(&self) -> ModelParamsSnapshot {
-        ModelParamsSnapshot::StructuredCredit {
-            prepayment_spec: self.credit_model.prepayment_spec.clone(),
-            default_spec: self.credit_model.default_spec.clone(),
-            recovery_spec: self.credit_model.recovery_spec.clone(),
-        }
-    }
-
-    fn with_model_params(
-        &self,
-        params: &ModelParamsSnapshot,
-    ) -> finstack_quant_core::Result<Box<dyn Instrument>> {
-        match params {
-            ModelParamsSnapshot::StructuredCredit {
-                prepayment_spec,
-                default_spec,
-                recovery_spec,
-            } => {
-                let mut modified = self.resolved_for_pricing()?;
-                modified.credit_model.prepayment_spec = prepayment_spec.clone();
-                modified.credit_model.default_spec = default_spec.clone();
-                modified.credit_model.recovery_spec = recovery_spec.clone();
-                Ok(Box::new(modified))
-            }
-            ModelParamsSnapshot::None => Ok(self.clone_box()),
-            ModelParamsSnapshot::Convertible { .. } => Err(Error::Validation(
-                "Instrument type mismatch: expected StructuredCredit model parameters".to_string(),
-            )),
         }
     }
 

@@ -41,6 +41,10 @@
 use crate::cap_floor::RateOptionType;
 use crate::cap_floor::pricing::CapletFloorletInputs;
 use crate::cap_floor::pricing::pricer::price_caplet_quote;
+use crate::{
+    vol_resolution::ResolvedVolatility, vol_resolution::VolatilityRequest,
+    vol_resolution::resolve_volatility,
+};
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
 };
@@ -53,9 +57,6 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::validation;
 use finstack_quant_models::volatility::VolatilityConvention;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
-    ResolvedVolatility, VolatilityRequest, resolve_volatility,
-};
 use finstack_quant_valuations_core::pricer::ModelKey;
 use rust_decimal::Decimal;
 

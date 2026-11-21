@@ -1,5 +1,6 @@
 //! Equity total-return swap contract.
 
+use crate::EquityUnderlyingParams;
 use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::{
@@ -12,9 +13,7 @@ use finstack_quant_core::{
 };
 use finstack_quant_margin::types::OtcMarginSpec;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::{
-    EquityUnderlyingParams, FinancingLegSpec, PayReceive, TrsScheduleSpec,
-};
+use finstack_quant_valuations_core::instruments::{FinancingLegSpec, PayReceive, TrsScheduleSpec};
 use rust_decimal::Decimal;
 use time::macros::date;
 
@@ -43,7 +42,8 @@ pub enum TrsDividendSettlement {
 ///     currency::Currency, dates::DayCount, money::Money, types::InstrumentId,
 /// };
 /// use finstack_quant_cashflows::builder::ScheduleParams;
-/// use finstack_quant_valuations_core::instruments::{EquityUnderlyingParams, FinancingLegSpec, PayReceive};
+/// use finstack_quant_valuations_core::instruments::{FinancingLegSpec, PayReceive};
+/// use finstack_quant_valuations_equity::EquityUnderlyingParams;
 /// use finstack_quant_core::types::Attributes;
 /// use finstack_quant_valuations_equity::equity_trs::{EquityTotalReturnSwap, TrsDividendSettlement};
 /// use finstack_quant_valuations_core::instruments::TrsScheduleSpec;

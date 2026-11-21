@@ -209,7 +209,7 @@ fn mixed_currency_fx_swap_rows_use_native_curves_and_reporting_currency_pv() {
 
 #[test]
 fn discounting_reconciles_with_schedule_pv_for_fixed_bond() {
-    use finstack_quant_valuations::instruments::common_impl::helpers::schedule_pv_raw;
+    use finstack_quant_valuations::instruments::rates::schedule_pv_raw;
 
     let issue = Date::from_calendar_date(2025, Month::January, 15).expect("date");
     let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("date");
@@ -835,8 +835,7 @@ fn revolver_balances_follow_draws_and_repayments() {
 }
 
 #[test]
-fn balances_stay_empty_for_instruments_without_an_outstanding_principal() {
-    let as_of = Date::from_calendar_date(2025, Month::January, 2).expect("date");
+fn schedule_balances_accepts_schedule_without_issue_date() {
     let terms = CashflowExportTerms::from_schedule(
         finstack_quant_cashflows::schedule_from_dated_flows(
             vec![(
@@ -849,12 +848,7 @@ fn balances_stay_empty_for_instruments_without_an_outstanding_principal() {
         )
         .expect("schedule"),
     );
-    assert!(
-        terms.get_flow_balances().is_none(),
-        "not requested at {as_of}"
-    );
-    let no_issue_date = terms
+    let _no_issue_date = terms
         .with_schedule_balances()
         .expect("no issue date is not an error");
-    assert!(no_issue_date.get_flow_balances().is_none());
 }

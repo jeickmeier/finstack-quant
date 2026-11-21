@@ -12,13 +12,107 @@ use finstack_quant_margin::constants::DURATION_APPROXIMATION_FACTOR;
 use finstack_quant_margin::constants::STANDARD_CDS_MATURITY_YEARS;
 use finstack_quant_margin::types::NettingSetId;
 use finstack_quant_margin::types::OtcMarginSpec;
+use finstack_quant_margin::types::SimmCreditClassification;
 use finstack_quant_margin::types::SimmSensitivities;
-use finstack_quant_valuations_core::instruments::common_impl::margin::add_classified_credit_delta;
-use finstack_quant_valuations_core::instruments::common_impl::margin::assign_credit_tenor_bucket;
-use finstack_quant_valuations_core::instruments::common_impl::margin::extract_reference_entity;
 use finstack_quant_valuations_core::instruments::common_impl::margin::netting_set_id_from_spec;
-use finstack_quant_valuations_core::instruments::common_impl::margin::repriced_metric;
 use finstack_quant_valuations_core::instruments::{Instrument, PayReceive};
+
+fn repriced_metric(
+    instrument: &dyn Instrument,
+    market: &MarketContext,
+    as_of: Date,
+    metric: finstack_quant_valuations_core::metrics::MetricId,
+) -> Option<f64> {
+    let result = instrument
+        .price_with_metrics(
+            market,
+            as_of,
+            std::slice::from_ref(&metric),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
+        )
+        .ok()?;
+    result.measures.get(metric.as_str()).copied()
+}
+
+fn assign_credit_tenor_bucket(years_to_maturity: f64) -> &'static str {
+    use finstack_quant_margin::constants::tenor_buckets::*;
+    match years_to_maturity {
+        y if y <= BUCKET_1Y => "1Y",
+        y if y <= BUCKET_2Y => "2Y",
+        y if y <= BUCKET_3Y => "3Y",
+        y if y <= BUCKET_5Y => "5Y",
+        y if y <= BUCKET_10Y => "10Y",
+        _ => "15Y",
+    }
+}
+
+fn extract_reference_entity(credit_curve_id: &str) -> Result<&str> {
+    if credit_curve_id.is_empty() {
+        return Err(finstack_quant_core::Error::Validation(
+            "credit curve id is empty".to_string(),
+        ));
+    }
+
+    let is_tenor = |s: &str| {
+        let last = s.chars().next_back().unwrap_or(' ');
+        matches!(last, 'Y' | 'M' | 'W' | 'D')
+            && s[..s.len() - 1].chars().all(|c| c.is_ascii_digit())
+            && s.len() >= 2
+    };
+    const CURVE_TYPES: &[&str] = &[
+        "CDS", "BOND", "CURVE", "OIS", "SOFR", "ESTR", "EURIBOR", "LIBOR", "HAZARD", "SPREAD",
+    ];
+    let is_curve_type = |s: &str| CURVE_TYPES.contains(&s);
+
+    let mut remaining = credit_curve_id;
+    for _ in 0..2 {
+        if let Some(pos) = remaining.rfind('-') {
+            let suffix = &remaining[pos + 1..];
+            if is_tenor(suffix) || is_curve_type(suffix) {
+                remaining = &remaining[..pos];
+                continue;
+            }
+        }
+        break;
+    }
+
+    if remaining.is_empty() {
+        tracing::warn!(
+            credit_curve_id,
+            "credit curve id has no recognizable entity prefix; using full string"
+        );
+        return Ok(credit_curve_id);
+    }
+    Ok(remaining)
+}
+
+fn add_classified_credit_delta(
+    sensitivities: &mut SimmSensitivities,
+    margin_spec: Option<&OtcMarginSpec>,
+    name: &str,
+    tenor: &str,
+    amount: f64,
+) -> Result<()> {
+    match margin_spec.and_then(|spec| spec.simm_credit_classification) {
+        Some(SimmCreditClassification::Qualifying { sector }) => {
+            sensitivities.add_credit_qualifying_delta(sector, name, tenor, amount);
+        }
+        Some(SimmCreditClassification::NonQualifying) => {
+            sensitivities.add_credit_non_qualifying_delta(name, tenor, amount);
+        }
+        None => {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "credit instrument '{name}' requires OtcMarginSpec.simm_credit_classification"
+            )));
+        }
+        Some(_) => {
+            return Err(finstack_quant_core::Error::Validation(
+                "unsupported SIMM credit classification".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
 
 /// Credit terms of a CDS-like trade that drive its SIMM credit delta.
 pub(crate) struct CreditSimmTerms<'a> {
@@ -212,5 +306,68 @@ mod tests {
         cds.upfront = Some((as_of, Money::from((1_i64, Currency::EUR))));
         assert!(cds.value(&market, as_of).is_err());
         assert!(cds.mtm_for_vm(&market, as_of).is_err());
+    }
+
+    #[test]
+    fn explicit_qualifying_classification_routes_credit_delta_to_sector_bucket() {
+        use finstack_quant_margin::types::{SimmCreditClassification, SimmCreditSector};
+
+        let spec = OtcMarginSpec::usd_bilateral()
+            .expect("margin spec")
+            .with_simm_credit_classification(SimmCreditClassification::Qualifying {
+                sector: SimmCreditSector::HighYieldFinancial,
+            });
+        let mut sensitivities = SimmSensitivities::new(Currency::USD);
+
+        add_classified_credit_delta(&mut sensitivities, Some(&spec), "CDX.NA.HY", "5Y", 12_500.0)
+            .expect("classified delta");
+
+        assert_eq!(
+            sensitivities.credit_qualifying_delta.get(&(
+                SimmCreditSector::HighYieldFinancial,
+                "CDX.NA.HY".to_string(),
+                "5Y".to_string(),
+            )),
+            Some(&12_500.0)
+        );
+        assert!(sensitivities.credit_non_qualifying_delta.is_empty());
+    }
+
+    #[test]
+    fn explicit_non_qualifying_classification_routes_credit_delta_to_cnq() {
+        use finstack_quant_margin::types::SimmCreditClassification;
+
+        let spec = OtcMarginSpec::usd_bilateral()
+            .expect("margin spec")
+            .with_simm_credit_classification(SimmCreditClassification::NonQualifying);
+        let mut sensitivities = SimmSensitivities::new(Currency::USD);
+
+        add_classified_credit_delta(&mut sensitivities, Some(&spec), "RMBS-1", "5Y", 8_000.0)
+            .expect("classified delta");
+
+        assert_eq!(
+            sensitivities
+                .credit_non_qualifying_delta
+                .get(&("RMBS-1".to_string(), "5Y".to_string())),
+            Some(&8_000.0)
+        );
+        assert!(sensitivities.credit_qualifying_delta.is_empty());
+    }
+
+    #[test]
+    fn missing_classification_rejects_credit_delta_generation() {
+        let mut sensitivities = SimmSensitivities::new(Currency::USD);
+
+        let error = add_classified_credit_delta(
+            &mut sensitivities,
+            None,
+            "UNCLASSIFIED-CDS",
+            "5Y",
+            5_000.0,
+        )
+        .expect_err("classification is mandatory");
+
+        assert!(error.to_string().contains("simm_credit_classification"));
+        assert!(sensitivities.is_empty());
     }
 }

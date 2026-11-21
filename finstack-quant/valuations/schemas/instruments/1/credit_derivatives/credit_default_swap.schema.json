@@ -26,7 +26,7 @@
       ]
     },
     "CdsDateRegime": {
-      "description": "Named contractual date regime of a CDS product (record\nCALIBRATION-FRAMEWORK-007, O7).\n\nThe regime owns how the premium grid, its stub and its endpoints are\nderived; no regime is inferred and none is a default.",
+      "description": "Named contractual date regime of a CDS product.\n\nThe regime owns how the premium grid, its stub and its endpoints are\nderived; no regime is inferred and none is a default.",
       "oneOf": [
         {
           "const": "standard",
@@ -669,12 +669,12 @@
     },
     "PremiumLegSpec": {
       "additionalProperties": false,
-      "description": "Specification for CDS premium legs",
+      "description": "Specification for CDS premium legs.",
       "properties": {
         "business_day_convention": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
           "default": "modified_following",
-          "description": "Business day convention"
+          "description": "Business day convention."
         },
         "calendar_id": {
           "anyOf": [
@@ -685,7 +685,7 @@
               "type": "null"
             }
           ],
-          "description": "Holiday calendar identifier"
+          "description": "Holiday calendar identifier."
         },
         "coupon_bp": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
@@ -697,23 +697,23 @@
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention"
+          "description": "Day count convention."
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve identifier"
+          "description": "Discount curve identifier."
         },
         "end": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "End date of protection"
+          "description": "End date of protection."
         },
         "frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-          "description": "Payment frequency"
+          "description": "Payment frequency."
         },
         "start": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Start date of protection"
+          "description": "Start date of protection."
         },
         "stub": {
           "$ref": "#/$defs/StubKind",
@@ -734,19 +734,19 @@
     },
     "ProtectionLegSpec": {
       "additionalProperties": false,
-      "description": "Specification for CDS protection legs",
+      "description": "Specification for CDS protection legs.",
       "properties": {
         "credit_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Hazard curve identifier for default probabilities"
+          "description": "Hazard curve identifier for default probabilities."
         },
         "recovery_rate": {
-          "description": "Recovery rate as a decimal fraction in `[0.0, 1.0)`",
+          "description": "Recovery rate as a decimal fraction in `[0.0, 1.0)`.",
           "format": "double",
           "type": "number"
         },
         "settlement_delay": {
-          "description": "Settlement delay in business days",
+          "description": "Settlement delay in business days.",
           "format": "uint16",
           "maximum": 65535,
           "minimum": 0,

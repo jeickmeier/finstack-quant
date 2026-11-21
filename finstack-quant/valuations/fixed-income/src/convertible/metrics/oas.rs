@@ -134,6 +134,7 @@ mod tests {
     use std::sync::Arc;
 
     use crate::convertible::ConvertibleBond;
+    use crate::{AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment};
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -141,9 +142,6 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
-    use finstack_quant_valuations_core::instruments::{
-        AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
-    };
     use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
     use time::Month;
 

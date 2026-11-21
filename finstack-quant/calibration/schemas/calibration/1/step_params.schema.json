@@ -33,7 +33,7 @@
       ]
     },
     "CdsDateRegime": {
-      "description": "Named contractual date regime of a CDS product (record\nCALIBRATION-FRAMEWORK-007, O7).\n\nThe regime owns how the premium grid, its stub and its endpoints are\nderived; no regime is inferred and none is a default.",
+      "description": "Named contractual date regime of a CDS product.\n\nThe regime owns how the premium grid, its stub and its endpoints are\nderived; no regime is inferred and none is a default.",
       "oneOf": [
         {
           "const": "standard",

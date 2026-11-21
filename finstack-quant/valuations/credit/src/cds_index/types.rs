@@ -7,20 +7,21 @@
 //! - `Constituents`: expand into per-name CDS positions with weights and
 //!   aggregate results across names.
 
+use crate::CreditParams;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_margin::types::OtcMarginSpec;
-use finstack_quant_valuations_core::instruments::CreditParams;
 use finstack_quant_valuations_core::instruments::MarketDependencies;
 use rust_decimal::Decimal;
 use time::macros::date;
 
 // Reuse CDS components for conventions and legs
 use crate::cds::CreditDefaultSwap;
-use finstack_quant_valuations_core::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
+use crate::{PremiumLegSpec, ProtectionLegSpec};
+use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::market::conventions::{CdsConvention, CdsValuationConvention};
 
 use super::parameters::CdsIndexParams;
@@ -216,7 +217,7 @@ impl CdsIndex {
             side: PayReceive::Pay,
             convention,
             premium_leg: PremiumLegSpec {
-                date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+                date_regime: crate::CdsDateRegime::Standard,
                 start: date!(2024 - 03 - 20),
                 end: date!(2029 - 12 - 20),
                 frequency,
@@ -330,7 +331,7 @@ impl CdsIndex {
             side,
             convention,
             premium_leg: PremiumLegSpec {
-                date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+                date_regime: crate::CdsDateRegime::Standard,
                 start,
                 end,
                 frequency,

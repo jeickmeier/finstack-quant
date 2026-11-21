@@ -307,6 +307,7 @@ mod lifecycle_tests {
 #[cfg(test)]
 mod settlement_and_sigma_tests {
     use super::*;
+    use crate::CreditParams;
     use crate::cds_option::{CdsOptionParams, CdsOptionStrike};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DateExt};
@@ -315,7 +316,7 @@ mod settlement_and_sigma_tests {
     };
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
     use finstack_quant_models::types::OptionType;
-    use finstack_quant_valuations_core::instruments::{CreditParams, SettlementType};
+    use finstack_quant_valuations_core::instruments::SettlementType;
     use rust_decimal::Decimal;
     use time::macros::date;
 

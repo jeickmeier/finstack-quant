@@ -10,13 +10,12 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 
 use crate::bond::{CallPutSchedule, CashflowSpec};
-use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_core::types::Attributes;
-use finstack_quant_valuations_core::instruments::model_params::ModelParamsSnapshot;
-use finstack_quant_valuations_core::instruments::{
+use crate::{
     AntiDilutionPolicy, ConversionEvent, ConversionPolicy, ConversionSpec, DividendAdjustment,
     PriceTrigger,
 };
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_core::types::Attributes;
 
 use super::pricing;
 use finstack_quant_valuations_core::impl_instrument_base;
@@ -414,7 +413,7 @@ impl ConvertibleBond {
 
     /// Effective conversion ratio after anti-dilution adjustments.
     ///
-    /// Applies all recorded [`DilutionEvent`](finstack_quant_valuations_core::instruments::DilutionEvent)s in chronological order using
+    /// Applies all recorded [`DilutionEvent`](finstack_quant_valuations_fixed_income::DilutionEvent)s in chronological order using
     /// the bond's [`AntiDilutionPolicy`]:
     ///
     /// - **None**: Returns the base conversion ratio unchanged.
@@ -851,30 +850,6 @@ impl finstack_quant_valuations_core::instruments::Instrument for ConvertibleBond
         pricing::price_convertible_bond(self, curves, as_of)
     }
 
-    fn model_params_snapshot(&self) -> ModelParamsSnapshot {
-        ModelParamsSnapshot::Convertible {
-            conversion_spec: self.conversion.clone(),
-        }
-    }
-
-    fn with_model_params(
-        &self,
-        params: &ModelParamsSnapshot,
-    ) -> finstack_quant_core::Result<Box<dyn finstack_quant_valuations_core::instruments::Instrument>>
-    {
-        match params {
-            ModelParamsSnapshot::Convertible { conversion_spec } => {
-                let mut modified = self.clone();
-                modified.conversion = conversion_spec.clone();
-                Ok(Box::new(modified))
-            }
-            ModelParamsSnapshot::None => Ok(self.clone_box()),
-            ModelParamsSnapshot::StructuredCredit { .. } => Err(Error::Validation(
-                "Instrument type mismatch: expected ConvertibleBond model parameters".to_string(),
-            )),
-        }
-    }
-
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
@@ -970,8 +945,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::DilutionEvent;
     use finstack_quant_cashflows::CashflowProvider;
-    use finstack_quant_valuations_core::instruments::DilutionEvent;
     use finstack_quant_valuations_core::instruments::Instrument;
 
     #[test]

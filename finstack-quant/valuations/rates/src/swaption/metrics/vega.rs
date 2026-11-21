@@ -28,10 +28,10 @@
 //! and vega; these are finite reporting conventions at a nondifferentiable point.
 
 use crate::swaption::Swaption;
+use crate::vol_resolution::ResolvedVolatility;
 use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::{bachelier_vega, black_vega};
 use finstack_quant_models::volatility::VolatilityConvention;
-use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::ResolvedVolatility;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Vega calculator for swaptions

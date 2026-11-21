@@ -36,7 +36,7 @@ pub(crate) struct EquityOptionHestonMcPricer {
 impl EquityOptionHestonMcPricer {
     /// Create a new Heston MC pricer with default configuration.
     pub(crate) fn new() -> Self {
-        use finstack_quant_valuations_core::instruments::common_impl::helpers::mc_defaults;
+        use crate::mc_defaults;
         Self {
             num_paths: mc_defaults::DEFAULT_MC_PATHS,
             steps_per_year: mc_defaults::DEFAULT_STEPS_PER_YEAR,

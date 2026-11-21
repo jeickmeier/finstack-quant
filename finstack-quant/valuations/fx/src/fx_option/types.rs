@@ -368,8 +368,7 @@ impl FxOption {
 
     /// Create a canonical example FX option for testing and documentation.
     ///
-    /// Returns an EUR/USD call expiring on the project-wide stable example
-    /// epoch (`finstack_quant_valuations_core::instruments::common_impl::EXAMPLE_FAR_EXPIRY`). The
+    /// Returns an EUR/USD call expiring on the stable FX example epoch (`crate::shared::FAR_EXPIRY`). The
     /// example is intentionally future-dated so docs and demos hit the live
     /// pricing path rather than the expired-option intrinsic-only branch.
     pub fn example() -> finstack_quant_core::Result<Self> {
@@ -386,7 +385,7 @@ impl FxOption {
                 Currency::USD,
                 "generic_interbank",
             )?)
-            .expiry(finstack_quant_valuations_core::instruments::common_impl::example_constants::FAR_EXPIRY)
+            .expiry(crate::shared::FAR_EXPIRY)
             .day_count(DayCount::Act365F)
             .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -786,7 +785,7 @@ mod validation_tests {
                 FxDeltaConvention::new(FxDeltaConventionKind::Forward, Currency::USD, "test")
                     .expect("valid delta convention"),
             )
-            .expiry(finstack_quant_valuations_core::instruments::common_impl::example_constants::FAR_EXPIRY)
+            .expiry(crate::shared::FAR_EXPIRY)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("USD-OIS"))

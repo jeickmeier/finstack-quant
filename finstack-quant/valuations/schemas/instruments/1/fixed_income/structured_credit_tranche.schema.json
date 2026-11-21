@@ -3507,12 +3507,12 @@
     },
     "FixedLegSpec": {
       "additionalProperties": false,
-      "description": "Specification for fixed rate legs in interest rate swaps",
+      "description": "Specification for fixed rate legs in interest rate swaps.",
       "properties": {
         "business_day_convention": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
           "default": "modified_following",
-          "description": "Business day convention for payment dates"
+          "description": "Business day convention for payment dates."
         },
         "calendar_id": {
           "anyOf": [
@@ -3523,47 +3523,47 @@
               "type": "null"
             }
           ],
-          "description": "Optional calendar for business day adjustments"
+          "description": "Optional calendar for business day adjustments."
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention for accrual"
+          "description": "Day count convention for accrual."
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve identifier for pricing"
+          "description": "Discount curve identifier for pricing."
         },
         "end": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "End date of the fixed leg"
+          "description": "End date of the fixed leg."
         },
         "end_of_month": {
           "default": false,
-          "description": "End-of-month roll convention (default: false).\n\nWhen `true`, if the start date falls on the last business day of a month,\nall subsequent roll dates will also fall on the last business day of their\nrespective months. This matches QuantLib's `MakeOIS` default behavior.\n\n# Market Standard\n\nPer ISDA 2006 Definitions Section 4.18, the End-of-Month convention should\nbe applied when the effective date is the last business day of a month.\nMost professional systems (QuantLib, Bloomberg SWDF) default to `true`.",
+          "description": "End-of-month roll convention (default: false).",
           "type": "boolean"
         },
         "frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-          "description": "Payment frequency"
+          "description": "Payment frequency."
         },
         "payment_lag_days": {
           "default": 0,
-          "description": "Payment lag in business days after period end (default: 0).\n\nBloomberg OIS swaps typically use 2 business days payment lag.\nThe actual payment date is adjusted from the period end date by\nthis many business days using the leg's calendar.",
+          "description": "Payment lag in business days after period end (default: 0).",
           "format": "int32",
           "type": "integer"
         },
         "rate": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-          "description": "Fixed rate (e.g., 0.05 for 5%)"
+          "description": "Fixed rate (e.g., 0.05 for 5%)."
         },
         "start": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Start date of the fixed leg"
+          "description": "Start date of the fixed leg."
         },
         "stub": {
           "$ref": "#/$defs/StubKind",
           "default": "short_front",
-          "description": "Stub period handling rule"
+          "description": "Stub period handling rule."
         }
       },
       "required": [
@@ -3578,12 +3578,12 @@
     },
     "FloatLegSpec": {
       "additionalProperties": false,
-      "description": "Specification for floating rate legs in interest rate swaps",
+      "description": "Specification for floating rate legs in interest rate swaps.",
       "properties": {
         "business_day_convention": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
           "default": "modified_following",
-          "description": "Business day convention for payment dates"
+          "description": "Business day convention for payment dates."
         },
         "calendar_id": {
           "anyOf": [
@@ -3594,28 +3594,28 @@
               "type": "null"
             }
           ],
-          "description": "Optional calendar for business day adjustments"
+          "description": "Optional calendar for business day adjustments."
         },
         "compounding": {
           "$ref": "#/$defs/FloatingLegCompounding",
           "default": "simple",
-          "description": "Compounding method for floating coupons.\n\nDetermines how floating rate coupons are calculated:\n- `simple` (default): one term forward per period\n- `compounded_*`: SOFR/SONIA-style daily compounding\n- `simple_average` is rejected by [`Self::validate`]\n\n# Implementation Notes\n\nCompounded-in-arrears is implemented for IRS pricing in `instruments::irs` with\nsupport for lookback and observation shift conventions. For seasoned (already\nstarted) compounded swaps, pricing requires explicit fixings for observation\ndates prior to `as_of`."
+          "description": "Compounding method for floating coupons."
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention for accrual"
+          "description": "Day count convention for accrual."
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve identifier for pricing"
+          "description": "Discount curve identifier for pricing."
         },
         "end": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "End date of the floating leg"
+          "description": "End date of the floating leg."
         },
         "end_of_month": {
           "default": false,
-          "description": "End-of-month roll convention (default: false).\n\nWhen `true`, if the start date falls on the last business day of a month,\nall subsequent roll dates will also fall on the last business day of their\nrespective months. This matches QuantLib's `MakeOIS` default behavior.\n\n# Market Standard\n\nPer ISDA 2006 Definitions Section 4.18, the End-of-Month convention should\nbe applied when the effective date is the last business day of a month.\nMost professional systems (QuantLib, Bloomberg SWDF) default to `true`.",
+          "description": "End-of-month roll convention (default: false).",
           "type": "boolean"
         },
         "fixing_calendar_id": {
@@ -3628,15 +3628,15 @@
             }
           ],
           "default": null,
-          "description": "Optional calendar for rate fixing (reset lag)"
+          "description": "Optional calendar for rate fixing (reset lag)."
         },
         "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Forward curve identifier for rate projections"
+          "description": "Forward curve identifier for rate projections."
         },
         "frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-          "description": "Payment frequency"
+          "description": "Payment frequency."
         },
         "index_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -3644,28 +3644,28 @@
         },
         "payment_lag_days": {
           "default": 0,
-          "description": "Payment lag in business days after period end (default: 0).\n\nBloomberg OIS swaps typically use 2 business days payment lag.\nThe actual payment date is adjusted from the period end date by\nthis many business days using the leg's calendar.",
+          "description": "Payment lag in business days after period end (default: 0).",
           "format": "int32",
           "type": "integer"
         },
         "reset_lag_days": {
           "default": 0,
-          "description": "Reset lag in business days for floating rate fixing (default: 0).\n\n- **0** (default): fixing on the accrual start date. A swap whose first\n  accrual period starts on or after the valuation date then prices off\n  the forward curve without historical fixings.\n- **Positive** (e.g., 2): T-2 fixing (2 business days before accrual\n  start). Use `RateIndexConventions::default_reset_lag_days` (or\n  `InterestRateSwap::from_conventions`) for the market default of a\n  given index.\n- **Negative** (e.g., -1): resolved at pricing time to the registered\n  index convention default; rejected when the forward curve id is not a\n  registered rate index.",
+          "description": "Reset lag in business days for floating rate fixing (default: 0).",
           "format": "int32",
           "type": "integer"
         },
         "spread_bp": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-          "description": "Spread in basis points added to the forward rate"
+          "description": "Spread in basis points added to the forward rate."
         },
         "start": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Start date of the floating leg"
+          "description": "Start date of the floating leg."
         },
         "stub": {
           "$ref": "#/$defs/StubKind",
           "default": "short_front",
-          "description": "Stub period handling rule"
+          "description": "Stub period handling rule."
         }
       },
       "required": [

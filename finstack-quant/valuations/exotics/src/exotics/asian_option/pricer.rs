@@ -471,8 +471,8 @@ impl Pricer for AsianOptionMcPricer {
     }
 }
 
+use crate::exotics::bs_gbm::BlackScholesInputsDf;
 use finstack_quant_models::closed_form::{AsianFixingSchedule, arithmetic_asian_tw_price_times};
-use finstack_quant_valuations_core::instruments::common_impl::helpers::BlackScholesInputsDf;
 
 /// Value of an expired Asian option: the intrinsic of the realized average
 /// (current spot when nothing was recorded) times quantity, undiscounted.
@@ -624,13 +624,10 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
         }
 
         let inputs = analytic_inputs(asian, market, as_of)?;
-        let (spot, r, q, sigma, t) = (
-            inputs.spot,
-            inputs.r_eff(),
-            inputs.q,
-            inputs.sigma,
-            inputs.t,
-        );
+        let r = inputs.r_eff().map_err(|error| {
+            PricingError::from_core(error, PricingErrorContext::from_instrument(asian))
+        })?;
+        let (spot, q, sigma, t) = (inputs.spot, inputs.q, inputs.sigma, inputs.t);
 
         // Price on the actual fixing schedule. Falling back to the
         // equal-spacing formula would misprice contracts whose fixings are

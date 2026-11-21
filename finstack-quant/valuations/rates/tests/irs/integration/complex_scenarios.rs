@@ -66,7 +66,7 @@ fn create_swap(as_of: Date, end: Date, fixed_rate: f64, side: PayReceive) -> Int
         id: "IRS_INTEGRATION_TEST".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side,
-        fixed_leg: finstack_quant_valuations_core::instruments::FixedLegSpec {
+        fixed_leg: finstack_quant_valuations_rates::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(fixed_rate).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -80,7 +80,7 @@ fn create_swap(as_of: Date, end: Date, fixed_rate: f64, side: PayReceive) -> Int
             start: as_of,
             end,
         },
-        float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
+        float_leg: finstack_quant_valuations_rates::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
@@ -181,7 +181,7 @@ fn test_forward_starting_swap() {
         id: "FORWARD_START".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed_leg: finstack_quant_valuations_core::instruments::FixedLegSpec {
+        fixed_leg: finstack_quant_valuations_rates::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -195,7 +195,7 @@ fn test_forward_starting_swap() {
             start, // Forward start
             end,
         },
-        float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
+        float_leg: finstack_quant_valuations_rates::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
@@ -308,7 +308,7 @@ fn test_swap_seasoned() {
         id: "SEASONED_SWAP".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
-        fixed_leg: finstack_quant_valuations_core::instruments::FixedLegSpec {
+        fixed_leg: finstack_quant_valuations_rates::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.04).expect("valid"), // Old rate from 2023
             frequency: Tenor::quarterly(),
@@ -322,7 +322,7 @@ fn test_swap_seasoned() {
             start,
             end,
         },
-        float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
+        float_leg: finstack_quant_valuations_rates::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
             index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),

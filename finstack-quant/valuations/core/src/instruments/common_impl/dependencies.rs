@@ -194,35 +194,19 @@ impl MarketDependencies {
         Self::default()
     }
 
-    /// Merge curve dependencies into this set.
-    pub fn add_curves(&mut self, curves: InstrumentCurves) {
-        for id in curves.discount_curves {
-            push_unique_curve(&mut self.curves.discount_curves, id);
-        }
-        for id in curves.forward_curves {
-            push_unique_curve(&mut self.curves.forward_curves, id);
-        }
-        for id in curves.credit_curves {
-            push_unique_curve(&mut self.curves.credit_curves, id);
-        }
-        for id in curves.inflation_curves {
-            push_unique_curve(&mut self.curves.inflation_curves, id);
-        }
-    }
-
     /// Add a discount-curve dependency.
     pub fn add_discount_curve(&mut self, id: impl Into<CurveId>) {
-        push_unique_curve(&mut self.curves.discount_curves, id.into());
+        push_unique(&mut self.curves.discount_curves, id.into());
     }
 
     /// Add a forward/projection-curve dependency.
     pub fn add_forward_curve(&mut self, id: impl Into<CurveId>) {
-        push_unique_curve(&mut self.curves.forward_curves, id.into());
+        push_unique(&mut self.curves.forward_curves, id.into());
     }
 
     /// Add a credit/hazard-curve dependency.
     pub fn add_credit_curve(&mut self, id: impl Into<CurveId>) {
-        push_unique_curve(&mut self.curves.credit_curves, id.into());
+        push_unique(&mut self.curves.credit_curves, id.into());
     }
 
     /// Add a composite credit-index dependency.
@@ -232,12 +216,12 @@ impl MarketDependencies {
     /// * `id` - Identifier resolved through `MarketContext::get_credit_index`.
     ///   Duplicate identifiers are ignored while preserving insertion order.
     pub fn add_credit_index(&mut self, id: impl Into<CurveId>) {
-        push_unique_curve_vec(&mut self.credit_index_ids, id.into());
+        push_unique(&mut self.credit_index_ids, id.into());
     }
 
     /// Add an inflation-curve or published-index dependency.
     pub fn add_inflation_curve(&mut self, id: impl Into<CurveId>) {
-        push_unique_curve(&mut self.curves.inflation_curves, id.into());
+        push_unique(&mut self.curves.inflation_curves, id.into());
     }
 
     /// Add an identifier resolved through `MarketContext::get_price`.
@@ -247,14 +231,12 @@ impl MarketDependencies {
     /// * `id` - Market-scalar key (a `PriceId` or plain string); duplicates are
     ///   ignored while preserving insertion order.
     pub fn add_market_scalar_id(&mut self, id: impl AsRef<str>) {
-        push_unique_string(&mut self.market_scalar_ids, id.as_ref().to_string());
+        push_unique(&mut self.market_scalar_ids, id.as_ref().to_string());
     }
 
     /// Add a typed volatility dependency.
     pub fn add_volatility_dependency(&mut self, dependency: VolatilityDependency) {
-        if !self.volatility_dependencies.contains(&dependency) {
-            self.volatility_dependencies.push(dependency);
-        }
+        push_unique(&mut self.volatility_dependencies, dependency);
     }
 
     /// Return unique volatility surface IDs in first-descriptor order.
@@ -291,17 +273,28 @@ impl MarketDependencies {
 
     /// Add a scalar time series identifier.
     pub fn add_series_id(&mut self, id: impl Into<String>) {
-        push_unique_string(&mut self.series_ids, id.into());
+        push_unique(&mut self.series_ids, id.into());
     }
 
     /// Add an FX pair dependency.
     pub fn add_fx_pair(&mut self, base: Currency, quote: Currency) {
-        push_unique_fx_pair(&mut self.fx_pairs, FxPair::new(base, quote));
+        push_unique(&mut self.fx_pairs, FxPair::new(base, quote));
     }
 
     /// Merge another dependency set into this one.
     pub fn merge(&mut self, other: MarketDependencies) {
-        self.add_curves(other.curves);
+        for id in other.curves.discount_curves {
+            push_unique(&mut self.curves.discount_curves, id);
+        }
+        for id in other.curves.forward_curves {
+            push_unique(&mut self.curves.forward_curves, id);
+        }
+        for id in other.curves.credit_curves {
+            push_unique(&mut self.curves.credit_curves, id);
+        }
+        for id in other.curves.inflation_curves {
+            push_unique(&mut self.curves.inflation_curves, id);
+        }
         for id in other.credit_index_ids {
             self.add_credit_index(id);
         }
@@ -343,32 +336,14 @@ pub(crate) fn require_volatility_grid(
     Ok(())
 }
 
-fn push_unique_curve(target: &mut SmallVec<[CurveId; 2]>, id: CurveId) {
-    if target.contains(&id) {
-        return;
+fn push_unique<C, T>(target: &mut C, item: T)
+where
+    C: std::ops::Deref<Target = [T]> + Extend<T>,
+    T: PartialEq,
+{
+    if !target.contains(&item) {
+        target.extend(std::iter::once(item));
     }
-    target.push(id);
-}
-
-fn push_unique_curve_vec(target: &mut Vec<CurveId>, id: CurveId) {
-    if target.contains(&id) {
-        return;
-    }
-    target.push(id);
-}
-
-fn push_unique_string(target: &mut Vec<String>, value: String) {
-    if target.contains(&value) {
-        return;
-    }
-    target.push(value);
-}
-
-fn push_unique_fx_pair(target: &mut Vec<FxPair>, pair: FxPair) {
-    if target.contains(&pair) {
-        return;
-    }
-    target.push(pair);
 }
 
 #[cfg(test)]

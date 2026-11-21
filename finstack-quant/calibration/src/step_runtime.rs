@@ -863,7 +863,7 @@ mod tests {
             &quote,
             &build_context,
             &crate::build::cds_tranche::CdsTrancheBuildOverrides::for_regime(
-                finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+                finstack_quant_valuations_credit::CdsDateRegime::Standard,
             ),
         )
         .expect("shared tranche builder");

@@ -280,7 +280,7 @@ pub(crate) fn compute_float_leg_pv(
         irs.float_leg.compounding,
         FloatingLegCompounding::SimpleAverage
     ) {
-        return Err(finstack_quant_valuations_core::instruments::common_impl::parameters::simple_average_unsupported());
+        return Err(crate::simple_average_unsupported());
     }
     irs.pv_float_leg(context, as_of)
 }
@@ -399,7 +399,7 @@ mod tests {
             .id(InstrumentId::new("OIS-SEASONED"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
-            .fixed_leg(finstack_quant_valuations_core::instruments::FixedLegSpec {
+            .fixed_leg(crate::FixedLegSpec {
                 discount_curve_id: disc_id.clone(),
                 rate: rust_decimal::Decimal::ZERO,
                 frequency: Tenor::monthly(),
@@ -413,7 +413,7 @@ mod tests {
                 payment_lag_days: 0,
                 end_of_month: false,
             })
-            .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
+            .float_leg(crate::FloatLegSpec {
                 discount_curve_id: disc_id,
                 index_id: fwd_id.as_str().into(),
                 forward_curve_id: fwd_id,
@@ -492,7 +492,7 @@ mod tests {
             .id(InstrumentId::new("OIS-NO-LOOKBACK"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
-            .fixed_leg(finstack_quant_valuations_core::instruments::FixedLegSpec {
+            .fixed_leg(crate::FixedLegSpec {
                 discount_curve_id: disc_id.clone(),
                 rate: rust_decimal::Decimal::try_from(0.03).expect("valid"),
                 frequency: finstack_quant_core::dates::Tenor::quarterly(),
@@ -507,7 +507,7 @@ mod tests {
                 payment_lag_days: 0,
                 end_of_month: false,
             })
-            .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
+            .float_leg(crate::FloatLegSpec {
                 discount_curve_id: disc_id.clone(),
                 index_id: disc_id.as_str().into(),
                 forward_curve_id: disc_id, // single-curve: same id as discount
@@ -581,7 +581,7 @@ mod tests {
             .id(InstrumentId::new("OIS-MISSING-CAL"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
-            .fixed_leg(finstack_quant_valuations_core::instruments::FixedLegSpec {
+            .fixed_leg(crate::FixedLegSpec {
                 discount_curve_id: disc_id.clone(),
                 rate: rust_decimal::Decimal::try_from(0.03).expect("valid"),
                 frequency: finstack_quant_core::dates::Tenor::quarterly(),
@@ -596,7 +596,7 @@ mod tests {
                 payment_lag_days: 0,
                 end_of_month: false,
             })
-            .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
+            .float_leg(crate::FloatLegSpec {
                 discount_curve_id: disc_id.clone(),
                 index_id: disc_id.as_str().into(),
                 forward_curve_id: disc_id,
@@ -665,7 +665,7 @@ mod tests {
             .id(InstrumentId::new("OIS-NO-CALENDAR"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
-            .fixed_leg(finstack_quant_valuations_core::instruments::FixedLegSpec {
+            .fixed_leg(crate::FixedLegSpec {
                 discount_curve_id: disc_id.clone(),
                 rate: rust_decimal::Decimal::try_from(0.03).expect("valid"),
                 frequency: finstack_quant_core::dates::Tenor::quarterly(),
@@ -680,7 +680,7 @@ mod tests {
                 payment_lag_days: 0,
                 end_of_month: false,
             })
-            .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
+            .float_leg(crate::FloatLegSpec {
                 discount_curve_id: disc_id.clone(),
                 index_id: disc_id.as_str().into(),
                 forward_curve_id: disc_id,
@@ -754,7 +754,7 @@ mod tests {
             .id(InstrumentId::new("OIS-VALUE-RAW-NO-FWD"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
-            .fixed_leg(finstack_quant_valuations_core::instruments::FixedLegSpec {
+            .fixed_leg(crate::FixedLegSpec {
                 discount_curve_id: disc_id.clone(),
                 rate: rust_decimal::Decimal::try_from(0.03).expect("valid"),
                 frequency: Tenor::quarterly(),
@@ -768,7 +768,7 @@ mod tests {
                 payment_lag_days: 0,
                 end_of_month: false,
             })
-            .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
+            .float_leg(crate::FloatLegSpec {
                 discount_curve_id: disc_id.clone(),
                 index_id: disc_id.as_str().into(),
                 forward_curve_id: disc_id,
@@ -828,7 +828,7 @@ mod tests {
             .id(InstrumentId::new("OIS-SCHEDULE-NO-FWD"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
-            .fixed_leg(finstack_quant_valuations_core::instruments::FixedLegSpec {
+            .fixed_leg(crate::FixedLegSpec {
                 discount_curve_id: disc_id.clone(),
                 rate: rust_decimal::Decimal::try_from(0.03).expect("valid"),
                 frequency: Tenor::quarterly(),
@@ -842,7 +842,7 @@ mod tests {
                 payment_lag_days: 0,
                 end_of_month: false,
             })
-            .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
+            .float_leg(crate::FloatLegSpec {
                 discount_curve_id: disc_id.clone(),
                 index_id: disc_id.as_str().into(),
                 forward_curve_id: disc_id,
@@ -933,7 +933,7 @@ mod tests {
             .id(InstrumentId::new("OIS-SCHEDULE-SEASONED"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
-            .fixed_leg(finstack_quant_valuations_core::instruments::FixedLegSpec {
+            .fixed_leg(crate::FixedLegSpec {
                 discount_curve_id: disc_id.clone(),
                 rate: rust_decimal::Decimal::ZERO,
                 frequency: Tenor::monthly(),
@@ -947,7 +947,7 @@ mod tests {
                 payment_lag_days: 0,
                 end_of_month: false,
             })
-            .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
+            .float_leg(crate::FloatLegSpec {
                 discount_curve_id: disc_id,
                 index_id: fwd_id.as_str().into(),
                 forward_curve_id: fwd_id,
@@ -1023,7 +1023,7 @@ mod tests {
             .id(InstrumentId::new("OIS-IDENTITY-TEST"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
-            .fixed_leg(finstack_quant_valuations_core::instruments::FixedLegSpec {
+            .fixed_leg(crate::FixedLegSpec {
                 discount_curve_id: disc_id.clone(),
                 rate: rust_decimal::Decimal::ZERO, // Zero fixed rate for this test
                 frequency: Tenor::quarterly(),
@@ -1037,7 +1037,7 @@ mod tests {
                 payment_lag_days: 0, // No payment delay for exact identity
                 end_of_month: false,
             })
-            .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
+            .float_leg(crate::FloatLegSpec {
                 discount_curve_id: disc_id.clone(),
                 index_id: disc_id.as_str().into(),
                 forward_curve_id: disc_id, // Single-curve: forward = discount

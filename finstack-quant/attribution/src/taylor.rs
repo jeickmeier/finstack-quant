@@ -29,6 +29,7 @@ use crate::factors::{MarketRestoreFlags, MarketSnapshot};
 use crate::helpers::*;
 use crate::metrics_based::shifts::measure_credit_curve_shift_bp;
 use crate::metrics_based::shifts::{CreditKeyRateBucket, extract_credit_keyrates};
+use crate::model_params::{ModelParamsSnapshot, extract_model_params};
 use crate::{AttributionFactor, AttributionMethod, MoveUnit, PnlAttribution};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::Result;
@@ -39,7 +40,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_models::volatility::measure_vol_surface_shift;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations::metrics::{STANDARD_BUCKETS_YEARS, bump_surface_vol_absolute};
 use finstack_quant_valuations::recalibration::{
     HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump, RecalibrationProvider,
@@ -500,7 +500,7 @@ fn compute_taylor_result(
     // Model-parameter snapshot: reprice T1 market with T0 params restored.
     let params_t0 = model_params_t0
         .cloned()
-        .unwrap_or_else(|| instrument.model_params_snapshot());
+        .unwrap_or_else(|| extract_model_params(instrument.as_ref()));
     if !matches!(params_t0, ModelParamsSnapshot::None) {
         let result = compute_model_params_factor(
             instrument,
@@ -1346,7 +1346,7 @@ fn compute_theta_factor(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     #[allow(dead_code, unused_imports)]
     mod test_utils {
         include!(concat!(
@@ -1866,6 +1866,54 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_valuations::instruments::VolatilityDependency;
 
+    pub(crate) fn extract_mock_model_params(
+        instrument: &dyn Instrument,
+    ) -> Option<ModelParamsSnapshot> {
+        let mock = instrument.as_any().downcast_ref::<MockInstrument>()?;
+        Some(match mock.model_cpr {
+            Some(cpr) => {
+                use finstack_quant_cashflows::builder::{
+                    DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
+                };
+                ModelParamsSnapshot::StructuredCredit {
+                    prepayment_spec: PrepaymentModelSpec::constant_cpr(cpr),
+                    default_spec: DefaultModelSpec::constant_cdr(0.0),
+                    recovery_spec: RecoveryModelSpec::with_lag(0.0, 0),
+                }
+            }
+            None => ModelParamsSnapshot::None,
+        })
+    }
+
+    pub(crate) fn apply_mock_model_params(
+        instrument: &Arc<dyn Instrument>,
+        params: &ModelParamsSnapshot,
+    ) -> Option<Result<Arc<dyn Instrument>>> {
+        let mock = instrument.as_any().downcast_ref::<MockInstrument>()?;
+        Some(match params {
+            ModelParamsSnapshot::None => Ok(Arc::clone(instrument)),
+            ModelParamsSnapshot::StructuredCredit {
+                prepayment_spec, ..
+            } => {
+                let mut clone = mock.clone();
+                clone.model_cpr = Some(match prepayment_spec {
+                    finstack_quant_cashflows::builder::PrepaymentModelSpec::Constant { cpr } => {
+                        *cpr
+                    }
+                    _ => {
+                        return Some(Err(finstack_quant_core::Error::Validation(
+                            "MockInstrument requires a constant CPR model".into(),
+                        )));
+                    }
+                });
+                Ok(Arc::new(clone))
+            }
+            ModelParamsSnapshot::Convertible { .. } => Err(finstack_quant_core::Error::Validation(
+                "MockInstrument does not accept convertible model parameters".to_string(),
+            )),
+        })
+    }
+
     /// Payoff shapes for [`MockInstrument`].
     #[derive(Clone)]
     enum MockPayoff {
@@ -2016,54 +2064,6 @@ mod tests {
 
         fn expiry(&self) -> Option<Date> {
             self.expiry
-        }
-
-        fn model_params_snapshot(
-            &self,
-        ) -> finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot {
-            match self.model_cpr {
-                Some(cpr) => {
-                    use finstack_quant_cashflows::builder::{
-                        DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
-                    };
-                    ModelParamsSnapshot::StructuredCredit {
-                        prepayment_spec: PrepaymentModelSpec::constant_cpr(cpr),
-                        default_spec: DefaultModelSpec::constant_cdr(0.0),
-                        recovery_spec: RecoveryModelSpec::with_lag(0.0, 0),
-                    }
-                }
-                None => ModelParamsSnapshot::None,
-            }
-        }
-
-        fn with_model_params(
-            &self,
-            params: &finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot,
-        ) -> Result<Box<dyn Instrument>> {
-            match params {
-                ModelParamsSnapshot::None => Ok(self.clone_box()),
-                ModelParamsSnapshot::StructuredCredit {
-                    prepayment_spec, ..
-                } => {
-                    let mut clone = self.clone();
-                    clone.model_cpr = Some(match prepayment_spec {
-                        finstack_quant_cashflows::builder::PrepaymentModelSpec::Constant {
-                            cpr,
-                        } => *cpr,
-                        _ => {
-                            return Err(finstack_quant_core::Error::Validation(
-                                "MockInstrument requires a constant CPR model".into(),
-                            ));
-                        }
-                    });
-                    Ok(Box::new(clone))
-                }
-                ModelParamsSnapshot::Convertible { .. } => {
-                    Err(finstack_quant_core::Error::Validation(
-                        "MockInstrument does not accept convertible model parameters".to_string(),
-                    ))
-                }
-            }
         }
 
         fn market_dependencies(

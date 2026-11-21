@@ -340,7 +340,11 @@ export type DAb4Cbba027968D61Ccae =
       risk_class: "non_qualifying";
     };
 /**
- * Basis used for bond duration, convexity, and DV01-style risk metrics.
+ * Risk calculation basis for callable/putable bonds.
+ *
+ * Selects whether analytical risk metrics (duration, convexity, DV01) evaluate
+ * the maturity/workout cashflow path under quoted yields or reprice the embedded
+ * option via the callable OAS/tree model.
  */
 export type DFd618Cd5743Ec18A168F = "bullet_discountable" | "callable_oas";
 /**
@@ -560,7 +564,7 @@ export type DayCount1 =
  */
 export type Date2 = string;
 /**
- * Base currency for pricing
+ * Base currency for pricing.
  */
 export type Currency1 =
   | "AED"
@@ -762,7 +766,8 @@ export interface DA04857579E2F6Abbb6Fa {
  *     currency::Currency, dates::DayCount, money::Money, types::InstrumentId,
  * };
  * use finstack_quant_cashflows::builder::ScheduleParams;
- * use finstack_quant_valuations_core::instruments::{EquityUnderlyingParams, FinancingLegSpec, PayReceive};
+ * use finstack_quant_valuations_core::instruments::{FinancingLegSpec, PayReceive};
+ * use finstack_quant_valuations_equity::EquityUnderlyingParams;
  * use finstack_quant_core::types::Attributes;
  * use finstack_quant_valuations_equity::equity_trs::{EquityTotalReturnSwap, TrsDividendSettlement};
  * use finstack_quant_valuations_core::instruments::TrsScheduleSpec;
@@ -1028,36 +1033,16 @@ export interface D_572Ad1Befb7D94914652 {
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
-   *
-   * Read only by the rates-only bond tree when `tree_model = black_derman_toy` selects
-   * BDT for a bond with embedded exercise rights, where it is required.
-   * It is a relative (lognormal) volatility, unlike the absolute
-   * [`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has
-   * no mean reversion. Must be finite and non-negative; `0.0` prices on the
-   * deterministic curve.
    */
   bdt_sigma?: number | null;
   /**
    * Black-Karasinski mean-reversion speed (κ) of the log short rate, in
    * annualised units (`0.03` = 3% per year).
-   *
-   * Companion to [`Self::bk_sigma`]: read only by the rates-only bond tree
-   * when `tree_model = black_karasinski`, where it is required. Must be
-   * finite and strictly positive; typical values are 0.01–0.10. A lognormal
-   * short rate without mean reversion is `tree_model = black_derman_toy`
-   * with [`Self::bdt_sigma`].
    */
   bk_mean_reversion?: number | null;
   /**
    * Black-Karasinski lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
-   *
-   * Read only by the rates-only bond tree when `tree_model = black_karasinski`,
-   * where it is required together with [`Self::bk_mean_reversion`]. It is
-   * a relative (lognormal) volatility on the same scale as
-   * [`Self::bdt_sigma`], unlike the absolute [`Self::hw1f_sigma`]; typical
-   * values are 0.10–0.40. Must be finite and non-negative; `0.0` prices on
-   * the deterministic curve.
    */
   bk_sigma?: number | null;
   /**
@@ -1221,7 +1206,7 @@ export interface D_572Ad1Befb7D94914652 {
    * model and grid; the path count, antithetic flag and seed label come from
    * `mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config.
    */
-  merton_mc_config?: DBffef9E684Ff0C351C83 | null;
+  merton_mc_config?: D_10A2B628165F3F3E10E7 | null;
   /**
    * Quote compounding convention for OAS inputs and outputs.
    *
@@ -1273,13 +1258,13 @@ export interface D_572Ad1Befb7D94914652 {
    */
   tree_model?: D_948Cdc4Db846A21357A4 | null;
   /**
-   * Number of time steps for tree-based pricing (e.g., 100)
+   * Number of time steps for tree-based pricing (e.g., 100).
    */
   tree_steps?: number | null;
   /**
    * Volatility surface extrapolation policy when `implied_volatility` is not set.
    */
-  vol_surface_extrapolation?: "error" | "clamp" | "linear_in_variance";
+  vol_surface_extrapolation?: "error" | "clamp";
 }
 /**
  * A finite, right-continuous piecewise-constant curve.
@@ -1295,14 +1280,9 @@ export interface DCdb8Fddc0106047270C4 {
   values: [number, ...number[]];
 }
 /**
- * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
- *
- * This is a wrapper around
- * [`crate::instruments::MertonMcConfig`]
- * that allows the pricer registry to access the MC configuration from
- * [`InstrumentPricingOverrides`].
+ * Configuration for Monte Carlo PIK bond pricing.
  */
-export interface DBffef9E684Ff0C351C83 {
+export interface D_10A2B628165F3F3E10E7 {
   /**
    * Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.
    *
@@ -3094,7 +3074,7 @@ export interface DD962Ef8Db4Edf11Dc092 {
  */
 export interface D_1D0C1815F8Dd0715Bd12 {
   /**
-   * Enable adaptive bump sizes based on volatility and moneyness
+   * Enable adaptive bump sizes based on volatility and moneyness.
    *
    * When true, bump sizes are scaled based on:
    * - Volatility level (higher vol → larger bumps)
@@ -3492,12 +3472,12 @@ export interface Tenor {
 export interface D_3907A55Cf33393B0F707 {
   currency: Currency1;
   /**
-   * Optional dividend yield identifier
+   * Optional dividend yield identifier.
    */
   div_yield_id?: Id5 | null;
   spot_id: Id6;
   /**
-   * Underlying ticker/identifier
+   * Underlying ticker/identifier.
    */
   ticker: string;
 }

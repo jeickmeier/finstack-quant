@@ -437,28 +437,24 @@ fn test_doc_clause_default_when_omitted() {
         .notional(Money::from((10_000_000_i64, Currency::USD)))
         .side(PayReceive::Pay)
         .convention(finstack_quant_valuations_core::market::conventions::CdsConvention::IsdaNa)
-        .premium_leg(
-            finstack_quant_valuations_core::instruments::PremiumLegSpec {
-                date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
-                start: as_of,
-                end: as_of.add_months(60).expect("valid fixture date"),
-                frequency: finstack_quant_core::dates::Tenor::quarterly(),
-                stub: finstack_quant_core::dates::StubKind::ShortFront,
-                business_day_convention:
-                    finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
-                calendar_id: Some("nyse".into()),
-                day_count: finstack_quant_core::dates::DayCount::Act360,
-                coupon_bp: Decimal::try_from(100.0).expect("valid"),
-                discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
-            },
-        )
-        .protection_leg(
-            finstack_quant_valuations_core::instruments::ProtectionLegSpec {
-                credit_curve_id: finstack_quant_core::types::CurveId::new("TEST-CREDIT"),
-                recovery_rate: 0.40,
-                settlement_delay: 3,
-            },
-        )
+        .premium_leg(crate::PremiumLegSpec {
+            date_regime: crate::CdsDateRegime::Standard,
+            start: as_of,
+            end: as_of.add_months(60).expect("valid fixture date"),
+            frequency: finstack_quant_core::dates::Tenor::quarterly(),
+            stub: finstack_quant_core::dates::StubKind::ShortFront,
+            business_day_convention:
+                finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
+            calendar_id: Some("nyse".into()),
+            day_count: finstack_quant_core::dates::DayCount::Act360,
+            coupon_bp: Decimal::try_from(100.0).expect("valid"),
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+        })
+        .protection_leg(crate::ProtectionLegSpec {
+            credit_curve_id: finstack_quant_core::types::CurveId::new("TEST-CREDIT"),
+            recovery_rate: 0.40,
+            settlement_delay: 3,
+        })
         .build()
         .expect("builder should succeed without doc_clause");
     assert_eq!(cds_built.doc_clause, None);
@@ -927,8 +923,7 @@ fn production_cds_option_audit_premium_frequency_and_stub_are_effective() {
     let start = date!(2025 - 01 - 01);
     let end = date!(2026 - 04 - 01);
     let mut cds = create_test_cds("BESPOKE-SCHEDULE", start, end, 100.0, 0.4);
-    cds.premium_leg.date_regime =
-        finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke;
+    cds.premium_leg.date_regime = crate::CdsDateRegime::Bespoke;
     cds.premium_leg.calendar_id = None;
     cds.premium_leg.frequency = Tenor::semi_annual();
     cds.premium_leg.stub = StubKind::ShortFront;

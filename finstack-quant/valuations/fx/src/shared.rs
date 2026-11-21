@@ -8,6 +8,9 @@ use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::types::{CurveId, PriceId};
 use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
+/// Far-future expiry shared by long-dated FX `example()` constructors (`2030-06-21`).
+pub(crate) const FAR_EXPIRY: Date = time::macros::date!(2030 - 06 - 21);
+
 /// Return whether an FX contractual event is complete under the end-of-day policy.
 ///
 /// FX fixing, expiry, delivery, and settlement cashflows remain live on their

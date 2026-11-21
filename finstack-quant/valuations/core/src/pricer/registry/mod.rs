@@ -280,7 +280,6 @@ impl PricerRegistry {
         &'registry self,
         instrument: &'instrument dyn Instrument,
         model: ModelKey,
-        instrument_validated: bool,
     ) -> std::result::Result<
         (
             crate::instruments::common_impl::helpers::ValidatedPricingLifecycle<
@@ -292,14 +291,9 @@ impl PricerRegistry {
         PricingError,
     > {
         let context = PricingErrorContext::from_instrument(instrument).model(model);
-        let lifecycle = if instrument_validated {
-            crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::from_validated(
-                instrument,
-            )
-        } else {
+        let lifecycle =
             crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(instrument)
-                .map_err(|error| PricingError::from_core(error, context))?
-        };
+                .map_err(|error| PricingError::from_core(error, context))?;
 
         let key = PricerKey::new(instrument.key(), model);
         let pricer = self
@@ -419,7 +413,6 @@ impl PricerRegistry {
             metric_registry,
             recalibration_provider,
             explain,
-            instrument_validated,
             ..
         } = options;
         let requested_as_of = as_of;
@@ -433,7 +426,7 @@ impl PricerRegistry {
             num_metrics = metrics.len(),
             "dispatching registered pricer"
         );
-        let (lifecycle, pricer) = self.validated_pricer(instrument, model, instrument_validated)?;
+        let (lifecycle, pricer) = self.validated_pricer(instrument, model)?;
         let effective_as_of = lifecycle.effective_as_of(market, as_of);
         let err_ctx = PricingErrorContext::from_instrument(instrument).model(model);
         let mut base_result = pricer
@@ -510,7 +503,7 @@ impl PricerRegistry {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<f64, PricingError> {
-        let (lifecycle, pricer) = self.validated_pricer(instrument, model, false)?;
+        let (lifecycle, pricer) = self.validated_pricer(instrument, model)?;
         let effective_as_of = lifecycle.effective_as_of(market, as_of);
         let err_ctx = PricingErrorContext::from_instrument(instrument).model(model);
         let base_value = pricer

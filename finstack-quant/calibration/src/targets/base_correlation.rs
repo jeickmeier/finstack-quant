@@ -15,8 +15,8 @@ use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DateExt, Tenor, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
-use finstack_quant_valuations_core::instruments::CdsDateRegime;
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_credit::CdsDateRegime;
 use finstack_quant_valuations_credit::cds_tranche::{CdsTranchePricer, PreparedTranche};
 use std::sync::Arc;
 

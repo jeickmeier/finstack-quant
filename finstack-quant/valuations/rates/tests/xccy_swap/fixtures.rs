@@ -7,8 +7,8 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::fx::FxMatrix;
 use finstack_quant_core::money::fx::SimpleFxProvider;
-use finstack_quant_valuations_core::instruments::FloatLegSpec;
 pub use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_rates::FloatLegSpec;
 use rust_decimal::Decimal;
 use std::sync::Arc;
 use time::Month;

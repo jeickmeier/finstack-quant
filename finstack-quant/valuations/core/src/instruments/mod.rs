@@ -88,9 +88,6 @@ pub mod envelope;
 /// the Python and WASM bindings.
 pub mod cashflow_export;
 
-/// Model parameter snapshots used by attribution.
-pub mod model_params;
-
 /// Canonical long/short position direction.
 pub(crate) mod position;
 pub use position::Position;
@@ -106,33 +103,15 @@ pub use common_impl::traits::{
 };
 pub use pricing::trs::{TotalReturnLegParams, TrsEngine, TrsReturnModel};
 
-pub use common_impl::parameters::bermudan_call::BermudanCallProvision;
-pub use common_impl::parameters::conventions::BondConvention;
-pub use common_impl::parameters::conventions::NdfQuoteConvention;
 pub use common_impl::parameters::conventions::NotionalExchange;
 pub use common_impl::parameters::conventions::ResettingSide;
-pub use common_impl::parameters::market::CreditParams;
 pub use common_impl::parameters::market::SettlementType;
 pub use common_impl::parameters::monitoring::Monitoring;
 pub use common_impl::parameters::quanto::QuantoSpec;
-pub use common_impl::parameters::underlying::CommodityUnderlyingParams;
-pub use common_impl::parameters::underlying::EquityUnderlyingParams;
-pub use common_impl::parameters::underlying::FxUnderlyingParams;
-pub use common_impl::parameters::underlying::IndexUnderlyingParams;
-pub use common_impl::parameters::volatility::VolatilityModel;
 pub use legs::FinancingLegSpec;
-pub use legs::FixedLegSpec;
-pub use legs::FloatLegSpec;
 pub use legs::PayReceive;
-pub use legs::ProtectionLegSpec;
-pub use legs::TotalReturnLegSpec;
-pub use legs::{CdsDateRegime, PremiumLegSpec};
 
 pub use common_impl::parameters::bond_quote::BondQuoteInput;
-pub use common_impl::parameters::convertible::{
-    AntiDilutionPolicy, ConversionEvent, ConversionPolicy, ConversionSpec, DilutionEvent,
-    DividendAdjustment, PriceTrigger,
-};
 pub use common_impl::parameters::merton_mc::{
     BarrierCrossing, CalibrationParameter, MertonMcCalibrationSpec, MertonMcConfig, PikMode,
     PikSchedule,

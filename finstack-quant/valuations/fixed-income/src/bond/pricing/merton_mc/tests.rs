@@ -957,12 +957,11 @@ fn merton_mc_config_roundtrips_via_pricing_overrides_json() {
     ov = ov.with_merton_mc_config(cfg);
     let json = serde_json::to_string(&ov).expect("ser");
     let back: InstrumentPricingOverrides = serde_json::from_str(&json).expect("de");
-    let restored = &back
+    let restored = back
         .model_config
         .merton_mc_config
         .as_ref()
-        .expect("merton_mc_config should be populated")
-        .0;
+        .expect("merton_mc_config should be populated");
     assert_eq!(restored.steps_per_year, 24);
     assert_eq!(restored.recovery_rate, 0.40);
 
@@ -990,12 +989,11 @@ fn merton_mc_config_roundtrips_via_pricing_overrides_json() {
     let from_notebook: InstrumentPricingOverrides =
         serde_json::from_value(notebook_shape).expect("notebook merton_mc_config shape");
     assert_eq!(from_notebook.model_config.mc_paths, Some(2000));
-    let restored = &from_notebook
+    let restored = from_notebook
         .model_config
         .merton_mc_config
         .as_ref()
-        .expect("merton_mc_config should be populated")
-        .0;
+        .expect("merton_mc_config should be populated");
     assert_eq!(restored.steps_per_year, 50);
     assert_eq!(restored.recovery_rate, 0.40);
     assert!(matches!(

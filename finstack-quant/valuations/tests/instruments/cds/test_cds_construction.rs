@@ -139,7 +139,7 @@ fn test_builder_pattern() {
         .side(PayReceive::Pay)
         .convention(convention)
         .premium_leg(PremiumLegSpec {
-            date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+            date_regime: finstack_quant_valuations::instruments::CdsDateRegime::Standard,
             start,
             end,
             frequency: convention.get_spec().expect("CDS registry").frequency,

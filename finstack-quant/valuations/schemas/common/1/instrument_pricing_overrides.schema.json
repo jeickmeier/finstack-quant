@@ -848,10 +848,6 @@
       ],
       "type": "object"
     },
-    "MertonMcOverride": {
-      "$ref": "#/$defs/MertonMcConfig",
-      "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`]."
-    },
     "MertonModel": {
       "additionalProperties": false,
       "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n`RawMertonModel`, so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. Unknown fields are rejected.",
@@ -928,7 +924,7 @@
           "description": "Contractual floating index used for asset-swap accruals and historical resets."
         },
         "bdt_sigma": {
-          "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
+          "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).",
           "format": "double",
           "type": [
             "number",
@@ -936,7 +932,7 @@
           ]
         },
         "bk_mean_reversion": {
-          "description": "Black-Karasinski mean-reversion speed (κ) of the log short rate, in\nannualised units (`0.03` = 3% per year).\n\nCompanion to [`Self::bk_sigma`]: read only by the rates-only bond tree\nwhen `tree_model = black_karasinski`, where it is required. Must be\nfinite and strictly positive; typical values are 0.01–0.10. A lognormal\nshort rate without mean reversion is `tree_model = black_derman_toy`\nwith [`Self::bdt_sigma`].",
+          "description": "Black-Karasinski mean-reversion speed (κ) of the log short rate, in\nannualised units (`0.03` = 3% per year).",
           "format": "double",
           "type": [
             "number",
@@ -944,7 +940,7 @@
           ]
         },
         "bk_sigma": {
-          "description": "Black-Karasinski lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_karasinski`,\nwhere it is required together with [`Self::bk_mean_reversion`]. It is\na relative (lognormal) volatility on the same scale as\n[`Self::bdt_sigma`], unlike the absolute [`Self::hw1f_sigma`]; typical\nvalues are 0.10–0.40. Must be finite and non-negative; `0.0` prices on\nthe deterministic curve.",
+          "description": "Black-Karasinski lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).",
           "format": "double",
           "type": [
             "number",
@@ -1056,7 +1052,7 @@
         "merton_mc_config": {
           "anyOf": [
             {
-              "$ref": "#/$defs/MertonMcOverride"
+              "$ref": "#/$defs/MertonMcConfig"
             },
             {
               "type": "null"
@@ -1112,7 +1108,7 @@
         },
         "tree_steps": {
           "default": null,
-          "description": "Number of time steps for tree-based pricing (e.g., 100)",
+          "description": "Number of time steps for tree-based pricing (e.g., 100).",
           "format": "uint",
           "minimum": 0,
           "type": [
@@ -1429,7 +1425,7 @@
       ]
     },
     "VolSurfaceExtrapolation": {
-      "description": "Policy for evaluating volatility surfaces outside their calibrated grid.\n\nMarket-standard production systems typically make this choice explicit because\nextrapolation can materially affect PV and greeks.\n\n# Market Standards\n\n- **Error**: Conservative approach for production systems; forces explicit handling.\n- **Clamp**: Simple flat extrapolation; common for quick prototyping.\n- **LinearInVariance**: Market-standard for equity/FX; preserves no-arbitrage conditions\n  better than linear-in-vol by extrapolating in total variance space (σ²T).",
+      "description": "Policy for evaluating volatility surfaces outside their calibrated grid.\n\nMarket-standard production systems typically make this choice explicit because\nextrapolation can materially affect PV and greeks.\n\n# Market Standards\n\n- **Error**: Conservative approach for production systems; forces explicit handling.\n- **Clamp**: Simple flat extrapolation; common for quick prototyping.",
       "oneOf": [
         {
           "const": "error",
@@ -1439,11 +1435,6 @@
         {
           "const": "clamp",
           "description": "Flat extrapolation to the nearest edge (clamp to grid).",
-          "type": "string"
-        },
-        {
-          "const": "linear_in_variance",
-          "description": "Linear extrapolation in total variance space (σ²T).\n\nThis is the market-standard approach for equity and FX volatility surfaces\nbecause it preserves the no-arbitrage condition that total variance must\nincrease with time. The extrapolated volatility is computed as:\n\n```text\nσ(T_extrap) = sqrt(σ²(T_edge) * T_edge / T_extrap + slope * (T_extrap - T_edge) / T_extrap)\n```\n\nwhere `slope` is derived from the variance gradient at the edge.\n\n# When to Use\n\n- Long-dated option pricing where expiries exceed the calibrated grid\n- Scenario analysis requiring extrapolation to extreme tenors\n- Bootstrapping procedures that need consistent variance behavior\n\n# References\n\n- Gatheral, J. (2006). *The Volatility Surface*. Chapter 3. `docs/REFERENCES.md#gatheral-volatility-surface`\n- Fengler, M. R. (2009). \"Arbitrage-free smoothing of the implied volatility surface.\"",
           "type": "string"
         }
       ]

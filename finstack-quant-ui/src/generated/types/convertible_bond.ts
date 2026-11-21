@@ -470,7 +470,11 @@ export type Date9 = string;
  */
 export type Date10 = string;
 /**
- * Basis used for bond duration, convexity, and DV01-style risk metrics.
+ * Risk calculation basis for callable/putable bonds.
+ *
+ * Selects whether analytical risk metrics (duration, convexity, DV01) evaluate
+ * the maturity/workout cashflow path under quoted yields or reprice the embedded
+ * option via the callable OAS/tree model.
  */
 export type DFd618Cd5743Ec18A168F = "bullet_discountable" | "callable_oas";
 /**
@@ -1742,9 +1746,7 @@ export interface D_8D9E4Ad211395Ba91969 {
    */
   anti_dilution: "none" | "full_ratchet" | "weighted_average";
   /**
-   * Historical dilution events that affect the conversion ratio, recorded
-   * in chronological (non-decreasing date) order and applied in that
-   * order. Validation rejects out-of-order events.
+   * Historical dilution events recorded in chronological order.
    */
   dilution_events?: D_333679A3A80Ab492C1C2[];
   /**
@@ -1794,9 +1796,6 @@ export interface D_8D9E4Ad211395Ba91969 {
 }
 /**
  * A dilutive event that triggers anti-dilution adjustment.
- *
- * Records details of an equity issuance or corporate action that may
- * affect the conversion ratio under the bond's anti-dilution provisions.
  */
 export interface D_333679A3A80Ab492C1C2 {
   date: Date5;
@@ -1817,23 +1816,6 @@ export interface D_333679A3A80Ab492C1C2 {
  * Share-price trigger of a convertible bond: the last sale price must be at
  * least `threshold_pct` of the conversion price on `required_days_above` of
  * `observation_days` consecutive trading days.
- *
- * Used for the issuer's soft call (`ConvertibleBond::soft_call_trigger`) and
- * the holder's contingent conversion
- * (`ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(..))`).
- *
- * # Industry Practice
- *
- * The standard trigger is 130% of the conversion price on 20 of 30
- * consecutive trading days; some issues use 120% or 150%.
- *
- * # Modeling scope
- *
- * The tree evaluates the trigger on the instantaneous node spot. The soft
- * call applies a Broadie-Glasserman-Kou-style barrier shift scaled by
- * `required_days_above / observation_days`; contingent conversion compares
- * the node spot with the nominal level and does not model the observation
- * window.
  */
 export interface D_51885E17C080D760Db74 {
   /**
@@ -1949,36 +1931,16 @@ export interface D_572Ad1Befb7D94914652 {
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
-   *
-   * Read only by the rates-only bond tree when `tree_model = black_derman_toy` selects
-   * BDT for a bond with embedded exercise rights, where it is required.
-   * It is a relative (lognormal) volatility, unlike the absolute
-   * [`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has
-   * no mean reversion. Must be finite and non-negative; `0.0` prices on the
-   * deterministic curve.
    */
   bdt_sigma?: number | null;
   /**
    * Black-Karasinski mean-reversion speed (κ) of the log short rate, in
    * annualised units (`0.03` = 3% per year).
-   *
-   * Companion to [`Self::bk_sigma`]: read only by the rates-only bond tree
-   * when `tree_model = black_karasinski`, where it is required. Must be
-   * finite and strictly positive; typical values are 0.01–0.10. A lognormal
-   * short rate without mean reversion is `tree_model = black_derman_toy`
-   * with [`Self::bdt_sigma`].
    */
   bk_mean_reversion?: number | null;
   /**
    * Black-Karasinski lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
-   *
-   * Read only by the rates-only bond tree when `tree_model = black_karasinski`,
-   * where it is required together with [`Self::bk_mean_reversion`]. It is
-   * a relative (lognormal) volatility on the same scale as
-   * [`Self::bdt_sigma`], unlike the absolute [`Self::hw1f_sigma`]; typical
-   * values are 0.10–0.40. Must be finite and non-negative; `0.0` prices on
-   * the deterministic curve.
    */
   bk_sigma?: number | null;
   /**
@@ -2142,7 +2104,7 @@ export interface D_572Ad1Befb7D94914652 {
    * model and grid; the path count, antithetic flag and seed label come from
    * `mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config.
    */
-  merton_mc_config?: DBffef9E684Ff0C351C83 | null;
+  merton_mc_config?: D_10A2B628165F3F3E10E7 | null;
   /**
    * Quote compounding convention for OAS inputs and outputs.
    *
@@ -2194,13 +2156,13 @@ export interface D_572Ad1Befb7D94914652 {
    */
   tree_model?: D_948Cdc4Db846A21357A4 | null;
   /**
-   * Number of time steps for tree-based pricing (e.g., 100)
+   * Number of time steps for tree-based pricing (e.g., 100).
    */
   tree_steps?: number | null;
   /**
    * Volatility surface extrapolation policy when `implied_volatility` is not set.
    */
-  vol_surface_extrapolation?: "error" | "clamp" | "linear_in_variance";
+  vol_surface_extrapolation?: "error" | "clamp";
 }
 /**
  * A finite, right-continuous piecewise-constant curve.
@@ -2216,14 +2178,9 @@ export interface DCdb8Fddc0106047270C4 {
   values: [number, ...number[]];
 }
 /**
- * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
- *
- * This is a wrapper around
- * [`crate::instruments::MertonMcConfig`]
- * that allows the pricer registry to access the MC configuration from
- * [`InstrumentPricingOverrides`].
+ * Configuration for Monte Carlo PIK bond pricing.
  */
-export interface DBffef9E684Ff0C351C83 {
+export interface D_10A2B628165F3F3E10E7 {
   /**
    * Barrier-crossing policy used for `MertonBarrierType::FirstPassage`.
    *
@@ -2671,7 +2628,7 @@ export interface DD962Ef8Db4Edf11Dc092 {
  */
 export interface D_1D0C1815F8Dd0715Bd12 {
   /**
-   * Enable adaptive bump sizes based on volatility and moneyness
+   * Enable adaptive bump sizes based on volatility and moneyness.
    *
    * When true, bump sizes are scaled based on:
    * - Volatility level (higher vol → larger bumps)

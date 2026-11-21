@@ -20,10 +20,10 @@
 //! bump-and-revalue greeks where those terms matter.
 
 use crate::swaption::Swaption;
+use crate::vol_resolution::ResolvedVolatility;
 use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::{bachelier_gamma, black_gamma};
 use finstack_quant_models::volatility::VolatilityConvention;
-use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::ResolvedVolatility;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Gamma calculator for swaptions

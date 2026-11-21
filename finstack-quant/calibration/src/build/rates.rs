@@ -13,7 +13,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::instruments::{
-    FixedLegSpec, FloatLegSpec, Instrument, ListedFutureTerms, PayReceive, Position,
+    Instrument, ListedFutureTerms, PayReceive, Position,
 };
 use finstack_quant_valuations_core::market::conventions::{
     ConventionRegistry, IrFutureReferencePeriod, RateIndexConventions, RateIndexKind,
@@ -22,6 +22,7 @@ use finstack_quant_valuations_rates::deposit::Deposit;
 use finstack_quant_valuations_rates::fra::ForwardRateAgreement;
 use finstack_quant_valuations_rates::ir_future::{FutureContractSpecs, InterestRateFuture};
 use finstack_quant_valuations_rates::irs::{InterestRateSwap, IrsLegConventions};
+use finstack_quant_valuations_rates::{FixedLegSpec, FloatLegSpec};
 use rust_decimal::Decimal;
 
 /// Build an interest rate instrument from a [`RateQuote`].

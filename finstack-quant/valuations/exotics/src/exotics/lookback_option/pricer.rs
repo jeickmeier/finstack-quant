@@ -104,7 +104,7 @@ impl LookbackOptionMcPricer {
         // per-step spots on a non-flat rate curve. On a flat curve this is
         // bit-equivalent to the constant `(r - q)` drift.
         let process = process.with_drift_schedule(std::sync::Arc::new(
-            finstack_quant_valuations_core::instruments::common_impl::helpers::build_gbm_drift_schedule(
+            crate::exotics::bs_gbm::build_gbm_drift_schedule(
                 disc_curve.as_ref(),
                 as_of,
                 r,

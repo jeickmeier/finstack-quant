@@ -7,10 +7,10 @@
 //! failure or non-converged residual) an error is returned rather than a
 //! fabricated bound value, so risk systems never receive a fake vol.
 
+use crate::VolatilityModel;
 use crate::swaption::Swaption;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::instruments::VolatilityModel;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Implied volatility in the configured normal or displaced Black quote units.
@@ -63,7 +63,9 @@ impl MetricCalculator for ImpliedVolCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::VolatilityModel;
     use crate::swaption::CashSettlementMethod;
+    use crate::{FixedLegSpec, FloatLegSpec};
     use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -75,8 +77,7 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_models::types::OptionType;
-    use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec};
-    use finstack_quant_valuations_core::instruments::{SettlementType, VolatilityModel};
+    use finstack_quant_valuations_core::instruments::SettlementType;
     use std::sync::Arc;
     use time::macros::date;
 

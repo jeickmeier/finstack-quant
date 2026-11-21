@@ -134,6 +134,7 @@ pub(crate) mod factors;
 pub(crate) mod helpers;
 pub mod long_rows;
 pub(crate) mod metrics_based;
+pub(crate) mod model_params;
 pub(crate) mod parallel;
 mod result;
 pub(crate) mod return_contribution;
@@ -161,6 +162,7 @@ pub use result::{
 #[doc(hidden)]
 pub use factors::{MarketRestoreFlags, MarketSnapshot};
 pub use metrics_based::attribute_pnl_metrics_based;
+pub use model_params::ModelParamsSnapshot;
 pub use return_contribution::{
     BenchmarkRelativeContribution, FactorContribution, GroupContribution, InstrumentContribution,
     ReturnContributionFactor, ReturnContributionPosition, ReturnContributionResult,
@@ -182,7 +184,6 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_factor::credit::hierarchy::CreditFactorModel;
-use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use std::sync::Arc;

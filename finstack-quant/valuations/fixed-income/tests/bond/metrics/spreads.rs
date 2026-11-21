@@ -263,9 +263,12 @@ fn test_asw_market_uses_configured_forward_curve() {
         "USD-OIS",
     )
     .unwrap();
-    bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
-        .with_quoted_clean_price_pct(98.0)
-        .with_asw_forward("USD-SOFR-6M", "USD-SOFR-OIS");
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.0);
+    bond.instrument_pricing_overrides
+        .model_config
+        .asw_forward_curve_id = Some("USD-SOFR-6M".into());
+    bond.instrument_pricing_overrides.model_config.asw_index_id = Some("USD-SOFR-OIS".into());
 
     let discount_curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
@@ -453,8 +456,10 @@ fn test_oas_metric_uses_tree_discount_curve_override() {
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price_pct(99.0)
         .with_hw1f_sigma(0.01)
-        .with_hw1f_mean_reversion(0.03)
-        .with_tree_discount_curve_id("USD-TREE");
+        .with_hw1f_mean_reversion(0.03);
+    bond.instrument_pricing_overrides
+        .model_config
+        .tree_discount_curve_id = Some("USD-TREE".into());
 
     let pricing_curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)

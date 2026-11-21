@@ -11,9 +11,9 @@ use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor, adjust,
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::instruments::CdsDateRegime;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
+use finstack_quant_valuations_credit::CdsDateRegime;
 use finstack_quant_valuations_credit::cds_tranche::{CdsTranche, CdsTrancheParams};
 
 /// Overrides for CDS tranche schedule conventions.

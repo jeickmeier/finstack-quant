@@ -229,7 +229,7 @@ impl FxTouchOption {
             .barrier_direction(BarrierDirection::Down)
             .payout_amount(Money::from((1_000_000_i64, Currency::USD)))
             .payout_timing(PayoutTiming::AtExpiry)
-            .expiry(finstack_quant_valuations_core::instruments::common_impl::example_constants::FAR_EXPIRY)
+            .expiry(crate::shared::FAR_EXPIRY)
             .monitoring_start_date_opt(Some(date!(2024 - 01 - 01)))
             .day_count(DayCount::Act365F)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))

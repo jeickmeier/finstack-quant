@@ -30,13 +30,9 @@ pub(crate) fn resolve_caplet_volatility(
     curves: &MarketContext,
     expiry: f64,
     strike: f64,
-) -> finstack_quant_core::Result<
-    finstack_quant_valuations_core::instruments::common_impl::vol_resolution::ResolvedVolatility,
-> {
+) -> finstack_quant_core::Result<crate::vol_resolution::ResolvedVolatility> {
+    use crate::{vol_resolution::VolatilityRequest, vol_resolution::resolve_volatility};
     use finstack_quant_models::volatility::VolatilityConvention;
-    use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
-        VolatilityRequest, resolve_volatility,
-    };
     let convention = match cap_floor.vol_type {
         CapFloorVolType::Auto => None,
         CapFloorVolType::Normal => Some(VolatilityConvention::Normal),
@@ -63,7 +59,7 @@ pub(crate) fn resolve_caplet_volatility(
 /// Price in the resolved quote convention without conversion or rate fallback.
 pub(crate) fn price_caplet_quote(
     inputs: CapletFloorletInputs,
-    quote: finstack_quant_valuations_core::instruments::common_impl::vol_resolution::ResolvedVolatility,
+    quote: crate::vol_resolution::ResolvedVolatility,
 ) -> finstack_quant_core::Result<Money> {
     let ccy = inputs.currency;
     let pv = price_caplet_quote_raw(inputs, quote)?;
@@ -72,7 +68,7 @@ pub(crate) fn price_caplet_quote(
 
 pub(crate) fn price_caplet_quote_raw(
     inputs: CapletFloorletInputs,
-    quote: finstack_quant_valuations_core::instruments::common_impl::vol_resolution::ResolvedVolatility,
+    quote: crate::vol_resolution::ResolvedVolatility,
 ) -> finstack_quant_core::Result<f64> {
     use crate::cap_floor::pricing::{black, normal};
     use finstack_quant_models::volatility::VolatilityConvention;
@@ -104,8 +100,8 @@ pub(crate) fn price_cap_floor_raw(
     curves: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
+    use crate::vol_resolution::ResolvedVolatility;
     use finstack_quant_models::volatility::VolatilityConvention;
-    use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::ResolvedVolatility;
 
     cap_floor.validate_for_pricing()?;
 

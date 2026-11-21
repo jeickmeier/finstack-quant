@@ -927,7 +927,7 @@ export default [
     "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/adaptive_bumps",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/adaptive_bumps",
     "default": false,
-    "description": "Enable adaptive bump sizes based on volatility and moneyness\n\nWhen true, bump sizes are scaled based on:\n- Volatility level (higher vol → larger bumps)\n- Time to expiry (longer dated → larger bumps)\n- Moneyness (deep ITM/OTM → smaller bumps)\n\nDefault: false (use fixed bump sizes)"
+    "description": "Enable adaptive bump sizes based on volatility and moneyness.\n\nWhen true, bump sizes are scaled based on:\n- Volatility level (higher vol → larger bumps)\n- Time to expiry (longer dated → larger bumps)\n- Moneyness (deep ITM/OTM → smaller bumps)\n\nDefault: false (use fixed bump sizes)"
   },
   {
     "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/credit_spread_bump_bp",
@@ -1580,7 +1580,7 @@ export default [
   {
     "path": "#/$defs/d_4ac4dad3ab3a5d25d3f9",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolSurfaceExtrapolation",
-    "description": "Policy for evaluating volatility surfaces outside their calibrated grid.\n\nMarket-standard production systems typically make this choice explicit because\nextrapolation can materially affect PV and greeks.\n\n# Market Standards\n\n- **Error**: Conservative approach for production systems; forces explicit handling.\n- **Clamp**: Simple flat extrapolation; common for quick prototyping.\n- **LinearInVariance**: Market-standard for equity/FX; preserves no-arbitrage conditions\n  better than linear-in-vol by extrapolating in total variance space (σ²T)."
+    "description": "Policy for evaluating volatility surfaces outside their calibrated grid.\n\nMarket-standard production systems typically make this choice explicit because\nextrapolation can materially affect PV and greeks.\n\n# Market Standards\n\n- **Error**: Conservative approach for production systems; forces explicit handling.\n- **Clamp**: Simple flat extrapolation; common for quick prototyping."
   },
   {
     "path": "#/$defs/d_4ac4dad3ab3a5d25d3f9/oneOf/0",
@@ -1593,12 +1593,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolSurfaceExtrapolation/oneOf/1",
     "const": "clamp",
     "description": "Flat extrapolation to the nearest edge (clamp to grid)."
-  },
-  {
-    "path": "#/$defs/d_4ac4dad3ab3a5d25d3f9/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/VolSurfaceExtrapolation/oneOf/2",
-    "const": "linear_in_variance",
-    "description": "Linear extrapolation in total variance space (σ²T).\n\nThis is the market-standard approach for equity and FX volatility surfaces\nbecause it preserves the no-arbitrage condition that total variance must\nincrease with time. The extrapolated volatility is computed as:\n\n```text\nσ(T_extrap) = sqrt(σ²(T_edge) * T_edge / T_extrap + slope * (T_extrap - T_edge) / T_extrap)\n```\n\nwhere `slope` is derived from the variance gradient at the edge.\n\n# When to Use\n\n- Long-dated option pricing where expiries exceed the calibrated grid\n- Scenario analysis requiring extrapolation to extreme tenors\n- Bootstrapping procedures that need consistent variance behavior\n\n# References\n\n- Gatheral, J. (2006). *The Volatility Surface*. Chapter 3. `docs/REFERENCES.md#gatheral-volatility-surface`\n- Fengler, M. R. (2009). \"Arbitrage-free smoothing of the implied volatility surface.\""
   },
   {
     "path": "#/$defs/d_4ba43030fede59fe5993",
@@ -1656,26 +1650,26 @@ export default [
   {
     "path": "#/$defs/d_5193595b8b998a0dc94c",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/BondFutureSpecs",
-    "description": "Contract specifications for bond futures.\n\nDefines the notional bond parameters used for conversion factor\ncalculations and the implied-repo day count. Contract size lives on the\nfuture's `terms`: `terms.multiplier` is the currency value of one full\nprice point, i.e. one hundredth of the per-contract face (1,000 for a\n$100,000 UST 10Y contract).\n\nDelivery timing is carried by the future's explicit `delivery_start` /\n`terms.settlement_date`, so the spec holds no settlement lag or holiday\ncalendar.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::contract_specs::BondFutureSpecs;\n\n// UST 10-year contract specs\nlet specs = BondFutureSpecs::default(); // UST 10Y defaults\nassert_eq!(specs.standard_coupon, 0.06);\n```"
+    "description": "Contract specifications for bond futures.\n\nDefines the notional bond parameters used for conversion factor\ncalculations and the implied-repo day count. Contract size lives on the\nfuture's `terms`: `terms.multiplier` is the currency value of one full\nprice point, i.e. one hundredth of the per-contract face (1,000 for a\n$100,000 UST 10Y contract).\n\nDelivery timing is carried by the future's explicit `delivery_start` /\n`terms.settlement_date`, so the spec holds no settlement lag or holiday\ncalendar.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::bond_future::BondFutureSpecs;\n\nlet specs = BondFutureSpecs::default();\nassert_eq!(specs.standard_coupon, 0.06);\n```"
   },
   {
     "path": "#/$defs/d_5193595b8b998a0dc94c/properties/repo_day_count",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/BondFutureSpecs/properties/repo_day_count",
     "default": "act_360",
-    "description": "Day-count convention for implied repo rate annualization.\n\nBond-future repo supports `act_360` and `act_365f`.",
+    "description": "Day-count convention for implied repo rate annualization (`act_360` or `act_365f`).",
     "ref": "#/$defs/RepoDayCountWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/RepoDayCountWire"
   },
   {
     "path": "#/$defs/d_5193595b8b998a0dc94c/properties/standard_coupon",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/BondFutureSpecs/properties/standard_coupon",
-    "description": "Standard coupon rate for conversion factor calculation (e.g., 0.06 for 6%)",
+    "description": "Standard coupon rate for conversion factor calculation (e.g., 0.06 for 6%).",
     "format": "double"
   },
   {
     "path": "#/$defs/d_5193595b8b998a0dc94c/properties/standard_maturity_years",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/BondFutureSpecs/properties/standard_maturity_years",
-    "description": "Standard maturity in years for conversion factor calculation",
+    "description": "Standard maturity in years for conversion factor calculation.",
     "format": "double"
   },
   {
@@ -1817,19 +1811,19 @@ export default [
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/bdt_sigma",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bdt_sigma",
-    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
+    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).",
     "format": "double"
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/bk_mean_reversion",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bk_mean_reversion",
-    "description": "Black-Karasinski mean-reversion speed (κ) of the log short rate, in\nannualised units (`0.03` = 3% per year).\n\nCompanion to [`Self::bk_sigma`]: read only by the rates-only bond tree\nwhen `tree_model = black_karasinski`, where it is required. Must be\nfinite and strictly positive; typical values are 0.01–0.10. A lognormal\nshort rate without mean reversion is `tree_model = black_derman_toy`\nwith [`Self::bdt_sigma`].",
+    "description": "Black-Karasinski mean-reversion speed (κ) of the log short rate, in\nannualised units (`0.03` = 3% per year).",
     "format": "double"
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/bk_sigma",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bk_sigma",
-    "description": "Black-Karasinski lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_karasinski`,\nwhere it is required together with [`Self::bk_mean_reversion`]. It is\na relative (lognormal) volatility on the same scale as\n[`Self::bdt_sigma`], unlike the absolute [`Self::hw1f_sigma`]; typical\nvalues are 0.10–0.40. Must be finite and non-negative; `0.0` prices on\nthe deterministic curve.",
+    "description": "Black-Karasinski lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).",
     "format": "double"
   },
   {
@@ -1930,8 +1924,8 @@ export default [
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/merton_mc_config/anyOf/0",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/merton_mc_config/anyOf/0",
-    "ref": "#/$defs/MertonMcOverride",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcOverride"
+    "ref": "#/$defs/MertonMcConfig",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig"
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/merton_mc_config/anyOf/1",
@@ -2000,7 +1994,7 @@ export default [
     "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_steps",
     "default": null,
-    "description": "Number of time steps for tree-based pricing (e.g., 100)",
+    "description": "Number of time steps for tree-based pricing (e.g., 100).",
     "format": "uint",
     "minimum": 0
   },
@@ -6415,13 +6409,6 @@ export default [
     "description": "Naira (566)"
   },
   {
-    "path": "#/$defs/d_bffef9e684ff0c351c83",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcOverride",
-    "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`].",
-    "ref": "#/$defs/MertonMcConfig",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig"
-  },
-  {
     "path": "#/$defs/d_c0401254ec268b317b65",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#",
     "description": "Day-count convention.",
@@ -6815,7 +6802,7 @@ export default [
   {
     "path": "#/$defs/d_d7f0aa83744a0794bfe5",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/BondFuture",
-    "description": "Bond future instrument.\n\nA standardized contract with a basket of eligible deliverables. The short\nchooses the bond to deliver, commonly the cheapest-to-deliver (CTD) bond.\n\n# Contract Mechanics\n\n- **Conversion factors**: Supplied per deliverable, preferably from the exchange.\n- **CTD resolution**: Explicit `ctd_bond_id`, then embedded `ctd_bond.id`,\n  then the sole basket member. A larger basket requires an explicit or embedded CTD.\n- **CTD analysis**: [`finstack_quant_valuations_core::instruments::Instrument::value`] marks the\n  caller-supplied CTD only; it does not rank the basket. Refresh the CTD\n  selection daily when the basket can switch.\n\n# Examples\n\n```rust\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse finstack_quant_valuations_fixed_income::bond_future::{BondFuture, DeliverableBond};\nuse finstack_quant_valuations_core::contract_specs::BondFutureSpecs;\nuse finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};\nuse finstack_quant_core::types::Attributes;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\n// 10 UST 10Y contracts ($100,000 face each, $1,000 per price point).\nlet future = BondFuture::builder()\n    .id(InstrumentId::new(\"TYH5\"))\n    .terms(ListedFutureTerms::new(\n        10.0,\n        1_000.0,\n        Currency::USD,\n        125.50,\n        date!(2025 - 03 - 20),\n        date!(2025 - 03 - 31),\n        Position::Long,\n    )?)\n    .delivery_start(date!(2025 - 03 - 21))\n    .contract_specs(BondFutureSpecs::ust_10y())\n    .deliverable_basket(vec![DeliverableBond {\n        bond_id: InstrumentId::new(\"US912828XG33\"),\n        conversion_factor: 0.8234,\n    }])\n    .discount_curve_id(CurveId::new(\"USD-TREASURY\"))\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(future.deliverable_basket.len(), 1);\n# Ok(())\n# }\n```"
+    "description": "Bond future instrument.\n\nA standardized contract with a basket of eligible deliverables. The short\nchooses the bond to deliver, commonly the cheapest-to-deliver (CTD) bond.\n\n# Contract Mechanics\n\n- **Conversion factors**: Supplied per deliverable, preferably from the exchange.\n- **CTD resolution**: Explicit `ctd_bond_id`, then embedded `ctd_bond.id`,\n  then the sole basket member. A larger basket requires an explicit or embedded CTD.\n- **CTD analysis**: [`finstack_quant_valuations_core::instruments::Instrument::value`] marks the\n  caller-supplied CTD only; it does not rank the basket. Refresh the CTD\n  selection daily when the basket can switch.\n\n# Examples\n\n```rust\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse finstack_quant_valuations_fixed_income::bond_future::{BondFuture, BondFutureSpecs, DeliverableBond};\nuse finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};\nuse finstack_quant_core::types::Attributes;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\n// 10 UST 10Y contracts ($100,000 face each, $1,000 per price point).\nlet future = BondFuture::builder()\n    .id(InstrumentId::new(\"TYH5\"))\n    .terms(ListedFutureTerms::new(\n        10.0,\n        1_000.0,\n        Currency::USD,\n        125.50,\n        date!(2025 - 03 - 20),\n        date!(2025 - 03 - 31),\n        Position::Long,\n    )?)\n    .delivery_start(date!(2025 - 03 - 21))\n    .contract_specs(BondFutureSpecs::ust_10y())\n    .deliverable_basket(vec![DeliverableBond {\n        bond_id: InstrumentId::new(\"US912828XG33\"),\n        conversion_factor: 0.8234,\n    }])\n    .discount_curve_id(CurveId::new(\"USD-TREASURY\"))\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(future.deliverable_basket.len(), 1);\n# Ok(())\n# }\n```"
   },
   {
     "path": "#/$defs/d_d7f0aa83744a0794bfe5/properties/attributes",
@@ -7254,7 +7241,7 @@ export default [
   {
     "path": "#/$defs/d_fd618cd5743ec18a168f",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BondRiskBasis",
-    "description": "Basis used for bond duration, convexity, and DV01-style risk metrics."
+    "description": "Risk calculation basis for callable/putable bonds.\n\nSelects whether analytical risk metrics (duration, convexity, DV01) evaluate\nthe maturity/workout cashflow path under quoted yields or reprice the embedded\noption via the callable OAS/tree model."
   },
   {
     "path": "#/$defs/d_fd618cd5743ec18a168f/oneOf/0",

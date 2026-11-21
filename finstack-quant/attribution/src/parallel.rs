@@ -49,12 +49,12 @@ use crate::credit_cascade::{
 };
 use crate::factors::*;
 use crate::helpers::*;
+use crate::model_params::{ModelParamsSnapshot, extract_model_params};
 use crate::{AttributionFactor, AttributionMethod, CrossFactorDetail, PnlAttribution};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::Result;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use indexmap::IndexMap;
 
 /// Additive cross-factor interaction contribution for a pair of factors.
@@ -429,7 +429,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
     // the execution policy and reduce in list order.
     let params_t0 = model_params_t0
         .cloned()
-        .unwrap_or_else(|| instrument.model_params_snapshot());
+        .unwrap_or_else(|| extract_model_params(instrument.as_ref()));
     let factors: &[FactorSpec] = if full_cross_attribution {
         &FULL_CROSS_FACTORS
     } else {

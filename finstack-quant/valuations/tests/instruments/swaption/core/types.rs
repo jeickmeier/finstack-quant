@@ -139,8 +139,11 @@ fn test_resolve_volatility_priority_and_greek_inputs_expired() {
     swaption.instrument_pricing_overrides = swaption
         .instrument_pricing_overrides
         .clone()
-        .with_implied_volatility(0.35)
-        .with_vol_surface_extrapolation(VolSurfaceExtrapolation::Clamp);
+        .with_implied_volatility(0.35);
+    swaption
+        .instrument_pricing_overrides
+        .model_config
+        .vol_surface_extrapolation = VolSurfaceExtrapolation::Clamp;
     let override_vol = swaption.resolve_volatility(&market, forward, t).unwrap();
     assert_approx_eq(override_vol, 0.35, 1e-12, "override vol");
 

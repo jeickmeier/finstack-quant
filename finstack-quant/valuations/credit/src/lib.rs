@@ -83,9 +83,12 @@ pub mod cds_option;
 pub mod cds_tranche;
 pub mod constants;
 pub(crate) mod cs01;
+/// CDS leg specifications and credit parameters.
+pub mod legs;
 
 mod family;
 pub use family::CREDIT;
+pub use legs::{CdsDateRegime, CreditParams, PremiumLegSpec, ProtectionLegSpec};
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

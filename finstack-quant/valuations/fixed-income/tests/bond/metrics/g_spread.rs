@@ -70,9 +70,9 @@ fn metrics(bond: &Bond, market: &MarketContext, ids: &[MetricId]) -> Vec<f64> {
 }
 
 fn named(mut bond: Bond, curve_id: &str) -> Bond {
-    bond.instrument_pricing_overrides = bond
-        .instrument_pricing_overrides
-        .with_government_curve_id(curve_id);
+    bond.instrument_pricing_overrides
+        .model_config
+        .government_curve_id = Some(curve_id.into());
     bond
 }
 

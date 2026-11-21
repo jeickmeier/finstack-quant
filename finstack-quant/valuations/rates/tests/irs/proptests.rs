@@ -13,8 +13,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
-use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec};
 use finstack_quant_valuations_rates::irs::InterestRateSwap;
+use finstack_quant_valuations_rates::{FixedLegSpec, FloatLegSpec};
 use proptest::prelude::*;
 use time::macros::date;
 

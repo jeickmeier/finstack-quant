@@ -303,7 +303,7 @@
         },
         "terms": {
           "$ref": "#/$defs/FutureOptionTerms",
-          "description": "Caller-supplied option-on-future pricing and settlement terms."
+          "description": "Complete listed or bilateral option-on-future terms."
         }
       },
       "required": [

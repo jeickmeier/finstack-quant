@@ -28,7 +28,7 @@
 //!
 //! ```rust
 //! use finstack_quant_valuations_exotics::commodity::commodity_forward::CommodityForward;
-//! use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
+//! use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::types::{CurveId, InstrumentId};
 //! use time::macros::date;
@@ -76,6 +76,13 @@ pub mod commodity_spread_option;
 pub mod commodity_swap;
 /// Commodity swaption module.
 pub mod commodity_swaption;
+/// Market conventions for commodities.
+pub mod conventions;
+/// Underlying parameter specs for commodities.
+pub mod underlying;
+
+pub use conventions::CommodityConvention;
+pub use underlying::CommodityUnderlyingParams;
 
 /// Market with the price curve `curve_id` shifted in parallel by `pct` of each
 /// forward (`0.01` = +1%), the bump the commodity forward-delta and gamma

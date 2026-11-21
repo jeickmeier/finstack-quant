@@ -5,6 +5,7 @@ use super::pricer::{
     CORR_BOUNDARY_WIDTH, CdsTranchePricer, MAX_CORRELATION, MIN_CORRELATION, NUMERICAL_TOLERANCE,
     PAR_SPREAD_TOLERANCE,
 };
+use crate::CdsDateRegime;
 use crate::cds_tranche::CdsTranche;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::Date;
@@ -12,7 +13,6 @@ use finstack_quant_core::market_data::{context::MarketContext, term_structures::
 use finstack_quant_core::math::distributions::binomial_pmf_all_into;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::instruments::CdsDateRegime;
 
 #[cfg(test)]
 thread_local! {

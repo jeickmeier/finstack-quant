@@ -225,7 +225,7 @@ impl BarrierOptionPdePricer {
         let t = bs_inputs.t;
         let ccy = inst.currency;
 
-        let r = bs_inputs.r_eff();
+        let r = bs_inputs.r_eff().map_err(wrap)?;
 
         let barrier_level = inst.barrier;
         let is_call = matches!(

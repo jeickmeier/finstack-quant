@@ -1098,7 +1098,7 @@ pub struct BaseCorrelationParams {
     /// CALIBRATION-FRAMEWORK-007, O7): `standard` CDS roll dates (20th of
     /// Mar/Jun/Sep/Dec) or `bespoke` for a schedule from the convention
     /// frequency and stub. Required; there is no default regime.
-    pub date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime,
+    pub date_regime: finstack_quant_valuations_credit::CdsDateRegime,
 }
 
 /// Parameters for Student-t copula degrees of freedom calibration.

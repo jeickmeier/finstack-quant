@@ -82,7 +82,7 @@ impl SimpleBondMertonMcPricer {
         bond.validate_merton_mc_embedded_rights()
             .map_err(|error| PricingError::from_core(error, ctx.clone()))?;
 
-        let base_config = &bond
+        let base_config = bond
             .instrument_pricing_overrides
             .model_config
             .merton_mc_config
@@ -92,8 +92,7 @@ impl SimpleBondMertonMcPricer {
                     "MertonMc pricer requires instrument_pricing_overrides.model_config.merton_mc_config",
                     ctx.clone(),
                 )
-            })?
-            .0;
+            })?;
 
         let disc = market
             .get_discount(bond.discount_curve_id.as_str())
@@ -453,7 +452,7 @@ mod tests {
             Rate::from_decimal(0.04).expect("valid rate"),
             date!(2024 - 03 - 07),
             date!(2030 - 03 - 07),
-            finstack_quant_valuations_core::instruments::BondConvention::UkGilt,
+            crate::BondConvention::UkGilt,
             "USD-OIS",
         )
         .expect("valid gilt");

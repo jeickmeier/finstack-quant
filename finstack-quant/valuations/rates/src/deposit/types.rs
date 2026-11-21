@@ -178,13 +178,7 @@ impl Deposit {
     ) -> finstack_quant_core::Result<f64> {
         // The T+0 inception exchange on `as_of` is part of the trade NPV
         // that a quoted deposit rate zeroes.
-        finstack_quant_valuations_core::instruments::common_impl::helpers::schedule_pv_raw(
-            self,
-            market,
-            as_of,
-            &self.discount_curve_id,
-            true,
-        )
+        crate::schedule_pv_raw(self, market, as_of, &self.discount_curve_id, true)
     }
 }
 
@@ -226,13 +220,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for Deposit {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        finstack_quant_valuations_core::instruments::common_impl::helpers::schedule_pv_raw(
-            self,
-            curves,
-            as_of,
-            &self.discount_curve_id,
-            false,
-        )
+        crate::schedule_pv_raw(self, curves, as_of, &self.discount_curve_id, false)
     }
 
     fn base_value_raw_with_currency(
@@ -241,13 +229,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for Deposit {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<(f64, finstack_quant_core::currency::Currency)> {
         Ok((
-            finstack_quant_valuations_core::instruments::common_impl::helpers::schedule_pv_raw(
-                self,
-                curves,
-                as_of,
-                &self.discount_curve_id,
-                false,
-            )?,
+            crate::schedule_pv_raw(self, curves, as_of, &self.discount_curve_id, false)?,
             self.notional.currency(),
         ))
     }

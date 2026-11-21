@@ -252,7 +252,7 @@
       "error": {
         "name": "FinstackError",
         "kind": "validation",
-        "message": "Valuation error for position 'DEP-1': Invalid input: Metric 'pv01' is not applicable to instrument type 'deposit' [instrument=DEP-USD-6M, type=Deposit, model=Discounting]"
+        "message": "Valuation error for position 'DEP-1': Invalid input: Metric 'pv01' is not applicable to instrument type 'deposit' [instrument=DEP-USD-6M, type=deposit, model=discounting]"
       }
     },
     "missingCurve": {

@@ -168,7 +168,6 @@ macro_rules! impl_future_option_instrument {
                 Some(self.terms.settlement.terminal_date())
             }
 
-
             $crate::impl_focused_pricing_overrides!();
         }
 
@@ -179,17 +178,13 @@ macro_rules! impl_future_option_instrument {
                 as_of: finstack_quant_core::dates::Date,
                 request: &$crate::instruments::OptionGreeksRequest,
             ) -> finstack_quant_core::Result<$crate::instruments::OptionGreeks> {
-                use $crate::instruments::{OptionGreekKind, OptionGreeks};
-
-                let mut greeks = OptionGreeks::default();
-                match request.greek {
-                    OptionGreekKind::Delta => greeks.delta = Some(self.cash_delta(market, as_of)?),
-                    OptionGreekKind::Gamma => greeks.gamma = Some(self.cash_gamma(market, as_of)?),
-                    OptionGreekKind::Vega => greeks.vega = Some(self.cash_vega(market, as_of)?),
-                    OptionGreekKind::Theta => greeks.theta = Some(self.cash_theta(market, as_of)?),
-                    _ => {}
-                }
-                Ok(greeks)
+                self.terms.option_greeks(
+                    self.instrument_pricing_overrides.model_config.tree_steps,
+                    self.instrument_pricing_overrides.market_quotes.implied_volatility,
+                    market,
+                    as_of,
+                    request,
+                )
             }
         }
 
@@ -232,7 +227,7 @@ macro_rules! impl_future_option_instrument {
 /// [`FutureOptionTerms`](crate::instruments::FutureOptionTerms) and the
 /// instrument/metric/scenario pricing overrides), its
 /// [`Instrument`](crate::instruments::Instrument) implementation through
-/// [`impl_future_option_instrument!`], and a `pub(crate)` registration
+/// [`impl_future_option_instrument!`], and an optional `pub(crate)` registration
 /// function named by `register_metrics` that registers delta, gamma, vega and
 /// theta for `instrument_type`. Doc comments and attributes written before
 /// `pub struct` are applied to the struct. The expanding crate must depend on
@@ -242,10 +237,14 @@ macro_rules! impl_future_option_instrument {
 /// # Arguments
 ///
 /// * `$name` - Struct name; also the JSON-schema type name.
+/// * `builder` - Identifier of the generated builder struct.
 /// * `instrument_type` - The `InstrumentType` variant the instrument and its
 ///   metrics are registered under.
 /// * `family` - The family static owning the instrument.
-/// * `register_metrics` - Name of the generated metric-registration function.
+/// * `require_rate_risk` - Optional boolean flag forcing
+///   `terms.underlying_price_change_per_bp` validation (used by IR futures options).
+/// * `register_metrics` - Optional name of the generated metric-registration
+///   function. Omit when the asset crate registers custom metrics (e.g. `Dv01`).
 #[macro_export]
 macro_rules! define_future_option {
     (
@@ -255,6 +254,38 @@ macro_rules! define_future_option {
         instrument_type: $key:expr_2021,
         family: $family:expr_2021,
         register_metrics: $register:ident $(,)?
+    ) => {
+        $crate::define_future_option!(@emit [$(#[$meta])*] $name; $builder; $key; $family; []; [$register]);
+    };
+    (
+        $(#[$meta:meta])*
+        pub struct $name:ident;
+        builder: $builder:ident,
+        instrument_type: $key:expr_2021,
+        family: $family:expr_2021,
+        require_rate_risk: $require_rate_risk:expr_2021 $(,)?
+    ) => {
+        $crate::define_future_option!(@emit [$(#[$meta])*] $name; $builder; $key; $family; [$require_rate_risk]; []);
+    };
+    (
+        $(#[$meta:meta])*
+        pub struct $name:ident;
+        builder: $builder:ident,
+        instrument_type: $key:expr_2021,
+        family: $family:expr_2021,
+        require_rate_risk: $require_rate_risk:expr_2021,
+        register_metrics: $register:ident $(,)?
+    ) => {
+        $crate::define_future_option!(@emit [$(#[$meta])*] $name; $builder; $key; $family; [$require_rate_risk]; [$register]);
+    };
+    (
+        @emit [$(#[$meta:meta])*]
+        $name:ident;
+        $builder:ident;
+        $key:expr_2021;
+        $family:expr_2021;
+        [$($require_rate_risk:expr_2021)?];
+        [$($register:ident)?]
     ) => {
         $(#[$meta])*
         #[derive(
@@ -270,7 +301,7 @@ macro_rules! define_future_option {
         pub struct $name {
             /// Unique instrument identifier.
             pub id: finstack_quant_core::types::InstrumentId,
-            /// Caller-supplied option-on-future pricing and settlement terms.
+            /// Complete listed or bilateral option-on-future terms.
             pub terms: finstack_quant_valuations_core::instruments::FutureOptionTerms,
             /// Instrument-owned pricing inputs: the flat option volatility in
             /// `market_quotes.implied_volatility` (required while live) and optional
@@ -317,23 +348,30 @@ macro_rules! define_future_option {
             }
         }
 
-        $crate::impl_future_option_instrument!($name, $key, $family);
+        $crate::impl_future_option_instrument!(
+            $name,
+            $key,
+            $family
+            $(, require_rate_risk = $require_rate_risk)?
+        );
 
-        /// Register delta, gamma, vega, and theta for this futures option.
-        pub(crate) fn $register(
-            registry: &mut $crate::metrics::MetricRegistry,
-        ) -> std::result::Result<(), $crate::metrics::MetricRegistryError> {
-            $crate::register_metrics! {
-                registry: registry,
-                instrument: $key,
-                metrics: [
-                    (Delta, $crate::metrics::sensitivities::option_greeks::OptionGreekCalculator::<$name>::delta()),
-                    (Gamma, $crate::metrics::sensitivities::option_greeks::OptionGreekCalculator::<$name>::gamma()),
-                    (Vega, $crate::metrics::sensitivities::option_greeks::OptionGreekCalculator::<$name>::vega()),
-                    (Theta, $crate::metrics::sensitivities::option_greeks::OptionGreekCalculator::<$name>::theta()),
-                ]
+        $(
+            /// Register delta, gamma, vega, and theta for this futures option.
+            pub(crate) fn $register(
+                registry: &mut $crate::metrics::MetricRegistry,
+            ) -> std::result::Result<(), $crate::metrics::MetricRegistryError> {
+                $crate::register_metrics! {
+                    registry: registry,
+                    instrument: $key,
+                    metrics: [
+                        (Delta, $crate::metrics::sensitivities::option_greeks::OptionGreekCalculator::<$name>::delta()),
+                        (Gamma, $crate::metrics::sensitivities::option_greeks::OptionGreekCalculator::<$name>::gamma()),
+                        (Vega, $crate::metrics::sensitivities::option_greeks::OptionGreekCalculator::<$name>::vega()),
+                        (Theta, $crate::metrics::sensitivities::option_greeks::OptionGreekCalculator::<$name>::theta()),
+                    ]
+                }
+                Ok(())
             }
-            Ok(())
-        }
+        )?
     };
 }

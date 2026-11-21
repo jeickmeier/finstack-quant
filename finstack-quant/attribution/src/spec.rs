@@ -3,6 +3,7 @@
 //! Provides serializable specs for defining complete attribution runs in JSON,
 //! with stable schemas and deterministic round-trip serialization.
 
+use crate::model_params::ModelParamsSnapshot;
 use crate::{AttributionMethod, CreditFactorDetailOptions, ExecutionPolicy, PnlAttribution};
 use finstack_quant_core::{
     Result,
@@ -13,7 +14,6 @@ use finstack_quant_core::{
 };
 use finstack_quant_factor::credit::hierarchy::CreditFactorModel;
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
-use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations::metrics::MetricId;
 use serde::{Deserialize, Serialize};
 use serde_json::json;

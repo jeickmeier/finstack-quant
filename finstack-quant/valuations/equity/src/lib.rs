@@ -118,6 +118,9 @@ pub mod equity_option;
 pub mod equity_total_return_future;
 /// Equity TRS module - Equity total return swaps.
 pub mod equity_trs;
+/// Variance swap module - Variance and volatility swaps.
+/// Shared Monte Carlo discretization defaults.
+mod mc_defaults;
 /// Observed-fixing lookup and validation shared by the seasoned instruments.
 pub(crate) mod past_fixings;
 /// PE fund module - Private equity/markets funds.
@@ -129,12 +132,15 @@ pub(crate) mod piecewise_gbm;
 pub mod spot;
 /// Spot-pinned finite-difference Greeks for products struck at inception spot.
 pub(crate) mod spot_pinned;
-/// Variance swap module - Variance and volatility swaps.
+/// Equity underlying asset parameters.
+pub mod underlying;
 pub mod variance_swap;
 /// Volatility index future module.
 pub mod vol_index_future;
 /// Exchange-listed options on volatility-index futures.
 pub mod vol_index_future_option;
+
+pub use underlying::EquityUnderlyingParams;
 
 mod family;
 

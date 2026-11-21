@@ -45,7 +45,7 @@
 //!
 //! ```
 //! use finstack_quant_valuations_rates::irs::InterestRateSwap;
-//! use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec};
+//! use finstack_quant_valuations_rates::{FixedLegSpec, FloatLegSpec};
 //! use finstack_quant_valuations_core::instruments::PayReceive;
 //! use finstack_quant_cashflows::builder::FloatingLegCompounding;
 //! use finstack_quant_core::currency::Currency;
@@ -155,13 +155,21 @@ mod rate_bucketed_dv01;
 pub(crate) mod rate_validation;
 /// Repo module - Repurchase agreements.
 pub mod repo;
+/// Swap fixed and floating leg specifications.
+pub mod swap_legs;
 /// Swaption module - Options on interest rate swaps.
 pub mod swaption;
+/// Interest-rate option volatility models and quote resolution.
+pub mod vol_resolution;
 /// Cross-currency swap module.
 pub mod xccy_swap;
 
 mod family;
+mod schedule_pv;
 pub use family::RATES;
+pub use schedule_pv::schedule_pv_raw;
+pub use swap_legs::{FixedLegSpec, FloatLegSpec, simple_average_unsupported};
+pub use vol_resolution::VolatilityModel;
 
 // `irs::marginable`'s unit tests `include!` the integration-test helper
 // `tests/support/rates.rs`, which names this crate from outside.

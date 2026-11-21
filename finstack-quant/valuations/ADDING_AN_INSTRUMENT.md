@@ -12,10 +12,8 @@ Each step names the check that fails when it is skipped.
 Add `<family>/src/<name>/`, following a neighbour (for example
 `fixed-income/src/bond/` or `rates/src/irs/`). The struct needs
 `id: InstrumentId`, `attributes: Attributes`, `Clone`, and an `example()`
-constructor; a long-dated example rolls forward from
-`common_impl::example_constants::FAR_EXPIRY`. Reuse the `common_impl/parameters/`
-leg and underlying types and the `instruments::pricing` kernels instead of
-writing parallel ones.
+constructor. Reuse the family parameter modules and shared `common_impl/parameters/`
+types and `instruments::pricing` kernels instead of writing parallel ones.
 
 ## 2. The `InstrumentType` variant
 
