@@ -10,6 +10,7 @@ use finstack_quant_core::math::units::{BASIS_POINTS_PER_UNIT, ONE_BASIS_POINT};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::constants::{credit, numerical};
 use finstack_quant_valuations_core::instruments::CdsDateRegime;
+use rust_decimal::prelude::ToPrimitive;
 
 impl CdsPricer {
     /// Generate contractual accrual and payment dates from the premium terms.
@@ -216,9 +217,7 @@ impl CdsPricer {
     ) -> Result<f64> {
         let full_premium_per_bp = self.premium_leg_pv_per_bp(cds, disc, surv, as_of)?;
         let accrued_per_unit_spread = self.clean_quote_accrual_fraction(cds, as_of)?;
-        let settlement = cds.quote_settlement_date(as_of)?;
-        let settlement_df = disc.df_between_dates(as_of, settlement)?;
-        Ok(full_premium_per_bp / ONE_BASIS_POINT - settlement_df * accrued_per_unit_spread)
+        Ok(full_premium_per_bp / ONE_BASIS_POINT - accrued_per_unit_spread)
     }
 
     /// Calculate par spread (bp) that sets NPV to zero.
@@ -232,7 +231,7 @@ impl CdsPricer {
     /// The denominator is selected by the instrument's `valuation_convention`
     /// (see [`Self::par_spread_denominator`]). The default,
     /// `BloombergCdswClean`, uses the premium-leg annuity **including**
-    /// accrual-on-default minus the accrued fraction discounted from quote settlement.
+    /// accrual-on-default minus the accrued fraction.
     /// The dirty quote uses the full premium-leg annuity. Accrual-on-default matters most for distressed
     /// credits (typically 2-5 bp for hazard > 3%).
     ///
@@ -466,8 +465,9 @@ impl CdsPricer {
         Ok(annuity * cds.notional.amount() / BASIS_POINTS_PER_UNIT)
     }
 
-    /// Economic CDS value from the holder's side, including eligible dated
-    /// upfront cash at its discount factor.
+    /// Canonical CDS instrument NPV from the holder's side, including dated
+    /// upfront cash at its discount factor and the Bloomberg CDSW clean-price
+    /// accrued add-back when `cds.uses_clean_price()` is `true`.
     pub(crate) fn npv_full(
         &self,
         cds: &CreditDefaultSwap,
@@ -492,11 +492,21 @@ impl CdsPricer {
             _ => 0.0,
         };
 
+        let clean_accrued = if cds.uses_clean_price() {
+            let accrual_fraction = self.clean_quote_accrual_fraction(cds, as_of)?;
+            let spread = cds.premium_leg.coupon_bp.to_f64().ok_or_else(|| {
+                Error::Validation("premium.coupon_bp cannot be represented as f64".into())
+            })? / BASIS_POINTS_PER_UNIT;
+            cds.notional.amount() * spread * accrual_fraction
+        } else {
+            0.0
+        };
         Ok(super::engine::signed_npv(
             cds,
             protection_pv,
             premium_pv,
             upfront_pv,
+            clean_accrued,
         ))
     }
 }

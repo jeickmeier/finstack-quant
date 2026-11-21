@@ -347,23 +347,6 @@ impl CreditDefaultSwap {
         CdsPricer::new().clean_quote_accrual_fraction(self, as_of)
     }
 
-    pub(crate) fn quote_settlement_date(&self, as_of: Date) -> finstack_quant_core::Result<Date> {
-        use finstack_quant_core::dates::{DateExt, adjust, calendar_by_id_strict};
-        use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
-        use finstack_quant_valuations_core::market::conventions::ids::CdsConventionKey;
-
-        let key = CdsConventionKey {
-            currency: self.notional.currency(),
-            doc_clause: self
-                .doc_clause
-                .unwrap_or_else(|| self.convention.as_doc_clause()),
-        };
-        let convention = ConventionRegistry::try_global()?.resolve_cds(&key)?;
-        let calendar = calendar_by_id_strict(&convention.calendar_id)?;
-        let spot = as_of.add_business_days(i32::from(convention.settlement_days), calendar)?;
-        adjust(spot, convention.business_day_convention, calendar)
-    }
-
     /// Create a canonical example CDS for testing and documentation.
     ///
     /// Returns a 5-year investment-grade CDS with standard ISDA conventions.

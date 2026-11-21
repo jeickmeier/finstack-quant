@@ -169,7 +169,7 @@ fn test_par_spread_calculation() {
 }
 
 #[test]
-fn risky_pv01_reconciles_discounted_clean_mark_to_par_spread() {
+fn risky_pv01_reconciles_clean_npv_to_par_spread() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
     // Seasoned: 42 days of accrued premium separate the clean and dirty annuities.
@@ -189,22 +189,24 @@ fn risky_pv01_reconciles_discounted_clean_mark_to_par_spread() {
     let risky_pv01 = pricer
         .risky_pv01(&cds, &disc, &credit, as_of)
         .expect("risky pv01");
-    use finstack_quant_core::market_data::traits::Discounting;
 
-    let dirty_pv = pricer
+    let clean_npv = pricer
         .npv_full(&cds, &disc, &credit, as_of)
-        .expect("economic PV");
-    let settlement = cds.quote_settlement_date(as_of).expect("quote settlement");
-    let settlement_df = disc
-        .df_between_dates(as_of, settlement)
-        .expect("settlement DF");
-    let accrual = cds.clean_quote_accrual(as_of).expect("quote accrual");
-    let accrued_cash = cds.notional.amount() * 0.01 * accrual;
-    assert!(settlement > as_of && accrual > 0.0 && settlement_df < 1.0);
-    let clean_mark = dirty_pv + settlement_df * accrued_cash;
+        .expect("clean NPV");
     let implied = (par_spread - 100.0) * risky_pv01;
-    assert!((clean_mark - implied).abs() < 1e-7);
-    assert!((dirty_pv + accrued_cash - implied).abs() > 1e-4);
+    assert!(
+        (clean_npv - implied).abs() < 1e-6 * clean_npv.abs().max(1.0),
+        "clean npv {clean_npv} should equal (par - coupon) x risky_pv01 = {implied}"
+    );
+    let dirty_annuity_pv01 = pricer
+        .risky_annuity(&cds, &disc, &credit, as_of)
+        .expect("risky annuity")
+        * cds.notional.amount()
+        * 1e-4;
+    assert!(
+        risky_pv01 < dirty_annuity_pv01,
+        "clean risky pv01 {risky_pv01} excludes accrued premium in {dirty_annuity_pv01}"
+    );
 }
 
 #[test]

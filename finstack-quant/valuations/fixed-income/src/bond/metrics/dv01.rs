@@ -1,6 +1,7 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
 use crate::bond::Bond;
+use finstack_quant_valuations_core::instruments::pricing_overrides::BondRiskBasis;
 use finstack_quant_valuations_core::metrics::sensitivities::dv01::{
     Dv01CalculatorConfig, UnifiedDv01Calculator,
 };
@@ -13,14 +14,48 @@ pub(crate) struct BondDv01Calculator;
 
 impl MetricCalculator for BondDv01Calculator {
     fn dependencies(&self) -> &[MetricId] {
-        &[MetricId::ZSpread]
+        &[MetricId::DurationMod, MetricId::Ytm]
     }
 
     fn dynamic_dependencies<'a>(&'a self, context: &MetricContext) -> Cow<'a, [MetricId]> {
-        BondBucketedDv01Calculator.dynamic_dependencies(context)
+        let Ok(bond) = context.instrument_as::<Bond>() else {
+            return Cow::Borrowed(self.dependencies());
+        };
+        let has_options = bond.has_exercise_rights();
+        let has_price_driver = bond
+            .instrument_pricing_overrides
+            .market_quotes
+            .has_price_driver();
+        if super::bond_risk_basis(context) == BondRiskBasis::CallableOas
+            || (!has_options && !has_price_driver)
+        {
+            BondBucketedDv01Calculator.dynamic_dependencies(context)
+        } else {
+            Cow::Borrowed(self.dependencies())
+        }
     }
 
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let bond: &Bond = context.instrument_as()?;
+        let has_options = bond.has_exercise_rights();
+        let basis = super::bond_risk_basis(context);
+
+        if basis != BondRiskBasis::CallableOas {
+            if !bond
+                .instrument_pricing_overrides
+                .market_quotes
+                .has_price_driver()
+                && !has_options
+            {
+                return direct_rate_dv01(context, Dv01CalculatorConfig::parallel_combined());
+            }
+
+            // Default (Workout) basis: delegate to yield-basis DV01 so quoted
+            // and callable bonds stay consistent with `DurationMod`,
+            // `Convexity`, and `YieldDv01` (matching Bloomberg YAS workout).
+            return super::yield_dv01::YieldDv01Calculator.calculate(context);
+        }
+
         super::risk_view::with_bond_risk_view(context, |ctx| {
             direct_rate_dv01(ctx, Dv01CalculatorConfig::parallel_combined())
         })
@@ -219,6 +254,9 @@ mod tests {
         bond.instrument_pricing_overrides = bond
             .instrument_pricing_overrides
             .with_quoted_clean_price_pct(98.0);
+        bond.metric_pricing_overrides = bond
+            .metric_pricing_overrides
+            .with_bond_risk_basis(BondRiskBasis::CallableOas);
         let result = bond
             .price_with_metrics(
                 &market,

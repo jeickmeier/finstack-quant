@@ -433,6 +433,7 @@ pub struct PreparedCds {
     periods: Vec<(CouponPeriod, f64, f64)>,
     spread: f64,
     upfront_pv: f64,
+    clean_accrued: f64,
     grids: IsdaWindowCache,
 }
 
@@ -493,6 +494,12 @@ impl PreparedCds {
             }
             _ => 0.0,
         };
+        let clean_accrued = if cds.uses_clean_price() {
+            let accrual_fraction = pricer.clean_quote_accrual_fraction(cds, as_of)?;
+            cds.notional.amount() * spread * accrual_fraction
+        } else {
+            0.0
+        };
         Ok(Self {
             pricer,
             cds: cds.clone(),
@@ -501,6 +508,7 @@ impl PreparedCds {
             periods,
             spread,
             upfront_pv,
+            clean_accrued,
             grids: IsdaWindowCache::default(),
         })
     }
@@ -564,6 +572,7 @@ impl PreparedCds {
             protection_pv,
             premium_pv,
             self.upfront_pv,
+            self.clean_accrued,
         ))
     }
 }
@@ -573,12 +582,20 @@ pub(super) fn signed_npv(
     protection_pv: f64,
     premium_pv: f64,
     upfront_pv: f64,
+    clean_accrued: f64,
 ) -> f64 {
     use finstack_quant_valuations_core::instruments::PayReceive;
-    match cds.side {
+    let mut value = match cds.side {
         PayReceive::Pay => protection_pv - premium_pv - upfront_pv,
         PayReceive::Receive => premium_pv - protection_pv + upfront_pv,
+    };
+    if cds.uses_clean_price() {
+        value = match cds.side {
+            PayReceive::Pay => value + clean_accrued,
+            PayReceive::Receive => value - clean_accrued,
+        };
     }
+    value
 }
 
 // Protection-leg and accrual-on-default integration over the ISDA Standard
@@ -1380,9 +1397,11 @@ mod cds_review_regression_tests {
                     pricer.premium_leg_pv_per_bp(&cds, &disc, &surv, as_of)? * 100.0 * 10_000_000.0,
                     expected_premium,
                 );
+                let accrued =
+                    pricer.clean_quote_accrual_fraction(&cds, as_of)? * 10_000_000.0 * 0.01;
                 let expected_protection = 10_000_000.0 * 0.6 * (1.0 - (-lambda * t).exp());
                 let npv = pricer.npv_full(&cds, &disc, &surv, as_of)?;
-                close(npv, expected_protection - expected_premium);
+                close(npv, expected_protection - expected_premium + accrued);
                 let market = MarketContext::new()
                     .try_insert(disc.clone())
                     .expect("insert market curve")

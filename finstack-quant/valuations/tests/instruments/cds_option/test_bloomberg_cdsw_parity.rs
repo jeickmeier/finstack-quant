@@ -21,10 +21,11 @@ fn cdx_ig_46_linked_spot_cds_reconciliation() {
     let df = discount
         .df_between_dates(as_of, settlement)
         .expect("spot settlement DF");
-    let dirty_pv = cds.value_raw(&market, as_of).expect("spot CDS PV");
+    let clean_pv = cds.value_raw(&market, as_of).expect("spot CDS clean PV");
     let accrual = cds.clean_quote_accrual(as_of).expect("clean accrued");
     let accrued_cash =
         -cds.notional.amount() * cds.premium_leg.coupon_bp.as_f64() / 10_000.0 * accrual;
+    let dirty_pv = clean_pv + accrued_cash;
     let invoice = dirty_pv / df;
     let principal = invoice - accrued_cash;
     eprintln!(
@@ -54,21 +55,18 @@ fn cdx_ig_46_linked_spot_cds_reconciliation() {
         .clone()
         .try_insert(bumped)
         .expect("insert bumped hazard");
-    let spread_dv01 = cds.value_raw(&bumped_market, as_of).expect("bumped CDS PV") - dirty_pv;
+    let spread_dv01 = cds.value_raw(&bumped_market, as_of).expect("bumped CDS PV") - clean_pv;
     assert!(
         (spread_dv01 / 46_963.21 - 1.0).abs() < 0.01,
         "CDSW spread DV01 {spread_dv01}"
     );
 
-    // A clean par quote requires zero principal after the accrued rebate is settled.
+    // Clean par quote yields zero clean principal at the quoted breakeven spread.
     let mut par_cds = cds;
     par_cds.premium_leg.coupon_bp = Decimal::new(536_264, 4);
     let par_pv = par_cds.value_raw(&market, as_of).expect("par CDS PV");
-    let par_rebate =
-        accrual * par_cds.notional.amount() * par_cds.premium_leg.coupon_bp.as_f64() / 10_000.0;
     assert!(
-        (par_pv + df * par_rebate).abs() < 0.01,
-        "clean par PV {}",
-        par_pv + df * par_rebate
+        par_pv.abs() < 10.0,
+        "clean par PV should be near zero at 53.6264 bp, got {par_pv}"
     );
 }

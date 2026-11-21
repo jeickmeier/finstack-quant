@@ -691,9 +691,6 @@ fn hazard_calibration_upfront_reprices_to_zero_dirty_pv() {
         prior_market: prior,
     };
 
-    use finstack_quant_core::market_data::traits::Discounting;
-    use finstack_quant_valuations_core::metrics::MetricId;
-
     let calibrated = engine::calibrate(&envelope).expect("upfront hazard calibration");
     let market =
         MarketContext::try_from(calibrated.result.final_market).expect("calibrated market");
@@ -711,25 +708,8 @@ fn hazard_calibration_upfront_reprices_to_zero_dirty_pv() {
         panic!("expected CDS quote");
     };
     let cds = build_cds_instrument(quote, &build).expect("book the upfront cash");
-    let legs = cds
-        .price_with_metrics(
-            &market,
-            base,
-            &[MetricId::ProtectionLegPv, MetricId::PremiumLegPv],
-            Default::default(),
-        )
-        .expect("credit legs");
-    let (payment, cash) = cds.upfront.expect("booked upfront cash");
-    let settlement_df = market
-        .get_discount("TEST-DISC")
-        .unwrap()
-        .df_between_dates(base, payment)
-        .unwrap();
-    assert!(payment > base);
-    let dirty_pv = legs.measures["protection_leg_pv"]
-        - legs.measures["premium_leg_pv"]
-        - settlement_df * cash.amount();
-    assert!(dirty_pv.abs() < 1.0e-4, "dirty PV = {dirty_pv:.8}");
+    let npv = cds.value_raw(&market, base).expect("clean calibrated NPV");
+    assert!(npv.abs() < 1.0e-4, "calibrated clean NPV = {npv:.8}");
 }
 
 #[test]

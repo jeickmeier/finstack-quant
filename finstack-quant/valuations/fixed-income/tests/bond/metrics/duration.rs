@@ -386,9 +386,9 @@ fn test_callable_quoted_bond_can_request_callable_oas_risk_basis() {
             > 1e-4,
         "callable_oas basis should use option-aware duration"
     );
-    assert_eq!(
-        callable_result.measures["dv01"],
-        bullet_result.measures["dv01"]
+    assert!(
+        (callable_result.measures["dv01"] - bullet_result.measures["dv01"]).abs() > 1e-2,
+        "callable_oas basis should use option-aware DV01"
     );
 }
 
@@ -428,6 +428,10 @@ fn test_floor_only_bond_uses_workout_schedule_and_option_aware_risk() {
         "floor-only duration must use the floor-generated workout yield"
     );
     assert!(
+        (workout.measures["dv01"] - workout.measures["yield_dv01"]).abs() < 1.0e-8,
+        "floor-only Workout DV01 must use the option-aware yield basis"
+    );
+    assert!(
         workout.measures["embedded_option_value"].abs() > 1.0e-6,
         "floor-only EOV must not collapse to zero"
     );
@@ -444,7 +448,10 @@ fn test_floor_only_bond_uses_workout_schedule_and_option_aware_risk() {
             finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .expect("floor-only callable-OAS risk metrics should compute");
-    assert_eq!(workout.measures["dv01"], option_aware.measures["dv01"]);
+    assert!(
+        (option_aware.measures["dv01"] - workout.measures["dv01"]).abs() > 1.0e-6,
+        "CallableOas DV01 must differ from Workout yield DV01"
+    );
     assert!(
         (option_aware.measures["duration_mod"] - workout.measures["duration_mod"]).abs() > 1.0e-4,
         "CallableOas duration must use floor optionality"
@@ -455,9 +462,13 @@ fn test_floor_only_bond_uses_workout_schedule_and_option_aware_risk() {
     );
 }
 
-/// A callable bond's unquoted model PV retains the option in both rate shocks.
+/// On the default Workout basis, a callable bond without a market quote uses
+/// yield-basis DV01 matching `YieldDv01`; switching to `CallableOas` uses the
+/// selected option-aware model curve bump.
 #[test]
-fn test_callable_no_quote_dv01_uses_selected_model() {
+fn test_callable_no_quote_dv01_respects_risk_basis() {
+    use finstack_quant_valuations_core::instruments::pricing_overrides::BondRiskBasis;
+
     let as_of = date!(2025 - 01 - 01);
 
     let mut callable = Bond::fixed(
@@ -491,7 +502,27 @@ fn test_callable_no_quote_dv01_uses_selected_model() {
 
     let market = callable_risk_market(as_of);
 
-    let result = callable
+    let workout = callable
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Dv01, MetricId::YieldDv01],
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
+        )
+        .expect("callable no-quote default-basis risk metrics should compute");
+    assert!(
+        (workout.measures["dv01"] - workout.measures["yield_dv01"]).abs() < 1e-8,
+        "default Workout callable DV01 must match yield_dv01: {} vs {}",
+        workout.measures["dv01"],
+        workout.measures["yield_dv01"]
+    );
+    assert!(workout.measures["dv01"] < 0.0);
+
+    let mut oas_callable = callable.clone();
+    oas_callable.metric_pricing_overrides = oas_callable
+        .metric_pricing_overrides
+        .with_bond_risk_basis(BondRiskBasis::CallableOas);
+    let result = oas_callable
         .price_with_metrics(
             &market,
             as_of,
