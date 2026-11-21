@@ -1,11 +1,12 @@
 //! Hazard-time conversion, settlement dates, ISDA integration boundaries and
 //! recovery-consistency checks shared by the CDS pricer.
 
+use crate::constants::credit;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, HolidayCalendar};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::constants::{credit, time as time_constants};
+use finstack_quant_valuations_core::constants::TRADING_DAYS_PER_YEAR;
 use time::Duration;
 
 /// Tolerance for recovery-rate consistency between the CDS instrument and the
@@ -134,7 +135,7 @@ pub(super) fn settlement_date(
     // result forward off any weekend so settlement always lands on a weekday.
     let delay_days = ((settlement_delay as f64)
         * finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR
-        / time_constants::BUSINESS_DAYS_PER_YEAR_US)
+        / TRADING_DAYS_PER_YEAR)
         .round() as i64;
     let mut settle = default_date + Duration::days(delay_days);
     while settle.is_weekend() {

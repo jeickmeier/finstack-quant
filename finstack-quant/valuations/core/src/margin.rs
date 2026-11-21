@@ -5,6 +5,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{Error, Result};
+pub use finstack_quant_margin::Marginable;
 use finstack_quant_margin::SimmVersion;
 use finstack_quant_margin::calculators::ImResult;
 use finstack_quant_margin::calculators::im::SimmCalculator;

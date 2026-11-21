@@ -49,19 +49,17 @@ impl Default for BermudanSwaptionLmmPricer {
     }
 }
 
-/// Monte Carlo settings for the LMM Bermudan pricer from the embedded
-/// `lmm_bermudan` product defaults (paths, seed, antithetic pairing, minimum
-/// steps between exercises, regression degree; in-sample LSMC).
+/// Standard Monte Carlo settings for the LMM Bermudan pricer (25,000 paths,
+/// seed 42, antithetic pairing, minimum 4 steps between exercises, degree-3
+/// polynomial regression; in-sample LSMC).
 #[must_use]
 pub fn lmm_bermudan_mc_config() -> Hw1fMcConfig {
-    let defaults = &finstack_quant_valuations_core::pricer::defaults::embedded_defaults_or_panic()
-        .lmm_bermudan;
     Hw1fMcConfig {
-        num_paths: defaults.num_paths,
-        seed: defaults.seed,
-        antithetic: defaults.antithetic,
-        min_steps_between_events: defaults.min_steps_between_exercises,
-        basis_degree: defaults.basis_degree,
+        num_paths: 25_000,
+        seed: 42,
+        antithetic: true,
+        min_steps_between_events: 4,
+        basis_degree: 3,
         oos_lsmc: false,
     }
 }

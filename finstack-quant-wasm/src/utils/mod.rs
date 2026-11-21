@@ -74,7 +74,7 @@ macro_rules! core_folded_js_error {
 }
 
 core_folded_js_error!(
-    finstack_quant_valuations::Error,
+    finstack_quant_valuations::pricer::PricingError,
     finstack_quant_models::correlation::Error,
     finstack_quant_core::math::linalg::CorrelationError,
 );

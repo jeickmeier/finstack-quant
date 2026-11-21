@@ -49,7 +49,7 @@
 //! - [`crate::metrics`]: risk metric identifiers, calculators, and registries.
 //! - [`crate::results`]: valuation result envelopes and metadata.
 //! - [`crate::constants`]: shared numerical constants.
-//! - [`crate::Error`] and [`crate::Result`]: valuation error types, at the crate root.
+//! - [`crate::margin`]: marginability dispatch bridging to `finstack-quant-margin`.
 //!
 //! # Example
 //!
@@ -62,10 +62,8 @@ extern crate self as finstack_quant_valuations_core;
 
 /// Shared numerical constants and basis point helpers.
 pub mod constants;
-#[doc(hidden)]
-pub mod contract_specs;
-/// Error types for pricing and valuation workflows.
-pub(crate) mod error;
+/// Marginability dispatch bridging instruments to `finstack-quant-margin`.
+pub mod margin;
 /// Market quotes and conventions
 pub mod market;
 /// Pricing dispatch and registry infrastructure.
@@ -92,8 +90,6 @@ pub mod __private {
 pub mod instruments;
 /// Risk metric calculators and registries.
 pub mod metrics;
-
-pub use error::{Error, Result};
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

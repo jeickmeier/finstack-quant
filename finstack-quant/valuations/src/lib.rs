@@ -100,17 +100,15 @@ pub use finstack_quant_valuations_core::{
 #[doc(hidden)]
 pub use finstack_quant_valuations_core::serde_defaults;
 pub use finstack_quant_valuations_core::{
-    constants, contract_specs, market, metrics, recalibration, results,
+    constants, margin, market, metrics, recalibration, results,
 };
 /// Pricing dispatch and registry infrastructure.
-pub mod margin;
 pub mod pricer;
 /// JSON Schema generation for API contracts.
 pub mod schema;
 
 /// Financial instrument definitions and builders.
 pub mod instruments;
-pub use finstack_quant_valuations_core::{Error, Result};
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

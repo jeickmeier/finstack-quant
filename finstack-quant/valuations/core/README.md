@@ -27,9 +27,9 @@ names a concrete instrument type.
 | `src/metrics/` | `MetricId`, `MetricCalculator`, `MetricContext`, `MetricRegistry`, the universal calculators, generic sensitivities, historical VaR |
 | `src/market/` | Market quotes, convention registries, listed-product catalog |
 | `src/results/` | `ValuationResult`, `ValuationDetails`, provenance, row export, the composite and structured-credit result DTOs |
-| `src/contract_specs.rs` | Embedded exchange contract specs (hidden; surfaced through the instruments that use them) |
+| `src/margin.rs` | Marginability bridge (`Marginable` dispatch) |
 | `src/recalibration.rs` | Recalibration contract implemented by the calibration crate |
-| `data/` | Conventions, contract specs, product defaults and the listed-product catalog compiled in with `include_str!` |
+| `data/` | Conventions, product defaults and the listed-product catalog compiled in with `include_str!` |
 
 ## Usage
 

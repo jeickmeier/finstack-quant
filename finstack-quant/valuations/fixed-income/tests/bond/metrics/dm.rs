@@ -4,7 +4,6 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, InputError};
-use finstack_quant_valuations_core::Error as ValuationError;
 use finstack_quant_valuations_core::pricer::PricingError;
 use finstack_quant_valuations_fixed_income::bond::Bond;
 use finstack_quant_valuations_fixed_income::bond::CashflowSpec;
@@ -62,7 +61,7 @@ fn test_dm_fixed_bond_is_rejected_in_strict_mode() {
         .expect_err("discount margin should not be available for fixed-rate bonds");
 
     match err {
-        ValuationError::Pricing(PricingError::InvalidInput { message, context }) => {
+        PricingError::InvalidInput { message, context } => {
             assert!(
                 message.contains("discount_margin"),
                 "pricing error should mention discount_margin, got: {message}"

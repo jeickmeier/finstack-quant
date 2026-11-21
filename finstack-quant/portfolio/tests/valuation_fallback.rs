@@ -82,7 +82,7 @@ impl Instrument for CanonicalPvInstrument {
         as_of: Date,
         metrics: &[finstack_quant_valuations::metrics::MetricId],
         _options: finstack_quant_valuations::instruments::PricingOptions,
-    ) -> finstack_quant_valuations::Result<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, finstack_quant_valuations::pricer::PricingError> {
         assert!(metrics.is_empty());
         Ok(ValuationResult::stamped(
             self.id(),
@@ -159,7 +159,7 @@ impl Instrument for ValueOnlyInstrument {
         _as_of: Date,
         _metrics: &[finstack_quant_valuations::metrics::MetricId],
         _options: finstack_quant_valuations::instruments::PricingOptions,
-    ) -> finstack_quant_valuations::Result<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, finstack_quant_valuations::pricer::PricingError> {
         Err(Error::Validation("pricing always fails".to_string()).into())
     }
 }

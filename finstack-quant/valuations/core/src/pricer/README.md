@@ -102,7 +102,7 @@ registry from `STANDARD.pricers().clone()` and mutate it, then pass it via
 
 `InstrumentType` and `ModelKey` are
 `#[repr(u16)]` with explicit discriminants, `#[non_exhaustive]`, serde
-`rename_all = "snake_case"`, and derive `strum::EnumIter`. `PricerKey` is
+`rename_all = "snake_case"`, and `ALL` / `iter()` generated in declaration order. `PricerKey` is
 `#[repr(C)]` (4 bytes) with `deny_unknown_fields`; `keys::tests::abi_is_stable`
 pins all three sizes.
 
@@ -258,17 +258,15 @@ variant except the first two carries a `PricingErrorContext`
 (instrument id, instrument type, model, curve ids), which is what makes a
 failure diagnosable when pricing many instruments.
 
-Both conversions are **lossy in one direction each** and are documented with a
-mapping table in [`errors.rs`](errors.rs):
+Both conversions are documented with a mapping table in [`errors.rs`](errors.rs):
 
 - `PricingError -> finstack_quant_core::Error` flattens the typed context into a
   message string; `ModelFailure` always lands as `Calibration { category: "pricing_model" }`.
-- `PricingError::from_core(err, context)` is the *only* way in. There is
-  deliberately no blanket `From<core::Error>` impl, because it would silently
-  attach an empty context; the signature forces the caller to supply one.
+- `PricingError::from_core(err, context)` attaches explicit pricing context
+  when lifting core errors; `From<core::Error> for PricingError` converts with
+  default context so pricers can propagate core errors with `?`.
 
-`PricingError` derives serde because it flows through the crate-level
-`crate::Error` wire envelope.
+[`Instrument::price_with_metrics`](crate::instruments::Instrument::price_with_metrics) returns `Result<ValuationResult, PricingError>` directly.
 
 ## JSON entry points
 

@@ -11,7 +11,7 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_option::bloo
 };
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::pricer::synthetic_underlying_cds;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
-use finstack_quant_valuations::constants::bloomberg_cdso;
+use finstack_quant_valuations::instruments::credit_derivatives::constants::bloomberg_cdso;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use super::common::cdx_ig_46_fixture;

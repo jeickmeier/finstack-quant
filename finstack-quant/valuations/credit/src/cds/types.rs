@@ -48,6 +48,7 @@
 //! );
 //! ```
 
+use crate::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -56,7 +57,6 @@ use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::validation;
 use finstack_quant_margin::types::OtcMarginSpec;
-use finstack_quant_valuations_core::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_quant_valuations_core::market::conventions::CdsConvention;
 use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
 use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
@@ -490,7 +490,7 @@ impl CreditDefaultSwap {
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::types::CurveId;
-    /// use finstack_quant_valuations_core::constants::isda::STANDARD_RECOVERY_SENIOR;
+    /// use finstack_quant_valuations_credit::constants::isda::STANDARD_RECOVERY_SENIOR;
     /// use finstack_quant_valuations_core::market::conventions::CdsConvention;
     /// use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
     /// use finstack_quant_valuations_core::instruments::{CdsDateRegime, PayReceive, PremiumLegSpec, ProtectionLegSpec};

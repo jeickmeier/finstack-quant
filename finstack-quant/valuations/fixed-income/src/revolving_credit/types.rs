@@ -621,12 +621,14 @@ pub struct RevolvingCreditMcRun {
 }
 
 impl RevolvingCreditMcRun {
+    const DEFAULT_NUM_PATHS: usize = 10_000;
+    const DEFAULT_ANTITHETIC: bool = false;
+
     /// Resolve sampling settings from a facility's model configuration.
     ///
-    /// `mc_paths` and `mc_antithetic` fall back to the embedded registry's
-    /// `revolving_credit` defaults. The seed is
-    /// `derive_seed(facility_id, mc_seed_scenario)`, with `"base"` when no
-    /// label is set.
+    /// `mc_paths` defaults to 10,000 and `mc_antithetic` defaults to `false`.
+    /// The seed is `derive_seed(facility_id, mc_seed_scenario)`, with `"base"`
+    /// when no label is set.
     ///
     /// # Arguments
     ///
@@ -637,22 +639,22 @@ impl RevolvingCreditMcRun {
     ///
     /// # Errors
     ///
-    /// Returns a validation error when the registry cannot be loaded or
-    /// `mc_paths` exceeds the workspace path cap.
+    /// Returns a validation error when `mc_paths` is zero or exceeds the
+    /// workspace path cap.
     pub fn resolve(
         facility_id: &finstack_quant_core::types::InstrumentId,
         model_config: &finstack_quant_valuations_core::instruments::pricing_overrides::ModelConfig,
     ) -> finstack_quant_core::Result<Self> {
-        let defaults = &finstack_quant_valuations_core::pricer::defaults::embedded_defaults()?
-            .revolving_credit;
         Ok(Self {
             num_paths:
                 finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_mc_paths(
                     model_config.mc_paths,
-                    defaults.num_paths,
+                    Self::DEFAULT_NUM_PATHS,
                 )?,
             seed: model_config.mc_seed(facility_id),
-            antithetic: model_config.mc_antithetic.unwrap_or(defaults.antithetic),
+            antithetic: model_config
+                .mc_antithetic
+                .unwrap_or(Self::DEFAULT_ANTITHETIC),
         })
     }
 }

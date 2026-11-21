@@ -9,15 +9,31 @@ use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId, PriceId};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_margin::types::RepoMarginSpec;
-use finstack_quant_valuations_core::contract_specs::embedded_registry;
 use finstack_quant_valuations_core::instruments::Instrument;
 use rust_decimal::Decimal;
 
 use finstack_quant_valuations_core::impl_instrument_base;
 
-fn repo_specs_id(currency: finstack_quant_core::currency::Currency) -> Result<&'static str> {
+#[derive(Debug, Clone, Copy)]
+struct RepoDefaultSpecs {
+    haircut: f64,
+    calendar_id: &'static str,
+    day_count: DayCount,
+    business_day_convention: BusinessDayConvention,
+    triparty: bool,
+}
+
+fn repo_defaults_for_currency(
+    currency: finstack_quant_core::currency::Currency,
+) -> Result<RepoDefaultSpecs> {
     match currency {
-        finstack_quant_core::currency::Currency::USD => Ok("repo.usd_general_collateral"),
+        finstack_quant_core::currency::Currency::USD => Ok(RepoDefaultSpecs {
+            haircut: 0.02,
+            calendar_id: "usny",
+            day_count: DayCount::Act360,
+            business_day_convention: BusinessDayConvention::Following,
+            triparty: false,
+        }),
         _ => Err(Error::Validation(format!(
             "No repo defaults for {currency}; use Repo::builder with explicit contract conventions"
         ))),
@@ -367,8 +383,7 @@ impl Repo {
     ) -> Result<Self> {
         use finstack_quant_core::dates::calendar_by_id_strict;
 
-        let defaults =
-            embedded_registry()?.repo_defaults(repo_specs_id(cash_amount.currency())?)?;
+        let defaults = repo_defaults_for_currency(cash_amount.currency())?;
         let cal_id = calendar_id.into();
         let calendar = calendar_by_id_strict(&cal_id)?;
 
@@ -408,8 +423,7 @@ impl Repo {
         maturity: Date,
         discount_curve_id: impl Into<CurveId>,
     ) -> Result<Self> {
-        let defaults =
-            embedded_registry()?.repo_defaults(repo_specs_id(cash_amount.currency())?)?;
+        let defaults = repo_defaults_for_currency(cash_amount.currency())?;
         let repo_rate = finstack_quant_core::decimal::f64_to_decimal(repo_rate)?;
 
         Repo::builder()
@@ -441,8 +455,7 @@ impl Repo {
         initial_maturity: Date,
         discount_curve_id: impl Into<CurveId>,
     ) -> Result<Self> {
-        let defaults =
-            embedded_registry()?.repo_defaults(repo_specs_id(cash_amount.currency())?)?;
+        let defaults = repo_defaults_for_currency(cash_amount.currency())?;
         let repo_rate = finstack_quant_core::decimal::f64_to_decimal(repo_rate)?;
 
         Repo::builder()
@@ -1215,5 +1228,24 @@ mod tests {
         );
 
         assert!(result.is_err(), "Unknown calendar should error");
+    }
+
+    #[test]
+    fn repo_defaults_for_currency_usd_and_unsupported_currency() {
+        let usd = repo_defaults_for_currency(Currency::USD).expect("USD defaults");
+        assert_eq!(usd.haircut, 0.02);
+        assert_eq!(usd.calendar_id, "usny");
+        assert_eq!(usd.day_count, DayCount::Act360);
+        assert_eq!(
+            usd.business_day_convention,
+            BusinessDayConvention::Following
+        );
+        assert!(!usd.triparty);
+
+        let eur = repo_defaults_for_currency(Currency::EUR);
+        assert!(
+            eur.is_err(),
+            "Non-USD defaults should require explicit builder"
+        );
     }
 }

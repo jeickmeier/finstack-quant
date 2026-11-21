@@ -30,13 +30,13 @@ pub use json::{
     validate_instrument_json, validate_typed_instrument_json,
 };
 
-use crate::instruments::credit_derivatives::CREDIT;
-use crate::instruments::equity::EQUITY;
-use crate::instruments::fixed_income::FIXED_INCOME;
-use crate::instruments::fx::FX;
-use crate::instruments::rates::RATES;
 use crate::metrics::{MetricRegistry, MetricRegistryError};
+use finstack_quant_valuations_credit::CREDIT;
+use finstack_quant_valuations_equity::EQUITY;
 use finstack_quant_valuations_exotics::EXOTICS;
+use finstack_quant_valuations_fixed_income::FIXED_INCOME;
+use finstack_quant_valuations_fx::FX;
+use finstack_quant_valuations_rates::RATES;
 use finstack_quant_valuations_structured_credit::STRUCTURED_CREDIT;
 
 /// The built-in instrument families, each owning a disjoint set of

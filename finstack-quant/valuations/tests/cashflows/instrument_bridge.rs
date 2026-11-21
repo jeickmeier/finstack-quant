@@ -81,9 +81,10 @@ fn bond_future_exposes_cashflow_provider_bridge() {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations::contract_specs::BondFutureSpecs;
     use finstack_quant_valuations::instruments::ListedFutureTerms;
-    use finstack_quant_valuations::instruments::fixed_income::bond_future::DeliverableBond;
+    use finstack_quant_valuations::instruments::fixed_income::bond_future::{
+        BondFutureSpecs, DeliverableBond,
+    };
     use time::Month;
 
     let future = BondFuture::builder()

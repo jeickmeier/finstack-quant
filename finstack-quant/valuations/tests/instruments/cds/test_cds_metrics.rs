@@ -1636,7 +1636,7 @@ fn market_with_clause_recipe(as_of: Date, doc_clause: CdsDocClause) -> MarketCon
             entity: "CORP",
             discount_curve_id: "USD_OIS",
             pillars: &pillars,
-            recovery_rate: finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR,
+            recovery_rate: finstack_quant_valuations::instruments::credit_derivatives::constants::isda::STANDARD_RECOVERY_SENIOR,
             cds_valuation_convention: None,
             doc_clause: Some(doc_clause),
         },

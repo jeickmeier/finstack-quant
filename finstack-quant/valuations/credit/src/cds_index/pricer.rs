@@ -14,6 +14,7 @@
 use crate::cds::CreditDefaultSwap;
 use crate::cds::pricing::{CdsPricer, date_from_hazard_time};
 use crate::cds_index::{CdsIndex, IndexPricing};
+use crate::constants::credit;
 use finstack_quant_cashflows::builder::merge_cashflow_schedules;
 use finstack_quant_cashflows::builder::{CashFlowSchedule, Notional};
 use finstack_quant_cashflows::{
@@ -28,7 +29,6 @@ use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::constants::credit;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::{
     Cs01Request, compute_parallel_cs01_with_provider_raw, require_hazard_replay,

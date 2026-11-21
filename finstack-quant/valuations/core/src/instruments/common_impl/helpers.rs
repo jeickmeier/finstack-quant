@@ -863,7 +863,8 @@ mod tests {
             as_of: Date,
             metrics: &[MetricId],
             options: crate::instruments::PricingOptions,
-        ) -> crate::Result<crate::results::ValuationResult> {
+        ) -> std::result::Result<crate::results::ValuationResult, crate::pricer::PricingError>
+        {
             let base = self.value(market, as_of)?;
             Ok(build_with_metrics_dyn(
                 Arc::from(self.clone_box()),

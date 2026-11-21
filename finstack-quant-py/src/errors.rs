@@ -127,7 +127,7 @@ pub fn kind_to_py(kind: finstack_quant_core::ErrorKind, message: String) -> PyEr
 ///
 /// The full error source chain (via [`std::error::Error::source`]) is flattened
 /// into the Python message. This preserves context from wrappers like
-/// `finstack_quant_valuations::Error::Calibration(core_err)`.
+/// [`finstack_quant_valuations::pricer::PricingError`].
 ///
 /// The exception class comes from [`finstack_quant_core::Error::kind`] through
 /// [`kind_to_py`]; that method is the only place the variant mapping is written.

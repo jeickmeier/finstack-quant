@@ -377,7 +377,7 @@ impl Instrument for ScenarioFailureInstrument {
         as_of: Date,
         _metrics: &[MetricId],
         options: PricingOptions,
-    ) -> finstack_quant_valuations::Result<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, finstack_quant_valuations::pricer::PricingError> {
         let config = options.config.as_deref().ok_or_else(|| {
             finstack_quant_core::Error::Validation(
                 "scenario test expected the executor request config".to_string(),

@@ -1280,7 +1280,8 @@ mod tests {
             as_of: Date,
             _metrics: &[MetricId],
             options: PricingOptions,
-        ) -> finstack_quant_valuations::Result<ValuationResult> {
+        ) -> std::result::Result<ValuationResult, finstack_quant_valuations::pricer::PricingError>
+        {
             if _metrics.is_empty() {
                 self.pv_only_calls.fetch_add(1, Ordering::SeqCst);
             } else {
@@ -1372,7 +1373,8 @@ mod tests {
             as_of: Date,
             _metrics: &[MetricId],
             _options: PricingOptions,
-        ) -> finstack_quant_valuations::Result<ValuationResult> {
+        ) -> std::result::Result<ValuationResult, finstack_quant_valuations::pricer::PricingError>
+        {
             Ok(ValuationResult::stamped(
                 self.id(),
                 as_of,

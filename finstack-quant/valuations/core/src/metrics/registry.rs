@@ -782,7 +782,7 @@ mod tests {
             _as_of: Date,
             _metrics: &[MetricId],
             _options: crate::instruments::PricingOptions,
-        ) -> crate::Result<ValuationResult> {
+        ) -> std::result::Result<ValuationResult, crate::pricer::PricingError> {
             unimplemented!()
         }
     }

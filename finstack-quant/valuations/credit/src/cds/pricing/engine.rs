@@ -7,6 +7,7 @@ use super::helpers::{
     validate_recovery_consistency,
 };
 use crate::cds::CreditDefaultSwap;
+use crate::constants::credit;
 use finstack_quant_core::dates::{Date, DayCountContext, HolidayCalendar};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::market_data::traits::Discounting;
@@ -14,7 +15,6 @@ use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::constants::credit;
 use rust_decimal::prelude::ToPrimitive;
 
 /// CDS pricing engine.
@@ -1307,10 +1307,7 @@ mod cds_review_regression_tests {
             .knots([(1.0, 10.0), (10.0, 10.0)])
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()?;
-        assert!(
-            surv.sp(5.0)?
-                < finstack_quant_valuations_core::constants::credit::SURVIVAL_PROBABILITY_FLOOR
-        );
+        assert!(surv.sp(5.0)? < crate::constants::credit::SURVIVAL_PROBABILITY_FLOOR);
         for convention in [
             CdsValuationConvention::IsdaDirty,
             CdsValuationConvention::BloombergCdswClean,

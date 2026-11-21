@@ -783,8 +783,10 @@ mod tests {
             as_of: Date,
             _metrics: &[finstack_quant_valuations::metrics::MetricId],
             _options: finstack_quant_valuations::instruments::PricingOptions,
-        ) -> finstack_quant_valuations::Result<finstack_quant_valuations::results::ValuationResult>
-        {
+        ) -> std::result::Result<
+            finstack_quant_valuations::results::ValuationResult,
+            finstack_quant_valuations::pricer::PricingError,
+        > {
             Ok(
                 finstack_quant_valuations::results::ValuationResult::stamped(
                     self.id(),

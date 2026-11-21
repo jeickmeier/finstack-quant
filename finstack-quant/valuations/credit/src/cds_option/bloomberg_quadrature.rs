@@ -55,6 +55,7 @@
 use crate::cds::CreditDefaultSwap;
 use crate::cds::pricing::CdsPricer;
 use crate::cds_option::CdsOption;
+use crate::constants::bloomberg_cdso;
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -67,7 +68,6 @@ use finstack_quant_core::math::special_functions::{norm_pdf, norm_pdf_unchecked}
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::OptionType;
-use finstack_quant_valuations_core::constants::bloomberg_cdso;
 use rust_decimal::Decimal;
 
 /// Above 10% forward spread, the lognormal-mean calibration is outside the

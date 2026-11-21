@@ -10,8 +10,9 @@ use crate::instruments::Instrument;
 /// This struct captures the instrument, model, and market data context
 /// when a pricing error occurs, enabling easier troubleshooting.
 ///
-/// Serde is derived because this type flows through the crate-level
-/// [`crate::Error`] enum, which is part of the wire-stable error envelope.
+/// Serde is derived for consistency with [`finstack_quant_core::Error`] and
+/// downstream serializable error envelopes such as
+/// `finstack_quant_scenarios::Error`.
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PricingErrorContext {
     /// The instrument ID that was being priced (if known).
@@ -140,10 +141,10 @@ impl std::fmt::Display for PricingErrorContext {
             parts.push(format!("instrument={}", id));
         }
         if let Some(typ) = self.instrument_type {
-            parts.push(format!("type={:?}", typ));
+            parts.push(format!("type={typ}"));
         }
         if let Some(model) = self.model {
-            parts.push(format!("model={:?}", model));
+            parts.push(format!("model={model}"));
         }
         if !self.curve_ids.is_empty() {
             parts.push(format!("curves=[{}]", self.curve_ids.join(", ")));
@@ -161,8 +162,9 @@ impl std::fmt::Display for PricingErrorContext {
 /// Each variant captures the error condition along with optional context
 /// (instrument ID, type, model, and curve IDs) for actionable debugging.
 ///
-/// Serde is derived because this type flows through the crate-level
-/// [`crate::Error`] enum, which is part of the wire-stable error envelope.
+/// Serde is derived for consistency with [`finstack_quant_core::Error`] and
+/// downstream serializable error envelopes such as
+/// `finstack_quant_scenarios::Error`.
 #[derive(Debug, Clone, PartialEq, thiserror::Error, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -291,7 +293,7 @@ impl From<finstack_quant_core::Error> for PricingError {
 /// |-----------------------|---------------------------------|---------------------------------------|
 /// | `UnknownPricer`       | `Input(NotFound)`               | Typed `PricerKey` → string id         |
 /// | `DuplicateRegistration`| `Validation`                    | Typed `PricerKey`                     |
-/// | `TypeMismatch`        | `Input(Invalid)`                | Expected/got instrument types         |
+/// | `TypeMismatch`        | `Validation`                    | Expected/got instrument types         |
 /// | `InvalidInput`        | `Validation`                    | Structured `PricingErrorContext`       |
 /// | `MissingMarketData`   | `Input(NotFound)`               | `PricingErrorContext`                  |
 /// | `ModelFailure`        | `Calibration`                   | `PricingErrorContext`; category fixed  |
@@ -299,7 +301,7 @@ impl From<PricingError> for finstack_quant_core::Error {
     fn from(err: PricingError) -> Self {
         match err {
             PricingError::UnknownPricer { key, .. } => {
-                let pricer_id = format!("pricer:{}:{:?}", key.instrument, key.model);
+                let pricer_id = format!("pricer:{}:{}", key.instrument, key.model);
                 finstack_quant_core::InputError::NotFound { id: pricer_id }.into()
             }
             PricingError::DuplicateRegistration { key } => {
@@ -624,7 +626,7 @@ mod tests {
         .into();
         match unknown_pricer {
             finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound { id }) => {
-                assert_eq!(id, "pricer:bond:Tree")
+                assert_eq!(id, "pricer:bond:tree")
             }
             other => panic!("unexpected mapping for unknown pricer: {other:?}"),
         }
@@ -745,8 +747,8 @@ mod tests {
 
         let rendered = populated.to_string();
         assert!(rendered.contains("instrument=BOND-007"));
-        assert!(rendered.contains("type=Bond"));
-        assert!(rendered.contains("model=Discounting"));
+        assert!(rendered.contains("type=bond"));
+        assert!(rendered.contains("model=discounting"));
         assert!(rendered.contains("curves=[USD-OIS, USD-SOFR, USD-CREDIT]"));
     }
 

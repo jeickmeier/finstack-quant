@@ -50,7 +50,6 @@ EXCLUDED_PATH_PARTS = {
 REGISTRY_CODE_PATH_PARTS = (
     "src/credit/registry.rs",
     "src/rating_scales.rs",
-    "src/contract_specs.rs",
     "finstack-quant/analytics/src/registry.rs",
     "finstack-quant/valuations/src/calibration/defaults.rs",
     "finstack-quant/valuations/src/market/conventions/loaders/",

@@ -4,18 +4,46 @@
 //! identifiers used by the pricing registry to route instruments to the
 //! appropriate pricer implementation.
 
+macro_rules! impl_key_strings {
+    ($ty:ty, $unknown_prefix:expr; $( $variant:ident => $name:literal ),+ $(,)?) => {
+        impl $ty {
+            /// All variants in canonical declaration order.
+            pub const ALL: &'static [Self] = &[$(<$ty>::$variant),+];
+
+            /// Iterate over all variants in canonical declaration order.
+            pub fn iter() -> std::iter::Copied<std::slice::Iter<'static, Self>> {
+                Self::ALL.iter().copied()
+            }
+
+            /// Canonical snake_case wire identifier.
+            pub const fn as_str(self) -> &'static str {
+                match self {
+                    $(<$ty>::$variant => $name),+
+                }
+            }
+        }
+
+        impl std::fmt::Display for $ty {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(self.as_str())
+            }
+        }
+
+        impl std::str::FromStr for $ty {
+            type Err = String;
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $($name => Ok(<$ty>::$variant),)+
+                    _ => Err(format!("{}: {s}", $unknown_prefix)),
+                }
+            }
+        }
+    };
+}
+
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    strum::EnumIter,
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[repr(u16)]
@@ -195,110 +223,89 @@ pub enum InstrumentType {
     StructuredCreditTranche = 94,
 }
 
-use strum::IntoEnumIterator;
-
-impl InstrumentType {
-    /// Canonical snake_case wire identifier.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            InstrumentType::Bond => "bond",
-            InstrumentType::Cds => "credit_default_swap",
-            InstrumentType::CdsIndex => "cds_index",
-            InstrumentType::CdsTranche => "cds_tranche",
-            InstrumentType::CdsOption => "cds_option",
-            InstrumentType::Irs => "interest_rate_swap",
-            InstrumentType::CapFloor => "cap_floor",
-            InstrumentType::Swaption => "swaption",
-            InstrumentType::BermudanSwaption => "bermudan_swaption",
-            InstrumentType::BasisSwap => "basis_swap",
-            InstrumentType::Basket => "basket",
-            InstrumentType::Convertible => "convertible_bond",
-            InstrumentType::Deposit => "deposit",
-            InstrumentType::EquityOption => "equity_option",
-            InstrumentType::FxOption => "fx_option",
-            InstrumentType::FxSpot => "fx_spot",
-            InstrumentType::FxSwap => "fx_swap",
-            InstrumentType::XccySwap => "xccy_swap",
-            InstrumentType::InflationLinkedBond => "inflation_linked_bond",
-            InstrumentType::InflationSwap => "inflation_swap",
-            InstrumentType::YoYInflationSwap => "yoy_inflation_swap",
-            InstrumentType::InflationCapFloor => "inflation_cap_floor",
-            InstrumentType::InterestRateFuture => "interest_rate_future",
-            InstrumentType::VarianceSwap => "variance_swap",
-            InstrumentType::FxVarianceSwap => "fx_variance_swap",
-            InstrumentType::Equity => "equity",
-            InstrumentType::Repo => "repo",
-            InstrumentType::Fra => "forward_rate_agreement",
-            InstrumentType::StructuredCredit => "structured_credit",
-            InstrumentType::StructuredCreditTranche => "structured_credit_tranche",
-            InstrumentType::PrivateMarketsFund => "private_markets_fund",
-            InstrumentType::RevolvingCredit => "revolving_credit",
-            InstrumentType::AssetBackedFacility => "asset_backed_facility",
-            InstrumentType::AsianOption => "asian_option",
-            InstrumentType::BarrierOption => "barrier_option",
-            InstrumentType::LookbackOption => "lookback_option",
-            InstrumentType::QuantoOption => "quanto_option",
-            InstrumentType::Autocallable => "autocallable",
-            InstrumentType::CmsOption => "cms_option",
-            InstrumentType::CmsSwap => "cms_swap",
-            InstrumentType::CliquetOption => "cliquet_option",
-            InstrumentType::RangeAccrual => "range_accrual",
-            InstrumentType::FxBarrierOption => "fx_barrier_option",
-            InstrumentType::TermLoan => "term_loan",
-            InstrumentType::Dcf => "discounted_cash_flow",
-            InstrumentType::RealEstateAsset => "real_estate_asset",
-            InstrumentType::LeveredRealEstateEquity => "levered_real_estate_equity",
-            InstrumentType::EquityTotalReturnSwap => "trs_equity",
-            InstrumentType::FiIndexTotalReturnSwap => "trs_fixed_income_index",
-            InstrumentType::BondFuture => "bond_future",
-            InstrumentType::CommodityForward => "commodity_forward",
-            InstrumentType::CommoditySwap => "commodity_swap",
-            InstrumentType::CommoditySpotOption => "commodity_spot_option",
-            InstrumentType::CommodityAsianOption => "commodity_asian_option",
-            InstrumentType::CommoditySwaption => "commodity_swaption",
-            InstrumentType::CommoditySpreadOption => "commodity_spread_option",
-            InstrumentType::VolatilityIndexFuture => "volatility_index_future",
-            InstrumentType::CommodityFuture => "commodity_future",
-            InstrumentType::FxFuture => "fx_future",
-            InstrumentType::EquityFuture => "equity_future",
-            InstrumentType::EquityTotalReturnFuture => "equity_total_return_future",
-            InstrumentType::InterestRateFutureOption => "interest_rate_future_option",
-            InstrumentType::EquityFutureOption => "equity_future_option",
-            InstrumentType::FxFutureOption => "fx_future_option",
-            InstrumentType::CommodityFutureOption => "commodity_future_option",
-            InstrumentType::VolatilityIndexFutureOption => "volatility_index_future_option",
-            InstrumentType::FxForward => "fx_forward",
-            InstrumentType::Ndf => "ndf",
-            InstrumentType::AgencyMbsPassthrough => "agency_mbs_passthrough",
-            InstrumentType::AgencyTba => "agency_tba",
-            InstrumentType::DollarRoll => "dollar_roll",
-            InstrumentType::AgencyCmo => "agency_cmo",
-            InstrumentType::FxDigitalOption => "fx_digital_option",
-            InstrumentType::FxTouchOption => "fx_touch_option",
-            InstrumentType::Tarn => "tarn",
-            InstrumentType::CmsSpreadOption => "cms_spread_option",
-            InstrumentType::CallableRangeAccrual => "callable_range_accrual",
-            InstrumentType::Snowball => "snowball",
-            InstrumentType::Composite => "composite",
-        }
-    }
-}
-
-impl std::fmt::Display for InstrumentType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl std::str::FromStr for InstrumentType {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::iter()
-            .find(|candidate| candidate.as_str() == s)
-            .ok_or_else(|| format!("Unknown instrument type: {s}"))
-    }
-}
+impl_key_strings!(
+    InstrumentType,
+    "Unknown instrument type";
+    Bond => "bond",
+    Cds => "credit_default_swap",
+    CdsIndex => "cds_index",
+    CdsTranche => "cds_tranche",
+    CdsOption => "cds_option",
+    Irs => "interest_rate_swap",
+    CapFloor => "cap_floor",
+    Swaption => "swaption",
+    BermudanSwaption => "bermudan_swaption",
+    BasisSwap => "basis_swap",
+    Basket => "basket",
+    Convertible => "convertible_bond",
+    Deposit => "deposit",
+    EquityOption => "equity_option",
+    FxOption => "fx_option",
+    FxSpot => "fx_spot",
+    FxSwap => "fx_swap",
+    XccySwap => "xccy_swap",
+    InflationLinkedBond => "inflation_linked_bond",
+    InflationSwap => "inflation_swap",
+    YoYInflationSwap => "yoy_inflation_swap",
+    InflationCapFloor => "inflation_cap_floor",
+    InterestRateFuture => "interest_rate_future",
+    VarianceSwap => "variance_swap",
+    FxVarianceSwap => "fx_variance_swap",
+    Equity => "equity",
+    Repo => "repo",
+    Fra => "forward_rate_agreement",
+    StructuredCredit => "structured_credit",
+    StructuredCreditTranche => "structured_credit_tranche",
+    PrivateMarketsFund => "private_markets_fund",
+    RevolvingCredit => "revolving_credit",
+    AssetBackedFacility => "asset_backed_facility",
+    AsianOption => "asian_option",
+    BarrierOption => "barrier_option",
+    LookbackOption => "lookback_option",
+    QuantoOption => "quanto_option",
+    Autocallable => "autocallable",
+    CmsOption => "cms_option",
+    CmsSwap => "cms_swap",
+    CliquetOption => "cliquet_option",
+    RangeAccrual => "range_accrual",
+    FxBarrierOption => "fx_barrier_option",
+    TermLoan => "term_loan",
+    Dcf => "discounted_cash_flow",
+    RealEstateAsset => "real_estate_asset",
+    LeveredRealEstateEquity => "levered_real_estate_equity",
+    EquityTotalReturnSwap => "trs_equity",
+    FiIndexTotalReturnSwap => "trs_fixed_income_index",
+    BondFuture => "bond_future",
+    CommodityForward => "commodity_forward",
+    CommoditySwap => "commodity_swap",
+    CommoditySpotOption => "commodity_spot_option",
+    CommodityAsianOption => "commodity_asian_option",
+    CommoditySwaption => "commodity_swaption",
+    CommoditySpreadOption => "commodity_spread_option",
+    VolatilityIndexFuture => "volatility_index_future",
+    CommodityFuture => "commodity_future",
+    FxFuture => "fx_future",
+    EquityFuture => "equity_future",
+    EquityTotalReturnFuture => "equity_total_return_future",
+    InterestRateFutureOption => "interest_rate_future_option",
+    EquityFutureOption => "equity_future_option",
+    FxFutureOption => "fx_future_option",
+    CommodityFutureOption => "commodity_future_option",
+    VolatilityIndexFutureOption => "volatility_index_future_option",
+    FxForward => "fx_forward",
+    Ndf => "ndf",
+    AgencyMbsPassthrough => "agency_mbs_passthrough",
+    AgencyTba => "agency_tba",
+    DollarRoll => "dollar_roll",
+    AgencyCmo => "agency_cmo",
+    FxDigitalOption => "fx_digital_option",
+    FxTouchOption => "fx_touch_option",
+    Tarn => "tarn",
+    CmsSpreadOption => "cms_spread_option",
+    CallableRangeAccrual => "callable_range_accrual",
+    Snowball => "snowball",
+    Composite => "composite",
+);
 
 /// Pricing model selection for the pricer registry.
 ///
@@ -347,17 +354,7 @@ impl std::str::FromStr for InstrumentType {
 /// assert_eq!(model, ModelKey::Black76);
 /// ```
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    strum::EnumIter,
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -526,59 +523,40 @@ pub enum ModelKey {
     BloombergCdso = 52,
 }
 
-impl ModelKey {
-    /// Canonical snake_case wire identifier.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            ModelKey::Discounting => "discounting",
-            ModelKey::Tree => "tree",
-            ModelKey::Black76 => "black76",
-            ModelKey::HullWhite1F => "hull_white_1f",
-            ModelKey::HazardRate => "hazard_rate",
-            ModelKey::RatesCredit => "rates_credit",
-            ModelKey::Normal => "normal",
-            ModelKey::MonteCarloGBM => "monte_carlo_gbm",
-            ModelKey::MonteCarloHeston => "monte_carlo_heston",
-            ModelKey::MonteCarloHullWhite1F => "monte_carlo_hull_white_1f",
-            ModelKey::MonteCarloThreeFactor => "monte_carlo_three_factor",
-            ModelKey::BarrierBSContinuous => "barrier_bs_continuous",
-            ModelKey::AsianGeometricBS => "asian_geometric_bs",
-            ModelKey::AsianTurnbullWakeman => "asian_turnbull_wakeman",
-            ModelKey::LookbackBSContinuous => "lookback_bs_continuous",
-            ModelKey::QuantoBS => "quanto_bs",
-            ModelKey::FxBarrierBSContinuous => "fx_barrier_bs_continuous",
-            ModelKey::HestonFourier => "heston_fourier",
-            ModelKey::MertonMc => "merton_mc",
-            ModelKey::MonteCarloSchwartzSmith => "monte_carlo_schwartz_smith",
-            ModelKey::StaticReplication => "static_replication",
-            ModelKey::LmmMonteCarlo => "lmm_monte_carlo",
-            ModelKey::StructuredCreditStochastic => "structured_credit_stochastic",
-            ModelKey::BondFutureCleanPriceProxy => "bond_future_clean_price_proxy",
-            ModelKey::MonteCarloRoughBergomi => "monte_carlo_rough_bergomi",
-            ModelKey::MonteCarloRoughHeston => "monte_carlo_rough_heston",
-            ModelKey::RoughHestonFourier => "rough_heston_fourier",
-            ModelKey::PdeCrankNicolson1D => "pde_crank_nicolson_1d",
-            ModelKey::PdeAdi2D => "pde_adi_2d",
-            ModelKey::BloombergCdso => "bloomberg_cdso",
-        }
-    }
-}
-
-impl std::fmt::Display for ModelKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl std::str::FromStr for ModelKey {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::iter()
-            .find(|candidate| candidate.as_str() == s)
-            .ok_or_else(|| format!("Unknown model key: {s}"))
-    }
-}
+impl_key_strings!(
+    ModelKey,
+    "Unknown model key";
+    Discounting => "discounting",
+    Tree => "tree",
+    Black76 => "black76",
+    HullWhite1F => "hull_white_1f",
+    HazardRate => "hazard_rate",
+    RatesCredit => "rates_credit",
+    Normal => "normal",
+    MonteCarloGBM => "monte_carlo_gbm",
+    MonteCarloHeston => "monte_carlo_heston",
+    MonteCarloHullWhite1F => "monte_carlo_hull_white_1f",
+    MonteCarloThreeFactor => "monte_carlo_three_factor",
+    BarrierBSContinuous => "barrier_bs_continuous",
+    AsianGeometricBS => "asian_geometric_bs",
+    AsianTurnbullWakeman => "asian_turnbull_wakeman",
+    LookbackBSContinuous => "lookback_bs_continuous",
+    QuantoBS => "quanto_bs",
+    FxBarrierBSContinuous => "fx_barrier_bs_continuous",
+    HestonFourier => "heston_fourier",
+    MertonMc => "merton_mc",
+    MonteCarloSchwartzSmith => "monte_carlo_schwartz_smith",
+    StaticReplication => "static_replication",
+    LmmMonteCarlo => "lmm_monte_carlo",
+    StructuredCreditStochastic => "structured_credit_stochastic",
+    BondFutureCleanPriceProxy => "bond_future_clean_price_proxy",
+    MonteCarloRoughBergomi => "monte_carlo_rough_bergomi",
+    MonteCarloRoughHeston => "monte_carlo_rough_heston",
+    RoughHestonFourier => "rough_heston_fourier",
+    PdeCrankNicolson1D => "pde_crank_nicolson_1d",
+    PdeAdi2D => "pde_adi_2d",
+    BloombergCdso => "bloomberg_cdso",
+);
 
 /// Composite key identifying a specific (instrument, model) pricing combination.
 ///
@@ -659,15 +637,14 @@ impl PricerKey {
 /// Returns `Error::Validation` when `model` is not a supported concrete model
 /// key.
 pub fn parse_model_key(model: &str) -> finstack_quant_core::Result<ModelKey> {
-    model.parse::<ModelKey>().map_err(|e| {
-        finstack_quant_core::Error::Validation(format!("Unknown model key: '{model}'. {e}"))
-    })
+    model
+        .parse::<ModelKey>()
+        .map_err(finstack_quant_core::Error::Validation)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use strum::IntoEnumIterator;
 
     #[test]
     fn abi_is_stable() {

@@ -8,14 +8,16 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Rate;
-use finstack_quant_valuations_core::contract_specs::BondFutureSpecs;
 use finstack_quant_valuations_core::instruments::{
     Instrument, ListedFutureTerms, Position, PricingOptions,
 };
 use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_core::pricer::PricingError;
 use finstack_quant_valuations_core::results::ValuationResult;
 use finstack_quant_valuations_fixed_income::bond::{Bond, FloatingBondParams};
-use finstack_quant_valuations_fixed_income::bond_future::{BondFuture, DeliverableBond};
+use finstack_quant_valuations_fixed_income::bond_future::{
+    BondFuture, BondFutureSpecs, DeliverableBond,
+};
 use time::macros::date;
 
 fn future(position: Position) -> BondFuture {
@@ -106,7 +108,7 @@ fn theta_result(
     future: &BondFuture,
     market: &MarketContext,
     as_of: Date,
-) -> finstack_quant_valuations_core::Result<ValuationResult> {
+) -> std::result::Result<ValuationResult, PricingError> {
     future.price_with_metrics(
         market,
         as_of,

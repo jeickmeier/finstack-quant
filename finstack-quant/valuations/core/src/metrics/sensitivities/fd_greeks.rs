@@ -894,7 +894,8 @@ mod tests {
             as_of: Date,
             metrics: &[MetricId],
             options: crate::instruments::PricingOptions,
-        ) -> crate::Result<crate::results::ValuationResult> {
+        ) -> std::result::Result<crate::results::ValuationResult, crate::pricer::PricingError>
+        {
             let base_value = self.value(market, as_of)?;
             Ok(
                 crate::instruments::common_impl::helpers::build_with_metrics_dyn(
@@ -1002,7 +1003,8 @@ mod tests {
             as_of: Date,
             metrics: &[MetricId],
             options: crate::instruments::PricingOptions,
-        ) -> crate::Result<crate::results::ValuationResult> {
+        ) -> std::result::Result<crate::results::ValuationResult, crate::pricer::PricingError>
+        {
             let base_value = self.value(market, as_of)?;
             Ok(
                 crate::instruments::common_impl::helpers::build_with_metrics_dyn(
@@ -1479,7 +1481,8 @@ mod tests {
             as_of: Date,
             metrics: &[MetricId],
             options: crate::instruments::PricingOptions,
-        ) -> crate::Result<crate::results::ValuationResult> {
+        ) -> std::result::Result<crate::results::ValuationResult, crate::pricer::PricingError>
+        {
             let base_value = self.value(market, as_of)?;
             Ok(
                 crate::instruments::common_impl::helpers::build_with_metrics_dyn(

@@ -123,7 +123,7 @@ pub struct CommodityForward {
     pub quantity: f64,
     /// Contract multiplier (typically 1.0 for OTC forwards, defaults to 1.0).
     #[serde(
-        default = "finstack_quant_valuations_core::serde_defaults::multiplier_one",
+        default = "default_multiplier",
         serialize_with = "finstack_quant_core::wire::serialize_positive_f64",
         deserialize_with = "finstack_quant_core::wire::deserialize_positive_f64"
     )]
@@ -254,6 +254,10 @@ pub struct CommodityForward {
     #[cfg_attr(feature = "json-schema", schemars(skip))]
     #[builder(default)]
     pub(crate) unknown_fields: finstack_quant_core::serde_guard::UnknownFieldGuard,
+}
+
+fn default_multiplier() -> f64 {
+    1.0
 }
 
 impl CommodityForward {

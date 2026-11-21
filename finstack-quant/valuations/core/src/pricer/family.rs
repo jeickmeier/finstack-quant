@@ -50,11 +50,8 @@ use std::sync::{Arc, OnceLock};
 use super::{PricerRegistry, PricingError};
 use crate::metrics::{MetricRegistry, MetricRegistryError, register_universal_metrics};
 
-/// Registration function adding a family's pricers to a registry.
-pub type RegisterPricers = fn(&mut PricerRegistry) -> Result<(), PricingError>;
-
-/// Registration function adding a family's metric calculators to a registry.
-pub type RegisterMetrics = fn(&mut MetricRegistry) -> Result<(), MetricRegistryError>;
+type RegisterPricers = fn(&mut PricerRegistry) -> Result<(), PricingError>;
+type RegisterMetrics = fn(&mut MetricRegistry) -> Result<(), MetricRegistryError>;
 
 /// A named group of instruments with the pricers and metrics that serve them.
 ///
@@ -97,8 +94,8 @@ impl Family {
     ///   register them here.
     pub const fn new(
         name: &'static str,
-        pricer_table: RegisterPricers,
-        metric_table: RegisterMetrics,
+        pricer_table: fn(&mut PricerRegistry) -> Result<(), PricingError>,
+        metric_table: fn(&mut MetricRegistry) -> Result<(), MetricRegistryError>,
     ) -> Self {
         Self {
             name,

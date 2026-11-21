@@ -398,11 +398,10 @@ fn reprice_with_dispatch(
     dispatch.price_money(instrument, market, as_of, Default::default())
 }
 
-/// Aggregate scenario P&Ls in parallel using rayon.
+/// Aggregate scenario P&Ls sequentially across historical scenarios.
 ///
-/// Each scenario is independent (creates its own `MarketContext`), making this
-/// embarrassingly parallel. The closure must be `Fn + Send + Sync` (not `FnMut`)
-/// because multiple threads may invoke it concurrently.
+/// Each scenario builds its own bumped `MarketContext` and preserves exact
+/// sequential order for deterministic results.
 fn aggregate_scenario_pnls_par<F>(
     history: &MarketHistory,
     base_market: &MarketContext,

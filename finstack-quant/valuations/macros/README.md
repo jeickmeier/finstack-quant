@@ -18,16 +18,15 @@ This is a supporting crate, not one of the 14 domain crates:
 - the only consumer is `finstack-quant-valuations`, where 65 instrument structs
   under `src/instruments/` derive `FinancialBuilder`
 
-Generated code names `finstack_quant_core` (and, on one path, `::time`)
-directly, so a deriving crate must depend on `finstack-quant-core` and `time`
-under their default names.
+Generated code names `finstack_quant_core` and `finstack_quant_valuations_core`
+directly, so a deriving crate must depend on both under their canonical names.
 
 ```toml
 # finstack-quant/valuations/Cargo.toml
 [dependencies]
 finstack-quant-valuations-macros = { path = "macros", version = "0.11.0" }
+finstack-quant-valuations-core = { path = "core", version = "0.11.0" }
 finstack-quant-core = { path = "../core", version = "0.11.0" }
-time = { workspace = true }
 ```
 
 ## `FinancialBuilder`
@@ -52,7 +51,6 @@ For a struct `T` with named fields, the derive emits:
 | Generated item | Signature |
 |----------------|-----------|
 | `TBuilder` | `pub struct TBuilder { … }`, `#[derive(Default)]` |
-| `TBuilder::new` | `pub fn new() -> Self` |
 | field setters | `pub fn <field>(self, value: <Ty>) -> Self` (consuming, chainable) |
 | optional setters | `pub fn <field>_opt(self, value: Option<Inner>) -> Self` for `Option<Inner>` fields |
 | `TBuilder::build` | `pub fn build(self) -> finstack_quant_core::Result<T>` |
@@ -94,46 +92,17 @@ Struct-level:
 
 | Attribute | Effect |
 |-----------|--------|
-| `#[builder(validate = <path>)]` | Calls `<path>(&built)?` as the last step of `build()`. Use it for cross-field economics checks. The target is normally an inherent `fn validate(&self) -> Result<()>` on the struct. |
+| `#[builder(validate = <path>)]` | Calls `<path>(&built)?` as the last step of `build()`. When omitted, `build()` calls `Instrument::validate_invariants(&built)?`. |
 
 Field-level:
 
 | Attribute | Effect |
 |-----------|--------|
-| `#[builder(default)]` | Field becomes optional-with-default; unset falls back to `Default::default()`. |
-| `#[builder(default = <expr>)]` | As above with an explicit expression, e.g. `#[builder(default = BusinessDayConvention::ModifiedFollowing)]`. |
-| `#[builder(optional)]` | Parsed and accepted, but generates nothing. `Option<T>` fields are already optional, so on the 136 fields that carry it today it reads as intent only. On a non-`Option` field it would **not** make the field optional. |
+| `#[builder(default)]` | Field falls back to `Default::default()` when unset. |
+| `#[builder(default = <expr>)]` | As above with an explicit expression, e.g. `#[builder(default = BusinessDayConvention::ModifiedFollowing)]`. Rejected at compile time on `Option<T>` and `attributes` fields. |
+| `#[builder(skip)]` | Omits setters and initializes the field directly from `#[builder(default = ...)]` or `Default::default()`. |
 
-Two silent-no-op cases to know about:
-
-- Unrecognized keys inside `#[builder(...)]` are ignored rather than rejected.
-- `#[builder(default …)]` on an `Option<T>` field is ignored — optional fields
-  are assigned straight through and never consult the default expression. It is
-  harmless for a bare `#[builder(default)]` (the fallback would be `None`
-  anyway), but `#[builder(default = Some(x))]` on an `Option<T>` field would
-  not do what it reads like.
-
-### Built-in validations
-
-Beyond a `validate =` hook, `build()` emits checks driven by which well-known
-field names the struct has. These fire only when the named fields are present:
-
-| Fields present | Check | Error |
-|----------------|-------|-------|
-| `start_date` and `maturity`/`maturity_date` | `start_date < maturity` | `InputError::InvalidDateRange` |
-| `issue`/`issue_date` and `maturity`/`maturity_date` | `issue < maturity` | `InputError::InvalidDateRange` |
-| `strike_variance` | `strike_variance >= 0.0` | `InputError::NegativeValue` |
-| `notional: Option<_>` and `spot_rate: Option<_>` | at least one is `Some` | `Error::Validation` |
-| `base_currency` and `quote_currency` | the two differ | `Error::Validation` |
-
-Required `issue`/`issue_date` fields must be supplied explicitly. Omitting one
-returns `Error::Validation` naming the builder and missing field, just as for
-other required fields. The macro never infers a contractual issue date from
-maturity.
-
-All of these are name-based heuristics rather than declared contracts; renaming
-a field silently changes which checks run. Instrument-specific rules belong in
-the `validate =` hook.
+Unrecognized struct- or field-level keys inside `#[builder(...)]` are rejected at compile time.
 
 ### Companion test
 
@@ -188,9 +157,7 @@ fn six_month_deposit() -> finstack_quant_core::Result<Deposit> {
 assert!(six_month_deposit().unwrap().fixed_rate.is_none());
 ```
 
-Because `Deposit` has both `start_date` and `maturity`, a build with
-`start_date >= maturity` fails with `InputError::InvalidDateRange` without any
-per-instrument code.
+Cross-field invariants live in `Instrument::validate_invariants` (called automatically by `build()`) or an explicit `#[builder(validate = ...)]` hook.
 
 ## Verification
 

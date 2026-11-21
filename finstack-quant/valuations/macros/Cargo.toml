@@ -12,7 +12,7 @@ description = "Procedural macros for the finstack-quant-valuations crates (`Fina
 proc-macro = true
 
 [dependencies]
-syn = { version = "2", features = ["full", "extra-traits"] }
+syn = "2"
 quote = "1"
 
 [lints]

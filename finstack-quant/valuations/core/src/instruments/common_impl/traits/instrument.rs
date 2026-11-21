@@ -666,7 +666,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         as_of: Date,
         metrics: &[MetricId],
         options: PricingOptions,
-    ) -> crate::Result<crate::results::ValuationResult> {
+    ) -> std::result::Result<crate::results::ValuationResult, crate::pricer::PricingError> {
         let PricingOptions {
             config,
             market_history,
@@ -691,14 +691,14 @@ pub trait Instrument: CashflowProvider + Send + Sync {
             instrument_validated: false,
         };
 
-        Ok(registry.price_with_metrics(
+        registry.price_with_metrics(
             instrument.as_ref(),
             model,
             market,
             as_of,
             metrics,
             registry_options,
-        )?)
+        )
     }
 
     /// Unified market data dependencies for this instrument.

@@ -969,8 +969,10 @@ mod tests {
             as_of: Date,
             metrics: &[MetricId],
             _options: PricingOptions,
-        ) -> finstack_quant_valuations::Result<finstack_quant_valuations::results::ValuationResult>
-        {
+        ) -> std::result::Result<
+            finstack_quant_valuations::results::ValuationResult,
+            finstack_quant_valuations::pricer::PricingError,
+        > {
             self.calls
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             if self.fail_metrics || (self.fail_ytm && metrics.contains(&MetricId::Ytm)) {

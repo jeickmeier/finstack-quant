@@ -72,8 +72,10 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
             let parsed = attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident("validate") {
                     custom_validator = Some(meta.value()?.parse()?);
+                    Ok(())
+                } else {
+                    Err(meta.error("unsupported struct builder attribute; expected validate"))
                 }
-                Ok(())
             });
             if let Err(error) = parsed {
                 return error.to_compile_error().into();
@@ -132,6 +134,7 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
             field_docs.insert(ident.clone(), docs);
 
             let mut default_expr: Option<Expr> = None;
+            let mut explicit_default = false;
             let mut skip = false;
             for attr in f.attrs {
                 if attr.path().is_ident("builder")
@@ -141,6 +144,7 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
                             if meta.input.peek(syn::Token![=]) {
                                 let value: Expr = meta.value()?.parse()?;
                                 default_expr = Some(value);
+                                explicit_default = true;
                             } else {
                                 // Use type's Default::default()
                                 let ty_default: Expr =
@@ -160,6 +164,16 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
                 }
             }
 
+            let is_optional = option_inner(&ty).is_some() || ident == "attributes";
+            if is_optional && explicit_default && !skip {
+                return syn::Error::new_spanned(
+                    &ident,
+                    "#[builder(default = <expr>)] is ignored on Option<T> and `attributes` fields; omit the default or use a non-Option field",
+                )
+                .to_compile_error()
+                .into();
+            }
+
             if skip {
                 let expr = default_expr.unwrap_or_else(|| {
                     syn::parse_quote! { ::core::default::Default::default() }
@@ -172,7 +186,7 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
             }
 
             // Optional if Option<T> or the field is `attributes`
-            if option_inner(&ty).is_some() || ident == "attributes" {
+            if is_optional {
                 optional_fields.push((ident, ty));
             } else {
                 required_fields.push((ident, ty));
@@ -240,7 +254,7 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
     let assign_req = required_fields.iter().map(|(id, _)| {
         if let Some(expr) = defaults.get(id) {
             let expr_clone = expr.clone();
-            quote! { #id: self.#id.unwrap_or(#expr_clone) }
+            quote! { #id: self.#id.unwrap_or_else(|| #expr_clone) }
         } else {
             let missing = missing_error(id);
             quote! { #id: self.#id.ok_or_else(|| #missing)? }

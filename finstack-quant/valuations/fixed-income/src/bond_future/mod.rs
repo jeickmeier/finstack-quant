@@ -15,7 +15,9 @@
 
 pub(crate) mod metrics;
 pub(crate) mod pricer;
+pub mod specs;
 pub(crate) mod types;
 
 pub use pricer::BondFuturePricer;
+pub use specs::{BondFutureSpecs, repo_annualization_denominator};
 pub use types::{BondFuture, BondFutureBuilder, DeliverableBond};

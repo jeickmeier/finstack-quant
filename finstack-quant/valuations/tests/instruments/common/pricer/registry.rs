@@ -16,7 +16,6 @@ use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::pricer::STANDARD;
 use finstack_quant_valuations::pricer::*;
 use std::str::FromStr;
-use strum::IntoEnumIterator;
 use time::macros::date;
 
 #[test]

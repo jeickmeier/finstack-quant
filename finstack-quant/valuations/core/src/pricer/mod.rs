@@ -33,7 +33,7 @@ mod keys;
 mod registry;
 
 pub use errors::{PricingError, PricingErrorContext};
-pub use family::{Family, RegisterMetrics, RegisterPricers};
+pub use family::Family;
 pub use keys::{InstrumentType, ModelKey, PricerKey, parse_model_key};
 pub use registry::{Pricer, PricerRegistry, PricingDispatch, expect_inst};
 

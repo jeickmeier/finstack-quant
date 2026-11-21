@@ -117,7 +117,7 @@ impl Instrument for ScaledInstrument {
         as_of: Date,
         _metrics: &[finstack_quant_valuations::metrics::MetricId],
         _options: finstack_quant_valuations::instruments::PricingOptions,
-    ) -> finstack_quant_valuations::Result<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, finstack_quant_valuations::pricer::PricingError> {
         let value = self.value(market, as_of)?;
         Ok(ValuationResult::stamped(self.id(), as_of, value))
     }
@@ -194,7 +194,7 @@ impl Instrument for CompositeInstrument {
         as_of: Date,
         _metrics: &[finstack_quant_valuations::metrics::MetricId],
         _options: finstack_quant_valuations::instruments::PricingOptions,
-    ) -> finstack_quant_valuations::Result<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, finstack_quant_valuations::pricer::PricingError> {
         let value = self.value(market, as_of)?;
         Ok(ValuationResult::stamped(self.id(), as_of, value))
     }

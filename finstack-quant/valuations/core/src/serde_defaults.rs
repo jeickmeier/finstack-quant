@@ -24,11 +24,6 @@ pub fn settlement_cash() -> SettlementType {
     SettlementType::Cash
 }
 
-/// Default contract multiplier (1.0).
-pub fn multiplier_one() -> f64 {
-    1.0
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -42,10 +37,5 @@ mod tests {
     #[test]
     fn settlement_cash_matches_enum() {
         assert_eq!(settlement_cash(), crate::instruments::SettlementType::Cash);
-    }
-
-    #[test]
-    fn multiplier_one_is_unity() {
-        assert_eq!(multiplier_one(), 1.0);
     }
 }

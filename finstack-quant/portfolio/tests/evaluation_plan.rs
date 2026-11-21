@@ -118,7 +118,7 @@ impl Instrument for ProbedInstrument {
         as_of: Date,
         metrics: &[MetricId],
         options: PricingOptions,
-    ) -> finstack_quant_valuations::Result<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, finstack_quant_valuations::pricer::PricingError> {
         if metrics.is_empty() {
             self.probe.pv_only_calls.fetch_add(1, Ordering::SeqCst);
         } else {

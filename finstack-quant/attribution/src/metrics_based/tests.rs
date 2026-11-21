@@ -109,7 +109,7 @@ impl Instrument for SpotVolTestInstrument {
         as_of: Date,
         _metrics: &[MetricId],
         _options: finstack_quant_valuations::instruments::PricingOptions,
-    ) -> finstack_quant_valuations::Result<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, finstack_quant_valuations::pricer::PricingError> {
         Ok(ValuationResult::stamped(
             self.id(),
             as_of,
@@ -1546,7 +1546,7 @@ impl Instrument for CreditVolTestInstrument {
         as_of: Date,
         _metrics: &[MetricId],
         _options: finstack_quant_valuations::instruments::PricingOptions,
-    ) -> finstack_quant_valuations::Result<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, finstack_quant_valuations::pricer::PricingError> {
         Ok(ValuationResult::stamped(
             self.id(),
             as_of,
@@ -1740,7 +1740,7 @@ impl Instrument for CreditCurvesTestInstrument {
         as_of: Date,
         _metrics: &[MetricId],
         _options: finstack_quant_valuations::instruments::PricingOptions,
-    ) -> finstack_quant_valuations::Result<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, finstack_quant_valuations::pricer::PricingError> {
         Ok(ValuationResult::stamped(
             self.id(),
             as_of,
@@ -1892,7 +1892,7 @@ impl Instrument for MultiSpotTestInstrument {
         as_of: Date,
         _metrics: &[MetricId],
         _options: finstack_quant_valuations::instruments::PricingOptions,
-    ) -> finstack_quant_valuations::Result<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, finstack_quant_valuations::pricer::PricingError> {
         Ok(ValuationResult::stamped(
             self.id(),
             as_of,

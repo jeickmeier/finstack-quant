@@ -84,7 +84,7 @@ fn index_factor_scales_pv() {
     let end = Date::from_calendar_date(2028, Month::January, 1).unwrap();
 
     let disc = flat_discount("USD-OIS", as_of);
-    let rec = finstack_quant_valuations_core::constants::isda::STANDARD_RECOVERY_SENIOR;
+    let rec = finstack_quant_valuations_credit::constants::isda::STANDARD_RECOVERY_SENIOR;
     let hz = 0.02;
     let names = [
         ("N1", "HZ1"),

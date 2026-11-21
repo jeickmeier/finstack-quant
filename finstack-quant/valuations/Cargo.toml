@@ -14,7 +14,6 @@ autotests = false
 [dependencies]
 finstack-quant-core = { path = "../core", version = "0.11.0-dev.202610210600", default-features = false }
 finstack-quant-cashflows = { path = "../cashflows", version = "0.11.0-dev.202610210600", default-features = false }
-finstack-quant-margin = { path = "../margin", version = "0.11.0-dev.202610210600", default-features = false }
 finstack-quant-models = { path = "../models", version = "0.11.0-dev.202610210600", default-features = false }
 finstack-quant-valuations-core = { path = "core", version = "0.11.0-dev.202610210600", default-features = false }
 finstack-quant-valuations-fixed-income = { path = "fixed-income", version = "0.11.0-dev.202610210600", default-features = false }
@@ -32,7 +31,6 @@ time = { workspace = true }
 rust_decimal = { workspace = true }
 schemars = { workspace = true, optional = true }
 jsonschema = { version = "0.28", default-features = false, optional = true }
-strum = { workspace = true, features = ["derive"] }
 
 # rayon has no working thread pool on single-threaded wasm32; parallel
 # code paths are cfg-gated to native targets, so the dependency is too.
@@ -66,7 +64,6 @@ json-schema = [
     "finstack-quant-valuations-fx/json-schema",
     "finstack-quant-core/json-schema",
     "finstack-quant-cashflows/json-schema",
-    "finstack-quant-margin/json-schema",
     "finstack-quant-models/json-schema",
 ]
 jsonschema-validate = [

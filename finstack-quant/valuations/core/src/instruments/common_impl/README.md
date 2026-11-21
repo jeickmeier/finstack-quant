@@ -128,10 +128,10 @@ methods.
   enforces ordering, finiteness, positivity and currency agreement only.
   Market-specific defaults (spot lags, business-day conventions, plausible rate
   bounds) belong in the instrument's own `validate_invariants`.
-- **Errors.** Instrument code returns `finstack_quant_core::Result`, not
-  `crate::Result`. `finstack_quant_valuations_core::Error` is the wider wrapper
-  (`Core`, `Pricing`, `Correlation`, `WaterfallValidation`) used by the pricer
-  and calibration layers; it converts one-way into the core error. No
+- **Errors.** Instrument code returns `finstack_quant_core::Result`.
+  [`Instrument::price_with_metrics`](traits/instrument.rs) returns
+  `Result<ValuationResult, PricingError>` (`PricingError` converts one-way into
+  `finstack_quant_core::Error` and implements `From<finstack_quant_core::Error>`). No
   `unwrap`/`expect` on user input.
 - **Two clocks.** A pricer that mixes an instrument day count with a curve day
   count must derive the model rate with `helpers::zero_rate_from_df` (so that

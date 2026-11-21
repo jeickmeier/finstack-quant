@@ -13,11 +13,11 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::OptionType;
 pub use finstack_quant_test_utils::assert::relative_eq;
-use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
     CdsOption, CdsOptionParams, CdsOptionStrike, ProtectionStartConvention,
 };
+use finstack_quant_valuations::instruments::credit_derivatives::constants::isda::STANDARD_RECOVERY_SENIOR;
 use rust_decimal::Decimal;
 
 /// Rebuild the market for both the CDSO option and its linked CDSW underlying.

@@ -3,14 +3,12 @@
 //! This module defines the data structures for bond futures, including
 //! the deliverable basket, contract specifications, and the main BondFuture type.
 
+use super::specs::{BondFutureSpecs, repo_annualization_denominator};
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations_core::contract_specs::{
-    BondFutureSpecs, repo_annualization_denominator,
-};
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::ListedFutureTerms;
 use finstack_quant_valuations_core::instruments::MarketDependencies;
@@ -89,8 +87,7 @@ pub struct DeliverableBond {
 /// ```rust
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::types::{CurveId, InstrumentId};
-/// use finstack_quant_valuations_fixed_income::bond_future::{BondFuture, DeliverableBond};
-/// use finstack_quant_valuations_core::contract_specs::BondFutureSpecs;
+/// use finstack_quant_valuations_fixed_income::bond_future::{BondFuture, BondFutureSpecs, DeliverableBond};
 /// use finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};
 /// use finstack_quant_core::types::Attributes;
 /// use time::macros::date;

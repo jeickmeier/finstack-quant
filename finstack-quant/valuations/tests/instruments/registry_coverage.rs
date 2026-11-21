@@ -11,7 +11,6 @@ use finstack_quant_valuations::instruments::json_loader::instrument_registry;
 use finstack_quant_valuations::pricer::InstrumentType;
 use finstack_quant_valuations::schema::instrument_types;
 use serde::Deserialize;
-use strum::IntoEnumIterator;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]

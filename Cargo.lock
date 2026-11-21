@@ -1051,7 +1051,6 @@ dependencies = [
  "finstack-quant-cashflows",
  "finstack-quant-core",
  "finstack-quant-covenants",
- "finstack-quant-margin",
  "finstack-quant-models",
  "finstack-quant-test-utils",
  "finstack-quant-valuations-core",
@@ -1073,7 +1072,6 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "strum",
  "time",
  "toml",
 ]
@@ -1089,7 +1087,6 @@ dependencies = [
  "finstack-quant-models",
  "finstack-quant-valuations-macros",
  "indexmap",
- "rayon",
  "rust_decimal",
  "rust_decimal_macros",
  "schemars",

@@ -49,6 +49,24 @@ pub struct ValuationLongRow {
 }
 
 impl ValuationResult {
+    fn measure_to_long_row(
+        base: crate::metrics::MetricId,
+        id: &crate::metrics::MetricId,
+        value: f64,
+    ) -> ValuationLongRow {
+        let components = id.decode_components(&base).unwrap_or_default();
+        let mut components = components.into_iter();
+        let curve = components.next();
+        let rest: Vec<String> = components.collect();
+        let bucket = (!rest.is_empty()).then(|| rest.join("::"));
+        ValuationLongRow {
+            metric: base.to_string(),
+            curve,
+            bucket,
+            value,
+        }
+    }
+
     /// Flatten every measure into one [`ValuationLongRow`] per key.
     ///
     /// Rows follow `measures` insertion order. This is the shape a risk desk
@@ -57,20 +75,7 @@ impl ValuationResult {
     pub fn to_long_rows(&self) -> Vec<ValuationLongRow> {
         self.measures
             .iter()
-            .map(|(id, &value)| {
-                let base = id.base();
-                let components = id.decode_components(&base).unwrap_or_default();
-                let mut components = components.into_iter();
-                let curve = components.next();
-                let rest: Vec<String> = components.collect();
-                let bucket = (!rest.is_empty()).then(|| rest.join("::"));
-                ValuationLongRow {
-                    metric: base.to_string(),
-                    curve,
-                    bucket,
-                    value,
-                }
-            })
+            .map(|(id, &value)| Self::measure_to_long_row(id.base(), id, value))
             .collect()
     }
 
@@ -81,9 +86,16 @@ impl ValuationResult {
     /// * `base` - Exact base metric name, such as `bucketed_dv01`; scalar
     ///   entries and other bases are excluded, and an unknown name returns no rows.
     pub fn to_series_rows(&self, base: &str) -> Vec<ValuationLongRow> {
-        self.to_long_rows()
-            .into_iter()
-            .filter(|row| row.metric == base && row.curve.is_some())
+        self.measures
+            .iter()
+            .filter_map(|(id, &value)| {
+                let metric_base = id.base();
+                if metric_base.as_str() != base {
+                    return None;
+                }
+                let row = Self::measure_to_long_row(metric_base, id, value);
+                row.curve.is_some().then_some(row)
+            })
             .collect()
     }
 

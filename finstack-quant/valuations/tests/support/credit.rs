@@ -20,9 +20,9 @@ use finstack_quant_core::{
     money::Money,
     types::{CurveId, InstrumentId},
 };
-use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
+use finstack_quant_valuations::instruments::credit_derivatives::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
 use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};

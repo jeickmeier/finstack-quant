@@ -54,9 +54,9 @@ pub enum Error {
     #[error(transparent)]
     Statements(#[from] finstack_quant_statements::Error),
 
-    /// Valuations library error.
+    /// Valuations pricing error.
     #[error(transparent)]
-    Valuations(#[from] finstack_quant_valuations::Error),
+    Valuations(#[from] finstack_quant_valuations::pricer::PricingError),
 
     /// General validation error.
     #[error("Validation error: {0}")]
