@@ -2,7 +2,7 @@
 //!
 //! Defines typed runtime settings and derives the simulated path count.
 //! Defaults come from the `rust.hw1f` block of the embedded Monte Carlo
-//! defaults registry ([`crate::monte_carlo::registry`]).
+//! defaults registry (`crate::monte_carlo::registry`).
 
 use serde::{Deserialize, Serialize};
 

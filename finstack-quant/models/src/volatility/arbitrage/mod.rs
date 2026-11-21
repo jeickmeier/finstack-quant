@@ -130,7 +130,7 @@ impl Default for ArbitrageCheckConfig {
 /// # Errors
 /// Returns a validation error when a forward is non-finite or non-positive,
 /// or the supplied vector has neither length one nor `expiry_count`.
-pub fn expand_forward_prices(
+fn expand_forward_prices(
     expiry_count: usize,
     forward_prices: Vec<f64>,
 ) -> finstack_quant_core::Result<Vec<f64>> {

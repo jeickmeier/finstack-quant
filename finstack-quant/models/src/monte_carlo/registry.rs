@@ -18,7 +18,7 @@ static EMBEDDED_DEFAULTS: EmbeddedJsonRegistry<MonteCarloDefaults, DefaultsFile>
 
 /// Resolved Monte Carlo defaults.
 #[derive(Debug, Clone, Deserialize)]
-pub struct MonteCarloDefaults {
+pub(crate) struct MonteCarloDefaults {
     /// Rust API defaults.
     pub rust: RustDefaults,
     /// Convenience-layer defaults shared by hosts and Rust convenience pricers.
@@ -28,7 +28,7 @@ pub struct MonteCarloDefaults {
 /// Defaults used by Rust Monte Carlo APIs.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct RustDefaults {
+pub(crate) struct RustDefaults {
     /// Generic engine defaults.
     pub engine: EngineDefaults,
     /// European pricer defaults.
@@ -44,7 +44,7 @@ pub struct RustDefaults {
 /// Defaults shared by the host bindings and the Rust convenience pricers.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ConvenienceDefaults {
+pub(crate) struct ConvenienceDefaults {
     /// Default currency code for convenience entry points.
     pub default_currency: String,
     /// European pricer defaults.
@@ -60,7 +60,7 @@ pub struct ConvenienceDefaults {
 /// Common path-count, seed, and parallel-execution defaults.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct PricerRuntimeDefaults {
+pub(crate) struct PricerRuntimeDefaults {
     /// Number of Monte Carlo paths.
     pub num_paths: usize,
     /// Root RNG seed.
@@ -72,7 +72,7 @@ pub struct PricerRuntimeDefaults {
 /// Generic engine runtime defaults.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct EngineDefaults {
+pub(crate) struct EngineDefaults {
     /// Whether parallel execution is requested by default.
     pub use_parallel: bool,
     /// Whether antithetic variance reduction is enabled by default.
@@ -82,7 +82,7 @@ pub struct EngineDefaults {
 /// Path-dependent pricer runtime defaults.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct PathDependentPricerDefaults {
+pub(crate) struct PathDependentPricerDefaults {
     /// Number of Monte Carlo paths.
     pub num_paths: usize,
     /// Root RNG seed.
@@ -106,7 +106,7 @@ pub struct PathDependentPricerDefaults {
 /// LSMC runtime defaults.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct LsmcRuntimeDefaults {
+pub(crate) struct LsmcRuntimeDefaults {
     /// Root RNG seed.
     pub seed: u64,
     /// Whether parallel execution is requested by default.
@@ -119,7 +119,7 @@ pub struct LsmcRuntimeDefaults {
 /// ([`crate::rates::hw1f::Hw1fMcConfig`]).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Hw1fRuntimeDefaults {
+pub(crate) struct Hw1fRuntimeDefaults {
     /// Number of independent Monte Carlo estimators (RNG streams).
     pub num_paths: usize,
     /// Root RNG seed.
@@ -135,7 +135,7 @@ pub struct Hw1fRuntimeDefaults {
 /// Pricer defaults with default time-grid step count.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ConveniencePricerDefaults {
+pub(crate) struct ConveniencePricerDefaults {
     /// Number of Monte Carlo paths.
     pub num_paths: usize,
     /// Root RNG seed.
@@ -149,7 +149,7 @@ pub struct ConveniencePricerDefaults {
 /// LSMC pricer defaults.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ConvenienceLsmcDefaults {
+pub(crate) struct ConvenienceLsmcDefaults {
     /// Number of Monte Carlo paths.
     pub num_paths: usize,
     /// Root RNG seed.
@@ -169,7 +169,7 @@ pub struct ConvenienceLsmcDefaults {
 /// Finite-difference Greek estimator defaults.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ConvenienceGreekDefaults {
+pub(crate) struct ConvenienceGreekDefaults {
     /// Number of Monte Carlo paths.
     pub num_paths: usize,
     /// Root RNG seed.
@@ -213,14 +213,14 @@ struct DefaultsFile {
 /// Returns an error when the embedded JSON cannot be deserialized or when its
 /// numeric and structural defaults fail the same validation applied to external
 /// configuration. A cached initialization error is cloned for later calls.
-pub fn embedded_defaults() -> Result<&'static MonteCarloDefaults> {
+pub(crate) fn embedded_defaults() -> Result<&'static MonteCarloDefaults> {
     EMBEDDED_DEFAULTS.load(defaults_from_file)
 }
 
 /// Panic-on-failure access for `Default` implementations backed by embedded data.
 #[must_use]
 #[allow(clippy::expect_used)]
-pub fn embedded_defaults_or_panic() -> &'static MonteCarloDefaults {
+pub(crate) fn embedded_defaults_or_panic() -> &'static MonteCarloDefaults {
     embedded_defaults().expect("embedded Monte Carlo defaults are compile-time assets")
 }
 

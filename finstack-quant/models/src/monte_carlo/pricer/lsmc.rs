@@ -52,11 +52,11 @@ use crate::monte_carlo::process::gbm::GbmProcess;
 use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::{Discretization, RandomStream};
 use crate::types::{OptionMarketParams, OptionType};
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::math::time_grid::TimeGrid;
-use finstack_quant_core::{Error, Result};
 
 // Bound retained path storage to 512 MB of f64 values and the time/exercise
 // grids to 100,000 intervals. Streaming MC limits do not protect this pricer,
@@ -579,7 +579,7 @@ impl LsmcPricer {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Validation`] for an unknown basis name, and an error
+    /// Returns [`finstack_quant_core::Error::Validation`] for an unknown basis name, and an error
     /// if the path or step count is zero.
     pub fn new(
         num_paths: Option<usize>,
@@ -593,8 +593,7 @@ impl LsmcPricer {
         let defaults = &super::super::registry::embedded_defaults()?
             .convenience
             .lsmc;
-        let basis = BasisKind::parse(basis.unwrap_or(defaults.basis.as_str()))
-            .map_err(Error::Validation)?;
+        let basis = BasisKind::parse(basis.unwrap_or(defaults.basis.as_str()))?;
         let num_steps = num_steps.unwrap_or(defaults.num_steps);
         let pricer = LsmcEngine::gbm_american(
             num_paths.unwrap_or(defaults.num_paths),
@@ -773,7 +772,7 @@ impl LsmcPricer {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Validation`] for an unknown basis name, and an error
+    /// Returns [`finstack_quant_core::Error::Validation`] for an unknown basis name, and an error
     /// if the step count is zero.
     fn call_config(
         &self,
@@ -798,7 +797,7 @@ impl LsmcPricer {
             None => (self.pricer.clone(), self.num_steps),
         };
         let basis = match basis {
-            Some(name) => BasisKind::parse(name).map_err(Error::Validation)?,
+            Some(name) => BasisKind::parse(name)?,
             None => self.basis,
         };
         Ok((
@@ -1479,7 +1478,7 @@ impl LsmcEngine {
 }
 
 fn lsmc_basis(kind: BasisKind, degree: usize, strike: f64) -> Result<LsmcBasis> {
-    build_lsmc_basis(kind, degree, strike).map_err(finstack_quant_core::Error::Validation)
+    build_lsmc_basis(kind, degree, strike)
 }
 
 #[cfg(test)]

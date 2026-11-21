@@ -37,21 +37,21 @@ impl BasisKind {
     ///
     /// # Errors
     ///
-    /// Returns a message listing the accepted basis names when `name` is not a
+    /// Returns [`finstack_quant_core::Error::Validation`] listing the accepted basis names when `name` is not a
     /// canonical value.
     ///
     /// # Arguments
     ///
     /// * `name` - Human-readable name used for registry lookup or diagnostic messages
-    pub fn parse(name: &str) -> Result<Self, String> {
+    pub fn parse(name: &str) -> finstack_quant_core::Result<Self> {
         match name {
             "laguerre" => Ok(Self::Laguerre),
             "polynomial" => Ok(Self::Polynomial),
             "normalized_polynomial" => Ok(Self::NormalizedPolynomial),
-            _ => Err(format!(
+            _ => Err(finstack_quant_core::Error::Validation(format!(
                 "unknown basis '{name}'; expected one of 'laguerre', 'polynomial', \
                  'normalized_polynomial'"
-            )),
+            ))),
         }
     }
 
@@ -67,7 +67,7 @@ impl BasisKind {
 }
 
 impl std::str::FromStr for BasisKind {
-    type Err = String;
+    type Err = finstack_quant_core::Error;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         Self::parse(value)
@@ -131,7 +131,7 @@ pub(crate) fn build_lsmc_basis(
     kind: BasisKind,
     degree: usize,
     strike: f64,
-) -> Result<LsmcBasis, String> {
+) -> finstack_quant_core::Result<LsmcBasis> {
     match kind {
         BasisKind::Laguerre => LaguerreBasis::new(degree, strike).map(LsmcBasis::Laguerre),
         BasisKind::Polynomial => PolynomialBasis::new(degree).map(LsmcBasis::Polynomial),
@@ -151,9 +151,11 @@ impl PolynomialBasis {
     ///
     /// # Arguments
     /// * `degree` - Maximum polynomial degree, strictly positive.
-    pub fn new(degree: usize) -> Result<Self, String> {
+    pub fn new(degree: usize) -> finstack_quant_core::Result<Self> {
         if degree == 0 {
-            return Err("degree must be positive".to_string());
+            return Err(finstack_quant_core::Error::Validation(
+                "degree must be positive".to_string(),
+            ));
         }
         Ok(Self { degree })
     }
@@ -199,12 +201,16 @@ impl NormalizedPolynomialBasis {
     /// * `degree` - Maximum polynomial degree, strictly positive.
     /// * `center` - Finite reference state subtracted before scaling.
     /// * `scale` - Finite normalization scale with absolute value greater than `1e-14`.
-    pub fn new(degree: usize, center: f64, scale: f64) -> Result<Self, String> {
+    pub fn new(degree: usize, center: f64, scale: f64) -> finstack_quant_core::Result<Self> {
         if degree == 0 {
-            return Err("degree must be positive".to_string());
+            return Err(finstack_quant_core::Error::Validation(
+                "degree must be positive".to_string(),
+            ));
         }
         if !center.is_finite() || !scale.is_finite() || scale.abs() <= 1e-14 {
-            return Err("center and scale must be finite, and scale must be non-zero".to_string());
+            return Err(finstack_quant_core::Error::Validation(
+                "center and scale must be finite, and scale must be non-zero".to_string(),
+            ));
         }
         Ok(Self {
             degree,
@@ -266,12 +272,16 @@ impl LaguerreBasis {
     /// # Arguments
     /// * `degree` - Maximum Laguerre degree, from one through four.
     /// * `strike` - Finite, strictly positive exercise-price normalization scale.
-    pub fn new(degree: usize, strike: f64) -> Result<Self, String> {
+    pub fn new(degree: usize, strike: f64) -> finstack_quant_core::Result<Self> {
         if degree == 0 || degree > 4 {
-            return Err("degree must be 1-4".to_string());
+            return Err(finstack_quant_core::Error::Validation(
+                "degree must be 1-4".to_string(),
+            ));
         }
         if !strike.is_finite() || strike <= 0.0 {
-            return Err("strike must be finite and positive".to_string());
+            return Err(finstack_quant_core::Error::Validation(
+                "strike must be finite and positive".to_string(),
+            ));
         }
         Ok(Self { degree, strike })
     }

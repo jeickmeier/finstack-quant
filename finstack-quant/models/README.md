@@ -468,8 +468,7 @@ position.
 Default path counts, seeds, and parallel/antithetic flags are versioned JSON in
 [`data/defaults/pricer_defaults.v1.json`](data/defaults/pricer_defaults.v1.json),
 embedded at build time and read by `McEngineConfig::new`, `LsmcConfig::new`,
-`PathDependentPricerConfig`, and the convenience pricers.
-`registry::embedded_defaults()` validates and caches the embedded record;
+`PathDependentPricerConfig`, and the convenience pricers internally;
 explicit pricer arguments control per-run overrides.
 
 ## Extending the crate
