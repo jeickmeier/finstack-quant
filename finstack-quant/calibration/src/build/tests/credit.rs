@@ -64,7 +64,7 @@ fn test_build_cds_upfront() {
     curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
     curve_ids.insert("credit".to_string(), "XYZ-CREDIT".to_string());
 
-    let ctx = BuildCtx::new(as_of, 1_000_000.0, curve_ids);
+    let ctx = BuildCtx::new(as_of, 1_000_000.0, curve_ids.clone());
 
     let key = CdsConventionKey {
         currency: Currency::USD,
@@ -74,11 +74,11 @@ fn test_build_cds_upfront() {
     let quote = CdsQuote::CdsUpfront {
         id: "CDS-TEST-UP".into(),
         entity: "XYZ-CORP-SNR".to_string(),
-        convention: key,
+        convention: key.clone(),
         pillar: Pillar::Tenor(Tenor::parse("5Y").unwrap()),
         coupon_bp: 100.0,
         upfront_pct: 0.02,
-        upfront_basis: crate::quotes::CdsUpfrontBasis::ActualCash,
+        upfront_basis: crate::quotes::CdsUpfrontBasis::Clean,
         recovery_rate: 0.40,
     };
 
@@ -91,11 +91,26 @@ fn test_build_cds_upfront() {
         assert_eq!(cds.convention, CdsConvention::IsdaNa);
         assert_eq!(cds.doc_clause, Some(CdsDocClause::IsdaNa));
         if let Some((_dt, amount)) = cds.upfront {
-            assert_eq!(amount.amount(), 20_000.0); // 2% of 1M
+            assert_eq!(amount.amount(), 20_000.0); // 2% clean of 1M matches BloombergCdswClean
         }
         assert_eq!(cds.premium_leg.discount_curve_id.as_str(), "USD-OIS");
         assert_eq!(cds.protection_leg.credit_curve_id.as_str(), "XYZ-CREDIT");
     }
+
+    let dirty_ctx = BuildCtx::new(as_of, 1_000_000.0, curve_ids)
+        .with_cds_valuation_convention(Some(CdsValuationConvention::IsdaDirty));
+    let actual_quote = CdsQuote::CdsUpfront {
+        id: "CDS-TEST-UP-CASH".into(),
+        entity: "XYZ-CORP-SNR".to_string(),
+        convention: key,
+        pillar: Pillar::Tenor(Tenor::parse("5Y").unwrap()),
+        coupon_bp: 100.0,
+        upfront_pct: 0.02,
+        upfront_basis: crate::quotes::CdsUpfrontBasis::ActualCash,
+        recovery_rate: 0.40,
+    };
+    let dirty_cds = build_cds_instrument(&actual_quote, &dirty_ctx).expect("build dirty upfront");
+    assert_eq!(dirty_cds.upfront.expect("upfront").1.amount(), 20_000.0);
 }
 
 #[test]

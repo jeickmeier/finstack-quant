@@ -233,25 +233,23 @@ pub(crate) fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<C
         attributes: Attributes::new().with_meta("entity", entity.as_str()),
     };
 
-    let is_upfront_quote = upfront.is_some();
-    let upfront = upfront.or_else(|| {
-        (cds.valuation_convention.uses_clean_price()
-            && !cds.valuation_convention.par_spread_uses_full_premium())
-        .then_some((0.0, CdsUpfrontBasis::Clean))
-    });
     if let Some((fraction, basis)) = upfront {
-        let actual_fraction = match basis {
-            CdsUpfrontBasis::Clean => {
+        let booked_fraction = match (cds.valuation_convention.uses_clean_price(), basis) {
+            // `npv_full` already adds back `clean_accrued` when `cds.uses_clean_price()`
+            // is true, so `cds.upfront` sits on the clean-principal basis there and
+            // on the actual-cash basis under `IsdaDirty`.
+            (true, CdsUpfrontBasis::Clean) | (false, CdsUpfrontBasis::ActualCash) => fraction,
+            (true, CdsUpfrontBasis::ActualCash) => {
+                fraction + spread_bp / 10_000.0 * cds.clean_quote_accrual(ctx.as_of())?
+            }
+            (false, CdsUpfrontBasis::Clean) => {
                 fraction - spread_bp / 10_000.0 * cds.clean_quote_accrual(ctx.as_of())?
             }
-            CdsUpfrontBasis::ActualCash => fraction,
         };
-        if is_upfront_quote || actual_fraction != 0.0 {
-            cds.upfront = Some((
-                dates.spot,
-                Money::new(ctx.notional() * actual_fraction, convention_key.currency)?,
-            ));
-        }
+        cds.upfront = Some((
+            dates.spot,
+            Money::new(ctx.notional() * booked_fraction, convention_key.currency)?,
+        ));
     }
 
     Ok(cds)
