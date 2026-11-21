@@ -193,7 +193,7 @@ pub(crate) fn extract_position_pnls(
 
     let nested = position_pnls.extract::<Vec<Vec<f64>>>()?;
     let (data, n_scenarios) = py
-        .detach(move || core_flatten_position_pnls(nested, n_positions))
+        .detach(move || core_flatten_position_pnls(&nested, n_positions))
         .map_err(crate::errors::core_to_py)?;
     Ok(PositionPnlMatrix {
         data,

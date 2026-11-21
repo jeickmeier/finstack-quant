@@ -34,9 +34,11 @@ use serde::{Deserialize, Serialize};
 
 use finstack_quant_core::math::linalg::flatten_square_matrix;
 
+use super::position::historical_var_decomposition_prepared;
+use super::stress::build_stress_attribution_prepared;
 use super::{
-    PositionRiskDecomposition, RiskBudgetResult, StressAttribution, build_stress_attribution,
-    evaluate_risk_budget_from_decomposition, flatten_position_pnls, historical_var_decomposition,
+    MinTail, PositionRiskDecomposition, PreparedHistoricalScenarios, RiskBudgetResult,
+    StressAttribution, evaluate_risk_budget_from_decomposition, flatten_position_pnls,
     parametric_var_decomposition,
 };
 
@@ -147,10 +149,16 @@ pub fn position_risk_report(
             (decomposition, None)
         }
         PositionRiskSource::Historical { pnls } => {
-            let (flat, n_scenarios) = flatten_position_pnls(pnls.clone(), ids.len())?;
-            let decomposition =
-                historical_var_decomposition(ids, &flat, n_scenarios, request.confidence)?;
-            let stress = build_stress_attribution(ids, &flat, n_scenarios, request.confidence)?;
+            let (flat, n_scenarios) = flatten_position_pnls(pnls, ids.len())?;
+            let prepared = PreparedHistoricalScenarios::prepare(
+                ids,
+                &flat,
+                n_scenarios,
+                request.confidence,
+                MinTail::AtLeastTwo,
+            )?;
+            let decomposition = historical_var_decomposition_prepared(&prepared);
+            let stress = build_stress_attribution_prepared(&prepared);
             (decomposition, Some(stress))
         }
     };
@@ -174,6 +182,7 @@ pub fn position_risk_report(
 
 #[cfg(test)]
 mod tests {
+    use super::super::build_stress_attribution;
     use super::*;
 
     fn ids() -> Vec<String> {
@@ -220,7 +229,7 @@ mod tests {
             source: PositionRiskSource::Historical { pnls: pnls.clone() },
             budget: None,
         })?;
-        let (flat, n) = flatten_position_pnls(pnls, 2)?;
+        let (flat, n) = flatten_position_pnls(&pnls, 2)?;
         let stress = build_stress_attribution(&ids(), &flat, n, Some(0.8))?;
         assert_eq!(
             report.stress.map(|s| s.var_threshold),

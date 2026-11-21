@@ -1,10 +1,8 @@
 //! Residual-risk overlays for additive factor decompositions.
 
 use super::parametric::scale_for_measure;
-use super::tail_multipliers;
 use super::types::{PositionResidualContribution, RiskDecomposition};
 use crate::RiskMeasure;
-use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
 
 /// Add one residual-risk overlay to a factor-only decomposition.
 ///
@@ -115,25 +113,10 @@ fn variance_from_measure(
             "total risk has the wrong sign for its risk measure".into(),
         ));
     }
-    let variance = match measure {
-        RiskMeasure::Variance => total_risk.max(0.0),
-        RiskMeasure::Volatility => total_risk * total_risk,
-        RiskMeasure::VaR { confidence } => {
-            let z = standard_normal_inv_cdf(confidence)?;
-            if z > 0.0 {
-                (total_risk / -z).powi(2)
-            } else {
-                0.0
-            }
-        }
-        RiskMeasure::ExpectedShortfall { confidence } => {
-            let (_, es_multiplier) = tail_multipliers(confidence)?;
-            if es_multiplier > 0.0 {
-                (total_risk / -es_multiplier).powi(2)
-            } else {
-                0.0
-            }
-        }
+    let variance = match super::signed_sigma_multiplier(measure)? {
+        None => total_risk.max(0.0),
+        Some(multiplier) if multiplier.abs() > 0.0 => (total_risk / multiplier).powi(2),
+        Some(_) => 0.0,
     };
     Ok(variance)
 }

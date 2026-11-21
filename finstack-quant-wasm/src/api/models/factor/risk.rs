@@ -197,7 +197,8 @@ pub fn build_stress_attribution(
     let ids = js_string_seq(&position_ids, "positionIds")?;
     let position_pnls = js_f64_matrix(&position_pnls, "positionPnls")?;
     let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
-    let (flat, n_scenarios) = flatten_position_pnls(position_pnls, ids.len()).map_err(to_js_err)?;
+    let (flat, n_scenarios) =
+        flatten_position_pnls(&position_pnls, ids.len()).map_err(to_js_err)?;
     let result =
         build_stress_attribution(&ids, &flat, n_scenarios, confidence).map_err(to_js_err)?;
     to_js_value(&result)

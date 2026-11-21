@@ -1,7 +1,6 @@
 //! Parametric factor risk decomposition using covariance-based Euler allocation.
 
 use super::types::{FactorContribution, PositionFactorContribution, RiskDecomposition};
-use super::{VARIANCE_TOLERANCE, tail_multipliers};
 use crate::{FactorCovarianceMatrix, RiskMeasure, SensitivityMatrix};
 
 /// Reject sensitivity matrices that contain non-finite deltas.
@@ -15,7 +14,7 @@ use crate::{FactorCovarianceMatrix, RiskMeasure, SensitivityMatrix};
 ///
 /// Returns [`finstack_quant_core::Error::Validation`] naming the first position /
 /// factor pair whose delta is NaN or infinite.
-pub(crate) fn validate_finite_sensitivities(
+fn validate_finite_sensitivities(
     sensitivities: &SensitivityMatrix,
 ) -> finstack_quant_core::Result<()> {
     let n_factors = sensitivities.n_factors();
@@ -76,55 +75,19 @@ fn portfolio_exposures(sensitivities: &SensitivityMatrix) -> Vec<f64> {
     exposures
 }
 
-fn covariance_times_exposures(covariance: &FactorCovarianceMatrix, exposures: &[f64]) -> Vec<f64> {
-    let mut cov_times_exposure = vec![0.0; covariance.n_factors()];
-
-    for (result, row) in cov_times_exposure
-        .iter_mut()
-        .zip(covariance.as_slice().chunks_exact(covariance.n_factors()))
-    {
-        *result = row
-            .iter()
-            .zip(exposures.iter())
-            .map(|(entry, exposure)| entry * exposure)
-            .sum();
-    }
-
-    cov_times_exposure
-}
-
 pub(super) fn scale_for_measure(
     measure: &RiskMeasure,
     variance: f64,
 ) -> finstack_quant_core::Result<(f64, f64)> {
     measure.validate()?;
-    let variance = validated_variance(variance)?;
+    let variance = super::validated_variance(variance)?;
     let sigma = variance.sqrt();
 
-    let scaled = match measure {
-        RiskMeasure::Variance => (variance, 1.0),
-        RiskMeasure::Volatility => {
+    let scaled = match super::signed_sigma_multiplier(*measure)? {
+        None => (variance, 1.0),
+        Some(multiplier) => {
             if sigma > 0.0 {
-                (sigma, sigma.recip())
-            } else {
-                (0.0, 0.0)
-            }
-        }
-        RiskMeasure::VaR { confidence } => {
-            // Loss convention: VaR is reported as a negative number.
-            let z_score =
-                finstack_quant_core::math::special_functions::standard_normal_inv_cdf(*confidence)?;
-            if sigma > 0.0 {
-                (-sigma * z_score, -z_score * sigma.recip())
-            } else {
-                (0.0, 0.0)
-            }
-        }
-        RiskMeasure::ExpectedShortfall { confidence } => {
-            // Loss convention: ES is reported as a negative number.
-            let (_, es_multiplier) = tail_multipliers(*confidence)?;
-            if sigma > 0.0 {
-                (-sigma * es_multiplier, -es_multiplier * sigma.recip())
+                (sigma * multiplier, multiplier * sigma.recip())
             } else {
                 (0.0, 0.0)
             }
@@ -132,20 +95,6 @@ pub(super) fn scale_for_measure(
     };
 
     Ok(scaled)
-}
-
-fn validated_variance(variance: f64) -> finstack_quant_core::Result<f64> {
-    if !variance.is_finite() {
-        Err(finstack_quant_core::Error::Validation(format!(
-            "Portfolio variance is not finite ({variance}); check sensitivities and covariance inputs"
-        )))
-    } else if variance < -VARIANCE_TOLERANCE {
-        Err(finstack_quant_core::Error::Validation(format!(
-            "Portfolio variance must be non-negative, got {variance}"
-        )))
-    } else {
-        Ok(variance.max(0.0))
-    }
 }
 
 /// Decompose the requested portfolio risk measure into factor and residual components.
@@ -204,7 +153,7 @@ pub fn decompose_factors(
     }
 
     let exposures = portfolio_exposures(sensitivities);
-    let cov_times_exposure = covariance_times_exposures(covariance, &exposures);
+    let cov_times_exposure = super::matvec_square(covariance.as_slice(), &exposures);
     let component_variance: Vec<f64> = exposures
         .iter()
         .zip(cov_times_exposure.iter())
