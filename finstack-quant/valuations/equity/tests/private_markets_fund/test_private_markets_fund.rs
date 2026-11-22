@@ -3,7 +3,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_equity::pe_fund::*;
+use finstack_quant_valuations_equity::private_markets_fund::*;
 use time::Month;
 
 fn test_currency() -> Currency {

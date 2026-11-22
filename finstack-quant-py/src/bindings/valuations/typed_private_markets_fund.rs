@@ -5,7 +5,7 @@ use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_valuations::instruments::equity::pe_fund::{
+use finstack_quant_valuations::instruments::equity::private_markets_fund::{
     PrivateMarketsFund, PrivateMarketsFundBuilder,
 };
 use pyo3::prelude::*;

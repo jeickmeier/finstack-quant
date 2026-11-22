@@ -27,7 +27,7 @@ use finstack_quant_valuations::instruments::equity::equity_future_option::Equity
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::equity::equity_total_return_future::EquityTotalReturnFuture;
 use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;
-use finstack_quant_valuations::instruments::equity::pe_fund::PrivateMarketsFund;
+use finstack_quant_valuations::instruments::equity::private_markets_fund::PrivateMarketsFund;
 use finstack_quant_valuations::instruments::equity::spot::Equity;
 use finstack_quant_valuations::instruments::equity::variance_swap::VarianceSwap;
 use finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;

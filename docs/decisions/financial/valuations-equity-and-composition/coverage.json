@@ -549,7 +549,7 @@
       "sha256": "8a2c48e7ac21b647da38c6db8873d2ffd9f63c3e39243dfe14654124e09f9e7f"
     },
     {
-      "path": "finstack-quant/valuations/equity/src/pe_fund/metrics.rs",
+      "path": "finstack-quant/valuations/equity/src/private_markets_fund/metrics.rs",
       "classification": "algorithm",
       "records": [
         "VALUATIONS-EQUITY-AND-COMPOSITION-19"
@@ -558,7 +558,7 @@
       "sha256": "9af8bf62a0961df7356f0d7500d4ab99edf1bc81c33f2df0a843a6b5515b35c3"
     },
     {
-      "path": "finstack-quant/valuations/equity/src/pe_fund/mod.rs",
+      "path": "finstack-quant/valuations/equity/src/private_markets_fund/mod.rs",
       "classification": "support",
       "records": [
         "VALUATIONS-EQUITY-AND-COMPOSITION-18"
@@ -567,7 +567,7 @@
       "sha256": "59e39aeb51065c061fc754323d2c48f8b45e8615d6d2f2ca2747b9d2ea323693"
     },
     {
-      "path": "finstack-quant/valuations/equity/src/pe_fund/types.rs",
+      "path": "finstack-quant/valuations/equity/src/private_markets_fund/types.rs",
       "classification": "algorithm",
       "records": [
         "VALUATIONS-EQUITY-AND-COMPOSITION-19"
@@ -576,7 +576,7 @@
       "sha256": "f805d03c93e222d61bdeb0ded11e9e38ff9c273cf18e7c42f36a654ac7af76c9"
     },
     {
-      "path": "finstack-quant/valuations/equity/src/pe_fund/waterfall.rs",
+      "path": "finstack-quant/valuations/equity/src/private_markets_fund/waterfall.rs",
       "classification": "algorithm",
       "records": [
         "VALUATIONS-EQUITY-AND-COMPOSITION-18"

@@ -25,7 +25,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::equity::pe_fund::{
+use finstack_quant_valuations::instruments::equity::private_markets_fund::{
     AllocationLedger, ClawbackSpec, FundEvent, FundEventKind, PeFundWaterfallSpec,
     PrivateMarketsFund, WaterfallStyle,
 };

@@ -107,7 +107,7 @@ Residual PV can be negative because future contributions remain. LP IRR/TVPI dep
 
 ### Evidence
 
-Inline [types.rs](../../../../finstack-quant/valuations/equity/src/pe_fund/types.rs) checks realized zero value, projected-flow/NAV modes and currency errors; [metrics.rs](../../../../finstack-quant/valuations/equity/src/pe_fund/metrics.rs) includes exact near-zero-rate IRR, fully realized DPI/TVPI identities and request-local ledger sharing. These are local examples and solver consistency, not independent fund administrator reconciliation.
+Inline [types.rs](../../../../finstack-quant/valuations/equity/src/private_markets_fund/types.rs) checks realized zero value, projected-flow/NAV modes and currency errors; [metrics.rs](../../../../finstack-quant/valuations/equity/src/private_markets_fund/metrics.rs) includes exact near-zero-rate IRR, fully realized DPI/TVPI identities and request-local ledger sharing. These are local examples and solver consistency, not independent fund administrator reconciliation.
 
 ## Independent numerical checks
 
@@ -138,5 +138,5 @@ the [equity and composition follow-ups](../FOLLOW_UPS.md#equity-and-composition)
 
 ## Owned source files
 
-- [types.rs](../../../../finstack-quant/valuations/equity/src/pe_fund/types.rs)
-- [metrics.rs](../../../../finstack-quant/valuations/equity/src/pe_fund/metrics.rs)
+- [types.rs](../../../../finstack-quant/valuations/equity/src/private_markets_fund/types.rs)
+- [metrics.rs](../../../../finstack-quant/valuations/equity/src/private_markets_fund/metrics.rs)

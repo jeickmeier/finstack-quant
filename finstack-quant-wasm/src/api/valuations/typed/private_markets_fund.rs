@@ -1,7 +1,7 @@
 //! A private-markets fund valued from its dated commitments and cash calls.
 
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::equity::pe_fund::{
+use finstack_quant_valuations::instruments::equity::private_markets_fund::{
     PrivateMarketsFund, PrivateMarketsFundBuilder,
 };
 use wasm_bindgen::prelude::*;

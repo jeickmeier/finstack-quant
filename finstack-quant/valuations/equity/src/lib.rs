@@ -88,7 +88,7 @@
 //! - [`EquityOption`](crate::equity_option::EquityOption) for vanilla options
 //! - [`VarianceSwap`](crate::variance_swap::VarianceSwap) for variance/volatility swaps
 //! - [`Autocallable`](crate::autocallable::Autocallable) for structured notes
-//! - [`PrivateMarketsFund`](crate::pe_fund::PrivateMarketsFund) for PE/credit fund valuation
+//! - [`PrivateMarketsFund`](crate::private_markets_fund::PrivateMarketsFund) for PE/credit fund valuation
 
 /// Explicit stochastic model policy for path-dependent equity structures.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -123,11 +123,11 @@ pub mod equity_trs;
 mod mc_defaults;
 /// Observed-fixing lookup and validation shared by the seasoned instruments.
 pub(crate) mod past_fixings;
-/// PE fund module - Private equity/markets funds.
-pub mod pe_fund;
 /// Shared piecewise-constant GBM process and forward-vol/rate bootstrap for the
 /// equity path-dependent MC pricers (cliquet, autocallable).
 pub(crate) mod piecewise_gbm;
+/// PE fund module - Private equity/markets funds.
+pub mod private_markets_fund;
 #[doc(hidden)]
 pub mod rf_component_dv01;
 /// Equity spot module - Equity spot positions.

@@ -1,7 +1,9 @@
 //! Private markets fund metrics: IRR, DPI, TVPI, carry calculations, and theta.
 
-use crate::pe_fund::waterfall::{FundEventKind, PeFundWaterfallSpec, PeFundWaterfallTranche};
-use crate::pe_fund::{AllocationLedger, PrivateMarketsFund};
+use crate::private_markets_fund::waterfall::{
+    FundEventKind, PeFundWaterfallSpec, PeFundWaterfallTranche,
+};
+use crate::private_markets_fund::{AllocationLedger, PrivateMarketsFund};
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
@@ -25,14 +27,16 @@ fn allocation_ledger(context: &mut MetricContext) -> Result<Arc<AllocationLedger
 fn paid_in_to_date(pe: &PrivateMarketsFund, as_of: Date) -> f64 {
     pe.events
         .iter()
-        .filter(|e| e.kind == crate::pe_fund::FundEventKind::Contribution && e.date <= as_of)
+        .filter(|e| {
+            e.kind == crate::private_markets_fund::FundEventKind::Contribution && e.date <= as_of
+        })
         .map(|e| e.amount.amount())
         .sum()
 }
 
 /// Total realized LP distributions from the allocation ledger on or before
 /// `as_of`, in currency units.
-fn realized_lp_to_date(ledger: &crate::pe_fund::AllocationLedger, as_of: Date) -> f64 {
+fn realized_lp_to_date(ledger: &crate::private_markets_fund::AllocationLedger, as_of: Date) -> f64 {
     ledger
         .rows
         .iter()
@@ -462,7 +466,7 @@ impl MetricCalculator for Nav01Calculator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pe_fund::{FundEvent, PeFundWaterfallSpec};
+    use crate::private_markets_fund::{FundEvent, PeFundWaterfallSpec};
     use time::Month;
 
     fn test_currency() -> finstack_quant_core::currency::Currency {
@@ -665,7 +669,7 @@ mod tests {
 
     #[test]
     fn allocation_is_shared_per_request_without_changing_metric_outputs() {
-        use crate::pe_fund::types::WATERFALL_CALLS;
+        use crate::private_markets_fund::types::WATERFALL_CALLS;
         let fund = PrivateMarketsFund::example().expect("fund");
         let calculators: [&dyn MetricCalculator; 5] = [
             &LpIrrCalculator,
@@ -760,7 +764,7 @@ mod tests {
 
     #[test]
     fn allocation_errors_are_not_cached_or_hidden_by_paid_in_guard() {
-        use crate::pe_fund::types::WATERFALL_CALLS;
+        use crate::private_markets_fund::types::WATERFALL_CALLS;
         let mut fund = PrivateMarketsFund::example().expect("fund");
         fund.events[0].amount = Money::from((1_i64, finstack_quant_core::currency::Currency::EUR));
         let mut context = MetricContext::new(

@@ -87,7 +87,7 @@ are tracked separately from performance measurements.
 | `mc_exotics_pricing` | Explicit GBM Asian MC, lookback/autocallable/cliquet MC, and continuous/quarterly barriers with GBM, Heston, and PDE |
 | `merton_mc_pricing` | Merton structural-credit MC: path count, tenor, antithetics, PIK, and terminal versus first-passage barriers |
 | `fi_misc_pricing` | Term loans and callable trees, deterministic/MC revolvers, agency MBS/TBA and OAS, fixed-income TRS, CMO waterfalls, and dollar rolls |
-| `pe_fund_pricing` | PE waterfall event/complexity scaling, European/American styles, and full pricing |
+| `private_markets_fund_pricing` | PE waterfall event/complexity scaling, European/American styles, and full pricing |
 | `equity_pricing` | Spot, TRS, futures, variance swaps, volatility-index futures, and Black-76 future options |
 | `convertible_pricing` | Binomial convertible PV, contract features, Greeks, metric packages, parity, and step convergence |
 | `inflation_pricing` | Inflation swaps, cap/floor, inflation-linked bond PV, real yield/duration, and metrics |

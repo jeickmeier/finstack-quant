@@ -1,6 +1,6 @@
 //! Private markets fund investment instrument type and implementations.
 
-use crate::pe_fund::waterfall::{
+use crate::private_markets_fund::waterfall::{
     AllocationLedger, EquityWaterfallEngine, FundEvent, FundEventKind, PeFundWaterfallSpec,
 };
 use finstack_quant_core::currency::Currency;
@@ -381,7 +381,7 @@ mod dependency_tests {
 #[cfg(test)]
 mod pricing_tests {
     use super::*;
-    use crate::pe_fund::waterfall::{FundEvent, PeFundWaterfallSpec};
+    use crate::private_markets_fund::waterfall::{FundEvent, PeFundWaterfallSpec};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_valuations_core::instruments::Instrument;
     use time::macros::date;

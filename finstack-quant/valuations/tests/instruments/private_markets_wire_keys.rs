@@ -6,8 +6,10 @@
 //! `hurdle_irr`, `day_count`, `catch_up_mode` and a presence-switched
 //! `clawback`. Each retired key is rejected by `deny_unknown_fields`.
 
-use finstack_quant_valuations::instruments::equity::pe_fund::PrivateMarketsFund;
-use finstack_quant_valuations::instruments::equity::pe_fund::{ClawbackSpec, PeFundWaterfallSpec};
+use finstack_quant_valuations::instruments::equity::private_markets_fund::PrivateMarketsFund;
+use finstack_quant_valuations::instruments::equity::private_markets_fund::{
+    ClawbackSpec, PeFundWaterfallSpec,
+};
 use finstack_quant_valuations::instruments::equity::real_estate::{
     LeveredRealEstateEquity, RealEstateAsset,
 };

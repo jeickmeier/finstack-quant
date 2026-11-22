@@ -109,7 +109,7 @@ Observed discrepancy: the partial-catch-up branch records cash paid to LP but do
 
 ### Evidence
 
-Inline tests in [waterfall.rs](../../../../finstack-quant/valuations/equity/src/pe_fund/waterfall.rs) cover order invariance, precise catch-up, promote thresholds, clawback/escrow conservation, fixed-rate dated hurdles and partial-catch-up allocations. These are local formula/ledger invariants; no executed regression or independent legal-agreement reference was established. [private-equity context](../../../REFERENCES.md#rosenbaum-pearl-2020) does not specify this implementation's negotiated waterfall terms.
+Inline tests in [waterfall.rs](../../../../finstack-quant/valuations/equity/src/private_markets_fund/waterfall.rs) cover order invariance, precise catch-up, promote thresholds, clawback/escrow conservation, fixed-rate dated hurdles and partial-catch-up allocations. These are local formula/ledger invariants; no executed regression or independent legal-agreement reference was established. [private-equity context](../../../REFERENCES.md#rosenbaum-pearl-2020) does not specify this implementation's negotiated waterfall terms.
 
 ## Independent numerical checks
 
@@ -143,4 +143,4 @@ the [equity and composition follow-ups](../FOLLOW_UPS.md#equity-and-composition)
 
 ## Owned source files
 
-- [waterfall.rs](../../../../finstack-quant/valuations/equity/src/pe_fund/waterfall.rs)
+- [waterfall.rs](../../../../finstack-quant/valuations/equity/src/private_markets_fund/waterfall.rs)

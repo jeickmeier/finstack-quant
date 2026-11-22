@@ -860,7 +860,7 @@ mod tests {
     use crate::instruments::commodity::commodity_spot_option::CommoditySpotOption;
     use crate::instruments::credit_derivatives::cds_option::CdsOption;
     use crate::instruments::equity::equity_option::EquityOption;
-    use crate::instruments::equity::pe_fund::PrivateMarketsFund;
+    use crate::instruments::equity::private_markets_fund::PrivateMarketsFund;
     use crate::instruments::fixed_income::bond::Bond;
     use crate::instruments::fixed_income::cmo::AgencyCmo;
     use crate::instruments::fixed_income::convertible::ConvertibleBond;

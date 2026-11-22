@@ -235,7 +235,7 @@ an explicit nonzero-product-underflow or checked-intermediate contract. Those so
 choices do not establish adoption of the stronger/different package above.
 
 [Term-loan discounting](../../../../finstack-quant/valuations/fixed-income/src/term_loan/pricing/discounting.rs),
-[PE fund valuation](../../../../finstack-quant/valuations/equity/src/pe_fund/types.rs),
+[PE fund valuation](../../../../finstack-quant/valuations/equity/src/private_markets_fund/types.rs),
 [structured-credit valuation](../../../../finstack-quant/valuations/structured-credit/src/structured_credit/types/instrument.rs),
 [asset-backed-facility valuation](../../../../finstack-quant/valuations/structured-credit/src/asset_backed_facility/pricing.rs)
 and [Monte Carlo discounting](../../../../finstack-quant/models/src/monte_carlo/pricer/path_dependent.rs)

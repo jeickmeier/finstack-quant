@@ -29,7 +29,7 @@ and `LeveredRealEstateEquity` stay in the umbrella at
 | `autocallable/`, `cliquet_option/` | Path-dependent structured notes | Monte Carlo over `finstack_quant_models::monte_carlo::payoff::{autocallable, cliquet}` |
 | `vol_index_future/`, `vol_index_future_option/` | VIX-style futures and options | Forward-variance fair value, Black-76 options |
 | `dcf_equity/` | Discounted-cash-flow equity | Explicit forecasts plus `TerminalValueSpec` |
-| `pe_fund/` | Private-markets funds | Deterministic commitment / drawdown / distribution schedules and fund-level metrics |
+| `private_markets_fund/` | Private-markets funds | Deterministic commitment / drawdown / distribution schedules and fund-level metrics |
 | `dividend01.rs`, `piecewise_gbm.rs` | Not instruments | Shared dividend-yield sensitivity and the forward-bootstrapped GBM used by the path-dependent pricers |
 | `family.rs` | Not an instrument | `EQUITY`, the family's pricer and metric registrations |
 
@@ -58,7 +58,7 @@ umbrella); the crate root exports only the `EQUITY` family static and
 Integration tests that need only this crate, valuations-core and the
 test-support crate live in `tests/`, compiled into the single `equity` target
 (`mise run rust-test-crate -- finstack-quant-valuations-equity`):
-`variance_swap/`, `autocallable/`, `private_market_fund/` and the type and
+`variance_swap/`, `autocallable/`, `private_markets_fund/` and the type and
 bucketed-DV01 tests of `equity/`. Tests that price through the standard
 registries, build options through `tests/support/equity_fx_options.rs`, or
 reach fixed-income instruments (`trs/`, the real-estate suite) stay in the

@@ -24,7 +24,7 @@ use super::equity::equity_future_option::EquityFutureOption;
 use super::equity::equity_option::EquityOption;
 use super::equity::equity_total_return_future::EquityTotalReturnFuture;
 use super::equity::equity_trs::EquityTotalReturnSwap;
-use super::equity::pe_fund::PrivateMarketsFund;
+use super::equity::private_markets_fund::PrivateMarketsFund;
 use super::equity::real_estate::RealEstateAsset;
 use super::equity::spot::Equity;
 use super::equity::variance_swap::VarianceSwap;

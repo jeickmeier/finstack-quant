@@ -224,7 +224,7 @@ fn bonds_loans_swaps_and_funds_drop_cash_on_the_payment_date() {
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_valuations::instruments::{
-        equity::{equity_trs::EquityTotalReturnSwap, pe_fund::PrivateMarketsFund},
+        equity::{equity_trs::EquityTotalReturnSwap, private_markets_fund::PrivateMarketsFund},
         fixed_income::{
             bond::Bond,
             fi_trs::FiIndexTotalReturnSwap,

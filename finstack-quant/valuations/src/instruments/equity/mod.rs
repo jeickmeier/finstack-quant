@@ -68,7 +68,7 @@
 //! - [`EquityOption`](crate::instruments::equity::equity_option::EquityOption) for vanilla options
 //! - [`VarianceSwap`](crate::instruments::equity::variance_swap::VarianceSwap) for variance/volatility swaps
 //! - [`Autocallable`](crate::instruments::equity::autocallable::Autocallable) for structured notes
-//! - [`PrivateMarketsFund`](crate::instruments::equity::pe_fund::PrivateMarketsFund) for PE/credit fund valuation
+//! - [`PrivateMarketsFund`](crate::instruments::equity::private_markets_fund::PrivateMarketsFund) for PE/credit fund valuation
 //!
 //! The family lives in `finstack-quant-valuations-equity` and is re-exported
 //! here unchanged. `real_estate` stays in this crate: `RealEstateFinancing`

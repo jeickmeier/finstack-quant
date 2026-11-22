@@ -4,7 +4,7 @@
 mod autocallable;
 #[path = "equity/mod.rs"]
 mod equity;
-#[path = "private_market_fund/mod.rs"]
-mod private_market_fund;
+#[path = "private_markets_fund/mod.rs"]
+mod private_markets_fund;
 #[path = "variance_swap/mod.rs"]
 mod variance_swap;

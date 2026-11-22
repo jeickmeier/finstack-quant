@@ -150,7 +150,7 @@ name = "fi_misc_pricing"
 harness = false
 
 [[bench]]
-name = "pe_fund_pricing"
+name = "private_markets_fund_pricing"
 harness = false
 
 [[bench]]
