@@ -70,8 +70,14 @@
 //! - Bond-market accrued-interest conventions: `docs/REFERENCES.md#icma-rule-book`
 //! - Fixed-income risk and hedging intuition: `docs/REFERENCES.md#tuckman-serrat-fixed-income`
 
-// Common functionality (traits, macros, helpers)
+// Core instrument traits and macros (declared first for textual macro scope)
 #[macro_use]
+mod traits;
+pub(crate) mod dependencies;
+mod listed;
+mod parameters;
+
+// Family-facing helpers (removed in Slice 5b)
 #[doc(hidden)]
 pub mod common_impl;
 mod legs;
@@ -94,34 +100,34 @@ pub use position::Position;
 
 mod breakeven;
 pub use breakeven::{BreakevenConfig, BreakevenMode, BreakevenTarget};
-pub use common_impl::dependencies::{
+pub use dependencies::{
     FxPair, InstrumentCurves, MarketDependencies, RatesCurveKind, VolatilityDependency,
-};
-pub use common_impl::traits::{
-    GreekBumps, Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
-    OptionGreeksRequest, PricingOptions,
 };
 pub use pricing::trs::{
     FinancingLegFlows, PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
 };
+pub use traits::{
+    GreekBumps, Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
+    OptionGreeksRequest, PricingOptions,
+};
 
-pub use common_impl::parameters::conventions::NotionalExchange;
-pub use common_impl::parameters::conventions::ResettingSide;
-pub use common_impl::parameters::market::SettlementType;
-pub use common_impl::parameters::monitoring::Monitoring;
-pub use common_impl::parameters::quanto::QuantoSpec;
 pub use legs::FinancingLegSpec;
 pub use legs::PayReceive;
+pub use parameters::conventions::NotionalExchange;
+pub use parameters::conventions::ResettingSide;
+pub use parameters::market::SettlementType;
+pub use parameters::monitoring::Monitoring;
+pub use parameters::quanto::QuantoSpec;
 
-pub use common_impl::parameters::trs_common::TrsScheduleSpec;
+pub use parameters::trs_common::TrsScheduleSpec;
 
-pub use common_impl::listed::future_option::FutureOptionExercise;
-pub use common_impl::listed::future_option::FutureOptionModel;
-pub use common_impl::listed::future_option::FutureOptionPremiumStyle;
-pub use common_impl::listed::future_option::FutureOptionSettlement;
-pub use common_impl::listed::future_option::FutureOptionTerms;
-pub use common_impl::listed::terms::ListedFutureSettlement;
-pub use common_impl::listed::terms::ListedFutureTerms;
+pub use listed::future_option::FutureOptionExercise;
+pub use listed::future_option::FutureOptionModel;
+pub use listed::future_option::FutureOptionPremiumStyle;
+pub use listed::future_option::FutureOptionSettlement;
+pub use listed::future_option::FutureOptionTerms;
+pub use listed::terms::ListedFutureSettlement;
+pub use listed::terms::ListedFutureTerms;
 
 /// Pricing overrides module.
 pub mod pricing_overrides;

@@ -179,7 +179,7 @@ Calendar-day daily sampling, actual-spacing annualization and time-weighted seas
 ## Evidence
 
 - [variance_observations.rs](../../../../finstack-quant/valuations/core/src/instruments/pricing/variance_observations.rs): algorithms and inspected inline tests `day_tenor_uses_holiday_calendar_and_business_endpoints`, `monthly_schedule_preserves_end_of_month_anchor`, and unknown-calendar rejection.
-- [monitoring.rs](../../../../finstack-quant/valuations/core/src/instruments/common_impl/parameters/monitoring.rs): required-knot and observation-step mapping; core/models own grid construction and crossing probabilities.
+- [monitoring.rs](../../../../finstack-quant/valuations/core/src/instruments/parameters/monitoring.rs): required-knot and observation-step mapping; core/models own grid construction and crossing probabilities.
 - [Demeterfi et al.](../../../REFERENCES.md#demeterfi-1999-volatility-swaps), [Broadie–Glasserman–Kou](../../../REFERENCES.md#broadie-glasserman-kou-1997), and [Glasserman](../../../REFERENCES.md#glasserman-2004-monte-carlo) provide canonical conceptual context, not direct acceptance of these calendar rules.
 - The live variance routes are [equity](../../../../finstack-quant/valuations/equity/src/variance_swap/pricer.rs) and [FX](../../../../finstack-quant/valuations/fx/src/fx_variance_swap/pricer.rs). Barrier use includes [asset GBM](../../../../finstack-quant/valuations/exotics/src/exotics/barrier_option/pricer.rs), [asset Heston](../../../../finstack-quant/valuations/exotics/src/exotics/barrier_option/heston_mc_pricer.rs), [asset PDE](../../../../finstack-quant/valuations/exotics/src/exotics/barrier_option/pde_pricer.rs) and [FX GBM](../../../../finstack-quant/valuations/fx/src/fx_barrier_option/pricer.rs).
 

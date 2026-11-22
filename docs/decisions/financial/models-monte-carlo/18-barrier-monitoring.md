@@ -242,7 +242,7 @@ through per-unit scaling and can treat a past at-hit rebate as
 discharged from the breach flag. Existing tests cover the old
 interval, rebate, variance and touch behavior. Implementation
 evidence remains separate from approval and price qualification.
-[Dated monitoring adapter](../../../../finstack-quant/valuations/core/src/instruments/common_impl/parameters/monitoring.rs).
+[Dated monitoring adapter](../../../../finstack-quant/valuations/core/src/instruments/parameters/monitoring.rs).
 
 ## Independent review evidence
 

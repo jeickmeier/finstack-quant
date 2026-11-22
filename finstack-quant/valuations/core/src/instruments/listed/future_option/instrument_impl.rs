@@ -1,5 +1,18 @@
 //! Shared trait and pricing delegation for asset-owned futures options.
 
+/// Implement validation, pricing, cashflow, Greek, and [`Instrument`](crate::instruments::Instrument)
+/// delegation for an asset-owned listed futures option wrapper around
+/// [`FutureOptionTerms`](crate::instruments::FutureOptionTerms).
+///
+/// # Arguments
+///
+/// * `$ty` - Concrete wrapper struct owning `id`, `terms: FutureOptionTerms`,
+///   `instrument_pricing_overrides`, `metric_pricing_overrides`, and `attributes`.
+/// * `$key` - The instrument's [`InstrumentType`](crate::pricer::InstrumentType).
+/// * `$family` - Path to the `static Family` registering the instrument's pricers
+///   and metrics.
+/// * `$require_rate_risk` - Optional boolean requiring
+///   `terms.underlying_price_change_per_bp` during validation (used by rate-futures options).
 #[macro_export]
 macro_rules! impl_future_option_instrument {
     ($ty:ty, $key:expr_2021, $family:expr_2021 $(, require_rate_risk = $require_rate_risk:expr_2021)?) => {

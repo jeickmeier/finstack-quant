@@ -314,7 +314,7 @@ The [equity input adapter](../../../../finstack-quant/valuations/equity/src/equi
 and [commodity option](../../../../finstack-quant/valuations/exotics/src/commodity/commodity_spot_option/types.rs)
 invoke shared option validation before tree pricing. The commodity
 carry helper uses short-horizon and ratio fallbacks.
-The [listed futures option](../../../../finstack-quant/valuations/core/src/instruments/common_impl/listed/future_option/types.rs)
+The [listed futures option](../../../../finstack-quant/valuations/core/src/instruments/listed/future_option/types.rs)
 uses distinct default grids for its official PV and risk routes.
 The [convertible credit tree](../../../../finstack-quant/valuations/fixed-income/src/convertible/pricing/credit_tree.rs)
 uses fixed CRR spacing with interval-specific reweighting.

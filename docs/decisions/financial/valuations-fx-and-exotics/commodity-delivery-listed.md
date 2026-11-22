@@ -154,8 +154,8 @@ An explicit delivery fixing would lock the post-delivery cash claim. Full carryi
 
 Delegated implementation dependencies:
 
-- [finstack-quant/valuations/core/src/instruments/common_impl/listed/terms.rs](../../../../finstack-quant/valuations/core/src/instruments/common_impl/listed/terms.rs)
-- [finstack-quant/valuations/core/src/instruments/common_impl/listed/future_option/types.rs](../../../../finstack-quant/valuations/core/src/instruments/common_impl/listed/future_option/types.rs)
+- [finstack-quant/valuations/core/src/instruments/listed/terms.rs](../../../../finstack-quant/valuations/core/src/instruments/listed/terms.rs)
+- [finstack-quant/valuations/core/src/instruments/listed/future_option/types.rs](../../../../finstack-quant/valuations/core/src/instruments/listed/future_option/types.rs)
 
 - [finstack-quant/valuations/exotics/tests/commodity/test_commodity_forward.rs](../../../../finstack-quant/valuations/exotics/tests/commodity/test_commodity_forward.rs): Forward price/settlement and physical-cashflow behavior assertions.
 

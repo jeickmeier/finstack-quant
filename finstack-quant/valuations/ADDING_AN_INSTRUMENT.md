@@ -12,7 +12,7 @@ Each step names the check that fails when it is skipped.
 Add `<family>/src/<name>/`, following a neighbour (for example
 `fixed-income/src/bond/` or `rates/src/irs/`). The struct needs
 `id: InstrumentId`, `attributes: Attributes`, `Clone`, and an `example()`
-constructor. Reuse the family parameter modules and shared `common_impl/parameters/`
+constructor. Reuse the family parameter modules and shared `parameters/`
 types and `instruments::pricing` kernels instead of writing parallel ones.
 
 ## 2. The `InstrumentType` variant
@@ -34,7 +34,7 @@ impl Instrument for Foo {
 `impl_instrument_base!` takes the instrument type and the family static and
 supplies `id`, `key`, `attributes` and `family`. Listed future options use
 `impl_future_option_instrument!` or `define_future_option!`
-(`core/src/instruments/common_impl/listed/future_option/instrument_impl.rs`),
+(`core/src/instruments/listed/future_option/instrument_impl.rs`),
 which generate the whole `impl Instrument`; that is why
 `grep 'impl Instrument for'` does not find them.
 

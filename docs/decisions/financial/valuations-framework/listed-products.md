@@ -272,9 +272,9 @@ After exercise, gamma/vega/theta are zero. Delta on a delivered in-the-money fut
 
 ## Evidence
 
-- [FutureOptionTerms](../../../../finstack-quant/valuations/core/src/instruments/common_impl/listed/future_option/types.rs): owning formulas, 401/201 defaults, exercise and settlement branches, finite differences.
-- [Instrument macro](../../../../finstack-quant/valuations/core/src/instruments/common_impl/listed/future_option/instrument_impl.rs): cross-asset delegation, overrides and rate-risk requirement.
-- [ListedFutureTerms](../../../../finstack-quant/valuations/core/src/instruments/common_impl/listed/terms.rs): explicit mark priority, MTM formula and date boundaries.
+- [FutureOptionTerms](../../../../finstack-quant/valuations/core/src/instruments/listed/future_option/types.rs): owning formulas, 401/201 defaults, exercise and settlement branches, finite differences.
+- [Instrument macro](../../../../finstack-quant/valuations/core/src/instruments/listed/future_option/instrument_impl.rs): cross-asset delegation, overrides and rate-risk requirement.
+- [ListedFutureTerms](../../../../finstack-quant/valuations/core/src/instruments/listed/terms.rs): explicit mark priority, MTM formula and date boundaries.
 - [Future-option implied-volatility tests](../../../../finstack-quant/valuations/tests/instruments/future_option/implied_volatility.rs): located cross-asset behavior/roundtrip evidence; a roundtrip is not an independent price benchmark.
 - [Black (1976)](../../../REFERENCES.md#black-1976), [Bachelier (1900)](../../../REFERENCES.md#bachelier-1900), and [Hull](../../../REFERENCES.md#hull-options-futures) provide canonical model context. These citations do not establish approval of the lifecycle rules or tree controls.
 

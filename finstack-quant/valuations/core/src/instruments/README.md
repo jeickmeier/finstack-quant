@@ -15,7 +15,11 @@ documentation implements it for a one-payment note.
 | Path | Role |
 |------|------|
 | `mod.rs` | Module declarations and the flat re-export list of the framework surface |
-| [`common_impl/`](common_impl/README.md) | The `Instrument` trait and provider traits, `PricingOptions`, multi-family parameter types (`PayReceive`, `FinancingLegSpec`, conventions, Merton MC config, bond quotes), the generic pricer, listed-contract mechanics, multi-family `Marginable` helpers. Public but hidden from the rendered docs; the families reach it by path |
+| `traits/` | The `Instrument` trait, `OptionGreeksProvider`, `PricingOptions`, and `impl_instrument_base!` macros |
+| `dependencies.rs` | `MarketDependencies`, `InstrumentCurves`, `FxPair`, `RatesCurveKind`, `VolatilityDependency` |
+| `parameters/` | Multi-family parameter types (`NotionalExchange`, `ResettingSide`, `SettlementType`, `Monitoring`, `QuantoSpec`, `TrsScheduleSpec`) |
+| [`listed/`](listed/README.md) | Shared listed-future terms (`ListedFutureTerms`) and option-on-future mechanics (`FutureOptionTerms`) |
+| [`common_impl/`](common_impl/README.md) | Shared pricing helpers, volatility resolution, and `Marginable` helpers (hidden from rendered docs; families reach it by path) |
 | `cashflow_export.rs` | `instrument_cashflows`, `InstrumentCashflowEnvelope`, `CashflowRow`, `CashflowExportTerms` — the per-flow DF / survival / PV exporter behind the Python/WASM `instrument_cashflows` bindings and the explain trace; it decomposes an instrument through `Instrument::cashflow_export_terms` and `Instrument::validate_cashflow_export` |
 | `pricing_overrides/` | `InstrumentPricingOverrides`, `MetricPricingOverrides`, `ScenarioPricingOverrides`, `ModelConfig`, `BumpConfig` |
 | `position.rs` | `Position` (long/short direction) |
@@ -28,7 +32,7 @@ infrastructure (`overnight_conventions`, `hw1f_params`, `heston_market`,
 ## Core trait
 
 Every instrument implements `Instrument`, defined in
-[`common_impl/traits/instrument.rs`](common_impl/traits/instrument.rs) and
+[`traits/instrument.rs`](traits/instrument.rs) and
 re-exported as `instruments::Instrument` (and unchanged through the umbrella).
 It requires `CashflowProvider` (from `finstack-quant-cashflows`) and
 `Send + Sync`.
@@ -71,4 +75,4 @@ not as new required methods.
 - [`../results/README.md`](../results/README.md) — `ValuationResult` envelope
 - [`../market/README.md`](../market/README.md) — quotes and conventions
 - [`../pricer/README.md`](../pricer/README.md) — dispatch keys, `PricerRegistry`, `Family`
-- [listed instrument mechanics](common_impl/listed/README.md)
+- [listed instrument mechanics](listed/README.md)

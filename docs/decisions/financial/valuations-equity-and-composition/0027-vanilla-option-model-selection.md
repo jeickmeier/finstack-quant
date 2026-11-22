@@ -117,7 +117,7 @@ Pending adoption and numerical qualification are tracked in the
 with product-specific FX work in the
 [FX follow-ups](../FOLLOW_UPS.md#fx-commodities-and-exotics).
 
-[instrument]: ../../../../finstack-quant/valuations/core/src/instruments/common_impl/traits/instrument.rs
+[instrument]: ../../../../finstack-quant/valuations/core/src/instruments/traits/instrument.rs
 [json]: ../../../../finstack-quant/valuations/src/pricer/json.rs
 [equity-family]: ../../../../finstack-quant/valuations/equity/src/family.rs
 [fx-family]: ../../../../finstack-quant/valuations/fx/src/family.rs

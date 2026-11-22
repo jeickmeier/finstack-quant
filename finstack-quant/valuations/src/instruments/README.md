@@ -92,6 +92,6 @@ Follow [`ADDING_AN_INSTRUMENT.md`](../../ADDING_AN_INSTRUMENT.md), the one check
   [cds_option](credit_derivatives/cds_option/README.md),
   [cds_tranche](credit_derivatives/cds_tranche/README.md),
   [bond_future](fixed_income/bond_future/README.md),
-  [listed instrument mechanics](../../core/src/instruments/common_impl/listed/README.md),
+  [listed instrument mechanics](../../core/src/instruments/listed/README.md),
   [real_estate](equity/real_estate/README.md),
   [range_accrual](exotics/range_accrual/README.md)

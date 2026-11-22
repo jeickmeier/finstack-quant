@@ -358,10 +358,7 @@ pub fn make_vol_bumper(context: &MetricContext) -> Result<Option<FactorBumper>> 
             {
                 vol_scalar_ids.push(name.to_owned());
             } else {
-                crate::instruments::common_impl::dependencies::require_volatility_grid(
-                    &context.curves,
-                    &id,
-                )?;
+                crate::instruments::dependencies::require_volatility_grid(&context.curves, &id)?;
                 vol_surface_ids.push(id);
             }
         }

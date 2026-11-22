@@ -2,7 +2,7 @@
 
 Reusable exchange terms, option-on-future pricing mechanics, and lifecycle
 logic. Concrete persisted instruments live under their asset-class modules;
-`common_impl` is never an instrument registry or portfolio/scenario JSON
+`instruments::listed` is never an instrument registry or portfolio/scenario JSON
 destination. Product-family coverage and routing metadata live under
 `market/listed`.
 

@@ -185,7 +185,7 @@ Unimplemented alternatives here include payment-date cash inclusion, compounding
 ## Evidence
 
 - [trs.rs](../../../../finstack-quant/valuations/core/src/instruments/pricing/trs.rs): complete engine after the test-only helper, financing projection, PV, annuity and par spread; inline tests are formula/reconciliation evidence, not an independent market benchmark.
-- [trs_common.rs](../../../../finstack-quant/valuations/core/src/instruments/common_impl/parameters/trs_common.rs) and [legs.rs](../../../../finstack-quant/valuations/core/src/instruments/legs.rs): schedule and compounding/default validation.
+- [trs_common.rs](../../../../finstack-quant/valuations/core/src/instruments/parameters/trs_common.rs) and [legs.rs](../../../../finstack-quant/valuations/core/src/instruments/legs.rs): schedule and compounding/default validation.
 - [Hull](../../../REFERENCES.md#hull-options-futures) supplies general carry/discounting context. A product-specific source supporting each TRS fixing and payment convention is not established here.
 - [Equity TRS pricing](../../../../finstack-quant/valuations/equity/src/equity_trs/pricer.rs) and [fixed-income index TRS pricing](../../../../finstack-quant/valuations/fixed-income/src/fi_trs/pricer.rs) are the live return and export adapters. Both use the financing discount source for the return leg today. [ISDA's disclosure annex](https://www.isda.org/a/AVEDE/equity-derivatives-risk-disclosure-statement-702595828-2.pdf) and [FpML's dated example](https://www.fpml.org/spec/fpml-4-9-5-rec-1/html/fpml-4-9-examples.html) give contract context for signed returns, financing and settlement. Their broader product variants do not define the shared profile.
 

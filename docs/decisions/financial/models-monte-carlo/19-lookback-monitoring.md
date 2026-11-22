@@ -216,7 +216,7 @@ clock branches query terminal spot for both payoff types. These
 are observed routing choices. The proposed contract preserves
 the separate analytic and MC model owners.
 [Carry helper](../../../../finstack-quant/valuations/core/src/instruments/common_impl/helpers.rs),
-[dated monitoring](../../../../finstack-quant/valuations/core/src/instruments/common_impl/parameters/monitoring.rs).
+[dated monitoring](../../../../finstack-quant/valuations/core/src/instruments/parameters/monitoring.rs).
 
 ## Independent review evidence
 

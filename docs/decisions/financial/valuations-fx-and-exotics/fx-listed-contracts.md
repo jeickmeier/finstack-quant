@@ -112,8 +112,8 @@ Exchange quoted marks are supported and avoid treating a modeled CIP quote as an
 
 Delegated implementation dependencies:
 
-- [finstack-quant/valuations/core/src/instruments/common_impl/listed/future_option/types.rs](../../../../finstack-quant/valuations/core/src/instruments/common_impl/listed/future_option/types.rs)
-- [finstack-quant/valuations/core/src/instruments/common_impl/listed/future_option/instrument_impl.rs](../../../../finstack-quant/valuations/core/src/instruments/common_impl/listed/future_option/instrument_impl.rs)
+- [finstack-quant/valuations/core/src/instruments/listed/future_option/types.rs](../../../../finstack-quant/valuations/core/src/instruments/listed/future_option/types.rs)
+- [finstack-quant/valuations/core/src/instruments/listed/future_option/instrument_impl.rs](../../../../finstack-quant/valuations/core/src/instruments/listed/future_option/instrument_impl.rs)
 
 No separate independent numerical benchmark was established in this slice. Inline tests in the owning implementation provide only the assertions present there; they are not proof of accuracy outside those cases.
 

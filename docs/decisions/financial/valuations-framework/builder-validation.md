@@ -126,8 +126,8 @@ The accepted decision requires lazy defaults, rejection of defaults on optional 
   A rate futures option can require the DV01 transformation at its wrapper
   boundary even when its standalone option terms validate.
   [Range-accrual types](../../../../finstack-quant/valuations/exotics/src/exotics/range_accrual/types.rs),
-  [futures-option terms](../../../../finstack-quant/valuations/core/src/instruments/common_impl/listed/future_option/types.rs),
-  [futures-option wrapper validation](../../../../finstack-quant/valuations/core/src/instruments/common_impl/listed/future_option/instrument_impl.rs).
+  [futures-option terms](../../../../finstack-quant/valuations/core/src/instruments/listed/future_option/types.rs),
+  [futures-option wrapper validation](../../../../finstack-quant/valuations/core/src/instruments/listed/future_option/instrument_impl.rs).
 - Repo and CapFloor have non-optional `attributes` fields without a wire
   default on the field. Their generated builders currently supply empty
   metadata by name. These declarations give a concrete omission case for

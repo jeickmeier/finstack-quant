@@ -124,7 +124,7 @@ Constant `DeltaVol` expresses one index-point exposure even when PV is zero afte
 
 ### Evidence
 
-[VIX index reference](../../../REFERENCES.md#cboe-vix-white-paper) and [Black futures-option reference](../../../REFERENCES.md#black-1976); inline tests in [types.rs](../../../../finstack-quant/valuations/equity/src/vol_index_future/types.rs) locate settlement/curve cases. Shared owner [future-option adapter](../../../../finstack-quant/valuations/core/src/instruments/common_impl/listed/future_option/mod.rs) is the implementation boundary for the macro; its owning audit covers that kernel.
+[VIX index reference](../../../REFERENCES.md#cboe-vix-white-paper) and [Black futures-option reference](../../../REFERENCES.md#black-1976); inline tests in [types.rs](../../../../finstack-quant/valuations/equity/src/vol_index_future/types.rs) locate settlement/curve cases. Shared owner [future-option adapter](../../../../finstack-quant/valuations/core/src/instruments/listed/future_option/mod.rs) is the implementation boundary for the macro; its owning audit covers that kernel.
 
 ## Independent arithmetic and qualification
 

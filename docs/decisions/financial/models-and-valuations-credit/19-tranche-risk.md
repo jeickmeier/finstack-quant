@@ -265,7 +265,7 @@ Consistent selected-pricer dispatch and per-name recovery replay are possible al
 Owners: [sensitivities.rs](../../../../finstack-quant/valuations/credit/src/cds_tranche/pricing/sensitivities.rs), [metric implementations](../../../../finstack-quant/valuations/credit/src/cds_tranche/metrics). [Tranche tests](../../../../finstack-quant/valuations/credit/tests/cds_tranche) locate finite-difference/repricing and sign evidence; these do not establish independent risk accuracy.
 
 The [tranche instrument](../../../../finstack-quant/valuations/credit/src/cds_tranche/types.rs)
-and [shared instrument pricing trait](../../../../finstack-quant/valuations/core/src/instruments/common_impl/traits/instrument.rs)
+and [shared instrument pricing trait](../../../../finstack-quant/valuations/core/src/instruments/traits/instrument.rs)
 locate the Money boundary behind the existing generic raw pricing call.
 [Credit attribution](../../../../finstack-quant/attribution/src/metrics_based/credit.rs)
 locates the use of matched quote movements and the aggregate spread
