@@ -6,7 +6,6 @@
 //! - Levered deal-style metrics (IRR, MOIC, DSCR, LTV)
 
 use super::levered_pricer;
-use super::types::RealEstateAsset;
 use crate::impl_instrument_base;
 use crate::instruments::Instrument;
 use crate::instruments::fixed_income::bond::Bond;
@@ -20,6 +19,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::InstrumentId;
+use finstack_quant_valuations_equity::real_estate::RealEstateAsset;
 
 /// Financing instruments supported by levered real-estate valuation and metrics.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -235,8 +235,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for LeveredRealEstateEquit
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::equity::real_estate::types::RealEstateValuationMethod;
     use finstack_quant_cashflows::CashflowProvider;
+    use finstack_quant_valuations_equity::real_estate::RealEstateValuationMethod;
 
     #[test]
     fn levered_real_estate_cashflow_schedule_emits_projected_equity_flows() {

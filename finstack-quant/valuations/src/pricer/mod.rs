@@ -80,19 +80,15 @@ fn register_standard_pricers(registry: &mut PricerRegistry) -> Result<(), Pricin
     register_generic!(
         registry,
         InstrumentType::Basket,
-        crate::instruments::exotics::basket::Basket
+        crate::instruments::basket::Basket
     );
-    // Levered real estate holds financing legs from several families, so the
-    // real-estate instruments register here rather than with `EQUITY`.
-    register_generic!(
-        registry,
-        InstrumentType::RealEstateAsset,
-        crate::instruments::equity::real_estate::RealEstateAsset
-    );
+    // Levered real estate holds financing legs from several families, so it
+    // registers here rather than with `EQUITY` (unlevered `RealEstateAsset`
+    // registers with `EQUITY`).
     register_generic!(
         registry,
         InstrumentType::LeveredRealEstateEquity,
-        crate::instruments::equity::real_estate::LeveredRealEstateEquity
+        crate::instruments::levered_real_estate::LeveredRealEstateEquity
     );
     Ok(())
 }
@@ -101,9 +97,8 @@ fn register_standard_metrics(registry: &mut MetricRegistry) -> Result<(), Metric
     for family in FAMILIES {
         family.register_metrics(registry)?;
     }
-    crate::instruments::exotics::basket::metrics::register_basket_metrics(registry)?;
-    crate::instruments::equity::real_estate::metrics::register_real_estate_metrics(registry)?;
-    crate::instruments::equity::real_estate::metrics::register_levered_real_estate_metrics(
+    crate::instruments::basket::metrics::register_basket_metrics(registry)?;
+    crate::instruments::levered_real_estate::metrics::register_levered_real_estate_metrics(
         registry,
     )?;
     crate::metrics::risk::register_risk_metrics(registry)

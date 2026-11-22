@@ -149,8 +149,6 @@ methodology difference that justifies it.
   `SystemTime::now()` call in the tree (`instruments/registry_coverage.rs`)
   only names a scratch directory.
 - Monte Carlo and stochastic paths take explicit seeds for bit-identical repeats.
-- Proptest regressions are committed next to their tests
-  (`*.proptest-regressions`) and must not be deleted to make a run pass.
 - No test reaches the network or an external service.
 
 ## Slow tests

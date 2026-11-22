@@ -20,7 +20,13 @@ pub(crate) fn compute_pv(
 ///
 /// Appraisal-value and direct-cap valuations carry no discount-rate input,
 /// so they are constant under the bump (zero rf DV01).
-pub(crate) fn pv_with_rf_bump(
+///
+/// # Arguments
+///
+/// * `asset` - Real estate asset to value.
+/// * `as_of` - Valuation date.
+/// * `bump` - Uniform absolute decimal shift applied to the DCF discount rate.
+pub fn pv_with_rf_bump(
     asset: &RealEstateAsset,
     as_of: Date,
     bump: f64,
@@ -136,10 +142,12 @@ pub(crate) fn compute_npv_direct_cap(
 /// Valuation horizon: `sale_date` when set (must be on/after `as_of`),
 /// otherwise the last NOI date on/after `as_of`. Cashflows after the horizon
 /// are outside the holding period and must not be valued or reported.
-pub(crate) fn horizon_date(
-    asset: &RealEstateAsset,
-    as_of: Date,
-) -> finstack_quant_core::Result<Date> {
+///
+/// # Arguments
+///
+/// * `asset` - Real estate asset whose horizon is resolved.
+/// * `as_of` - Valuation date.
+pub fn horizon_date(asset: &RealEstateAsset, as_of: Date) -> finstack_quant_core::Result<Date> {
     if let Some(sale_date) = asset.sale_date {
         if sale_date < as_of {
             return Err(Error::Validation("sale_date must be on/after as_of".into()));
@@ -149,7 +157,13 @@ pub(crate) fn horizon_date(
     Ok(last_noi(asset, as_of)?.0)
 }
 
-pub(crate) fn future_noi_flows(
+/// Future NOI schedule entries on or after `as_of`, sorted chronologically.
+///
+/// # Arguments
+///
+/// * `asset` - Real estate asset whose NOI schedule is filtered.
+/// * `as_of` - Valuation date.
+pub fn future_noi_flows(
     asset: &RealEstateAsset,
     as_of: Date,
 ) -> finstack_quant_core::Result<Vec<(Date, f64)>> {
@@ -172,7 +186,12 @@ pub(crate) fn future_noi_flows(
 /// valuation horizon (`sale_date` when set, else the last NOI date). This is
 /// the holding-period view used by DCF valuation, cashflow schedules, and
 /// return metrics, so all three agree on the horizon.
-pub(crate) fn unlevered_flows(
+///
+/// # Arguments
+///
+/// * `asset` - Real estate asset whose unlevered net cashflows are computed.
+/// * `as_of` - Valuation date.
+pub fn unlevered_flows(
     asset: &RealEstateAsset,
     as_of: Date,
 ) -> finstack_quant_core::Result<Vec<(Date, f64)>> {
@@ -208,7 +227,12 @@ pub(crate) fn unlevered_flows(
     Ok(merged)
 }
 
-pub(crate) fn acquisition_cost_total(asset: &RealEstateAsset) -> finstack_quant_core::Result<f64> {
+/// Total acquisition closing costs in the asset currency.
+///
+/// # Arguments
+///
+/// * `asset` - Real estate asset whose acquisition costs are summed.
+pub fn acquisition_cost_total(asset: &RealEstateAsset) -> finstack_quant_core::Result<f64> {
     cost_total(asset, &asset.acquisition_costs, "acquisition_costs")
 }
 
@@ -248,11 +272,23 @@ pub(crate) fn purchase_price(asset: &RealEstateAsset) -> finstack_quant_core::Re
 }
 
 /// Purchase price amount, required by return and leverage metrics.
-pub(crate) fn required_purchase_price(asset: &RealEstateAsset) -> finstack_quant_core::Result<f64> {
+///
+/// # Arguments
+///
+/// * `asset` - Real estate asset whose purchase price is required.
+pub fn required_purchase_price(asset: &RealEstateAsset) -> finstack_quant_core::Result<f64> {
     purchase_price(asset)?.ok_or_else(|| Error::Validation("purchase_price is required".into()))
 }
 
-pub(crate) fn sale_proceeds_at(
+/// Net sale proceeds realized at `horizon`, after percentage and itemized
+/// disposition costs.
+///
+/// # Arguments
+///
+/// * `asset` - Real estate asset whose terminal proceeds are computed.
+/// * `as_of` - Valuation date.
+/// * `horizon` - Exit date on or after `as_of`.
+pub fn sale_proceeds_at(
     asset: &RealEstateAsset,
     as_of: Date,
     horizon: Date,

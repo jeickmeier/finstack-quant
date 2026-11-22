@@ -8,6 +8,7 @@ target-*
 !/Cargo.lock
 *.pdb
 .benchmarks
+**/proptest-regressions/
 
 # Python
 __pycache__/

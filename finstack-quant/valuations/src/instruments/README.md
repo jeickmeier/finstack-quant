@@ -39,9 +39,11 @@ Files at this level:
 
 | File | Role |
 |------|------|
-| `mod.rs` | `pub use finstack_quant_valuations_core::instruments::*`, the asset-class module declarations and the flat public re-export list |
+| `mod.rs` | `pub use finstack_quant_valuations_core::instruments::*`, inline re-export modules for every asset-class namespace, and the flat public re-export list |
 | `json_loader.rs` | `InstrumentEnvelope`, `InstrumentJson`, and the registry macro (the closed world) |
-| `composite/` | `CompositeInstrument` and its legs; it holds `InstrumentJson`, so it belongs to the closed world |
+| `composite/` | `CompositeInstrument` and its legs; holds `InstrumentJson`, so it belongs to the closed world |
+| `basket/` | `Basket` and its constituents; holds `InstrumentJson`, re-exported as `exotics::basket` |
+| `levered_real_estate/` | `LeveredRealEstateEquity` and `RealEstateFinancing`; holds `RealEstateAsset` plus financing legs from other families, re-exported into `equity::real_estate` |
 | `<family>/family.rs` | The family's `Family` static: its pricer table and metric table |
 
 The framework surface (`Instrument`, `PricingOptions`, parameter types, the
@@ -93,5 +95,5 @@ Follow [`ADDING_AN_INSTRUMENT.md`](../../ADDING_AN_INSTRUMENT.md), the one check
   [cds_tranche](credit_derivatives/cds_tranche/README.md),
   [bond_future](fixed_income/bond_future/README.md),
   [listed instrument mechanics](../../core/src/instruments/listed/README.md),
-  [real_estate](equity/real_estate/README.md),
+  [real_estate](../../equity/src/real_estate/README.md),
   [range_accrual](exotics/range_accrual/README.md)

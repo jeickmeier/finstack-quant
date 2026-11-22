@@ -38,10 +38,10 @@ and the closed world around them.
 | [`structured-credit/`](structured-credit/README.md) | `finstack-quant-valuations-structured-credit`: the structured-credit tier (ABS/RMBS/CMBS/CLO deals, agency CMOs, asset-backed facilities) with its `STRUCTURED_CREDIT` registration static; depends on fixed-income and rates; re-exported as `instruments::fixed_income::{structured_credit, cmo, asset_backed_facility}` |
 | [`rates/`](rates/README.md) | `finstack-quant-valuations-rates`: the interest-rate and inflation family (deposits, FRAs, futures, IRS, basis and cross-currency swaps, caps/floors, swaptions, CMS, repos, inflation swaps and caps/floors) with its `RATES` registration static; re-exported as `instruments::rates` |
 | [`credit/`](credit/README.md) | `finstack-quant-valuations-credit`: the credit-derivatives family (CDS, CDS indices, tranches, CDS options, the CS01 fast path) with its `CREDIT` registration static; re-exported as `instruments::credit_derivatives` |
-| [`equity/`](equity/README.md) | `finstack-quant-valuations-equity`: the equity family (spot, options, futures and futures options, variance swaps, TRS, autocallables, cliquets, vol-index futures, DCF equity, private-markets funds) with its `EQUITY` registration static; re-exported as `instruments::equity`; `real_estate` stays here under `instruments::equity::real_estate` |
-| [`exotics/`](exotics/README.md) | `finstack-quant-valuations-exotics`: the exotics family (Asian, barrier, lookback options, range accruals, TARN, snowball) and the commodity family (forwards, futures, swaps, options), one `EXOTICS` registration static; re-exported as `instruments::exotics` and `instruments::commodity`; `Basket` stays here under `instruments::exotics::basket` |
+| [`equity/`](equity/README.md) | `finstack-quant-valuations-equity`: the equity family (spot, options, futures and futures options, variance swaps, TRS, autocallables, cliquets, vol-index futures, DCF equity, private-markets funds, unlevered real estate) with its `EQUITY` registration static; re-exported as `instruments::equity`; `LeveredRealEstateEquity` stays in the umbrella under `src/instruments/levered_real_estate/` and is merged into `instruments::equity::real_estate` |
+| [`exotics/`](exotics/README.md) | `finstack-quant-valuations-exotics`: the exotics family (Asian, barrier, lookback options, range accruals, TARN, snowball) and the commodity family (forwards, futures, swaps, options), one `EXOTICS` registration static; re-exported as `instruments::exotics` and `instruments::commodity`; `Basket` stays in the umbrella under `src/instruments/basket/` and is re-exported as `instruments::exotics::basket` |
 | [`fx/`](fx/README.md) | `finstack-quant-valuations-fx`: the FX family (spot, forwards, swaps, NDFs, listed futures, vanilla/barrier/digital/touch/variance/quanto options) with its `FX` registration static; re-exported as `instruments::fx` |
-| [`src/instruments/`](src/instruments/README.md) | The façade modules of the family crates; the umbrella-resident instruments — `exotics::basket` and `equity::real_estate` (both register with `STANDARD`); `composite`; `json_loader` (`InstrumentJson`, the closed world); the JSON cashflow-export entry points |
+| [`src/instruments/`](src/instruments/README.md) | Inline re-export modules for all seven asset-class namespaces; the three cross-family umbrella instruments (`composite/`, `basket/`, `levered_real_estate/`, all registered with `STANDARD`); `json_loader` (`InstrumentJson`, the closed world) |
 | `src/pricer/` | `FAMILIES`, the `STANDARD` family and `STANDARD.pricers()`, the JSON pricing entry points (`src/pricer/json.rs`) and the registry catalog (`src/pricer/catalog.rs`), both lifted flat into `pricer` |
 | `src/results.rs` | Core result façade; metrics are re-exported directly from the core crate |
 | `src/schema.rs` | Accessors and validators for the checked-in JSON Schema artifacts |
@@ -52,8 +52,8 @@ including the `core_framework` module that exercises the framework over
 built-in instruments), [`test-support/`](test-support/README.md) (the dev-only
 `finstack-quant-valuations-test-support` crate: market builders, fixtures,
 tolerances and parity assertions shared by every valuations test tree),
-[`benches/`](benches/README.md),
-[`schemas/`](schemas/README.md) and `examples/`. The embedded data lives with
+[`benches/`](benches/README.md), and
+[`schemas/`](schemas/README.md). The embedded data lives with
 its crate: `core/data/` (conventions, contract specs, product defaults,
 listed-product catalog), `fixed-income/data/assumptions/` (TBA) and
 `structured-credit/data/assumptions/` (structured credit), all compiled in

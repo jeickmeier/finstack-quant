@@ -70,6 +70,11 @@ fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
         InstrumentType::PrivateMarketsFund,
         crate::private_markets_fund::PrivateMarketsFund
     );
+    register_generic!(
+        registry,
+        InstrumentType::RealEstateAsset,
+        crate::real_estate::RealEstateAsset
+    );
     Ok(())
 }
 
@@ -85,6 +90,7 @@ fn register_metrics(registry: &mut MetricRegistry) -> Result<(), MetricRegistryE
     crate::equity_trs::metrics::register_equity_trs_metrics(registry)?;
     crate::variance_swap::metrics::register_variance_swap_metrics(registry)?;
     crate::private_markets_fund::metrics::register_private_markets_fund_metrics(registry)?;
+    crate::real_estate::metrics::register_real_estate_metrics(registry)?;
     crate::dcf_equity::metrics::register_dcf_metrics(registry)?;
     crate::vol_index_future::metrics::register_vol_index_future_metrics(registry)?;
     crate::autocallable::metrics::register_autocallable_metrics(registry)?;

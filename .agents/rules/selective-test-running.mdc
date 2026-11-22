@@ -60,7 +60,7 @@ Add `--all-features` to `rust-lint-crate` / `rust-fix-crate` when touching featu
 | `finstack-quant/valuations/structured-credit/` | `finstack-quant-valuations-structured-credit` (structured credit, CMO, asset-backed facility; depends on fixed-income and rates; also rerun `finstack-quant-valuations`: the JSON round-trip and `price_instrument` tests live there) |
 | `finstack-quant/valuations/rates/` | `finstack-quant-valuations-rates` (also rerun `finstack-quant-valuations`, see fx; its `tests/support/rates.rs` is path-included by the umbrella tests and benches) |
 | `finstack-quant/valuations/credit/` | `finstack-quant-valuations-credit` (also rerun `finstack-quant-valuations`: most CDS integration tests bootstrap curves through calibration and live there) |
-| `finstack-quant/valuations/equity/` | `finstack-quant-valuations-equity` (also rerun `finstack-quant-valuations`, see fx; `src/instruments/equity/real_estate/` is umbrella code) |
+| `finstack-quant/valuations/equity/` | `finstack-quant-valuations-equity` (also rerun `finstack-quant-valuations`, see fx; `src/instruments/levered_real_estate/` is umbrella code) |
 | `finstack-quant/valuations/exotics/` | `finstack-quant-valuations-exotics` (exotics + commodity; also rerun `finstack-quant-valuations`, see fx) |
 | `finstack-quant/valuations/fx/` | `finstack-quant-valuations-fx` (also rerun `finstack-quant-valuations`: its façade, registries and closed-world tests cover the family) |
 | `finstack-quant/calibration/` | `finstack-quant-calibration` |

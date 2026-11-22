@@ -11,10 +11,12 @@ is unchanged. Depends on `finstack-quant-core`, `finstack-quant-cashflows`,
 `finstack-quant-models`, `finstack-quant-margin` (the `Marginable` impl of
 `EquityTotalReturnSwap`) and valuations-core only; no other instrument family.
 
-Real estate is not here. `RealEstateFinancing` holds `Bond`, `TermLoan`,
-`RevolvingCredit` and `Repo` legs from other families, so `RealEstateAsset`
-and `LeveredRealEstateEquity` stay in the umbrella at
-`instruments::equity::real_estate`, registered with `STANDARD`.
+Unlevered real estate (`RealEstateAsset`) lives here in `real_estate/` and
+registers with `EQUITY`. Levered real estate (`LeveredRealEstateEquity` and
+`RealEstateFinancing`, which holds `Bond`, `TermLoan`, `RevolvingCredit` and
+`Repo` legs from other families) stays in the umbrella at
+`src/instruments/levered_real_estate/`, registered with `STANDARD`, and is
+re-exported alongside `RealEstateAsset` under `instruments::equity::real_estate`.
 
 ## Leaves
 
@@ -30,6 +32,7 @@ and `LeveredRealEstateEquity` stay in the umbrella at
 | `vol_index_future/`, `vol_index_future_option/` | VIX-style futures and options | Forward-variance fair value, Black-76 options |
 | `dcf_equity/` | Discounted-cash-flow equity | Explicit forecasts plus `TerminalValueSpec` |
 | `private_markets_fund/` | Private-markets funds | Deterministic commitment / drawdown / distribution schedules and fund-level metrics |
+| `real_estate/` | Unlevered real estate assets | DCF (NOI/CapEx + terminal cap rate or sale price) and direct capitalization |
 | `dividend01.rs`, `piecewise_gbm.rs` | Not instruments | Shared dividend-yield sensitivity and the forward-bootstrapped GBM used by the path-dependent pricers |
 | `family.rs` | Not an instrument | `EQUITY`, the family's pricer and metric registrations |
 

@@ -29,27 +29,30 @@ Import path: `finstack_quant_valuations::instruments::equity::real_estate`
 ## Module layout
 
 ```
-real_estate/
+valuations/equity/src/real_estate/
 ├── mod.rs            # re-exports
 ├── types.rs          # RealEstateAsset, valuation method, property type, example
 ├── pricer.rs         # DCF / direct-cap NPV, horizon, sale proceeds, rf-bump PV
-├── levered.rs        # LeveredRealEstateEquity
-├── levered_pricer.rs # equity/financing cashflows, exit date, payoff, PV
 └── metrics/
     ├── cap_rates.rs     # going-in / exit cap rate
     ├── returns.rs       # unlevered IRR, multiple, cash-on-cash
-    ├── levered.rs       # levered IRR, equity multiple, LTV, DSCR, debt payoff
-    └── sensitivities.rs # cap-rate and discount-rate finite differences
+    └── sensitivities.rs # cap-rate sensitivity helpers and calculator
+
+valuations/src/instruments/levered_real_estate/
+├── mod.rs            # re-exports
+├── levered.rs        # LeveredRealEstateEquity, RealEstateFinancing
+├── levered_pricer.rs # equity/financing cashflows, exit date, payoff, PV
+└── metrics/
+    ├── mod.rs        # LeveredCapRate01Calculator, registration
+    └── levered.rs    # levered IRR, equity multiple, LTV, DSCR, debt payoff
 ```
 
-Both instruments stay in the umbrella crate rather than in
-`finstack-quant-valuations-equity`: their financing stack holds `InstrumentJson`
-legs, which is the closed world. They are registered with `register_generic!`
-under `InstrumentType::RealEstateAsset` and
-`InstrumentType::LeveredRealEstateEquity` by the umbrella's `STANDARD` family in
-[`src/pricer/mod.rs`](../../../pricer/mod.rs), not by `EQUITY`. Pricing runs through
-`Instrument::base_value`; `levered_pricer.rs` contains the shared PV and
-cashflow helpers used by `LeveredRealEstateEquity`.
+`RealEstateAsset` lives in `finstack-quant-valuations-equity` and registers
+with `EQUITY`. `LeveredRealEstateEquity` stays in the umbrella crate because
+`RealEstateFinancing` holds `Bond`, `TermLoan`, `RevolvingCredit`, and `Repo`
+legs from other families; it registers with `STANDARD` in
+[`src/pricer/mod.rs`](../../../src/pricer/mod.rs). Both are re-exported
+together under `finstack_quant_valuations::instruments::equity::real_estate`.
 
 ## Levered equity composition
 

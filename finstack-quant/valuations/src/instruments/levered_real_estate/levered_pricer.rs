@@ -7,6 +7,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations_equity::real_estate::pricer as asset_pricer;
 use std::collections::BTreeMap;
 
 pub(crate) fn compute_pv(
@@ -53,7 +54,7 @@ pub(crate) fn asset_sale_proceeds_at(
     as_of: Date,
     exit: Date,
 ) -> finstack_quant_core::Result<f64> {
-    let Some((_d, proceeds)) = super::pricer::sale_proceeds_at(&inst.asset, as_of, exit)? else {
+    let Some((_d, proceeds)) = asset_pricer::sale_proceeds_at(&inst.asset, as_of, exit)? else {
         return Err(Error::Validation(
             "sale_price or terminal_cap_rate is required to compute sale proceeds".into(),
         ));
@@ -97,16 +98,16 @@ pub(crate) fn equity_cashflows(
     validate_currency(inst)?;
     // The exit is the asset's valuation horizon, so PV, the equity cashflow
     // schedule and levered metrics share one holding period.
-    let exit = super::pricer::horizon_date(&inst.asset, as_of)?;
+    let exit = asset_pricer::horizon_date(&inst.asset, as_of)?;
 
-    let purchase = super::pricer::required_purchase_price(&inst.asset)?;
+    let purchase = asset_pricer::required_purchase_price(&inst.asset)?;
 
     let mut flows: BTreeMap<Date, f64> = BTreeMap::new();
-    let acq_cost = super::pricer::acquisition_cost_total(&inst.asset)?;
+    let acq_cost = asset_pricer::acquisition_cost_total(&inst.asset)?;
     *flows.entry(as_of).or_insert(0.0) += -(purchase + acq_cost);
 
     // Unlevered flows already stop at the horizon, which is the exit.
-    for (d, a) in super::pricer::unlevered_flows(&inst.asset, as_of)? {
+    for (d, a) in asset_pricer::unlevered_flows(&inst.asset, as_of)? {
         *flows.entry(d).or_insert(0.0) += a;
     }
 
@@ -147,7 +148,7 @@ pub(crate) fn financing_payoff_at_exit(
     market: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
-    let exit = super::pricer::horizon_date(&inst.asset, as_of)?;
+    let exit = asset_pricer::horizon_date(&inst.asset, as_of)?;
     let schedules = financing_schedules_supported(inst, market, as_of)?;
     Money::new(payoff_at(&schedules, exit, inst.currency)?, inst.currency)
 }

@@ -2018,7 +2018,7 @@
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/equity/real_estate/pricer.rs",
+      "path": "finstack-quant/valuations/equity/src/real_estate/pricer.rs",
       "category": "market_convention",
       "contains": "\"discount_curve and discount_rate cannot both be None after construction\"",
       "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."

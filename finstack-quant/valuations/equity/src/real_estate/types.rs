@@ -1,15 +1,15 @@
 //! Real estate asset valuation types.
 
 use super::pricer;
-use crate::impl_instrument_base;
-use crate::instruments::Instrument;
-use crate::pricer::InstrumentType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::InstrumentId;
+use finstack_quant_valuations_core::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::pricer::InstrumentType;
 
 /// Broad property classification for reporting / tagging.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -150,31 +150,33 @@ pub struct RealEstateAsset {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "crate::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        crate::instruments::pricing_overrides::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "crate::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
-    pub metric_pricing_overrides: crate::instruments::pricing_overrides::MetricPricingOverrides,
+    pub metric_pricing_overrides:
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "crate::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
-    pub scenario_pricing_overrides: crate::instruments::pricing_overrides::ScenarioPricingOverrides,
+    pub scenario_pricing_overrides:
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     #[serde(default)]
     #[builder(default)]
     pub attributes: Attributes,
 }
 
-crate::validate_on_deserialize!(RealEstateAsset);
+finstack_quant_valuations_core::validate_on_deserialize!(RealEstateAsset);
 
 impl RealEstateAsset {
     /// Seed an independent builder with the complete existing contract.
@@ -429,7 +431,7 @@ impl Instrument for RealEstateAsset {
     fn includes_valuation_date_cashflows(&self) -> bool {
         true
     }
-    impl_instrument_base!(InstrumentType::RealEstateAsset, crate::pricer::STANDARD);
+    impl_instrument_base!(InstrumentType::RealEstateAsset, crate::EQUITY);
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()
@@ -437,8 +439,9 @@ impl Instrument for RealEstateAsset {
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
-        let deps = crate::instruments::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         Ok(deps)
     }
 
@@ -451,7 +454,7 @@ impl Instrument for RealEstateAsset {
         pricer::compute_pv(self, as_of)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 impl finstack_quant_cashflows::CashflowScheduleSource for RealEstateAsset {
     fn raw_cashflow_schedule(

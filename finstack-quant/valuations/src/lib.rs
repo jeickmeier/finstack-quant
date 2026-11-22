@@ -99,9 +99,7 @@ pub use finstack_quant_valuations_core::{
 
 #[doc(hidden)]
 pub use finstack_quant_valuations_core::serde_defaults;
-pub use finstack_quant_valuations_core::{constants, margin, recalibration};
-/// Market conventions, exchange-listed product catalog, and volatility resolution.
-pub mod market;
+pub use finstack_quant_valuations_core::{constants, margin, market, recalibration};
 /// Metrics framework, registry, aggregation, and Historical VaR.
 pub mod metrics;
 /// Pricing dispatch and registry infrastructure.

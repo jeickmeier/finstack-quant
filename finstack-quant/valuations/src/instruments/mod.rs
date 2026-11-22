@@ -163,6 +163,10 @@ pub use finstack_quant_valuations_fixed_income::{
 pub use finstack_quant_valuations_fx::NdfQuoteConvention;
 pub use finstack_quant_valuations_rates::{FixedLegSpec, FloatLegSpec, VolatilityModel};
 
+// Cross-family instruments owned by the umbrella crate.
+pub(crate) mod basket;
+pub(crate) mod levered_real_estate;
+
 /// Commodity derivatives.
 pub mod commodity {
     pub use finstack_quant_valuations_exotics::commodity::*;
@@ -174,11 +178,31 @@ pub mod credit_derivatives {
     pub use finstack_quant_valuations_credit::*;
 }
 /// Equity instruments and equity derivatives.
-pub mod equity;
+pub mod equity {
+    pub use finstack_quant_valuations_equity::*;
+
+    /// Real estate assets and levered real-estate equity.
+    pub mod real_estate {
+        pub use crate::instruments::levered_real_estate::*;
+        pub use finstack_quant_valuations_equity::real_estate::*;
+    }
+}
 /// Exotic and path-dependent options.
-pub mod exotics;
+pub mod exotics {
+    pub use finstack_quant_valuations_exotics::exotics::*;
+
+    /// Multi-underlying basket instruments.
+    pub mod basket {
+        pub use crate::instruments::basket::*;
+    }
+}
 /// Fixed income instruments: bonds, loans, MBS, and structured products.
-pub mod fixed_income;
+pub mod fixed_income {
+    pub use finstack_quant_valuations_fixed_income::*;
+    pub use finstack_quant_valuations_structured_credit::{
+        asset_backed_facility, cmo, structured_credit,
+    };
+}
 /// FX instruments and FX derivatives.
 pub mod fx {
     pub use finstack_quant_valuations_fx::*;

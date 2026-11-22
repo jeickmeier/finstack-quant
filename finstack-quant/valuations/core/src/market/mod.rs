@@ -28,6 +28,8 @@
 
 /// Market conventions and registries.
 pub mod conventions;
+/// Exchange-listed product-family coverage and valuation routes.
+pub mod listed;
 mod volatility;
 
 pub use volatility::resolve_vol_source;

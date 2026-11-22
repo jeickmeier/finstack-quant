@@ -15,7 +15,7 @@ mod weight_risk;
 
 use crate::metrics::MetricRegistry;
 
-use crate::instruments::exotics::basket::types::Basket;
+use crate::instruments::basket::types::Basket;
 use crate::metrics::MetricCalculator;
 use crate::metrics::MetricContext;
 use basket_mark_shock::BasketMarkShockCalculator;

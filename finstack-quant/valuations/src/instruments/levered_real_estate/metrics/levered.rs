@@ -1,10 +1,12 @@
 //! Metrics for [`LeveredRealEstateEquity`].
 
+use super::super::{LeveredRealEstateEquity, levered_pricer};
 use crate::instruments::Instrument;
-use crate::instruments::equity::real_estate::{LeveredRealEstateEquity, levered_pricer, pricer};
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Error;
 use finstack_quant_valuations_core::metrics::returns::{YieldBasis, xirr_on_basis};
+use finstack_quant_valuations_equity::real_estate::metrics::moic;
+use finstack_quant_valuations_equity::real_estate::pricer as asset_pricer;
 
 /// Levered equity IRR (XIRR-style) from the levered equity cashflow schedule.
 #[derive(Debug, Default)]
@@ -31,7 +33,7 @@ impl MetricCalculator for EquityMultiple {
         let inst: &LeveredRealEstateEquity = context.instrument_as()?;
 
         let flows = levered_pricer::equity_cashflows(inst, &context.curves, context.as_of)?;
-        super::moic(flows.into_iter().map(|(_, a)| a), "EquityMultiple")
+        moic(flows.into_iter().map(|(_, a)| a), "EquityMultiple")
     }
 }
 
@@ -88,10 +90,10 @@ fn min_dscr(
     let inst: &LeveredRealEstateEquity = context.instrument_as()?;
 
     let as_of = context.as_of;
-    let exit = pricer::horizon_date(&inst.asset, as_of)?;
+    let exit = asset_pricer::horizon_date(&inst.asset, as_of)?;
 
     // Errors when no NOI falls on/after `as_of`, so the loop below runs.
-    let noi = pricer::future_noi_flows(&inst.asset, as_of)?;
+    let noi = asset_pricer::future_noi_flows(&inst.asset, as_of)?;
 
     let schedules = levered_pricer::financing_schedules_supported(inst, &context.curves, as_of)?;
 
@@ -164,7 +166,7 @@ impl MetricCalculator for LoanToValueAtOrigination {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let inst: &LeveredRealEstateEquity = context.instrument_as()?;
 
-        let purchase = pricer::required_purchase_price(&inst.asset)?;
+        let purchase = asset_pricer::required_purchase_price(&inst.asset)?;
         if purchase <= 0.0 {
             return Err(Error::Validation(
                 "LoanToValueAtOrigination: purchase_price must be positive".into(),

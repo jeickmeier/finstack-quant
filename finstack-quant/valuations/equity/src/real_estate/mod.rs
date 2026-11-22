@@ -2,14 +2,14 @@
 //!
 //! Supports DCF and direct capitalization approaches for single-asset valuation.
 
-mod levered;
-mod levered_pricer;
-/// Real estate metric calculators.
-pub(crate) mod metrics;
-pub(crate) mod pricer;
+/// Real estate asset metric calculators and shared helpers.
+#[doc(hidden)]
+pub mod metrics;
+/// Real estate asset pricer helpers.
+#[doc(hidden)]
+pub mod pricer;
 mod types;
 
-pub use levered::{LeveredRealEstateEquity, LeveredRealEstateEquityBuilder, RealEstateFinancing};
 pub use types::{
     RealEstateAsset, RealEstateAssetBuilder, RealEstatePropertyType, RealEstateValuationMethod,
 };

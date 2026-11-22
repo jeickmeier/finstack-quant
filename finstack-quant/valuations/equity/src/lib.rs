@@ -128,6 +128,8 @@ pub(crate) mod past_fixings;
 pub(crate) mod piecewise_gbm;
 /// PE fund module - Private equity/markets funds.
 pub mod private_markets_fund;
+/// Real estate asset valuation (unlevered DCF and direct capitalization).
+pub mod real_estate;
 #[doc(hidden)]
 pub mod rf_component_dv01;
 /// Equity spot module - Equity spot positions.
