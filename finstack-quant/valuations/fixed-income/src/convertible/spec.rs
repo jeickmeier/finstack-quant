@@ -82,7 +82,7 @@ impl PriceTrigger {
 /// Defines how and when conversion can occur.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ConversionPolicy {
     /// Holder may convert at any time (subject to window, if any).
     Voluntary,
@@ -230,4 +230,20 @@ pub struct ConversionSpec {
     /// Historical dilution events recorded in chronological order.
     #[serde(default)]
     pub dilution_events: Vec<DilutionEvent>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    // schema-rejection-test
+    fn conversion_policy_rejects_unknown_fields() {
+        assert!(
+            serde_json::from_str::<ConversionPolicy>(
+                r#"{"window":{"start":"2025-01-01","end":"2026-01-01","extra":1}}"#
+            )
+            .is_err()
+        );
+    }
 }

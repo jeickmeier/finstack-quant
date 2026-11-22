@@ -46,15 +46,17 @@
 
 pub mod composite;
 pub(crate) mod dataframe;
+mod details;
 mod field_units;
 mod provenance;
 pub mod structured_credit;
 mod valuation_result;
 
 pub use dataframe::{ValuationLongRow, ValuationRow};
+pub use details::{
+    CreditDerivativeValuationDetails, FxValuationDetails, MonteCarloValuationDetails,
+    ValuationDetails,
+};
 pub use field_units::MetricFieldUnit;
 pub use provenance::{SensitivityBumps, ValuationProvenance};
-pub use valuation_result::{
-    CreditDerivativeValuationDetails, FxValuationDetails, MonteCarloValuationDetails,
-    ValuationDetails, ValuationResult,
-};
+pub use valuation_result::ValuationResult;

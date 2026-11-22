@@ -439,7 +439,6 @@ export type D_1B4D5042646Bf8D5C9Cb =
          * Fraction accreted to notional.
          */
         pik_fraction: number;
-        [k: string]: unknown;
       };
     }
   | "toggle";
@@ -5608,7 +5607,6 @@ export interface DCda814224Ddf8B157Fc6 {
            * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
            */
           start: string;
-          [k: string]: unknown;
         };
       }
     | {
@@ -5628,7 +5626,6 @@ export interface DCda814224Ddf8B157Fc6 {
            * Upper conversion price (above this, holder receives min shares).
            */
           upper_conversion_price: number;
-          [k: string]: unknown;
         };
       };
   /**

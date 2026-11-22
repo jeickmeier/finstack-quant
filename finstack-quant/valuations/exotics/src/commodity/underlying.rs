@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 /// Commodity underlying parameters for forwards, swaps, and options.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct CommodityUnderlyingParams {
     /// Commodity type (e.g., "Energy", "Metal", "Agricultural")
     pub commodity_type: String,
@@ -58,5 +59,24 @@ impl CommodityUnderlyingParams {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    // schema-rejection-test
+    fn commodity_underlying_params_rejects_unknown_fields() {
+        let mut json = serde_json::to_value(CommodityUnderlyingParams::new(
+            "Energy",
+            "CL",
+            "BBL",
+            Currency::USD,
+        ))
+        .expect("serialize");
+        json["unexpected"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<CommodityUnderlyingParams>(json).is_err());
     }
 }

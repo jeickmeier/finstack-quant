@@ -111,6 +111,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/common/1/rate_index_conventions.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Market conventions of one interest-rate index.",
   "examples": [
     {

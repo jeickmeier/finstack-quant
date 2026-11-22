@@ -115,6 +115,7 @@
       "type": "object"
     },
     "CreditDerivativeValuationDetails": {
+      "additionalProperties": false,
       "description": "Metadata for CDS-family valuation paths.",
       "properties": {
         "integration_method": {
@@ -1002,6 +1003,7 @@
       "type": "object"
     },
     "FxValuationDetails": {
+      "additionalProperties": false,
       "description": "Metadata for FX-bearing valuation paths (FX forwards, FX options, quanto).\n\nCaptures the FX policy applied at pricing time so downstream audit /\nreconciliation can trace whether a quoted rate came from a direct\nmarket quote or via triangulation through the matrix pivot currency.\nMirrors the \"FX policy visibility\" invariant in `ARCHITECTURE.md`: the\napplied conversion strategy is recorded per layer (valuations, statements,\nportfolio).",
       "properties": {
         "fx_triangulated": {
@@ -1287,6 +1289,7 @@
       "type": "object"
     },
     "MonteCarloValuationDetails": {
+      "additionalProperties": false,
       "description": "Reproducibility and convergence diagnostics for a Monte Carlo valuation.",
       "properties": {
         "antithetic": {
@@ -1690,6 +1693,7 @@
       "type": "object"
     },
     "StochasticPricingResult": {
+      "additionalProperties": false,
       "description": "Stochastic pricing result for a structured credit deal.",
       "properties": {
         "clean_price": {
@@ -1937,6 +1941,7 @@
       ]
     },
     "TranchePricingResult": {
+      "additionalProperties": false,
       "description": "Tranche-level pricing result.",
       "properties": {
         "attach_pct": {
@@ -2045,6 +2050,7 @@
       "description": "Model-specific typed valuation details.\n\nThese details are for rich structured outputs that do not fit the scalar\n`measures` map while still belonging in the standard valuation envelope.",
       "oneOf": [
         {
+          "additionalProperties": false,
           "description": "Recursive leg valuation and primitive exposure detail for a composite.",
           "properties": {
             "data": {
@@ -2062,6 +2068,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Credit-derivative pricing metadata.",
           "properties": {
             "data": {
@@ -2079,6 +2086,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Scenario-waterfall structured credit stochastic pricing result.",
           "properties": {
             "data": {
@@ -2096,6 +2104,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "FX-bearing instrument pricing metadata (forwards, options, quanto, …).\n\nSurfaces the [`FxMatrix`](finstack_quant_core::money::fx::FxMatrix) lookup\nchain that backed the spot rate used at pricing time, satisfying the\nproject-wide FX-policy-visibility invariant for instruments that\nresolve their spot through the matrix.",
           "properties": {
             "data": {
@@ -2113,6 +2122,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Monte Carlo estimator and reproducibility metadata.",
           "properties": {
             "data": {

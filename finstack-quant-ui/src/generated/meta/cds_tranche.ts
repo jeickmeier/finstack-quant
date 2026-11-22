@@ -107,7 +107,6 @@ export default [
   {
     "path": "#/$defs/d_00292b2cd9779815232f/properties/theta_period",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/properties/theta_period",
-    "default": null,
     "description": "Theta / carry horizon over which time decay is measured (for example\n1D, 1W, 1M, 3M; wire form `{\"count\": 1, \"unit\": \"weeks\"}`). Day and\nweek tenors roll a fixed number of days, month and year tenors roll\ncalendar months (EOM-aware). `None` uses one day."
   },
   {
@@ -240,35 +239,30 @@ export default [
   {
     "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/credit_spread_bump_bp",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/credit_spread_bump_bp",
-    "default": null,
     "description": "Custom credit spread bump size override (in basis points, e.g., 1.0 for 1bp).\n\nUsed by CS01 calculations that bump par spreads / hazard calibration quotes.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/rate_bump_bp",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/rate_bump_bp",
-    "default": null,
     "description": "Parallel rate bump in basis points (1.0 = 1bp).\n\nSizes DV01, rho, foreign rho and forward PV01. Results stay reported per\n1bp: `(pv_bumped - pv) / rate_bump_bp`. `None` uses the\n`valuations.sensitivities.v1` value (default 1bp).",
     "format": "double"
   },
   {
     "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_decimal",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/spot_bump_decimal",
-    "default": null,
     "description": "Spot bump as a decimal fraction of spot (0.01 = 1%).\n\nSizes every finite-difference spot greek (delta, gamma, vanna, charm,\nspeed, color, FX delta). When set it also replaces the adaptive spot\nbump. `None` uses the `valuations.sensitivities.v1` value (default 1%).",
     "format": "double"
   },
   {
     "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/vol_bump_decimal",
-    "default": null,
     "description": "Absolute volatility bump in decimal volatility (0.01 = 1 vol point).\n\nSizes every finite-difference volatility greek (vega, vanna, volga, FX\nvega). `None` uses the `valuations.sensitivities.v1` value (default\n1 vol point). Results stay reported per 1 vol point.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_bp",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/ytm_bump_bp",
-    "default": null,
     "description": "Yield bump in basis points (1.0 = 1bp) for numerical yield duration and\nconvexity: InflationLinkedBond `RealDuration` and structured-credit\n`DurationMod`/`Convexity`.\n\n`None` keeps each metric's default shock (1bp for duration, 10bp for\nstructured-credit convexity).",
     "format": "double"
   },
@@ -458,7 +452,6 @@ export default [
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/call_friction_cents",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/call_friction_cents",
-    "default": null,
     "description": "Exercise friction cost for issuer/borrower calls, expressed as **cents per 100 of par**.\n\nThis models the real-world costs of refinancing / reissue (fees, OID, documentation),\nby requiring the issuer/borrower to see sufficient economic benefit before exercising.\n\n## Convention\n- `0.0` (or `None`) means frictionless optimal exercise (pure model)\n- `50.0` means **$0.50 per $100** of outstanding principal (0.50 points)\n- `200.0` means **$2.00 per $100** of outstanding principal (2.00 points)\n\nThe friction affects the **exercise decision threshold**, but redemption still occurs\nat the contractual call price.",
     "format": "double"
   },
@@ -607,7 +600,6 @@ export default [
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/tree_steps",
-    "default": null,
     "description": "Number of time steps for tree-based pricing (e.g., 100).",
     "format": "uint",
     "minimum": 0

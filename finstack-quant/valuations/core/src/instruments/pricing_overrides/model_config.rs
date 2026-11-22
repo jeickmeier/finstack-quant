@@ -70,13 +70,13 @@ fn validate_oas_quote_compounding(compounding: Compounding) -> finstack_quant_co
 #[serde(default, deny_unknown_fields)]
 pub struct ModelConfig {
     /// Volatility surface extrapolation policy when `implied_volatility` is not set.
-    #[serde(default)]
     pub vol_surface_extrapolation: VolSurfaceExtrapolation,
     /// Short-rate lattice for the rates-only bond tree (`hull_white`,
     /// `black_derman_toy` or `black_karasinski`). `None` selects Hull-White.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tree_model: Option<ShortRateTreeModel>,
     /// Number of time steps for tree-based pricing (e.g., 100).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tree_steps: Option<usize>,
     /// Exercise friction cost for issuer/borrower calls, expressed as **cents per 100 of par**.
     ///
@@ -90,6 +90,7 @@ pub struct ModelConfig {
     ///
     /// The friction affects the **exercise decision threshold**, but redemption still occurs
     /// at the contractual call price.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub call_friction_cents: Option<f64>,
     /// Hull-White 1F short-rate absolute volatility override (σ), in annual decimal units.
     ///
@@ -118,40 +119,40 @@ pub struct ModelConfig {
     /// additionally capped by
     /// [`KAPPA_MAX`](finstack_quant_models::trees::two_factor_rates_credit::KAPPA_MAX);
     /// Hull-White trees on other paths keep their own wider range.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hw1f_sigma: Option<f64>,
     /// Optional piecewise-constant Hull-White short-rate volatility schedule.
     ///
     /// When supplied, this replaces the scalar [`Self::hw1f_sigma`] override.
     /// The schedule is left-continuous, starts at time zero, and carries
     /// absolute annual short-rate volatilities.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hw1f_sigma_schedule: Option<finstack_quant_core::math::piecewise::PiecewiseConstantCurve>,
     /// Hull-White 1F mean-reversion speed override (κ), in annualised units.
     ///
     /// Companion to [`Self::hw1f_sigma`]. The two values must be supplied
     /// together unless the market context contains a complete pre-fitted
     /// scalar pair or volatility schedule. Typical values: 0.01–0.10.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hw1f_mean_reversion: Option<f64>,
     /// Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
     /// decimal proportion of the short rate (`0.20` = 20%).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bdt_sigma: Option<f64>,
     /// Black-Karasinski lognormal short-rate volatility (σ), as an annual
     /// decimal proportion of the short rate (`0.20` = 20%).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bk_sigma: Option<f64>,
     /// Black-Karasinski mean-reversion speed (κ) of the log short rate, in
     /// annualised units (`0.03` = 3% per year).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bk_mean_reversion: Option<f64>,
     /// Pre-calibrated flat LMM forward-rate volatility loading scale.
     ///
     /// This is the positive annualized decimal scale applied to the Bermudan
     /// LMM loading shape. Obtain it from the top-level calibration helper;
     /// pricing never reads or fits a volatility surface.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub lmm_base_vol: Option<f64>,
     /// Credit hazard-rate volatility for the two-factor rates-credit callable
     /// lattice (σ_λ), annualised, in **absolute** decimal hazard-rate points
@@ -171,7 +172,7 @@ pub struct ModelConfig {
     /// carries no hazard diffusion. Requires `credit_curve_id` on the
     /// instrument; setting it without one is a validation error rather than a
     /// silent no-op.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hazard_sigma: Option<f64>,
     /// Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit
     /// lattice, annualised.
@@ -189,7 +190,7 @@ pub struct ModelConfig {
     /// unattainable correlation and reports the lattice-wide maximum, which is
     /// also available up front from
     /// [`RatesCreditTree::max_feasible_correlation`](finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree::max_feasible_correlation).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hazard_mean_reversion: Option<f64>,
     /// Instantaneous correlation between the short-rate and hazard-rate
     /// shocks on the rates-credit lattice, in `[-1, 1]`.
@@ -201,29 +202,29 @@ pub struct ModelConfig {
     ///
     /// Feasibility depends on the mean-reversion settings — see
     /// [`Self::hazard_mean_reversion`].
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rate_credit_correlation: Option<f64>,
     /// Optional discount curve identifier for tree-based option/OAS models.
     ///
     /// Some vendor OAS screens use a model curve distinct from the bond's pricing
     /// or spread curve. When set, tree pricers calibrate to this curve while
     /// non-tree spread metrics continue to use the instrument's discount curve.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tree_discount_curve_id: Option<CurveId>,
     /// Optional forward curve identifier for asset-swap spread metrics.
     ///
     /// When set, ASW par/market metrics project the floating receiver leg from
     /// this forward curve instead of using a discount-curve par-rate proxy.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub asw_forward_curve_id: Option<CurveId>,
     /// Contractual floating index used for asset-swap accruals and historical resets.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub asw_index_id: Option<finstack_quant_core::types::IndexId>,
     /// Optional government discount curve identifier for the bond `g_spread` metric.
     ///
     /// The metric subtracts this curve's par yield from the bond's yield. It
     /// enters no price, and `g_spread` is an error when it is unset.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub government_curve_id: Option<CurveId>,
     /// Quote compounding convention for OAS inputs and outputs.
     ///
@@ -239,13 +240,13 @@ pub struct ModelConfig {
     /// The rates-credit bond engine defaults to 20,000 estimators per training
     /// and pricing stage; other pricers retain their own defaults. Intended for
     /// tests, benchmarks, and controlled revaluation, not as a market quote.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mc_paths: Option<usize>,
     /// Optional antithetic-variates override for Monte Carlo pricing.
     ///
     /// `None` keeps the selected pricer's default. Structured equity pricers
     /// default to `true`; set `Some(false)` only for controlled diagnostics.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mc_antithetic: Option<bool>,
     /// Optional Monte Carlo seed label.
     ///
@@ -254,7 +255,7 @@ pub struct ModelConfig {
     /// the same random streams for the same instrument. `None` seeds with the
     /// pricer's base label. Finite-difference Greeks set a fixed label on the
     /// repriced clone so base and bumped legs share common random numbers.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mc_seed_scenario: Option<String>,
     /// Optional absolute target for the Monte Carlo confidence-interval
     /// half-width in instrument currency.
@@ -263,7 +264,7 @@ pub struct ModelConfig {
     /// their minimum sample count when this positive finite target is reached.
     /// The rates-credit bond engine always consumes its fixed estimator budget
     /// and validates this target against the final 95% confidence interval.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mc_target_ci_half_width: Option<f64>,
     /// Pool-granularity policy for structured-credit copula default models.
     ///
@@ -273,7 +274,7 @@ pub struct ModelConfig {
     /// `PoolGranularity::LargeHomogeneous` to opt into the closed-form LHP
     /// fast-path for genuinely granular pools. Ignored by non-copula default
     /// models and by non-structured-credit instruments.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub structured_credit_pool_granularity: Option<PoolGranularity>,
 }
 

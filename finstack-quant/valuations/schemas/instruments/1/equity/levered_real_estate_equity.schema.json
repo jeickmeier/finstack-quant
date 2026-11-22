@@ -3217,6 +3217,7 @@
           "description": "Coupon split between cash and PIK.",
           "properties": {
             "split": {
+              "additionalProperties": false,
               "properties": {
                 "cash_fraction": {
                   "description": "Fraction paid in cash (e.g. 0.5 for 50%).",

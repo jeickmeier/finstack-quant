@@ -58,6 +58,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/common/1/cds_convention_spec.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Market conventions of one CDS currency and documentation clause.",
   "examples": [
     {

@@ -4896,7 +4896,6 @@ export interface CdsConventionKey {
    * The documentation clause (e.g. CR14, MM14).
    */
   doc_clause: CdsDocClause;
-  [k: string]: unknown;
 }
 /**
  * One gross cash distribution per entitled share on its schedule's share basis.

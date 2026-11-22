@@ -1278,7 +1278,6 @@ export type PikMode =
          * Fraction accreted to notional.
          */
         pik_fraction: number;
-        [k: string]: unknown;
       };
     }
   | "toggle";
@@ -2370,7 +2369,6 @@ export type ConversionPolicy =
          * Start.
          */
         start: DateWire;
-        [k: string]: unknown;
       };
     }
   | {
@@ -2390,7 +2388,6 @@ export type ConversionPolicy =
          * Upper conversion price (above this, holder receives min shares).
          */
         upper_conversion_price: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -2542,7 +2539,6 @@ export type NotionalExchange =
          * Which leg (`Leg1` or `Leg2`) has its notional reset each period.
          */
         resetting_side: ResettingSide;
-        [k: string]: unknown;
       };
     };
 /**
@@ -3820,27 +3816,22 @@ export type ValuationDetails =
   | {
       data: CompositeValuationDetails;
       type: "composite";
-      [k: string]: unknown;
     }
   | {
       data: CreditDerivativeValuationDetails;
       type: "credit_derivative";
-      [k: string]: unknown;
     }
   | {
       data: StochasticPricingResult;
       type: "structured_credit_stochastic";
-      [k: string]: unknown;
     }
   | {
       data: FxValuationDetails;
       type: "fx";
-      [k: string]: unknown;
     }
   | {
       data: MonteCarloValuationDetails;
       type: "monte_carlo";
-      [k: string]: unknown;
     };
 /**
  * Pricing model selection for the pricer registry.
@@ -18190,7 +18181,6 @@ export interface CashflowRow {
    * Year fraction from `as_of` to `date` under the discount curve's day count.
    */
   year_fraction: number;
-  [k: string]: unknown;
 }
 /**
  * Market conventions of one CDS currency and documentation clause.
@@ -18224,7 +18214,6 @@ export interface CdsConventionSpec {
    * Stub convention used when constructing the premium schedule.
    */
   stub: StubKind;
-  [k: string]: unknown;
 }
 /**
  * Preset identity, coupon and convention of a standard CDS index series.
@@ -18710,7 +18699,6 @@ export interface CreditDerivativeValuationDetails {
    * Registered model key used by the pricer.
    */
   model_key: ModelKey;
-  [k: string]: unknown;
 }
 /**
  * Stochastic pricing result for a structured credit deal.
@@ -18816,7 +18804,6 @@ export interface StochasticPricingResult {
    * for pools without draws).
    */
   unfunded_draw_path_fraction?: number;
-  [k: string]: unknown;
 }
 /**
  * Stochastic pricing mode.
@@ -18909,7 +18896,6 @@ export interface TranchePricingResult {
    * the tranche received principal; `0.0` when it never did.
    */
   wal: number;
-  [k: string]: unknown;
 }
 /**
  * Metadata for FX-bearing valuation paths (FX forwards, FX options, quanto).
@@ -18931,7 +18917,6 @@ export interface FxValuationDetails {
    * scalar (`fx_spot_id`) rather than the matrix.
    */
   fx_triangulated?: boolean | null;
-  [k: string]: unknown;
 }
 /**
  * Reproducibility and convergence diagnostics for a Monte Carlo valuation.
@@ -18998,7 +18983,6 @@ export interface MonteCarloValuationDetails {
    * antithetic partners. Zero when no policy is trained.
    */
   training_simulated_paths: number;
-  [k: string]: unknown;
 }
 /**
  * Container for detailed execution traces of financial computations.
@@ -20723,7 +20707,6 @@ export interface InflationSwapConventions {
    * Settlement lag in business days.
    */
   settlement_days: number;
-  [k: string]: unknown;
 }
 /**
  * Native cashflow rows, reporting-currency PV and reconciliation status.
@@ -20777,7 +20760,6 @@ export interface InstrumentCashflowEnvelope {
    * Sum of `flows[i].pv`. Matches `base_value` for supported products.
    */
   total_pv: number;
-  [k: string]: unknown;
 }
 /**
  * Contract conventions of one interest-rate future.
@@ -21466,7 +21448,6 @@ export interface RateIndexConventions {
    * Index tenor (None for overnight indices).
    */
   tenor?: Tenor | null;
-  [k: string]: unknown;
 }
 /**
  * One evaluated cell of the scenario table.
@@ -21675,7 +21656,6 @@ export interface SwaptionConventions {
    * Settlement lag in business days.
    */
   settlement_days: number;
-  [k: string]: unknown;
 }
 /**
  * Per-tranche risk and spread metrics from the tranche's own projected cashflows.
@@ -21918,5 +21898,4 @@ export interface XccyConventions {
    * Standard T+N spot settlement lag in business days.
    */
   settlement_days: number;
-  [k: string]: unknown;
 }

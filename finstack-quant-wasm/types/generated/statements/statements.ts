@@ -1056,7 +1056,6 @@ export type PikMode =
          * Fraction accreted to notional.
          */
         pik_fraction: number;
-        [k: string]: unknown;
       };
     }
   | "toggle";
@@ -1387,7 +1386,6 @@ export type ConversionPolicy =
          * Start.
          */
         start: DateWire;
-        [k: string]: unknown;
       };
     }
   | {
@@ -1407,7 +1405,6 @@ export type ConversionPolicy =
          * Upper conversion price (above this, holder receives min shares).
          */
         upper_conversion_price: number;
-        [k: string]: unknown;
       };
     };
 /**

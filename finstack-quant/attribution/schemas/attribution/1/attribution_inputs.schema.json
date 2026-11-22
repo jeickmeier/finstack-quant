@@ -407,6 +407,7 @@
           "description": "Holder may convert within a window.",
           "properties": {
             "window": {
+              "additionalProperties": false,
               "properties": {
                 "end": {
                   "$ref": "#/$defs/DateWire",
@@ -447,6 +448,7 @@
           "description": "Mandatory conversion with variable delivery ratio (PERCS / DECS / ACES).",
           "properties": {
             "mandatory_variable": {
+              "additionalProperties": false,
               "properties": {
                 "conversion_date": {
                   "$ref": "#/$defs/DateWire",
@@ -4711,6 +4713,7 @@
           "description": "Structured credit parameters (prepayment, default, recovery).",
           "properties": {
             "structured_credit": {
+              "additionalProperties": false,
               "properties": {
                 "default_spec": {
                   "$ref": "#/$defs/DefaultModelSpec",
@@ -4743,6 +4746,7 @@
           "description": "Convertible bond parameters (conversion ratio, policies).",
           "properties": {
             "convertible": {
+              "additionalProperties": false,
               "properties": {
                 "conversion_spec": {
                   "$ref": "#/$defs/ConversionSpec",

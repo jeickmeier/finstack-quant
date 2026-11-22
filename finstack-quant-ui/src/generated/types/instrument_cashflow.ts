@@ -417,7 +417,6 @@ export interface InstrumentCashflowWire {
    * Sum of `flows[i].pv`. Matches `base_value` for supported products.
    */
   total_pv: number;
-  [k: string]: unknown;
 }
 /**
  * Single-row enriched cashflow view.
@@ -561,5 +560,4 @@ export interface D_674830A94Dacf97E7Ac8 {
    * Year fraction from `as_of` to `date` under the discount curve's day count.
    */
   year_fraction: number;
-  [k: string]: unknown;
 }

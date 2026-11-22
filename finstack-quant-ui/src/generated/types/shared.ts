@@ -1549,7 +1549,6 @@ export type PikMode =
          * Fraction accreted to notional.
          */
         pik_fraction: number;
-        [k: string]: unknown;
       };
     }
   | "toggle";
@@ -14714,7 +14713,6 @@ export type ConversionPolicy =
       window: {
         end: Date47;
         start: Date48;
-        [k: string]: unknown;
       };
     }
   | {
@@ -14731,7 +14729,6 @@ export type ConversionPolicy =
          * Upper conversion price (above this, holder receives min shares).
          */
         upper_conversion_price: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -15504,7 +15501,6 @@ export type NotionalExchange =
          * Which leg (`Leg1` or `Leg2`) has its notional reset each period.
          */
         resetting_side: "leg1" | "leg2";
-        [k: string]: unknown;
       };
     };
 /**
@@ -30939,7 +30935,6 @@ export interface ConversionSpec {
         window: {
           end: Date47;
           start: Date48;
-          [k: string]: unknown;
         };
       }
     | {
@@ -30956,7 +30951,6 @@ export interface ConversionSpec {
            * Upper conversion price (above this, holder receives min shares).
            */
           upper_conversion_price: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -34236,7 +34230,6 @@ export interface XccySwap {
            * Which leg (`Leg1` or `Leg2`) has its notional reset each period.
            */
           resetting_side: "leg1" | "leg2";
-          [k: string]: unknown;
         };
       };
   reporting_currency: Currency5;
@@ -57921,7 +57914,6 @@ export interface ConversionSpec1 {
         window: {
           end: Date47;
           start: Date48;
-          [k: string]: unknown;
         };
       }
     | {
@@ -57938,7 +57930,6 @@ export interface ConversionSpec1 {
            * Upper conversion price (above this, holder receives min shares).
            */
           upper_conversion_price: number;
-          [k: string]: unknown;
         };
       };
   /**

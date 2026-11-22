@@ -84,7 +84,7 @@ impl Default for MertonMcCalibrationSpec {
 /// by a [`ToggleExerciseModel`].
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum PikMode {
     /// Coupon paid in cash.
     Cash,
@@ -354,4 +354,20 @@ fn validate_recovery_rate(recovery_rate: f64) -> finstack_quant_core::Result<()>
             )
         },
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    // schema-rejection-test
+    fn pik_mode_split_rejects_unknown_fields() {
+        assert!(
+            serde_json::from_str::<PikMode>(
+                r#"{"split":{"cash_fraction":0.5,"pik_fraction":0.5,"extra":1}}"#
+            )
+            .is_err()
+        );
+    }
 }

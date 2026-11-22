@@ -225,6 +225,7 @@
           "description": "Mark-to-market resetting. The notional of `resetting_side` is re-marked at each\nof its coupon reset dates to match the constant leg's notional in current FX.\nA rebalancing cashflow is paid on the resetting leg only — the constant leg's\nprincipal-and-coupon schedule is unchanged, matching standard MtM-XCCY market\nconvention (QuantLib's `MtMCrossCurrencyBasisSwap` follows the same pattern).\nUnder CIP no-FX-vol the constant-currency leg of the FX swap that funds the\nrebalancing is PV-fair from today's perspective, so the resetting-leg flow is\nthe only cashflow that needs to be emitted explicitly. Implies initial AND\nfinal principal exchange.",
           "properties": {
             "mtm_resetting": {
+              "additionalProperties": false,
               "properties": {
                 "resetting_side": {
                   "$ref": "#/$defs/ResettingSide",

@@ -45,10 +45,10 @@ pub(super) fn check_finite_fields(
 #[serde(default, deny_unknown_fields)]
 pub struct InstrumentPricingOverrides {
     /// Market-quoted values (prices, implied vol, spreads, upfront payments).
-    #[serde(default, skip_serializing_if = "MarketQuoteOverrides::is_empty")]
+    #[serde(skip_serializing_if = "MarketQuoteOverrides::is_empty")]
     pub market_quotes: MarketQuoteOverrides,
     /// Model selection and tree pricing parameters.
-    #[serde(default, skip_serializing_if = "ModelConfig::is_empty")]
+    #[serde(skip_serializing_if = "ModelConfig::is_empty")]
     pub model_config: ModelConfig,
 }
 

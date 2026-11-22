@@ -1160,7 +1160,7 @@ fn default_monte_carlo_matches_explicit_estimator_count_and_honors_override() {
         .price_stochastic_with_mode(
             &market,
             closing_date(),
-            StructuredCreditPricingMode::monte_carlo(100),
+            StructuredCreditPricingMode::monte_carlo(100).expect("valid estimator count"),
         )
         .expect("reduced estimator count");
     assert_eq!(

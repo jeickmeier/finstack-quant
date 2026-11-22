@@ -1493,7 +1493,6 @@ export type PikMode =
          * Fraction accreted to notional.
          */
         pik_fraction: number;
-        [k: string]: unknown;
       };
     }
   | "toggle";
@@ -2799,7 +2798,6 @@ export type ConversionPolicy =
          * Start.
          */
         start: DateWire;
-        [k: string]: unknown;
       };
     }
   | {
@@ -2819,7 +2817,6 @@ export type ConversionPolicy =
          * Upper conversion price (above this, holder receives min shares).
          */
         upper_conversion_price: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -2971,7 +2968,6 @@ export type NotionalExchange =
          * Which leg (`Leg1` or `Leg2`) has its notional reset each period.
          */
         resetting_side: ResettingSide;
-        [k: string]: unknown;
       };
     };
 /**
@@ -4982,7 +4978,6 @@ export type ModelParamsSnapshot =
          * Recovery model specification.
          */
         recovery_spec: RecoveryModelSpec;
-        [k: string]: unknown;
       };
     }
   | {
@@ -4991,7 +4986,6 @@ export type ModelParamsSnapshot =
          * Conversion specification for convertible bonds.
          */
         conversion_spec: ConversionSpec;
-        [k: string]: unknown;
       };
     }
   | "none";

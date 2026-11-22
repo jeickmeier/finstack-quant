@@ -13,27 +13,22 @@ export type ValuationDetails =
   | {
       data: CompositeValuationDetails;
       type: "composite";
-      [k: string]: unknown;
     }
   | {
       data: CreditDerivativeValuationDetails;
       type: "credit_derivative";
-      [k: string]: unknown;
     }
   | {
       data: StochasticPricingResult;
       type: "structured_credit_stochastic";
-      [k: string]: unknown;
     }
   | {
       data: FxValuationDetails;
       type: "fx";
-      [k: string]: unknown;
     }
   | {
       data: MonteCarloValuationDetails;
       type: "monte_carlo";
-      [k: string]: unknown;
     };
 /**
  * Domain-specific trace entry types.
@@ -3006,7 +3001,6 @@ export interface CreditDerivativeValuationDetails {
     | "pde_crank_nicolson_1d"
     | "pde_adi_2d"
     | "bloomberg_cdso";
-  [k: string]: unknown;
 }
 /**
  * Metadata for FX-bearing valuation paths (FX forwards, FX options, quanto).
@@ -3034,7 +3028,6 @@ export interface FxValuationDetails {
    * scalar (`fx_spot_id`) rather than the matrix.
    */
   fx_triangulated?: boolean | null;
-  [k: string]: unknown;
 }
 /**
  * Collection of curves used by an instrument, categorized by market role.
@@ -3391,7 +3384,6 @@ export interface MonteCarloValuationDetails {
    * antithetic partners. Zero when no policy is trained.
    */
   training_simulated_paths: number;
-  [k: string]: unknown;
 }
 /**
  * Immutable resolved quantity for one top-level composite leg.
@@ -3573,7 +3565,6 @@ export interface StochasticPricingResult {
    * for pools without draws).
    */
   unfunded_draw_path_fraction?: number;
-  [k: string]: unknown;
 }
 /**
  * Mean over paths of the draw option cost: the value to the deal of its
@@ -4536,7 +4527,6 @@ export interface TranchePricingResult {
    * the tranche received principal; `0.0` when it never did.
    */
   wal: number;
-  [k: string]: unknown;
 }
 /**
  * This tranche's share of the deal's draw option cost: the mean over

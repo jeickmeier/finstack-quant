@@ -67,6 +67,7 @@ use std::collections::HashMap;
 /// Top-level cashflow envelope returned by [`instrument_cashflows`].
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct InstrumentCashflowEnvelope {
     /// Instrument identifier.
     pub instrument_id: String,
@@ -161,6 +162,7 @@ impl InstrumentCashflowEnvelope {
 /// Single-row enriched cashflow view.
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct CashflowRow {
     /// Payment date.
     #[cfg_attr(
@@ -924,5 +926,17 @@ mod tests {
             .with_schedule_balances()
             .expect("no issue date is not an error");
         assert!(no_issue_date.flow_balances.is_none());
+    }
+
+    #[test]
+    // schema-rejection-test
+    fn cashflow_export_types_reject_unknown_fields() {
+        let mut row_json = flow("2026-01-15", "USD", "fixed", 10.0, 9.0);
+        row_json["unexpected"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<super::CashflowRow>(row_json).is_err());
+
+        let mut env_json = serde_json::to_value(envelope(vec![])).expect("serialize");
+        env_json["unexpected"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<InstrumentCashflowEnvelope>(env_json).is_err());
     }
 }

@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 /// Stochastic pricing result for a structured credit deal.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct StochasticPricingResult {
     /// Net present value of the deal
     pub npv: Money,
@@ -153,6 +154,7 @@ impl StochasticPricingResult {
 /// Tranche-level pricing result.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct TranchePricingResult {
     /// Tranche identifier
     pub tranche_id: String,
@@ -349,14 +351,23 @@ impl StructuredCreditPricingMode {
     ///
     /// # Arguments
     ///
-    /// * `num_paths` - Number of independent antithetic estimators, clamped to
-    ///   at least 50 (100 simulated paths); the engine simulates
+    /// * `num_paths` - Number of independent antithetic estimators (must be at
+    ///   least 2 to estimate sampling uncertainty); the engine simulates
     ///   `2 × num_paths` scenario paths.
-    pub fn monte_carlo(num_paths: usize) -> Self {
-        StructuredCreditPricingMode::MonteCarlo {
-            num_paths: num_paths.max(50),
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when `num_paths < 2`.
+    pub fn monte_carlo(num_paths: usize) -> finstack_quant_core::Result<Self> {
+        finstack_quant_core::validation::require_with(num_paths >= 2, || {
+            format!(
+                "StructuredCreditPricingMode::monte_carlo requires at least 2 estimators, got {num_paths}"
+            )
+        })?;
+        Ok(StructuredCreditPricingMode::MonteCarlo {
+            num_paths,
             antithetic: true,
-        }
+        })
     }
 }
 
@@ -449,5 +460,43 @@ mod tests {
 
         assert!(result.unexpected_loss.amount() > 0.0);
         assert!((result.es_confidence - 0.99).abs() < 1e-10);
+    }
+
+    #[test]
+    fn monte_carlo_mode_validates_minimum_estimators() {
+        assert!(StructuredCreditPricingMode::monte_carlo(0).is_err());
+        assert!(StructuredCreditPricingMode::monte_carlo(1).is_err());
+        let mode = StructuredCreditPricingMode::monte_carlo(2).expect("2 estimators allowed");
+        assert_eq!(
+            mode,
+            StructuredCreditPricingMode::MonteCarlo {
+                num_paths: 2,
+                antithetic: true,
+            }
+        );
+    }
+
+    #[test]
+    // schema-rejection-test
+    fn structured_credit_result_types_reject_unknown_fields() {
+        let currency = Currency::USD;
+        let mut deal_json = serde_json::to_value(StochasticPricingResult::new(
+            Money::from((1_000_i64, currency)),
+            Money::from((10_i64, currency)),
+            100,
+            StructuredCreditPricingMode::monte_carlo(50).expect("valid"),
+        ))
+        .expect("serialize");
+        deal_json["unexpected"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<StochasticPricingResult>(deal_json).is_err());
+
+        let mut tranche_json = serde_json::to_value(TranchePricingResult::new(
+            "A".to_string(),
+            TrancheSeniority::Senior,
+            Money::from((500_i64, currency)),
+        ))
+        .expect("serialize");
+        tranche_json["unexpected"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<TranchePricingResult>(tranche_json).is_err());
     }
 }

@@ -479,7 +479,6 @@ export type D_5307Cfd099D1544Efbe2 =
          * Fraction accreted to notional.
          */
         pik_fraction: number;
-        [k: string]: unknown;
       };
     }
   | "toggle";

@@ -37,6 +37,7 @@ pub struct ValuationRow {
 /// joined into `bucket` with `::`. Scalar metrics carry `None` for both.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct ValuationLongRow {
     /// Base metric name (`bucketed_dv01`, `pv01`, `dv01`).
     pub metric: String,
@@ -246,5 +247,19 @@ mod tests {
         let back: ValuationRow = serde_json::from_str(&json).expect("should deserialize");
         assert_eq!(back.instrument_id, "BOND-SERDE");
         assert_eq!(back.measures.get("dv01"), Some(&500.0));
+    }
+
+    #[test]
+    // schema-rejection-test
+    fn valuation_long_row_rejects_unknown_fields() {
+        let mut json = serde_json::to_value(ValuationLongRow {
+            metric: "dv01".to_string(),
+            curve: None,
+            bucket: None,
+            value: 10.0,
+        })
+        .expect("serialize");
+        json["unexpected"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<ValuationLongRow>(json).is_err());
     }
 }

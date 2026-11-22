@@ -629,7 +629,6 @@ export interface Local5 {
    * The documentation clause (e.g. CR14, MM14).
    */
   doc_clause: "cr14" | "mr14" | "mm14" | "xr14" | "isda_na" | "isda_eu" | "isda_as" | "isda_au" | "isda_nz" | "custom";
-  [k: string]: unknown;
 }
 
 /**

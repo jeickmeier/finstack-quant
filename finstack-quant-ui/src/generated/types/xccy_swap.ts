@@ -506,7 +506,6 @@ export interface D_3Be43Bb3476C3B55E034 {
            * Which leg (`Leg1` or `Leg2`) has its notional reset each period.
            */
           resetting_side: "leg1" | "leg2";
-          [k: string]: unknown;
         };
       };
   reporting_currency: Currency;

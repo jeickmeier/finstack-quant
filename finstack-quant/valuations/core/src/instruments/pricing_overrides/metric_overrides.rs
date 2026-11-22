@@ -15,28 +15,33 @@ pub struct BumpConfig {
     ///
     /// `None` keeps each metric's default shock (1bp for duration, 10bp for
     /// structured-credit convexity).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ytm_bump_bp: Option<f64>,
     /// Spot bump as a decimal fraction of spot (0.01 = 1%).
     ///
     /// Sizes every finite-difference spot greek (delta, gamma, vanna, charm,
     /// speed, color, FX delta). When set it also replaces the adaptive spot
     /// bump. `None` uses the `valuations.sensitivities.v1` value (default 1%).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub spot_bump_decimal: Option<f64>,
     /// Absolute volatility bump in decimal volatility (0.01 = 1 vol point).
     ///
     /// Sizes every finite-difference volatility greek (vega, vanna, volga, FX
     /// vega). `None` uses the `valuations.sensitivities.v1` value (default
     /// 1 vol point). Results stay reported per 1 vol point.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub vol_bump_decimal: Option<f64>,
     /// Parallel rate bump in basis points (1.0 = 1bp).
     ///
     /// Sizes DV01, rho, foreign rho and forward PV01. Results stay reported per
     /// 1bp: `(pv_bumped - pv) / rate_bump_bp`. `None` uses the
     /// `valuations.sensitivities.v1` value (default 1bp).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rate_bump_bp: Option<f64>,
     /// Custom credit spread bump size override (in basis points, e.g., 1.0 for 1bp).
     ///
     /// Used by CS01 calculations that bump par spreads / hazard calibration quotes.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub credit_spread_bump_bp: Option<f64>,
     /// Enable adaptive bump sizes based on volatility and moneyness.
     ///
@@ -122,12 +127,13 @@ impl ThetaDayBasis {
 #[serde(default, deny_unknown_fields)]
 pub struct MetricPricingOverrides {
     /// Bump sizes for finite-difference sensitivities.
-    #[serde(default, skip_serializing_if = "BumpConfig::is_empty")]
+    #[serde(skip_serializing_if = "BumpConfig::is_empty")]
     pub bump_config: BumpConfig,
     /// Theta / carry horizon over which time decay is measured (for example
     /// 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
     /// week tenors roll a fixed number of days, month and year tenors roll
     /// calendar months (EOM-aware). `None` uses one day.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub theta_period: Option<finstack_quant_core::dates::Tenor>,
     /// Breakeven configuration: which parameter to solve for and solve mode.
     #[serde(skip_serializing_if = "Option::is_none")]

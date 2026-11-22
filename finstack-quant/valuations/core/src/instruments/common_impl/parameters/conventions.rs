@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Principal exchange schedule options for cross-currency swaps.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum NotionalExchange {
     /// No principal exchange.
     None,
@@ -119,5 +119,16 @@ mod tests {
         assert_eq!("leg1".parse::<ResettingSide>(), Ok(ResettingSide::Leg1));
         assert_eq!("leg2".parse::<ResettingSide>(), Ok(ResettingSide::Leg2));
         assert!("leg3".parse::<ResettingSide>().is_err());
+    }
+
+    #[test]
+    // schema-rejection-test
+    fn notional_exchange_rejects_unknown_fields() {
+        assert!(
+            serde_json::from_str::<NotionalExchange>(
+                r#"{"mtm_resetting":{"resetting_side":"leg1","extra":1}}"#
+            )
+            .is_err()
+        );
     }
 }

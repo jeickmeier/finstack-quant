@@ -15,7 +15,7 @@ use std::sync::Arc;
 /// pricing. This enum captures the relevant parameters for each type.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ModelParamsSnapshot {
     /// Structured credit parameters (prepayment, default, recovery).
     StructuredCredit {
@@ -135,5 +135,21 @@ pub(crate) fn instrument_with_model_params(
                 },
             ))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    // schema-rejection-test
+    fn model_params_snapshot_rejects_unknown_fields() {
+        let valid = ModelParamsSnapshot::Convertible {
+            conversion_spec: ConvertibleBond::example().expect("example").conversion,
+        };
+        let mut json = serde_json::to_value(valid).expect("serialize");
+        json["convertible"]["unexpected"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<ModelParamsSnapshot>(json).is_err());
     }
 }

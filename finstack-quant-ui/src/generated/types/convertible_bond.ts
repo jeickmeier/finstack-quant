@@ -1728,7 +1728,6 @@ export interface D_8D9E4Ad211395Ba91969 {
         window: {
           end: Date6;
           start: Date7;
-          [k: string]: unknown;
         };
       }
     | {
@@ -1745,7 +1744,6 @@ export interface D_8D9E4Ad211395Ba91969 {
            * Upper conversion price (above this, holder receives min shares).
            */
           upper_conversion_price: number;
-          [k: string]: unknown;
         };
       };
   /**

@@ -1,5 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Native cashflow rows, reporting-currency PV and reconciliation status.",
   "examples": [
     {
@@ -122,6 +123,7 @@
       "type": "string"
     },
     "d_674830a94dacf97e7ac8": {
+      "additionalProperties": false,
       "description": "Single-row enriched cashflow view.",
       "properties": {
         "accrual_day_count": {

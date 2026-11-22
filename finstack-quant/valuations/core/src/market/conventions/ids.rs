@@ -144,6 +144,7 @@ impl std::str::FromStr for CdsDocClause {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct CdsConventionKey {
     /// The currency of the CDS.
     pub currency: Currency,
@@ -172,5 +173,22 @@ impl CdsDocClause {
             Self::IsdaNz => "isda_nz",
             Self::Custom => "custom",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    // schema-rejection-test
+    fn cds_convention_key_rejects_unknown_fields() {
+        let mut json = serde_json::to_value(CdsConventionKey {
+            currency: Currency::USD,
+            doc_clause: CdsDocClause::Cr14,
+        })
+        .expect("serialize");
+        json["unexpected"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<CdsConventionKey>(json).is_err());
     }
 }

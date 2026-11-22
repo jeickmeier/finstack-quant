@@ -146,6 +146,7 @@
       ]
     },
     "CashflowRow": {
+      "additionalProperties": false,
       "description": "Single-row enriched cashflow view.",
       "properties": {
         "accrual_day_count": {
@@ -347,6 +348,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Native cashflow rows, reporting-currency PV and reconciliation status.",
   "examples": [
     {

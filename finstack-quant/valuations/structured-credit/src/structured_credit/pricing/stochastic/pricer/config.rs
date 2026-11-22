@@ -202,7 +202,7 @@ mod tests {
         let curve = test_discount_curve();
         let tree_config = ScenarioTreeConfig::new(12);
 
-        let mode = StructuredCreditPricingMode::monte_carlo(1_000);
+        let mode = StructuredCreditPricingMode::monte_carlo(1_000).expect("valid estimator count");
 
         let config = StochasticPricerConfig::new(today, curve, tree_config, mode.clone());
 

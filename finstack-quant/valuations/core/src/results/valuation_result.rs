@@ -1,7 +1,7 @@
 //! Valuation result schema, measures, explanations, and serialization.
 //!
+use super::details::ValuationDetails;
 use crate::metrics::MetricId;
-use crate::pricer::ModelKey;
 use finstack_quant_core::config::{FinstackConfig, ResultsMeta, results_meta};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::explain::ExplanationTrace;
@@ -9,114 +9,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::wire::SchemaVersion;
 
 use indexmap::IndexMap;
-
-/// Model-specific typed valuation details.
-///
-/// These details are for rich structured outputs that do not fit the scalar
-/// `measures` map while still belonging in the standard valuation envelope.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(tag = "type", content = "data", rename_all = "snake_case")]
-pub enum ValuationDetails {
-    /// Recursive leg valuation and primitive exposure detail for a composite.
-    Composite(super::composite::CompositeValuationDetails),
-    /// Credit-derivative pricing metadata.
-    CreditDerivative(CreditDerivativeValuationDetails),
-    /// Scenario-waterfall structured credit stochastic pricing result.
-    StructuredCreditStochastic(super::structured_credit::StochasticPricingResult),
-    /// FX-bearing instrument pricing metadata (forwards, options, quanto, …).
-    ///
-    /// Surfaces the [`FxMatrix`](finstack_quant_core::money::fx::FxMatrix) lookup
-    /// chain that backed the spot rate used at pricing time, satisfying the
-    /// project-wide FX-policy-visibility invariant for instruments that
-    /// resolve their spot through the matrix.
-    Fx(FxValuationDetails),
-    /// Monte Carlo estimator and reproducibility metadata.
-    MonteCarlo(MonteCarloValuationDetails),
-}
-
-/// Metadata for CDS-family valuation paths.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct CreditDerivativeValuationDetails {
-    /// Registered model key used by the pricer.
-    pub model_key: ModelKey,
-    /// CDS integration method actually used, when applicable.
-    pub integration_method: Option<String>,
-}
-
-/// Metadata for FX-bearing valuation paths (FX forwards, FX options, quanto).
-///
-/// Captures the FX policy applied at pricing time so downstream audit /
-/// reconciliation can trace whether a quoted rate came from a direct
-/// market quote or via triangulation through the matrix pivot currency.
-/// Mirrors the "FX policy visibility" invariant in `ARCHITECTURE.md`: the
-/// applied conversion strategy is recorded per layer (valuations, statements,
-/// portfolio).
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct FxValuationDetails {
-    /// `true` when the FX spot was obtained via triangulation through the
-    /// [`FxMatrix`](finstack_quant_core::money::fx::FxMatrix) pivot currency
-    /// rather than a direct quote. Mirrors
-    /// [`FxRateResult.triangulated`](finstack_quant_core::money::fx::FxRateResult).
-    /// `None` when the instrument resolved spot from an explicit market
-    /// scalar (`fx_spot_id`) rather than the matrix.
-    pub fx_triangulated: Option<bool>,
-}
-
-/// Reproducibility and convergence diagnostics for a Monte Carlo valuation.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct MonteCarloValuationDetails {
-    /// Registered model used for the simulation.
-    pub model_key: ModelKey,
-    /// Sampling standard error of the discounted PV mean in the result
-    /// currency. For LSMC valuations, this measures pricing-path uncertainty
-    /// under the frozen fitted exercise policy. It excludes regression
-    /// approximation, time-grid discretization, and model error.
-    pub standard_error: f64,
-    /// Number of independent paths used to fit an exercise or control policy.
-    ///
-    /// Zero for Monte Carlo engines that do not have a separate training
-    /// stage.
-    #[serde(serialize_with = "finstack_quant_core::wire::count::serialize")]
-    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
-    pub training_paths: usize,
-    /// Total factor paths simulated in the policy-training stage, including
-    /// antithetic partners. Zero when no policy is trained.
-    #[serde(serialize_with = "finstack_quant_core::wire::count::serialize")]
-    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
-    pub training_simulated_paths: usize,
-    /// Independent paths used to fit state-conditional make-whole reference
-    /// values. Zero when no stochastic make-whole stage is required.
-    #[serde(serialize_with = "finstack_quant_core::wire::count::serialize")]
-    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
-    pub make_whole_training_paths: usize,
-    /// Total factor paths simulated for state-conditional make-whole training,
-    /// including antithetic partners. Zero when that stage is absent.
-    #[serde(serialize_with = "finstack_quant_core::wire::count::serialize")]
-    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
-    pub make_whole_training_simulated_paths: usize,
-    /// Number of independent path estimators contributing to the mean.
-    #[serde(serialize_with = "finstack_quant_core::wire::count::serialize")]
-    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
-    pub estimator_paths: usize,
-    /// Total number of simulated paths, including antithetic partners.
-    #[serde(serialize_with = "finstack_quant_core::wire::count::serialize")]
-    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
-    pub simulated_paths: usize,
-    /// Deterministic random seed used for the run.
-    pub seed: u64,
-    /// Simulation times in year fractions, including zero and maturity.
-    pub time_grid: Vec<f64>,
-    /// Whether antithetic variates were enabled.
-    pub antithetic: bool,
-    /// Whether Sobol quasi-random sampling was enabled.
-    pub sobol: bool,
-    /// Whether Brownian-bridge ordering was enabled for Sobol paths.
-    pub brownian_bridge: bool,
-}
 
 /// Complete valuation result envelope with NPV, risk metrics, and metadata.
 ///
@@ -769,6 +661,8 @@ mod tests {
 
     #[test]
     fn credit_derivative_details_serialize_canonical_model_key() {
+        use super::super::details::CreditDerivativeValuationDetails;
+        use crate::pricer::ModelKey;
         let details = CreditDerivativeValuationDetails {
             model_key: ModelKey::HazardRate,
             integration_method: Some("isda_standard_model".to_string()),

@@ -57,6 +57,7 @@ pub enum RateIndexKind {
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct RateIndexConventions {
     /// Operating currency of the index.
     pub currency: Currency,
@@ -178,6 +179,7 @@ impl std::str::FromStr for CdsConvention {
 /// is the regional schedule family used to select these settings.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct CdsConventionSpec {
     /// Regional schedule family represented by this registry row.
     pub family: CdsConvention,
@@ -202,6 +204,7 @@ pub struct CdsConventionSpec {
 /// by swaption builders to construct instruments with correct market conventions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct SwaptionConventions {
     /// Calendar for exercise and settlement.
     pub calendar_id: String,
@@ -224,6 +227,7 @@ pub struct SwaptionConventions {
 /// Used by inflation swap builders to construct instruments with correct market conventions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct InflationSwapConventions {
     /// Calendar for payment/fixing.
     pub calendar_id: String,
@@ -242,6 +246,7 @@ pub struct InflationSwapConventions {
 /// Conventions for cross-currency basis swaps.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct XccyConventions {
     /// Base (foreign) currency of the pair.
     pub base_currency: Currency,
@@ -457,5 +462,94 @@ impl CdsValuationConvention {
             | Self::BloombergCdswClean
             | Self::BloombergCdswCleanFullPremium => 0,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_rejects_unknown<T: for<'de> serde::Deserialize<'de>>(value: serde_json::Value) {
+        let mut obj = value;
+        obj["unexpected"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<T>(obj).is_err());
+    }
+
+    #[test]
+    // schema-rejection-test
+    fn convention_structs_reject_unknown_fields() {
+        assert_rejects_unknown::<RateIndexConventions>(
+            serde_json::to_value(RateIndexConventions {
+                currency: Currency::USD,
+                kind: RateIndexKind::OvernightRfr,
+                tenor: None,
+                day_count: DayCount::Act360,
+                default_payment_frequency: Tenor::annual(),
+                default_payment_lag_days: 2,
+                default_reset_lag_days: 0,
+                ois_compounding: None,
+                market_calendar_id: "usny".to_string(),
+                market_settlement_days: 2,
+                market_business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                default_fixed_leg_day_count: DayCount::Act360,
+                default_fixed_leg_frequency: Tenor::annual(),
+            })
+            .expect("serialize"),
+        );
+
+        assert_rejects_unknown::<CdsConventionSpec>(
+            serde_json::to_value(CdsConventionSpec {
+                family: CdsConvention::IsdaNa,
+                calendar_id: "usny".to_string(),
+                day_count: DayCount::Act360,
+                business_day_convention: BusinessDayConvention::Following,
+                stub: StubKind::ShortFront,
+                settlement_days: 3,
+                frequency: Tenor::quarterly(),
+            })
+            .expect("serialize"),
+        );
+
+        assert_rejects_unknown::<SwaptionConventions>(
+            serde_json::to_value(SwaptionConventions {
+                calendar_id: "usny".to_string(),
+                settlement_days: 2,
+                business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                fixed_leg_frequency: Tenor::semi_annual(),
+                fixed_leg_day_count: DayCount::Thirty360,
+                float_leg_index: "USD-SOFR-3M".to_string(),
+            })
+            .expect("serialize"),
+        );
+
+        assert_rejects_unknown::<InflationSwapConventions>(
+            serde_json::to_value(InflationSwapConventions {
+                calendar_id: "usny".to_string(),
+                settlement_days: 2,
+                business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                day_count: DayCount::Thirty360,
+                inflation_lag: Tenor::quarterly(),
+                interpolation:
+                    finstack_quant_core::market_data::scalars::SeriesInterpolation::Linear,
+            })
+            .expect("serialize"),
+        );
+
+        assert_rejects_unknown::<XccyConventions>(
+            serde_json::to_value(XccyConventions {
+                base_currency: Currency::EUR,
+                quote_currency: Currency::USD,
+                base_index_id: IndexId::new("EUR-EURIBOR-3M"),
+                quote_index_id: IndexId::new("USD-SOFR-3M"),
+                settlement_days: 2,
+                payment_frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                business_day_convention: BusinessDayConvention::ModifiedFollowing,
+                base_calendar_id: "target2".to_string(),
+                quote_calendar_id: "usny".to_string(),
+                notional_exchange: crate::instruments::NotionalExchange::InitialAndFinal,
+            })
+            .expect("serialize"),
+        );
     }
 }

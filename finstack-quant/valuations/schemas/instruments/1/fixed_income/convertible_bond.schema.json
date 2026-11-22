@@ -387,6 +387,7 @@
           "description": "Holder may convert within a window.",
           "properties": {
             "window": {
+              "additionalProperties": false,
               "properties": {
                 "end": {
                   "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -427,6 +428,7 @@
           "description": "Mandatory conversion with variable delivery ratio (PERCS / DECS / ACES).",
           "properties": {
             "mandatory_variable": {
+              "additionalProperties": false,
               "properties": {
                 "conversion_date": {
                   "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",

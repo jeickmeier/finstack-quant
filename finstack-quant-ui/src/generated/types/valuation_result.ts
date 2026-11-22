@@ -15,27 +15,22 @@ export type D_979A918A504Fe5C6F8F7 =
   | {
       data: D_11C88C8641Cb7Ae81898;
       type: "composite";
-      [k: string]: unknown;
     }
   | {
       data: DB613C7Ee220C23Ada4E9;
       type: "credit_derivative";
-      [k: string]: unknown;
     }
   | {
       data: D_482Fa346C77E25F26A51;
       type: "structured_credit_stochastic";
-      [k: string]: unknown;
     }
   | {
       data: DCcd53Ca701E8C5Bb4008;
       type: "fx";
-      [k: string]: unknown;
     }
   | {
       data: DAdb505B22Deadbdfe62E;
       type: "monte_carlo";
-      [k: string]: unknown;
     };
 /**
  * Primitive instrument identifier.
@@ -2460,7 +2455,6 @@ export interface DB613C7Ee220C23Ada4E9 {
     | "pde_crank_nicolson_1d"
     | "pde_adi_2d"
     | "bloomberg_cdso";
-  [k: string]: unknown;
 }
 /**
  * Stochastic pricing result for a structured credit deal.
@@ -2538,7 +2532,6 @@ export interface D_482Fa346C77E25F26A51 {
    * for pools without draws).
    */
   unfunded_draw_path_fraction?: number;
-  [k: string]: unknown;
 }
 /**
  * Mean over paths of the draw option cost: the value to the deal of its
@@ -3495,7 +3488,6 @@ export interface DD845B68D12Fbaca7791F {
    * the tranche received principal; `0.0` when it never did.
    */
   wal: number;
-  [k: string]: unknown;
 }
 /**
  * This tranche's share of the deal's draw option cost: the mean over
@@ -4582,7 +4574,6 @@ export interface DCcd53Ca701E8C5Bb4008 {
    * scalar (`fx_spot_id`) rather than the matrix.
    */
   fx_triangulated?: boolean | null;
-  [k: string]: unknown;
 }
 /**
  * Reproducibility and convergence diagnostics for a Monte Carlo valuation.
@@ -4679,5 +4670,4 @@ export interface DAdb505B22Deadbdfe62E {
    * antithetic partners. Zero when no policy is trained.
    */
   training_simulated_paths: number;
-  [k: string]: unknown;
 }
