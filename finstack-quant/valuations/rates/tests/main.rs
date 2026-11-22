@@ -10,6 +10,8 @@ mod basis_swap;
 mod cap_floor;
 #[path = "cms_option/mod.rs"]
 mod cms_option;
+#[path = "deposit/mod.rs"]
+mod deposit;
 #[path = "fra/mod.rs"]
 mod fra;
 #[path = "inflation_cap_floor/mod.rs"]

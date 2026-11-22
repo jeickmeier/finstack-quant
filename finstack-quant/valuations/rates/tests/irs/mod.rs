@@ -11,11 +11,13 @@
 
 mod cashflows;
 mod construction;
+mod horizon_market_fixings;
 mod integration;
 mod metrics;
 mod pricing;
 mod proptests;
 mod test_compounding_accuracy;
+mod test_irs_parity;
 mod test_swap_pricing;
 mod test_swap_symmetry;
 mod validation;

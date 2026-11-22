@@ -161,32 +161,30 @@ Other steps:
 
 Integration tests that need only this crate, valuations-core and the
 test-support crate live in `tests/<leaf>/`, compiled into the single `rates`
-target (`mise run rust-test-crate -- finstack-quant-valuations-rates`): `irs`,
-`basis_swap`, `cap_floor`, `fra`, `ir_future`, `cms_option`, `inflation_swap`,
-`xccy_swap`, plus `inflation_cap_floor/pricing.rs` and `repo/margin.rs`. The
+target (`mise run rust-test-crate -- finstack-quant-valuations-rates`): `irs`
+(including `test_irs_parity` and `horizon_market_fixings`), `basis_swap`,
+`cap_floor`, `deposit`, `fra`, `ir_future`, `cms_option`, `inflation_swap`,
+`inflation_cap_floor`, `repo`, `swaption`, and `xccy_swap`. The
 IRS builder they share is `tests/support/rates.rs`; the umbrella's test trees
-and benches include that file by path. Tests that price through the standard
-registries or reach another family stay in the umbrella's
-`../tests/instruments/<leaf>/`: `deposit/`, `repo/` (bar `margin.rs`),
-`swaption/` (its shared fixtures build a `Bond`), `future_option/`,
-`inflation_cap_floor/metrics.rs` and the rates wire-key tests. `cms_swap` and
-`cms_spread_option` are covered by colocated `#[cfg(test)]` modules;
-`swaption/pricing/numeraire_tests.rs` holds the in-crate no-arbitrage
-numéraire checks for the Bermudan engines.
+and benches include that file by path. Cross-family and wire-contract suites
+stay in the umbrella's `../tests/instruments/`: `future_option/` and the rates
+wire-key tests. `cms_swap` and `cms_spread_option` are covered by colocated
+`#[cfg(test)]` modules; `swaption/pricing/tests/numeraire.rs` holds the in-crate
+no-arbitrage numéraire checks for the Bermudan engines.
 
 ```bash
-# whole target
-cargo nextest run -p finstack-quant-valuations --test valuations instruments
+# whole family crate (lib + rates integration target)
+mise run rust-test-crate -- finstack-quant-valuations-rates
 
 # one leaf (filter is a substring match on the test name)
-cargo nextest run -p finstack-quant-valuations --test valuations instruments::swaption::
-cargo nextest run -p finstack-quant-valuations --test valuations instruments::irs::
+mise run rust-test-filter -- finstack-quant-valuations-rates swaption::
+mise run rust-test-filter -- finstack-quant-valuations-rates irs::
 
 # colocated unit tests
-cargo nextest run -p finstack-quant-valuations --lib rates::cms_swap
+mise run rust-test-filter -- finstack-quant-valuations-rates cms_swap::
 
 # the HW1F engines themselves
-cargo nextest run -p finstack-quant-models --lib rates::hw1f
+mise run rust-test-filter -- finstack-quant-models rates::hw1f
 
 # whole workspace, what CI runs
 mise run rust-test

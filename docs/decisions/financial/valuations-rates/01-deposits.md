@@ -147,7 +147,7 @@ Compounded or continuously compounded deposit quotes would require explicit conv
 ## Evidence
 
 - [Deposit implementation](../../../../finstack-quant/valuations/rates/src/deposit/types.rs), [metric registration and year fraction](../../../../finstack-quant/valuations/rates/src/deposit/metrics/mod.rs), [DF lookup](../../../../finstack-quant/valuations/rates/src/deposit/metrics/df.rs), [par rate](../../../../finstack-quant/valuations/rates/src/deposit/metrics/par_rate.rs), [quote inversion](../../../../finstack-quant/valuations/rates/src/deposit/metrics/df_end_from_quote.rs).
-- [Deposit pricing tests](../../../../finstack-quant/valuations/tests/instruments/deposit/pricing.rs), [par-rate tests](../../../../finstack-quant/valuations/tests/instruments/deposit/metrics/par_rate.rs), [DF tests](../../../../finstack-quant/valuations/tests/instruments/deposit/metrics/discount_factors.rs): formula and inversion evidence.
+- [Deposit pricing tests](../../../../finstack-quant/valuations/rates/tests/deposit/pricing.rs), [par-rate tests](../../../../finstack-quant/valuations/rates/tests/deposit/metrics/par_rate.rs), [DF tests](../../../../finstack-quant/valuations/rates/tests/deposit/metrics/discount_factors.rs): formula and inversion evidence.
 - [ISDA day counts](../../../REFERENCES.md#isda-2006-definitions), [Hull](../../../REFERENCES.md#hull-options-futures): reference context; calendar and admissible-rate choices still require adoption.
 
 ## Evidence limits
@@ -178,7 +178,7 @@ Formula tests are not a complete cross-market convention benchmark.
 These are bounded checks of dates, cash, lifecycle and algebra. The
 existing same-day trade and holder pricing tests, inverse tests and
 QuantLib-based host fixture remain production reconciliation evidence
-to qualify on the accepted basis. [Existing par tests](../../../../finstack-quant/valuations/tests/instruments/deposit/metrics/par_rate.rs),
+to qualify on the accepted basis. [Existing par tests](../../../../finstack-quant/valuations/rates/tests/deposit/metrics/par_rate.rs),
 [fixture generator](../../../../scripts/golden/quantlib/deposits.py),
 [discount calibration adapter](../../../../finstack-quant/calibration/src/build/prepared.rs).
 

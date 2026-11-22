@@ -51,27 +51,15 @@ pub(crate) mod test_support;
 #[path = "instruments/bond/mod.rs"]
 mod bond;
 
-/// Deposit tests - Money market deposits and term deposits
-#[path = "instruments/deposit/mod.rs"]
-mod deposit;
-
 /// Bond future tests - Treasury and government bond futures
 #[path = "instruments/bond_future/mod.rs"]
 mod bond_future;
 
 // Interest Rate Derivatives
 
-/// Inflation cap/floor tests - YoY inflation caps/floors
-#[path = "instruments/inflation_cap_floor/mod.rs"]
-mod inflation_cap_floor;
-
 /// Futures-option tests - Shared option-on-future wrappers
 #[path = "instruments/future_option/mod.rs"]
 mod future_option;
-
-/// Swaption tests - Options on interest rate swaps
-#[path = "instruments/swaption/mod.rs"]
-mod swaption;
 
 // Credit Derivatives
 
@@ -172,11 +160,7 @@ mod convertible;
 #[path = "instruments/structured_credit/mod.rs"]
 mod structured_credit;
 
-// Repo and Financing
-
-/// Repo tests - Repurchase agreements
-#[path = "instruments/repo/mod.rs"]
-mod repo;
+// Financing
 
 /// Revolving credit tests - Revolving credit facilities
 #[path = "instruments/revolving_credit/mod.rs"]

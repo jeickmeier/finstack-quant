@@ -32,7 +32,7 @@ Multi-file module trees:
 |--------|--------|
 | `instruments` | Product tests (`tests/instruments.rs`), wire-key contracts, dependency completeness, and registry/serde/fixture contract tests. See [`instruments/README.md`](instruments/README.md). |
 | `core_framework` | Framework behaviour (`tests/core.rs`): generic pricer, registry, enrichment, breakeven, DV01, FD Greeks, theta, VaR/HVaR, cross-factor, and cashflow export over built-in instruments. |
-| `metrics` | Greeks and sensitivities (`tests/metrics.rs`): analytical-vs-FD convergence, determinism, sign conventions, mathematical relationships, invariants (proptest), edge cases, vanna-volga, horizon fixings. |
+| `metrics` | Greeks and sensitivities (`tests/metrics.rs`): analytical-vs-FD convergence, determinism, sign conventions, mathematical relationships, invariants (proptest), edge cases, vanna-volga. |
 | `cashflows` | `CashflowProvider` contract compliance and the instrument-to-`finstack_quant_cashflows` bridge. |
 | `integration` | End-to-end workflows, metrics strict mode, JSON round-trips, schema parity, TypeScript export. |
 | `golden` | External-reference parity against Bloomberg, QuantLib, and closed-form values. See [`golden/README.md`](golden/README.md). |

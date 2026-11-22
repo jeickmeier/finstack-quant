@@ -1,5 +1,13 @@
-//! Swaption tests that need only this crate. The rest of the swaption suite
-//! stays in the umbrella: its shared fixture builds a `Bond`.
+//! Comprehensive swaption test suite (European and Bermudan).
+
+pub mod common;
+pub mod core;
+pub mod edge_cases;
+pub mod integration;
+pub mod invariants;
+pub mod market;
+pub mod metrics;
+pub mod pricing;
 
 mod bermudan_pricing;
 mod envelope;

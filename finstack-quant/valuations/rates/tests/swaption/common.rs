@@ -1,0 +1,241 @@
+//! Common test utilities and fixtures for swaption tests.
+
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_models::types::OptionType;
+use finstack_quant_test_utils::assert::approx_eq;
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::instruments::pricing_overrides::VolSurfaceExtrapolation;
+use finstack_quant_valuations_core::instruments::{Instrument, SettlementType};
+use finstack_quant_valuations_rates::VolatilityModel;
+use finstack_quant_valuations_rates::irs::InterestRateSwap;
+use finstack_quant_valuations_rates::swaption::{CashSettlementMethod, Swaption};
+use finstack_quant_valuations_rates::{FixedLegSpec, FloatLegSpec};
+use rust_decimal::Decimal;
+use time::macros::date;
+
+/// Build a flat forward curve with constant rate
+pub fn build_flat_forward_curve(rate: f64, base_date: Date, curve_id: &str) -> ForwardCurve {
+    ForwardCurve::flat(curve_id, base_date, rate, DayCount::Act360).unwrap()
+}
+
+/// Build a flat discount curve with constant rate
+pub fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve {
+    DiscountCurve::builder(curve_id)
+        .base_date(base_date)
+        .day_count(DayCount::Act360)
+        .knots([
+            (0.0, 1.0),
+            (1.0, (-rate).exp()),
+            (5.0, (-rate * 5.0).exp()),
+            (10.0, (-rate * 10.0).exp()),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+        .build()
+        .unwrap()
+}
+
+/// Build a flat volatility surface
+pub fn build_flat_vol_surface(vol: f64, _base_date: Date, vol_surface_id: &str) -> VolSurface {
+    VolSurface::builder(vol_surface_id)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
+        .expiries(&[0.25, 1.0, 5.0, 10.0])
+        .secondary_values(&[0.02, 0.03, 0.05, 0.07])
+        .row(&[vol, vol, vol, vol])
+        .row(&[vol, vol, vol, vol])
+        .row(&[vol, vol, vol, vol])
+        .row(&[vol, vol, vol, vol])
+        .build()
+        .unwrap()
+}
+
+/// Build a vol surface with realistic smile (lower vol for OTM puts, higher for OTM calls)
+pub fn build_smile_vol_surface(_base_date: Date, vol_surface_id: &str) -> VolSurface {
+    VolSurface::builder(vol_surface_id)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
+        .expiries(&[0.25, 1.0, 5.0])
+        .secondary_values(&[0.02, 0.03, 0.05, 0.07])
+        .row(&[0.25, 0.22, 0.20, 0.22]) // 3M expiry
+        .row(&[0.28, 0.24, 0.20, 0.24]) // 1Y expiry
+        .row(&[0.32, 0.26, 0.22, 0.28]) // 5Y expiry
+        .build()
+        .unwrap()
+}
+
+/// Create a standard ATM payer swaption for testing: physically settled,
+/// Black vol, semi-annual 30/360 fixed versus quarterly ACT/360 floating on
+/// `USD_OIS` / `USD_LIBOR_3M`.
+pub fn create_standard_payer_swaption(
+    expiry: Date,
+    swap_start: Date,
+    swap_end: Date,
+    strike: f64,
+) -> Swaption {
+    let fixed = FixedLegSpec {
+        discount_curve_id: CurveId::new("USD_OIS"),
+        rate: Decimal::try_from(strike).expect("valid strike"),
+        frequency: Tenor::semi_annual(),
+        day_count: DayCount::Thirty360,
+        business_day_convention: BusinessDayConvention::ModifiedFollowing,
+        calendar_id: None,
+        stub: StubKind::None,
+        start: swap_start,
+        end: swap_end,
+
+        payment_lag_days: 0,
+        end_of_month: false,
+    };
+    let float = FloatLegSpec {
+        discount_curve_id: CurveId::new("USD_OIS"),
+        index_id: "USD_LIBOR_3M".into(),
+        forward_curve_id: CurveId::new("USD_LIBOR_3M"),
+        spread_bp: Decimal::ZERO,
+        frequency: Tenor::quarterly(),
+        day_count: DayCount::Act360,
+        business_day_convention: BusinessDayConvention::ModifiedFollowing,
+        calendar_id: None,
+        stub: StubKind::None,
+        reset_lag_days: 0,
+        fixing_calendar_id: None,
+        start: swap_start,
+        end: swap_end,
+        compounding: FloatingLegCompounding::Simple,
+        payment_lag_days: 0,
+        end_of_month: false,
+    };
+    let mut swaption = Swaption::builder()
+        .id(InstrumentId::new("SWAPTION_TEST"))
+        .option_type(OptionType::Call)
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
+        .expiry(expiry)
+        .settlement(SettlementType::Physical)
+        .cash_settlement_method(CashSettlementMethod::default())
+        .vol_model(VolatilityModel::Black)
+        .vol_surface_id(CurveId::new("USD_SWAPTION_VOL"))
+        .underlying_fixed_leg(fixed)
+        .underlying_float_leg(float)
+        .build()
+        .expect("valid swaption");
+    // Tests intentionally exercise OTM/ITM strikes; opt in to flat extrapolation
+    // to avoid making results depend on the surface strike grid.
+    let mut overrides = InstrumentPricingOverrides::default();
+    overrides.model_config.vol_surface_extrapolation = VolSurfaceExtrapolation::Clamp;
+    swaption.instrument_pricing_overrides = overrides;
+    swaption
+}
+
+/// Create a standard ATM receiver swaption for testing
+pub fn create_standard_receiver_swaption(
+    expiry: Date,
+    swap_start: Date,
+    swap_end: Date,
+    strike: f64,
+) -> Swaption {
+    let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, strike);
+    swaption.option_type = OptionType::Put;
+    swaption.id = "RECEIVER_SWAPTION_TEST".into();
+    swaption
+}
+
+/// Create a complete market context with flat curves and vol surface
+/// Stamp the swaption's own model PV as the observed premium in
+/// `instrument_pricing_overrides.market_quotes.quoted_premium`, so `ImpliedVol`
+/// inverts back to the pricing volatility (a solver round trip).
+pub fn with_model_premium(mut swaption: Swaption, market: &MarketContext, as_of: Date) -> Swaption {
+    let pv = swaption.value(market, as_of).expect("model PV").amount();
+    swaption.instrument_pricing_overrides = swaption
+        .instrument_pricing_overrides
+        .with_quoted_premium(pv);
+    swaption
+}
+
+pub fn create_flat_market(as_of: Date, rate: f64, vol: f64) -> MarketContext {
+    let disc_curve = build_flat_discount_curve(rate, as_of, "USD_OIS");
+    let fwd_curve = build_flat_forward_curve(rate, as_of, "USD_LIBOR_3M");
+    let vol_surface = build_flat_vol_surface(vol, as_of, "USD_SWAPTION_VOL");
+
+    MarketContext::new()
+        .try_insert(disc_curve)
+        .expect("insert market curve")
+        .try_insert(fwd_curve)
+        .expect("insert market curve")
+        .insert_surface(vol_surface)
+}
+
+/// Compute the par rate of the vanilla IRS equivalent to a legacy swaption underlier.
+pub fn equivalent_vanilla_irs_par_rate(
+    swaption: &Swaption,
+    market: &MarketContext,
+    as_of: Date,
+) -> f64 {
+    let fixed = |rate| {
+        let mut fixed = swaption.underlying_fixed_leg.clone();
+        fixed.rate = Decimal::try_from(rate).unwrap();
+        fixed
+    };
+    let float = swaption.underlying_float_leg.clone();
+    let value_at_fixed_rate = |rate| {
+        InterestRateSwap::builder()
+            .id(format!("IRS-{rate:.0}").into())
+            .notional(swaption.notional)
+            .side(PayReceive::Receive)
+            .fixed_leg(fixed(rate))
+            .float_leg(float.clone())
+            .build()
+            .unwrap()
+            .value(market, as_of)
+            .unwrap()
+            .amount()
+    };
+
+    let value_zero = value_at_fixed_rate(0.0);
+    let value_unit = value_at_fixed_rate(1.0);
+    -value_zero / (value_unit - value_zero)
+}
+
+/// Standard test dates
+pub fn standard_dates() -> (Date, Date, Date, Date) {
+    let as_of = date!(2024 - 01 - 01);
+    let expiry = date!(2025 - 01 - 01);
+    let swap_start = date!(2025 - 01 - 01);
+    let swap_end = date!(2030 - 01 - 01);
+    (as_of, expiry, swap_start, swap_end)
+}
+
+/// Assert `actual` is within `rel_tol` of `expected`, scaled by `max(|expected|, 1)`
+/// so the check is relative above unit magnitude and absolute below it.
+pub fn assert_approx_eq(actual: f64, expected: f64, rel_tol: f64, msg: &str) {
+    approx_eq(actual, expected, rel_tol * expected.abs().max(1.0), msg);
+}
+
+/// Assert a value is finite and within reasonable bounds
+pub fn assert_reasonable(value: f64, lower: f64, upper: f64, name: &str) {
+    assert!(
+        value.is_finite(),
+        "{} should be finite, got: {}",
+        name,
+        value
+    );
+    assert!(
+        value >= lower && value <= upper,
+        "{} should be in [{}, {}], got: {}",
+        name,
+        lower,
+        upper,
+        value
+    );
+}

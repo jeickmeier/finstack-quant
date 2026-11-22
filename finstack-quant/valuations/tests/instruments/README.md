@@ -36,11 +36,10 @@ larger ones split into subdirectories:
 
 | Directory | Subdirectories |
 |-----------|----------------|
-| `bond`, `cap_floor`, `irs` | `metrics/`, `validation/`, `integration/` |
-| `swaption` | `core/`, `pricing/`, `market/`, `metrics/`, `edge_cases/`, `integration/` |
+| `bond` | `metrics/`, `validation/`, `integration/` |
 | `structured_credit` | `unit/`, `integration/` (the JSON round-trip and `price_instrument` tests; the rest of the suite is in `../../structured-credit/tests/`) |
-| `term_loan`, `revolving_credit`, `fra` | `metrics/`, `validation/` |
-| `deposit`, `fx_spot`, `inflation_swap` | `metrics/`, `integration/` |
+| `term_loan`, `revolving_credit` | `metrics/`, `validation/` |
+| `fx_spot` | `metrics/`, `integration/` |
 | `equity` | `real_estate/` |
 
 Split only when a directory outgrows a flat layout. The authoritative module

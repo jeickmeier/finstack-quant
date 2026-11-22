@@ -199,7 +199,7 @@ A cashflow-derived curve sensitivity could replace the margin duration proxy; co
 ## Evidence
 
 - [Repo implementation](../../../../finstack-quant/valuations/rates/src/repo/types.rs), [metrics](../../../../finstack-quant/valuations/rates/src/repo/metrics/mod.rs), [accrued interest](../../../../finstack-quant/valuations/rates/src/repo/metrics/accrued_interest.rs), [collateral return](../../../../finstack-quant/valuations/rates/src/repo/metrics/implied_collateral_return.rs), [margin proxy](../../../../finstack-quant/valuations/rates/src/repo/marginable.rs).
-- [Repo pricing](../../../../finstack-quant/valuations/tests/instruments/repo/pricing.rs), [collateral tests](../../../../finstack-quant/valuations/tests/instruments/repo/collateral.rs), [margin tests](../../../../finstack-quant/valuations/rates/tests/repo/margin.rs): formula, convention and proxy behavior evidence.
+- [Repo pricing](../../../../finstack-quant/valuations/rates/tests/repo/pricing.rs), [collateral tests](../../../../finstack-quant/valuations/rates/tests/repo/collateral.rs), [margin tests](../../../../finstack-quant/valuations/rates/tests/repo/margin.rs): formula, convention and proxy behavior evidence.
 - [Hull](../../../REFERENCES.md#hull-options-futures) provides general financing context. A specific adopted repo margin-proxy validation reference was not established; the existence of [SIMM](../../../REFERENCES.md#isda-simm) does not validate this approximation.
 
 ## Evidence limits
