@@ -1,70 +1,90 @@
 # Valuations tests
 
-Integration tests for `finstack-quant-valuations`: instrument pricing, cashflow
-generation, calibration, market quotes, risk metrics, external-reference golden
-vectors, and the schema/serde contracts that keep the wire format stable.
+Integration tests for `finstack-quant-valuations`: cross-family instrument
+pricing, cashflow generation, risk metrics, external-reference golden vectors,
+and the registry, schema, and serde contracts that keep the wire format stable.
 
-Every `.rs` file directly under `tests/` is its own cargo integration target
-(`--test <name>`). Directories beside them are not targets; they are pulled into
-a target with `#[path = "..."]`. Unit tests for internal implementation details
-stay in `#[cfg(test)]` modules under `src/`.
+`finstack-quant-valuations` sets `autotests = false` in `Cargo.toml` and
+compiles a single integration target, `[[test]] name = "valuations"` rooted at
+[`tests/main.rs`](main.rs). Every module under `tests/` is pulled into `main.rs`
+via `#[path = "..."]` so the crate links once instead of once per file.
+[`tests/instruments.rs`](instruments.rs) is the product-tree module under
+`valuations`. Unit tests for internal implementation details stay in
+`#[cfg(test)]` modules under `src/`.
 
-## Targets
+## Crate ownership
 
-Large, multi-directory targets:
+Single-family product tests live in their family crate under `<family>/tests/`
+so changing one family does not rebuild or relink the umbrella crate.
 
-| Target | Covers |
+The umbrella `valuations` target keeps:
+
+- Cross-family tests (multi-family pricing, risk, cashflow, and payment-boundary suites)
+- Registry, wire-key, schema, golden, and serialization contracts
+- Framework-behaviour tests (`core_framework`, which exercises `valuations-core` over real instruments)
+- Tests that require `finstack-quant-calibration` or JSON/envelope loading (`InstrumentJson`, `json_loader`, `json_examples`, `pricer::json`, `schema`)
+
+## Modules in `tests/main.rs`
+
+Multi-file module trees:
+
+| Module | Covers |
 |--------|--------|
-| `instruments` | Per-instrument construction, cashflows, pricing, metrics, validation across 48 instrument directories, plus registry/serde/fixture contract tests. See [`instruments/README.md`](instruments/README.md). |
-| `calibration` | Plan-driven calibration: bootstrap, repricing, bump invariants, hazard / inflation / swaption-vol / SVI / base-correlation steps, parametric (Nelson-Siegel) curves, failure modes and envelope diagnostics, explainability, validation, Bloomberg accuracy, the `examples/market_bootstrap` reference envelopes, and standalone term-structure property tests. |
-| `metrics` | Greeks and sensitivities: analytical-vs-FD convergence, determinism, sign conventions, mathematical relationships, invariants (proptest), edge cases, vanna-volga, historical VaR quantiles. |
-| `market` | `MarketQuote` serde, quote schema helpers, bump logic, and instrument construction from rate and credit quotes. |
+| `instruments` | Product tests (`tests/instruments.rs`), wire-key contracts, dependency completeness, and registry/serde/fixture contract tests. See [`instruments/README.md`](instruments/README.md). |
+| `core_framework` | Framework behaviour (`tests/core.rs`): generic pricer, registry, enrichment, breakeven, DV01, FD Greeks, theta, VaR/HVaR, cross-factor, and cashflow export over built-in instruments. |
+| `metrics` | Greeks and sensitivities (`tests/metrics.rs`): analytical-vs-FD convergence, determinism, sign conventions, mathematical relationships, invariants (proptest), edge cases, vanna-volga, horizon fixings. |
 | `cashflows` | `CashflowProvider` contract compliance and the instrument-to-`finstack_quant_cashflows` bridge. |
-| `integration` | End-to-end workflows (100-bond multi-currency portfolio, FX settlement), metrics strict mode, JSON round-trips, schema parity, TypeScript export. |
+| `integration` | End-to-end workflows, metrics strict mode, JSON round-trips, schema parity, TypeScript export. |
 | `golden` | External-reference parity against Bloomberg, QuantLib, and closed-form values. See [`golden/README.md`](golden/README.md). |
-| `sanity_invariants` | Mostly internal consistency — par-rate self-consistency, pay/receive symmetry, DV01 magnitude bands, cross-implementation parity. One exception: `test_quantlib_external_parity.rs` reads the `data/quantlib_parity/` fixtures and compares bond, IRS, and FX-forward values against QuantLib. |
+| `sanity_invariants` | Internal consistency checks (par-rate self-consistency, pay/receive symmetry, DV01 magnitude bands, cross-implementation parity) and `test_quantlib_external_parity.rs` against `data/quantlib_parity/`. |
 
-Single-file targets:
+Single-file modules:
 
-| Target | Covers |
+| Module | Covers |
 |--------|--------|
 | `canonical_contracts` | Canonical byte encoding, content hashes, and key-insertion-order invariance for the instrument and calibration envelopes |
 | `cashflow_export_schema` | JSON Schema coverage of `InstrumentCashflowEnvelope` and its row fields |
 | `cross_factor_metrics_tests` | Cross-factor gamma against manual four-corner repricing |
 | `default_attribute_consistency` | Static source audit over every instrument `types.rs`: builder defaults carry a matching `#[serde(default)]`, and no type stores the legacy full-override bag |
+| `field_units` | Field-unit tables (`results::*_field_units`) cover every field of each family result type in struct order |
+| `metric_request_contract` | Requested metrics on JSON pricing entry points either appear in `ValuationResult::measures` or return an error |
+| `payment_boundaries` | Period-cash boundary behaviour across payment dates |
+| `performance_context_bump` | Context-bump capture and direct-stencil contract (`tests/performance/context_bump.rs`) |
 | `phase2_strictness` | Persisted calibration steps reject unknown flattened fields |
-| `portfolio_loss` | Copula-based portfolio credit-loss simulation: determinism, VaR/ES estimator, overflow rejection |
+| `production_*` | Production quant-audit regressions (`production_audit`, `production_barrier_ndf_audit`, `production_inflation_audit`, `production_risk_audit`, `production_simm_sensitivity_audit`, `production_simplicity_regressions`, `production_structured_audit`, `production_structured_metrics_audit`, `production_waterfall_audit`) |
+| `registry_snapshot` | Pins the standard pricer and metric registries against `tests/data/registry_snapshot.json` |
 | `return_floor_example` | Readable public-API example: MOIC/XIRR return-floor loan, priced and verified through public APIs only |
-| `sabr_core_parity` | This crate's `SABRModel` vs the canonical Hagan/Obloj expansion in `finstack_quant_core` |
 | `schema_audit` | Every instrument `example()` serializes to valid JSON, round-trips through `InstrumentEnvelope`, and matches the checked-in schema |
 
 ## Directory map
 
 ```
 tests/
-├── <target>.rs             # one cargo integration target each (see above)
+├── main.rs                 # single [[test]] target (`valuations`); wires modules with #[path]
+├── <module>.rs             # top-level modules pulled into main.rs
 │
-├── common/                 # Equity-option builders for the metrics target
+├── common/                 # Equity-option builders for the metrics module
 │   └── builders.rs         # TestOptionBuilder, simple_call_option, simple_put_option
 │
-├── support/                # Instrument builders shared across several targets
-│   ├── rates.rs            # usd_irs_swap (path-included from ../rates/tests/support/)
+├── support/                # Instrument builders shared across modules
+│   ├── mod.rs              # re-exports local helpers plus path-included family/calibration helpers
 │   ├── credit.rs           # CDS builders and calibrated hazard curves (needs calibration)
-│   ├── equity_fx_options.rs
-│   └── calibration.rs      # quote-set and MarketContext splitting helpers (path-included from ../../calibration/tests/support/)
+│   └── equity_fx_options.rs
 │
-├── instruments/            # 48 instrument dirs + contract tests + generated fixtures
-├── calibration/            # incl. term_structures/ property tests
+├── core/                   # framework-behaviour tests (wired by core.rs)
+├── instruments/            # product directories + contract tests + generated fixtures
 ├── metrics/
-├── market/                 # incl. build/{credit,rates}.rs
 ├── cashflows/
+├── performance/
 ├── sanity_invariants/
 ├── integration/            # e2e/, metrics/, schema/, serialization/
 ├── golden/                 # runner + schema + data/ (bloomberg, quantlib, regression)
+├── fixtures/               # JSON regression fixtures for production audits
 │
 └── data/
     ├── canonical/          # instrument + calibration canonical bytes and SHA-256
-    └── quantlib_parity/    # T0/T1 fixtures shared with finstack-quant-attribution
+    ├── quantlib_parity/    # T0/T1 fixtures shared with finstack-quant-attribution
+    └── registry_snapshot.json
 ```
 
 ## Shared helpers
@@ -73,7 +93,7 @@ Market-data builders, fixtures, tolerances, assertions and the parity helpers
 live in the dev-only crate
 [`finstack-quant-valuations-test-support`](../test-support/README.md), which
 every valuations crate dev-depends on. Import them by crate path from any
-target or `#[cfg(test)]` module:
+module or `#[cfg(test)]` block:
 
 ```rust
 use finstack_quant_valuations_test_support::fixtures::{base_date, usd_discount_curve};
@@ -88,15 +108,16 @@ through `ANALYTICAL`, `NUMERICAL`, `CURVE_PRICING`, `RELATIVE` and
 `BUMP_VS_ANALYTICAL` to `STATISTICAL`.
 
 **`support/`** holds the instrument builders that stay with this crate because
-they build instruments or need `finstack-quant-calibration` (`credit.rs`). Each
-target declares the ones it wants explicitly, so the local module name differs
-per target — `crate::instruments::test_support::*` in `instruments`,
-`crate::credit_support::*` and `crate::option_support::*` in `metrics`. Check
-the target's entry-point `.rs` file for the local name.
+they build instruments across families or need `finstack-quant-calibration`
+(`credit.rs`). `support/mod.rs` also path-includes shared helpers owned by
+family crates (for example `../../rates/tests/support/rates.rs`) and
+calibration (`../../../calibration/tests/support/calibration.rs`). Modules pull
+them through `crate::instruments::test_support::*` or re-exports in `metrics.rs`
+(`credit_support`, `option_support`).
 
 ## Tolerance policy
 
-`test-support/src/tolerances.rs` — used by the `metrics` and `core_framework` targets:
+`test-support/src/tolerances.rs` — used by `metrics` and `core_framework`:
 
 | Constant | Value | Use case |
 |----------|-------|----------|
@@ -119,10 +140,10 @@ methodology difference that justifies it.
 
 - No test derives a date from the system clock. Dates come from
   `time::macros::date!`, from `fixtures::base_date()`, or from
-  `test_helpers::dates::TODAY` (both in the test-support crate). The one `SystemTime::now()` call in the tree
-  (`instruments/registry_coverage.rs`) only names a scratch directory.
-- Monte Carlo and copula paths take explicit seeds; `portfolio_loss` asserts
-  that repeated runs are bit-identical.
+  `test_helpers::dates::TODAY` (both in the test-support crate). The one
+  `SystemTime::now()` call in the tree (`instruments/registry_coverage.rs`)
+  only names a scratch directory.
+- Monte Carlo and stochastic paths take explicit seeds for bit-identical repeats.
 - Proptest regressions are committed next to their tests
   (`*.proptest-regressions`) and must not be deleted to make a run pass.
 - No test reaches the network or an external service.
@@ -130,38 +151,32 @@ methodology difference that justifies it.
 ## Slow tests
 
 Long-running cases, including the golden pricing walk, carry
-`#[ignore = "slow: covered by mise run rust-test --slow"]`. Mark
-a test slow when it is a large property run, a multi-scenario loop, a Monte
-Carlo convergence check, a calibration round-trip, or a vendor-parity sweep.
+`#[ignore = "slow: covered by mise run rust-test --slow"]`. Mark a test slow
+when it is a large property run, a multi-scenario loop, a Monte Carlo
+convergence check, a calibration round-trip, or a vendor-parity sweep.
 
 ## Running
 
-Use `cargo nextest`; a bare `cargo test` also runs doc tests, which this project
-does not want in the normal loop.
+Use the `mise` test tasks (which route through `cargo nextest` and skip doc
+tests in the normal loop):
 
 ```bash
-# Whole workspace (what CI runs)
+# Whole valuations integration target
+mise run rust-test-integration -- finstack-quant-valuations valuations
+
+# Filter within the valuations crate (substring match on test path)
+mise run rust-test-filter -- finstack-quant-valuations instruments::bond::
+mise run rust-test-filter -- finstack-quant-valuations metrics::
+mise run rust-test-filter -- finstack-quant-valuations registry_snapshot
+
+# Family crate tests
+mise run rust-test-crate -- finstack-quant-valuations-rates
+
+# Whole workspace (final gate / CI)
 mise run rust-test
-
-# Whole crate
-cargo nextest run -p finstack-quant-valuations
-
-# One target
-cargo nextest run -p finstack-quant-valuations --test valuations instruments
-cargo nextest run -p finstack-quant-valuations --test calibration
-cargo nextest run -p finstack-quant-valuations --test valuations metrics
-
-# A subtree within a target (filter is a substring match on the test name)
-cargo nextest run -p finstack-quant-valuations --test valuations instruments::bond::
-cargo nextest run -p finstack-quant-valuations --test calibration term_structures::
-cargo nextest run -p finstack-quant-valuations --test valuations metrics::metrics::sign_conventions::
 
 # Ignored (slow) tests
 mise run rust-test --slow
-cargo nextest run -p finstack-quant-valuations --test valuations instruments --run-ignored only
-
-# Golden layer, including the ignored walk (see tests/golden/README.md)
-cargo nextest run -p finstack-quant-valuations --test valuations golden --run-ignored all
 ```
 
 Schema and fixture drift is gated separately, because it depends on generated
@@ -169,17 +184,21 @@ artifacts rather than on test code:
 
 ```bash
 mise run gen-check
-mise run gen-check            # schemas, fixtures, and bindings are idempotent
 ```
 
 ## Adding tests
 
+**Single-family product test** — add it to `<family>/tests/` so it runs without
+rebuilding the umbrella crate.
+
 **New instrument** — follow [`ADDING_AN_INSTRUMENT.md`](../ADDING_AN_INSTRUMENT.md)
 (steps 7–9 are the tests, the persistence manifest and the regenerated fixture).
 
-**New calibration / metrics / market / cashflows test** — add the file to the
-directory and the `mod` line to that directory's `mod.rs`. The entry-point `.rs`
-file does not change.
+**New module in an existing umbrella tree (`metrics`, `cashflows`, `core`, `integration`, `sanity_invariants`)** — add the file to the directory and declare it in that directory's `mod.rs` (or `tests/<tree>.rs`).
+
+**New top-level umbrella module** — add the `.rs` file under `tests/` and wire
+it into [`tests/main.rs`](main.rs) with `#[path = "..."] mod ...;` (`autotests`
+is disabled).
 
 **New golden fixture** — add JSON under
 `golden/data/pricing/<golden-type>/<instrument>/`
@@ -187,9 +206,6 @@ with a full `metadata` block (source, source detail, capture and review fields,
 regen command) and a tolerance with a reason for each expected metric. Screenshot
 evidence is mandatory for `bloomberg-screen` and `intex` sources. See
 [`golden/README.md`](golden/README.md).
-
-**New single-file target** — put the `.rs` file directly under `tests/`. Cargo
-picks it up automatically; there is no `[[test]]` entry to add.
 
 ## Test-writing conventions
 
@@ -216,5 +232,4 @@ picks it up automatically; there is no `[[test]]` entry to add.
 New vendor references belong in `golden/`, where the fixture schema forces
 provenance metadata; internal-consistency checks belong in `sanity_invariants/`.
 The pre-existing `sanity_invariants/test_quantlib_external_parity.rs` and the
-four `quantlib_parity.rs` modules under `instruments/` (`cap_floor`,
-`convertible`, `fra`, `swaption`) predate that split.
+`quantlib_parity.rs` modules under instrument directories predate that split.
