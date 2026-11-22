@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 description = "FX instruments of Finstack Quant valuations: spot, forwards, swaps, NDFs, listed futures and FX options (vanilla, barrier, digital, touch, variance, quanto)"
+autobenches = false
 autotests = false
 
 [dependencies]
@@ -24,6 +25,7 @@ schemars = { workspace = true, optional = true }
 finstack-quant-valuations-test-support = { path = "../test-support", version = "0.11.0-dev.202610210600" }
 finstack-quant-test-utils = { path = "../../test-utils", version = "0.11.0-dev.202610210600" }
 time = { workspace = true, features = ["macros"] }
+criterion = { workspace = true }
 
 [features]
 default = ["json-schema"]
@@ -41,3 +43,11 @@ workspace = true
 [[test]]
 name = "fx"
 path = "tests/main.rs"
+
+[[bench]]
+name = "fx_pricing"
+harness = false
+
+[[bench]]
+name = "fx_exotics_pricing"
+harness = false

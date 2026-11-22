@@ -1,11 +1,13 @@
 # Valuations Benchmarks
 
-Criterion benchmarks for valuation pricing, cashflows, and risk. Cross-family
-and calibration-dependent targets are declared in [`Cargo.toml`](../Cargo.toml),
-while single-family targets live in their family crate's `benches/` directory
-and `Cargo.toml` (`rates`, `fixed-income`, `credit`, etc.). With
-`autobenches = false`, adding a source file does not register a benchmark
-target.
+Criterion benchmarks for valuation pricing, cashflows, and risk. Cross-family,
+umbrella-risk, and calibration-dependent targets (12) are declared in
+[`Cargo.toml`](../Cargo.toml), while single-family targets (22) live in their
+owning family crate's `benches/` directory and `Cargo.toml` (`rates`,
+`fixed-income`, `credit`, `equity`, `fx`, `exotics`, `structured-credit`).
+Shared benchmark helpers (`support/{mod,record}.rs`) remain here and are
+path-included by family benches. With `autobenches = false`, adding a source
+file does not register a benchmark target.
 
 ## Run
 
@@ -69,42 +71,42 @@ This table inventories registered targets and their operations; it is not a
 claim that every fixture already passes validation. Model and fixture repairs
 are tracked separately from performance measurements.
 
-| Target | Coverage and model |
-| --- | --- |
-| `bond_pricing` | Bond PV, yield, duration, DV01 and spreads; callable tree/OAS, call windows, and stochastic-hazard LSMC |
-| `bond_rates_credit` | Callable bond PV and OAS through explicit `RatesCredit` dispatch with nonzero rate volatility; joint rates-credit LSMC |
-| `bond_future_bench` | Conversion factor, model price, NPV, instrument value, DV01, bucketed DV01, and metric package |
-| `swap_pricing` | IRS/OIS discounted cashflows, compensated summation stress, DV01, par rate, and standard metrics |
-| `option_pricing` | Black-Scholes equity PV/Greeks, analytical barrier repricing for FD Greeks, and bucketed equity vega |
-| `cms_pricing` | Default Black-76/Hagan CMS cap and swap pricing; an explicit static-replication cap uses smile quadrature |
-| `cds_pricing` | Single-name CDS PV, calibrated parallel/bucketed CS01, and par spread |
-| `cds_option_pricing` | Single-name and index CDS option PV, Greeks, and implied volatility |
-| `cds_tranche_pricing` | Gaussian and Student-t copula tranche pricing, heterogeneous baskets, CS01, correlation delta, jump-to-default, and par spread |
-| `cds_index_pricing` | Single-curve and constituent-curve index PV, par spread, CS01, risky PV01, and metrics |
-| `structured_credit_pricing` | Deterministic pool/waterfall valuation, cashflows, tranche/pool metrics, and pool-size scaling |
-| `swaption_pricing` | Black-76 PV, SABR-implied volatility, Greeks, forward swap rate, and annuity |
-| `fourier_var_pricing` | Taylor-approximation historical VaR for a bond with 250/1,000 scenarios; no Fourier or COS pricing |
-| `cashflow_generation` | Bond/swap cashflows, fixed schedule construction, and compensated summation |
-| `linear_rates` | Deposit, FRA, basis swap, cap/floor PV and Greeks, repo, and interest-rate future |
-| `mc_pricing` | Hull-White Bermudan swaption LSMC and tree pricing, with per-price preparation versus a prepared tree |
-| `mc_exotics_pricing` | Explicit GBM Asian MC, lookback/autocallable/cliquet MC, and continuous/quarterly barriers with GBM, Heston, and PDE |
-| `merton_mc_pricing` | Merton structural-credit MC: path count, tenor, antithetics, PIK, and terminal versus first-passage barriers |
-| `fi_misc_pricing` | Term loans and callable trees, deterministic/MC revolvers, agency MBS/TBA and OAS, fixed-income TRS, CMO waterfalls, and dollar rolls |
-| `private_markets_fund_pricing` | PE waterfall event/complexity scaling, European/American styles, and full pricing |
-| `equity_pricing` | Spot, TRS, futures, variance swaps, volatility-index futures, and Black-76 future options |
-| `convertible_pricing` | Binomial convertible PV, contract features, Greeks, metric packages, parity, and step convergence |
-| `inflation_pricing` | Inflation swaps, cap/floor, inflation-linked bond PV, real yield/duration, and metrics |
-| `commodity_pricing` | Forwards/swaps, Black-76 options/swaptions, arithmetic moment-matching and geometric Asian pricing, and Kirk spread approximation |
-| `bucketed_risk` | Bond/swap parallel and bucketed DV01, CDS parallel and bucketed CS01, and combined metrics |
-| `metrics` | Bond metric packages, requested-metric scaling, and sequential metrics across five bonds |
-| `fx_pricing` | FX spot, forward, swap, NDF, vanilla option PV, and option Greeks |
-| `fx_exotics_pricing` | Analytical barriers/touch/digital/quanto options and variance-swap replication |
-| `composite_pricing` | Fixed-quantity equity composite value and primitive-exposure decomposition over 2/8/32/64 legs |
-| `future_option_pricing` | European Black-76 PV; American future-delivery lattice PV and cash delta at 201/401 steps; raw terms at 401 steps with an untimed 801-step convergence check; American cash-settled closed-form control |
-| `rate_exotics_pricing` | Analytical and quanto range accrual, explicit quanto GBM MC, Hull-White callable range-accrual LSMC, snowball, and TARN |
-| `xccy_pricing` | Cross-currency swap tenor and notional-exchange variants |
-| `fd_greeks` | Delta/gamma/vega/vanna/volga packages for equity and barrier options; Asian Greeks explicitly select `MonteCarloGBM` with 200 paths and 12 monthly fixings |
-| `structured_credit_stochastic` | Deterministic waterfall control and stochastic MC over 100/1,000 paths with antithetics on/off |
+| Target | Crate (`finstack-quant-valuations*`) | Coverage and model |
+| --- | --- | --- |
+| `bond_pricing` | `fixed-income` | Bond PV, yield, duration, DV01 and spreads; callable tree/OAS, call windows, and stochastic-hazard LSMC |
+| `bond_rates_credit` | `fixed-income` | Callable bond PV and OAS through explicit `RatesCredit` dispatch with nonzero rate volatility; joint rates-credit LSMC |
+| `bond_future_bench` | `fixed-income` | Conversion factor, model price, NPV, instrument value, DV01, bucketed DV01, and metric package |
+| `swap_pricing` | `rates` | IRS/OIS discounted cashflows, compensated summation stress, DV01, par rate, and standard metrics |
+| `option_pricing` | umbrella | Black-Scholes equity PV/Greeks, analytical barrier repricing for FD Greeks, and bucketed equity vega |
+| `cms_pricing` | `rates` | Default Black-76/Hagan CMS cap and swap pricing; an explicit static-replication cap uses smile quadrature |
+| `cds_pricing` | umbrella | Single-name CDS PV, calibrated parallel/bucketed CS01, and par spread |
+| `cds_option_pricing` | `credit` | Single-name and index CDS option PV, Greeks, and implied volatility |
+| `cds_tranche_pricing` | umbrella | Gaussian and Student-t copula tranche pricing, heterogeneous baskets, CS01, correlation delta, jump-to-default, and par spread |
+| `cds_index_pricing` | umbrella | Single-curve and constituent-curve index PV, par spread, CS01, risky PV01, and metrics |
+| `structured_credit_pricing` | `structured-credit` | Deterministic pool/waterfall valuation, cashflows, tranche/pool metrics, and pool-size scaling |
+| `swaption_pricing` | `rates` | Black-76 PV, SABR-implied volatility, Greeks, forward swap rate, and annuity |
+| `fourier_var_pricing` | umbrella | Taylor-approximation historical VaR for a bond with 250/1,000 scenarios; no Fourier or COS pricing |
+| `cashflow_generation` | umbrella | Bond/swap cashflows, fixed schedule construction, and compensated summation |
+| `linear_rates` | `rates` | Deposit, FRA, basis swap, cap/floor PV and Greeks, repo, and interest-rate future |
+| `mc_pricing` | `rates` | Hull-White Bermudan swaption LSMC and tree pricing, with per-price preparation versus a prepared tree |
+| `mc_exotics_pricing` | umbrella | Explicit GBM Asian MC, lookback/autocallable/cliquet MC, and continuous/quarterly barriers with GBM, Heston, and PDE |
+| `merton_mc_pricing` | `fixed-income` | Merton structural-credit MC: path count, tenor, antithetics, PIK, and terminal versus first-passage barriers |
+| `fi_misc_pricing` | umbrella | Term loans and callable trees, deterministic/MC revolvers, agency MBS/TBA and OAS, fixed-income TRS, CMO waterfalls, and dollar rolls |
+| `private_markets_fund_pricing` | `equity` | PE waterfall event/complexity scaling, European/American styles, and full pricing |
+| `equity_pricing` | `equity` | Spot, TRS, futures, variance swaps, volatility-index futures, and Black-76 future options |
+| `convertible_pricing` | `fixed-income` | Binomial convertible PV, contract features, Greeks, metric packages, parity, and step convergence |
+| `inflation_pricing` | umbrella | Inflation swaps, cap/floor, inflation-linked bond PV, real yield/duration, and metrics |
+| `commodity_pricing` | `exotics` | Forwards/swaps, Black-76 options/swaptions, arithmetic moment-matching and geometric Asian pricing, and Kirk spread approximation |
+| `bucketed_risk` | umbrella | Bond/swap parallel and bucketed DV01, CDS parallel and bucketed CS01, and combined metrics |
+| `metrics` | `fixed-income` | Bond metric packages, requested-metric scaling, and sequential metrics across five bonds |
+| `fx_pricing` | `fx` | FX spot, forward, swap, NDF, vanilla option PV, and option Greeks |
+| `fx_exotics_pricing` | `fx` | Analytical barriers/touch/digital/quanto options and variance-swap replication |
+| `composite_pricing` | umbrella | Fixed-quantity equity composite value and primitive-exposure decomposition over 2/8/32/64 legs |
+| `future_option_pricing` | `rates` | European Black-76 PV; American future-delivery lattice PV and cash delta at 201/401 steps; raw terms at 401 steps with an untimed 801-step convergence check; American cash-settled closed-form control |
+| `rate_exotics_pricing` | `exotics` | Analytical and quanto range accrual, explicit quanto GBM MC, Hull-White callable range-accrual LSMC, snowball, and TARN |
+| `xccy_pricing` | `rates` | Cross-currency swap tenor and notional-exchange variants |
+| `fd_greeks` | umbrella | Delta/gamma/vega/vanna/volga packages for equity and barrier options; Asian Greeks explicitly select `MonteCarloGBM` with 200 paths and 12 monthly fixings |
+| `structured_credit_stochastic` | `structured-credit` | Deterministic waterfall control and stochastic MC over 100/1,000 paths with antithetics on/off |
 
 The table describes the current source configuration, not a runtime validation
 result. Smoke-check each case before saving a successful-pricing baseline and

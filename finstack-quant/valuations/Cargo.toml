@@ -90,10 +90,6 @@ name = "cds_index_pricing"
 harness = false
 
 [[bench]]
-name = "structured_credit_pricing"
-harness = false
-
-[[bench]]
 name = "fourier_var_pricing"
 harness = false
 
@@ -110,19 +106,7 @@ name = "fi_misc_pricing"
 harness = false
 
 [[bench]]
-name = "private_markets_fund_pricing"
-harness = false
-
-[[bench]]
-name = "equity_pricing"
-harness = false
-
-[[bench]]
 name = "inflation_pricing"
-harness = false
-
-[[bench]]
-name = "commodity_pricing"
 harness = false
 
 [[bench]]
@@ -130,27 +114,11 @@ name = "bucketed_risk"
 harness = false
 
 [[bench]]
-name = "fx_pricing"
-harness = false
-
-[[bench]]
-name = "fx_exotics_pricing"
-harness = false
-
-[[bench]]
 name = "composite_pricing"
 harness = false
 
 [[bench]]
-name = "rate_exotics_pricing"
-harness = false
-
-[[bench]]
 name = "fd_greeks"
-harness = false
-
-[[bench]]
-name = "structured_credit_stochastic"
 harness = false
 
 [[bin]]

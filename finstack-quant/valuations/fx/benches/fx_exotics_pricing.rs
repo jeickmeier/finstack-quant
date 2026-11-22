@@ -27,18 +27,17 @@ use finstack_quant_core::types::BarrierType;
 use finstack_quant_core::types::{BarrierDirection, PayoutTiming};
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_models::types::OptionType;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::Monitoring;
-use finstack_quant_valuations::instruments::fx::fx_barrier_option::FxBarrierOption;
-use finstack_quant_valuations::instruments::fx::fx_digital_option::{
-    DigitalPayoutType, FxDigitalOption,
-};
-use finstack_quant_valuations::instruments::fx::fx_touch_option::{FxTouchOption, TouchType};
-use finstack_quant_valuations::instruments::fx::fx_variance_swap::FxVarianceSwap;
-use finstack_quant_valuations::instruments::fx::quanto_option::QuantoOption;
-use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::pricer::ModelKey;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::Monitoring;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::pricer::ModelKey;
+use finstack_quant_valuations_fx::fx_barrier_option::FxBarrierOption;
+use finstack_quant_valuations_fx::fx_digital_option::{DigitalPayoutType, FxDigitalOption};
+use finstack_quant_valuations_fx::fx_touch_option::{FxTouchOption, TouchType};
+use finstack_quant_valuations_fx::fx_variance_swap::FxVarianceSwap;
+use finstack_quant_valuations_fx::quanto_option::QuantoOption;
 
+#[path = "../../benches/support/mod.rs"]
 mod support;
 use std::hint::black_box;
 use std::sync::Arc;
@@ -281,7 +280,7 @@ fn make_digital(as_of: Date, tenor_years: i32, payout_type: DigitalPayoutType) -
 }
 
 fn make_variance_swap(as_of: Date, tenor_years: i32) -> FxVarianceSwap {
-    use finstack_quant_valuations::instruments::PayReceive;
+    use finstack_quant_valuations_core::instruments::PayReceive;
     let maturity =
         Date::from_calendar_date(as_of.year() + tenor_years, as_of.month(), as_of.day()).unwrap();
     FxVarianceSwap::builder()

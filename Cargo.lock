@@ -1122,6 +1122,7 @@ dependencies = [
 name = "finstack-quant-valuations-equity"
 version = "0.11.0"
 dependencies = [
+ "criterion",
  "finstack-quant-cashflows",
  "finstack-quant-core",
  "finstack-quant-margin",
@@ -1144,6 +1145,7 @@ dependencies = [
 name = "finstack-quant-valuations-exotics"
 version = "0.11.0"
 dependencies = [
+ "criterion",
  "finstack-quant-cashflows",
  "finstack-quant-core",
  "finstack-quant-models",
@@ -1188,6 +1190,7 @@ dependencies = [
 name = "finstack-quant-valuations-fx"
 version = "0.11.0"
 dependencies = [
+ "criterion",
  "finstack-quant-cashflows",
  "finstack-quant-core",
  "finstack-quant-models",
@@ -1236,6 +1239,7 @@ dependencies = [
 name = "finstack-quant-valuations-structured-credit"
 version = "0.11.0"
 dependencies = [
+ "criterion",
  "finstack-quant-cashflows",
  "finstack-quant-core",
  "finstack-quant-models",

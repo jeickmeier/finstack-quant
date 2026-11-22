@@ -26,26 +26,27 @@ use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::engine::PathCaptureMode;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
-use finstack_quant_valuations::instruments::exotics::callable_range_accrual::CallableRangeAccrual;
-use finstack_quant_valuations::instruments::exotics::range_accrual::RangeAccrual;
-use finstack_quant_valuations::instruments::exotics::snowball::Snowball;
-use finstack_quant_valuations::instruments::exotics::tarn::Tarn;
-use finstack_quant_valuations::instruments::pricing::hw1f_params::{
+use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
     Hw1fParamFamily, resolve_hw1f_params,
 };
-use finstack_quant_valuations::instruments::pricing::monte_carlo::merged_path_config;
-use finstack_quant_valuations::instruments::pricing_overrides::{
+use finstack_quant_valuations_core::instruments::pricing::monte_carlo::merged_path_config;
+use finstack_quant_valuations_core::instruments::pricing_overrides::{
     InstrumentPricingOverrides, ModelConfig,
 };
-use finstack_quant_valuations::instruments::{Instrument, PricingOptions, QuantoSpec};
-use finstack_quant_valuations::pricer::STANDARD;
-use finstack_quant_valuations::pricer::{InstrumentType, ModelKey, PricerKey};
-use finstack_quant_valuations::results::ValuationResult;
+use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions, QuantoSpec};
+use finstack_quant_valuations_core::pricer::{InstrumentType, ModelKey, PricerKey};
+use finstack_quant_valuations_core::results::ValuationResult;
+use finstack_quant_valuations_exotics::EXOTICS;
+use finstack_quant_valuations_exotics::exotics::callable_range_accrual::CallableRangeAccrual;
+use finstack_quant_valuations_exotics::exotics::range_accrual::RangeAccrual;
+use finstack_quant_valuations_exotics::exotics::snowball::Snowball;
+use finstack_quant_valuations_exotics::exotics::tarn::Tarn;
 use std::hint::black_box;
 use time::Month;
 
-#[path = "support/record.rs"]
+#[path = "../../benches/support/record.rs"]
 mod record;
+#[path = "../../benches/support/mod.rs"]
 mod support;
 
 const MC_PATHS: u64 = 2_500;
@@ -425,7 +426,7 @@ fn bench_quanto_range_accrual(c: &mut Criterion) {
     group.bench_function("gbm_2500_paths_12_observations", |b| {
         let as_of = date(2024, Month::January, 1);
         let (inst, market) = quanto_range_fixture(as_of);
-        let registry = STANDARD.pricers();
+        let registry = EXOTICS.pricers();
         let key = PricerKey::new(InstrumentType::RangeAccrual, ModelKey::MonteCarloGBM);
         let pricer = registry.get_pricer(key).expect("GBM range accrual pricer");
         assert_eq!(pricer.key(), key);

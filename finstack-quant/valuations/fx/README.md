@@ -137,7 +137,7 @@ another family stay in the umbrella's `../tests/` (`fx_barrier_option/
 theta_observed_state.rs`, `fx_dependency_completeness`, cross-family metrics).
 `fx_digital_option` and `fx_touch_option` are covered by colocated
 `#[cfg(test)]` modules plus the umbrella's registry, serde and dependency
-contract tests. Benches stay in the umbrella.
+contract tests.
 
 ```bash
 # FX crate unit and integration tests
@@ -153,12 +153,12 @@ mise run rust-test-filter -- finstack-quant-valuations fx_dependency_completenes
 mise run rust-test
 ```
 
-Criterion benches in `../../../benches/`: `fx_pricing` (spot, forward, swap,
-NDF, option and metrics) and `fx_exotics_pricing` (barrier, touch, digital,
-variance swap, quanto).
+Criterion benches in `benches/`: `fx_pricing` (spot, forward, swap, NDF, option
+and metrics) and `fx_exotics_pricing` (barrier, touch, digital, variance swap,
+quanto).
 
 ```bash
-mise run rust-bench-crate -- finstack-quant-valuations fx_exotics_pricing
+mise run rust-bench-crate -- finstack-quant-valuations-fx fx_exotics_pricing
 mise run rust-bench
 ```
 

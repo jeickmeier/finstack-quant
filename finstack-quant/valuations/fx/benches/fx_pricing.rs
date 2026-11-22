@@ -15,21 +15,22 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
-use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;
-use finstack_quant_valuations::instruments::fx::fx_swap::FxSwap;
-use finstack_quant_valuations::instruments::fx::ndf::Ndf;
-use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
-use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations::pricer::ModelKey;
+use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_core::pricer::ModelKey;
+use finstack_quant_valuations_fx::fx_forward::FxForward;
+use finstack_quant_valuations_fx::fx_spot::FxSpot;
+use finstack_quant_valuations_fx::fx_swap::FxSwap;
+use finstack_quant_valuations_fx::ndf::Ndf;
 
+#[path = "../../benches/support/mod.rs"]
 mod support;
 use std::hint::black_box;
 use std::sync::Arc;
 use time::Month;
 
 #[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
-#[path = "../fx/tests/support/options.rs"]
+#[path = "../tests/support/options.rs"]
 mod option_support;
 
 fn base_date() -> Date {
@@ -182,9 +183,7 @@ fn bench_fx_forward_pv(c: &mut Criterion) {
             let as_of = base_date();
             let maturity = as_of + time::Duration::days(*days);
             let forward = FxForward::builder()
-                .spot_basis(
-                    finstack_quant_valuations::instruments::fx::fx_forward::FxSpotBasis::Cash,
-                )
+                .spot_basis(finstack_quant_valuations_fx::fx_forward::FxSpotBasis::Cash)
                 .id(InstrumentId::new(format!("EURUSD-FWD-{label}")))
                 .base_currency(Currency::EUR)
                 .quote_currency(Currency::USD)

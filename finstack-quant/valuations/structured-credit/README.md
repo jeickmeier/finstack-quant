@@ -65,6 +65,6 @@ and the stochastic revolver fixtures
 (`fixed-income/tests/support/revolver_draws.rs`) for instrument-level loan
 pools. The JSON round-trip and `price_instrument` tests of the deal and the
 facility stay in the umbrella's `../tests/instruments/{structured_credit,
-asset_backed_facility}/`. Benches (`structured_credit_pricing`,
-`structured_credit_stochastic`, the CMO groups of `fi_misc_pricing`) stay in
-the umbrella.
+asset_backed_facility}/`. Criterion benches in `benches/`:
+`structured_credit_pricing` and `structured_credit_stochastic` (the CMO groups
+of cross-crate `fi_misc_pricing` stay in the umbrella's `../benches/`).

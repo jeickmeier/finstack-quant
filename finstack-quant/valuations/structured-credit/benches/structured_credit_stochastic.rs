@@ -5,6 +5,7 @@
 //! - Deterministic waterfall NPV (`value`) — isolates non-MC overhead
 //! - Stochastic MC NPV across path counts and antithetic on/off
 
+#[path = "../../benches/support/mod.rs"]
 mod support;
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
@@ -14,12 +15,12 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, DealType, PoolAsset, StandardDealParams, StructuredCredit, Tranche, TrancheStructure,
-};
-use finstack_quant_valuations::results::structured_credit::{
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::results::structured_credit::{
     StochasticPricingResult, StructuredCreditPricingMode, TrancheSeniority,
+};
+use finstack_quant_valuations_structured_credit::structured_credit::{
+    AssetPool, DealType, PoolAsset, StandardDealParams, StructuredCredit, Tranche, TrancheStructure,
 };
 use std::hint::black_box;
 use time::Month;

@@ -10,6 +10,7 @@
 //!
 //! Market Standards Review (Week 5)
 
+#[path = "../../benches/support/mod.rs"]
 mod support;
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
@@ -21,14 +22,14 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_core::pricer::ModelKey;
+use finstack_quant_valuations_core::results::ValuationResult;
+use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
+use finstack_quant_valuations_structured_credit::structured_credit::{
     AssetPool, DealType, PoolAsset, StandardDealParams, StructuredCredit, Tranche, TrancheStructure,
 };
-use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations::pricer::ModelKey;
-use finstack_quant_valuations::results::ValuationResult;
-use finstack_quant_valuations::results::structured_credit::TrancheSeniority;
 use std::hint::black_box;
 use time::Month;
 
@@ -264,7 +265,7 @@ fn bench_wal_calculation(c: &mut Criterion) {
                             black_box(&market),
                             black_box(as_of),
                             black_box(&[MetricId::WAL]),
-                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                            finstack_quant_valuations_core::instruments::PricingOptions::default(),
                         )
                         .expect("structured-credit WAL")
                     },
@@ -291,7 +292,7 @@ fn bench_duration_metrics(c: &mut Criterion) {
                     black_box(&market),
                     black_box(as_of),
                     black_box(&metrics),
-                    finstack_quant_valuations::instruments::PricingOptions::default(),
+                    finstack_quant_valuations_core::instruments::PricingOptions::default(),
                 )
                 .expect("structured-credit duration metrics")
             },
@@ -320,7 +321,7 @@ fn bench_cs01(c: &mut Criterion) {
                             black_box(&market),
                             black_box(as_of),
                             black_box(&[MetricId::Cs01]),
-                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                            finstack_quant_valuations_core::instruments::PricingOptions::default(),
                         )
                         .expect("structured-credit CS01")
                     },
@@ -354,7 +355,7 @@ fn bench_pool_metrics(c: &mut Criterion) {
                             black_box(&market),
                             black_box(as_of),
                             black_box(&pool_metrics),
-                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                            finstack_quant_valuations_core::instruments::PricingOptions::default(),
                         )
                         .expect("structured-credit pool metrics")
                     },
@@ -385,7 +386,7 @@ fn bench_warf_calculation(c: &mut Criterion) {
                             black_box(&market),
                             black_box(as_of),
                             black_box(&[MetricId::CloWarf]),
-                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                            finstack_quant_valuations_core::instruments::PricingOptions::default(),
                         )
                         .expect("structured-credit WARF")
                     },
@@ -418,7 +419,7 @@ fn bench_price_metrics(c: &mut Criterion) {
                     black_box(&market),
                     black_box(as_of),
                     black_box(&price_metrics),
-                    finstack_quant_valuations::instruments::PricingOptions::default(),
+                    finstack_quant_valuations_core::instruments::PricingOptions::default(),
                 )
                 .expect("structured-credit price metrics")
             },
@@ -456,7 +457,7 @@ fn bench_full_metrics_suite(c: &mut Criterion) {
                     black_box(&market),
                     black_box(as_of),
                     black_box(&all_metrics),
-                    finstack_quant_valuations::instruments::PricingOptions::default(),
+                    finstack_quant_valuations_core::instruments::PricingOptions::default(),
                 )
                 .expect("structured-credit full metric suite")
             },

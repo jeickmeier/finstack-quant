@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 description = "Equity instruments of Finstack Quant valuations: spot, options, futures, variance swaps, total return swaps, autocallables, cliquets, DCF equity and private-markets funds"
+autobenches = false
 autotests = false
 
 [dependencies]
@@ -29,6 +30,7 @@ schemars = { workspace = true, optional = true }
 finstack-quant-valuations-test-support = { path = "../test-support", version = "0.11.0-dev.202610210600" }
 finstack-quant-test-utils = { path = "../../test-utils", version = "0.11.0-dev.202610210600" }
 time = { workspace = true, features = ["macros"] }
+criterion = { workspace = true }
 
 [features]
 default = ["json-schema"]
@@ -47,3 +49,11 @@ workspace = true
 [[test]]
 name = "equity"
 path = "tests/main.rs"
+
+[[bench]]
+name = "equity_pricing"
+harness = false
+
+[[bench]]
+name = "private_markets_fund_pricing"
+harness = false

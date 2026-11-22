@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 description = "Structured credit of Finstack Quant valuations: ABS, RMBS, CMBS and CLO deals with pool, tranche and waterfall modelling, agency CMOs and asset-backed warehouse facilities"
+autobenches = false
 autotests = false
 
 [dependencies]
@@ -31,6 +32,7 @@ finstack-quant-valuations-test-support = { path = "../test-support", version = "
 time = { workspace = true, features = ["macros"] }
 rust_decimal_macros = { workspace = true }
 rayon = "1.11"
+criterion = { workspace = true }
 
 [features]
 default = ["json-schema"]
@@ -50,3 +52,11 @@ workspace = true
 [[test]]
 name = "structured-credit"
 path = "tests/main.rs"
+
+[[bench]]
+name = "structured_credit_pricing"
+harness = false
+
+[[bench]]
+name = "structured_credit_stochastic"
+harness = false

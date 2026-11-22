@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 description = "Exotic options, structured rate notes and commodity derivatives of Finstack Quant valuations: Asian, barrier and lookback options, range accruals, TARNs and snowballs, commodity forwards, swaps and options"
+autobenches = false
 autotests = false
 
 [dependencies]
@@ -24,6 +25,7 @@ schemars = { workspace = true, optional = true }
 [dev-dependencies]
 finstack-quant-valuations-test-support = { path = "../test-support", version = "0.11.0-dev.202610210600" }
 time = { workspace = true, features = ["macros"] }
+criterion = { workspace = true }
 
 [features]
 default = ["json-schema"]
@@ -41,3 +43,11 @@ workspace = true
 [[test]]
 name = "exotics"
 path = "tests/main.rs"
+
+[[bench]]
+name = "commodity_pricing"
+harness = false
+
+[[bench]]
+name = "rate_exotics_pricing"
+harness = false

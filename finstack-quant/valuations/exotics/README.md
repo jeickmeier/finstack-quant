@@ -134,4 +134,8 @@ test-support crate live in `tests/`, compiled into the single `exotics` target
 and `test_cross_impl_parity`. Tests that round-trip `InstrumentJson`
 (`commodity_spot_option/metrics.rs`), use the composite/basket instruments, or
 reach another family (`production_barrier_ndf_audit.rs`) stay in the umbrella's
-`../tests/`. Benches stay in the umbrella.
+`../tests/`.
+
+Criterion benches in `benches/`: `commodity_pricing` and
+`rate_exotics_pricing`. Cross-family Monte Carlo benches (`mc_exotics_pricing`)
+stay in the umbrella's `../benches/`.

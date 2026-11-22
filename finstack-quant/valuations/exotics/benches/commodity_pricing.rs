@@ -10,8 +10,9 @@
 
 #![allow(clippy::unwrap_used)]
 
-#[path = "support/record.rs"]
+#[path = "../../benches/support/record.rs"]
 mod record;
+#[path = "../../benches/support/mod.rs"]
 mod support;
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
@@ -24,19 +25,19 @@ use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
-use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::Position;
-use finstack_quant_valuations::instruments::commodity::commodity_asian_option::CommodityAsianOption;
-use finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;
-use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOption;
-use finstack_quant_valuations::instruments::commodity::commodity_spread_option::CommoditySpreadOption;
-use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
-use finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;
-use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::instruments::{PayReceive, PricingOptions, SettlementType};
-use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations::pricer::ModelKey;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::Position;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::instruments::{PayReceive, PricingOptions, SettlementType};
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_core::pricer::ModelKey;
+use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
+use finstack_quant_valuations_exotics::commodity::commodity_asian_option::CommodityAsianOption;
+use finstack_quant_valuations_exotics::commodity::commodity_forward::CommodityForward;
+use finstack_quant_valuations_exotics::commodity::commodity_spot_option::CommoditySpotOption;
+use finstack_quant_valuations_exotics::commodity::commodity_spread_option::CommoditySpreadOption;
+use finstack_quant_valuations_exotics::commodity::commodity_swap::CommoditySwap;
+use finstack_quant_valuations_exotics::commodity::commodity_swaption::CommoditySwaption;
 use finstack_quant_valuations_test_support::commodity_curves as commodity_curve_support;
 use finstack_quant_valuations_test_support::volatility as volatility_support;
 use std::hint::black_box;
