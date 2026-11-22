@@ -64,19 +64,7 @@ impl ParsedInstrument {
         instrument_pricing_overrides: Option<&Value>,
     ) -> finstack_quant_core::Result<Self> {
         if let Some(patch) = metric_pricing_overrides {
-            let id = instrument.id().to_owned();
-            let current = instrument
-                .get_metric_pricing_overrides_mut()
-                .ok_or_else(|| {
-                    Error::Validation(format!(
-                        "instrument does not support metric pricing overrides [instrument={id}]"
-                    ))
-                })?;
-            let mut value =
-                serde_json::to_value(&*current).map_err(|e| Error::Validation(e.to_string()))?;
-            merge_metric_patch(&mut value, patch, Some(&id))?;
-            *current =
-                serde_json::from_value(value).map_err(|e| Error::Validation(e.to_string()))?;
+            apply_metric_pricing_overrides(instrument.as_mut(), patch)?;
         }
         if let Some(patch) = instrument_pricing_overrides {
             apply_instrument_pricing_overrides(instrument.as_mut(), patch)?;
@@ -295,11 +283,21 @@ pub fn validate_typed_instrument_json(
 ///
 /// Returns `Error::Validation` when parsing, metric-pricing override merging,
 /// instrument validation, or canonical serialization fails.
+#[tracing::instrument(
+    name = "valuations.json.validate_instrument",
+    level = "debug",
+    skip(json, metric_pricing_overrides),
+    fields(
+        json_bytes = json.len(),
+        has_metric_overrides = metric_pricing_overrides.is_some(),
+    ),
+    err,
+)]
 pub fn validate_instrument_json(
     json: &str,
     metric_pricing_overrides: Option<&str>,
 ) -> finstack_quant_core::Result<String> {
-    let envelope = decode_pricing_envelope(json, metric_pricing_overrides)?;
+    let envelope = decode_envelope_with_metric_overrides(json, metric_pricing_overrides)?;
     envelope.instrument.validate_for_pricing()?;
     serde_json::to_string(&envelope)
         .map_err(|e| Error::Validation(format!("invalid instrument JSON: {e}")))
@@ -324,12 +322,24 @@ pub fn validate_instrument_json(
 ///
 /// Returns `Error::Validation` when either JSON value is malformed, the
 /// override cannot be merged, or the resulting instrument is invalid.
+#[tracing::instrument(
+    name = "valuations.json.parse_boxed_instrument",
+    level = "debug",
+    skip(instrument_json, metric_pricing_overrides, instrument_pricing_overrides),
+    fields(
+        json_bytes = instrument_json.len(),
+        has_metric_overrides = metric_pricing_overrides.is_some(),
+        has_instrument_overrides = instrument_pricing_overrides.is_some(),
+    ),
+    err,
+)]
 pub fn parse_boxed_instrument_from_json(
     instrument_json: &str,
     metric_pricing_overrides: Option<&str>,
     instrument_pricing_overrides: Option<&Value>,
 ) -> finstack_quant_core::Result<ParsedInstrument> {
-    let envelope = decode_pricing_envelope(instrument_json, metric_pricing_overrides)?;
+    let envelope =
+        decode_envelope_with_metric_overrides(instrument_json, metric_pricing_overrides)?;
     ParsedInstrument::from_instrument_json(envelope.instrument, None, instrument_pricing_overrides)
 }
 
@@ -351,6 +361,13 @@ pub fn parse_boxed_instrument_from_json(
 ///
 /// Returns `Error::Validation` when `json` exceeds the size cap, is not an
 /// array of well-formed envelopes, or any instrument fails domain validation.
+#[tracing::instrument(
+    name = "valuations.json.parse_boxed_instruments",
+    level = "debug",
+    skip(json),
+    fields(json_bytes = json.len()),
+    err,
+)]
 pub fn parse_boxed_instruments_from_json(
     json: &str,
 ) -> finstack_quant_core::Result<Vec<Box<dyn Instrument>>> {
@@ -539,6 +556,19 @@ impl PriceExtras {
 /// Returns an error for an invalid date, model or metric identifier; missing
 /// required market data; or a failure in the selected pricer
 /// or metric calculation.
+#[tracing::instrument(
+    name = "valuations.json.price_instrument",
+    level = "debug",
+    skip(instrument, market, metrics, market_history, pricing_options),
+    fields(
+        inst_id = %instrument.as_instrument().id(),
+        model = %model,
+        as_of = %as_of,
+        metric_count = metrics.len(),
+        has_market_history = market_history.is_some(),
+    ),
+    err,
+)]
 pub fn price_instrument(
     instrument: &ParsedInstrument,
     market: &MarketContext,
@@ -698,52 +728,114 @@ fn with_id_suffix(message: String, id: Option<&str>) -> String {
     }
 }
 
-fn merge_metric_patch(
-    current: &mut Value,
-    overrides_json: &str,
+/// Validate a JSON override patch as an object matching `T`'s schema without
+/// materializing absent defaults into the patch (key presence determines which
+/// stored fields are replaced).
+fn validate_override_patch<T: serde::de::DeserializeOwned>(
+    patch: &Value,
+    field_name: &str,
+    label: &str,
     id: Option<&str>,
 ) -> finstack_quant_core::Result<()> {
-    let pricing_patch: Value = serde_json::from_str(overrides_json).map_err(|e| {
-        Error::Validation(with_id_suffix(
-            format!("invalid metric_pricing_overrides JSON: {e}"),
+    if !patch.is_object() {
+        return Err(Error::Validation(with_id_suffix(
+            format!("{label} must be an object"),
             id,
-        ))
-    })?;
-    // Validate the canonical shape without materializing absent defaults into
-    // the patch: field presence determines which stored overrides are replaced.
-    let _: MetricPricingOverrides = serde_json::from_value(pricing_patch.clone()).map_err(|e| {
-        Error::Validation(with_id_suffix(
-            format!("invalid metric_pricing_overrides JSON: {e}"),
-            id,
-        ))
-    })?;
-    let patch = pricing_patch.as_object().cloned().ok_or_else(|| {
-        Error::Validation(with_id_suffix(
-            "metric pricing overrides must be an object".into(),
-            id,
-        ))
-    })?;
-    let metric_pricing_overrides = current.as_object_mut().ok_or_else(|| {
-        Error::Validation(with_id_suffix(
-            "instrument.spec.metric_pricing_overrides must be an object".into(),
-            id,
-        ))
-    })?;
-    for (key, value) in patch {
-        if key == "bump_config"
-            && let (Some(existing), Some(provided)) = (
-                metric_pricing_overrides
-                    .get_mut(&key)
-                    .and_then(Value::as_object_mut),
-                value.as_object(),
-            )
-        {
-            existing.extend(provided.clone());
-            continue;
-        }
-        metric_pricing_overrides.insert(key, value);
+        )));
     }
+    let _: T = serde_json::from_value(patch.clone()).map_err(|error| {
+        Error::Validation(with_id_suffix(
+            format!("invalid {field_name} JSON: {error}"),
+            id,
+        ))
+    })?;
     Ok(())
+}
+
+fn parse_metric_patch(
+    overrides_json: &str,
+    id: Option<&str>,
+) -> finstack_quant_core::Result<Value> {
+    let patch: Value = serde_json::from_str(overrides_json).map_err(|error| {
+        Error::Validation(with_id_suffix(
+            format!("invalid metric_pricing_overrides JSON: {error}"),
+            id,
+        ))
+    })?;
+    validate_override_patch::<MetricPricingOverrides>(
+        &patch,
+        "metric_pricing_overrides",
+        "metric pricing overrides",
+        id,
+    )?;
+    Ok(patch)
+}
+
+fn apply_validated_override_patch<T>(
+    current: &mut T,
+    patch: &Value,
+    field_name: &str,
+    id: &str,
+    merge: fn(&mut Value, &Value),
+) -> finstack_quant_core::Result<()>
+where
+    T: serde::Serialize + serde::de::DeserializeOwned,
+{
+    let error = |error: serde_json::Error| {
+        Error::Validation(with_id_suffix(
+            format!("invalid {field_name} JSON: {error}"),
+            Some(id),
+        ))
+    };
+    let mut value = serde_json::to_value(&*current).map_err(error)?;
+    merge(&mut value, patch);
+    *current = serde_json::from_value(value).map_err(error)?;
+    Ok(())
+}
+
+fn apply_metric_pricing_overrides(
+    instrument: &mut dyn Instrument,
+    overrides_json: &str,
+) -> finstack_quant_core::Result<()> {
+    let id = instrument.id().to_owned();
+    let current = instrument
+        .get_metric_pricing_overrides_mut()
+        .ok_or_else(|| {
+            Error::Validation(with_id_suffix(
+                "instrument does not support metric pricing overrides".into(),
+                Some(&id),
+            ))
+        })?;
+    let patch = parse_metric_patch(overrides_json, Some(&id))?;
+    apply_validated_override_patch(
+        current,
+        &patch,
+        "metric_pricing_overrides",
+        &id,
+        merge_metric_override_values,
+    )
+}
+
+fn apply_metric_pricing_overrides_value(
+    instrument: &mut dyn Instrument,
+    patch: &Value,
+) -> finstack_quant_core::Result<()> {
+    let id = instrument.id().to_owned();
+    let current = instrument
+        .get_metric_pricing_overrides_mut()
+        .ok_or_else(|| {
+            Error::Validation(with_id_suffix(
+                "instrument does not support metric pricing overrides".into(),
+                Some(&id),
+            ))
+        })?;
+    apply_validated_override_patch(
+        current,
+        patch,
+        "metric_pricing_overrides",
+        &id,
+        merge_metric_override_values,
+    )
 }
 
 fn apply_instrument_pricing_overrides(
@@ -759,23 +851,37 @@ fn apply_instrument_pricing_overrides(
                 Some(&id),
             ))
         })?;
-    let error = |error: serde_json::Error| {
-        Error::Validation(with_id_suffix(
-            format!("invalid instrument_pricing_overrides JSON: {error}"),
-            Some(&id),
-        ))
+    validate_override_patch::<InstrumentPricingOverrides>(
+        patch,
+        "instrument_pricing_overrides",
+        "instrument pricing overrides",
+        Some(&id),
+    )?;
+    apply_validated_override_patch(
+        current,
+        patch,
+        "instrument_pricing_overrides",
+        &id,
+        merge_override_values,
+    )
+}
+
+fn merge_metric_override_values(current: &mut Value, patch: &Value) {
+    let (Some(current), Some(patch)) = (current.as_object_mut(), patch.as_object()) else {
+        *current = patch.clone();
+        return;
     };
-    if !patch.is_object() {
-        return Err(Error::Validation(with_id_suffix(
-            "instrument pricing overrides must be an object".into(),
-            Some(&id),
-        )));
+    for (key, value) in patch {
+        if key == "bump_config"
+            && value.is_object()
+            && let Some(existing) = current.get_mut(key)
+            && existing.is_object()
+        {
+            merge_override_values(existing, value);
+        } else {
+            current.insert(key.clone(), value.clone());
+        }
     }
-    let _: InstrumentPricingOverrides = serde_json::from_value(patch.clone()).map_err(error)?;
-    let mut value = serde_json::to_value(&*current).map_err(error)?;
-    merge_override_values(&mut value, patch);
-    *current = serde_json::from_value(value).map_err(error)?;
-    Ok(())
 }
 
 fn merge_override_values(current: &mut Value, patch: &Value) {
@@ -788,59 +894,38 @@ fn merge_override_values(current: &mut Value, patch: &Value) {
     }
 }
 
-fn pricing_document(
-    instrument_json: &str,
-    metric_pricing_overrides: Option<&str>,
-) -> finstack_quant_core::Result<Value> {
-    let mut document = parse_json_value(
-        instrument_json.as_bytes(),
-        &LoadLimits::default().with_max_bytes(MAX_JSON_BYTES),
-    )
-    .map_err(instrument_load_error)?;
-    if let Some(patch) = metric_pricing_overrides {
-        let instrument_id = document
-            .get("instrument")
-            .and_then(|v| v.get("spec"))
-            .and_then(|v| v.get("id"))
-            .and_then(Value::as_str)
-            .map(ToString::to_string);
-        let id = instrument_id.as_deref();
-        let spec = document
-            .get_mut("instrument")
-            .and_then(|instrument| {
-                let embedded_deal =
-                    instrument.get("type").and_then(Value::as_str) == Some("structured_credit_tranche");
-                let spec = instrument.get_mut("spec")?;
-                if embedded_deal {
-                    spec.get_mut("deal")
-                } else {
-                    Some(spec)
-                }
-            })
-            .and_then(Value::as_object_mut)
-            .ok_or_else(|| {
-                Error::Validation(with_id_suffix(
-                    "instrument envelope must contain an object instrument.spec (and an object deal for a structured credit tranche)".into(),
-                    id,
-                ))
-            })?;
-        let current = spec
-            .entry("metric_pricing_overrides".to_string())
-            .or_insert_with(|| Value::Object(Default::default()));
-        merge_metric_patch(current, patch, id)?;
-    }
-    Ok(document)
-}
-
-fn decode_pricing_envelope(
+fn decode_envelope_with_metric_overrides(
     json: &str,
     metric_pricing_overrides: Option<&str>,
 ) -> finstack_quant_core::Result<InstrumentEnvelope> {
-    InstrumentEnvelope::decode_value(
-        pricing_document(json, metric_pricing_overrides)?,
-        &LoadLimits::default().with_max_bytes(MAX_JSON_BYTES),
-    )
-    .map_err(instrument_load_error)
+    let limits = LoadLimits::default().with_max_bytes(MAX_JSON_BYTES);
+    let Some(patch_str) = metric_pricing_overrides else {
+        return InstrumentEnvelope::decode_bytes(json.as_bytes(), &limits)
+            .map_err(instrument_load_error);
+    };
+
+    let mut document = parse_json_value(json.as_bytes(), &limits).map_err(instrument_load_error)?;
+    let id = document
+        .pointer("/instrument/spec/id")
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned);
+    let patch = parse_metric_patch(patch_str, id.as_deref())?;
+
+    // If the wire envelope carries an un-deserializable stored
+    // `metric_pricing_overrides` object that the caller's patch repairs before
+    // validation, patch that object in place so decoding can proceed to the
+    // canonical typed override path below.
+    if let Some(existing) = document.pointer_mut("/instrument/spec/metric_pricing_overrides")
+        && existing.is_object()
+        && serde_json::from_value::<MetricPricingOverrides>(existing.clone()).is_err()
+    {
+        merge_metric_override_values(existing, &patch);
+    }
+
+    let mut envelope =
+        InstrumentEnvelope::decode_value(document, &limits).map_err(instrument_load_error)?;
+    apply_metric_pricing_overrides_value(envelope.instrument.as_dyn_instrument_mut(), &patch)?;
+    Ok(envelope)
 }
 
 #[cfg(test)]
@@ -851,11 +936,7 @@ mod tests {
         instrument_json: &str,
         metric_pricing_overrides: Option<&str>,
     ) -> finstack_quant_core::Result<String> {
-        serde_json::to_string(&pricing_document(
-            instrument_json,
-            metric_pricing_overrides,
-        )?)
-        .map_err(|e| Error::Validation(e.to_string()))
+        validate_instrument_json(instrument_json, metric_pricing_overrides)
     }
     use crate::instruments::commodity::commodity_spot_option::CommoditySpotOption;
     use crate::instruments::credit_derivatives::cds_option::CdsOption;
@@ -1241,6 +1322,61 @@ mod tests {
             parsed.metric_pricing_overrides.theta_period,
             Some(finstack_quant_core::dates::Tenor::monthly())
         );
+    }
+
+    #[test]
+    fn structured_credit_tranche_metric_overrides_merge_via_typed_path() {
+        let mut tranche =
+            crate::instruments::fixed_income::structured_credit::StructuredCreditTranche::example()
+                .expect("structured credit tranche example");
+        tranche
+            .get_metric_pricing_overrides_mut()
+            .expect("tranche metric overrides")
+            .bump_config
+            .vol_bump_decimal = Some(0.02);
+        let json = envelope_json(InstrumentJson::StructuredCreditTranche(Box::new(tranche)));
+        let patch =
+            r#"{"theta_period":{"count":1,"unit":"weeks"},"bump_config":{"rate_bump_bp":3.0}}"#;
+
+        let validated = validate_instrument_json(&json, Some(patch)).expect("validate tranche");
+        let envelope: InstrumentEnvelope =
+            serde_json::from_str(&validated).expect("parse validated tranche");
+        let InstrumentJson::StructuredCreditTranche(parsed_tranche) = envelope.instrument else {
+            panic!("expected structured credit tranche");
+        };
+        assert_eq!(
+            parsed_tranche.deal().metric_pricing_overrides.theta_period,
+            Some(finstack_quant_core::dates::Tenor::weekly())
+        );
+        assert_eq!(
+            parsed_tranche
+                .deal()
+                .metric_pricing_overrides
+                .bump_config
+                .rate_bump_bp,
+            Some(3.0)
+        );
+        assert_eq!(
+            parsed_tranche
+                .deal()
+                .metric_pricing_overrides
+                .bump_config
+                .vol_bump_decimal,
+            Some(0.02)
+        );
+
+        let boxed =
+            parse_boxed_instrument_from_json(&json, Some(patch), None).expect("parse boxed");
+        let controls = boxed
+            .as_instrument()
+            .get_metric_pricing_overrides()
+            .expect("tranche controls");
+        assert_eq!(
+            controls.theta_period,
+            Some(finstack_quant_core::dates::Tenor::weekly())
+        );
+        assert_eq!(controls.bump_config.rate_bump_bp, Some(3.0));
+        assert_eq!(controls.bump_config.vol_bump_decimal, Some(0.02));
     }
 
     #[test]

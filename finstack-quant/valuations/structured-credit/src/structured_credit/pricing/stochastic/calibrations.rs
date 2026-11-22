@@ -16,7 +16,9 @@
 //! - PSA Standard Prepayment Model assumptions `docs/REFERENCES.md#richard-roll-1989`
 //! - Basel IRB correlation formulas `docs/REFERENCES.md#basel-ii-2006`
 
-use crate::structured_credit::assumptions::{embedded_registry_or_panic, required_assumption};
+use crate::structured_credit::assumptions::{
+    CLO_STANDARD_CALIBRATION, CMBS_STANDARD_CALIBRATION, RMBS_STANDARD_CALIBRATION,
+};
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_core::Result;
 use finstack_quant_models::credit::pool::StochasticPrepaySpec;
@@ -51,7 +53,7 @@ pub(crate) struct RmbsCalibration {
 /// - Moderate prepayment (6% CPR base)
 /// - Standard PSA-style seasoning
 pub(crate) fn rmbs_standard() -> RmbsCalibration {
-    required_assumption(embedded_registry_or_panic().rmbs_stochastic_calibration("rmbs_standard"))
+    RMBS_STANDARD_CALIBRATION
 }
 
 /// CLO standard calibration parameters.
@@ -78,7 +80,7 @@ pub(crate) struct CloCalibration {
 /// - Higher correlation (20-25%) for corporate exposures
 /// - Higher prepayment (20% CPR, the CLO registry base case) due to refinancing
 pub(crate) fn clo_standard() -> CloCalibration {
-    required_assumption(embedded_registry_or_panic().clo_stochastic_calibration("clo_standard"))
+    CLO_STANDARD_CALIBRATION
 }
 
 /// CMBS standard calibration parameters.
@@ -105,7 +107,7 @@ pub(crate) struct CmbsCalibration {
 /// - Moderate correlation (15%)
 /// - Low prepayment due to lockouts/defeasance (3% CPR)
 pub(crate) fn cmbs_standard() -> CmbsCalibration {
-    required_assumption(embedded_registry_or_panic().cmbs_stochastic_calibration("cmbs_standard"))
+    CMBS_STANDARD_CALIBRATION
 }
 
 pub(crate) fn rmbs_default_spec() -> StochasticDefaultSpec {

@@ -132,15 +132,9 @@ impl InstrumentCashflowEnvelope {
     pub fn calendar_year_ladder_by_currency(
         &self,
     ) -> finstack_quant_core::Result<Vec<CurrencyLadder>> {
-        let mut groups: Vec<(Currency, Vec<&CashflowRow>)> = Vec::new();
+        let mut groups: indexmap::IndexMap<Currency, Vec<&CashflowRow>> = indexmap::IndexMap::new();
         for flow in &self.flows {
-            match groups
-                .iter_mut()
-                .find(|(currency, _)| *currency == flow.currency)
-            {
-                Some((_, rows)) => rows.push(flow),
-                None => groups.push((flow.currency, vec![flow])),
-            }
+            groups.entry(flow.currency).or_default().push(flow);
         }
         groups
             .into_iter()
@@ -585,7 +579,7 @@ fn envelope_for_priced(
         as_of_date,
     )?;
 
-    let accrual_notionals = accrual_start_balances(&schedule);
+    let accrual_notionals = accrual_start_balances(&schedule)?;
 
     for (row_index, flow) in schedule.get_flows().iter().enumerate() {
         let ccy = flow.get_amount().currency();
@@ -781,12 +775,28 @@ fn envelope_for_priced(
 
 /// Outstanding principal at each flow's accrual start, row-aligned.
 ///
-/// Returns `None` when the schedule cannot replay balances (no issue-date
-/// metadata); rows without an accrual period map to `None`.
+/// Returns `Ok(None)` when the schedule cannot replay a single-currency
+/// balance path (no issue-date metadata, multi-currency flows, or no accrual
+/// periods); rows without an accrual period map to `None`. Genuine balance
+/// replay errors (such as principal repayments exceeding outstanding balance
+/// or decimal overflow) are propagated.
 fn accrual_start_balances(
     schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
-) -> Option<Vec<Option<f64>>> {
+) -> Result<Option<Vec<Option<f64>>>> {
+    if schedule.get_meta().issue_date.is_none() {
+        return Ok(None);
+    }
     let flows = schedule.get_flows();
+    let notional_currency = schedule.get_notional().initial.currency();
+    // A single scalar balance path is only meaningful when every flow settles
+    // in the schedule's notional currency (multi-currency swaps carry one
+    // principal path per leg).
+    if flows
+        .iter()
+        .any(|flow| flow.get_amount().currency() != notional_currency)
+    {
+        return Ok(None);
+    }
     let mut starts: Vec<Date> = flows
         .iter()
         .filter_map(|flow| {
@@ -795,10 +805,13 @@ fn accrual_start_balances(
                 .map(|accrual| accrual.get_start())
         })
         .collect();
+    if starts.is_empty() {
+        return Ok(None);
+    }
     starts.sort_unstable();
     starts.dedup();
-    let balances = schedule.outstanding_at_dates(&starts).ok()?;
-    Some(
+    let balances = schedule.outstanding_at_dates(&starts)?;
+    Ok(Some(
         flows
             .iter()
             .map(|flow| {
@@ -807,7 +820,7 @@ fn accrual_start_balances(
                 Some(balances[index].amount())
             })
             .collect(),
-    )
+    ))
 }
 
 fn sum_pvs<I>(pvs: I) -> finstack_quant_core::Result<f64>
@@ -925,6 +938,75 @@ mod tests {
             .with_schedule_balances()
             .expect("no issue date is not an error");
         assert!(no_issue_date.flow_balances.is_none());
+    }
+
+    #[test]
+    fn accrual_start_balances_propagates_replay_errors_and_skips_issueless() {
+        use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
+        use finstack_quant_core::cashflow::{CFKind, CashFlowAccrual, CashFlowParams};
+        use finstack_quant_core::dates::{Date, DayCount, DayCountContextState};
+        use finstack_quant_core::money::Money;
+
+        let issue = Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
+        let end = Date::from_calendar_date(2025, time::Month::July, 1).expect("date");
+        let accrual = CashFlowAccrual::new(
+            issue,
+            end,
+            DayCount::Act360,
+            None,
+            DayCountContextState::default(),
+        )
+        .expect("accrual");
+        let coupon = CashFlowParams::new(
+            end,
+            None,
+            Money::from((5_i64, Currency::USD)),
+            CFKind::Fixed,
+            0.5,
+            Some(0.10),
+        )
+        .with_accrual(accrual)
+        .build()
+        .expect("coupon flow");
+
+        // Without issue_date, balance replay is skipped cleanly.
+        let issueless = CashFlowSchedule::from_flows(
+            vec![coupon.clone()],
+            Notional::par(100.0, Currency::USD).expect("notional"),
+            DayCount::Act360,
+            CashFlowMeta::default(),
+        );
+        assert!(
+            super::accrual_start_balances(&issueless)
+                .expect("issueless returns Ok(None)")
+                .is_none()
+        );
+
+        // With issue_date, over-repayment is a real balance-replay error and must propagate.
+        let over_repay = CashFlowParams::new(
+            end,
+            None,
+            Money::from((200_i64, Currency::USD)),
+            CFKind::Notional,
+            0.0,
+            None,
+        )
+        .with_principal_delta(Money::from((-200_i64, Currency::USD)))
+        .with_principal_date(end)
+        .build()
+        .expect("notional flow");
+        let corrupt = CashFlowSchedule::from_flows(
+            vec![over_repay, coupon],
+            Notional::par(100.0, Currency::USD).expect("notional"),
+            DayCount::Act360,
+            CashFlowMeta {
+                issue_date: Some(issue),
+                ..CashFlowMeta::default()
+            },
+        );
+        let err = super::accrual_start_balances(&corrupt)
+            .expect_err("over-repayment must not be swallowed");
+        assert!(matches!(err, finstack_quant_core::Error::Validation(_)));
     }
 
     #[test]

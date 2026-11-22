@@ -22,7 +22,7 @@
       "type": "number"
     },
     "diversity_score": {
-      "description": "Diversity score (Moody's methodology) of the assets that name an obligor;\n`None` when none does. See [`AssetPool::diversity_score`].",
+      "description": "Diversity score (Moody's methodology) of the assets that name an obligor;\n`None` when none does. See [`AssetPool::diversity_score`](super::AssetPool::diversity_score).",
       "format": "double",
       "type": [
         "number",
@@ -48,7 +48,7 @@
       "type": "number"
     },
     "wac": {
-      "description": "Weighted-average coupon (annual decimal) of the performing fixed-rate\ncollateral; `None` when there is none. See [`AssetPool::wac`].",
+      "description": "Weighted-average coupon (annual decimal) of the performing fixed-rate\ncollateral; `None` when there is none. See [`AssetPool::wac`](super::AssetPool::wac).",
       "format": "double",
       "type": [
         "number",
@@ -64,7 +64,7 @@
       ]
     },
     "weighted_avg_spread_bp": {
-      "description": "Weighted-average spread in basis points of the performing collateral\nthat carries an explicit `spread_bp`; `None` when there is none. See\n[`AssetPool::weighted_avg_spread_bp`].",
+      "description": "Weighted-average spread in basis points of the performing collateral\nthat carries an explicit `spread_bp`; `None` when there is none. See\n[`AssetPool::weighted_avg_spread_bp`](super::AssetPool::weighted_avg_spread_bp).",
       "format": "double",
       "type": [
         "number",

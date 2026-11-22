@@ -1,5 +1,4 @@
 use super::*;
-use crate::structured_credit::utils::months::ClampedMonths;
 
 /// Record a residual principal distribution to a tranche at deal end: appends
 /// the flow to the tranche's cashflows and principal flows and bumps its
@@ -476,6 +475,18 @@ pub(crate) struct PreparedDealSimulation {
 ///
 /// Propagates invalid waterfall rules, invalid custom waterfalls, missing
 /// payment calendars, and schedule-construction failures, in that order.
+#[tracing::instrument(
+    name = "structured_credit.simulation.prepare",
+    level = "debug",
+    skip(instrument),
+    fields(
+        inst_id = %instrument.id.as_str(),
+        deal_type = ?instrument.deal_type,
+        as_of = %as_of,
+        tranche_count = instrument.tranches.tranches.len(),
+    ),
+    err,
+)]
 pub(crate) fn prepare_deal_simulation(
     instrument: &StructuredCredit,
     as_of: Date,
@@ -775,7 +786,7 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
         if redemption_due {
             let redemption_price_pct = deal_call.map_or(100.0, |call| call.price_pct);
             let seasoning_months =
-                state.closing_seasoning_months + state.closing_date.clamped_months_until(pay_date);
+                state.closing_seasoning_months + state.closing_date.months_until(pay_date)?;
             let proceeds = liquidation_value(
                 &state,
                 instrument.liquidation_price_pct.unwrap_or(100.0) / 100.0,
@@ -888,6 +899,20 @@ fn attach_non_waterfall_payments(state: &mut SimulationState<'_>) -> Result<()> 
 /// * `source` - Pool flow source driving each period. `None` picks the
 ///   deal's own: the instruments' schedules when `pool.instruments` is
 ///   populated, the deterministic pool model otherwise.
+#[tracing::instrument(
+    name = "structured_credit.simulation.simulate",
+    level = "debug",
+    skip(instrument, context, source),
+    fields(
+        inst_id = %instrument.id.as_str(),
+        deal_type = ?instrument.deal_type,
+        as_of = %as_of,
+        tranche_count = instrument.tranches.tranches.len(),
+        instrument_collateral = instrument.pool.instruments.is_some(),
+        custom_source = source.is_some(),
+    ),
+    err,
+)]
 pub(crate) fn simulate_with_source(
     instrument: &StructuredCredit,
     context: &MarketContext,

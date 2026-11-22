@@ -26,7 +26,8 @@
 use finstack_quant_core::schema::SchemaArtifact;
 use finstack_quant_core::{Error, Result};
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::OnceLock;
 
 /// Every domain registry, labelled with its Python/WASM namespace name.
 ///
@@ -89,6 +90,34 @@ pub fn artifacts_with_domain() -> Vec<(&'static str, &'static SchemaArtifact)> {
         .collect()
 }
 
+/// Look up one domain's schema artifact slice by its namespace name.
+///
+/// # Arguments
+///
+/// * `domain` - Published domain name from [`domains`] (for example `"core"`,
+///   `"valuations"`, or `"factor_model"`).
+///
+/// # Errors
+///
+/// Returns [`Error::Input`] ([`InputError::NotFound`](finstack_quant_core::InputError::NotFound))
+/// when `domain` is not a registered schema domain.
+///
+/// # Examples
+/// ```
+/// let core = finstack_quant::schema::domain_registry("core").expect("core");
+/// assert!(!core.is_empty());
+/// ```
+pub fn domain_registry(domain: &str) -> Result<&'static [SchemaArtifact]> {
+    domain_registries()
+        .into_iter()
+        .find_map(|(name, registry)| (name == domain).then_some(registry))
+        .ok_or_else(|| {
+            Error::Input(finstack_quant_core::InputError::NotFound {
+                id: format!("schema domain {domain:?} (call domains() for valid domains)"),
+            })
+        })
+}
+
 /// The domain names that label the rows of [`index`], sorted and unique.
 ///
 /// # Examples
@@ -134,22 +163,21 @@ pub fn documents_by_id() -> Result<BTreeMap<String, Value>> {
 /// partial corpus would silently degrade every cross-document `$ref`
 /// resolution and union-failure expansion that depends on it.
 fn corpus() -> Result<&'static BTreeMap<String, Value>> {
-    static CACHE: std::sync::OnceLock<Result<BTreeMap<String, Value>>> = std::sync::OnceLock::new();
+    static CACHE: OnceLock<Result<BTreeMap<String, Value>>> = OnceLock::new();
     CACHE
         .get_or_init(documents_by_id)
         .as_ref()
         .map_err(Clone::clone)
 }
 
-/// Every corpus document as a compiled, in-process resolvable resource.
+/// Every corpus document as a compiled, in-process resolvable resource, keyed by `$id`.
 ///
 /// # Errors
 ///
 /// Returns [`Error::Internal`] if [`corpus`] fails to render, or if a
 /// rendered document is not a compilable JSON Schema resource.
-fn resources() -> Result<&'static [(String, jsonschema::Resource)]> {
-    static CACHE: std::sync::OnceLock<Result<Vec<(String, jsonschema::Resource)>>> =
-        std::sync::OnceLock::new();
+fn resources_by_id() -> Result<&'static BTreeMap<String, jsonschema::Resource>> {
+    static CACHE: OnceLock<Result<BTreeMap<String, jsonschema::Resource>>> = OnceLock::new();
     CACHE
         .get_or_init(|| {
             corpus()?
@@ -161,11 +189,56 @@ fn resources() -> Result<&'static [(String, jsonschema::Resource)]> {
                 })
                 .collect()
         })
-        .as_deref()
+        .as_ref()
         .map_err(Clone::clone)
 }
 
-/// Build a validator for one document, with the whole corpus resolvable.
+/// Collect every external document URI referenced by `$ref` inside `value`.
+///
+/// Local fragment references (`#/...`) resolve inside the current document and
+/// are skipped. `examples` arrays hold instance payloads rather than schema
+/// assertions, so they are skipped as well.
+fn collect_external_refs(value: &Value, out: &mut Vec<String>) {
+    match value {
+        Value::Object(map) => {
+            if let Some(target) = map.get("$ref").and_then(Value::as_str) {
+                let doc_id = target.split('#').next().unwrap_or(target);
+                if !doc_id.is_empty() {
+                    out.push(doc_id.to_string());
+                }
+            }
+            for (key, nested) in map {
+                if key != "examples" {
+                    collect_external_refs(nested, out);
+                }
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                collect_external_refs(item, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Compute the transitive set of external corpus `$id`s reachable from `schema`.
+fn reachable_resource_ids(schema: &Value, corpus: &BTreeMap<String, Value>) -> BTreeSet<String> {
+    let mut visited = BTreeSet::new();
+    let mut queue = Vec::new();
+    collect_external_refs(schema, &mut queue);
+    while let Some(id) = queue.pop() {
+        if visited.insert(id.clone())
+            && let Some(doc) = corpus.get(&id)
+        {
+            collect_external_refs(doc, &mut queue);
+        }
+    }
+    visited
+}
+
+/// Build a validator for one document, registering only the corpus resources
+/// transitively reachable from its `$ref` targets.
 ///
 /// Format assertion is switched on. JSON Schema leaves `format` as an
 /// annotation by default, which would let `"01/15/2034"` pass a `format: date`
@@ -177,15 +250,52 @@ fn resources() -> Result<&'static [(String, jsonschema::Resource)]> {
 ///
 /// Returns [`Error::Internal`] if the document is not a compilable schema.
 fn build_validator(schema: &Value) -> Result<jsonschema::Validator> {
+    let corpus = corpus()?;
+    let all_resources = resources_by_id()?;
+    let reachable = reachable_resource_ids(schema, corpus);
+    let trimmed = reachable.iter().filter_map(|id| {
+        all_resources
+            .get(id)
+            .map(|resource| (id.as_str(), resource.clone()))
+    });
     jsonschema::options()
         .should_validate_formats(true)
-        .with_resources(
-            resources()?
-                .iter()
-                .map(|(id, resource)| (id.as_str(), resource.clone())),
-        )
+        .with_resources(trimmed)
         .build(schema)
         .map_err(|error| Error::Internal(format!("compile schema: {error}")))
+}
+
+/// Per-artifact compiled validators, keyed by canonical `$id`.
+///
+/// Slots are filled lazily on first [`validate`] call for an artifact so
+/// callers only pay compile time and resolver memory for the schemas they
+/// actually validate against.
+fn validator_cache() -> &'static BTreeMap<&'static str, OnceLock<Result<jsonschema::Validator>>> {
+    static CACHE: OnceLock<BTreeMap<&'static str, OnceLock<Result<jsonschema::Validator>>>> =
+        OnceLock::new();
+    CACHE.get_or_init(|| {
+        artifacts()
+            .into_iter()
+            .map(|artifact| (artifact.id, OnceLock::new()))
+            .collect()
+    })
+}
+
+/// Return the cached validator for a registered artifact, compiling it on first use.
+fn cached_validator(artifact: &SchemaArtifact) -> Result<Option<&'static jsonschema::Validator>> {
+    let Some(slot) = validator_cache().get(artifact.id) else {
+        return Ok(None);
+    };
+    let validator = slot
+        .get_or_init(|| {
+            let schema = corpus()?
+                .get(artifact.id)
+                .ok_or_else(|| Error::Internal(format!("{} missing from corpus", artifact.id)))?;
+            build_validator(schema)
+        })
+        .as_ref()
+        .map_err(Clone::clone)?;
+    Ok(Some(validator))
 }
 
 /// Look up one artifact by `$id`, full path, or trailing filename.
@@ -233,24 +343,98 @@ pub fn find(selector: &str) -> Result<&'static SchemaArtifact> {
 /// assert!(index["artifacts"].as_array().expect("rows").len() > 100);
 /// ```
 pub fn index() -> Result<Value> {
+    static CACHE: OnceLock<Result<Value>> = OnceLock::new();
+    CACHE
+        .get_or_init(|| {
+            let corpus = corpus()?;
+            let mut rows = Vec::new();
+            for (domain, artifact) in artifacts_with_domain() {
+                let rendered = corpus.get(artifact.id).ok_or_else(|| {
+                    Error::Internal(format!("{} missing from rendered corpus", artifact.id))
+                })?;
+                let mut row = finstack_quant_core::schema::schema_index_row(artifact, rendered)?;
+                row.insert("domain".to_string(), Value::String(domain.to_string()));
+                rows.push(Value::Object(row));
+            }
+            rows.sort_by(|left, right| {
+                (left["domain"].as_str(), left["path"].as_str())
+                    .cmp(&(right["domain"].as_str(), right["path"].as_str()))
+            });
+            Ok(serde_json::json!({
+                "artifacts": rows,
+                "schema_index_version": finstack_quant_core::schema::SCHEMA_INDEX_VERSION,
+            }))
+        })
+        .clone()
+}
+
+/// Per-domain cached schema index documents, keyed by domain name.
+fn domain_index_cache() -> &'static BTreeMap<&'static str, OnceLock<Result<Value>>> {
+    static CACHE: OnceLock<BTreeMap<&'static str, OnceLock<Result<Value>>>> = OnceLock::new();
+    CACHE.get_or_init(|| {
+        domain_registries()
+            .into_iter()
+            .map(|(domain, _)| (domain, OnceLock::new()))
+            .collect()
+    })
+}
+
+/// Build one domain's schema index document from the cached rendered corpus.
+fn build_domain_index_from_corpus(registry: &[SchemaArtifact]) -> Result<Value> {
     let corpus = corpus()?;
-    let mut rows = Vec::new();
-    for (domain, artifact) in artifacts_with_domain() {
+    let mut rows = BTreeMap::new();
+    for artifact in registry {
         let rendered = corpus.get(artifact.id).ok_or_else(|| {
             Error::Internal(format!("{} missing from rendered corpus", artifact.id))
         })?;
-        let mut row = finstack_quant_core::schema::schema_index_row(artifact, rendered)?;
-        row.insert("domain".to_string(), Value::String(domain.to_string()));
-        rows.push(Value::Object(row));
+        let row = finstack_quant_core::schema::schema_index_row(artifact, rendered)?;
+        if rows
+            .insert(artifact.relative_path, Value::Object(row))
+            .is_some()
+        {
+            return Err(Error::Validation(format!(
+                "duplicate schema path in index: {}",
+                artifact.relative_path
+            )));
+        }
     }
-    rows.sort_by(|left, right| {
-        (left["domain"].as_str(), left["path"].as_str())
-            .cmp(&(right["domain"].as_str(), right["path"].as_str()))
-    });
     Ok(serde_json::json!({
-        "artifacts": rows,
+        "artifacts": rows.into_values().collect::<Vec<_>>(),
         "schema_index_version": finstack_quant_core::schema::SCHEMA_INDEX_VERSION,
     }))
+}
+
+/// List every schema published by a single domain crate, cached per domain.
+///
+/// Matches the structure produced by
+/// [`build_schema_index`](finstack_quant_core::schema::build_schema_index)
+/// (`artifacts` sorted by `path`, plus `schema_index_version`) while reusing
+/// the cached rendered corpus so repeated calls do not regenerate schemas.
+///
+/// # Arguments
+///
+/// * `domain` - Published domain name from [`domains`] (for example `"core"`,
+///   `"valuations"`, or `"factor_model"`).
+///
+/// # Errors
+///
+/// Returns [`Error::Input`] ([`InputError::NotFound`](finstack_quant_core::InputError::NotFound))
+/// when `domain` is not a registered schema domain, or [`Error::Internal`] if a
+/// schema in the domain cannot be rendered or encoded.
+///
+/// # Examples
+/// ```
+/// let index = finstack_quant::schema::index_for_domain("core").expect("core index");
+/// assert_eq!(index["schema_index_version"], serde_json::json!(1));
+/// assert!(!index["artifacts"].as_array().expect("rows").is_empty());
+/// ```
+pub fn index_for_domain(domain: &str) -> Result<Value> {
+    let registry = domain_registry(domain)?;
+    let slot = domain_index_cache()
+        .get(domain)
+        .ok_or_else(|| Error::Internal(format!("schema domain cache missing {domain:?}")))?;
+    slot.get_or_init(|| build_domain_index_from_corpus(registry))
+        .clone()
 }
 
 /// Render a published schema in canonical or LLM projection form.
@@ -287,8 +471,10 @@ use finstack_quant_core::schema::diagnostics::Failure;
 
 /// Validate a payload against one published artifact.
 ///
-/// Union failures are drilled into rather than reported at the union: see the
-/// module documentation for why that matters.
+/// Validators are compiled lazily on first use per artifact `$id` with only the
+/// corpus resources transitively reachable via `$ref`, and cached for the
+/// process lifetime. Union failures are drilled into rather than reported at
+/// the union: see the module documentation for why that matters.
 ///
 /// # Arguments
 ///
@@ -312,8 +498,27 @@ use finstack_quant_core::schema::diagnostics::Failure;
 /// assert_eq!(failures[0].pointer, "/instrument/spec/cashflow_spec/fixed/day_count");
 /// ```
 pub fn validate(artifact: &SchemaArtifact, payload: &Value) -> Result<Vec<Failure>> {
+    if let Some(validator) = cached_validator(artifact)? {
+        if validator.is_valid(payload) {
+            return Ok(Vec::new());
+        }
+        let schema = corpus()?
+            .get(artifact.id)
+            .ok_or_else(|| Error::Internal(format!("{} missing from corpus", artifact.id)))?;
+        return Ok(finstack_quant_core::schema::diagnostics::collect_failures(
+            validator,
+            schema,
+            payload,
+            &|id| corpus().ok()?.get(id).cloned(),
+            &build_validator,
+        ));
+    }
+
     let schema = artifact.generate()?;
     let validator = build_validator(&schema)?;
+    if validator.is_valid(payload) {
+        return Ok(Vec::new());
+    }
     Ok(finstack_quant_core::schema::diagnostics::collect_failures(
         &validator,
         &schema,
@@ -506,5 +711,76 @@ mod tests {
             panic!("unknown selector must fail");
         };
         assert!(error.to_string().contains("index()"), "{error}");
+    }
+
+    #[test]
+    fn domain_registry_resolves_known_domains_and_rejects_unknown() {
+        assert_eq!(
+            domain_registry("core").expect("core").len(),
+            finstack_quant_core::schema::ARTIFACTS.len()
+        );
+        assert_eq!(
+            domain_registry("valuations").expect("valuations").len(),
+            finstack_quant_valuations::schema::artifacts_slice().len()
+        );
+        let Err(err) = domain_registry("no_such_domain") else {
+            panic!("unknown domain must fail");
+        };
+        assert_eq!(err.kind(), finstack_quant_core::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn cached_validator_is_reused_and_trimmed_to_reachable_refs() {
+        let artifact = bond();
+        let corpus_map = corpus().expect("corpus");
+        let bond_doc = corpus_map.get(artifact.id).expect("bond in corpus");
+        let reachable = reachable_resource_ids(bond_doc, corpus_map);
+        assert!(
+            reachable.contains("https://finstack_quant.dev/schemas/common/1/money.schema.json"),
+            "bond must reach money schema: {reachable:?}"
+        );
+        assert!(
+            reachable.len() < corpus_map.len() / 2,
+            "single-instrument validator should trim corpus resources ({} vs {})",
+            reachable.len(),
+            corpus_map.len()
+        );
+
+        let first = cached_validator(artifact)
+            .expect("compile")
+            .expect("registered");
+        let second = cached_validator(artifact)
+            .expect("compile")
+            .expect("registered");
+        assert!(
+            std::ptr::eq(first, second),
+            "repeat lookups must reuse the same cached validator"
+        );
+
+        let valid = bond_example();
+        assert_eq!(validate(artifact, &valid).expect("validate"), Vec::new());
+        assert_eq!(validate(artifact, &valid).expect("validate"), Vec::new());
+
+        let mut bad_date = valid;
+        bad_date["instrument"]["spec"]["maturity"] = json!("01/15/2034");
+        let failures = validate(artifact, &bad_date).expect("validate");
+        assert!(
+            failures
+                .iter()
+                .any(|failure| failure.pointer == "/instrument/spec/maturity"),
+            "cached validator must assert format: date, got {failures:?}"
+        );
+    }
+
+    #[test]
+    fn index_for_domain_matches_build_schema_index_and_caches() {
+        let cached = index_for_domain("core").expect("core index");
+        let expected =
+            finstack_quant_core::schema::build_schema_index(finstack_quant_core::schema::ARTIFACTS)
+                .expect("build core index");
+        assert_eq!(cached, expected);
+        assert_eq!(index_for_domain("core").expect("core index repeat"), cached);
+        let err = index_for_domain("no_such_domain").expect_err("unknown domain");
+        assert_eq!(err.kind(), finstack_quant_core::ErrorKind::NotFound);
     }
 }

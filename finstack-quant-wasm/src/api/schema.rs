@@ -2,15 +2,16 @@
 //!
 //! Each domain crate publishes its wire contracts through a `SchemaArtifact`
 //! registry; the umbrella crate merges the eleven registries. The schemas are
-//! rendered from those registries on demand, so a schema read here always
-//! describes the wire format this build accepts.
+//! rendered from those registries on demand and cached in-process, so a schema
+//! read here always describes the wire format this build accepts.
 //!
-//! wasm-bindgen exports share one flat namespace, so the per-crate
-//! `index` / `get` / `validate` triple is exported under crate-prefixed names
-//! (`coreSchemaIndex`, …) and the JS facade maps them back to
-//! `core.schema.index`, mirroring Python `finstack_quant.core.schema.index`.
-//! Python returns JSON text from these accessors; WASM returns the same
-//! documents as plain objects.
+//! wasm-bindgen exports share one flat namespace, so per-crate
+//! `index` / `get` / `validate` share three domain-parameterized Rust exports
+//! (`domainSchemaIndex`, `domainSchemaGet`, `domainSchemaValidate`) and the JS
+//! facade curries each crate's domain name through `exports/domainSchema.js`
+//! into `<domain>.schema.{index,get,validate}`, mirroring Python
+//! `finstack_quant.<domain>.schema`. Python returns JSON text from these
+//! accessors; WASM returns the same documents as plain objects.
 
 use crate::utils::input::{from_js_json, js_opt_string, js_string};
 use crate::utils::{to_js_err, to_js_value};
@@ -39,137 +40,68 @@ fn report(artifact: &SchemaArtifact, payload: &JsValue) -> Result<JsValue, JsVal
     to_js_value(&failures)
 }
 
-/// Emit the `index` / `get` / `validate` exports of one crate registry.
+// ---------------------------------------------------------------------------
+// Per-domain registry (`<domain>.schema.*`, via `exports/domainSchema.js`)
+// ---------------------------------------------------------------------------
+
+/// List every JSON Schema published by one domain crate.
 ///
-/// `$registry` is the crate's `&[SchemaArtifact]`; each function is given as
-/// its Rust name and its flat wasm-bindgen export name.
-macro_rules! schema_registry {
-    (
-        $registry:expr_2021,
-        $index:ident = $index_js:literal,
-        $get:ident = $get_js:literal,
-        $validate:ident = $validate_js:literal
-    ) => {
-        /// List every JSON Schema this crate publishes.
-        ///
-        /// Each row carries `path`, `$id`, `title`, `type_name` (the Rust root
-        /// type), `summary`, `bytes` and `kind` (`input` for documents you
-        /// author, `output` for documents the library emits, `component` for
-        /// shared definitions).
-        /// @returns `{ artifacts, schema_index_version }`, with one row per published schema.
-        /// @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
-        #[wasm_bindgen(js_name = $index_js, unchecked_return_type = "SchemaIndex")]
-        pub fn $index() -> Result<JsValue, JsValue> {
-            to_js_value(
-                &finstack_quant_core::schema::build_schema_index($registry).map_err(to_js_err)?,
-            )
-        }
-
-        /// Fetch one published JSON Schema of this crate.
-        /// @param selector - Schema `$id`, registry path or trailing filename from `index()`, e.g. `"market_context_state.schema.json"`. Partial filenames do not match.
-        /// @param profile - `"canonical"` (the default) for the validation contract, or `"llm"` for a self-contained projection with cross-document references inlined, intended for structured-output generation.
-        /// @returns JSON Schema document.
-        /// @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and kind `invalid_type` if either argument is not a string.
-        #[wasm_bindgen(js_name = $get_js, unchecked_return_type = "Record<string, unknown>")]
-        pub fn $get(
-            #[wasm_bindgen(unchecked_param_type = "string")] selector: JsValue,
-            #[wasm_bindgen(unchecked_optional_param_type = "SchemaProfile")] profile: Option<
-                JsValue,
-            >,
-        ) -> Result<JsValue, JsValue> {
-            let selector = js_string(&selector, "selector")?;
-            let artifact = finstack_quant_core::schema::find_schema_artifact($registry, &selector)
-                .map_err(to_js_err)?;
-            render(artifact, profile)
-        }
-
-        /// Validate a payload against one published JSON Schema of this crate.
-        ///
-        /// A failure inside a tagged union is reported at the offending field
-        /// of the branch the payload most nearly matches, not at the union.
-        /// @param selector - Schema `$id`, registry path or trailing filename from `index()`.
-        /// @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
-        /// @returns One `{ pointer, message }` row per failure, where `pointer` is the JSON Pointer of the offending value; empty when the payload is valid.
-        /// @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and kind `invalid_type` if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
-        #[wasm_bindgen(js_name = $validate_js, unchecked_return_type = "SchemaValidationFailure[]")]
-        pub fn $validate(
-            #[wasm_bindgen(unchecked_param_type = "string")] selector: JsValue,
-            #[wasm_bindgen(unchecked_param_type = "string | object")] payload: JsValue,
-        ) -> Result<JsValue, JsValue> {
-            let selector = js_string(&selector, "selector")?;
-            let artifact = finstack_quant_core::schema::find_schema_artifact($registry, &selector)
-                .map_err(to_js_err)?;
-            report(artifact, &payload)
-        }
-    };
+/// Each row carries `path`, `$id`, `title`, `type_name` (the Rust root type),
+/// `summary`, `bytes` and `kind` (`input` for documents you author, `output`
+/// for documents the library emits, `component` for shared definitions).
+/// @param domain - Registered domain name from `schema.domains()`, e.g. `"core"`, `"valuations"`, or `"factor_model"`.
+/// @returns `{ artifacts, schema_index_version }`, with one row per published schema.
+/// @throws Error - Throws with kind `not_found` if `domain` is not a registered schema domain, kind `invalid_type` if `domain` is not a string, and kind `internal` if a schema cannot be rendered (does not occur for a released build).
+#[wasm_bindgen(js_name = domainSchemaIndex, unchecked_return_type = "SchemaIndex")]
+pub fn domain_schema_index(
+    #[wasm_bindgen(unchecked_param_type = "string")] domain: JsValue,
+) -> Result<JsValue, JsValue> {
+    let domain = js_string(&domain, "domain")?;
+    to_js_value(&finstack_quant::schema::index_for_domain(&domain).map_err(to_js_err)?)
 }
 
-schema_registry!(
-    finstack_quant_analytics::schema::ARTIFACTS,
-    analytics_schema_index = "analyticsSchemaIndex",
-    analytics_schema_get = "analyticsSchemaGet",
-    analytics_schema_validate = "analyticsSchemaValidate"
-);
-schema_registry!(
-    finstack_quant_core::schema::ARTIFACTS,
-    core_schema_index = "coreSchemaIndex",
-    core_schema_get = "coreSchemaGet",
-    core_schema_validate = "coreSchemaValidate"
-);
-schema_registry!(
-    finstack_quant_attribution::schema::ARTIFACTS,
-    attribution_schema_index = "attributionSchemaIndex",
-    attribution_schema_get = "attributionSchemaGet",
-    attribution_schema_validate = "attributionSchemaValidate"
-);
-schema_registry!(
-    finstack_quant_calibration::json_schema::artifacts(),
-    calibration_schema_index = "calibrationSchemaIndex",
-    calibration_schema_get = "calibrationSchemaGet",
-    calibration_schema_validate = "calibrationSchemaValidate"
-);
-schema_registry!(
-    finstack_quant_cashflows::schema::ARTIFACTS,
-    cashflows_schema_index = "cashflowsSchemaIndex",
-    cashflows_schema_get = "cashflowsSchemaGet",
-    cashflows_schema_validate = "cashflowsSchemaValidate"
-);
-schema_registry!(
-    finstack_quant_margin::schema::ARTIFACTS,
-    margin_schema_index = "marginSchemaIndex",
-    margin_schema_get = "marginSchemaGet",
-    margin_schema_validate = "marginSchemaValidate"
-);
-schema_registry!(
-    finstack_quant_factor::schema::ARTIFACTS,
-    factor_schema_index = "factorSchemaIndex",
-    factor_schema_get = "factorSchemaGet",
-    factor_schema_validate = "factorSchemaValidate"
-);
-schema_registry!(
-    finstack_quant_portfolio::schema::ARTIFACTS,
-    portfolio_schema_index = "portfolioSchemaIndex",
-    portfolio_schema_get = "portfolioSchemaGet",
-    portfolio_schema_validate = "portfolioSchemaValidate"
-);
-schema_registry!(
-    finstack_quant_scenarios::schema::ARTIFACTS,
-    scenarios_schema_index = "scenariosSchemaIndex",
-    scenarios_schema_get = "scenariosSchemaGet",
-    scenarios_schema_validate = "scenariosSchemaValidate"
-);
-schema_registry!(
-    finstack_quant_statements::schema::ARTIFACTS,
-    statements_schema_index = "statementsSchemaIndex",
-    statements_schema_get = "statementsSchemaGet",
-    statements_schema_validate = "statementsSchemaValidate"
-);
-schema_registry!(
-    finstack_quant_valuations::schema::artifacts_slice(),
-    valuations_schema_index = "valuationsSchemaIndex",
-    valuations_schema_get = "valuationsSchemaGet",
-    valuations_schema_validate = "valuationsSchemaValidate"
-);
+/// Fetch one published JSON Schema of a domain crate.
+/// @param domain - Registered domain name from `schema.domains()`, e.g. `"core"`, `"valuations"`, or `"factor_model"`.
+/// @param selector - Schema `$id`, registry path or trailing filename from `index()`, e.g. `"market_context_state.schema.json"`. Partial filenames do not match.
+/// @param profile - `"canonical"` (the default) for the validation contract, or `"llm"` for a self-contained projection with cross-document references inlined, intended for structured-output generation.
+/// @returns JSON Schema document.
+/// @throws Error - Throws with kind `not_found` if `domain` is not a registered schema domain or no schema in that domain matches `selector`, kind `validation` if `profile` is unknown, and kind `invalid_type` if any supplied argument is not a string.
+#[wasm_bindgen(js_name = domainSchemaGet, unchecked_return_type = "Record<string, unknown>")]
+pub fn domain_schema_get(
+    #[wasm_bindgen(unchecked_param_type = "string")] domain: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] selector: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "SchemaProfile")] profile: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let domain = js_string(&domain, "domain")?;
+    let selector = js_string(&selector, "selector")?;
+    let registry = finstack_quant::schema::domain_registry(&domain).map_err(to_js_err)?;
+    let artifact = finstack_quant_core::schema::find_schema_artifact(registry, &selector)
+        .map_err(to_js_err)?;
+    render(artifact, profile)
+}
+
+/// Validate a payload against one published JSON Schema of a domain crate.
+///
+/// A failure inside a tagged union is reported at the offending field of the
+/// branch the payload most nearly matches, not at the union.
+/// @param domain - Registered domain name from `schema.domains()`, e.g. `"core"`, `"valuations"`, or `"factor_model"`.
+/// @param selector - Schema `$id`, registry path or trailing filename from `index()`.
+/// @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
+/// @returns One `{ pointer, message }` row per failure, where `pointer` is the JSON Pointer of the offending value; empty when the payload is valid.
+/// @throws Error - Throws with kind `not_found` if `domain` is not a registered schema domain or no schema in that domain matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and kind `invalid_type` if `domain` or `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
+#[wasm_bindgen(js_name = domainSchemaValidate, unchecked_return_type = "SchemaValidationFailure[]")]
+pub fn domain_schema_validate(
+    #[wasm_bindgen(unchecked_param_type = "string")] domain: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] selector: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string | object")] payload: JsValue,
+) -> Result<JsValue, JsValue> {
+    let domain = js_string(&domain, "domain")?;
+    let selector = js_string(&selector, "selector")?;
+    let registry = finstack_quant::schema::domain_registry(&domain).map_err(to_js_err)?;
+    let artifact = finstack_quant_core::schema::find_schema_artifact(registry, &selector)
+        .map_err(to_js_err)?;
+    report(artifact, &payload)
+}
 
 // ---------------------------------------------------------------------------
 // Whole-workspace registry (`schema.*`, Python `finstack_quant.schema`)

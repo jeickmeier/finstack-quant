@@ -1,4 +1,5 @@
 import * as wasm from '../../pkg/finstack_quant_wasm.js';
+import { domainSchema } from '../domainSchema.js';
 
 /**
  * Registry of the JSON Schemas the cashflows crate publishes, plus the embedded resolver resources.
@@ -11,8 +12,6 @@ import * as wasm from '../../pkg/finstack_quant_wasm.js';
  * ```
  */
 export const schema = {
-  index: wasm.cashflowsSchemaIndex,
-  get: wasm.cashflowsSchemaGet,
-  validate: wasm.cashflowsSchemaValidate,
+  ...domainSchema('cashflows'),
   resources: wasm.cashflowsSchemaResources,
 };

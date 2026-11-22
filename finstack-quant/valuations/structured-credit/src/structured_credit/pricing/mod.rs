@@ -47,6 +47,18 @@ impl StructuredCredit {
     /// # Errors
     ///
     /// Propagates validation, missing-curve, schedule and cash-conservation errors.
+    #[tracing::instrument(
+        name = "structured_credit.run_simulation",
+        level = "debug",
+        skip(self, market),
+        fields(
+            inst_id = %self.id.as_str(),
+            deal_type = ?self.deal_type,
+            as_of = %as_of,
+            tranche_count = self.tranches.tranches.len(),
+        ),
+        err,
+    )]
     pub fn run_simulation(&self, market: &MarketContext, as_of: Date) -> Result<SimulationRun> {
         #[cfg(test)]
         SIMULATION_RUNS.with(|runs| runs.set(runs.get() + 1));

@@ -393,6 +393,13 @@ impl Pricer for CommodityAsianOptionAnalyticalPricer {
         )
     }
 
+    #[tracing::instrument(
+        name = "commodity_asian_option.analytical.price_dyn",
+        level = "debug",
+        skip(self, instrument, market),
+        fields(inst_id = %instrument.id(), as_of = %as_of),
+        err,
+    )]
     fn price_dyn(
         &self,
         instrument: &dyn Instrument,

@@ -25,7 +25,7 @@
           "type": "null"
         }
       ],
-      "description": "Collection account balance ([`AssetPool::collection_account`])."
+      "description": "Collection account balance\n([`AssetPool::collection_account`](super::AssetPool::collection_account))."
     },
     "cumulative_defaults": {
       "anyOf": [
@@ -36,7 +36,7 @@
           "type": "null"
         }
       ],
-      "description": "Cumulative defaults to date ([`AssetPool::cumulative_defaults`])."
+      "description": "Cumulative defaults to date\n([`AssetPool::cumulative_defaults`](super::AssetPool::cumulative_defaults))."
     },
     "cumulative_prepayments": {
       "anyOf": [
@@ -47,7 +47,7 @@
           "type": "null"
         }
       ],
-      "description": "Cumulative voluntary prepayments ([`AssetPool::cumulative_prepayments`])."
+      "description": "Cumulative voluntary prepayments\n([`AssetPool::cumulative_prepayments`](super::AssetPool::cumulative_prepayments))."
     },
     "cumulative_recoveries": {
       "anyOf": [
@@ -58,7 +58,7 @@
           "type": "null"
         }
       ],
-      "description": "Cumulative recoveries on defaulted assets\n([`AssetPool::cumulative_recoveries`])."
+      "description": "Cumulative recoveries on defaulted assets\n([`AssetPool::cumulative_recoveries`](super::AssetPool::cumulative_recoveries))."
     },
     "cumulative_scheduled_amortization": {
       "anyOf": [
@@ -69,7 +69,7 @@
           "type": "null"
         }
       ],
-      "description": "Cumulative scheduled amortization\n([`AssetPool::cumulative_scheduled_amortization`])."
+      "description": "Cumulative scheduled amortization\n([`AssetPool::cumulative_scheduled_amortization`](super::AssetPool::cumulative_scheduled_amortization))."
     },
     "excess_spread_account": {
       "anyOf": [
@@ -80,7 +80,7 @@
           "type": "null"
         }
       ],
-      "description": "Excess spread account balance ([`AssetPool::excess_spread_account`])."
+      "description": "Excess spread account balance\n([`AssetPool::excess_spread_account`](super::AssetPool::excess_spread_account))."
     },
     "original_balance": {
       "anyOf": [
@@ -91,7 +91,7 @@
           "type": "null"
         }
       ],
-      "description": "Original (cut-off) pool balance ([`AssetPool::original_balance`])."
+      "description": "Original (cut-off) pool balance\n([`AssetPool::original_balance`](super::AssetPool::original_balance))."
     }
   },
   "title": "PoolAccounts",

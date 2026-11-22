@@ -215,6 +215,13 @@ fn simulate_rbergomi<F: finstack_quant_models::monte_carlo::traits::Payoff>(
         Discretization, RandomStream, StochasticProcess,
     };
 
+    if num_paths == 0 {
+        return Err(PricingError::model_failure_with_context(
+            "rough Bergomi Monte Carlo simulation requires at least one path (got 0)",
+            err_ctx,
+        ));
+    }
+
     let &RBergomiModel {
         time_grid,
         process,
@@ -279,17 +286,47 @@ fn simulate_rbergomi<F: finstack_quant_models::monte_carlo::traits::Payoff>(
         })?;
     }
 
-    let stderr = stats
-        .get_stderr()
-        .map_err(|e| {
-            finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
-        })?
-        .unwrap_or(f64::NAN);
-    let mean = stats
-        .get_mean()
-        .map_err(|e| finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx))?
-        .unwrap_or(f64::NAN);
-    Ok((mean, if stderr.is_finite() { stderr } else { 0.0 }))
+    let mean = match stats.get_mean().map_err(|e| {
+        finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
+    })? {
+        Some(mean) if mean.is_finite() => mean,
+        Some(mean) => {
+            return Err(PricingError::model_failure_with_context(
+                format!("rough Bergomi Monte Carlo produced non-finite mean payoff: {mean}"),
+                err_ctx,
+            ));
+        }
+        None => {
+            return Err(PricingError::model_failure_with_context(
+                "rough Bergomi Monte Carlo accumulated no paths",
+                err_ctx,
+            ));
+        }
+    };
+
+    let stderr = match stats.get_stderr().map_err(|e| {
+        finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
+    })? {
+        Some(stderr) if stderr.is_finite() && stderr >= 0.0 => stderr,
+        Some(stderr) => {
+            return Err(PricingError::model_failure_with_context(
+                format!("rough Bergomi Monte Carlo produced invalid standard error: {stderr}"),
+                err_ctx,
+            ));
+        }
+        None if stats.get_count() == 1 => 0.0,
+        None => {
+            return Err(PricingError::model_failure_with_context(
+                format!(
+                    "rough Bergomi Monte Carlo standard error unavailable for {} paths",
+                    stats.get_count()
+                ),
+                err_ctx,
+            ));
+        }
+    };
+
+    Ok((mean, stderr))
 }
 
 impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
@@ -701,5 +738,77 @@ mod variance_strip_tests {
                 result.value.amount()
             );
         }
+    }
+
+    #[test]
+    fn zero_paths_returns_model_failure_and_single_path_returns_finite_price() {
+        use finstack_quant_core::currency::Currency;
+        use finstack_quant_core::dates::DayCount;
+        use finstack_quant_core::market_data::scalars::MarketScalar;
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+        use finstack_quant_valuations_core::pricer::Pricer;
+        use time::macros::date;
+
+        let as_of = date!(2025 - 01 - 01);
+        let expiry = date!(2026 - 01 - 01);
+        let (market, example) = market_and_option();
+        let option = EquityOption::european_with_market_data(
+            "RBERGOMI-PATH-EDGE-CASES",
+            "SPX",
+            crate::equity_option::parameters::EquityOptionParams::new(
+                100.0,
+                expiry,
+                finstack_quant_models::types::OptionType::Call,
+                1.0,
+                Currency::USD,
+            ),
+            crate::equity_option::parameters::EquityOptionMarketData::new(
+                "USD-OIS",
+                "EQUITY-SPOT",
+                example.vol_surface_id,
+            ),
+        )
+        .expect("option");
+        let discount =
+            DiscountCurve::flat("USD-OIS", as_of, 0.03, DayCount::Act365F).expect("discount curve");
+        let market = market
+            .try_insert(discount)
+            .expect("insert discount curve")
+            .insert_price(
+                "EQUITY-SPOT",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "EQUITY-DIVYIELD",
+                MarketScalar::unitless(0.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "ROUGH_BERGOMI_ETA",
+                MarketScalar::unitless(0.5).expect("valid scalar"),
+            )
+            .insert_price(
+                "ROUGH_BERGOMI_HURST",
+                MarketScalar::unitless(0.1).expect("valid scalar"),
+            )
+            .insert_price(
+                "ROUGH_BERGOMI_RHO",
+                MarketScalar::unitless(-0.7).expect("valid scalar"),
+            );
+
+        let err = EquityOptionRoughBergomiMcPricer::new(0, 16)
+            .price_dyn(&option, &market, as_of)
+            .expect_err("zero paths must return an explicit model failure");
+        assert!(
+            matches!(err, PricingError::ModelFailure { .. }),
+            "expected ModelFailure, got: {err:?}"
+        );
+
+        let single_path = EquityOptionRoughBergomiMcPricer::new(1, 16)
+            .price_dyn(&option, &market, as_of)
+            .expect("single path must succeed with finite price");
+        assert!(single_path.value.amount().is_finite());
+        assert!(!single_path.measures.contains_key(
+            &finstack_quant_valuations_core::metrics::MetricId::custom("mc_stderr")
+        ));
     }
 }

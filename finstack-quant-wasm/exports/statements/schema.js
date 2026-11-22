@@ -1,4 +1,4 @@
-import * as wasm from '../../pkg/finstack_quant_wasm.js';
+import { domainSchema } from '../domainSchema.js';
 
 /**
  * Registry of the canonical statements JSON Schemas.
@@ -10,8 +10,4 @@ import * as wasm from '../../pkg/finstack_quant_wasm.js';
  * console.log(document.title);
  * ```
  */
-export const schema = {
-  index: wasm.statementsSchemaIndex,
-  get: wasm.statementsSchemaGet,
-  validate: wasm.statementsSchemaValidate,
-};
+export const schema = domainSchema('statements');

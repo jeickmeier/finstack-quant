@@ -1,11 +1,11 @@
-//! Compiled-in JSON Schemas for the valuations wire format.
+//! Registry-backed JSON Schemas for the valuations wire format.
 //!
 //! The instrument envelope, the per-type instrument schemas and the valuation
-//! result schema are embedded in the WASM module by the Rust accessors in
-//! `finstack_quant_valuations::schema`, so they always describe the wire
-//! format this build accepts. Each accessor returns the schema document as a
-//! plain object; the Python `finstack_quant.valuations.schema` accessors
-//! return the same document as JSON text.
+//! result schema are rendered on demand and cached in-process by the Rust
+//! accessors in `finstack_quant_valuations::schema`, so they always describe
+//! the wire format this build accepts. Each accessor returns the schema
+//! document as a plain object; the Python `finstack_quant.valuations.schema`
+//! accessors return the same document as JSON text.
 
 use crate::utils::input::{from_js_json, js_string};
 use crate::utils::{to_js_err, to_js_value};
@@ -18,7 +18,7 @@ use wasm_bindgen::prelude::*;
 /// `type` discriminator and the matching `spec` payload. The document is
 /// large (about one megabyte); read it once and cache the parsed result.
 /// @returns JSON Schema document of the instrument envelope.
-/// @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
+/// @throws Error - Throws with kind `internal` if the schema cannot be rendered (does not occur for a released build).
 #[wasm_bindgen(js_name = instrumentEnvelopeSchema, unchecked_return_type = "Record<string, unknown>")]
 pub fn instrument_envelope_schema() -> Result<JsValue, JsValue> {
     to_js_value(schema::instrument_envelope_schema().map_err(to_js_err)?)
@@ -49,7 +49,7 @@ pub fn instrument_schema(
 
 /// JSON Schema of the `ValuationResult` envelope returned by the pricing entry points.
 /// @returns JSON Schema document of the valuation result.
-/// @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
+/// @throws Error - Throws with kind `internal` if the schema cannot be rendered (does not occur for a released build).
 #[wasm_bindgen(js_name = valuationResultSchema, unchecked_return_type = "Record<string, unknown>")]
 pub fn valuation_result_schema() -> Result<JsValue, JsValue> {
     to_js_value(schema::valuation_result_schema().map_err(to_js_err)?)

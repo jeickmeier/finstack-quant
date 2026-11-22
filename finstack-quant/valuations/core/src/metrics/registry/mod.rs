@@ -44,6 +44,7 @@ pub enum MetricRegistryError {
 #[derive(Clone)]
 pub struct MetricRegistry {
     entries: FxHashMap<MetricId, MetricEntry>,
+    allow_overwrite: bool,
 }
 
 pub(crate) fn validate_measure(
@@ -99,7 +100,12 @@ impl MetricRegistry {
     pub fn new() -> Self {
         Self {
             entries: FxHashMap::default(),
+            allow_overwrite: false,
         }
+    }
+
+    pub(crate) fn set_allow_overwrite(&mut self, allow: bool) {
+        self.allow_overwrite = allow;
     }
 }
 
@@ -140,10 +146,17 @@ impl MetricRegistry {
             }
         });
         if let Some(instrument) = duplicate_instrument {
-            return Err(MetricRegistryError::DuplicateRegistration {
-                metric: id,
-                instrument,
-            });
+            if !self.allow_overwrite {
+                return Err(MetricRegistryError::DuplicateRegistration {
+                    metric: id,
+                    instrument,
+                });
+            }
+            tracing::error!(
+                metric = %id,
+                ?instrument,
+                "duplicate built-in metric registration overwritten"
+            );
         }
         self.replace_metric(id, calculator, applicable_to);
         Ok(())

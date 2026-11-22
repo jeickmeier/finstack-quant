@@ -5,7 +5,9 @@
 //! [`super::WaterfallRules`]; this module only holds the fee schedule the
 //! template waterfall turns into fee tiers.
 
-use crate::structured_credit::assumptions::{embedded_registry_or_panic, required_assumption};
+use crate::structured_credit::assumptions::{
+    abs_standard_fees, clo_standard_fees, cmbs_standard_fees, rmbs_standard_fees,
+};
 use finstack_quant_core::money::Money;
 
 use serde::{Deserialize, Serialize};
@@ -65,22 +67,22 @@ pub struct IncentiveFeeSpec {
 impl DealFees {
     /// Create CLO-style fee structure
     pub fn clo_standard(currency: finstack_quant_core::currency::Currency) -> Self {
-        required_assumption(embedded_registry_or_panic().deal_fees("clo_standard", currency))
+        clo_standard_fees(currency)
     }
 
     /// Create ABS-style fee structure
     pub fn abs_standard(currency: finstack_quant_core::currency::Currency) -> Self {
-        required_assumption(embedded_registry_or_panic().deal_fees("abs_auto_standard", currency))
+        abs_standard_fees(currency)
     }
 
     /// Create CMBS-style fee structure
     pub fn cmbs_standard(currency: finstack_quant_core::currency::Currency) -> Self {
-        required_assumption(embedded_registry_or_panic().deal_fees("cmbs_standard", currency))
+        cmbs_standard_fees(currency)
     }
 
     /// Create RMBS-style fee structure
     pub fn rmbs_standard(currency: finstack_quant_core::currency::Currency) -> Self {
-        required_assumption(embedded_registry_or_panic().deal_fees("rmbs_standard", currency))
+        rmbs_standard_fees(currency)
     }
 }
 

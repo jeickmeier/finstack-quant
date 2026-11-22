@@ -45,9 +45,10 @@ pub(crate) fn financing_pv(
 
 pub(crate) fn validate_currency(inst: &LeveredRealEstateEquity) -> finstack_quant_core::Result<()> {
     if inst.asset.currency != inst.currency {
-        return Err(Error::Validation(
-            "asset currency must match levered equity currency".into(),
-        ));
+        return Err(Error::CurrencyMismatch {
+            expected: inst.asset.currency,
+            actual: inst.currency,
+        });
     }
     Ok(())
 }
@@ -192,4 +193,28 @@ fn payoff_at(
         payoff_amt += payoff.amount().abs();
     }
     Ok(payoff_amt)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_currency_returns_currency_mismatch_on_asset_equity_divergence() {
+        let mut equity = LeveredRealEstateEquity::example().expect("valid example");
+        validate_currency(&equity).expect("matching currencies pass");
+
+        equity.currency = Currency::EUR;
+        let err = validate_currency(&equity).expect_err("mismatched currency must error");
+        assert!(
+            matches!(
+                err,
+                Error::CurrencyMismatch {
+                    expected: Currency::USD,
+                    actual: Currency::EUR,
+                }
+            ),
+            "expected CurrencyMismatch(USD vs EUR), got {err:?}"
+        );
+    }
 }

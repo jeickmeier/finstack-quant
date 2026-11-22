@@ -621,6 +621,18 @@ impl Pricer for BarrierOptionPdePricer {
         PricerKey::new(InstrumentType::BarrierOption, ModelKey::PdeCrankNicolson1D)
     }
 
+    #[tracing::instrument(
+        name = "barrier_option.pde1d.price_dyn",
+        level = "debug",
+        skip(self, instrument, market),
+        fields(
+            inst_id = %instrument.id(),
+            as_of = %as_of,
+            space_points = self.space_points,
+            time_steps = self.time_steps,
+        ),
+        err,
+    )]
     fn price_dyn(
         &self,
         instrument: &dyn Instrument,

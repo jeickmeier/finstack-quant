@@ -545,27 +545,58 @@ impl BermudanSwaptionPricer {
             .collect();
 
         let model_curve = ModelDiscountCurve::new(disc.as_ref(), as_of)?;
-        let discount_fn = |t| model_curve.get_df(t).unwrap_or(f64::NAN);
+        let discount_fn = FallibleDiscountFn::new(&model_curve);
 
         // Calibrate Hull-White parameters from discount curve
-        let hw_params =
-            calibrate_theta_from_curve(hw_params.kappa, hw_params.sigma, discount_fn, &theta_times)
-                .map_err(|error| {
-                    PricingError::model_failure_with_context(
-                        error.to_string(),
-                        PricingErrorContext::default(),
-                    )
-                })?;
+        let hw_params = calibrate_theta_from_curve(
+            hw_params.kappa,
+            hw_params.sigma,
+            |t| discount_fn.eval(t),
+            &theta_times,
+        )
+        .map_err(|error| {
+            if let Some(curve_err) = discount_fn.take_error() {
+                PricingError::from_core(curve_err, PricingErrorContext::default())
+            } else {
+                PricingError::model_failure_with_context(
+                    error.to_string(),
+                    PricingErrorContext::default(),
+                )
+            }
+        })?;
+        if let Some(curve_err) = discount_fn.take_error() {
+            return Err(PricingError::from_core(
+                curve_err,
+                PricingErrorContext::default(),
+            ));
+        }
 
         // Initial short rate f(0,0) of the `as_of`-rebased curve: the same
         // estimator the θ fit starts its mean recursion from.
-        let initial_rate = fd_instantaneous_forward(&discount_fn, 0.0).ok_or_else(|| {
-            PricingError::model_failure_with_context(
-                "discount curve has a non-positive discount factor at the valuation date"
-                    .to_string(),
-                PricingErrorContext::default(),
-            )
-        })?;
+        let initial_rate = match fd_instantaneous_forward(&|t| discount_fn.eval(t), 0.0) {
+            Some(rate) => {
+                if let Some(curve_err) = discount_fn.take_error() {
+                    return Err(PricingError::from_core(
+                        curve_err,
+                        PricingErrorContext::default(),
+                    ));
+                }
+                rate
+            }
+            None => {
+                if let Some(curve_err) = discount_fn.take_error() {
+                    return Err(PricingError::from_core(
+                        curve_err,
+                        PricingErrorContext::default(),
+                    ));
+                }
+                return Err(PricingError::model_failure_with_context(
+                    "discount curve has a non-positive discount factor at the valuation date"
+                        .to_string(),
+                    PricingErrorContext::default(),
+                ));
+            }
+        };
 
         let exercise_value = |step: usize, short_rate: f64| {
             let slot = exercise_indices.binary_search(&step).map_err(|_| {
@@ -574,13 +605,19 @@ impl BermudanSwaptionPricer {
                 )
             })?;
             let t = time_grid.time(step);
-            exercise_cashflows[slot].evaluate(
+            let evaluated = exercise_cashflows[slot].evaluate(
                 t,
                 hw_params.model.kappa,
                 hw_params.sigma_at_time(t)?,
-                |maturity| hw_bond_price(&hw_params, short_rate, t, maturity, discount_fn),
+                |maturity| {
+                    hw_bond_price(&hw_params, short_rate, t, maturity, |u| discount_fn.eval(u))
+                },
                 terms,
-            )
+            );
+            if let Some(curve_err) = discount_fn.take_error() {
+                return Err(curve_err);
+            }
+            evaluated
         };
         let hw_process = HullWhite1FProcess::new(hw_params.clone());
 
@@ -847,6 +884,43 @@ pub(crate) fn settled_result(swaption: &BermudanSwaption, as_of: Date) -> Valuat
     )
 }
 
+/// Adapter bridging a fallible [`ModelDiscountCurve`] into the `Fn(f64) -> f64`
+/// discount-factor callbacks expected by Hull-White calibration and bond helpers.
+///
+/// Latches the first curve evaluation error and returns a non-positive sentinel
+/// (`0.0`) so `fd_instantaneous_forward` and `hw_ln_a` abort immediately and
+/// callers propagate the original curve error instead of a generic failure.
+struct FallibleDiscountFn<'a> {
+    curve: &'a ModelDiscountCurve<'a>,
+    first_error: std::cell::RefCell<Option<finstack_quant_core::Error>>,
+}
+
+impl<'a> FallibleDiscountFn<'a> {
+    fn new(curve: &'a ModelDiscountCurve<'a>) -> Self {
+        Self {
+            curve,
+            first_error: std::cell::RefCell::new(None),
+        }
+    }
+
+    fn eval(&self, t: f64) -> f64 {
+        match self.curve.get_df(t) {
+            Ok(df) => df,
+            Err(err) => {
+                let mut slot = self.first_error.borrow_mut();
+                if slot.is_none() {
+                    *slot = Some(err);
+                }
+                0.0
+            }
+        }
+    }
+
+    fn take_error(&self) -> Option<finstack_quant_core::Error> {
+        self.first_error.borrow_mut().take()
+    }
+}
+
 /// Inputs of a live Bermudan for the Hull-White tree and LSMC engines.
 struct LiveBermudan {
     disc: Arc<DiscountCurve>,
@@ -1012,6 +1086,94 @@ mod lsmc_diagnostics_tests {
             .price_dyn(&swaption, &market, as_of)
             .expect_err("public pricing must reject zero base steps");
         assert!(error.to_string().contains("mc_base_steps"));
+    }
+
+    #[test]
+    fn lsmc_propagates_discount_curve_error_instead_of_nan() {
+        let as_of = date!(2026 - 01 - 15);
+        let mut swaption = BermudanSwaption::example().expect("swaption");
+        let model = &mut swaption.instrument_pricing_overrides.model_config;
+        model.hw1f_mean_reversion = Some(0.03);
+        model.hw1f_sigma = Some(0.012);
+        model.mc_paths = Some(32);
+
+        // Curve ends at 1Y with `ExtrapolationPolicy::Error`, well short of the
+        // swaption's maturity, so `ModelDiscountCurve::get_df` returns an
+        // explicit out-of-range validation error during θ(t) calibration.
+        let short_curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Error)
+            .build()
+            .expect("short discount curve");
+        let market = MarketContext::new()
+            .try_insert(short_curve)
+            .expect("insert short curve");
+
+        let error = BermudanSwaptionPricer::lsmc()
+            .price_dyn(&swaption, &market, as_of)
+            .expect_err("short curve with Error extrapolation must fail pricing");
+        let msg = error.to_string();
+        assert!(
+            msg.contains("exceeds maximum knot"),
+            "expected underlying curve extrapolation error, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn fallible_discount_fn_latches_first_curve_error() {
+        use finstack_quant_core::market_data::traits::Discounting;
+        use finstack_quant_core::types::CurveId;
+
+        struct FailingFutureCurve {
+            id: CurveId,
+            base_date: Date,
+        }
+
+        impl Discounting for FailingFutureCurve {
+            fn id(&self) -> &CurveId {
+                &self.id
+            }
+
+            fn base_date(&self) -> Date {
+                self.base_date
+            }
+
+            fn df(&self, t: f64) -> finstack_quant_core::Result<f64> {
+                if t == 0.0 {
+                    Ok(1.0)
+                } else {
+                    Err(finstack_quant_core::Error::Validation(format!(
+                        "synthetic curve failure at t={t}"
+                    )))
+                }
+            }
+
+            fn instantaneous_forward(&self, t: f64) -> finstack_quant_core::Result<f64> {
+                Err(finstack_quant_core::Error::Validation(format!(
+                    "synthetic forward failure at t={t}"
+                )))
+            }
+        }
+
+        let curve = FailingFutureCurve {
+            id: CurveId::new("FAIL-DISC"),
+            base_date: date!(2026 - 01 - 15),
+        };
+        let model_curve = ModelDiscountCurve::new(&curve, curve.base_date).expect("rebased curve");
+        let adapter = FallibleDiscountFn::new(&model_curve);
+
+        assert!(fd_instantaneous_forward(&|t| adapter.eval(t), 0.0).is_none());
+        let err = adapter
+            .take_error()
+            .expect("adapter must latch underlying curve error");
+        assert!(
+            err.to_string().contains("synthetic curve failure"),
+            "unexpected latched error: {err}"
+        );
+        assert!(adapter.take_error().is_none());
     }
 }
 

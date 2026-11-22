@@ -269,6 +269,13 @@ impl AssetBackedFacility {
     /// Returns the deal's validation or simulation errors, or
     /// `Error::Validation` when the engine does not report both synthetic
     /// classes.
+    #[tracing::instrument(
+        name = "asset_backed_facility.project",
+        level = "debug",
+        skip(self, market),
+        fields(inst_id = %self.id.as_str(), as_of = %as_of),
+        err,
+    )]
     pub fn project(
         &self,
         market: &MarketContext,
@@ -355,6 +362,13 @@ impl AssetBackedFacility {
     ///
     /// Returns the projection errors, or `Error::Validation` when no rate
     /// solves.
+    #[tracing::instrument(
+        name = "asset_backed_facility.facility_irr",
+        level = "debug",
+        skip(self, market),
+        fields(inst_id = %self.id.as_str(), as_of = %as_of),
+        err,
+    )]
     pub fn facility_irr(
         &self,
         market: &MarketContext,
@@ -496,6 +510,13 @@ impl Instrument for AssetBackedFacility {
         Ok(deps)
     }
 
+    #[tracing::instrument(
+        name = "asset_backed_facility.base_value",
+        level = "debug",
+        skip(self, market),
+        fields(inst_id = %self.id(), as_of = %as_of),
+        err,
+    )]
     fn base_value(
         &self,
         market: &MarketContext,

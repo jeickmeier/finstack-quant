@@ -169,6 +169,17 @@ impl<N: Hw1fNote> Pricer for Hw1fNotePricer<N> {
         PricerKey::new(N::INSTRUMENT_TYPE, ModelKey::MonteCarloHullWhite1F)
     }
 
+    #[tracing::instrument(
+        name = "hw1f_note.mc.price_dyn",
+        level = "debug",
+        skip(self, instrument, market),
+        fields(
+            note = N::LABEL,
+            inst_id = %instrument.id(),
+            as_of = %as_of,
+        ),
+        err,
+    )]
     fn price_dyn(
         &self,
         instrument: &dyn Instrument,

@@ -3,7 +3,9 @@ use super::{
     MarketConditions, PaymentCalculation, PaymentType, Recipient, RecipientType, StructuredCredit,
     TemplateFees, TrancheSeniority, Waterfall,
 };
-use crate::structured_credit::assumptions::embedded_registry_or_panic;
+use crate::structured_credit::assumptions::{
+    DEFAULT_REFI_RATE, default_default_spec, default_prepayment_spec, default_recovery_spec,
+};
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
@@ -11,7 +13,7 @@ use finstack_quant_core::money::Money;
 impl Default for MarketConditions {
     fn default() -> Self {
         Self {
-            refi_rate: embedded_registry_or_panic().market_conditions(),
+            refi_rate: DEFAULT_REFI_RATE,
         }
     }
 }
@@ -34,15 +36,15 @@ impl Default for CreditModelConfig {
 
 impl CreditModelConfig {
     pub(super) fn default_prepayment_spec() -> PrepaymentModelSpec {
-        embedded_registry_or_panic().default_prepayment_spec()
+        default_prepayment_spec()
     }
 
     pub(super) fn default_default_spec() -> DefaultModelSpec {
-        embedded_registry_or_panic().default_default_spec()
+        default_default_spec()
     }
 
     pub(super) fn default_recovery_spec() -> RecoveryModelSpec {
-        embedded_registry_or_panic().default_recovery_spec()
+        default_recovery_spec()
     }
 }
 

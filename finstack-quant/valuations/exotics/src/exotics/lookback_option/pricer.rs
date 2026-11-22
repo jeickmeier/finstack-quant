@@ -215,6 +215,13 @@ impl Pricer for LookbackOptionMcPricer {
         PricerKey::new(InstrumentType::LookbackOption, ModelKey::MonteCarloGBM)
     }
 
+    #[tracing::instrument(
+        name = "lookback_option.mc.price_dyn",
+        level = "debug",
+        skip(self, instrument, market),
+        fields(inst_id = %instrument.id(), as_of = %as_of),
+        err,
+    )]
     fn price_dyn(
         &self,
         instrument: &dyn finstack_quant_valuations_core::instruments::Instrument,
@@ -422,6 +429,13 @@ impl Pricer for LookbackOptionAnalyticalPricer {
         )
     }
 
+    #[tracing::instrument(
+        name = "lookback_option.analytical.price_dyn",
+        level = "debug",
+        skip(self, instrument, market),
+        fields(inst_id = %instrument.id(), as_of = %as_of),
+        err,
+    )]
     fn price_dyn(
         &self,
         instrument: &dyn Instrument,

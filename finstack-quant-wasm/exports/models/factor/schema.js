@@ -1,4 +1,4 @@
-import * as wasm from '../../../pkg/finstack_quant_wasm.js';
+import { domainSchema } from '../../domainSchema.js';
 
 /**
  * Registry of the factor-model JSON Schemas.
@@ -10,8 +10,4 @@ import * as wasm from '../../../pkg/finstack_quant_wasm.js';
  * console.log(document.title);
  * ```
  */
-export const schema = {
-  index: wasm.factorSchemaIndex,
-  get: wasm.factorSchemaGet,
-  validate: wasm.factorSchemaValidate,
-};
+export const schema = domainSchema('factor_model');

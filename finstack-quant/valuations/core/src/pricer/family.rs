@@ -175,17 +175,41 @@ impl Family {
         Ok(registry)
     }
 
-    #[allow(clippy::expect_used)]
     fn registries(&'static self) -> &'static FamilyRegistries {
-        self.registries.get_or_init(|| FamilyRegistries {
-            pricers: Arc::new(
-                self.build_pricers()
-                    .expect("built-in pricer registrations must be valid"),
-            ),
-            metrics: Arc::new(
-                self.build_metrics()
-                    .expect("built-in metric registrations must be valid"),
-            ),
+        self.registries.get_or_init(|| {
+            let mut pricers = PricerRegistry::new();
+            pricers.set_allow_overwrite(true);
+            if let Err(err) = self.register_pricers(&mut pricers) {
+                tracing::error!(
+                    family = self.name,
+                    error = %err,
+                    "built-in pricer registration returned an error"
+                );
+            }
+            pricers.set_allow_overwrite(false);
+
+            let mut metrics = MetricRegistry::new();
+            metrics.set_allow_overwrite(true);
+            if let Err(err) = register_universal_metrics(&mut metrics) {
+                tracing::error!(
+                    family = self.name,
+                    error = %err,
+                    "universal metric registration returned an error"
+                );
+            }
+            if let Err(err) = self.register_metrics(&mut metrics) {
+                tracing::error!(
+                    family = self.name,
+                    error = %err,
+                    "built-in metric registration returned an error"
+                );
+            }
+            metrics.set_allow_overwrite(false);
+
+            FamilyRegistries {
+                pricers: Arc::new(pricers),
+                metrics: Arc::new(metrics),
+            }
         })
     }
 
@@ -241,5 +265,88 @@ mod tests {
             &family.shared_pricers()
         ));
         assert!(std::ptr::eq(family.metrics(), family.metrics()));
+    }
+
+    #[test]
+    fn duplicate_family_table_fails_strict_build_but_cached_accessors_stay_strict_after_init() {
+        use crate::instruments::Instrument;
+        use crate::metrics::{MetricCalculator, MetricContext};
+        use crate::pricer::{InstrumentType, ModelKey, Pricer, PricerKey};
+        use finstack_quant_core::dates::Date;
+        use finstack_quant_core::market_data::context::MarketContext;
+
+        struct StubPricer;
+        impl Pricer for StubPricer {
+            fn key(&self) -> PricerKey {
+                PricerKey::new(InstrumentType::Bond, ModelKey::Discounting)
+            }
+
+            fn price_dyn(
+                &self,
+                _instrument: &dyn Instrument,
+                _market: &MarketContext,
+                _as_of: Date,
+            ) -> Result<crate::results::ValuationResult, PricingError> {
+                Err(PricingError::UnknownPricer {
+                    key: self.key(),
+                    available_models: Vec::new(),
+                })
+            }
+        }
+
+        struct StubMetric;
+        impl MetricCalculator for StubMetric {
+            fn calculate(&self, _context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+                Ok(0.0)
+            }
+        }
+
+        fn dup_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
+            registry.register(StubPricer)?;
+            registry.register(StubPricer)
+        }
+
+        fn dup_metrics(registry: &mut MetricRegistry) -> Result<(), MetricRegistryError> {
+            registry.register_metric(
+                MetricId::Ytm,
+                Arc::new(StubMetric),
+                &[InstrumentType::Bond],
+            )?;
+            registry.register_metric(MetricId::Ytm, Arc::new(StubMetric), &[InstrumentType::Bond])
+        }
+
+        static DUP_FAMILY: Family = Family::new("dup_test", dup_pricers, dup_metrics);
+
+        assert!(matches!(
+            DUP_FAMILY.build_pricers(),
+            Err(PricingError::DuplicateRegistration { .. })
+        ));
+        assert!(matches!(
+            DUP_FAMILY.build_metrics(),
+            Err(MetricRegistryError::DuplicateRegistration { .. })
+        ));
+
+        // Cached &'static accessors initialize without panicking and reset strictness.
+        let mut cloned_pricers = DUP_FAMILY.pricers().clone();
+        assert!(
+            cloned_pricers
+                .get_pricer(PricerKey::new(InstrumentType::Bond, ModelKey::Discounting))
+                .is_some()
+        );
+        assert!(matches!(
+            cloned_pricers.register(StubPricer),
+            Err(PricingError::DuplicateRegistration { .. })
+        ));
+
+        let mut cloned_metrics = DUP_FAMILY.metrics().clone();
+        assert!(cloned_metrics.has_metric(MetricId::Ytm));
+        assert!(matches!(
+            cloned_metrics.register_metric(
+                MetricId::Ytm,
+                Arc::new(StubMetric),
+                &[InstrumentType::Bond]
+            ),
+            Err(MetricRegistryError::DuplicateRegistration { .. })
+        ));
     }
 }

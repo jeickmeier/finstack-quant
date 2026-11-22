@@ -1,7 +1,8 @@
 import * as wasm from '../../pkg/finstack_quant_wasm.js';
+import { domainSchema } from '../domainSchema.js';
 
 /**
- * Compiled-in JSON Schemas of the valuations wire format.
+ * Registry-backed JSON Schemas of the valuations wire format.
  *
  * Each accessor returns the JSON Schema document as a plain object that always matches this build;
  * `index` / `get` / `validate` cover every schema the valuations crate publishes.
@@ -14,9 +15,7 @@ import * as wasm from '../../pkg/finstack_quant_wasm.js';
  * ```
  */
 export const schema = {
-  index: wasm.valuationsSchemaIndex,
-  get: wasm.valuationsSchemaGet,
-  validate: wasm.valuationsSchemaValidate,
+  ...domainSchema('valuations'),
   instrumentEnvelopeSchema: wasm.instrumentEnvelopeSchema,
   instrumentTypes: wasm.instrumentTypes,
   instrumentSchema: wasm.instrumentSchema,

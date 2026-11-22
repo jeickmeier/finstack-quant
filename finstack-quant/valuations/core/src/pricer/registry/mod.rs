@@ -110,6 +110,7 @@ pub trait Pricer: Send + Sync {
 #[derive(Clone, Default)]
 pub struct PricerRegistry {
     pricers: Arc<BTreeMap<PricerKey, Arc<dyn Pricer>>>,
+    allow_overwrite: bool,
 }
 /// Pricing path used consistently by base, bumped, theta, and scenario valuations.
 #[derive(Clone, Default)]
@@ -233,6 +234,10 @@ impl PricerRegistry {
         Self::default()
     }
 
+    pub(crate) fn set_allow_overwrite(&mut self, allow: bool) {
+        self.allow_overwrite = allow;
+    }
+
     /// Register a pricer under its authoritative key.
     ///
     /// Returns [`PricingError::DuplicateRegistration`] without mutating the
@@ -248,7 +253,14 @@ impl PricerRegistry {
     ) -> std::result::Result<(), PricingError> {
         let key = pricer.key();
         if self.pricers.contains_key(&key) {
-            return Err(PricingError::DuplicateRegistration { key });
+            if !self.allow_overwrite {
+                return Err(PricingError::DuplicateRegistration { key });
+            }
+            tracing::error!(
+                instrument = %key.instrument,
+                model = %key.model,
+                "duplicate built-in pricer registration overwritten"
+            );
         }
         Arc::make_mut(&mut self.pricers).insert(key, Arc::new(pricer));
         Ok(())

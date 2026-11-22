@@ -12,5 +12,3 @@
 finstack-quant/margin/src/registry/mod.rs: clippy::expect_used: embedded margin registry, read by Default impls
 finstack-quant/models/src/monte_carlo/registry.rs: clippy::expect_used: embedded Monte Carlo defaults, read by pricer-config Default impls
 finstack-quant/statements-analytics/src/analysis/ecl/policy.rs: clippy::expect_used: embedded ECL policy registry, read by EclConfig/StagingConfig/CeclConfig Default
-finstack-quant/valuations/core/src/pricer/family.rs: clippy::expect_used: per-family registries built from code on first use; &'static accessors
-finstack-quant/valuations/structured-credit/src/structured_credit/assumptions.rs: clippy::expect_used: embedded structured-credit assumptions, read by Default impls and constructors

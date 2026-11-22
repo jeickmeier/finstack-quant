@@ -59,7 +59,7 @@
 //!
 //! - [`crate::constants`]: shared numerical constants.
 //! - [`crate::schema`]: JSON Schema generation for API contracts.
-//! - [`crate::Error`] and [`crate::Result`]: valuation error types, at the crate root.
+//! - [`finstack_quant_core::Error`], [`finstack_quant_core::Result`], and [`crate::pricer::PricingError`]: shared and pricing-specific error types.
 //!
 //! # Example
 //!

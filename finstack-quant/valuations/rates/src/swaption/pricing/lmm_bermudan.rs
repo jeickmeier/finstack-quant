@@ -184,29 +184,31 @@ pub fn price_bermudan_lmm(
     // Split-sample partition (see `Hw1fMcConfig::split`).
     let split = config.split();
 
-    // Polynomial basis: [1, S, A, S^2, S*A, S^3, ...]
-    let make_basis = |sr: f64, ann: f64| -> Vec<f64> {
-        let mut b = Vec::with_capacity(config.basis_degree + 3);
-        b.push(1.0);
-        b.push(sr);
-        b.push(ann);
-        if config.basis_degree >= 2 {
-            b.push(sr * sr);
-            b.push(sr * ann);
-        }
-        if config.basis_degree >= 3 {
-            b.push(sr * sr * sr);
-        }
-        b
+    // Polynomial basis: [1, S, A, S^2, S*A, S^3] stored on the stack (max 6 terms)
+    // to avoid per-path heap allocations inside the backward induction loop.
+    let num_basis = if config.basis_degree >= 3 {
+        6
+    } else if config.basis_degree >= 2 {
+        5
+    } else {
+        3
     };
+    let eval_basis =
+        |sr: f64, ann: f64| -> [f64; 6] { [1.0, sr, ann, sr * sr, sr * ann, sr * sr * sr] };
+
+    // Reused scratch buffers across exercise dates.
+    let mut exercise_values = Vec::with_capacity(total_paths);
+    let mut basis_inputs = Vec::with_capacity(total_paths);
+    let mut itm_continuation = Vec::with_capacity(total_paths);
+    let mut a_matrix = Vec::with_capacity(total_paths * num_basis);
 
     // Iterate backward through exercise dates
     for ex_idx in (0..exercise_step_indices.len()).rev() {
         let step = exercise_step_indices[ex_idx];
         let t_exercise = time_grid.time(step);
 
-        let mut exercise_values = Vec::with_capacity(total_paths);
-        let mut basis_inputs = Vec::with_capacity(total_paths);
+        exercise_values.clear();
+        basis_inputs.clear();
 
         // Index of the first forward still alive at this exercise date.
         // A forward `j` is alive while its fixing date `T_j >= t`. The
@@ -273,38 +275,30 @@ pub fn price_bermudan_lmm(
             // way, so exercise vs continuation is compared in a single
             // consistent accounting unit.
 
-            // Collect ITM train paths for regression. In split-sample mode
-            // only train paths feed the fit; the fitted rule is applied to
-            // every ITM path below so price paths get it out-of-sample.
-            let mut itm_indices = Vec::new();
-            let mut itm_basis = Vec::new();
-            let mut itm_continuation = Vec::new();
+            // Collect ITM train paths for regression directly into flat buffers.
+            // In split-sample mode only train paths feed the fit; the fitted
+            // rule is applied to every ITM path below so price paths get it
+            // out-of-sample.
+            a_matrix.clear();
+            itm_continuation.clear();
 
             for (i, &ev) in exercise_values.iter().enumerate() {
                 if ev > 0.0 && split.is_train(i) {
-                    itm_indices.push(i);
                     let (sr, ann) = basis_inputs[i];
-                    itm_basis.push(make_basis(sr, ann));
+                    let basis = eval_basis(sr, ann);
+                    a_matrix.extend_from_slice(&basis[..num_basis]);
                     itm_continuation.push(cashflow[i]);
                 }
             }
 
-            if itm_indices.len() > config.basis_degree + 3 {
+            if itm_continuation.len() > config.basis_degree + 3 {
                 // Solve least-squares regression. A regression failure is a
                 // hard error (matching the HW1F LSMC harness) rather than a
                 // silent skip that would leave biased continuation values.
-                let num_basis = itm_basis.first().map_or(0, |b| b.len());
-                let mut a_matrix = vec![0.0; itm_indices.len() * num_basis];
-                for (row, basis) in itm_basis.iter().enumerate() {
-                    for (col, &val) in basis.iter().enumerate() {
-                        a_matrix[row * num_basis + col] = val;
-                    }
-                }
-
                 let coeffs = solve_least_squares(
                     &a_matrix,
                     &itm_continuation,
-                    itm_indices.len(),
+                    itm_continuation.len(),
                     num_basis,
                 )?;
                 // Apply the fitted rule to every ITM path (train and price).
@@ -313,8 +307,12 @@ pub fn price_bermudan_lmm(
                         continue;
                     }
                     let (sr, ann) = basis_inputs[i];
-                    let basis = make_basis(sr, ann);
-                    let cont_value: f64 = basis.iter().zip(coeffs.iter()).map(|(b, c)| b * c).sum();
+                    let basis = eval_basis(sr, ann);
+                    let cont_value: f64 = basis[..num_basis]
+                        .iter()
+                        .zip(coeffs.iter())
+                        .map(|(b, c)| b * c)
+                        .sum();
                     if ev > cont_value {
                         cashflow[i] = ev;
                     }

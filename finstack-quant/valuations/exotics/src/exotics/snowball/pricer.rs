@@ -256,6 +256,13 @@ impl Pricer for SnowballDiscountingPricer {
         PricerKey::new(InstrumentType::Snowball, ModelKey::Discounting)
     }
 
+    #[tracing::instrument(
+        name = "snowball.discounting.price_dyn",
+        level = "debug",
+        skip(self, instrument, market),
+        fields(inst_id = %instrument.id(), as_of = %as_of),
+        err,
+    )]
     fn price_dyn(
         &self,
         instrument: &dyn Instrument,

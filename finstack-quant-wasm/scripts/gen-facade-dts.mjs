@@ -128,6 +128,8 @@ function parseModule(file) {
     source,
     imports: new Map(),
     locals: new Map(),
+    factories: new Map(),
+    exportedFactories: new Map(),
     objects: new Map(),
     exportsByName: new Map(),
     facadeType,
@@ -192,18 +194,58 @@ function parseModule(file) {
       for (const el of st.importClause.namedBindings.elements)
         module.imports.set(el.name.text, { file: from, name: (el.propertyName ?? el.name).text });
     }
-    if (ts.isFunctionDeclaration(st) && st.name) module.locals.set(st.name.text, facadeType(st));
+    if (ts.isFunctionDeclaration(st) && st.name) {
+      module.locals.set(st.name.text, facadeType(st));
+      const ret = st.body?.statements.length === 1 ? st.body.statements[0] : null;
+      if (
+        ret &&
+        ts.isReturnStatement(ret) &&
+        ret.expression &&
+        ts.isObjectLiteralExpression(ret.expression)
+      ) {
+        module.factories.set(st.name.text, ret.expression);
+        if (isExported(st)) module.exportedFactories.set(st.name.text, ret.expression);
+      }
+    }
     if (ts.isVariableStatement(st))
       for (const d of st.declarationList.declarations) {
         if (!ts.isIdentifier(d.name) || !d.initializer) continue;
         if (ts.isObjectLiteralExpression(d.initializer)) {
-          module.objects.set(d.name.text, d.initializer);
-          if (isExported(st)) module.exportsByName.set(d.name.text, d.initializer);
-        } else module.locals.set(d.name.text, facadeType(st));
+          const entry = { module, object: d.initializer, docModule: module, docNode: st };
+          module.objects.set(d.name.text, entry);
+          if (isExported(st)) module.exportsByName.set(d.name.text, entry);
+        } else {
+          const factory = resolveFactoryCall(module, d.initializer);
+          if (factory) {
+            const entry = {
+              module: factory.module,
+              object: factory.object,
+              docModule: module,
+              docNode: st,
+            };
+            module.objects.set(d.name.text, entry);
+            if (isExported(st)) module.exportsByName.set(d.name.text, entry);
+          } else module.locals.set(d.name.text, facadeType(st));
+        }
       }
   }
   parsed.set(file, module);
   return module;
+}
+
+// Resolve `factory(...)` when the callee is a helper function returning an
+// object literal (such as `domainSchema('core')`).
+function resolveFactoryCall(module, expr) {
+  if (!ts.isCallExpression(expr) || !ts.isIdentifier(expr.expression)) return null;
+  const callee = expr.expression.text;
+  if (module.imports.has(callee)) {
+    const target = module.imports.get(callee);
+    const child = parseModule(target.file);
+    const object = child.exportedFactories.get(target.name);
+    return object ? { module: child, object } : null;
+  }
+  if (module.factories.has(callee)) return { module, object: module.factories.get(callee) };
+  return null;
 }
 
 // ── Namespace tree ────────────────────────────────────────────────────────────
@@ -212,8 +254,8 @@ const pascal = (segments) =>
 const interfaces = []; // { name, doc, members: [{ key, type, doc }] }
 // The doc comment on the statement that declares a namespace object (not a
 // `@facadeType` / `@facadeClass` block), or null.
-function namespaceDoc(module, object) {
-  let statement = object;
+function namespaceDoc(module, node) {
+  let statement = node;
   while (statement && !ts.isVariableStatement(statement)) statement = statement.parent;
   if (!statement) return null;
   const blocks = (ts.getLeadingCommentRanges(module.text, statement.getFullStart()) ?? [])
@@ -221,10 +263,17 @@ function namespaceDoc(module, object) {
     .filter((c) => c.startsWith('/**') && !/@facade(Type|Class)/.test(c));
   return blocks.at(-1) ?? null;
 }
-function buildNamespace(module, object, segments) {
-  const name = `${pascal(segments)}Namespace`;
-  const members = [];
+function collectNamespaceMembers(module, object, segments, members) {
   for (const property of object.properties) {
+    if (ts.isSpreadAssignment(property)) {
+      const spread = resolveFactoryCall(module, property.expression);
+      if (!spread)
+        fail(
+          `${segments.join('.')}: cannot declare spread \`${property.getText(module.source).slice(0, 60)}\``
+        );
+      collectNamespaceMembers(spread.module, spread.object, segments, members);
+      continue;
+    }
     const key = property.name.getText(module.source);
     const where = `${segments.join('.')}.${key}`;
     if (
@@ -256,14 +305,14 @@ function buildNamespace(module, object, segments) {
     if (local && module.imports.has(local)) {
       const target = module.imports.get(local);
       const child = parseModule(target.file);
-      const childObject =
+      const childEntry =
         child.exportsByName.get(target.name) ??
         fail(`${where}: ${target.name} is not an exported object in ${target.file}`);
-      members.push({ key, type: buildNamespace(child, childObject, [...segments, key]) });
+      members.push({ key, type: buildNamespace(childEntry, [...segments, key]) });
     } else if (local && module.objects.has(local)) {
       members.push({
         key,
-        type: buildNamespace(module, module.objects.get(local), [...segments, key]),
+        type: buildNamespace(module.objects.get(local), [...segments, key]),
       });
     } else if (local && module.locals.has(local)) {
       const wrapper = module.locals.get(local);
@@ -274,7 +323,12 @@ function buildNamespace(module, object, segments) {
       members.push({ key, type: wrapper.type, doc: wrapper.doc, wrapper: true });
     } else fail(`${where}: cannot declare \`${property.getText(module.source).slice(0, 60)}\``);
   }
-  interfaces.push({ name, doc: namespaceDoc(module, object), members });
+}
+function buildNamespace(entry, segments) {
+  const name = `${pascal(segments)}Namespace`;
+  const members = [];
+  collectNamespaceMembers(entry.module, entry.object, segments, members);
+  interfaces.push({ name, doc: namespaceDoc(entry.docModule, entry.docNode), members });
   return name;
 }
 
@@ -294,10 +348,10 @@ for (const st of index.statements) {
   const module = parseModule(path.resolve(PACKAGE, specifier));
   for (const el of st.exportClause.elements) {
     const exported = el.name.text;
-    const object =
+    const entry =
       module.exportsByName.get((el.propertyName ?? el.name).text) ??
       fail(`index.js: ${exported} is not an exported object`);
-    roots.push({ exported, iface: buildNamespace(module, object, [exported]) });
+    roots.push({ exported, iface: buildNamespace(entry, [exported]) });
   }
 }
 

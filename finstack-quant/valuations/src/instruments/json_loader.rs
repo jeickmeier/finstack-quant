@@ -285,6 +285,8 @@ macro_rules! instrument_payload {
     (unwrap boxed $value:expr_2021) => { *$value };
     (as_dyn plain $value:expr_2021) => { $value as &dyn Instrument };
     (as_dyn boxed $value:expr_2021) => { $value.as_ref() as &dyn Instrument };
+    (as_dyn_mut plain $value:expr_2021) => { $value as &mut dyn Instrument };
+    (as_dyn_mut boxed $value:expr_2021) => { $value.as_mut() as &mut dyn Instrument };
 }
 
 /// Equality probe for [`InstrumentJson::semantic_eq`], resolved per payload type
@@ -378,6 +380,13 @@ macro_rules! define_instrument_json {
                 }
             }
 
+            /// Borrow the payload mutably as a runtime instrument.
+            pub(crate) fn as_dyn_instrument_mut(&mut self) -> &mut dyn Instrument {
+                match self {
+                    $(Self::$variant(instrument) => instrument_payload!(as_dyn_mut $kind instrument),)*
+                }
+            }
+
             /// Typed equality of two payloads, for the instrument types whose Rust
             /// type implements `PartialEq`.
             ///
@@ -413,11 +422,15 @@ macro_rules! define_instrument_json {
         /// through [`crate::schema::instrument_types`].
         pub(crate) const INSTRUMENT_TYPES: &[&str] = &[$($tag,)*];
 
-        /// Build the canonical instrument registry used by serde, schemas, fixtures,
+        /// Return the canonical instrument registry used by serde, schemas, fixtures,
         /// runtime schema lookup, and binding tag exposure.
+        ///
+        /// Built once lazily and cached for the process lifetime.
         #[must_use]
-        pub fn instrument_registry() -> Vec<InstrumentRegistryEntry> {
-            vec![$({
+        pub fn instrument_registry() -> &'static [InstrumentRegistryEntry] {
+            static REGISTRY: std::sync::OnceLock<Vec<InstrumentRegistryEntry>> =
+                std::sync::OnceLock::new();
+            REGISTRY.get_or_init(|| vec![$({
                 fn examples() -> Result<Vec<serde_json::Value>> {
                     let spec: $ty = $example?;
                     let value = serde_json::to_value(InstrumentEnvelope::new(
@@ -433,17 +446,6 @@ macro_rules! define_instrument_json {
                         schema_example_error(concat!("validate ", $tag, " example"), error)
                     })?;
                     Ok(vec![value])
-                }
-
-                fn embedded_schema() -> std::result::Result<serde_json::Value, String> {
-                    serde_json::from_str(include_str!(concat!(
-                        "../../schemas/instruments/1/",
-                        $category,
-                        "/",
-                        $tag,
-                        ".schema.json"
-                    )))
-                    .map_err(|error| format!("invalid embedded schema for {}: {error}", $tag))
                 }
 
                 InstrumentRegistryEntry {
@@ -464,9 +466,8 @@ macro_rules! define_instrument_json {
                     .with_examples(examples),
                     fixture_path: concat!("tests/instruments/json_examples/", $tag, ".json"),
                     examples,
-                    embedded_schema,
                 }
-            },)*]
+            },)*])
         }
 
         /// The registry-backed tagged union of a runtime instrument.
@@ -487,13 +488,28 @@ macro_rules! define_instrument_json {
         /// `Some(InstrumentJson)` for a registered runtime type, or `None` for an
         /// unregistered implementation.
         pub fn instrument_json_of(instrument: &dyn Instrument) -> Option<InstrumentJson> {
+            type Converter = fn(&dyn std::any::Any) -> Option<InstrumentJson>;
+            static DISPATCH: std::sync::OnceLock<
+                std::collections::HashMap<std::any::TypeId, Converter>,
+            > = std::sync::OnceLock::new();
+            let table = DISPATCH.get_or_init(|| {
+                let mut map = std::collections::HashMap::with_capacity(INSTRUMENT_TYPES.len());
+                $(
+                    map.insert(
+                        std::any::TypeId::of::<$ty>(),
+                        (|value: &dyn std::any::Any| {
+                            value.downcast_ref::<$ty>().map(|instrument| {
+                                InstrumentJson::$variant(instrument_payload!(wrap $kind instrument.clone()))
+                            })
+                        }) as Converter,
+                    );
+                )*
+                map
+            });
             let value = instrument.as_any();
-            $(
-                if let Some(instrument) = value.downcast_ref::<$ty>() {
-                    return Some(InstrumentJson::$variant(instrument_payload!(wrap $kind instrument.clone())));
-                }
-            )*
-            None
+            table
+                .get(&(*value).type_id())
+                .and_then(|convert| convert(value))
         }
 
         $(
@@ -541,7 +557,6 @@ pub struct InstrumentRegistryEntry {
     /// Canonical generated fixture path relative to this crate.
     pub fixture_path: &'static str,
     examples: fn() -> Result<Vec<serde_json::Value>>,
-    embedded_schema: fn() -> std::result::Result<serde_json::Value, String>,
 }
 
 impl InstrumentRegistryEntry {
@@ -553,10 +568,6 @@ impl InstrumentRegistryEntry {
     /// serialized, or deserialized through its single-instrument envelope.
     pub fn examples(&self) -> Result<Vec<serde_json::Value>> {
         (self.examples)()
-    }
-
-    pub(crate) fn load_embedded_schema(&self) -> std::result::Result<serde_json::Value, String> {
-        (self.embedded_schema)()
     }
 }
 
@@ -1655,5 +1666,25 @@ mod tests {
                 panic!("{} and {} share an index summary", other, entry.tag);
             }
         }
+    }
+
+    #[test]
+    fn instrument_registry_is_cached_and_json_of_dispatches_plain_and_boxed() {
+        let first = instrument_registry();
+        let second = instrument_registry();
+        assert!(std::ptr::eq(first.as_ptr(), second.as_ptr()));
+        assert_eq!(first.len(), INSTRUMENT_TYPES.len());
+
+        let bond = Bond::example().expect("bond example");
+        assert!(matches!(
+            instrument_json_of(&bond),
+            Some(InstrumentJson::Bond(_))
+        ));
+
+        let composite = CompositeInstrument::example().expect("composite example");
+        assert!(matches!(
+            instrument_json_of(&composite),
+            Some(InstrumentJson::Composite(_))
+        ));
     }
 }

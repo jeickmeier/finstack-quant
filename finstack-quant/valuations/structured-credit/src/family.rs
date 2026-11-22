@@ -64,6 +64,13 @@ impl Pricer for StructuredCreditDiscountingPricer {
         PricerKey::new(InstrumentType::StructuredCredit, ModelKey::Discounting)
     }
 
+    #[tracing::instrument(
+        name = "structured_credit.discounting.price_dyn",
+        level = "debug",
+        skip(self, instrument, market),
+        fields(inst_id = %instrument.id(), as_of = %as_of),
+        err,
+    )]
     fn price_dyn(
         &self,
         instrument: &dyn Instrument,
@@ -119,6 +126,13 @@ impl Pricer for StructuredCreditTrancheDiscountingPricer {
         )
     }
 
+    #[tracing::instrument(
+        name = "structured_credit_tranche.discounting.price_dyn",
+        level = "debug",
+        skip(self, instrument, market),
+        fields(inst_id = %instrument.id(), as_of = %as_of),
+        err,
+    )]
     fn price_dyn(
         &self,
         instrument: &dyn Instrument,
@@ -150,6 +164,13 @@ impl Pricer for StructuredCreditStochasticPricer {
         )
     }
 
+    #[tracing::instrument(
+        name = "structured_credit.stochastic.price_dyn",
+        level = "debug",
+        skip(self, instrument, market),
+        fields(inst_id = %instrument.id(), as_of = %as_of),
+        err,
+    )]
     fn price_dyn(
         &self,
         instrument: &dyn Instrument,

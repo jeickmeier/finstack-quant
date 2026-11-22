@@ -779,6 +779,13 @@ impl finstack_quant_valuations_core::instruments::Instrument for Ndf {
         Ok(deps)
     }
 
+    #[tracing::instrument(
+        name = "ndf.base_value",
+        level = "debug",
+        skip(self, market),
+        fields(inst_id = %self.id(), as_of = %as_of),
+        err,
+    )]
     fn base_value(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,

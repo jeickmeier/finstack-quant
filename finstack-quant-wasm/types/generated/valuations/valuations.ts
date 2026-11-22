@@ -21188,33 +21188,38 @@ export interface OasResult {
  */
 export interface PoolAccounts {
   /**
-   * Collection account balance ([`AssetPool::collection_account`]).
+   * Collection account balance
+   * ([`AssetPool::collection_account`](super::AssetPool::collection_account)).
    */
   collection_account?: Money | null;
   /**
-   * Cumulative defaults to date ([`AssetPool::cumulative_defaults`]).
+   * Cumulative defaults to date
+   * ([`AssetPool::cumulative_defaults`](super::AssetPool::cumulative_defaults)).
    */
   cumulative_defaults?: Money | null;
   /**
-   * Cumulative voluntary prepayments ([`AssetPool::cumulative_prepayments`]).
+   * Cumulative voluntary prepayments
+   * ([`AssetPool::cumulative_prepayments`](super::AssetPool::cumulative_prepayments)).
    */
   cumulative_prepayments?: Money | null;
   /**
    * Cumulative recoveries on defaulted assets
-   * ([`AssetPool::cumulative_recoveries`]).
+   * ([`AssetPool::cumulative_recoveries`](super::AssetPool::cumulative_recoveries)).
    */
   cumulative_recoveries?: Money | null;
   /**
    * Cumulative scheduled amortization
-   * ([`AssetPool::cumulative_scheduled_amortization`]).
+   * ([`AssetPool::cumulative_scheduled_amortization`](super::AssetPool::cumulative_scheduled_amortization)).
    */
   cumulative_scheduled_amortization?: Money | null;
   /**
-   * Excess spread account balance ([`AssetPool::excess_spread_account`]).
+   * Excess spread account balance
+   * ([`AssetPool::excess_spread_account`](super::AssetPool::excess_spread_account)).
    */
   excess_spread_account?: Money | null;
   /**
-   * Original (cut-off) pool balance ([`AssetPool::original_balance`]).
+   * Original (cut-off) pool balance
+   * ([`AssetPool::original_balance`](super::AssetPool::original_balance)).
    */
   original_balance?: Money | null;
 }
@@ -21298,7 +21303,7 @@ export interface PoolStats {
   defaulted_balance_pct: number;
   /**
    * Diversity score (Moody's methodology) of the assets that name an obligor;
-   * `None` when none does. See [`AssetPool::diversity_score`].
+   * `None` when none does. See [`AssetPool::diversity_score`](super::AssetPool::diversity_score).
    */
   diversity_score?: number | null;
   /**
@@ -21318,7 +21323,7 @@ export interface PoolStats {
   undrawn_commitment?: number;
   /**
    * Weighted-average coupon (annual decimal) of the performing fixed-rate
-   * collateral; `None` when there is none. See [`AssetPool::wac`].
+   * collateral; `None` when there is none. See [`AssetPool::wac`](super::AssetPool::wac).
    */
   wac?: number | null;
   /**
@@ -21332,7 +21337,7 @@ export interface PoolStats {
   /**
    * Weighted-average spread in basis points of the performing collateral
    * that carries an explicit `spread_bp`; `None` when there is none. See
-   * [`AssetPool::weighted_avg_spread_bp`].
+   * [`AssetPool::weighted_avg_spread_bp`](super::AssetPool::weighted_avg_spread_bp).
    */
   weighted_avg_spread_bp?: number | null;
 }

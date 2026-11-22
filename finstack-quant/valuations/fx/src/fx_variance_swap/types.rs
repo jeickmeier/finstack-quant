@@ -476,6 +476,13 @@ impl Instrument for FxVarianceSwap {
         Ok(deps)
     }
 
+    #[tracing::instrument(
+        name = "fx_variance_swap.base_value",
+        level = "debug",
+        skip(self, context),
+        fields(inst_id = %self.id(), as_of = %as_of),
+        err,
+    )]
     fn base_value(&self, context: &MarketContext, as_of: Date) -> Result<Money> {
         pricer::compute_pv(self, context, as_of)
     }

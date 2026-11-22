@@ -199,7 +199,8 @@ Generated schemas use canonical external refs for repeated shapes:
 
 Validators must resolve these `$id` URIs. Offline validators should register the
 checked-in files as in-memory resources keyed by their `$id` values. The Rust
-runtime validation helpers do this automatically for embedded schemas.
+runtime validation helpers generate and register these shared schemas
+automatically on demand.
 
 `exotics/basket.schema.json` is the single canonical basket schema; there is no
 separate "basket with instruments" artifact.
@@ -240,7 +241,8 @@ schema `$ref`s another instrument schema, and neither does
 the envelope included.
 
 In Rust, use `finstack_quant_valuations::schema::validate_instrument_envelope_json()`
-for runtime validation against the embedded schemas, or
+for runtime validation against the generated schemas (rendered on demand and
+cached in-process with format validation enabled), or
 `validate_instrument_type_json()` when the discriminator is already known. The
 umbrella crate's `finstack_quant::schema::validate()` resolves cross-crate
 `$ref`s and drills into `oneOf` failures so the reported error names the field

@@ -337,6 +337,13 @@ impl Pricer for RangeAccrualMcPricer {
         PricerKey::new(InstrumentType::RangeAccrual, ModelKey::MonteCarloGBM)
     }
 
+    #[tracing::instrument(
+        name = "range_accrual.mc.price_dyn",
+        level = "debug",
+        skip(self, instrument, market),
+        fields(inst_id = %instrument.id(), as_of = %as_of),
+        err,
+    )]
     fn price_dyn(
         &self,
         instrument: &dyn finstack_quant_valuations_core::instruments::Instrument,
@@ -359,6 +366,13 @@ impl Pricer for RangeAccrualStaticReplicationPricer {
         PricerKey::new(InstrumentType::RangeAccrual, ModelKey::StaticReplication)
     }
 
+    #[tracing::instrument(
+        name = "range_accrual.static_replication.price_dyn",
+        level = "debug",
+        skip(self, instrument, market),
+        fields(inst_id = %instrument.id(), as_of = %as_of),
+        err,
+    )]
     fn price_dyn(
         &self,
         instrument: &dyn Instrument,

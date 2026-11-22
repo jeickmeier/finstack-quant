@@ -175,7 +175,14 @@ fn financing_period_projection(
                     )?,
                 )
             } else if period_start == as_of {
-                fixings.and_then(|series| series.get_value_exact(period_start).ok())
+                match fixings {
+                    Some(series) => match series.get_value_exact(period_start) {
+                        Ok(rate) => Some(rate),
+                        Err(err) if err.kind() == finstack_quant_core::ErrorKind::NotFound => None,
+                        Err(err) => return Err(err),
+                    },
+                    None => None,
+                }
             } else {
                 None
             };
@@ -280,11 +287,15 @@ fn for_each_financing_period(
     mut visit: impl FnMut(Date, FinancingPeriodProjection) -> finstack_quant_core::Result<()>,
 ) -> finstack_quant_core::Result<()> {
     let fwd = market.get_forward(financing.forward_curve_id.as_str())?;
-    let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
-        market,
+    let index_id = finstack_quant_core::market_data::fixings::validate_fixing_index_id(
         financing.forward_curve_id.as_str(),
-    )
-    .ok();
+    )?;
+    let fixing_id = fixing_series_id(index_id);
+    let fixings = match market.get_series(&fixing_id) {
+        Ok(series) => Some(series),
+        Err(err) if err.kind() == finstack_quant_core::ErrorKind::NotFound => None,
+        Err(err) => return Err(err),
+    };
     let period_schedule = schedule.period_schedule()?;
     // Overnight accrual boundaries always land on business days; unadjusted
     // schedules fall back to Modified Following for that adjustment.

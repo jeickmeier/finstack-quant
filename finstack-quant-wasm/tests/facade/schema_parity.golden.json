@@ -149,28 +149,28 @@
       },
       "report": [
         {
-          "message": "Additional properties are not allowed ('not_a_field' was unexpected)",
-          "pointer": ""
+          "pointer": "",
+          "message": "Additional properties are not allowed ('not_a_field' was unexpected)"
         },
         {
-          "message": "\"tickers\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"tickers\" is a required property"
         },
         {
-          "message": "\"matrix\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"matrix\" is a required property"
         },
         {
-          "message": "\"n_obs\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"n_obs\" is a required property"
         },
         {
-          "message": "\"start_date\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"start_date\" is a required property"
         },
         {
-          "message": "\"end_date\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"end_date\" is a required property"
         }
       ]
     },
@@ -280,16 +280,16 @@
       },
       "report": [
         {
-          "message": "Additional properties are not allowed ('not_a_field' was unexpected)",
-          "pointer": ""
+          "pointer": "",
+          "message": "Additional properties are not allowed ('not_a_field' was unexpected)"
         },
         {
-          "message": "\"calendar\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"calendar\" is a required property"
         },
         {
-          "message": "\"periods\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"periods\" is a required property"
         }
       ]
     },
@@ -1025,16 +1025,16 @@
       },
       "report": [
         {
-          "message": "Additional properties are not allowed ('not_a_field' was unexpected)",
-          "pointer": ""
+          "pointer": "",
+          "message": "Additional properties are not allowed ('not_a_field' was unexpected)"
         },
         {
-          "message": "\"schema\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"schema\" is a required property"
         },
         {
-          "message": "\"attribution\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"attribution\" is a required property"
         }
       ]
     },
@@ -1334,16 +1334,16 @@
       },
       "report": [
         {
-          "message": "Additional properties are not allowed ('not_a_field' was unexpected)",
-          "pointer": ""
+          "pointer": "",
+          "message": "Additional properties are not allowed ('not_a_field' was unexpected)"
         },
         {
-          "message": "\"schema\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"schema\" is a required property"
         },
         {
-          "message": "\"plan\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"plan\" is a required property"
         }
       ]
     },
@@ -1466,12 +1466,12 @@
       },
       "report": [
         {
-          "message": "\"none\" was expected",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"none\" was expected"
         },
         {
-          "message": "{\"not_a_field\":1} is not of type \"string\"",
-          "pointer": ""
+          "pointer": "",
+          "message": "{\"not_a_field\":1} is not of type \"string\""
         }
       ]
     },
@@ -1732,36 +1732,36 @@
       },
       "report": [
         {
-          "message": "\"ead\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"ead\" is a required property"
         },
         {
-          "message": "\"rc\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"rc\" is a required property"
         },
         {
-          "message": "\"pfe\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"pfe\" is a required property"
         },
         {
-          "message": "\"multiplier\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"multiplier\" is a required property"
         },
         {
-          "message": "\"add_on_aggregate\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"add_on_aggregate\" is a required property"
         },
         {
-          "message": "\"add_on_by_asset_class\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"add_on_by_asset_class\" is a required property"
         },
         {
-          "message": "\"alpha\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"alpha\" is a required property"
         },
         {
-          "message": "\"maturity_factor\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"maturity_factor\" is a required property"
         }
       ]
     },
@@ -1896,16 +1896,16 @@
       },
       "report": [
         {
-          "message": "Additional properties are not allowed ('not_a_field' was unexpected)",
-          "pointer": ""
+          "pointer": "",
+          "message": "Additional properties are not allowed ('not_a_field' was unexpected)"
         },
         {
-          "message": "\"schema\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"schema\" is a required property"
         },
         {
-          "message": "\"config\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"config\" is a required property"
         }
       ]
     },
@@ -2314,12 +2314,12 @@
       },
       "report": [
         {
-          "message": "Additional properties are not allowed ('not_a_field' was unexpected)",
-          "pointer": ""
+          "pointer": "",
+          "message": "Additional properties are not allowed ('not_a_field' was unexpected)"
         },
         {
-          "message": "\"width\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"width\" is a required property"
         }
       ]
     },
@@ -2432,16 +2432,16 @@
       },
       "report": [
         {
-          "message": "Additional properties are not allowed ('not_a_field' was unexpected)",
-          "pointer": ""
+          "pointer": "",
+          "message": "Additional properties are not allowed ('not_a_field' was unexpected)"
         },
         {
-          "message": "\"schema\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"schema\" is a required property"
         },
         {
-          "message": "\"scenario\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"scenario\" is a required property"
         }
       ]
     },
@@ -2964,24 +2964,24 @@
       },
       "report": [
         {
-          "message": "Additional properties are not allowed ('not_a_field' was unexpected)",
-          "pointer": ""
+          "pointer": "",
+          "message": "Additional properties are not allowed ('not_a_field' was unexpected)"
         },
         {
-          "message": "\"id\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"id\" is a required property"
         },
         {
-          "message": "\"periods\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"periods\" is a required property"
         },
         {
-          "message": "\"nodes\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"nodes\" is a required property"
         },
         {
-          "message": "\"schema_version\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"schema_version\" is a required property"
         }
       ]
     },
@@ -3205,7 +3205,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/pool_accounts.schema.json",
             "type_name": "PoolAccounts",
             "kind": "component",
-            "bytes": 2726
+            "bytes": 3021
           },
           {
             "path": "schemas/common/1/price_extras.schema.json",
@@ -3975,7 +3975,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/pool_report.schema.json",
             "type_name": "PoolReport",
             "kind": "output",
-            "bytes": 7538
+            "bytes": 7638
           },
           {
             "path": "schemas/results/1/pool_report_field_units.schema.json",
@@ -3989,7 +3989,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
             "type_name": "PoolStats",
             "kind": "output",
-            "bytes": 2872
+            "bytes": 2972
           },
           {
             "path": "schemas/results/1/scenario_table.schema.json",
@@ -4227,16 +4227,16 @@
       },
       "report": [
         {
-          "message": "Additional properties are not allowed ('not_a_field' was unexpected)",
-          "pointer": ""
+          "pointer": "",
+          "message": "Additional properties are not allowed ('not_a_field' was unexpected)"
         },
         {
-          "message": "\"schema\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"schema\" is a required property"
         },
         {
-          "message": "\"instrument\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"instrument\" is a required property"
         }
       ]
     },
@@ -5803,7 +5803,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/pool_accounts.schema.json",
             "type_name": "PoolAccounts",
             "kind": "component",
-            "bytes": 2726
+            "bytes": 3021
           },
           {
             "domain": "valuations",
@@ -6683,7 +6683,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/pool_report.schema.json",
             "type_name": "PoolReport",
             "kind": "output",
-            "bytes": 7538
+            "bytes": 7638
           },
           {
             "domain": "valuations",
@@ -6699,7 +6699,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
             "type_name": "PoolStats",
             "kind": "output",
-            "bytes": 2872
+            "bytes": 2972
           },
           {
             "domain": "valuations",
@@ -6948,16 +6948,16 @@
       },
       "report": [
         {
-          "message": "Additional properties are not allowed ('not_a_field' was unexpected)",
-          "pointer": ""
+          "pointer": "",
+          "message": "Additional properties are not allowed ('not_a_field' was unexpected)"
         },
         {
-          "message": "\"schema\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"schema\" is a required property"
         },
         {
-          "message": "\"instrument\" is a required property",
-          "pointer": ""
+          "pointer": "",
+          "message": "\"instrument\" is a required property"
         }
       ]
     }

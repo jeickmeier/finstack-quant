@@ -243,6 +243,13 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxDigitalOption
         finstack_quant_valuations_core::pricer::ModelKey::Black76
     }
 
+    #[tracing::instrument(
+        name = "fx_digital_option.base_value",
+        level = "debug",
+        skip(self, curves),
+        fields(inst_id = %self.id(), as_of = %as_of),
+        err,
+    )]
     fn base_value(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,

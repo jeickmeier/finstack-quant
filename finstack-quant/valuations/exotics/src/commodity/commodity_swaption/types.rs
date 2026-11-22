@@ -528,6 +528,13 @@ impl finstack_quant_valuations_core::instruments::Instrument for CommoditySwapti
         Ok(deps)
     }
 
+    #[tracing::instrument(
+        name = "commodity_swaption.base_value",
+        level = "debug",
+        skip(self, market),
+        fields(inst_id = %self.id(), as_of = %as_of),
+        err,
+    )]
     fn base_value(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
         // Post-expiry: option is fully settled, value is 0
         if as_of > self.expiry {

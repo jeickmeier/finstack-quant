@@ -6,7 +6,7 @@
 
 import type * as wasm from './pkg/finstack_quant_wasm.js';
 import type * as generated from './types/generated/index.js';
-import type { CashFlowBuilder, CashFlowSchedule, CreditIndexData, DiscountCurve, FxMatrix, HazardCurve, HullWhiteParams, ImProfile, InflationIndex, MarketContext, MarketContextCurve, Money, MoneyValue, MvaResult, ScalarTimeSeries, ScheduleBuilder, start } from './pkg/finstack_quant_wasm.js';
+import type { CashFlowBuilder, CashFlowSchedule, CreditIndexData, DiscountCurve, FxMatrix, HazardCurve, HullWhiteParams, ImProfile, InflationIndex, MarketContext, MarketContextCurve, Money, MoneyValue, MvaResult, ScalarTimeSeries, ScheduleBuilder, SchemaIndex, SchemaProfile, SchemaValidationFailure, start } from './pkg/finstack_quant_wasm.js';
 
 export { default } from './pkg/finstack_quant_wasm.js';
 export type * from './pkg/finstack_quant_wasm.js';
@@ -395,7 +395,7 @@ export interface CoreSchemaNamespace {
    * @returns `{ artifacts, schema_index_version }`, with one row per published schema.
    * @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
    */
-  readonly index: typeof wasm.coreSchemaIndex;
+  readonly index: () => SchemaIndex;
   /**
    * Fetch one published JSON Schema of this crate.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`, e.g. `"market_context_state.schema.json"`. Partial filenames do not match.
@@ -403,18 +403,18 @@ export interface CoreSchemaNamespace {
    * @returns JSON Schema document.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and kind `invalid_type` if either argument is not a string.
    */
-  readonly get: typeof wasm.coreSchemaGet;
+  readonly get: (selector: string, profile?: SchemaProfile) => Record<string, unknown>;
   /**
    * Validate a payload against one published JSON Schema of this crate.
    *
-   * A failure inside a tagged union is reported at the offending field
-   * of the branch the payload most nearly matches, not at the union.
+   * A failure inside a tagged union is reported at the offending field of
+   * the branch the payload most nearly matches, not at the union.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`.
    * @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
    * @returns One `{ pointer, message }` row per failure, where `pointer` is the JSON Pointer of the offending value; empty when the payload is valid.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and kind `invalid_type` if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
    */
-  readonly validate: typeof wasm.coreSchemaValidate;
+  readonly validate: (selector: string, payload: string | object) => SchemaValidationFailure[];
 }
 
 /**
@@ -1701,7 +1701,7 @@ export interface AnalyticsSchemaNamespace {
    * @returns `{ artifacts, schema_index_version }`, with one row per published schema.
    * @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
    */
-  readonly index: typeof wasm.analyticsSchemaIndex;
+  readonly index: () => SchemaIndex;
   /**
    * Fetch one published JSON Schema of this crate.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`, e.g. `"market_context_state.schema.json"`. Partial filenames do not match.
@@ -1709,18 +1709,18 @@ export interface AnalyticsSchemaNamespace {
    * @returns JSON Schema document.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and kind `invalid_type` if either argument is not a string.
    */
-  readonly get: typeof wasm.analyticsSchemaGet;
+  readonly get: (selector: string, profile?: SchemaProfile) => Record<string, unknown>;
   /**
    * Validate a payload against one published JSON Schema of this crate.
    *
-   * A failure inside a tagged union is reported at the offending field
-   * of the branch the payload most nearly matches, not at the union.
+   * A failure inside a tagged union is reported at the offending field of
+   * the branch the payload most nearly matches, not at the union.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`.
    * @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
    * @returns One `{ pointer, message }` row per failure, where `pointer` is the JSON Pointer of the offending value; empty when the payload is valid.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and kind `invalid_type` if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
    */
-  readonly validate: typeof wasm.analyticsSchemaValidate;
+  readonly validate: (selector: string, payload: string | object) => SchemaValidationFailure[];
 }
 
 /**
@@ -1889,7 +1889,7 @@ export interface AttributionSchemaNamespace {
    * @returns `{ artifacts, schema_index_version }`, with one row per published schema.
    * @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
    */
-  readonly index: typeof wasm.attributionSchemaIndex;
+  readonly index: () => SchemaIndex;
   /**
    * Fetch one published JSON Schema of this crate.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`, e.g. `"market_context_state.schema.json"`. Partial filenames do not match.
@@ -1897,18 +1897,18 @@ export interface AttributionSchemaNamespace {
    * @returns JSON Schema document.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and kind `invalid_type` if either argument is not a string.
    */
-  readonly get: typeof wasm.attributionSchemaGet;
+  readonly get: (selector: string, profile?: SchemaProfile) => Record<string, unknown>;
   /**
    * Validate a payload against one published JSON Schema of this crate.
    *
-   * A failure inside a tagged union is reported at the offending field
-   * of the branch the payload most nearly matches, not at the union.
+   * A failure inside a tagged union is reported at the offending field of
+   * the branch the payload most nearly matches, not at the union.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`.
    * @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
    * @returns One `{ pointer, message }` row per failure, where `pointer` is the JSON Pointer of the offending value; empty when the payload is valid.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and kind `invalid_type` if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
    */
-  readonly validate: typeof wasm.attributionSchemaValidate;
+  readonly validate: (selector: string, payload: string | object) => SchemaValidationFailure[];
 }
 
 /**
@@ -2242,7 +2242,7 @@ export interface CalibrationSchemaNamespace {
    * @returns `{ artifacts, schema_index_version }`, with one row per published schema.
    * @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
    */
-  readonly index: typeof wasm.calibrationSchemaIndex;
+  readonly index: () => SchemaIndex;
   /**
    * Fetch one published JSON Schema of this crate.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`, e.g. `"market_context_state.schema.json"`. Partial filenames do not match.
@@ -2250,18 +2250,18 @@ export interface CalibrationSchemaNamespace {
    * @returns JSON Schema document.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and kind `invalid_type` if either argument is not a string.
    */
-  readonly get: typeof wasm.calibrationSchemaGet;
+  readonly get: (selector: string, profile?: SchemaProfile) => Record<string, unknown>;
   /**
    * Validate a payload against one published JSON Schema of this crate.
    *
-   * A failure inside a tagged union is reported at the offending field
-   * of the branch the payload most nearly matches, not at the union.
+   * A failure inside a tagged union is reported at the offending field of
+   * the branch the payload most nearly matches, not at the union.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`.
    * @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
    * @returns One `{ pointer, message }` row per failure, where `pointer` is the JSON Pointer of the offending value; empty when the payload is valid.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and kind `invalid_type` if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
    */
-  readonly validate: typeof wasm.calibrationSchemaValidate;
+  readonly validate: (selector: string, payload: string | object) => SchemaValidationFailure[];
 }
 
 /**
@@ -3233,7 +3233,7 @@ export interface CashflowsSchemaNamespace {
    * @returns `{ artifacts, schema_index_version }`, with one row per published schema.
    * @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
    */
-  readonly index: typeof wasm.cashflowsSchemaIndex;
+  readonly index: () => SchemaIndex;
   /**
    * Fetch one published JSON Schema of this crate.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`, e.g. `"market_context_state.schema.json"`. Partial filenames do not match.
@@ -3241,18 +3241,18 @@ export interface CashflowsSchemaNamespace {
    * @returns JSON Schema document.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and kind `invalid_type` if either argument is not a string.
    */
-  readonly get: typeof wasm.cashflowsSchemaGet;
+  readonly get: (selector: string, profile?: SchemaProfile) => Record<string, unknown>;
   /**
    * Validate a payload against one published JSON Schema of this crate.
    *
-   * A failure inside a tagged union is reported at the offending field
-   * of the branch the payload most nearly matches, not at the union.
+   * A failure inside a tagged union is reported at the offending field of
+   * the branch the payload most nearly matches, not at the union.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`.
    * @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
    * @returns One `{ pointer, message }` row per failure, where `pointer` is the JSON Pointer of the offending value; empty when the payload is valid.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and kind `invalid_type` if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
    */
-  readonly validate: typeof wasm.cashflowsSchemaValidate;
+  readonly validate: (selector: string, payload: string | object) => SchemaValidationFailure[];
   /**
    * The embedded cashflow schemas, keyed by `$id`.
    *
@@ -5137,7 +5137,7 @@ export interface ModelsFactorSchemaNamespace {
    * @returns `{ artifacts, schema_index_version }`, with one row per published schema.
    * @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
    */
-  readonly index: typeof wasm.factorSchemaIndex;
+  readonly index: () => SchemaIndex;
   /**
    * Fetch one published JSON Schema of this crate.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`, e.g. `"market_context_state.schema.json"`. Partial filenames do not match.
@@ -5145,18 +5145,18 @@ export interface ModelsFactorSchemaNamespace {
    * @returns JSON Schema document.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and kind `invalid_type` if either argument is not a string.
    */
-  readonly get: typeof wasm.factorSchemaGet;
+  readonly get: (selector: string, profile?: SchemaProfile) => Record<string, unknown>;
   /**
    * Validate a payload against one published JSON Schema of this crate.
    *
-   * A failure inside a tagged union is reported at the offending field
-   * of the branch the payload most nearly matches, not at the union.
+   * A failure inside a tagged union is reported at the offending field of
+   * the branch the payload most nearly matches, not at the union.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`.
    * @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
    * @returns One `{ pointer, message }` row per failure, where `pointer` is the JSON Pointer of the offending value; empty when the payload is valid.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and kind `invalid_type` if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
    */
-  readonly validate: typeof wasm.factorSchemaValidate;
+  readonly validate: (selector: string, payload: string | object) => SchemaValidationFailure[];
 }
 
 /**
@@ -6821,7 +6821,7 @@ export interface MarginSchemaNamespace {
    * @returns `{ artifacts, schema_index_version }`, with one row per published schema.
    * @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
    */
-  readonly index: typeof wasm.marginSchemaIndex;
+  readonly index: () => SchemaIndex;
   /**
    * Fetch one published JSON Schema of this crate.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`, e.g. `"market_context_state.schema.json"`. Partial filenames do not match.
@@ -6829,18 +6829,18 @@ export interface MarginSchemaNamespace {
    * @returns JSON Schema document.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and kind `invalid_type` if either argument is not a string.
    */
-  readonly get: typeof wasm.marginSchemaGet;
+  readonly get: (selector: string, profile?: SchemaProfile) => Record<string, unknown>;
   /**
    * Validate a payload against one published JSON Schema of this crate.
    *
-   * A failure inside a tagged union is reported at the offending field
-   * of the branch the payload most nearly matches, not at the union.
+   * A failure inside a tagged union is reported at the offending field of
+   * the branch the payload most nearly matches, not at the union.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`.
    * @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
    * @returns One `{ pointer, message }` row per failure, where `pointer` is the JSON Pointer of the offending value; empty when the payload is valid.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and kind `invalid_type` if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
    */
-  readonly validate: typeof wasm.marginSchemaValidate;
+  readonly validate: (selector: string, payload: string | object) => SchemaValidationFailure[];
 }
 
 /**
@@ -9055,7 +9055,7 @@ export interface ValuationsMarketNamespace {
 }
 
 /**
- * Compiled-in JSON Schemas of the valuations wire format.
+ * Registry-backed JSON Schemas of the valuations wire format.
  *
  * Each accessor returns the JSON Schema document as a plain object that always matches this build;
  * `index` / `get` / `validate` cover every schema the valuations crate publishes.
@@ -9078,7 +9078,7 @@ export interface ValuationsSchemaNamespace {
    * @returns `{ artifacts, schema_index_version }`, with one row per published schema.
    * @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
    */
-  readonly index: typeof wasm.valuationsSchemaIndex;
+  readonly index: () => SchemaIndex;
   /**
    * Fetch one published JSON Schema of this crate.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`, e.g. `"market_context_state.schema.json"`. Partial filenames do not match.
@@ -9086,18 +9086,18 @@ export interface ValuationsSchemaNamespace {
    * @returns JSON Schema document.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and kind `invalid_type` if either argument is not a string.
    */
-  readonly get: typeof wasm.valuationsSchemaGet;
+  readonly get: (selector: string, profile?: SchemaProfile) => Record<string, unknown>;
   /**
    * Validate a payload against one published JSON Schema of this crate.
    *
-   * A failure inside a tagged union is reported at the offending field
-   * of the branch the payload most nearly matches, not at the union.
+   * A failure inside a tagged union is reported at the offending field of
+   * the branch the payload most nearly matches, not at the union.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`.
    * @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
    * @returns One `{ pointer, message }` row per failure, where `pointer` is the JSON Pointer of the offending value; empty when the payload is valid.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and kind `invalid_type` if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
    */
-  readonly validate: typeof wasm.valuationsSchemaValidate;
+  readonly validate: (selector: string, payload: string | object) => SchemaValidationFailure[];
   /**
    * JSON Schema of the canonical instrument envelope.
    *
@@ -9105,7 +9105,7 @@ export interface ValuationsSchemaNamespace {
    * `type` discriminator and the matching `spec` payload. The document is
    * large (about one megabyte); read it once and cache the parsed result.
    * @returns JSON Schema document of the instrument envelope.
-   * @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
+   * @throws Error - Throws with kind `internal` if the schema cannot be rendered (does not occur for a released build).
    */
   readonly instrumentEnvelopeSchema: typeof wasm.instrumentEnvelopeSchema;
   /**
@@ -9123,7 +9123,7 @@ export interface ValuationsSchemaNamespace {
   /**
    * JSON Schema of the `ValuationResult` envelope returned by the pricing entry points.
    * @returns JSON Schema document of the valuation result.
-   * @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
+   * @throws Error - Throws with kind `internal` if the schema cannot be rendered (does not occur for a released build).
    */
   readonly valuationResultSchema: typeof wasm.valuationResultSchema;
   /**
@@ -9252,7 +9252,7 @@ export interface StatementsSchemaNamespace {
    * @returns `{ artifacts, schema_index_version }`, with one row per published schema.
    * @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
    */
-  readonly index: typeof wasm.statementsSchemaIndex;
+  readonly index: () => SchemaIndex;
   /**
    * Fetch one published JSON Schema of this crate.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`, e.g. `"market_context_state.schema.json"`. Partial filenames do not match.
@@ -9260,18 +9260,18 @@ export interface StatementsSchemaNamespace {
    * @returns JSON Schema document.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and kind `invalid_type` if either argument is not a string.
    */
-  readonly get: typeof wasm.statementsSchemaGet;
+  readonly get: (selector: string, profile?: SchemaProfile) => Record<string, unknown>;
   /**
    * Validate a payload against one published JSON Schema of this crate.
    *
-   * A failure inside a tagged union is reported at the offending field
-   * of the branch the payload most nearly matches, not at the union.
+   * A failure inside a tagged union is reported at the offending field of
+   * the branch the payload most nearly matches, not at the union.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`.
    * @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
    * @returns One `{ pointer, message }` row per failure, where `pointer` is the JSON Pointer of the offending value; empty when the payload is valid.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and kind `invalid_type` if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
    */
-  readonly validate: typeof wasm.statementsSchemaValidate;
+  readonly validate: (selector: string, payload: string | object) => SchemaValidationFailure[];
 }
 
 /**
@@ -11228,7 +11228,7 @@ export interface PortfolioSchemaNamespace {
    * @returns `{ artifacts, schema_index_version }`, with one row per published schema.
    * @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
    */
-  readonly index: typeof wasm.portfolioSchemaIndex;
+  readonly index: () => SchemaIndex;
   /**
    * Fetch one published JSON Schema of this crate.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`, e.g. `"market_context_state.schema.json"`. Partial filenames do not match.
@@ -11236,18 +11236,18 @@ export interface PortfolioSchemaNamespace {
    * @returns JSON Schema document.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and kind `invalid_type` if either argument is not a string.
    */
-  readonly get: typeof wasm.portfolioSchemaGet;
+  readonly get: (selector: string, profile?: SchemaProfile) => Record<string, unknown>;
   /**
    * Validate a payload against one published JSON Schema of this crate.
    *
-   * A failure inside a tagged union is reported at the offending field
-   * of the branch the payload most nearly matches, not at the union.
+   * A failure inside a tagged union is reported at the offending field of
+   * the branch the payload most nearly matches, not at the union.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`.
    * @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
    * @returns One `{ pointer, message }` row per failure, where `pointer` is the JSON Pointer of the offending value; empty when the payload is valid.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and kind `invalid_type` if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
    */
-  readonly validate: typeof wasm.portfolioSchemaValidate;
+  readonly validate: (selector: string, payload: string | object) => SchemaValidationFailure[];
 }
 
 /**
@@ -12431,7 +12431,7 @@ export interface ScenariosSchemaNamespace {
    * @returns `{ artifacts, schema_index_version }`, with one row per published schema.
    * @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
    */
-  readonly index: typeof wasm.scenariosSchemaIndex;
+  readonly index: () => SchemaIndex;
   /**
    * Fetch one published JSON Schema of this crate.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`, e.g. `"market_context_state.schema.json"`. Partial filenames do not match.
@@ -12439,18 +12439,18 @@ export interface ScenariosSchemaNamespace {
    * @returns JSON Schema document.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and kind `invalid_type` if either argument is not a string.
    */
-  readonly get: typeof wasm.scenariosSchemaGet;
+  readonly get: (selector: string, profile?: SchemaProfile) => Record<string, unknown>;
   /**
    * Validate a payload against one published JSON Schema of this crate.
    *
-   * A failure inside a tagged union is reported at the offending field
-   * of the branch the payload most nearly matches, not at the union.
+   * A failure inside a tagged union is reported at the offending field of
+   * the branch the payload most nearly matches, not at the union.
    * @param selector - Schema `$id`, registry path or trailing filename from `index()`.
    * @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
    * @returns One `{ pointer, message }` row per failure, where `pointer` is the JSON Pointer of the offending value; empty when the payload is valid.
    * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and kind `invalid_type` if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
    */
-  readonly validate: typeof wasm.scenariosSchemaValidate;
+  readonly validate: (selector: string, payload: string | object) => SchemaValidationFailure[];
 }
 
 /**

@@ -293,6 +293,13 @@ impl Instrument for CommoditySpreadOption {
         Ok(deps)
     }
 
+    #[tracing::instrument(
+        name = "commodity_spread_option.base_value",
+        level = "debug",
+        skip(self, market),
+        fields(inst_id = %self.id(), as_of = %as_of),
+        err,
+    )]
     fn base_value(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
         crate::commodity::commodity_spread_option::pricer::compute_pv(self, market, as_of)
     }

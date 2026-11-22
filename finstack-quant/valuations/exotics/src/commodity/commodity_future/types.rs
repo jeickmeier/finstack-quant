@@ -375,6 +375,13 @@ impl finstack_quant_valuations_core::instruments::Instrument for CommodityFuture
         Ok(dependencies)
     }
 
+    #[tracing::instrument(
+        name = "commodity_future.base_value",
+        level = "debug",
+        skip(self, market),
+        fields(inst_id = %self.id(), as_of = %as_of),
+        err,
+    )]
     fn base_value(
         &self,
         market: &MarketContext,

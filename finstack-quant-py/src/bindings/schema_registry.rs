@@ -6,9 +6,27 @@
 //! every contract the crate publishes, `get` fetches one by path, and
 //! `validate` checks a payload and reports where it failed.
 //!
-//! Schemas are rendered from the crate's `ARTIFACTS` registry on demand rather
-//! than embedded, so nothing can drift from the installed wheel and the
-//! extension module carries no copy of the six megabytes of checked-in JSON.
+//! Schemas are rendered from the crate's `ARTIFACTS` registry on demand and
+//! cached in `finstack_quant::schema`, so nothing can drift from the installed
+//! wheel and the extension module carries no copy of the checked-in JSON.
+
+/// Map a Python `<domain>.schema` module path to its umbrella schema domain name.
+pub(crate) fn domain_for_module(module: &str) -> Option<&'static str> {
+    match module {
+        "finstack_quant.analytics.schema" => Some("analytics"),
+        "finstack_quant.attribution.schema" => Some("attribution"),
+        "finstack_quant.calibration.schema" => Some("calibration"),
+        "finstack_quant.cashflows.schema" => Some("cashflows"),
+        "finstack_quant.core.schema" => Some("core"),
+        "finstack_quant.margin.schema" => Some("margin"),
+        "finstack_quant.models.factor.schema" => Some("factor_model"),
+        "finstack_quant.portfolio.schema" => Some("portfolio"),
+        "finstack_quant.scenarios.schema" => Some("scenarios"),
+        "finstack_quant.statements.schema" => Some("statements"),
+        "finstack_quant.valuations.schema" => Some("valuations"),
+        _ => None,
+    }
+}
 
 /// Generate `index`, `get` and `validate` for one crate's schema namespace.
 ///
@@ -23,8 +41,12 @@ macro_rules! schema_registry_functions {
         #[pyfunction]
         #[pyo3(text_signature = "()")]
         fn index() -> PyResult<String> {
-            let value = finstack_quant_core::schema::build_schema_index($registry)
-                .map_err(crate::errors::core_to_py)?;
+            let value = match $crate::bindings::schema_registry::domain_for_module($module) {
+                Some(domain) => finstack_quant::schema::index_for_domain(domain)
+                    .map_err(crate::errors::core_to_py)?,
+                None => finstack_quant_core::schema::build_schema_index($registry)
+                    .map_err(crate::errors::core_to_py)?,
+            };
             serde_json::to_string_pretty(&value).map_err(|error| {
                 pyo3::exceptions::PyValueError::new_err(format!("serialize index: {error}"))
             })

@@ -7,9 +7,8 @@ use crate::structured_credit::pricing::stochastic::pricer::ScenarioTreeConfig;
 use crate::structured_credit::pricing::stochastic::pricer::{
     StochasticPricer, StochasticPricerConfig,
 };
-use crate::structured_credit::utils::months::ClampedMonths;
 use finstack_quant_core::Result;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
@@ -229,7 +228,11 @@ impl StructuredCredit {
         &self,
         as_of: Date,
     ) -> finstack_quant_core::Result<ScenarioTreeConfig> {
-        let months_to_maturity = as_of.clamped_months_until(self.maturity).max(1) as usize;
+        let months_to_maturity = if as_of < self.maturity {
+            as_of.months_until(self.maturity)?.max(1) as usize
+        } else {
+            1
+        };
         let mut tree_config = ScenarioTreeConfig::new(months_to_maturity);
 
         let (prepay, default) = self.effective_stochastic_specs()?;
@@ -408,6 +411,17 @@ impl StructuredCredit {
     /// (deterministic) or `ModelKey::StructuredCreditStochastic` (stochastic).
     /// This method is the advanced per-tranche convenience used by tests and
     /// scenario metrics; it does not run the registry pipeline.
+    #[tracing::instrument(
+        name = "structured_credit.value_tranche",
+        level = "debug",
+        skip(self, market),
+        fields(
+            inst_id = %self.id.as_str(),
+            tranche_id = %tranche_id,
+            as_of = %as_of,
+        ),
+        err,
+    )]
     pub fn value_tranche(
         &self,
         tranche_id: &str,

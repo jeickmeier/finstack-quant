@@ -272,7 +272,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/pool_accounts.schema.json",
-      "bytes": 2726,
+      "bytes": 3021,
       "kind": "component",
       "path": "schemas/common/1/pool_accounts.schema.json",
       "summary": "Account balances and performance tallies of a seasoned structured-credit pool.",
@@ -1262,7 +1262,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/pool_report.schema.json",
-      "bytes": 7538,
+      "bytes": 7638,
       "kind": "output",
       "path": "schemas/results/1/pool_report.schema.json",
       "summary": "Collateral-pool statistics, WARF and concentration by obligor, industry and rating.",
@@ -1280,7 +1280,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
-      "bytes": 2872,
+      "bytes": 2972,
       "kind": "output",
       "path": "schemas/results/1/pool_stats.schema.json",
       "summary": "Collateral-pool statistics: WAC, spread, maturity, diversity and concentration.",

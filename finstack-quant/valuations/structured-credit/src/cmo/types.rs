@@ -736,10 +736,7 @@ impl AgencyCmo {
 
 impl finstack_quant_cashflows::CashflowScheduleSource for AgencyCmo {
     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
-        Ok(self
-            .reference_tranche()
-            .ok()
-            .map(|tranche| tranche.current_face))
+        Ok(Some(self.reference_tranche()?.current_face))
     }
 
     fn raw_cashflow_schedule(
@@ -1087,5 +1084,20 @@ mod tests {
         .expect("canonical PacCollar keys");
         assert_eq!(collar.lower_speed_multiplier, 1.0);
         assert_eq!(collar.upper_speed_multiplier, 3.0);
+    }
+
+    #[test]
+    fn cashflow_source_notional_propagates_missing_reference_tranche() {
+        use finstack_quant_cashflows::CashflowScheduleSource;
+
+        let mut cmo = AgencyCmo::example().expect("valid example");
+        let expected = cmo.reference_tranche().expect("ref exists").current_face;
+        assert_eq!(cmo.notional().expect("valid notional"), Some(expected));
+
+        cmo.reference_tranche_id = "NON_EXISTENT".to_string();
+        let err = cmo
+            .notional()
+            .expect_err("broken reference_tranche_id must not silently return None");
+        assert_eq!(err.kind(), finstack_quant_core::ErrorKind::NotFound);
     }
 }

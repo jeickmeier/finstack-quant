@@ -694,6 +694,13 @@ impl Instrument for CommoditySpotOption {
         Ok(deps)
     }
 
+    #[tracing::instrument(
+        name = "commodity_spot_option.base_value",
+        level = "debug",
+        skip(self, market),
+        fields(inst_id = %self.id(), as_of = %as_of),
+        err,
+    )]
     fn base_value(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
         self.validate()?;
         if let Some(claim) = self.resolved_claim(market, as_of)? {

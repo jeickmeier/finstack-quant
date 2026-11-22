@@ -203,6 +203,17 @@ impl Pricer for AsianOptionHestonMcPricer {
         PricerKey::new(InstrumentType::AsianOption, ModelKey::MonteCarloHeston)
     }
 
+    #[tracing::instrument(
+        name = "asian_option.heston_mc.price_dyn",
+        level = "debug",
+        skip(self, instrument, market),
+        fields(
+            inst_id = %instrument.id(),
+            as_of = %as_of,
+            num_paths = self.num_paths,
+        ),
+        err,
+    )]
     fn price_dyn(
         &self,
         instrument: &dyn Instrument,

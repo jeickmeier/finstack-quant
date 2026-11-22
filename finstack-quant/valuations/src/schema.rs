@@ -1,167 +1,181 @@
 //! JSON-Schema helpers for Finstack Quant types.
 //!
-//! Schemas are generated from the crate's serde-friendly types and checked in
-//! under `schemas/`. These helpers expose them as `serde_json::Value` for use
-//! in validation, UI forms, and contract generation.
+//! Schemas are generated on demand from the crate's serde-friendly types and
+//! cached in-process for validation, UI forms, and contract generation.
 //!
 //! # Error Handling
 //!
 //! All schema accessors return `Result<&'static Value>` instead of panicking,
-//! allowing callers to handle schema loading failures gracefully.
+//! allowing callers to handle schema generation failures gracefully.
 
+#[cfg(feature = "json-schema")]
 use serde_json::Value;
+#[cfg(feature = "json-schema")]
 use std::sync::OnceLock;
 
 #[cfg(feature = "jsonschema-validate")]
 use finstack_quant_core::schema::COMMON_SCHEMA_BASE;
-#[cfg(test)]
+#[cfg(all(test, feature = "json-schema"))]
 use finstack_quant_core::schema::JSON_SCHEMA_DIALECT;
 
 #[cfg(feature = "json-schema")]
 use finstack_quant_valuations_core::schema::package_valuations_schema;
 
-/// Parse embedded JSON schema at compile time, returning a Result.
-/// The JSON is embedded via `include_str!` so the content is always present,
-/// but parsing can still fail if the JSON is malformed.
-macro_rules! try_include_schema {
-    ($path:expr_2021) => {
-        serde_json::from_str::<Value>(include_str!($path))
-            .map_err(|e| format!("invalid schema JSON at {}: {}", $path, e))
-    };
+#[cfg(feature = "json-schema")]
+const INSTRUMENT_ENVELOPE_PATH: &str = "schemas/instruments/1/instrument.schema.json";
+
+#[cfg(feature = "json-schema")]
+const VALUATION_RESULT_PATH: &str = "schemas/results/1/valuation_result.schema.json";
+
+#[cfg(feature = "json-schema")]
+const INSTRUMENT_SCHEMA_PREFIX: &str = "schemas/instruments/1/";
+
+/// Shared `common/1` component filenames referenced by valuations and cashflow schemas.
+#[cfg(feature = "jsonschema-validate")]
+const SHARED_COMMON_SCHEMA_FILES: &[&str] = &[
+    "attributes.schema.json",
+    "business_day_convention.schema.json",
+    "currency.schema.json",
+    "date.schema.json",
+    "day_count.schema.json",
+    "decimal.schema.json",
+    "diagnostic.schema.json",
+    "id.schema.json",
+    "instrument_pricing_overrides.schema.json",
+    "metric_pricing_overrides.schema.json",
+    "money.schema.json",
+    "scenario_pricing_overrides.schema.json",
+    "tenor.schema.json",
+    "validation_report.schema.json",
+];
+
+#[cfg(feature = "json-schema")]
+fn generate_registered_schema(relative_path: &str) -> finstack_quant_core::Result<Value> {
+    let artifact = artifacts_slice()
+        .iter()
+        .find(|artifact| artifact.relative_path == relative_path)
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Internal(format!(
+                "schema artifact missing from valuations registry: {relative_path}"
+            ))
+        })?;
+    artifact.generate()
 }
 
 /// Get the JSON Schema for the instrument envelope.
 ///
+/// Rendered on demand from the crate's schema registry and cached for the
+/// process lifetime.
+///
 /// # Errors
 ///
-/// Returns `Error::Validation` if the embedded schema JSON is malformed.
+/// Returns an error if the envelope schema cannot be generated.
+#[cfg(feature = "json-schema")]
 pub fn instrument_envelope_schema() -> finstack_quant_core::Result<&'static Value> {
-    static SCHEMA: OnceLock<Result<Value, String>> = OnceLock::new();
+    static SCHEMA: OnceLock<finstack_quant_core::Result<Value>> = OnceLock::new();
     SCHEMA
-        .get_or_init(|| try_include_schema!("../schemas/instruments/1/instrument.schema.json"))
+        .get_or_init(|| generate_registered_schema(INSTRUMENT_ENVELOPE_PATH))
         .as_ref()
-        .map_err(|e| finstack_quant_core::Error::Validation(e.clone()))
+        .map_err(Clone::clone)
 }
 
-fn instrument_schema_cache()
--> &'static std::collections::BTreeMap<&'static str, Result<Value, String>> {
-    static CACHE: OnceLock<std::collections::BTreeMap<&'static str, Result<Value, String>>> =
+#[cfg(feature = "json-schema")]
+struct CachedInstrumentSchema {
+    artifact: &'static SchemaArtifact,
+    rendered: OnceLock<finstack_quant_core::Result<Value>>,
+}
+
+#[cfg(feature = "json-schema")]
+fn instrument_schema_slots()
+-> &'static std::collections::BTreeMap<&'static str, CachedInstrumentSchema> {
+    static CACHE: OnceLock<std::collections::BTreeMap<&'static str, CachedInstrumentSchema>> =
         OnceLock::new();
     CACHE.get_or_init(|| {
-        crate::instruments::json_loader::instrument_registry()
-            .into_iter()
-            .map(|entry| (entry.tag, entry.load_embedded_schema()))
+        artifacts_slice()
+            .iter()
+            .filter(|artifact| {
+                artifact.relative_path.starts_with(INSTRUMENT_SCHEMA_PREFIX)
+                    && artifact.relative_path != INSTRUMENT_ENVELOPE_PATH
+            })
+            .map(|artifact| {
+                (
+                    artifact.title,
+                    CachedInstrumentSchema {
+                        artifact,
+                        rendered: OnceLock::new(),
+                    },
+                )
+            })
             .collect()
     })
 }
 
-#[cfg(feature = "jsonschema-validate")]
-fn common_schema_resource(
-    filename: &'static str,
-    raw: &'static str,
-) -> finstack_quant_core::Result<(String, jsonschema::Resource)> {
-    let schema = serde_json::from_str::<Value>(raw).map_err(|e| {
-        finstack_quant_core::Error::Validation(format!(
-            "invalid common schema JSON at {filename}: {e}"
-        ))
-    })?;
-    let resource = jsonschema::Resource::from_contents(schema).map_err(|e| {
-        finstack_quant_core::Error::Validation(format!(
-            "invalid common schema resource at {filename}: {e}"
-        ))
-    })?;
-    Ok((format!("{COMMON_SCHEMA_BASE}{filename}"), resource))
+#[cfg(feature = "json-schema")]
+fn instrument_schema_ref(instrument_type: &str) -> finstack_quant_core::Result<&'static Value> {
+    let slot = instrument_schema_slots()
+        .get(instrument_type)
+        .ok_or_else(|| unknown_instrument_type(instrument_type))?;
+    slot.rendered
+        .get_or_init(|| slot.artifact.generate())
+        .as_ref()
+        .map_err(Clone::clone)
 }
 
 #[cfg(feature = "jsonschema-validate")]
-fn common_schema_resources() -> finstack_quant_core::Result<Vec<(String, jsonschema::Resource)>> {
-    [
-        (
-            "attributes.schema.json",
-            include_str!("../schemas/common/1/attributes.schema.json"),
-        ),
-        (
-            "business_day_convention.schema.json",
-            include_str!("../schemas/common/1/business_day_convention.schema.json"),
-        ),
-        (
-            "currency.schema.json",
-            include_str!("../schemas/common/1/currency.schema.json"),
-        ),
-        (
-            "date.schema.json",
-            include_str!("../schemas/common/1/date.schema.json"),
-        ),
-        (
-            "day_count.schema.json",
-            include_str!("../schemas/common/1/day_count.schema.json"),
-        ),
-        (
-            "decimal.schema.json",
-            include_str!("../schemas/common/1/decimal.schema.json"),
-        ),
-        (
-            "id.schema.json",
-            include_str!("../schemas/common/1/id.schema.json"),
-        ),
-        (
-            "money.schema.json",
-            include_str!("../schemas/common/1/money.schema.json"),
-        ),
-        (
-            "instrument_pricing_overrides.schema.json",
-            include_str!("../schemas/common/1/instrument_pricing_overrides.schema.json"),
-        ),
-        (
-            "metric_pricing_overrides.schema.json",
-            include_str!("../schemas/common/1/metric_pricing_overrides.schema.json"),
-        ),
-        (
-            "scenario_pricing_overrides.schema.json",
-            include_str!("../schemas/common/1/scenario_pricing_overrides.schema.json"),
-        ),
-        (
-            "tenor.schema.json",
-            include_str!("../schemas/common/1/tenor.schema.json"),
-        ),
-    ]
-    .into_iter()
-    .map(|(filename, raw)| common_schema_resource(filename, raw))
-    .collect()
+fn is_shared_common_schema(id: &str) -> bool {
+    id.strip_prefix(COMMON_SCHEMA_BASE)
+        .is_some_and(|filename| SHARED_COMMON_SCHEMA_FILES.contains(&filename))
 }
 
+/// Cached external schema documents and compiled resources reachable by
+/// instrument and envelope schemas (`common/1` + `cashflow/1`).
 #[cfg(feature = "jsonschema-validate")]
-fn embedded_instrument_schema_resources()
--> finstack_quant_core::Result<Vec<(String, jsonschema::Resource)>> {
-    let mut resources = std::collections::BTreeMap::new();
-    for (tag, schema_result) in instrument_schema_cache() {
-        let schema = schema_result.as_ref().map_err(|e| {
-            finstack_quant_core::Error::Validation(format!(
-                "invalid instrument schema JSON for {tag}: {e}"
-            ))
-        })?;
-        let id = schema.get("$id").and_then(Value::as_str).ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "instrument schema for {tag} is missing $id"
-            ))
-        })?;
-        let resource = jsonschema::Resource::from_contents(schema.clone()).map_err(|e| {
-            finstack_quant_core::Error::Validation(format!(
-                "invalid instrument schema resource for {tag}: {e}"
-            ))
-        })?;
-        resources.insert(id.to_string(), resource);
-    }
-
-    Ok(resources.into_iter().collect())
+struct CachedRefResources {
+    documents: std::collections::BTreeMap<String, Value>,
+    resources: Vec<(String, jsonschema::Resource)>,
 }
 
+/// Render and compile the shared `common/1` and `cashflow/1` schema resources
+/// once per process.
+///
+/// Every per-type instrument schema and the inlined `instrument.schema.json`
+/// envelope only `$ref` into `common/1` and `cashflow/1` — none references
+/// another instrument schema. Keeping only this trimmed set avoids both
+/// generating all instrument schemas up front and duplicating them inside every
+/// compiled validator.
 #[cfg(feature = "jsonschema-validate")]
-fn external_schema_resources() -> finstack_quant_core::Result<Vec<(String, jsonschema::Resource)>> {
-    let mut resources = common_schema_resources()?;
-    resources.extend(finstack_quant_cashflows::schema::resources()?);
-    resources.extend(embedded_instrument_schema_resources()?);
-    Ok(resources)
+fn shared_ref_resources() -> finstack_quant_core::Result<&'static CachedRefResources> {
+    static CACHE: OnceLock<finstack_quant_core::Result<CachedRefResources>> = OnceLock::new();
+    CACHE
+        .get_or_init(|| {
+            let mut documents = std::collections::BTreeMap::new();
+            let mut resources = Vec::new();
+            for artifact in artifacts_slice() {
+                if !is_shared_common_schema(artifact.id) {
+                    continue;
+                }
+                let schema = artifact.generate()?;
+                let resource =
+                    jsonschema::Resource::from_contents(schema.clone()).map_err(|e| {
+                        finstack_quant_core::Error::Validation(format!(
+                            "invalid common schema resource at {}: {e}",
+                            artifact.id
+                        ))
+                    })?;
+                documents.insert(artifact.id.to_string(), schema);
+                resources.push((artifact.id.to_string(), resource));
+            }
+            for (id, resource) in finstack_quant_cashflows::schema::resources()? {
+                documents.insert(id.clone(), resource.contents().clone());
+                resources.push((id, resource));
+            }
+            Ok(CachedRefResources {
+                documents,
+                resources,
+            })
+        })
+        .as_ref()
+        .map_err(Clone::clone)
 }
 
 /// Return every canonical instrument discriminator, in registry order.
@@ -177,28 +191,24 @@ pub fn instrument_types() -> &'static [&'static str] {
 
 /// Get the JSON Schema for a single instrument type.
 ///
-/// Returns the dedicated generated schema for a canonical registry tag.
+/// Returns the dedicated generated schema for a canonical registry tag,
+/// rendered lazily on first request and cached for the process lifetime.
 ///
 /// # Errors
 ///
-/// Returns `Error::Validation` if the embedded schema JSON is malformed, and
+/// Returns an error if the schema cannot be generated, and
 /// `InputError::NotFound` if the requested instrument type is not registered.
 ///
 /// # Arguments
 ///
 /// * `instrument_type` - Canonical registered tagged-instrument type string.
+#[cfg(feature = "json-schema")]
 pub fn instrument_schema(instrument_type: &str) -> finstack_quant_core::Result<Value> {
-    if let Some(schema) = instrument_schema_cache().get(instrument_type) {
-        return schema
-            .as_ref()
-            .cloned()
-            .map_err(|e| finstack_quant_core::Error::Validation(e.clone()));
-    }
-
-    Err(unknown_instrument_type(instrument_type))
+    instrument_schema_ref(instrument_type).cloned()
 }
 
 /// The lookup miss reported for a discriminator that is not in the registry.
+#[cfg(feature = "json-schema")]
 fn unknown_instrument_type(instrument_type: &str) -> finstack_quant_core::Error {
     finstack_quant_core::InputError::NotFound {
         id: format!(
@@ -210,17 +220,19 @@ fn unknown_instrument_type(instrument_type: &str) -> finstack_quant_core::Error 
 
 /// Get JSON-Schema for ValuationResult.
 ///
-/// Returns schema for valuation result envelope (PV + metrics).
+/// Returns schema for valuation result envelope (PV + metrics), rendered on
+/// demand and cached for the process lifetime.
 ///
 /// # Errors
 ///
-/// Returns `Error::Validation` if the embedded schema JSON is malformed.
+/// Returns an error if the valuation-result schema cannot be generated.
+#[cfg(feature = "json-schema")]
 pub fn valuation_result_schema() -> finstack_quant_core::Result<&'static Value> {
-    static SCHEMA: OnceLock<Result<Value, String>> = OnceLock::new();
+    static SCHEMA: OnceLock<finstack_quant_core::Result<Value>> = OnceLock::new();
     SCHEMA
-        .get_or_init(|| try_include_schema!("../schemas/results/1/valuation_result.schema.json"))
+        .get_or_init(|| generate_registered_schema(VALUATION_RESULT_PATH))
         .as_ref()
-        .map_err(|e| finstack_quant_core::Error::Validation(e.clone()))
+        .map_err(Clone::clone)
 }
 
 #[cfg(feature = "jsonschema-validate")]
@@ -271,28 +283,31 @@ pub fn valuation_result_schema() -> finstack_quant_core::Result<&'static Value> 
 /// * `instance` - Parsed JSON instrument envelope to validate against the
 ///   canonical v1 envelope schema and its selected type schema.
 pub fn validate_instrument_envelope_json(instance: &Value) -> finstack_quant_core::Result<()> {
-    // Consulted before the `instrument.type` lookup below so that a malformed
-    // embedded envelope schema is still reported first, as it was before the
-    // validator cache was introduced.
-    let _envelope_schema = instrument_envelope_schema()?;
-    let envelope_result = instrument_envelope_validator()
-        .and_then(|validator| validate_with(validator, instance, "instrument envelope"));
+    let envelope_schema = instrument_envelope_schema()?;
+    let envelope_validator = instrument_envelope_validator()?;
+    let envelope_valid = envelope_validator.is_valid(instance);
 
-    let instrument_type = instance
-        .pointer("/instrument/type")
-        .and_then(Value::as_str)
-        .ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "instrument envelope validation passed but instrument.type is missing".to_string(),
-            )
-        })?;
+    let instrument_type = instance.pointer("/instrument/type").and_then(Value::as_str);
 
-    if let Err(envelope_error) = envelope_result {
-        if instrument_types().contains(&instrument_type) {
-            validate_instrument_type_json(instrument_type, instance)?;
+    if !envelope_valid {
+        if let Some(ty) = instrument_type
+            && instrument_types().contains(&ty)
+        {
+            validate_instrument_type_json(ty, instance)?;
         }
-        return Err(envelope_error);
+        return validate_with(
+            envelope_validator,
+            envelope_schema,
+            instance,
+            "instrument envelope",
+        );
     }
+
+    let instrument_type = instrument_type.ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "instrument envelope validation passed but instrument.type is missing".to_string(),
+        )
+    })?;
 
     validate_instrument_type_json(instrument_type, instance)
 }
@@ -313,8 +328,9 @@ pub fn validate_instrument_type_json(
     instrument_type: &str,
     instance: &Value,
 ) -> finstack_quant_core::Result<()> {
+    let schema = instrument_schema_ref(instrument_type)?;
     let validator = instrument_type_validator(instrument_type)?;
-    validate_with(validator, instance, instrument_type)
+    validate_with(validator, schema, instance, instrument_type)
 }
 
 /// Outcome of compiling one schema, as stored in the validator caches.
@@ -325,49 +341,20 @@ pub fn validate_instrument_type_json(
 type CachedValidator = Result<jsonschema::Validator, finstack_quant_core::Error>;
 
 #[cfg(feature = "jsonschema-validate")]
-/// Resources an individual instrument schema can actually reach.
+/// Compile `schema` against the supplied resolver resources with format
+/// validation enabled.
 ///
-/// Every instrument schema `$ref`s only into `common/1` and `cashflow/1` — none
-/// references another instrument schema (verified: 654 `common/1` and 21
-/// `cashflow/1` absolute refs across all seventy, zero cross-instrument).
-/// Registering all seventy instrument documents for a single-type validator
-/// therefore costs memory without ever resolving a reference. The envelope
-/// validator still needs the full set, because its `oneOf` branches point at
-/// every instrument.
-///
-/// # Memory
-///
-/// A compiled `jsonschema::Validator` retains its whole resolver registry, and
-/// `jsonschema` 0.28 offers no way to share one registry across validators. The
-/// cache is therefore unbounded but per-type-lazy: measured from Python, warming
-/// all seventy type validators costs ~477 MB over baseline with this trimmed set
-/// versus ~1375 MB with the full one. A process that only touches the handful of
-/// types it actually prices pays proportionally less. This is a deliberate trade
-/// against the ~2800x latency win — rebuilding per call cost ~105 ms.
-///
-/// `registry_coverage::every_registered_instrument_satisfies_persistence_contract`
-/// validates all seventy fixtures through this path, so a schema that grew a
-/// cross-instrument `$ref` would fail there rather than silently mis-resolve.
-fn instrument_ref_resources() -> finstack_quant_core::Result<Vec<(String, jsonschema::Resource)>> {
-    let mut resources = common_schema_resources()?;
-    resources.extend(finstack_quant_cashflows::schema::resources()?);
-    Ok(resources)
-}
-
-#[cfg(feature = "jsonschema-validate")]
-/// Compile `schema` against the supplied resolver resources.
-///
-/// This is the expensive step the caches below exist to amortize: each call
-/// parses the `common/1` schemas, clones the cashflow resources and (for the
-/// envelope) all embedded instrument schemas, then builds a resolver registry
-/// over them.
-fn build_validator_with(
+/// Format assertion is switched on so `format: "date"` and other format
+/// keywords match `finstack_quant::schema::validate` and the strict Rust
+/// loaders.
+fn build_validator_with<'a>(
     schema: &Value,
     context: &str,
-    resources: Vec<(String, jsonschema::Resource)>,
+    resources: impl Iterator<Item = (&'a str, jsonschema::Resource)>,
 ) -> CachedValidator {
     jsonschema::options()
-        .with_resources(resources.into_iter())
+        .should_validate_formats(true)
+        .with_resources(resources)
         .build(schema)
         .map_err(|e| {
             finstack_quant_core::Error::Validation(format!("Invalid {context} schema: {e}"))
@@ -375,31 +362,24 @@ fn build_validator_with(
 }
 
 #[cfg(feature = "jsonschema-validate")]
-/// Compile `schema` with every embedded resource registered.
+/// Compile `schema` with the cached `common/1` and `cashflow/1` resources.
 ///
-/// Used for the envelope, whose `oneOf` reaches every instrument schema.
+/// Both per-type instrument schemas and the inlined envelope schema only `$ref`
+/// into these shared definitions, so both share the same trimmed resource set.
 fn build_validator(schema: &Value, context: &str) -> CachedValidator {
-    build_validator_with(schema, context, external_schema_resources()?)
-}
-
-#[cfg(feature = "jsonschema-validate")]
-/// Compile a single instrument type's schema with only the resources it can reach.
-fn build_instrument_validator(schema: &Value, context: &str) -> CachedValidator {
-    build_validator_with(schema, context, instrument_ref_resources()?)
+    let shared = shared_ref_resources()?;
+    build_validator_with(
+        schema,
+        context,
+        shared
+            .resources
+            .iter()
+            .map(|(id, resource)| (id.as_str(), resource.clone())),
+    )
 }
 
 #[cfg(feature = "jsonschema-validate")]
 /// Compiled validator for the instrument envelope schema.
-///
-/// # Why this is cached
-///
-/// Building a `jsonschema::Validator` compiles every embedded resource - the
-/// twelve `common/1` schemas, the cashflow schemas and all instrument schemas -
-/// into a resolver registry. Measured in release on this workspace that build
-/// costs ~16 ms, while checking an instance against an already-built validator
-/// costs ~1 us. Rebuilding the validator per call therefore dominated bulk
-/// validation: a 5,000-instrument book spent minutes recompiling the same
-/// schemas. Caching makes the compile a one-off.
 ///
 /// `jsonschema::Validator` is `Send + Sync`, so lending `&'static` references
 /// is sound from rayon workers and from Python callers that released the GIL.
@@ -418,17 +398,14 @@ fn instrument_envelope_validator() -> finstack_quant_core::Result<&'static jsons
 /// Per-instrument-type compiled validators, keyed by canonical registry tag.
 ///
 /// Each tag owns its own `OnceLock`, so two instrument types can never share a
-/// validator and each is compiled at most once. Slots are filled lazily rather
-/// than all at once because a validator retains its own copy of the resource
-/// registry (~20 MB measured): compiling all of them up front would cost about
-/// a second and 1.4 GB for callers that touch only a handful of types.
+/// validator and each is compiled at most once on demand.
 fn instrument_validator_cache()
 -> &'static std::collections::BTreeMap<&'static str, OnceLock<CachedValidator>> {
     static CACHE: OnceLock<std::collections::BTreeMap<&'static str, OnceLock<CachedValidator>>> =
         OnceLock::new();
     CACHE.get_or_init(|| {
-        instrument_schema_cache()
-            .keys()
+        instrument_types()
+            .iter()
             .map(|tag| (*tag, OnceLock::new()))
             .collect()
     })
@@ -439,8 +416,9 @@ fn instrument_validator_cache()
 ///
 /// # Errors
 ///
-/// Returns `Error::Validation` if the type is not registered, if its embedded
-/// schema is malformed, or if that schema fails to compile.
+/// Returns `InputError::NotFound` if the type is not registered, or
+/// `Error::Validation` / `Error::Internal` if its schema fails to generate or
+/// compile.
 ///
 /// # Arguments
 ///
@@ -452,36 +430,30 @@ fn instrument_type_validator(
         .get_key_value(instrument_type)
         .map(|(tag, slot)| (*tag, slot))
         .ok_or_else(|| unknown_instrument_type(instrument_type))?;
-    slot.get_or_init(|| build_instrument_validator(&instrument_schema(tag)?, tag))
+    slot.get_or_init(|| build_validator(instrument_schema_ref(tag)?, tag))
         .as_ref()
         .map_err(Clone::clone)
 }
 
 #[cfg(feature = "jsonschema-validate")]
 /// Collect every violation `validator` reports for `instance`.
+///
+/// Reuses the cached schema document and shared resolver resources instead of
+/// rebuilding full-corpus validators on each failing branch.
 fn validate_with(
     validator: &jsonschema::Validator,
+    schema: &Value,
     instance: &Value,
     context: &str,
 ) -> finstack_quant_core::Result<()> {
     if validator.is_valid(instance) {
         return Ok(());
     }
-    let schema = if context == "instrument envelope" {
-        instrument_envelope_schema()?.clone()
-    } else {
-        instrument_schema(context)?
-    };
-    let resources = external_schema_resources()?;
-    let resolve = |id: &str| {
-        resources
-            .iter()
-            .find(|(uri, _)| uri == id)
-            .map(|(_, resource)| resource.contents().clone())
-    };
+    let shared = shared_ref_resources()?;
+    let resolve = |id: &str| shared.documents.get(id).cloned();
     let errors: Vec<String> = finstack_quant_core::schema::diagnostics::collect_failures(
         validator,
-        &schema,
+        schema,
         instance,
         &resolve,
         &|branch| build_validator(branch, context),
@@ -1498,11 +1470,7 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_examples(examples::ir_future_conventions),
     ];
 
-    artifacts.extend(
-        instrument_registry()
-            .into_iter()
-            .map(|entry| entry.artifact),
-    );
+    artifacts.extend(instrument_registry().iter().map(|entry| entry.artifact));
     artifacts
 }
 
@@ -1510,6 +1478,7 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
 mod tests {
     use super::*;
 
+    #[cfg(feature = "json-schema")]
     fn first_schema_example(schema: &Value) -> Value {
         schema
             .get("examples")
@@ -1521,19 +1490,22 @@ mod tests {
 
     /// Validate the way the pre-cache code did: compile a throwaway validator
     /// for every call. Used as the behavioural reference for the cached path.
+    #[cfg(feature = "jsonschema-validate")]
     fn validate_uncached(
         instrument_type: &str,
         instance: &Value,
     ) -> finstack_quant_core::Result<()> {
         let schema = instrument_schema(instrument_type)?;
         let validator = build_validator(&schema, instrument_type)?;
-        validate_with(&validator, instance, instrument_type)
+        validate_with(&validator, &schema, instance, instrument_type)
     }
 
+    #[cfg(feature = "json-schema")]
     fn bond_example() -> Value {
         first_schema_example(&instrument_schema("bond").expect("bond schema"))
     }
 
+    #[cfg(feature = "jsonschema-validate")]
     #[test]
     fn test_cached_validator_matches_uncached_verdicts() {
         let valid = bond_example();
@@ -1577,9 +1549,8 @@ mod tests {
     }
 
     /// Validates `instance` through the cached envelope path twice and checks
-    /// the verdict and its stability across calls. One test per case: a
-    /// rejected envelope takes tens of seconds to validate, so the cases run
-    /// in parallel instead of back to back.
+    /// the verdict and its stability across calls.
+    #[cfg(feature = "jsonschema-validate")]
     fn assert_envelope_verdict_is_stable(label: &str, instance: &Value, expect_ok: bool) {
         let first = validate_instrument_envelope_json(instance);
         assert_eq!(first.is_ok(), expect_ok, "{label}: unexpected verdict");
@@ -1590,11 +1561,13 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "jsonschema-validate")]
     #[test]
     fn test_cached_envelope_validation_keeps_its_verdict_for_a_valid_example() {
         assert_envelope_verdict_is_stable("valid", &bond_example(), true);
     }
 
+    #[cfg(feature = "jsonschema-validate")]
     #[test]
     fn test_cached_envelope_validation_keeps_its_verdict_for_an_unknown_field() {
         let mut unknown_field = bond_example();
@@ -1602,6 +1575,7 @@ mod tests {
         assert_envelope_verdict_is_stable("unknown field", &unknown_field, false);
     }
 
+    #[cfg(feature = "jsonschema-validate")]
     #[test]
     fn test_cached_envelope_validation_keeps_its_verdict_for_a_malformed_scalar() {
         let mut malformed_scalar = bond_example();
@@ -1610,6 +1584,7 @@ mod tests {
         assert_envelope_verdict_is_stable("malformed scalar", &malformed_scalar, false);
     }
 
+    #[cfg(feature = "jsonschema-validate")]
     #[test]
     fn test_cached_validators_are_not_shared_across_instrument_types() {
         let bond = instrument_type_validator("bond").expect("bond validator");
@@ -1627,6 +1602,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "jsonschema-validate")]
     #[test]
     fn test_cached_validator_is_shared_across_threads() {
         let instance = bond_example();
@@ -1649,6 +1625,7 @@ mod tests {
         });
     }
 
+    #[cfg(feature = "jsonschema-validate")]
     #[test]
     fn test_cached_compilation_failure_is_reported_on_every_call() {
         // A schema that cannot compile must keep failing with the same error
@@ -1682,6 +1659,7 @@ mod tests {
     /// Timing harness for the validator cache; run with
     /// `cargo nextest run -p finstack-quant-valuations --release
     /// --run-ignored all -E 'test(bench_validator_cache)' --no-capture`.
+    #[cfg(feature = "jsonschema-validate")]
     #[test]
     #[ignore = "timing harness, not a correctness assertion"]
     fn bench_validator_cache() {
@@ -1712,6 +1690,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "json-schema")]
     #[test]
     fn test_schema_stubs() {
         // Verify stub schemas are valid JSON and have expected structure
@@ -1727,10 +1706,10 @@ mod tests {
         assert_eq!(result["title"], "Valuation Result");
     }
 
+    #[cfg(feature = "json-schema")]
     #[test]
     fn test_all_schemas_parse_successfully() {
-        // Ensure all embedded schemas parse without error.
-        // This test catches invalid JSON at CI time rather than runtime.
+        // Ensure all generated schemas render without error.
         assert!(
             instrument_schema("bond").is_ok(),
             "instrument_schema(\"bond\") should return Ok"
@@ -1756,6 +1735,7 @@ mod tests {
         assert!(types.contains(&"cms_swap"));
     }
 
+    #[cfg(feature = "json-schema")]
     #[test]
     fn test_instrument_schema_returns_dedicated_schema_when_available() {
         let schema = instrument_schema("bond").expect("bond schema should load");
@@ -1766,6 +1746,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "json-schema")]
     #[test]
     fn test_all_envelope_types_have_dedicated_schemas() {
         for ty in instrument_types() {
@@ -1781,6 +1762,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "json-schema")]
     #[test]
     fn test_instrument_schema_rejects_unknown_discriminator() {
         let err = instrument_schema("not_a_supported_instrument_type").expect_err("unknown type");
@@ -1792,6 +1774,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "json-schema")]
     #[test]
     fn test_instrument_schema_cache_covers_canonical_tags_only() {
         let bond = instrument_schema("bond").expect("bond");
@@ -1801,6 +1784,7 @@ mod tests {
         assert!(instrument_schema("interest_rate_option").is_err());
     }
 
+    #[cfg(feature = "jsonschema-validate")]
     #[test]
     fn test_validate_instrument_json_accepts_valid_envelope() {
         let valid = first_schema_example(&instrument_schema("bond").expect("bond schema"));
@@ -1810,6 +1794,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "jsonschema-validate")]
     #[test]
     fn test_validate_instrument_json_rejects_empty_typed_spec() {
         let invalid = serde_json::json!({
@@ -1828,6 +1813,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "jsonschema-validate")]
     #[test]
     fn test_validate_instrument_json_rejects_missing_schema() {
         let invalid = serde_json::json!({
@@ -1842,6 +1828,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "jsonschema-validate")]
     #[test]
     fn near_miss_instrument_error_names_the_missing_field() {
         // Single-instrument schemas used to wrap their payload in a one-branch
@@ -1873,6 +1860,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "jsonschema-validate")]
     #[test]
     fn test_validate_instrument_json_rejects_unknown_type() {
         let invalid = serde_json::json!({
@@ -1881,5 +1869,28 @@ mod tests {
         });
         let err = validate_instrument_envelope_json(&invalid);
         assert!(err.is_err(), "unknown instrument type should fail");
+    }
+
+    #[cfg(feature = "jsonschema-validate")]
+    #[test]
+    fn test_validate_instrument_envelope_rejects_malformed_date_format() {
+        let mut payload = bond_example();
+        payload["instrument"]["spec"]["maturity"] = serde_json::json!("01/15/2034");
+
+        let envelope_err = validate_instrument_envelope_json(&payload)
+            .expect_err("malformed date must fail envelope validation")
+            .to_string();
+        assert!(
+            envelope_err.contains("/instrument/spec/maturity"),
+            "envelope error must point at maturity: {envelope_err}"
+        );
+
+        let typed_err = validate_instrument_type_json("bond", &payload)
+            .expect_err("malformed date must fail typed validation")
+            .to_string();
+        assert!(
+            typed_err.contains("/instrument/spec/maturity"),
+            "typed error must point at maturity: {typed_err}"
+        );
     }
 }

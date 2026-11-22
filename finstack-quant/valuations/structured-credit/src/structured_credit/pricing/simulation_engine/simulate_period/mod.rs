@@ -6,7 +6,6 @@
 
 use super::*;
 use crate::structured_credit::types::{PaymentCalculation, PaymentType};
-use crate::structured_credit::utils::months::ClampedMonths;
 
 mod cash;
 mod losses;
@@ -73,7 +72,7 @@ pub(super) fn simulate_period(
     // Seasoned collateral therefore enters the ramp partway up instead of
     // restarting at month zero on the deal closing date.
     let seasoning_months =
-        state.closing_seasoning_months + state.closing_date.clamped_months_until(pay_date);
+        state.closing_seasoning_months + state.closing_date.months_until(pay_date)?;
 
     // Capture period start before updating prev_date (for accrual calculations)
     let period_start = period.accrual_start;
@@ -562,28 +561,8 @@ pub(super) fn simulate_period(
     // Per-period deal accounting: end-of-period balances, the cash that moved
     // and the coverage tests exactly as the executor evaluated them (single
     // source: the waterfall's own results).
-    let trigger_levels: FxHashMap<&str, f64> = period_waterfall
-        .coverage_tests()
-        .map(|spec| (spec.id.as_str(), spec.trigger_level))
-        .collect();
-    let coverage_tests = waterfall_result
-        .coverage_tests
-        .iter()
-        .map(|(test_id, ratio, passing)| {
-            let trigger_level = trigger_levels
-                .get(test_id.as_str())
-                .copied()
-                .unwrap_or(f64::NAN);
-            let ratio = *ratio;
-            super::state::CoverageTestDiagnostic {
-                test_id: test_id.clone(),
-                ratio,
-                trigger_level,
-                cushion: ratio.map(|ratio| ratio - trigger_level),
-                passing: *passing,
-            }
-        })
-        .collect();
+    let coverage_tests =
+        build_coverage_test_diagnostics(&period_waterfall, &waterfall_result.coverage_tests)?;
     let record = super::state::PeriodDiagnostics {
         interest_collections: pool_flows.interest,
         principal_collections: pool_flows
@@ -669,4 +648,89 @@ fn apply_tranche_draws(
         state.tranche_draws.push((tranche_id, pay_date, amount));
     }
     Ok(())
+}
+
+/// Build per-period coverage-test diagnostics by matching each evaluated
+/// waterfall test result against its specification on `period_waterfall`.
+fn build_coverage_test_diagnostics(
+    period_waterfall: &Waterfall,
+    evaluated_tests: &[(String, Option<f64>, bool)],
+) -> Result<Vec<super::state::CoverageTestDiagnostic>> {
+    let trigger_levels: FxHashMap<&str, f64> = period_waterfall
+        .coverage_tests()
+        .map(|spec| (spec.id.as_str(), spec.trigger_level))
+        .collect();
+    evaluated_tests
+        .iter()
+        .map(|(test_id, ratio, passing)| {
+            let trigger_level = trigger_levels
+                .get(test_id.as_str())
+                .copied()
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Internal(format!(
+                        "waterfall reported coverage test '{test_id}' that is absent from \
+                             period waterfall coverage_tests"
+                    ))
+                })?;
+            let ratio = *ratio;
+            Ok(super::state::CoverageTestDiagnostic {
+                test_id: test_id.clone(),
+                ratio,
+                trigger_level,
+                cushion: ratio.map(|ratio| ratio - trigger_level),
+                passing: *passing,
+            })
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::structured_credit::types::{CoverageTestAction, CoverageTestSpec, WaterfallTier};
+
+    fn waterfall_with_oc_test(id: &str, trigger_level: f64) -> Waterfall {
+        let spec = CoverageTestSpec {
+            id: id.to_string(),
+            tranche_id: "CLASS_A".to_string(),
+            kind: CoverageTestType::Oc,
+            trigger_level,
+            action: CoverageTestAction::PayDownSenior,
+            placement: None,
+            divert_pct: None,
+        };
+        Waterfall::builder(Currency::USD)
+            .add_tier(WaterfallTier::coverage_tests("oc_tier", 1, vec![spec]))
+            .build()
+            .expect("valid test waterfall")
+    }
+
+    #[test]
+    fn missing_coverage_test_spec_returns_internal_error_instead_of_nan() {
+        let waterfall = waterfall_with_oc_test("OC_CLASS_A", 1.20);
+        let evaluated = vec![("OC_UNKNOWN".to_string(), Some(1.35), true)];
+        let err = build_coverage_test_diagnostics(&waterfall, &evaluated)
+            .expect_err("unknown coverage test ID must error instead of emitting NaN");
+        assert!(
+            matches!(err, finstack_quant_core::Error::Internal(_)),
+            "expected Internal error, got: {err:?}"
+        );
+        assert!(
+            err.to_string().contains("OC_UNKNOWN"),
+            "error must name missing test_id, got: {err}"
+        );
+    }
+
+    #[test]
+    fn known_coverage_test_spec_populates_finite_trigger_and_cushion() {
+        let waterfall = waterfall_with_oc_test("OC_CLASS_A", 1.20);
+        let evaluated = vec![("OC_CLASS_A".to_string(), Some(1.35), true)];
+        let diagnostics =
+            build_coverage_test_diagnostics(&waterfall, &evaluated).expect("matching spec");
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].test_id, "OC_CLASS_A");
+        assert_eq!(diagnostics[0].trigger_level, 1.20);
+        assert!((diagnostics[0].cushion.expect("cushion") - 0.15).abs() < 1e-12);
+        assert!(diagnostics[0].passing);
+    }
 }

@@ -41,6 +41,18 @@ impl Pricer for CommoditySpotOptionMcPricer {
         )
     }
 
+    #[tracing::instrument(
+        name = "commodity_spot_option.mc.price_dyn",
+        level = "debug",
+        skip(self, instrument, market),
+        fields(
+            inst_id = %instrument.id(),
+            as_of = %as_of,
+            num_paths = self.mc_params.num_paths,
+            num_steps = self.mc_params.num_steps,
+        ),
+        err,
+    )]
     fn price_dyn(
         &self,
         instrument: &dyn Instrument,

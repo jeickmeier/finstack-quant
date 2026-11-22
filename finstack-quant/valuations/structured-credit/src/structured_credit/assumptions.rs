@@ -12,6 +12,109 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 
+pub(crate) const DEFAULT_REFI_RATE: f64 = 0.04;
+const DEFAULT_PREPAYMENT_CPR: f64 = 0.2;
+const DEFAULT_CDR: f64 = 0.02;
+const DEFAULT_RECOVERY_RATE: f64 = 0.6;
+const DEFAULT_RECOVERY_LAG_MONTHS: u32 = 12;
+
+pub(crate) const RMBS_STANDARD_CALIBRATION: RmbsCalibration = RmbsCalibration {
+    base_cdr: 0.02,
+    default_correlation: 0.05,
+    base_cpr: 0.06,
+    prepay_factor_loading: 0.4,
+    cpr_volatility: 0.2,
+    refi_sensitivity: 2.0,
+    burnout_rate: 0.1,
+};
+
+pub(crate) const CLO_STANDARD_CALIBRATION: CloCalibration = CloCalibration {
+    base_cdr: 0.02,
+    default_correlation: 0.2,
+    base_cpr: 0.2,
+    prepay_factor_loading: 0.25,
+    cpr_volatility: 0.15,
+};
+
+pub(crate) const CMBS_STANDARD_CALIBRATION: CmbsCalibration = CmbsCalibration {
+    base_cdr: 0.025,
+    default_correlation: 0.15,
+    base_cpr: 0.03,
+    prepay_factor_loading: 0.2,
+    cpr_volatility: 0.1,
+};
+
+pub(crate) fn default_prepayment_spec() -> PrepaymentModelSpec {
+    PrepaymentModelSpec::constant_cpr(DEFAULT_PREPAYMENT_CPR)
+}
+
+pub(crate) fn default_default_spec() -> DefaultModelSpec {
+    DefaultModelSpec::constant_cdr(DEFAULT_CDR)
+}
+
+pub(crate) fn default_recovery_spec() -> RecoveryModelSpec {
+    RecoveryModelSpec::with_lag(DEFAULT_RECOVERY_RATE, DEFAULT_RECOVERY_LAG_MONTHS)
+}
+
+pub(crate) fn clo_standard_fees(currency: Currency) -> DealFees {
+    DealFees {
+        trustee_fee: Money::from((50_000_i64, currency)),
+        senior_mgmt_fee_bp: 15.0,
+        subordinated_mgmt_fee_bp: 35.0,
+        servicing_fee_bp: 0.0,
+        master_servicer_fee_bp: None,
+        special_servicer_fee_bp: None,
+        workout_fee_pct: None,
+        liquidation_fee_pct: None,
+        incentive_fee: Some(IncentiveFeeSpec {
+            hurdle_irr: 0.12,
+            share: 0.2,
+        }),
+    }
+}
+
+pub(crate) fn abs_standard_fees(currency: Currency) -> DealFees {
+    DealFees {
+        trustee_fee: Money::from((25_000_i64, currency)),
+        senior_mgmt_fee_bp: 0.0,
+        subordinated_mgmt_fee_bp: 0.0,
+        servicing_fee_bp: 50.0,
+        master_servicer_fee_bp: None,
+        special_servicer_fee_bp: None,
+        workout_fee_pct: None,
+        liquidation_fee_pct: None,
+        incentive_fee: None,
+    }
+}
+
+pub(crate) fn cmbs_standard_fees(currency: Currency) -> DealFees {
+    DealFees {
+        trustee_fee: Money::from((75_000_i64, currency)),
+        senior_mgmt_fee_bp: 0.0,
+        subordinated_mgmt_fee_bp: 0.0,
+        servicing_fee_bp: 0.0,
+        master_servicer_fee_bp: Some(25.0),
+        special_servicer_fee_bp: Some(25.0),
+        workout_fee_pct: None,
+        liquidation_fee_pct: None,
+        incentive_fee: None,
+    }
+}
+
+pub(crate) fn rmbs_standard_fees(currency: Currency) -> DealFees {
+    DealFees {
+        trustee_fee: Money::from((30_000_i64, currency)),
+        senior_mgmt_fee_bp: 0.0,
+        subordinated_mgmt_fee_bp: 0.0,
+        servicing_fee_bp: 25.0,
+        master_servicer_fee_bp: None,
+        special_servicer_fee_bp: None,
+        workout_fee_pct: None,
+        liquidation_fee_pct: None,
+        incentive_fee: None,
+    }
+}
+
 static EMBEDDED_REGISTRY: EmbeddedJsonRegistry<StructuredCreditAssumptionRegistry> =
     EmbeddedJsonRegistry::new(
         include_str!("../../data/assumptions/structured_credit_assumptions.v1.json"),
@@ -32,18 +135,22 @@ pub(crate) struct StructuredCreditAssumptionRegistry {
 }
 
 impl StructuredCreditAssumptionRegistry {
+    #[cfg(test)]
     pub(crate) fn market_conditions(&self) -> f64 {
         self.market_conditions.refi_rate
     }
 
+    #[cfg(test)]
     pub(crate) fn default_prepayment_spec(&self) -> PrepaymentModelSpec {
         PrepaymentModelSpec::constant_cpr(self.credit_model_defaults.prepayment_cpr)
     }
 
+    #[cfg(test)]
     pub(crate) fn default_default_spec(&self) -> DefaultModelSpec {
         DefaultModelSpec::constant_cdr(self.credit_model_defaults.default_cdr)
     }
 
+    #[cfg(test)]
     pub(crate) fn default_recovery_spec(&self) -> RecoveryModelSpec {
         RecoveryModelSpec::with_lag(
             self.credit_model_defaults.recovery_rate,
@@ -65,6 +172,7 @@ impl StructuredCreditAssumptionRegistry {
         self.simulation.pool_balance_cleanup_threshold
     }
 
+    #[cfg(test)]
     pub(crate) fn rmbs_stochastic_calibration(&self, id: &str) -> Result<RmbsCalibration> {
         let record = self
             .stochastic_calibrations
@@ -83,6 +191,7 @@ impl StructuredCreditAssumptionRegistry {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn clo_stochastic_calibration(&self, id: &str) -> Result<CloCalibration> {
         let record = self
             .stochastic_calibrations
@@ -99,6 +208,7 @@ impl StructuredCreditAssumptionRegistry {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn cmbs_stochastic_calibration(&self, id: &str) -> Result<CmbsCalibration> {
         let record = self
             .stochastic_calibrations
@@ -115,6 +225,7 @@ impl StructuredCreditAssumptionRegistry {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn deal_fees(&self, id: &str, currency: Currency) -> Result<DealFees> {
         let fees = &self.deal_profile(id)?.fees;
         Ok(DealFees {
@@ -146,7 +257,7 @@ impl StructuredCreditAssumptionRegistry {
     fn deal_profile(&self, id: &str) -> Result<&DealProfileRecord> {
         self.deal_profiles
             .iter()
-            .find(|profile| profile.ids.iter().any(|candidate| candidate == id))
+            .find(|profile| has_id(&profile.ids, id))
             .ok_or_else(|| not_found("structured-credit deal profile", id))
     }
 
@@ -424,19 +535,6 @@ pub(crate) fn embedded_registry() -> Result<&'static StructuredCreditAssumptionR
     EMBEDDED_REGISTRY.load(validate_registry)
 }
 
-#[allow(clippy::expect_used)]
-pub(crate) fn embedded_registry_or_panic() -> &'static StructuredCreditAssumptionRegistry {
-    embedded_registry().expect("embedded structured-credit assumptions are compile-time assets")
-}
-
-/// Unwrap a lookup into the embedded, compile-time-validated assumptions
-/// registry. The registry ships with the crate, so a missing entry is a
-/// packaging defect rather than a caller error.
-#[allow(clippy::expect_used)]
-pub(crate) fn required_assumption<T>(result: Result<T>) -> T {
-    result.expect("embedded structured-credit assumptions registry value should exist")
-}
-
 fn validate_registry(
     registry: StructuredCreditAssumptionRegistry,
 ) -> Result<StructuredCreditAssumptionRegistry> {
@@ -681,5 +779,78 @@ mod tests {
     fn default_factor_loading_outside_unit_range_is_rejected() {
         assert!(super::validate_factor_loading(0.8, "default factor loading").is_ok());
         assert!(super::validate_factor_loading(1.5, "default factor loading").is_err());
+    }
+
+    #[test]
+    fn typed_defaults_match_embedded_json_asset() {
+        use finstack_quant_core::currency::Currency;
+
+        let registry = super::embedded_registry().expect("embedded assumptions registry");
+
+        assert_eq!(super::DEFAULT_REFI_RATE, registry.market_conditions());
+        assert_eq!(
+            super::default_prepayment_spec(),
+            registry.default_prepayment_spec()
+        );
+        assert_eq!(
+            super::default_default_spec(),
+            registry.default_default_spec()
+        );
+        assert_eq!(
+            super::default_recovery_spec(),
+            registry.default_recovery_spec()
+        );
+
+        assert_eq!(
+            super::RMBS_STANDARD_CALIBRATION,
+            registry
+                .rmbs_stochastic_calibration("rmbs_standard")
+                .expect("rmbs_standard calibration")
+        );
+        assert_eq!(
+            super::CLO_STANDARD_CALIBRATION,
+            registry
+                .clo_stochastic_calibration("clo_standard")
+                .expect("clo_standard calibration")
+        );
+        assert_eq!(
+            super::CMBS_STANDARD_CALIBRATION,
+            registry
+                .cmbs_stochastic_calibration("cmbs_standard")
+                .expect("cmbs_standard calibration")
+        );
+
+        let assert_fees_eq = |actual: super::DealFees, expected: super::DealFees| {
+            assert_eq!(actual.trustee_fee, expected.trustee_fee);
+            assert_eq!(actual.senior_mgmt_fee_bp, expected.senior_mgmt_fee_bp);
+            assert_eq!(
+                actual.subordinated_mgmt_fee_bp,
+                expected.subordinated_mgmt_fee_bp
+            );
+            assert_eq!(actual.servicing_fee_bp, expected.servicing_fee_bp);
+            assert_eq!(
+                actual.master_servicer_fee_bp,
+                expected.master_servicer_fee_bp
+            );
+            assert_eq!(
+                actual.special_servicer_fee_bp,
+                expected.special_servicer_fee_bp
+            );
+            assert_eq!(actual.workout_fee_pct, expected.workout_fee_pct);
+            assert_eq!(actual.liquidation_fee_pct, expected.liquidation_fee_pct);
+            assert_eq!(actual.incentive_fee, expected.incentive_fee);
+        };
+
+        for (actual, id) in [
+            (super::clo_standard_fees(Currency::USD), "clo_standard"),
+            (super::abs_standard_fees(Currency::USD), "abs_auto_standard"),
+            (super::cmbs_standard_fees(Currency::USD), "cmbs_standard"),
+            (super::rmbs_standard_fees(Currency::USD), "rmbs_standard"),
+        ] {
+            let expected = registry
+                .deal_fees(id, Currency::USD)
+                .expect("standard deal fees");
+            assert_fees_eq(actual, expected);
+        }
     }
 }

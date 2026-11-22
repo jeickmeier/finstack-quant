@@ -428,56 +428,51 @@ impl ConvertibleBond {
     /// price is set, or when the recorded dilution events collapse the
     /// adjusted conversion price to numerical zero (below `1e-10`), which
     /// indicates corrupt event data; `validate` reports this case explicitly.
-    // `AntiDilutionPolicy::None` is excluded by the `matches!` early return below.
-    #[allow(clippy::unreachable)]
     pub fn effective_conversion_ratio(&self) -> Option<f64> {
         let base_ratio = self.conversion_ratio()?;
 
-        // If no anti-dilution or no events, return base ratio
-        if matches!(self.conversion.anti_dilution, AntiDilutionPolicy::None)
-            || self.conversion.dilution_events.is_empty()
-        {
+        if self.conversion.dilution_events.is_empty() {
             return Some(base_ratio);
         }
 
-        // Start with the original conversion price
+        // Start with the original conversion price and apply recorded events
+        // sequentially (chronological order is enforced by validation).
         let notional = self.notional.amount();
-        let mut current_cp = notional / base_ratio;
-
-        // Events are stored in chronological order (enforced by validation)
-        // and applied sequentially.
-        for event in &self.conversion.dilution_events {
-            match &self.conversion.anti_dilution {
-                AntiDilutionPolicy::None => unreachable!(
-                    "effective_conversion_ratio reached AntiDilutionPolicy::None; the \
-                     early return above excludes it"
-                ),
-                AntiDilutionPolicy::FullRatchet => {
-                    // Full ratchet: conversion price drops to the new issue price
-                    // if it is below the current conversion price.
-                    if event.new_issue_price < current_cp {
-                        current_cp = event.new_issue_price;
+        let current_cp = match &self.conversion.anti_dilution {
+            AntiDilutionPolicy::None => return Some(base_ratio),
+            AntiDilutionPolicy::FullRatchet => {
+                // Full ratchet: conversion price drops to the new issue price
+                // if it is below the current conversion price.
+                let mut cp = notional / base_ratio;
+                for event in &self.conversion.dilution_events {
+                    if event.new_issue_price < cp {
+                        cp = event.new_issue_price;
                     }
                 }
-                AntiDilutionPolicy::WeightedAverage => {
-                    // Broad-based weighted average formula:
-                    //   new_cp = old_cp × (O + new_money / old_cp) / (O + N)
-                    // where:
-                    //   O = shares outstanding before the event
-                    //   N = new shares issued
-                    //   new_money = N × new_issue_price
+                cp
+            }
+            AntiDilutionPolicy::WeightedAverage => {
+                // Broad-based weighted average formula:
+                //   new_cp = old_cp × (O + new_money / old_cp) / (O + N)
+                // where:
+                //   O = shares outstanding before the event
+                //   N = new shares issued
+                //   new_money = N × new_issue_price
+                let mut cp = notional / base_ratio;
+                for event in &self.conversion.dilution_events {
                     let o = event.shares_outstanding_before;
                     let n = event.new_shares_issued;
                     let new_money = n * event.new_issue_price;
 
                     if (o + n) > 0.0 {
-                        let numerator = o + new_money / current_cp;
+                        let numerator = o + new_money / cp;
                         let denominator = o + n;
-                        current_cp *= numerator / denominator;
+                        cp *= numerator / denominator;
                     }
                 }
+                cp
             }
-        }
+        };
 
         // A conversion price collapsing to (numerical) zero means the dilution
         // events are corrupt: returning the unadjusted base ratio here would

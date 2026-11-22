@@ -54,6 +54,18 @@ pub(crate) fn resolve_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyM
 /// Projects collateral cashflows (including a prior-month payment still in
 /// flight at `as_of`) and runs them through the waterfall to determine the
 /// reference tranche's cashflows.
+#[tracing::instrument(
+    name = "cmo.generate_tranche_cashflows",
+    level = "debug",
+    skip(cmo),
+    fields(
+        inst_id = %cmo.id.as_str(),
+        tranche_id = %cmo.reference_tranche_id,
+        as_of = %as_of,
+        max_periods = ?max_periods,
+    ),
+    err,
+)]
 pub(crate) fn generate_tranche_cashflows(
     cmo: &AgencyCmo,
     as_of: Date,
@@ -245,6 +257,18 @@ fn create_assumed_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyMbsPa
 /// Price a CMO reference tranche.
 ///
 /// Generates tranche cashflows and discounts them to present value.
+#[tracing::instrument(
+    name = "cmo.price",
+    level = "debug",
+    skip(cmo, market),
+    fields(
+        inst_id = %cmo.id.as_str(),
+        tranche_id = %cmo.reference_tranche_id,
+        tranche_count = cmo.waterfall.tranches.len(),
+        as_of = %as_of,
+    ),
+    err,
+)]
 pub(crate) fn price_cmo(cmo: &AgencyCmo, market: &MarketContext, as_of: Date) -> Result<Money> {
     let schedule = build_reference_tranche_schedule(cmo, as_of, None)?;
     let currency = cmo.reference_tranche()?.current_face.currency();

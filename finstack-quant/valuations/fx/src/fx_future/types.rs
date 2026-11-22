@@ -239,6 +239,13 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxFuture {
         Some((self.base_currency, self.quote_currency()))
     }
 
+    #[tracing::instrument(
+        name = "fx_future.base_value",
+        level = "debug",
+        skip(self, market),
+        fields(inst_id = %self.id(), as_of = %as_of),
+        err,
+    )]
     fn base_value(
         &self,
         market: &MarketContext,

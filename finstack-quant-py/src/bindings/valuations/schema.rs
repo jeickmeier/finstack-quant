@@ -1,9 +1,10 @@
 //! Python bindings for `finstack_quant_valuations::schema`.
 //!
-//! Every schema exposed here is compiled into the extension module by the
-//! canonical Rust accessors (`include_str!` + `OnceLock`), so a schema read
-//! from Python always describes the exact wire format the installed wheel
-//! accepts. There is no loose data file that can drift from the binary.
+//! Every schema exposed here is rendered on demand from the crate's Rust serde
+//! types and cached in `OnceLock` by the canonical accessors in
+//! `finstack_quant_valuations::schema`, so a schema read from Python always
+//! describes the exact wire format the installed wheel accepts without
+//! embedding checked-in JSON in the extension module.
 
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::schema_registry::schema_registry_functions;
