@@ -1106,7 +1106,7 @@
       "sha256": "aee96515e09ec92fbbc0b5ccdc5ad29f697a8144cd3b5ddd5980f1df0e092d55"
     },
     {
-      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/utils/simulation.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/recovery.rs",
       "classification": "algorithm",
       "records": [
         "VALUATIONS-STRUCTURED-CREDIT-03",

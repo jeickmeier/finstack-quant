@@ -117,7 +117,7 @@ Explicit `LossAllocationPolicy`, `LossRecognition`, call scope/date and liquidat
 - [structured_credit/pricing/simulation_engine/orchestration.rs](../../../../finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/orchestration.rs)
 - [structured_credit/pricing/simulation_engine/simulate_period/losses.rs](../../../../finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/simulate_period/losses.rs)
 - [structured_credit/pricing/simulation_engine/simulate_period/record.rs](../../../../finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/simulate_period/record.rs)
-- [structured_credit/utils/simulation.rs](../../../../finstack-quant/valuations/structured-credit/src/structured_credit/utils/simulation.rs)
+- [structured_credit/pricing/simulation_engine/recovery.rs](../../../../finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/recovery.rs)
 
 Existing evidence: [structured_credit/unit/loss_allocation_tests.rs](../../../../finstack-quant/valuations/structured-credit/tests/structured_credit/unit/loss_allocation_tests.rs); [structured_credit/unit/call_tests.rs](../../../../finstack-quant/valuations/structured-credit/tests/structured_credit/unit/call_tests.rs); [structured_credit/integration/simulation_edge_tests.rs](../../../../finstack-quant/valuations/structured-credit/tests/structured_credit/integration/simulation_edge_tests.rs). These are behavior/formula/invariant tests; no test was rerun for this audit. Where only a test location was inspected, no independent reference validation is claimed.
 

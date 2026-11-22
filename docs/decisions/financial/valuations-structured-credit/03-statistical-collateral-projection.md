@@ -135,7 +135,7 @@ The default/prepay ordering and half-period interest adjustment are approximatio
 - [structured_credit/pricing/simulation_engine/pool_flow_source.rs](../../../../finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/pool_flow_source.rs)
 - [structured_credit/pricing/simulation_engine/period_helpers.rs](../../../../finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/period_helpers.rs)
 - [structured_credit/utils/amortization.rs](../../../../finstack-quant/valuations/structured-credit/src/structured_credit/utils/amortization.rs)
-- [structured_credit/utils/simulation.rs](../../../../finstack-quant/valuations/structured-credit/src/structured_credit/utils/simulation.rs)
+- [structured_credit/pricing/simulation_engine/recovery.rs](../../../../finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/recovery.rs)
 
 Existing evidence: [structured_credit/unit/amortization_term_tests.rs](../../../../finstack-quant/valuations/structured-credit/tests/structured_credit/unit/amortization_term_tests.rs); [structured_credit/unit/seasoning_tests.rs](../../../../finstack-quant/valuations/structured-credit/tests/structured_credit/unit/seasoning_tests.rs); [structured_credit/unit/index_floor_tests.rs](../../../../finstack-quant/valuations/structured-credit/tests/structured_credit/unit/index_floor_tests.rs); [structured_credit/unit/stochastic_pricing_tests.rs](../../../../finstack-quant/valuations/structured-credit/tests/structured_credit/unit/stochastic_pricing_tests.rs). These are behavior/formula/invariant tests; no test was rerun for this audit. Where only a test location was inspected, no independent reference validation is claimed.
 

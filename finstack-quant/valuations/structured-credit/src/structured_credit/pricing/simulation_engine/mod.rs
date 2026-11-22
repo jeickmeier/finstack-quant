@@ -12,7 +12,6 @@ use crate::structured_credit::types::{
     RecipientType, StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority, TrancheStructure,
     Waterfall, WaterfallDistribution,
 };
-use crate::structured_credit::utils::simulation::RecoveryQueue;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
@@ -40,6 +39,7 @@ mod orchestration;
 pub(crate) mod period_helpers;
 mod pool_flow_source;
 mod pool_flows;
+mod recovery;
 mod reserve;
 mod simulate_period;
 mod state;
@@ -55,6 +55,7 @@ use pool_flows::{
     AssetSeasonedRates, PeriodDefaultOutcome, PoolFlowRates, PoolFlows, RatedPoolFlowRequest,
     SpecialServicingFees, calculate_pool_flows_with_rates,
 };
+use recovery::RecoveryQueue;
 use simulate_period::simulate_period;
 pub use state::{
     CoverageTestBreach, CoverageTestDiagnostic, NonWaterfallPayment, NonWaterfallSource,
