@@ -24,6 +24,14 @@ The umbrella `valuations` target keeps:
 - Framework-behaviour tests (`core_framework`, which exercises `valuations-core` over real instruments)
 - Tests that require `finstack-quant-calibration` or JSON/envelope loading (`InstrumentJson`, `json_loader`, `json_examples`, `pricer::json`, `schema`)
 
+`instruments/{cds,cds_index,cds_option,cds_tranche}/` remain in the umbrella
+target rather than `finstack-quant-valuations-credit`: `calibration` depends on
+`credit`, so `credit` cannot take a calibration dev-dependency without creating
+a cycle, and helper-closure analysis shows every test file in `cds_index/`,
+`cds_option/`, and `cds_tranche/` imports its calibration-pinned sibling helper
+(`test_utils.rs`, `common.rs`, or `helpers.rs`), leaving zero self-contained
+calibration-free files.
+
 ## Modules in `tests/main.rs`
 
 Multi-file module trees:
