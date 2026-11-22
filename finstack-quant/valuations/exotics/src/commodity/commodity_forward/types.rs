@@ -4,8 +4,7 @@
 //! commodity forward contracts. Pricing uses curve-based forward interpolation
 //! with an optional quoted forward override (`quoted_forward`).
 
-use crate::CommodityUnderlyingParams;
-use crate::commodity::CommodityConvention;
+use crate::{CommodityConvention, CommodityUnderlyingParams};
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CFKind;

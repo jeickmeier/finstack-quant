@@ -137,7 +137,7 @@ pub mod spot;
 /// Spot-pinned finite-difference Greeks for products struck at inception spot.
 pub(crate) mod spot_pinned;
 /// Equity underlying asset parameters.
-pub mod underlying;
+pub(crate) mod underlying;
 pub mod variance_swap;
 #[doc(hidden)]
 pub mod vega;

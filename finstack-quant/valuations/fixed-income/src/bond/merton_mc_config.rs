@@ -110,7 +110,7 @@ pub enum PikMode {
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_valuations_fixed_income::bond::{PikMode, PikSchedule};
+/// use finstack_quant_valuations_fixed_income::{PikMode, PikSchedule};
 ///
 /// // All coupons PIK
 /// let uniform = PikSchedule::Uniform(PikMode::Pik);

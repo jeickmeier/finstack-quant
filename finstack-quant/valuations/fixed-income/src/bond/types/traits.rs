@@ -294,7 +294,7 @@ impl Bond {
     /// unsupported cashflow shapes, invalid dates, or invalid MC inputs.
     pub fn price_merton_mc(
         &self,
-        config: &crate::bond::MertonMcConfig,
+        config: &crate::MertonMcConfig,
         discount_rate: f64,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<crate::bond::pricing::merton_mc::MertonMcResult> {
@@ -310,13 +310,13 @@ impl Bond {
     /// Shared by [`Bond::price_merton_mc`] and the low-path market calibration.
     pub(crate) fn price_merton_mc_with_run(
         &self,
-        config: &crate::bond::MertonMcConfig,
+        config: &crate::MertonMcConfig,
         run: &crate::bond::pricing::merton_mc::MertonMcRun,
         discount_rate: f64,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<crate::bond::pricing::merton_mc::MertonMcResult> {
         use crate::bond::pricing::merton_mc::{MertonBondTerms, MertonMcEngine};
-        use crate::bond::{MertonMcConfig, PikMode, PikSchedule};
+        use crate::{MertonMcConfig, PikMode, PikSchedule};
         use finstack_quant_cashflows::builder::CouponType;
         use rust_decimal::prelude::ToPrimitive;
 
@@ -488,7 +488,7 @@ mod metrics_equivalent_tests {
 
     #[test]
     fn metrics_equivalent_preserves_all_other_bond_state() {
-        use crate::bond::MertonMcConfig;
+        use crate::MertonMcConfig;
         use finstack_quant_models::credit::{AssetDynamics, MertonBarrierType, MertonModel};
 
         let mut bond = Bond::example().expect("bond example");

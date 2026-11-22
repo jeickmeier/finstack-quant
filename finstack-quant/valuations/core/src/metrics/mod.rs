@@ -96,7 +96,7 @@ pub use finite_difference::{
     volatility_override,
 };
 #[doc(hidden)]
-pub use sensitivities::fd_greeks::clone_with_crn_seed_if_supported;
+pub use sensitivities::fd_greeks::bump::clone_with_crn_seed_if_supported;
 
 // Error helper functions
 

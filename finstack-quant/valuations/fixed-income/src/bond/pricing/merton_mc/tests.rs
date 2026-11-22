@@ -1,5 +1,5 @@
 use super::*;
-use crate::bond::MertonMcCalibrationSpec;
+use crate::MertonMcCalibrationSpec;
 use finstack_quant_models::credit::ThresholdDirection;
 use finstack_quant_models::credit::{
     AssetDynamics, CreditStateVariable, DynamicRecoverySpec, EndogenousHazardSpec,

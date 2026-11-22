@@ -1,7 +1,7 @@
 use super::MertonMcResult;
 use super::calibration::{MertonMcCalibrationOutput, calibrate_parameter_to_market};
+use crate::MertonMcConfig;
 use crate::bond::Bond;
-use crate::bond::MertonMcConfig;
 use crate::bond::pricing::time_basis::{
     BondModelSchedule, bond_cashflow_dfs_on_model_grid, bond_model_schedule,
     implied_flat_discount_rate_from_curve,

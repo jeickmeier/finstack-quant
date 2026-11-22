@@ -9,7 +9,6 @@ mod marginable;
 pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
-mod underlying;
+pub(crate) mod underlying;
 
 pub use types::{FiIndexTotalReturnSwap, FiIndexTotalReturnSwapBuilder};
-pub use underlying::IndexUnderlyingParams;

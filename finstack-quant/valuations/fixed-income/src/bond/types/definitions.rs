@@ -110,7 +110,7 @@ pub struct Bond {
     /// Used when pricing this bond with the `"merton_mc"` model key.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default)]
-    pub merton_mc_config: Option<Box<crate::bond::MertonMcConfig>>,
+    pub merton_mc_config: Option<Box<crate::MertonMcConfig>>,
     /// Optional call/put schedule (dates and redemption prices as % of par amount).
     pub call_put: Option<CallPutSchedule>,
     /// Optional guaranteed minimum-return ("return floor") call protection.
@@ -174,7 +174,7 @@ impl<'de> serde::Deserialize<'de> for Bond {
             scenario_pricing_overrides:
                 finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
             #[serde(default)]
-            merton_mc_config: Option<Box<crate::bond::MertonMcConfig>>,
+            merton_mc_config: Option<Box<crate::MertonMcConfig>>,
             call_put: Option<CallPutSchedule>,
             #[serde(default)]
             return_floor: Option<super::return_floor::ReturnFloorSpec>,

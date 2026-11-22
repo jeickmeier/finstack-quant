@@ -10,8 +10,9 @@ use finstack_quant_core::{
 };
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations_fx::FxSpotBasis;
 use finstack_quant_valuations_fx::fx_option::{
-    FxDeltaConvention, FxDeltaConventionKind, FxOption, FxOptionDelivery, FxSpotBasis,
+    FxDeltaConvention, FxDeltaConventionKind, FxOption, FxOptionDelivery,
 };
 
 /// Create an FX European call option using the builder pattern.

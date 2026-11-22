@@ -15,7 +15,7 @@
 
 pub(crate) mod metrics;
 pub(crate) mod pricer;
-pub mod specs;
+pub(crate) mod specs;
 pub(crate) mod types;
 
 pub use pricer::BondFuturePricer;

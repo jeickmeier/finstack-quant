@@ -16,13 +16,13 @@
 //!   stable finite differences.
 //! - **Non-positive spot validation**: Returns an error if spot price is non-positive.
 
-mod bump;
+pub(crate) mod bump;
 mod first_order;
 mod second_order;
 #[cfg(test)]
 mod tests;
 
-pub use bump::{MIN_ABSOLUTE_BUMP, clone_with_crn_seed_if_supported};
+pub use bump::MIN_ABSOLUTE_BUMP;
 pub use first_order::{GenericFdDelta, GenericFdVega};
 pub use second_order::{GenericFdGamma, GenericFdVanna, GenericFdVolga};
 

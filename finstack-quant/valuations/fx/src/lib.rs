@@ -103,7 +103,7 @@ pub mod fx_touch_option;
 pub mod fx_variance_swap;
 /// NDF module - Non-deliverable forwards.
 pub mod ndf;
-pub use ndf::NdfQuoteConvention;
+pub use ndf::conventions::NdfQuoteConvention;
 /// Quanto option module - Cross-currency quanto options.
 pub mod quanto_option;
 pub(crate) mod shared;

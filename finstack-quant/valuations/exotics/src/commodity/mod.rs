@@ -77,12 +77,9 @@ pub mod commodity_swap;
 /// Commodity swaption module.
 pub mod commodity_swaption;
 /// Market conventions for commodities.
-pub mod conventions;
+pub(crate) mod conventions;
 /// Underlying parameter specs for commodities.
-pub mod underlying;
-
-pub use conventions::CommodityConvention;
-pub use underlying::CommodityUnderlyingParams;
+pub(crate) mod underlying;
 
 /// Market with the price curve `curve_id` shifted in parallel by `pct` of each
 /// forward (`0.01` = +1%), the bump the commodity forward-delta and gamma

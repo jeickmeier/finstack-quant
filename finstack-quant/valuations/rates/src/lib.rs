@@ -159,9 +159,10 @@ pub(crate) mod rate_validation;
 /// Repo module - Repurchase agreements.
 pub mod repo;
 /// Swap fixed and floating leg specifications.
-pub mod swap_legs;
+pub(crate) mod swap_legs;
 /// Swaption module - Options on interest rate swaps.
 pub mod swaption;
+mod vol_model;
 /// Interest-rate option volatility models and quote resolution.
 pub mod vol_resolution;
 /// Cross-currency swap module.
@@ -176,8 +177,8 @@ pub use family::RATES;
 /// short-rate volatility). Results are reported per 0.01 absolute σ.
 pub(crate) const HW_SIGMA_BUMP: f64 = 1e-4;
 pub use schedule_pv::schedule_pv_raw;
-pub use swap_legs::{FixedLegSpec, FloatLegSpec, simple_average_unsupported};
-pub use vol_resolution::VolatilityModel;
+pub use swap_legs::{FixedLegSpec, FloatLegSpec, add_payment_delay, simple_average_unsupported};
+pub use vol_model::VolatilityModel;
 
 // `irs::marginable`'s unit tests `include!` the integration-test helper
 // `tests/support/rates.rs`, which names this crate from outside.

@@ -122,7 +122,7 @@ fn create_market(as_of: Date) -> MarketContext {
 
 fn create_fx_option(expiry: Date, option_type: OptionType) -> FxOption {
     FxOption::builder()
-        .spot_basis(finstack_quant_valuations_fx::fx_option::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations_fx::FxSpotBasis::Cash)
         .delivery(finstack_quant_valuations_fx::fx_option::FxOptionDelivery::CashAtExpiry)
         .id(InstrumentId::new("EURUSD-QLPARITY"))
         .base_currency(BASE)

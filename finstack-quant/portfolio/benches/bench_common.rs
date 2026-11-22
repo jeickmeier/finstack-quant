@@ -934,7 +934,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     for i in 0..positions_per_derivative.min(2) {
         let fx_option_id = format!("FXOPTION_{}", i);
         let fx_option = FxOption::builder()
-            .spot_basis(finstack_quant_valuations::instruments::fx::fx_option::FxSpotBasis::Cash)
+            .spot_basis(finstack_quant_valuations::instruments::fx::FxSpotBasis::Cash)
             .delivery(finstack_quant_valuations::instruments::fx::fx_option::FxOptionDelivery::CashAtExpiry)
             .id(fx_option_id.clone().into())
             .base_currency(Currency::EUR)

@@ -4282,7 +4282,7 @@ export default [
   {
     "path": "#/$defs/d_696482bd20f57f99f7e9",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DividendAdjustment",
-    "description": "How dividends affect conversion terms (dividend protection).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::convertible::{\n    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,\n};\n\nlet conversion = ConversionSpec {\n    ratio: Some(25.0),\n    price: None,\n    policy: ConversionPolicy::Voluntary,\n    anti_dilution: AntiDilutionPolicy::None,\n    dividend_adjustment: DividendAdjustment::AdjustRatio,\n    dilution_events: Vec::new(),\n};\nassert!(conversion.dividend_adjustment.is_protected());\n```"
+    "description": "How dividends affect conversion terms (dividend protection).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::{\n    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,\n};\n\nlet conversion = ConversionSpec {\n    ratio: Some(25.0),\n    price: None,\n    policy: ConversionPolicy::Voluntary,\n    anti_dilution: AntiDilutionPolicy::None,\n    dividend_adjustment: DividendAdjustment::AdjustRatio,\n    dilution_events: Vec::new(),\n};\nassert!(conversion.dividend_adjustment.is_protected());\n```"
   },
   {
     "path": "#/$defs/d_696482bd20f57f99f7e9/oneOf/0",
@@ -8515,7 +8515,7 @@ export default [
   {
     "path": "#/$defs/d_cfda8e57db9764a22d4b",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikSchedule",
-    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_fixed_income::bond::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
+    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_fixed_income::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
   },
   {
     "path": "#/$defs/d_cfda8e57db9764a22d4b/oneOf/0",

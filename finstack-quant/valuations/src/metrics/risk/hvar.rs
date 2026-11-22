@@ -6,7 +6,8 @@
 
 use std::sync::Arc;
 
-use super::var_calculator::{VarConfig, VarResult, calculate_var};
+use super::VarConfig;
+use super::var_calculator::{VarResult, calculate_var};
 use crate::metrics::{
     MetricCalculator, MetricContext, MetricId, MetricRegistry, MetricRegistryError,
 };

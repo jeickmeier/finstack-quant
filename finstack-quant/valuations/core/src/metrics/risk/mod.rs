@@ -6,7 +6,7 @@
 
 pub(crate) mod market_history;
 pub(crate) mod risk_factors;
-pub mod var_calculator;
+pub(crate) mod var_calculator;
 
 pub use market_history::{MarketHistory, MarketScenario, RiskFactorShift, UnshiftedHazardPolicy};
 pub use risk_factors::RiskFactorType;

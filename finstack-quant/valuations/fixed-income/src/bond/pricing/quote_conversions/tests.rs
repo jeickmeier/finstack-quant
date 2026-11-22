@@ -1,5 +1,5 @@
 use super::*;
-use crate::bond::BondQuoteInput;
+use crate::BondQuoteInput;
 use crate::bond::{Bond, BondSettlementConvention, CallPut, CallPutSchedule};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCountContext};

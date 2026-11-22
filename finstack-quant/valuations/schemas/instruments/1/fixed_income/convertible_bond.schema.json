@@ -762,7 +762,7 @@
       "type": "object"
     },
     "DividendAdjustment": {
-      "description": "How dividends affect conversion terms (dividend protection).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::convertible::{\n    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,\n};\n\nlet conversion = ConversionSpec {\n    ratio: Some(25.0),\n    price: None,\n    policy: ConversionPolicy::Voluntary,\n    anti_dilution: AntiDilutionPolicy::None,\n    dividend_adjustment: DividendAdjustment::AdjustRatio,\n    dilution_events: Vec::new(),\n};\nassert!(conversion.dividend_adjustment.is_protected());\n```",
+      "description": "How dividends affect conversion terms (dividend protection).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::{\n    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,\n};\n\nlet conversion = ConversionSpec {\n    ratio: Some(25.0),\n    price: None,\n    policy: ConversionPolicy::Voluntary,\n    anti_dilution: AntiDilutionPolicy::None,\n    dividend_adjustment: DividendAdjustment::AdjustRatio,\n    dilution_events: Vec::new(),\n};\nassert!(conversion.dividend_adjustment.is_protected());\n```",
       "oneOf": [
         {
           "const": "none",

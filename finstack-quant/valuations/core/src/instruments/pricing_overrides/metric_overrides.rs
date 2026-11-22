@@ -147,7 +147,7 @@ pub struct MetricPricingOverrides {
     pub theta_day_basis: Option<ThetaDayBasis>,
     /// Historical VaR / Expected Shortfall configuration override.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub var_config: Option<crate::metrics::risk::var_calculator::VarConfig>,
+    pub var_config: Option<crate::metrics::risk::VarConfig>,
 }
 
 impl MetricPricingOverrides {

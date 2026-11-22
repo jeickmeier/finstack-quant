@@ -1041,14 +1041,14 @@ impl Bond {
     ///
     /// # Arguments
     ///
-    /// * `config` - [`MertonMcConfig`](crate::bond::MertonMcConfig) specifying the
+    /// * `config` - [`MertonMcConfig`](crate::MertonMcConfig) specifying the
     ///   structural Merton asset model, recovery rate, PIK schedule, and simulation grid.
     ///
     /// # Returns
     ///
     /// `self` with `merton_mc_config` set.
     #[must_use]
-    pub fn with_merton_mc_config(mut self, config: crate::bond::MertonMcConfig) -> Self {
+    pub fn with_merton_mc_config(mut self, config: crate::MertonMcConfig) -> Self {
         self.merton_mc_config = Some(Box::new(config));
         self
     }

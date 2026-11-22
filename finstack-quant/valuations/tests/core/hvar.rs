@@ -10,9 +10,10 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations::metrics::risk::var_calculator::{VarConfig, calculate_var};
+use finstack_quant_valuations::metrics::risk::var_calculator::calculate_var;
 use finstack_quant_valuations::metrics::risk::{
-    MarketHistory, MarketScenario, RiskFactorShift, RiskFactorType, apply_market_scenario,
+    MarketHistory, MarketScenario, RiskFactorShift, RiskFactorType, VarConfig,
+    apply_market_scenario,
 };
 use finstack_quant_valuations::pricer::{PricingDispatch, STANDARD};
 use std::sync::Arc;

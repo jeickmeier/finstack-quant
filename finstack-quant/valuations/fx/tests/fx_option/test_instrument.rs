@@ -19,7 +19,7 @@ use time::macros::date;
 fn test_builder_pattern_creates_valid_option() {
     // Arrange & Act
     let option = FxOption::builder()
-        .spot_basis(finstack_quant_valuations_fx::fx_option::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations_fx::FxSpotBasis::Cash)
         .delivery(finstack_quant_valuations_fx::fx_option::FxOptionDelivery::CashAtExpiry)
         .id(InstrumentId::new("TEST_CALL"))
         .base_currency(Currency::EUR)
@@ -98,7 +98,7 @@ fn test_builder_with_explicit_pair_fields() {
 
     // Act
     let option = FxOption::builder()
-        .spot_basis(finstack_quant_valuations_fx::fx_option::FxSpotBasis::Cash)
+        .spot_basis(finstack_quant_valuations_fx::FxSpotBasis::Cash)
         .delivery(finstack_quant_valuations_fx::fx_option::FxOptionDelivery::CashAtExpiry)
         .id("TEST_OPTION".into())
         .base_currency(base_currency)

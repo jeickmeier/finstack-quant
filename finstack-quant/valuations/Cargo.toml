@@ -39,6 +39,7 @@ jsonschema = { version = "0.28", default-features = false, optional = true }
 rayon = "1.11"
 
 [dev-dependencies]
+finstack-quant-margin = { path = "../margin", version = "0.11.0-dev.202610210600", default-features = false }
 finstack-quant-test-utils = { path = "../test-utils", version = "0.11.0-dev.202610210600" }
 finstack-quant-valuations-test-support = { path = "test-support", version = "0.11.0-dev.202610210600" }
 finstack-quant-calibration = { path = "../calibration", version = "0.11.0-dev.202610210600" }

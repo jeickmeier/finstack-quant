@@ -15,8 +15,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_core::pricer::ModelKey;
+use finstack_quant_valuations_fixed_income::BondQuoteInput;
+use finstack_quant_valuations_fixed_income::bond::Bond;
 use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::compute_quotes;
-use finstack_quant_valuations_fixed_income::bond::{Bond, BondQuoteInput};
 use time::macros::date;
 
 fn build_simple_discount_curve(as_of: finstack_quant_core::dates::Date) -> DiscountCurve {

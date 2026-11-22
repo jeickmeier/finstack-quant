@@ -283,7 +283,7 @@ fn resolve_rate_quote_dates(
                 _ => maturity,
             };
             let pillar_date = if swap_use_payment_delay {
-                finstack_quant_valuations_rates::swap_legs::add_payment_delay(
+                finstack_quant_valuations_rates::add_payment_delay(
                     maturity,
                     conv.default_payment_lag_days,
                     Some(&conv.market_calendar_id),

@@ -251,7 +251,7 @@ impl<'a> CashflowEngine<'a> {
         as_of: Date,
         postings: &'a [crate::loan_terms::PrincipalPosting],
     ) -> Result<PathAwareCashflowSchedule> {
-        let fixings = super::utils::resolve_fixings(facility, market);
+        let fixings = super::utils::resolve_fixings(facility, market)?;
         let mut engine = Self::new(facility, Some(market), as_of, fixings)?;
         engine.postings = postings;
         engine.generate_deterministic()

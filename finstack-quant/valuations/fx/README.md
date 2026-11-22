@@ -57,7 +57,7 @@ option's `BarrierDirection` and `PayoutTiming` are `finstack_quant_core::types`.
 Family-path-only types include `fx_option::{FxDeltaConvention,
 FxDeltaConventionKind, FxOptionBuilder}`,
 `fx_forward::FxForwardBuilder`, `fx_variance_swap::FxVarianceSwapBuilder` and
-`ndf::NdfFixingSource`; `ndf::NdfQuoteConvention` and the barrier `Monitoring`
+`ndf::NdfFixingSource`; `NdfQuoteConvention` and the barrier `Monitoring`
 are re-exported at `finstack_quant_valuations::instruments` (`Monitoring`
 lives in valuations-core). Monte Carlo payoff kernels and pricers are crate-private.
 

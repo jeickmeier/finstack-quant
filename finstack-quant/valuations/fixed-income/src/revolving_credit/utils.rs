@@ -20,18 +20,24 @@ use finstack_quant_valuations_core::instruments::pricing::overnight::{
 use finstack_quant_valuations_core::instruments::pricing::overnight_conventions;
 
 /// Historical fixing series of a floating-rate facility's index, when the
-/// market carries one; `None` for fixed-rate facilities or a missing series.
+/// market carries one; `Ok(None)` for fixed-rate facilities or a missing series.
 pub(super) fn resolve_fixings<'a>(
     facility: &RevolvingCredit,
     market: &'a MarketContext,
-) -> Option<&'a ScalarTimeSeries> {
+) -> Result<Option<&'a ScalarTimeSeries>> {
     match &facility.rate {
-        RateSpec::Floating(spec) => finstack_quant_core::market_data::fixings::get_fixing_series(
-            market,
-            spec.index_id.as_ref(),
-        )
-        .ok(),
-        RateSpec::Fixed { .. } => None,
+        RateSpec::Floating(spec) => {
+            let index_id = finstack_quant_core::market_data::fixings::validate_fixing_index_id(
+                spec.index_id.as_ref(),
+            )?;
+            let series_id = finstack_quant_core::market_data::fixings::fixing_series_id(index_id);
+            match market.get_series(&series_id) {
+                Ok(series) => Ok(Some(series)),
+                Err(err) if err.kind() == finstack_quant_core::ErrorKind::NotFound => Ok(None),
+                Err(err) => Err(err),
+            }
+        }
+        RateSpec::Fixed { .. } => Ok(None),
     }
 }
 
@@ -1091,6 +1097,118 @@ mod tests {
                 .to_string()
                 .contains("exceed commitment")
         );
+    }
+
+    #[test]
+    fn resolve_fixings_propagates_invalid_index_id_and_allows_missing_valid_series() {
+        use crate::revolving_credit::cashflow_engine::CashflowEngine;
+        use finstack_quant_core::ErrorKind;
+        use finstack_quant_core::market_data::scalars::{
+            ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+        };
+        use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+        use rust_decimal::Decimal;
+        use time::macros::date;
+
+        let start = date!(2025 - 01 - 02);
+        let end = date!(2026 - 01 - 02);
+        let make_floating = |index_id: &str| {
+            create_test_facility(
+                start,
+                end,
+                Tenor::quarterly(),
+                RateSpec::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
+                    index_id: index_id.into(),
+                    forward_curve_id: "USD-SOFR-3M".into(),
+                    spread_bp: Decimal::from(200),
+                    gearing: Decimal::ONE,
+                    gearing_includes_spread: true,
+                    index_floor_bp: None,
+                    index_cap_bp: None,
+                    all_in_floor_bp: None,
+                    all_in_cap_bp: None,
+                    overnight_index_constraints: Default::default(),
+                    reset_frequency: Tenor::quarterly(),
+                    index_tenor: None,
+                    reset_lag_days: 0,
+                    fixing_calendar_id: None,
+                    compounding: None,
+                    overnight_basis: None,
+                    fallback: Default::default(),
+                }),
+                None,
+            )
+        };
+
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(start)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (2.0, 0.92)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .expect("discount curve");
+        let fwd = ForwardCurve::flat("USD-SOFR-3M", start, 0.04, DayCount::Act365F)
+            .expect("forward curve");
+        let market = MarketContext::new()
+            .try_insert(disc)
+            .expect("insert discount curve")
+            .try_insert(fwd)
+            .expect("insert forward curve");
+
+        // Valid missing fixing series on an unseasoned facility resolves cleanly to Ok(None).
+        let valid_facility = make_floating("USD-SOFR-3M");
+        assert!(
+            resolve_fixings(&valid_facility, &market)
+                .expect("missing valid fixing series should return Ok(None)")
+                .is_none()
+        );
+        assert!(CashflowEngine::deterministic(&valid_facility, &market, start, &[]).is_ok());
+
+        // Invalid index_id must propagate a Validation error rather than silently returning None.
+        for invalid_id in ["FIXING:USD-SOFR-3M", "", "  ", " USD-SOFR-3M"] {
+            let invalid_facility = make_floating(invalid_id);
+            let err = resolve_fixings(&invalid_facility, &market)
+                .expect_err("invalid fixing index_id must fail validation");
+            assert_eq!(
+                err.kind(),
+                ErrorKind::Validation,
+                "expected Validation error for '{invalid_id}', got: {err}"
+            );
+
+            let engine_err = CashflowEngine::deterministic(&invalid_facility, &market, start, &[])
+                .expect_err("unseasoned deterministic schedule must propagate invalid index_id");
+            assert_eq!(engine_err.kind(), ErrorKind::Validation);
+        }
+
+        // Fixed-rate facility returns Ok(None).
+        let fixed_facility = create_test_facility(
+            start,
+            end,
+            Tenor::quarterly(),
+            RateSpec::Fixed { rate: 0.05 },
+            None,
+        );
+        assert!(
+            resolve_fixings(&fixed_facility, &market)
+                .expect("fixed facility should return Ok(None)")
+                .is_none()
+        );
+
+        // Present valid fixing series is returned.
+        let series = ScalarTimeSeries::new(
+            "FIXING:USD-SOFR-3M",
+            vec![(start, 0.045)],
+            None,
+            SeriesInterpolation::Step,
+            SeriesExtrapolation::Error,
+        )
+        .expect("series");
+        let market_with_fixings = market.insert_series(series);
+        let resolved = resolve_fixings(&valid_facility, &market_with_fixings)
+            .expect("present fixing series should succeed")
+            .expect("present fixing series should be Some");
+        assert_eq!(resolved.id().as_str(), "FIXING:USD-SOFR-3M");
     }
 
     #[test]

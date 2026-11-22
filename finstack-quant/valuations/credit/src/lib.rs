@@ -84,7 +84,7 @@ pub mod cds_tranche;
 pub mod constants;
 pub(crate) mod cs01;
 /// CDS leg specifications and credit parameters.
-pub mod legs;
+pub(crate) mod legs;
 
 mod family;
 pub use family::CREDIT;

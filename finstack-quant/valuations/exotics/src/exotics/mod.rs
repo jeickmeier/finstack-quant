@@ -98,7 +98,7 @@ pub mod asian_option;
 /// Barrier option module - Knock-in/knock-out options.
 pub mod barrier_option;
 /// Bermudan issuer call provision for callable rate exotics.
-pub mod bermudan_call;
+pub(crate) mod bermudan_call;
 pub(crate) mod bs_gbm;
 /// Callable range accrual module - Range accrual with Bermudan call.
 pub mod callable_range_accrual;
@@ -112,5 +112,3 @@ pub mod range_accrual;
 pub mod snowball;
 /// TARN (Target Redemption Note) module.
 pub mod tarn;
-
-pub use bermudan_call::BermudanCallProvision;

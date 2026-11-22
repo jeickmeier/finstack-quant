@@ -160,7 +160,7 @@ pub enum AntiDilutionPolicy {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_valuations_fixed_income::convertible::{
+/// use finstack_quant_valuations_fixed_income::{
 ///     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
 /// };
 ///

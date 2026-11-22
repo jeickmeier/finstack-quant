@@ -297,7 +297,7 @@ fn test_bond_serde_roundtrip_preserves_funding_curve_id() {
 
 #[test]
 fn bond_price_merton_mc_api() {
-    use crate::bond::MertonMcConfig;
+    use crate::MertonMcConfig;
     use finstack_quant_models::credit::MertonModel;
 
     // Use Corporate convention (30/360) to avoid ActActIsma frequency requirement
@@ -333,7 +333,7 @@ fn bond_price_merton_mc_api() {
 /// bullets off the base coupon spec.
 #[test]
 fn bond_price_merton_mc_rejects_amortizing() {
-    use crate::bond::MertonMcConfig;
+    use crate::MertonMcConfig;
     use finstack_quant_cashflows::builder::AmortizationSpec;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_models::credit::MertonModel;

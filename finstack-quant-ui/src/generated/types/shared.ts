@@ -14903,7 +14903,7 @@ export type DigitalPayoutType = "cash_or_nothing" | "asset_or_nothing";
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations_fixed_income::convertible::{
+ * use finstack_quant_valuations_fixed_income::{
  *     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
  * };
  *
@@ -15685,7 +15685,7 @@ export type PaymentType = "fee" | "interest" | "principal" | "residual" | "cover
  * # Examples
  *
  * ```
- * use finstack_quant_valuations_fixed_income::bond::{PikMode, PikSchedule};
+ * use finstack_quant_valuations_fixed_income::{PikMode, PikSchedule};
  *
  * // All coupons PIK
  * let uniform = PikSchedule::Uniform(PikMode::Pik);

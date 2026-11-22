@@ -49,13 +49,9 @@
 mod market_inputs;
 pub(crate) mod metrics;
 pub(crate) mod pricing;
-mod spec;
+pub(crate) mod spec;
 mod types;
 
-pub use spec::{
-    AntiDilutionPolicy, ConversionEvent, ConversionPolicy, ConversionSpec, DilutionEvent,
-    DividendAdjustment, PriceTrigger,
-};
 pub use types::{
     ConvertibleBond, ConvertibleBondBuilder, ConvertibleGreeks, ConvertibleSettlement,
 };

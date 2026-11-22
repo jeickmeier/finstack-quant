@@ -111,15 +111,17 @@ pub mod tba;
 /// Term loan module.
 pub mod term_loan;
 
-pub use bond::{
-    BarrierCrossing, BondConvention, BondQuoteInput, CalibrationParameter, MertonMcCalibrationSpec,
-    MertonMcConfig, PikMode, PikSchedule,
+pub use bond::bond_quote::BondQuoteInput;
+pub use bond::conventions::BondConvention;
+pub use bond::merton_mc_config::{
+    BarrierCrossing, CalibrationParameter, MertonMcCalibrationSpec, MertonMcConfig, PikMode,
+    PikSchedule,
 };
-pub use convertible::{
+pub use convertible::spec::{
     AntiDilutionPolicy, ConversionEvent, ConversionPolicy, ConversionSpec, DilutionEvent,
     DividendAdjustment, PriceTrigger,
 };
-pub use fi_trs::IndexUnderlyingParams;
+pub use fi_trs::underlying::IndexUnderlyingParams;
 
 mod family;
 pub use family::FIXED_INCOME;

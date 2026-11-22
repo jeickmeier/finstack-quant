@@ -289,7 +289,7 @@ impl RevolvingCreditPricer {
 
         // Historical fixings remain contractual in stochastic valuation. The
         // short-rate process drives only reset dates that have not fixed yet.
-        let fixings = resolve_fixings(facility, market);
+        let fixings = resolve_fixings(facility, market)?;
         let engine = CashflowEngine::new(facility, Some(market), as_of, fixings)?;
         // Factor state is observed on accrual boundaries plus term-index
         // reset dates so intra-period resets re-fix the coupon.

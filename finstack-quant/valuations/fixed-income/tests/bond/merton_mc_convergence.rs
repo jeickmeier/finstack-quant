@@ -15,7 +15,7 @@ use finstack_quant_models::credit::{AssetDynamics, MertonBarrierType, MertonMode
 use finstack_quant_valuations_fixed_income::bond::pricing::merton_mc::{
     MertonMcEngine, MertonMcRun,
 };
-use finstack_quant_valuations_fixed_income::bond::{MertonMcConfig, PikMode, PikSchedule};
+use finstack_quant_valuations_fixed_income::{MertonMcConfig, PikMode, PikSchedule};
 
 /// Build a standard Merton model for tests: V=200, sigma=0.25, B=100, r=0.04.
 fn base_merton() -> MertonModel {

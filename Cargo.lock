@@ -1050,6 +1050,7 @@ dependencies = [
  "finstack-quant-calibration",
  "finstack-quant-cashflows",
  "finstack-quant-core",
+ "finstack-quant-margin",
  "finstack-quant-models",
  "finstack-quant-test-utils",
  "finstack-quant-valuations-core",

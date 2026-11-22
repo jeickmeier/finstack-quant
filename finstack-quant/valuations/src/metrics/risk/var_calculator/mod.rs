@@ -26,7 +26,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxQuery};
 use finstack_quant_core::types::CurveId;
 
-pub use finstack_quant_valuations_core::metrics::risk::{VarConfig, VarMethod};
+use finstack_quant_valuations_core::metrics::risk::{VarConfig, VarMethod};
 
 #[cfg(test)]
 mod tests;

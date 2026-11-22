@@ -92,10 +92,9 @@
 //! - [`crate::fx_forward::FxForward`] for deliverable forwards
 //! - [`crate::fx_swap::FxSwap`] for FX swap instruments
 
-mod conventions;
+pub(crate) mod conventions;
 mod types;
 
-pub use conventions::NdfQuoteConvention;
 pub use types::{Ndf, NdfBuilder, NdfFixingSource, NdfTradeDateParams};
 
 /// Metrics submodule for NDF risk measures.

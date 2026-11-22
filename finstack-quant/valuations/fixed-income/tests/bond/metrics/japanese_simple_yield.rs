@@ -9,9 +9,9 @@ use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_core::pricer::ModelKey;
-use finstack_quant_valuations_fixed_income::BondConvention;
 use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::compute_quotes;
-use finstack_quant_valuations_fixed_income::bond::{Bond, BondQuoteInput, CashflowSpec};
+use finstack_quant_valuations_fixed_income::bond::{Bond, CashflowSpec};
+use finstack_quant_valuations_fixed_income::{BondConvention, BondQuoteInput};
 use time::macros::date;
 
 fn flat_jpy_market(as_of: finstack_quant_core::dates::Date) -> MarketContext {
