@@ -1,8 +1,8 @@
 //! Tests for option behavior across different moneyness levels (ITM/ATM/OTM).
 
 use super::helpers::*;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_test_support::assertions::assert_positive;
 use time::macros::date;
 
@@ -89,7 +89,7 @@ fn test_delta_increases_with_moneyness_call() {
                 &market,
                 as_of,
                 &[MetricId::Delta],
-                finstack_quant_valuations::instruments::PricingOptions::default(),
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
             )
             .unwrap();
         deltas.push(*result.measures.get("delta").unwrap());
@@ -127,7 +127,7 @@ fn test_delta_behavior_put() {
                 &market,
                 as_of,
                 &[MetricId::Delta],
-                finstack_quant_valuations::instruments::PricingOptions::default(),
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
             )
             .unwrap();
         deltas.push(*result.measures.get("delta").unwrap());

@@ -143,7 +143,7 @@ ATM strip construction is not calibration of rough parameters, and a positive to
 
 ### Evidence
 
-[rough Bergomi](../../../REFERENCES.md#bayer-friz-gatheral-2016), [rough Heston](../../../REFERENCES.md#el-euch-rosenbaum-2019), [hybrid scheme](../../../REFERENCES.md#bennedsen-lunde-pakkanen-2017); inline `variance_strip_tests` in [rough_bergomi_mc.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/rough_bergomi_mc.rs) inspect total-variance conservation, invalid surfaces and deterministic-variance refinement. [test_rough_bergomi.rs](../../../../finstack-quant/valuations/tests/instruments/equity_option/test_rough_bergomi.rs) locates simulation cases. These are limit/identity/cross-engine evidence, not independent calibrated-market validation.
+[rough Bergomi](../../../REFERENCES.md#bayer-friz-gatheral-2016), [rough Heston](../../../REFERENCES.md#el-euch-rosenbaum-2019), [hybrid scheme](../../../REFERENCES.md#bennedsen-lunde-pakkanen-2017); inline `variance_strip_tests` in [rough_bergomi_mc.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/rough_bergomi_mc.rs) inspect total-variance conservation, invalid surfaces and deterministic-variance refinement. [test_rough_bergomi.rs](../../../../finstack-quant/valuations/equity/tests/equity_option/test_rough_bergomi.rs) locates simulation cases. These are limit/identity/cross-engine evidence, not independent calibrated-market validation.
 
 ## Independent numerical checks
 

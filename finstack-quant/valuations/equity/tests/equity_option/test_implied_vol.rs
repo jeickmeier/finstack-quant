@@ -4,8 +4,8 @@ use super::helpers::*;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_models::types::OptionType;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::MetricId;
 use time::macros::date;
 
 fn bs_price(
@@ -83,7 +83,7 @@ fn test_implied_vol_recovers_surface_vol() {
             &market,
             as_of,
             &[MetricId::ImpliedVol],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -125,7 +125,7 @@ fn test_implied_vol_atm_option() {
             &market,
             as_of,
             &[MetricId::ImpliedVol],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -162,7 +162,7 @@ fn test_implied_vol_itm_option() {
             &market,
             as_of,
             &[MetricId::ImpliedVol],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -199,7 +199,7 @@ fn test_implied_vol_otm_option() {
             &market,
             as_of,
             &[MetricId::ImpliedVol],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -236,7 +236,7 @@ fn test_implied_vol_short_dated() {
             &market,
             as_of,
             &[MetricId::ImpliedVol],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -273,7 +273,7 @@ fn test_implied_vol_long_dated() {
             &market,
             as_of,
             &[MetricId::ImpliedVol],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -310,7 +310,7 @@ fn test_implied_vol_high_volatility() {
             &market,
             as_of,
             &[MetricId::ImpliedVol],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -348,7 +348,7 @@ fn test_implied_vol_low_volatility() {
             &market,
             as_of,
             &[MetricId::ImpliedVol],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -373,7 +373,7 @@ fn test_implied_vol_rejects_expired() {
 
     let mut call = create_call(as_of, expiry, strike);
     call.exercise = Some(
-        finstack_quant_valuations::instruments::equity::equity_option::EquityOptionExercise::new(
+        finstack_quant_valuations_equity::equity_option::EquityOptionExercise::new(
             expiry, spot, expiry, true,
         ),
     );
@@ -390,7 +390,7 @@ fn test_implied_vol_rejects_expired() {
             &market,
             as_of,
             &[MetricId::ImpliedVol],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .expect_err("expired volatility is unidentifiable");
     assert!(error.to_string().contains("live, unexercised"));
@@ -418,7 +418,7 @@ fn test_implied_vol_requires_quoted_premium() {
             &market,
             as_of,
             &[MetricId::ImpliedVol],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .expect_err("implied vol needs market_quotes.quoted_premium");
     assert!(
@@ -460,7 +460,7 @@ fn test_implied_vol_with_dividends() {
             &market,
             as_of,
             &[MetricId::ImpliedVol],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 

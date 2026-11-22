@@ -12,10 +12,12 @@
 //! that don't rely on external reference values with loose tolerances.
 //! See: test_option_bounds.rs (property tests) and test_put_call_parity.rs (parity tests)
 
+mod greek_relationships;
 mod helpers;
 mod test_alt_models;
 mod test_constructors;
 mod test_edge_cases;
+mod test_equity_option_parity;
 mod test_finance_regressions;
 mod test_greeks;
 mod test_implied_vol;

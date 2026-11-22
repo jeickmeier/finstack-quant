@@ -4,6 +4,7 @@
 //! duration sensitivity, and index-specific behaviors.
 
 use crate::support::trs::*;
+use crate::support::trs_market::*;
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency::*;
 use finstack_quant_core::market_data::context::MarketContext;

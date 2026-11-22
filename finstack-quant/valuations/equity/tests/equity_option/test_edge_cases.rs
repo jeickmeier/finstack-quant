@@ -1,9 +1,9 @@
 //! Tests for edge cases and boundary conditions.
 
 use super::helpers::*;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::equity::equity_option::EquityOptionExercise;
-use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_equity::equity_option::EquityOptionExercise;
 use finstack_quant_valuations_test_support::assertions::{assert_non_negative, assert_positive};
 use time::macros::date;
 
@@ -109,7 +109,7 @@ fn test_expired_option_greeks_are_static() {
             &market,
             as_of,
             &metrics,
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -270,7 +270,7 @@ fn test_very_long_maturity() {
             &market,
             as_of,
             &[MetricId::Vega],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
     let vega = *result.measures.get("vega").unwrap();

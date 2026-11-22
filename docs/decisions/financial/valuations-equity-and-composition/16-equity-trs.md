@@ -133,7 +133,7 @@ Continuous dividend income is simple, not reinvested compounded total return. Th
 
 ### Evidence
 
-[equity carry reference](../../../REFERENCES.md#hull-options-futures); [test_equity_trs.rs](../../../../finstack-quant/valuations/tests/instruments/trs/test_equity_trs.rs) and inline [pricer.rs](../../../../finstack-quant/valuations/equity/src/equity_trs/pricer.rs) locate seasoned/dividend/payment cases. Tests establish local leg identities; an independent financing/payment-lag and SIMM reconciliation is not established.
+[equity carry reference](../../../REFERENCES.md#hull-options-futures); [test_equity_trs.rs](../../../../finstack-quant/valuations/equity/tests/equity_trs/test_equity_trs.rs) and inline [pricer.rs](../../../../finstack-quant/valuations/equity/src/equity_trs/pricer.rs) locate seasoned/dividend/payment cases. Tests establish local leg identities; an independent financing/payment-lag and SIMM reconciliation is not established.
 
 ## Independent numerical checks
 

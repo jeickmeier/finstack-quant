@@ -7,9 +7,9 @@
 //! - Expired option handling
 
 use super::helpers::*;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::equity::equity_option::EquityOptionExercise;
-use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_equity::equity_option::EquityOptionExercise;
 use time::Duration;
 use time::macros::date;
 
@@ -27,7 +27,7 @@ fn test_near_expiry_gamma_stability() {
                 &market,
                 as_of,
                 &[MetricId::Gamma],
-                finstack_quant_valuations::instruments::PricingOptions::default(),
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
             )
             .unwrap();
 
@@ -62,7 +62,7 @@ fn test_gamma_increases_near_expiry_atm() {
             &market,
             as_of,
             &[MetricId::Gamma],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
     let gamma_30d = *result_30d.measures.get("gamma").unwrap();
@@ -74,7 +74,7 @@ fn test_gamma_increases_near_expiry_atm() {
             &market,
             as_of,
             &[MetricId::Gamma],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
     let gamma_7d = *result_7d.measures.get("gamma").unwrap();
@@ -101,7 +101,7 @@ fn test_near_expiry_theta_stability() {
                 &market,
                 as_of,
                 &[MetricId::Theta],
-                finstack_quant_valuations::instruments::PricingOptions::default(),
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
             )
             .unwrap();
 
@@ -130,7 +130,7 @@ fn test_theta_magnitude_increases_near_expiry_atm() {
             &market,
             as_of,
             &[MetricId::Theta],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
     let theta_30d = *result_30d.measures.get("theta").unwrap();
@@ -142,7 +142,7 @@ fn test_theta_magnitude_increases_near_expiry_atm() {
             &market,
             as_of,
             &[MetricId::Theta],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
     let theta_7d = *result_7d.measures.get("theta").unwrap();
@@ -179,7 +179,7 @@ fn test_near_expiry_delta_stability() {
                 &market,
                 as_of,
                 &[MetricId::Delta],
-                finstack_quant_valuations::instruments::PricingOptions::default(),
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
             )
             .unwrap();
         let delta = *result.measures.get("delta").unwrap();
@@ -222,7 +222,7 @@ fn test_delta_approaches_step_function() {
             &market,
             as_of,
             &[MetricId::Delta],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
     let delta_itm = *result_itm.measures.get("delta").unwrap();
@@ -234,7 +234,7 @@ fn test_delta_approaches_step_function() {
             &market,
             as_of,
             &[MetricId::Delta],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
     let delta_otm = *result_otm.measures.get("delta").unwrap();
@@ -301,7 +301,7 @@ fn test_expired_option_greeks() {
             &market,
             as_of,
             &[MetricId::Delta, MetricId::Gamma, MetricId::Vega],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -347,7 +347,7 @@ fn test_vega_decreases_near_expiry() {
             &market,
             as_of,
             &[MetricId::Vega],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
     let vega_30d = *result_30d.measures.get("vega").unwrap();
@@ -359,7 +359,7 @@ fn test_vega_decreases_near_expiry() {
             &market,
             as_of,
             &[MetricId::Vega],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
     let vega_7d = *result_7d.measures.get("vega").unwrap();

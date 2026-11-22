@@ -168,8 +168,8 @@ cargo nextest run -p finstack-quant-valuations --test valuations instruments::re
 
 Long-running cases carry `#[ignore = "slow: covered by mise run rust-test --slow"]`
 and are skipped by default. They currently live in `cds`, `cds_index`,
-`cds_option`, `cds_tranche`, `equity_option`, `exotic_harness`,
-`structured_credit`, and rates swaption/cap-floor Monte Carlo paths.
+`cds_option`, `cds_tranche`, `structured_credit`, plus family-crate slow suites
+(equity options, exotic harness, and rates swaption/cap-floor Monte Carlo paths).
 Mark a test slow when it is a large property run, a
 multi-scenario loop, a Monte Carlo convergence check, or a calibration
 round-trip.

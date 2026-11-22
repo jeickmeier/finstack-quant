@@ -20,9 +20,9 @@ use finstack_quant_core::market_data::surfaces::{
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
-use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
-use finstack_quant_valuations::instruments::{Instrument, SettlementType};
-use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_core::instruments::{Instrument, SettlementType};
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_equity::equity_option::EquityOption;
 use time::Month;
 
 // Test parameters matching the known BS reference value
@@ -195,7 +195,7 @@ fn test_delta_values() {
             &market,
             as_of,
             &call_metrics,
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .expect("call metrics should succeed");
     let put_result = put
@@ -203,7 +203,7 @@ fn test_delta_values() {
             &market,
             as_of,
             &put_metrics,
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .expect("put metrics should succeed");
 
@@ -261,7 +261,7 @@ fn test_gamma_call_equals_put() {
             &market,
             as_of,
             &metrics,
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .expect("call metrics should succeed");
     let put_result = put
@@ -269,7 +269,7 @@ fn test_gamma_call_equals_put() {
             &market,
             as_of,
             &metrics,
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .expect("put metrics should succeed");
 

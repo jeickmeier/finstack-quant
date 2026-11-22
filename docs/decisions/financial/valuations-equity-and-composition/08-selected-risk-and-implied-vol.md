@@ -128,7 +128,7 @@ Continuous Dividend01 bypasses selected dispatch while the discrete variant pres
 
 ### Evidence
 
-Source inline cases in [selected_model.rs](../../../../finstack-quant/valuations/equity/src/equity_option/metrics/selected_model.rs) and [dividend01.rs](../../../../finstack-quant/valuations/equity/src/dividend01.rs); [test_implied_vol.rs](../../../../finstack-quant/valuations/tests/instruments/equity_option/test_implied_vol.rs) and [test_greeks.rs](../../../../finstack-quant/valuations/tests/instruments/equity_option/test_greeks.rs) locate roundtrip and finite-difference comparisons. [Brent](../../../REFERENCES.md#brent-1973) provides the solver reference; roundtripping the same pricer is not independent price validation.
+Source inline cases in [selected_model.rs](../../../../finstack-quant/valuations/equity/src/equity_option/metrics/selected_model.rs) and [dividend01.rs](../../../../finstack-quant/valuations/equity/src/dividend01.rs); [test_implied_vol.rs](../../../../finstack-quant/valuations/equity/tests/equity_option/test_implied_vol.rs) and [test_greeks.rs](../../../../finstack-quant/valuations/equity/tests/equity_option/test_greeks.rs) locate roundtrip and finite-difference comparisons. [Brent](../../../REFERENCES.md#brent-1973) provides the solver reference; roundtripping the same pricer is not independent price validation.
 
 ## Independent arithmetic and qualification
 

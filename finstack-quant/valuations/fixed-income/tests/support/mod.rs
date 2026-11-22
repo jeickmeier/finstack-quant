@@ -4,3 +4,4 @@
 
 pub mod revolver_draws;
 pub mod trs;
+pub mod trs_market;

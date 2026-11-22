@@ -3,7 +3,8 @@
 //! Tests cover instrument creation, validation, pricing, NPV calculations,
 //! leg decomposition, and sensitivity to market parameters.
 
-use super::test_utils::*;
+use crate::support::trs::*;
+use crate::support::trs_market::*;
 use finstack_quant_cashflows::{CashflowProvider, builder::ScheduleParams};
 use finstack_quant_core::currency::Currency::*;
 use finstack_quant_core::dates::DayCount;
@@ -13,9 +14,10 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, PriceId};
-use finstack_quant_valuations::instruments::{
-    EquityUnderlyingParams, FinancingLegSpec, Instrument, PayReceive, TrsScheduleSpec,
+use finstack_quant_valuations_core::instruments::{
+    FinancingLegSpec, Instrument, PayReceive, TrsScheduleSpec,
 };
+use finstack_quant_valuations_equity::EquityUnderlyingParams;
 use rust_decimal::Decimal;
 
 // Construction and Validation Tests
@@ -136,9 +138,7 @@ fn completed_period_remains_valued_until_lagged_payment_date() {
     let mut schedule_params = ScheduleParams::quarterly_act360();
     schedule_params.payment_lag_days = 2;
     let schedule = TrsScheduleSpec::from_params(start, end, schedule_params);
-    let trs =
-        finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap::builder(
-        )
+    let trs = finstack_quant_valuations_equity::equity_trs::EquityTotalReturnSwap::builder()
         .id("EQ-TRS-UNPAID".into())
         .notional(Money::new(1_000_000.0, USD).expect("valid money fixture"))
         .underlying(
@@ -154,7 +154,7 @@ fn completed_period_remains_valued_until_lagged_payment_date() {
         .schedule(schedule)
         .side(PayReceive::Receive)
         .dividend_settlement(
-            finstack_quant_valuations::instruments::equity::equity_trs::TrsDividendSettlement::OnDividendDate,
+            finstack_quant_valuations_equity::equity_trs::TrsDividendSettlement::OnDividendDate,
         )
         .initial_level(4_900.0)
         .build()
@@ -700,8 +700,8 @@ fn test_equity_trs_theta_across_a_financing_reset() {
             .price_with_metrics(
                 &market,
                 as_of,
-                &[finstack_quant_valuations::metrics::MetricId::Theta],
-                finstack_quant_valuations::instruments::PricingOptions::default(),
+                &[finstack_quant_valuations_core::metrics::MetricId::Theta],
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
             )
             .unwrap_or_else(|err| panic!("{compounding:?} theta across the start reset: {err}"));
         assert!(result.measures["theta"].is_finite(), "{compounding:?}");

@@ -2,10 +2,11 @@
 //!
 //! Tests the common TrsEngine methods used by both equity and FI index TRS.
 
-use super::test_utils::*;
+use crate::support::trs::*;
+use crate::support::trs_market::*;
 use finstack_quant_core::currency::Currency::USD;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::TrsEngine;
+use finstack_quant_valuations_core::instruments::TrsEngine;
 
 // Financing Leg PV Tests
 

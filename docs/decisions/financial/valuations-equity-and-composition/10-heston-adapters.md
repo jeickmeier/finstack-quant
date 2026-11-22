@@ -124,7 +124,7 @@ A full volatility surface is not fitted by selecting Heston. Flat expiry-equival
 
 ### Evidence
 
-[Heston](../../../REFERENCES.md#heston-1993), [Andersen QE](../../../REFERENCES.md#andersen-2008-heston-qe); [test_alt_models.rs](../../../../finstack-quant/valuations/tests/instruments/equity_option/test_alt_models.rs) and inline [heston_mc.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/heston_mc.rs) locate cross-engine and input-failure cases. The Heston-MC limiting-case comparison in `test_alt_models.rs` is slow/ignored in the ordinary suite, and some comparisons reuse library closed forms. Underlying process/transform algorithms are owned by the models audit; no parameter calibration or new simulation was run. Cross-engine agreement is not a complete independent certification.
+[Heston](../../../REFERENCES.md#heston-1993), [Andersen QE](../../../REFERENCES.md#andersen-2008-heston-qe); [test_alt_models.rs](../../../../finstack-quant/valuations/equity/tests/equity_option/test_alt_models.rs) and inline [heston_mc.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/heston_mc.rs) locate cross-engine and input-failure cases. The Heston-MC limiting-case comparison in `test_alt_models.rs` is slow/ignored in the ordinary suite, and some comparisons reuse library closed forms. Underlying process/transform algorithms are owned by the models audit; no parameter calibration or new simulation was run. Cross-engine agreement is not a complete independent certification.
 
 ## Independent numerical checks
 

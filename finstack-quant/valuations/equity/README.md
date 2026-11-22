@@ -58,8 +58,11 @@ umbrella); the crate root exports only the `EQUITY` family static and
 Integration tests that need only this crate, valuations-core and the
 test-support crate live in `tests/`, compiled into the single `equity` target
 (`mise run rust-test-crate -- finstack-quant-valuations-equity`):
-`variance_swap/`, `autocallable/`, `private_markets_fund/` and the type and
-bucketed-DV01 tests of `equity/`. Tests that price through the standard
-registries, build options through `tests/support/equity_fx_options.rs`, or
-reach fixed-income instruments (`trs/`, the real-estate suite) stay in the
-umbrella's `../tests/instruments/`. Benches stay in the umbrella.
+`equity/` (including `pricer_tests`), `equity_option/` (including
+`greek_relationships` and `test_equity_option_parity`), `equity_trs/` (equity
+TRS and shared TRS pricing-engine tests), `variance_swap/`, `autocallable/`,
+and `private_markets_fund/`. Shared helpers in `tests/support/` (`greeks.rs`,
+`options.rs`, `trs.rs`) are also `#[path]`-included by umbrella cross-family
+tests. Cross-family suites (`trs/`, `metrics/{edge_cases,vanna_volga_pockets}`,
+and `real_estate/`, which references fixed-income instruments) stay in the
+umbrella's `../tests/`. Benches stay in the umbrella.

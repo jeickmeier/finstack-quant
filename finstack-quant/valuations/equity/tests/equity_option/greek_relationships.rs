@@ -17,10 +17,10 @@ use finstack_quant_core::market_data::surfaces::{
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::SettlementType;
-use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
-use finstack_quant_valuations::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::SettlementType;
+use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations_equity::equity_option::EquityOption;
 use std::sync::Arc;
 use time::macros::date;
 
@@ -67,7 +67,7 @@ fn metric_value(
         pv,
         MetricContext::default_config(),
     );
-    let results = finstack_quant_valuations::pricer::STANDARD
+    let results = finstack_quant_valuations_equity::EQUITY
         .metrics()
         .compute(std::slice::from_ref(&metric), &mut context)
         .unwrap_or_else(|error| panic!("{metric} computation failed: {error}"));
@@ -154,21 +154,21 @@ fn test_charm_equals_delta_decay() {
 
     // Use analytical delta as an independent reference for the registry's
     // finite-difference Charm calculator.
-    let delta_at_t = crate::metrics::common::direct_equity_greek(
+    let delta_at_t = crate::support::greeks::direct_equity_greek(
         &option,
         &market,
         as_of,
-        finstack_quant_valuations::instruments::OptionGreekKind::Delta,
+        finstack_quant_valuations_core::instruments::OptionGreekKind::Delta,
     )
     .unwrap();
 
     // Compute delta at t + dt (1 day forward)
     let as_of_plus_dt = as_of + time::Duration::days(1);
-    let delta_at_t_dt = crate::metrics::common::direct_equity_greek(
+    let delta_at_t_dt = crate::support::greeks::direct_equity_greek(
         &option,
         &market,
         as_of_plus_dt,
-        finstack_quant_valuations::instruments::OptionGreekKind::Delta,
+        finstack_quant_valuations_core::instruments::OptionGreekKind::Delta,
     )
     .unwrap();
 
@@ -193,21 +193,21 @@ fn test_color_equals_gamma_decay() {
 
     // Use analytical gamma as an independent reference for the registry's
     // finite-difference Color calculator.
-    let gamma_at_t = crate::metrics::common::direct_equity_greek(
+    let gamma_at_t = crate::support::greeks::direct_equity_greek(
         &option,
         &market,
         as_of,
-        finstack_quant_valuations::instruments::OptionGreekKind::Gamma,
+        finstack_quant_valuations_core::instruments::OptionGreekKind::Gamma,
     )
     .unwrap();
 
     // Compute gamma at t + dt (1 day forward)
     let as_of_plus_dt = as_of + time::Duration::days(1);
-    let gamma_at_t_dt = crate::metrics::common::direct_equity_greek(
+    let gamma_at_t_dt = crate::support::greeks::direct_equity_greek(
         &option,
         &market,
         as_of_plus_dt,
-        finstack_quant_valuations::instruments::OptionGreekKind::Gamma,
+        finstack_quant_valuations_core::instruments::OptionGreekKind::Gamma,
     )
     .unwrap();
 
@@ -240,11 +240,11 @@ fn test_speed_equals_gamma_convexity() {
             Money::new(spot + spot_bump, Currency::USD).expect("valid money fixture"),
         ),
     );
-    let gamma_at_s_up = crate::metrics::common::direct_equity_greek(
+    let gamma_at_s_up = crate::support::greeks::direct_equity_greek(
         &option,
         &market_up,
         as_of,
-        finstack_quant_valuations::instruments::OptionGreekKind::Gamma,
+        finstack_quant_valuations_core::instruments::OptionGreekKind::Gamma,
     )
     .unwrap();
 
@@ -255,11 +255,11 @@ fn test_speed_equals_gamma_convexity() {
             Money::new(spot - spot_bump, Currency::USD).expect("valid money fixture"),
         ),
     );
-    let gamma_at_s_down = crate::metrics::common::direct_equity_greek(
+    let gamma_at_s_down = crate::support::greeks::direct_equity_greek(
         &option,
         &market_down,
         as_of,
-        finstack_quant_valuations::instruments::OptionGreekKind::Gamma,
+        finstack_quant_valuations_core::instruments::OptionGreekKind::Gamma,
     )
     .unwrap();
 

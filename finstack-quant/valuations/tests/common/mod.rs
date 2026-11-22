@@ -1,42 +1,15 @@
 //! Equity-option builders for the umbrella test suite.
 //!
 //! Market-context builders, fixtures, tolerances and assertions live in
-//! `finstack_quant_valuations_test_support`; this module keeps only the
-//! helpers that construct an `EquityOption`.
+//! `finstack_quant_valuations_test_support`; `direct_equity_greek` lives in
+//! `equity/tests/support/greeks.rs` and is path-included here.
 
 // Allow unused items in test utilities - they're available for future tests
 #![allow(dead_code, unused_imports)]
 
 pub mod builders;
+#[path = "../../equity/tests/support/greeks.rs"]
+pub mod greeks;
 
 pub use builders::*;
-
-/// Request a native equity Greek without entering selected-model registry dispatch.
-pub fn direct_equity_greek(
-    option: &finstack_quant_valuations::instruments::equity::equity_option::EquityOption,
-    market: &finstack_quant_core::market_data::context::MarketContext,
-    as_of: finstack_quant_core::dates::Date,
-    kind: finstack_quant_valuations::instruments::OptionGreekKind,
-) -> finstack_quant_core::Result<f64> {
-    use finstack_quant_valuations::instruments::{
-        GreekBumps, OptionGreekKind, OptionGreeksProvider, OptionGreeksRequest,
-    };
-    let result = option.option_greeks(
-        market,
-        as_of,
-        &OptionGreeksRequest {
-            greek: kind,
-            base_pv: None,
-            bumps: GreekBumps::default(),
-        },
-    )?;
-    let value = match kind {
-        OptionGreekKind::Delta => result.delta,
-        OptionGreekKind::Gamma => result.gamma,
-        OptionGreekKind::Vega => result.vega,
-        OptionGreekKind::Theta => result.theta,
-        OptionGreekKind::Rho => result.rho_bp,
-        _ => None,
-    };
-    value.ok_or_else(|| finstack_quant_core::Error::Validation("native Greek absent".into()))
-}
+pub use greeks::direct_equity_greek;

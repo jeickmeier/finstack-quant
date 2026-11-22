@@ -1125,6 +1125,7 @@ dependencies = [
  "finstack-quant-core",
  "finstack-quant-margin",
  "finstack-quant-models",
+ "finstack-quant-test-utils",
  "finstack-quant-valuations-core",
  "finstack-quant-valuations-macros",
  "finstack-quant-valuations-test-support",

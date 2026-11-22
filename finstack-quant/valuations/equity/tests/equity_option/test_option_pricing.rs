@@ -4,7 +4,7 @@
 //! bitwise-identical results across multiple runs, and validates correctness
 //! against market standards (put-call parity, Greeks bounds).
 
-use crate::instruments::test_support::equity_fx_options as test_utils;
+use crate::support::options as test_utils;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -15,9 +15,9 @@ use finstack_quant_core::market_data::surfaces::{
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
-use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_equity::equity_option::EquityOption;
 #[allow(unused_imports)]
 use finstack_quant_valuations_test_support::tolerances;
 use time::Month;
@@ -117,7 +117,7 @@ fn test_option_all_greeks_determinism() {
                     &market,
                     as_of,
                     &metrics,
-                    finstack_quant_valuations::instruments::PricingOptions::default(),
+                    finstack_quant_valuations_core::instruments::PricingOptions::default(),
                 )
                 .unwrap()
         })

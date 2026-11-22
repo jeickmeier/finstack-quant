@@ -125,7 +125,7 @@ This contract does not infer historical exercise from today's spot. The syntheti
 
 ### Evidence
 
-Inline lifecycle cases in [types.rs](../../../../finstack-quant/valuations/equity/src/equity_option/types.rs) and [tests.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/tests.rs); [test_finance_regressions.rs](../../../../finstack-quant/valuations/tests/instruments/equity_option/test_finance_regressions.rs) locate expiry/dividend/exercise regressions. [Hull settlement context](../../../REFERENCES.md#hull-options-futures) is background; no exchange exercise-rule conformance was established.
+Inline lifecycle cases in [types.rs](../../../../finstack-quant/valuations/equity/src/equity_option/types.rs) and [tests.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/tests.rs); [test_finance_regressions.rs](../../../../finstack-quant/valuations/equity/tests/equity_option/test_finance_regressions.rs) locate expiry/dividend/exercise regressions. [Hull settlement context](../../../REFERENCES.md#hull-options-futures) is background; no exchange exercise-rule conformance was established.
 
 ## Independent arithmetic and qualification
 

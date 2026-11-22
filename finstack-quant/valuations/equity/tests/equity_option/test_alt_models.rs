@@ -18,8 +18,8 @@
 use super::helpers::*;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_valuations::instruments::PricingOptions;
-use finstack_quant_valuations::pricer::ModelKey;
+use finstack_quant_valuations_core::instruments::PricingOptions;
+use finstack_quant_valuations_core::pricer::ModelKey;
 use time::macros::date;
 
 /// Black-Scholes reference price for the shared `create_call` contract
@@ -83,7 +83,7 @@ fn price_call(
     strike: f64,
 ) -> f64 {
     let call = create_call(as_of, expiry, strike);
-    finstack_quant_valuations::pricer::STANDARD
+    finstack_quant_valuations_equity::EQUITY
         .pricers()
         .price_with_metrics(&call, model, market, as_of, &[], PricingOptions::default())
         .expect("pricing should succeed")
@@ -257,7 +257,7 @@ fn heston_fourier_missing_scalars_error() {
     let market = build_standard_market(as_of, 100.0, 0.20, 0.0, 0.0);
     let call = create_call(as_of, expiry, 100.0);
 
-    let result = finstack_quant_valuations::pricer::STANDARD
+    let result = finstack_quant_valuations_equity::EQUITY
         .pricers()
         .price_with_metrics(
             &call,
@@ -301,7 +301,7 @@ fn heston_mc_collapses_to_black_scholes() {
     );
     let mut call = create_call(as_of, expiry, strike);
     call.instrument_pricing_overrides.model_config.mc_paths = Some(80_000);
-    let pv = finstack_quant_valuations::pricer::STANDARD
+    let pv = finstack_quant_valuations_equity::EQUITY
         .pricers()
         .price_with_metrics(
             &call,
@@ -472,7 +472,7 @@ fn rough_heston_mc_atm_is_positive_and_sane() {
     );
     let mut call = create_call(as_of, expiry, 100.0);
     call.instrument_pricing_overrides.model_config.mc_paths = Some(4_000);
-    let pv = finstack_quant_valuations::pricer::STANDARD
+    let pv = finstack_quant_valuations_equity::EQUITY
         .pricers()
         .price_with_metrics(
             &call,
@@ -501,7 +501,7 @@ fn rough_heston_fourier_missing_scalars_error() {
     let market = build_standard_market(as_of, 100.0, 0.20, 0.0, 0.0);
     let call = create_call(as_of, expiry, 100.0);
 
-    let result = finstack_quant_valuations::pricer::STANDARD
+    let result = finstack_quant_valuations_equity::EQUITY
         .pricers()
         .price_with_metrics(
             &call,

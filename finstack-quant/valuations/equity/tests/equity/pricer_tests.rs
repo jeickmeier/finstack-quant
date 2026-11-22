@@ -6,10 +6,10 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::equity::spot::Equity;
-use finstack_quant_valuations::instruments::pricing::GenericInstrumentPricer;
-use finstack_quant_valuations::pricer::{InstrumentType, ModelKey, Pricer};
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::pricing::GenericInstrumentPricer;
+use finstack_quant_valuations_core::pricer::{InstrumentType, ModelKey, Pricer};
+use finstack_quant_valuations_equity::spot::Equity;
 
 fn build_flat_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve {
     let builder = DiscountCurve::builder(curve_id)
@@ -187,25 +187,14 @@ fn test_simple_equity_pricer_price_dyn() {
 
 #[test]
 fn test_simple_equity_pricer_type_mismatch() {
-    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+    use finstack_quant_valuations_equity::equity_option::EquityOption;
 
-    // Create a bond (wrong type)
-    let issue = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
-    let maturity = Date::from_calendar_date(2029, time::Month::January, 1).unwrap();
-    let bond = Bond::fixed(
-        "BOND",
-        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
-        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
-        issue,
-        maturity,
-        finstack_quant_core::dates::StubKind::ShortFront,
-        "USD-TREASURY",
-    )
-    .unwrap();
+    // Create a different instrument type from the same crate
+    let option = EquityOption::example().unwrap();
 
     let market = MarketContext::new();
     let pricer = GenericInstrumentPricer::<Equity>::discounting(InstrumentType::Equity);
-    let instrument: &dyn Instrument = &bond;
+    let instrument: &dyn Instrument = &option;
     let as_of = finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
         .unwrap();
 

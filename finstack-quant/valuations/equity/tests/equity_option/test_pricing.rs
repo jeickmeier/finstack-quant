@@ -1,7 +1,7 @@
 //! Tests for Black-Scholes pricing implementation.
 
 use super::helpers::*;
-use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_test_support::assertions::assert_positive;
 use time::macros::date;
 

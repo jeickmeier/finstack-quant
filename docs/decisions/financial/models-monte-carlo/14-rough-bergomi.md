@@ -232,7 +232,7 @@ the same model law. [Process](../../../../finstack-quant/models/src/monte_carlo/
 [raw non-Markov tests](../../../../finstack-quant/models/src/monte_carlo/simulate/tests/non_markov.rs),
 [equity pricing route](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/rough_bergomi_mc.rs),
 [equity input resolution](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/inputs.rs),
-[equity tests](../../../../finstack-quant/valuations/tests/instruments/equity_option/test_rough_bergomi.rs),
+[equity tests](../../../../finstack-quant/valuations/equity/tests/equity_option/test_rough_bergomi.rs),
 [primary references](../../../REFERENCES.md#rough-bergomi-adapted-steps-and-moment-limits).
 
 ## Relationship to the accepted forward-variance boundary

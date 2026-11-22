@@ -7,8 +7,8 @@
 //! - Moneyness behavior
 
 use super::helpers::*;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_test_support::assertions::{assert_non_negative, assert_positive};
 use time::macros::date;
 
@@ -29,7 +29,7 @@ fn test_atm_call_delta_near_fifty() {
             &market,
             as_of,
             &[MetricId::Delta],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -57,7 +57,7 @@ fn test_call_delta_always_positive() {
                 &market,
                 as_of,
                 &[MetricId::Delta],
-                finstack_quant_valuations::instruments::PricingOptions::default(),
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
             )
             .unwrap();
 
@@ -94,7 +94,7 @@ fn test_put_delta_always_negative() {
                 &market,
                 as_of,
                 &[MetricId::Delta],
-                finstack_quant_valuations::instruments::PricingOptions::default(),
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
             )
             .unwrap();
 
@@ -129,7 +129,7 @@ fn test_itm_call_delta_approaches_one() {
             &market,
             as_of,
             &[MetricId::Delta],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -155,7 +155,7 @@ fn test_otm_call_delta_approaches_zero() {
             &market,
             as_of,
             &[MetricId::Delta],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -184,7 +184,7 @@ fn test_delta_increases_with_spot() {
                 &market,
                 as_of,
                 &[MetricId::Delta],
-                finstack_quant_valuations::instruments::PricingOptions::default(),
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
             )
             .unwrap();
 
@@ -222,7 +222,7 @@ fn test_gamma_always_positive() {
                 &market,
                 as_of,
                 &[MetricId::Gamma],
-                finstack_quant_valuations::instruments::PricingOptions::default(),
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
             )
             .unwrap();
 
@@ -251,7 +251,7 @@ fn test_atm_gamma_highest() {
             &market,
             as_of,
             &[MetricId::Gamma],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap()
         .measures
@@ -263,7 +263,7 @@ fn test_atm_gamma_highest() {
             &market,
             as_of,
             &[MetricId::Gamma],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap()
         .measures
@@ -275,7 +275,7 @@ fn test_atm_gamma_highest() {
             &market,
             as_of,
             &[MetricId::Gamma],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap()
         .measures
@@ -313,7 +313,7 @@ fn test_gamma_same_for_call_and_put() {
             &market,
             as_of,
             &[MetricId::Gamma],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap()
         .measures
@@ -325,7 +325,7 @@ fn test_gamma_same_for_call_and_put() {
             &market,
             as_of,
             &[MetricId::Gamma],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap()
         .measures
@@ -354,7 +354,7 @@ fn test_vega_always_positive() {
                 &market,
                 as_of,
                 &[MetricId::Vega],
-                finstack_quant_valuations::instruments::PricingOptions::default(),
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
             )
             .unwrap();
 
@@ -383,7 +383,7 @@ fn test_atm_vega_highest() {
             &market,
             as_of,
             &[MetricId::Vega],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap()
         .measures
@@ -395,7 +395,7 @@ fn test_atm_vega_highest() {
             &market,
             as_of,
             &[MetricId::Vega],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap()
         .measures
@@ -407,7 +407,7 @@ fn test_atm_vega_highest() {
             &market,
             as_of,
             &[MetricId::Vega],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap()
         .measures
@@ -445,7 +445,7 @@ fn test_vega_same_for_call_and_put() {
             &market,
             as_of,
             &[MetricId::Vega],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap()
         .measures
@@ -457,7 +457,7 @@ fn test_vega_same_for_call_and_put() {
             &market,
             as_of,
             &[MetricId::Vega],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap()
         .measures
@@ -483,7 +483,7 @@ fn test_vega_increases_with_maturity() {
             &market,
             as_of,
             &[MetricId::Vega],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap()
         .measures
@@ -495,7 +495,7 @@ fn test_vega_increases_with_maturity() {
             &market,
             as_of,
             &[MetricId::Vega],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap()
         .measures
@@ -527,7 +527,7 @@ fn test_theta_negative_for_long_options() {
             &market,
             as_of,
             &[MetricId::Theta],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -547,7 +547,7 @@ fn theta_horizon_follows_theta_period() {
     let expiry = date!(2025 - 01 - 01);
     let market = build_standard_market(as_of, 100.0, 0.25, 0.05, 0.0);
     let metrics = [MetricId::Theta, MetricId::ThetaPeriodDays];
-    let options = finstack_quant_valuations::instruments::PricingOptions::default;
+    let options = finstack_quant_valuations_core::instruments::PricingOptions::default;
 
     let daily_call = create_call(as_of, expiry, 100.0);
     let daily = daily_call
@@ -588,7 +588,7 @@ fn test_atm_theta_magnitude_highest() {
             &market,
             as_of,
             &[MetricId::Theta],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap()
         .measures
@@ -600,7 +600,7 @@ fn test_atm_theta_magnitude_highest() {
             &market,
             as_of,
             &[MetricId::Theta],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap()
         .measures
@@ -633,7 +633,7 @@ fn test_call_rho_positive() {
             &market,
             as_of,
             &[MetricId::Rho],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -657,7 +657,7 @@ fn test_put_rho_negative() {
             &market,
             as_of,
             &[MetricId::Rho],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -682,7 +682,7 @@ fn test_rho_increases_with_maturity() {
             &market,
             as_of,
             &[MetricId::Rho],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap()
         .measures
@@ -694,7 +694,7 @@ fn test_rho_increases_with_maturity() {
             &market,
             as_of,
             &[MetricId::Rho],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap()
         .measures
@@ -734,7 +734,7 @@ fn test_all_greeks_computed_together() {
             &market,
             as_of,
             &metrics,
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -768,10 +768,10 @@ fn test_all_greeks_computed_together() {
 #[test]
 fn equity_option_native_rho_is_per_bp() {
     use finstack_quant_models::types::ExerciseStyle;
-    use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
+    use finstack_quant_valuations_equity::equity_option::EquityOption;
 
     let fixture: serde_json::Value = serde_json::from_str(include_str!(
-        "../../golden/data/pricing/quantlib/equity_option/spx_atm_call_1y_quantlib.json"
+        "../../../tests/golden/data/pricing/quantlib/equity_option/spx_atm_call_1y_quantlib.json"
     ))
     .expect("golden fixture parses");
     let option: EquityOption =
@@ -782,11 +782,11 @@ fn equity_option_native_rho_is_per_bp() {
     let as_of = date!(2026 - 04 - 30);
     let quantlib_rho = fixture["expected"]["rho"].as_f64().expect("expected rho");
 
-    let rho = crate::metrics::common::direct_equity_greek(
+    let rho = crate::support::greeks::direct_equity_greek(
         &option,
         &market,
         as_of,
-        finstack_quant_valuations::instruments::OptionGreekKind::Rho,
+        finstack_quant_valuations_core::instruments::OptionGreekKind::Rho,
     )
     .expect("native rho");
     assert!(
@@ -798,11 +798,11 @@ fn equity_option_native_rho_is_per_bp() {
     for style in [ExerciseStyle::European, ExerciseStyle::American] {
         let mut styled = option.clone();
         styled.exercise_style = style;
-        let native = crate::metrics::common::direct_equity_greek(
+        let native = crate::support::greeks::direct_equity_greek(
             &styled,
             &market,
             as_of,
-            finstack_quant_valuations::instruments::OptionGreekKind::Rho,
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Rho,
         )
         .expect("native rho");
         let metric = *styled
@@ -810,7 +810,7 @@ fn equity_option_native_rho_is_per_bp() {
                 &market,
                 as_of,
                 &[MetricId::Rho],
-                finstack_quant_valuations::instruments::PricingOptions::default(),
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
             )
             .expect("rho metric")
             .measures

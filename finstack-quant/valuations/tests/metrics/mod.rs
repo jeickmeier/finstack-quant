@@ -8,7 +8,6 @@
 //! - `convergence` - Analytical vs finite difference Greek convergence
 //! - `determinism` - Deterministic results for identical inputs
 //! - `edge_cases` - Boundary conditions and degenerate cases
-//! - `greek_relationships` - Mathematical relationships between Greeks
 //! - `invariants` - Property-based tests for metric invariants
 //! - `sign_conventions` - Correct sign conventions for all Greeks
 //! - `theta_observed_fixings` - Theta records the held spot for fixings inside the roll
@@ -23,7 +22,6 @@ mod bump_config_routing;
 mod convergence;
 mod determinism;
 mod edge_cases;
-mod greek_relationships;
 mod invariants;
 mod option_provider_consolidation;
 mod sign_conventions;

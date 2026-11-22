@@ -81,19 +81,11 @@ mod cds_tranche;
 
 // Equity Derivatives
 
-/// Equity tests - Equity spot instruments
-#[path = "instruments/equity/mod.rs"]
-mod equity;
-
 /// Basket option tests - Multi-underlying options
 #[path = "instruments/basket/mod.rs"]
 mod basket;
 
-/// Equity option tests - Vanilla and exotic equity options
-#[path = "instruments/equity_option/mod.rs"]
-mod equity_option;
-
-/// Total Return Swap (TRS) tests - Equity and asset swaps
+/// Total Return Swap (TRS) tests - Cross-family equity and FI index TRS suites
 #[path = "instruments/trs/mod.rs"]
 mod trs;
 

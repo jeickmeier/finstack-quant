@@ -113,7 +113,7 @@ The forward method does not reject a negative prepaid spot after cash dividends.
 
 ### Evidence
 
-[Hull carry reference](../../../REFERENCES.md#hull-options-futures); [types_tests.rs](../../../../finstack-quant/valuations/equity/tests/equity/types_tests.rs) and [test_bucketed_dv01.rs](../../../../finstack-quant/valuations/equity/tests/equity/test_bucketed_dv01.rs) contain local construction/carry and rate-risk checks; [pricer_tests.rs](../../../../finstack-quant/valuations/tests/instruments/equity/pricer_tests.rs) supplies pricing cases. These are formula/behavior comparisons, not a historical dividend or corporate-action benchmark.
+[Hull carry reference](../../../REFERENCES.md#hull-options-futures); [types_tests.rs](../../../../finstack-quant/valuations/equity/tests/equity/types_tests.rs) and [test_bucketed_dv01.rs](../../../../finstack-quant/valuations/equity/tests/equity/test_bucketed_dv01.rs) contain local construction/carry and rate-risk checks; [pricer_tests.rs](../../../../finstack-quant/valuations/equity/tests/equity/pricer_tests.rs) supplies pricing cases. These are formula/behavior comparisons, not a historical dividend or corporate-action benchmark.
 
 ### Relationship to the accepted cash-dividend source boundary
 

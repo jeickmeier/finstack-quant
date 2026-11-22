@@ -5,7 +5,6 @@
 //! - **convergence**: Analytical vs finite difference Greek convergence
 //! - **determinism**: Deterministic results for identical inputs
 //! - **edge_cases**: Boundary conditions and degenerate cases
-//! - **greek_relationships**: Mathematical relationships between Greeks
 //! - **invariants**: Property-based tests for metric invariants
 //! - **sign_conventions**: Correct sign conventions for all Greeks
 //! - **vanna_volga_pockets**: Vanna-volga smile interpolation tests
