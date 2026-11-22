@@ -26,7 +26,7 @@ use finstack_quant_models::monte_carlo::pricer::path_dependent::{
 };
 use finstack_quant_models::monte_carlo::process::gbm::{GbmParams, GbmProcess};
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
+use finstack_quant_valuations_core::instruments::pricing::volatility::{
     FxVolatilityRequest, resolve_fx_sigma, resolve_sigma_at,
 };
 use finstack_quant_valuations_core::pricer::{
@@ -43,7 +43,7 @@ fn asset_spot(inst: &RangeAccrual, curves: &MarketContext) -> Result<f64> {
         .as_ref()
         .map_or(inst.terms.notional.currency(), |q| q.asset_currency);
     let spot =
-        finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+        finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
             scalar, expected,
         )?;
     finstack_quant_core::validation::validate_f64_positive(spot, "RangeAccrual asset spot")?;
@@ -62,7 +62,7 @@ fn asset_growth(
         .terms
         .day_count
         .year_fraction(as_of, date, DayCountContext::default())?;
-    let q = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+    let q = finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield(
         curves,
         inst.terms.div_yield_id.as_ref(),
     )?;
@@ -77,7 +77,7 @@ fn asset_growth(
         .get_discount(quanto.asset_discount_curve_id.as_str())?
         .df_between_dates(as_of, date)?;
     let fx_spot =
-        finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+        finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
             curves.get_price(quanto.fx_spot_id.as_str())?,
             inst.terms.notional.currency(),
         )?;
@@ -197,7 +197,7 @@ impl RangeAccrualMcPricer {
         let disc_curve = curves.get_discount(inst.terms.discount_curve_id.as_str())?;
         let discount_factor = disc_curve.df_between_dates(as_of, final_date)?;
         let r =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
+            finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df(
                 discount_factor,
                 t,
                 "range-accrual Monte Carlo drift",
@@ -254,7 +254,7 @@ impl RangeAccrualMcPricer {
         let process = GbmProcess::new(GbmParams::new(r, 0.0, sigma)?)
             .with_drift_schedule(std::sync::Arc::new(drift));
         let mut config =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::merged_path_config(
+            finstack_quant_valuations_core::instruments::pricing::monte_carlo::merged_path_config(
                 &self.config,
                 &inst.instrument_pricing_overrides,
             )?;

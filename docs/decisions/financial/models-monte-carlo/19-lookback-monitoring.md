@@ -215,7 +215,7 @@ can fall back to an unseeded extremum, and the expiry and collapsed
 clock branches query terminal spot for both payoff types. These
 are observed routing choices. The proposed contract preserves
 the separate analytic and MC model owners.
-[Carry helper](../../../../finstack-quant/valuations/core/src/instruments/common_impl/helpers.rs),
+[Carry helper](../../../../finstack-quant/valuations/core/src/instruments/pricing/market_inputs.rs),
 [dated monitoring](../../../../finstack-quant/valuations/core/src/instruments/parameters/monitoring.rs).
 
 ## Independent review evidence

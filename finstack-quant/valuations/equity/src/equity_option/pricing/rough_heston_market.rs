@@ -4,7 +4,7 @@
 //! same required `ROUGH_HESTON_*` market scalars through this module.
 
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_valuations_core::instruments::common_impl::helpers::get_unitless_scalar_strict;
+use finstack_quant_valuations_core::instruments::pricing::market_inputs::get_unitless_scalar_strict;
 
 /// Bundle of rough-Heston parameters resolved from a market context.
 #[derive(Debug, Clone, Copy)]

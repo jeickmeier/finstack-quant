@@ -869,19 +869,17 @@ mod tests {
         ) -> std::result::Result<crate::results::ValuationResult, crate::pricer::PricingError>
         {
             let base_value = self.value(market, as_of)?;
-            Ok(
-                crate::instruments::common_impl::helpers::build_with_metrics_dyn(
-                    Arc::from(self.clone_box()),
-                    Arc::new(market.clone()),
-                    as_of,
-                    base_value,
-                    metrics,
-                    crate::instruments::common_impl::helpers::MetricBuildOptions {
-                        pricing: options,
-                        ..crate::instruments::common_impl::helpers::MetricBuildOptions::default()
-                    },
-                )?,
-            )
+            Ok(crate::instruments::lifecycle::build_with_metrics_dyn(
+                Arc::from(self.clone_box()),
+                Arc::new(market.clone()),
+                as_of,
+                base_value,
+                metrics,
+                crate::instruments::lifecycle::MetricBuildOptions {
+                    pricing: options,
+                    ..crate::instruments::lifecycle::MetricBuildOptions::default()
+                },
+            )?)
         }
     }
 

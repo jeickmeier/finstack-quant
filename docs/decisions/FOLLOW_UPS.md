@@ -333,7 +333,7 @@ resolve the stated scope question explicitly.
   [rate_between_dates](../../finstack-quant/core/src/market_data/term_structures/forward_curve/curve.rs).
   Verify date-based relative discounting `D(b,T)/D(b,v)` and
   `zero_rate_from_df` adoption across pricers. The
-  [rate helper](../../finstack-quant/valuations/core/src/instruments/common_impl/helpers.rs)
+  [rate helper](../../finstack-quant/valuations/core/src/instruments/pricing/discounting.rs)
   does not enforce finite model time and returns zero for `t <= 0` before
   validating the factor. Reconcile already accepted enforcement for finite
   positive factors/model time, leaving lifecycle branches operation-owned; test the

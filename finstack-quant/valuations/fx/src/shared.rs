@@ -331,13 +331,13 @@ fn collect_fx_option_inputs_no_vol_at_spot(
         DayCountContext::default(),
     )?;
     let r_domestic =
-        finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
+        finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df(
             df_d,
             t,
             &format!("{} domestic discount", request.rate_context),
         )?;
     let r_foreign =
-        finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
+        finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df(
             df_f,
             t,
             &format!("{} foreign discount", request.rate_context),
@@ -395,20 +395,19 @@ pub(crate) fn collect_fx_option_inputs_at_spot(
             "FX option delivery forward",
         )?;
     }
-    let sigma =
-        finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_fx_sigma(
-            finstack_quant_valuations_core::instruments::common_impl::vol_resolution::FxVolatilityRequest {
-                overrides: &request.instrument_pricing_overrides.market_quotes,
-                curves: request.market,
-                vol_surface_id: request.vol_surface_id,
-                pair,
-                as_of: request.as_of,
-                expiry: request.expiry,
-                model_time: no_vol.t,
-                strike: request.strike,
-                forward,
-            },
-        )?;
+    let sigma = finstack_quant_valuations_core::instruments::pricing::volatility::resolve_fx_sigma(
+        finstack_quant_valuations_core::instruments::pricing::volatility::FxVolatilityRequest {
+            overrides: &request.instrument_pricing_overrides.market_quotes,
+            curves: request.market,
+            vol_surface_id: request.vol_surface_id,
+            pair,
+            as_of: request.as_of,
+            expiry: request.expiry,
+            model_time: no_vol.t,
+            strike: request.strike,
+            forward,
+        },
+    )?;
 
     Ok(FxOptionInputs {
         spot: no_vol.spot,

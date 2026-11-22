@@ -56,7 +56,7 @@ fn path_config(
     antithetic_default: bool,
 ) -> PathDependentPricerConfig {
     let mut config =
-        finstack_quant_valuations::instruments::common_impl::helpers::merged_path_config(
+        finstack_quant_valuations::instruments::pricing::monte_carlo::merged_path_config(
             &PathDependentPricerConfig::default().with_antithetic(antithetic_default),
             overrides,
         )

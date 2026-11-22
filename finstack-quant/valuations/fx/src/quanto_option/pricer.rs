@@ -24,7 +24,7 @@ fn collect_quanto_inputs(
     curves: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<(f64, f64, f64, f64, f64, f64, f64)> {
-    use finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df;
+    use finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df;
 
     let t = inst
         .day_count
@@ -48,13 +48,13 @@ fn collect_quanto_inputs(
     let spot_scalar = curves.get_price(&inst.spot_id)?;
     let spot = finstack_quant_valuations_core::metrics::scalar_numeric_value(spot_scalar);
 
-    let q = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+    let q = finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield(
         curves,
         inst.div_yield_id.as_ref(),
     )?;
 
     let sigma_equity =
-        finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at(
+        finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at(
             &inst.instrument_pricing_overrides.market_quotes,
             curves,
             inst.vol_surface_id.as_str(),
@@ -84,8 +84,8 @@ fn collect_quanto_inputs(
         )?;
         let fx_overrides =
             finstack_quant_valuations_core::instruments::pricing_overrides::MarketQuoteOverrides::default();
-        finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_fx_sigma(
-            finstack_quant_valuations_core::instruments::common_impl::vol_resolution::FxVolatilityRequest {
+        finstack_quant_valuations_core::instruments::pricing::volatility::resolve_fx_sigma(
+            finstack_quant_valuations_core::instruments::pricing::volatility::FxVolatilityRequest {
                 overrides: &fx_overrides,
                 curves,
                 vol_surface_id: fx_vol_surface_id.as_str(),

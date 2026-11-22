@@ -5001,7 +5001,7 @@ and invalid-input behavior MUST follow explicit operation-specific contracts.
 Discount with the curve factor directly whenever the model permits.
 
 **Evidence:** `zero_rate_from_df` in
-[the shared pricing helpers](finstack-quant/valuations/core/src/instruments/common_impl/helpers.rs)
+[the shared discounting helpers](finstack-quant/valuations/core/src/instruments/pricing/discounting.rs)
 and the [discount curve's date APIs](finstack-quant/core/src/market_data/term_structures/discount_curve/curve.rs)
 provide the conversion primitives. The rate helper does not validate finite
 model time and returns zero for `t <= 0` before validating the factor. Its

@@ -87,12 +87,12 @@ reached through the standard metric registry.
   explicit `FxPairConvention` for the instrument's ordered pair.
 - **Two clocks.** Option pricers combine a vol-surface clock with a
   discount-curve clock; the model rate must satisfy `exp(-r·t_vol) = df`.
-  `common_impl::helpers::zero_rate_from_df` derives that rate and core curve
+  `instruments::pricing::discounting::zero_rate_from_df` derives that rate and core curve
   methods (`DiscountCurve::df_between_dates`, `ForwardCurve::rate_between_dates`)
   supply curve-consistent lookups. Never divide `ln(df)` by a year fraction
   measured on a different day count.
 - **Volatility precedence.** Surface-driven pricers resolve σ through
-  `common_impl::vol_resolution::resolve_sigma_at`, so
+  `instruments::pricing::volatility::resolve_sigma_at` / `resolve_fx_sigma`, so
   `MarketQuoteOverrides::implied_volatility` behaves as a flat σ across tenor
   and strike everywhere in the family.
 - **FX policy visibility.** `FxForward`, `FxOption` and `QuantoOption` override
@@ -164,7 +164,7 @@ mise run rust-bench
 ## Related
 
 - [`../README.md`](../README.md) — `Instrument` trait, JSON contract, add-an-instrument checklist
-- [`../common_impl/README.md`](../common_impl/README.md) — `fx_dates`, two-clock plumbing, vol resolution, variance replication
+- [`../core/src/instruments/README.md`](../core/src/instruments/README.md) — framework traits, two-clock discounting, and volatility resolution
 - [`../rates/README.md`](../rates/README.md) — cross-currency swaps live there but register in this family's pricer shard
 - [`../commodity/README.md`](../commodity/README.md) — the other Black-76-centric family
 - [`../../metrics/README.md`](../../metrics/README.md) — greeks and metric registration

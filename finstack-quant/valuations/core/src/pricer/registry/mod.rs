@@ -283,7 +283,7 @@ impl PricerRegistry {
         model: ModelKey,
     ) -> std::result::Result<
         (
-            crate::instruments::common_impl::helpers::ValidatedPricingLifecycle<
+            crate::instruments::lifecycle::ValidatedPricingLifecycle<
                 'instrument,
                 dyn Instrument + 'instrument,
             >,
@@ -292,9 +292,8 @@ impl PricerRegistry {
         PricingError,
     > {
         let context = PricingErrorContext::from_instrument(instrument).model(model);
-        let lifecycle =
-            crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(instrument)
-                .map_err(|error| PricingError::from_core(error, context))?;
+        let lifecycle = crate::instruments::lifecycle::ValidatedPricingLifecycle::new(instrument)
+            .map_err(|error| PricingError::from_core(error, context))?;
 
         let key = PricerKey::new(instrument.key(), model);
         let pricer = self

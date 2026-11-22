@@ -43,7 +43,7 @@ impl CliquetOptionMcPricer {
             return Ok((Money::from((0_i64, inst.notional.currency())), None));
         }
         let initial_spot =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+            finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
                 curves.get_price(&inst.spot_id)?,
                 inst.notional.currency(),
             )?;
@@ -136,7 +136,7 @@ impl CliquetOptionMcPricer {
             return Ok((Money::from((0_i64, inst.notional.currency())), None));
         }
 
-        let div_yield = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+        let div_yield = finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield(
             curves,
             inst.div_yield_id.as_ref(),
         )?;
@@ -202,7 +202,7 @@ impl CliquetOptionMcPricer {
             .collect();
 
         let merged_cfg =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::merged_path_config(
+            finstack_quant_valuations_core::instruments::pricing::monte_carlo::merged_path_config(
                 &self.config,
                 &inst.instrument_pricing_overrides,
             )?;
@@ -285,7 +285,7 @@ impl Pricer for CliquetOptionMcPricer {
 
         let mut result = ValuationResult::stamped(cliquet.id(), as_of, pv);
         if let Some(estimate) = estimate {
-            finstack_quant_valuations_core::instruments::common_impl::helpers::attach_mc_diagnostics(&mut result, &estimate);
+            finstack_quant_valuations_core::instruments::pricing::monte_carlo::attach_mc_diagnostics(&mut result, &estimate);
         }
         Ok(result)
     }

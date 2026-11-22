@@ -201,7 +201,7 @@ These tests document observed runtime expectations.
 [raw simulation](../../../../finstack-quant/models/src/monte_carlo/simulate.rs),
 [simulation tests](../../../../finstack-quant/models/src/monte_carlo/simulate/tests.rs),
 [dated equity adapter](../../../../finstack-quant/valuations/equity/src/piecewise_gbm.rs),
-[volatility resolution](../../../../finstack-quant/valuations/core/src/instruments/common_impl/vol_resolution.rs).
+[volatility resolution](../../../../finstack-quant/valuations/core/src/instruments/pricing/volatility.rs).
 
 ## Follow-up tracking
 

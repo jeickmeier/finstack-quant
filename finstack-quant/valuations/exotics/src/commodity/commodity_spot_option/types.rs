@@ -428,19 +428,20 @@ impl CommoditySpotOption {
         let t = self.time_to_expiry(as_of)?;
         let df = disc.df_between_dates(as_of, self.expiry)?;
         let r =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
+            finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df(
                 df,
                 t,
                 "commodity-option model rate",
             )?;
 
-        let sigma = finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &self.instrument_pricing_overrides.market_quotes,
-            market,
-            self.vol_surface_id.as_str(),
-            t,
-            self.strike,
-        )?;
+        let sigma =
+            finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at(
+                &self.instrument_pricing_overrides.market_quotes,
+                market,
+                self.vol_surface_id.as_str(),
+                t,
+                self.strike,
+            )?;
 
         let forward = self.forward_price(market, as_of)?;
         let spot = if matches!(self.exercise_style, ExerciseStyle::European) {
@@ -469,7 +470,7 @@ impl CommoditySpotOption {
         };
         let scalar = market.get_price(spot_id)?;
         let spot =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+            finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
                 scalar,
                 self.underlying.currency,
             )?;
@@ -936,13 +937,14 @@ impl CommoditySpotOption {
             return Ok(Some(intrinsic * self.quantity * self.multiplier));
         }
 
-        let sigma = finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &self.instrument_pricing_overrides.market_quotes,
-            market,
-            self.vol_surface_id.as_str(),
-            t,
-            self.strike,
-        )?;
+        let sigma =
+            finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at(
+                &self.instrument_pricing_overrides.market_quotes,
+                market,
+                self.vol_surface_id.as_str(),
+                t,
+                self.strike,
+            )?;
         let forward = self.forward_price(market, as_of)?;
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let df = disc.df_between_dates(as_of, self.expiry)?;
@@ -1039,13 +1041,14 @@ impl CommoditySpotOption {
             return Ok(Some(0.0));
         }
 
-        let sigma = finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &self.instrument_pricing_overrides.market_quotes,
-            market,
-            self.vol_surface_id.as_str(),
-            t,
-            self.strike,
-        )?;
+        let sigma =
+            finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at(
+                &self.instrument_pricing_overrides.market_quotes,
+                market,
+                self.vol_surface_id.as_str(),
+                t,
+                self.strike,
+            )?;
         if sigma <= 0.0 {
             return Ok(Some(0.0));
         }

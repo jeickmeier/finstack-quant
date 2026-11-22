@@ -338,7 +338,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for CliquetOption {
             return Ok(None);
         }
         let spot =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+            finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
                 market.get_price(&self.spot_id)?,
                 self.notional.currency(),
             )?;

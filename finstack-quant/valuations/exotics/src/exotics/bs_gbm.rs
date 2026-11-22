@@ -4,7 +4,7 @@ use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::monte_carlo::process::gbm::DriftSchedule;
-use finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df;
+use finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df;
 
 /// Build a curve-consistent cumulative drift schedule for `GbmProcess::with_drift_schedule`.
 ///

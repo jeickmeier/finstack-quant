@@ -254,7 +254,7 @@ market repricing accuracy or historical point-in-time eligibility.
 
 Inspected source: [InflationIndex](../../../../finstack-quant/core/src/market_data/scalars/inflation_index.rs),
 [generic series storage](../../../../finstack-quant/core/src/market_data/scalars/primitives.rs),
-[reference helpers](../../../../finstack-quant/valuations/core/src/instruments/common_impl/helpers.rs),
+[reference helpers](../../../../finstack-quant/valuations/core/src/instruments/pricing/inflation.rs),
 [bond indexation](../../../../finstack-quant/valuations/fixed-income/src/inflation_linked_bond/indexation.rs),
 [calibration preflight](../../../../finstack-quant/calibration/src/validation/preflight.rs),
 [inflation target](../../../../finstack-quant/calibration/src/targets/inflation.rs),

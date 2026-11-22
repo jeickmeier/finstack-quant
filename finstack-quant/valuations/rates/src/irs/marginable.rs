@@ -13,8 +13,8 @@ use finstack_quant_margin::types::NettingSetId;
 use finstack_quant_margin::types::OtcMarginSpec;
 use finstack_quant_margin::types::SimmSensitivities;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::instruments::common_impl::margin::assign_ir_tenor_bucket;
-use finstack_quant_valuations_core::instruments::common_impl::margin::netting_set_id_from_spec;
+use finstack_quant_valuations_core::margin::assign_ir_tenor_bucket;
+use finstack_quant_valuations_core::margin::netting_set_id_from_spec;
 
 fn repriced_bucketed_dv01(
     instrument: &dyn Instrument,

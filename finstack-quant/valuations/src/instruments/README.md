@@ -45,7 +45,7 @@ Files at this level:
 | `<family>/family.rs` | The family's `Family` static: its pricer table and metric table |
 
 The framework surface (`Instrument`, `PricingOptions`, parameter types, the
-`common_impl` kernels, `instruments::pricing`) is re-exported flat from
+`instruments::lifecycle`, `instruments::pricing`) is re-exported flat from
 `instruments::*` exactly as the core crate exports it.
 
 ## Core trait

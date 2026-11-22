@@ -9,32 +9,6 @@ use finstack_quant_core::money::Money;
 use indexmap::IndexMap;
 use std::sync::Arc;
 
-/// Publish a Monte Carlo estimate's standard error, 95% confidence bounds and
-/// path counts as `mc_*` custom measures on `result`.
-///
-/// # Arguments
-///
-/// * `result` - Target valuation result whose `measures` map receives the `mc_*` keys.
-/// * `estimate` - Monte Carlo estimate carrying standard error, confidence bounds, and path counts.
-pub fn attach_mc_diagnostics(
-    result: &mut crate::results::ValuationResult,
-    estimate: &finstack_quant_models::monte_carlo::results::MoneyEstimate,
-) {
-    for (id, value) in [
-        ("mc_stderr", estimate.stderr),
-        ("mc_ci_95_low", estimate.ci_95.0.amount()),
-        ("mc_ci_95_high", estimate.ci_95.1.amount()),
-        ("mc_num_paths", estimate.num_paths as f64),
-        (
-            "mc_num_simulated_paths",
-            estimate.num_simulated_paths as f64,
-        ),
-        ("mc_relative_stderr", estimate.relative_stderr()),
-    ] {
-        result.measures.insert(MetricId::custom(id), value);
-    }
-}
-
 /// Validated pricing boundary shared by direct and registry-backed routes.
 ///
 /// Construction performs the only mandatory invariant/override validation
@@ -294,4 +268,207 @@ pub(crate) fn build_with_metrics_dyn(
     );
     result.measures = measures;
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::instruments::Instrument;
+    use crate::pricer::InstrumentType;
+    use finstack_quant_core::config::FinstackConfig;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::types::Attributes;
+    use std::any::Any;
+    use time::macros::date;
+
+    #[derive(Clone)]
+    struct StubInstrument {
+        id: String,
+        attrs: Attributes,
+        instrument_pricing_overrides:
+            crate::instruments::pricing_overrides::InstrumentPricingOverrides,
+        metric_pricing_overrides: crate::instruments::pricing_overrides::MetricPricingOverrides,
+        scenario_pricing_overrides: crate::instruments::pricing_overrides::ScenarioPricingOverrides,
+    }
+
+    crate::impl_empty_cashflow_provider!(
+        StubInstrument,
+        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
+    );
+
+    impl StubInstrument {
+        fn new(id: &str) -> Self {
+            Self {
+                id: id.to_string(),
+                attrs: Attributes::default(),
+                instrument_pricing_overrides: Default::default(),
+                metric_pricing_overrides: Default::default(),
+                scenario_pricing_overrides: Default::default(),
+            }
+        }
+    }
+
+    impl Instrument for StubInstrument {
+        fn includes_valuation_date_cashflows(&self) -> bool {
+            true
+        }
+
+        fn market_dependencies(
+            &self,
+        ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
+            Ok(crate::instruments::MarketDependencies::new())
+        }
+
+        fn id(&self) -> &str {
+            &self.id
+        }
+
+        fn key(&self) -> InstrumentType {
+            InstrumentType::Bond
+        }
+
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+
+        fn base_value(
+            &self,
+            _market: &MarketContext,
+            _as_of: Date,
+        ) -> finstack_quant_core::Result<Money> {
+            Ok(Money::new(123.45, Currency::USD).expect("valid money fixture"))
+        }
+
+        fn attributes(&self) -> &Attributes {
+            &self.attrs
+        }
+
+        fn attributes_mut(&mut self) -> &mut Attributes {
+            &mut self.attrs
+        }
+
+        fn clone_box(&self) -> Box<dyn Instrument> {
+            Box::new(self.clone())
+        }
+
+        crate::impl_focused_pricing_overrides!();
+
+        fn price_with_metrics(
+            &self,
+            market: &MarketContext,
+            as_of: Date,
+            metrics: &[MetricId],
+            options: crate::instruments::PricingOptions,
+        ) -> std::result::Result<crate::results::ValuationResult, crate::pricer::PricingError>
+        {
+            let base = self.value(market, as_of)?;
+            Ok(build_with_metrics_dyn(
+                Arc::from(self.clone_box()),
+                Arc::new(market.clone()),
+                as_of,
+                base,
+                metrics,
+                MetricBuildOptions {
+                    pricing: options,
+                    ..MetricBuildOptions::default()
+                },
+            )?)
+        }
+    }
+
+    #[test]
+    fn stamped_result_uses_provided_config() -> finstack_quant_core::Result<()> {
+        let instrument = Arc::new(StubInstrument::new("STUB"));
+        let market = Arc::new(MarketContext::new());
+        let as_of = date!(2024 - 01 - 01);
+        let base_value = Money::from((10_i64, Currency::USD));
+
+        let mut cfg = FinstackConfig::default();
+        cfg.rounding
+            .output_scale
+            .set_scale(Currency::USD, 4)
+            .expect("valid decimal scale");
+        let cfg = Arc::new(cfg);
+
+        let result = build_with_metrics_dyn(
+            instrument,
+            market,
+            as_of,
+            base_value,
+            &[],
+            MetricBuildOptions {
+                pricing: PricingOptions {
+                    config: Some(cfg),
+                    ..PricingOptions::default()
+                },
+                ..MetricBuildOptions::default()
+            },
+        )?;
+
+        let usd_scale = result.meta.rounding.output_scale(Currency::USD);
+        assert_eq!(usd_scale, 4, "meta should reflect provided config");
+        Ok(())
+    }
+
+    #[test]
+    fn metric_result_preserves_scenario_adjusted_base_value() -> finstack_quant_core::Result<()> {
+        let mut instrument = StubInstrument::new("STUB-SHOCK");
+        instrument.scenario_pricing_overrides = instrument
+            .scenario_pricing_overrides
+            .with_scenario_price_shock_decimal(-0.10);
+
+        let market = MarketContext::new();
+        let result = instrument.price_with_metrics(
+            &market,
+            date!(2024 - 01 - 01),
+            &[],
+            crate::instruments::PricingOptions::default(),
+        )?;
+
+        assert!((result.value.amount() - 111.105).abs() < 1e-9);
+        Ok(())
+    }
+
+    #[test]
+    fn instrument_value_default_applies_scenario_price_shock_once()
+    -> finstack_quant_core::Result<()> {
+        let mut instrument = StubInstrument::new("STUB-VALUE");
+        instrument.scenario_pricing_overrides = instrument
+            .scenario_pricing_overrides
+            .with_scenario_price_shock_decimal(-0.10);
+
+        let market = MarketContext::new();
+        let as_of = date!(2024 - 01 - 01);
+
+        let direct = instrument.value(&market, as_of)?;
+        assert!((direct.amount() - 111.105).abs() < 1e-9);
+
+        let via_metrics = instrument
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[],
+                crate::instruments::PricingOptions::default(),
+            )?
+            .value;
+        assert!((direct.amount() - via_metrics.amount()).abs() < 1e-9);
+        Ok(())
+    }
+
+    #[test]
+    fn instrument_base_value_is_unshocked() -> finstack_quant_core::Result<()> {
+        let mut instrument = StubInstrument::new("STUB-BASE");
+        instrument.scenario_pricing_overrides = instrument
+            .scenario_pricing_overrides
+            .with_scenario_price_shock_decimal(-0.10);
+
+        let market = MarketContext::new();
+        let base = instrument.base_value(&market, date!(2024 - 01 - 01))?;
+        assert!((base.amount() - 123.45).abs() < 1e-9);
+        Ok(())
+    }
 }

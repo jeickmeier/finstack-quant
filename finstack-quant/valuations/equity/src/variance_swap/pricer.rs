@@ -173,7 +173,7 @@ impl VarianceSwap {
         }
         if let Ok(scalar) = context.get_price(&self.spot_id) {
             let spot =
-                finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+                finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
                     scalar,
                     self.notional.currency(),
                 )?;
@@ -400,14 +400,14 @@ fn spot_variance_to_date(
     surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
     let disc = context.get_discount(&inst.discount_curve_id)?;
     let spot =
-        finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+        finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
             context.get_price(&inst.spot_id)?,
             inst.notional.currency(),
         )?;
     // Date-based zero rate over [as_of, target_date]: avoids the
     // axis bias of `disc.zero_rate(t, Continuous)` when curve base != as_of.
     let df_mat = disc.as_ref().df_between_dates(as_of, target_date)?;
-    let r = finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
+    let r = finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df(
         df_mat,
         t,
         "variance-swap replication rate",

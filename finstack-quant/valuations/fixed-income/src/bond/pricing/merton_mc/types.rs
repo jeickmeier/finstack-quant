@@ -39,7 +39,7 @@ impl MertonMcRun {
     ) -> finstack_quant_core::Result<Self> {
         Ok(Self {
             num_paths:
-                finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_mc_paths(
+                finstack_quant_valuations_core::instruments::pricing::monte_carlo::resolve_mc_paths(
                     model_config.mc_paths,
                     crate::bond::merton_mc_config::DEFAULT_MERTON_PIK_MC_PATHS,
                 )?,

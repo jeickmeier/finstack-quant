@@ -304,7 +304,7 @@ Owning code: [canonical parameter validator](../../../../finstack-quant/core/src
 [model parameter representation](../../../../finstack-quant/models/src/volatility/sabr/parameters.rs),
 [expansions](../../../../finstack-quant/models/src/volatility/sabr/expansion.rs),
 [active source resolution](../../../../finstack-quant/valuations/core/src/market/volatility.rs),
-[shared quote resolver](../../../../finstack-quant/valuations/core/src/instruments/common_impl/vol_resolution.rs),
+[shared quote resolver](../../../../finstack-quant/valuations/core/src/instruments/pricing/volatility.rs),
 [caplet adapter](../../../../finstack-quant/valuations/rates/src/cap_floor/pricing/pricer.rs),
 [swaption adapter](../../../../finstack-quant/valuations/rates/src/swaption/types/swaption.rs)
 and [calibration publication](../../../../finstack-quant/calibration/src/targets/swaption.rs).

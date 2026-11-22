@@ -265,7 +265,7 @@ pricing, historical knowledge, vendor agreement or a uniform accuracy bound.
 
 Inspected owners: [InflationCurve](../../../../finstack-quant/core/src/market_data/term_structures/inflation.rs),
 [shared roll](../../../../finstack-quant/core/src/market_data/term_structures/common/roll.rs),
-[reference helpers](../../../../finstack-quant/valuations/core/src/instruments/common_impl/helpers.rs),
+[reference helpers](../../../../finstack-quant/valuations/core/src/instruments/pricing/inflation.rs),
 [bond indexation](../../../../finstack-quant/valuations/fixed-income/src/inflation_linked_bond/indexation.rs),
 [inflation target](../../../../finstack-quant/calibration/src/targets/inflation.rs),
 [Python binding](../../../../finstack-quant-py/src/bindings/core/market_data/curves/inflation.rs)

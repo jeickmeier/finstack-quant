@@ -468,8 +468,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// dirty price at the instrument's settlement date). Bond quote metrics
     /// such as YTM, z-spread, and discount margin stay settlement-anchored.
     fn value(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<Money> {
-        let lifecycle =
-            crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
+        let lifecycle = crate::instruments::lifecycle::ValidatedPricingLifecycle::new(self)?;
         let effective_as_of = lifecycle.effective_as_of(market, as_of);
         let base = self.base_value(market, effective_as_of)?;
         lifecycle.apply_value(base)
@@ -546,8 +545,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// `value_raw()` should represent the same economics as [`Instrument::value`]
     /// before currency rounding, not a different pricing convention.
     fn value_raw(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
-        let lifecycle =
-            crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
+        let lifecycle = crate::instruments::lifecycle::ValidatedPricingLifecycle::new(self)?;
         let effective_as_of = lifecycle.effective_as_of(market, as_of);
         let base = self.base_value_raw(market, effective_as_of)?;
         Ok(lifecycle.apply_raw_value(base))
@@ -579,8 +577,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<(f64, Currency)> {
-        let lifecycle =
-            crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
+        let lifecycle = crate::instruments::lifecycle::ValidatedPricingLifecycle::new(self)?;
         let effective_as_of = lifecycle.effective_as_of(market, as_of);
         let (base, currency) = self.base_value_raw_with_currency(market, effective_as_of)?;
         Ok((lifecycle.apply_raw_value(base), currency))

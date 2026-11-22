@@ -307,7 +307,7 @@ drafts retain their independent decision status.
 
 ## Evidence and verification required
 
-The [shared pricing helpers](../../../../finstack-quant/valuations/core/src/instruments/common_impl/helpers.rs)
+The [shared pricing helpers](../../../../finstack-quant/valuations/core/src/instruments/pricing/discounting.rs)
 contain `zero_rate_from_df`; the
 [discount curve](../../../../finstack-quant/core/src/market_data/term_structures/discount_curve/curve.rs)
 provides date-based discounting. Their presence does not prove all callers

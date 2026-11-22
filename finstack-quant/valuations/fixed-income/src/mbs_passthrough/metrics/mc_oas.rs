@@ -114,7 +114,7 @@ impl McOasConfig {
         };
         Ok(Self {
             num_paths:
-                finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_mc_paths(
+                finstack_quant_valuations_core::instruments::pricing::monte_carlo::resolve_mc_paths(
                     model.mc_paths,
                     DEFAULT_NUM_PATHS,
                 )?,

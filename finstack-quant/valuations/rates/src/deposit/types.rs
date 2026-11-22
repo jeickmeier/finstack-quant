@@ -206,7 +206,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for Deposit {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         // Holder view: cash settling on `as_of` is no longer owed.
-        finstack_quant_valuations_core::instruments::common_impl::helpers::schedule_pv(
+        finstack_quant_valuations_core::instruments::pricing::discounting::schedule_pv(
             self,
             curves,
             as_of,

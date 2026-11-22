@@ -1,6 +1,6 @@
 //! Valuation-side resolution of closed-form Heston parameters.
 
-use crate::instruments::common_impl::helpers::get_unitless_scalar_strict;
+use crate::instruments::pricing::market_inputs::get_unitless_scalar_strict;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_models::volatility::heston::HestonParams;
 

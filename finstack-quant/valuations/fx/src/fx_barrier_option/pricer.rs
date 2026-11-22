@@ -101,7 +101,7 @@ impl FxBarrierOptionMcPricer {
         let process = GbmProcess::new(gbm_params);
 
         let mut config =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::merged_path_config(
+            finstack_quant_valuations_core::instruments::pricing::monte_carlo::merged_path_config(
                 &self.config,
                 &inst.instrument_pricing_overrides,
             )?;

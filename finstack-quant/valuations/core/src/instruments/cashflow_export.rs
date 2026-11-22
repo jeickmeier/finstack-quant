@@ -664,8 +664,7 @@ fn envelope_for_priced(
                     .rate,
             )
         };
-        let pv =
-            crate::instruments::common_impl::helpers::apply_scenario_raw_value(instrument, base_pv);
+        let pv = crate::instruments::lifecycle::apply_scenario_raw_value(instrument, base_pv);
 
         let mbs_row = mbs_state.as_ref().and_then(|m| m.get(&flow.get_date()));
         let row_balance = terms

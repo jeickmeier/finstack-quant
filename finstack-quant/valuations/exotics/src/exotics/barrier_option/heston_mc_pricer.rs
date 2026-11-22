@@ -60,13 +60,13 @@ impl BarrierOptionHestonMcPricer {
         let disc_curve = market.get_discount(inst.discount_curve_id.as_str())?;
         let discount_factor = disc_curve.df_between_dates(as_of, inst.expiry)?;
         let r =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
+            finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df(
                 discount_factor,
                 t,
                 "BarrierOption Heston MC discount curve",
             )?;
         let spot = super::pricer::resolve_spot(inst, market)?;
-        let q = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+        let q = finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield(
             market,
             inst.div_yield_id.as_ref(),
         )?;
@@ -100,7 +100,7 @@ impl BarrierOptionHestonMcPricer {
             .with_observed_barrier_breached(inst.observed_barrier_breached.unwrap_or(false));
 
         let num_paths =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_mc_paths(
+            finstack_quant_valuations_core::instruments::pricing::monte_carlo::resolve_mc_paths(
                 inst.instrument_pricing_overrides.model_config.mc_paths,
                 self.num_paths,
             )?;

@@ -272,7 +272,7 @@ accuracy, market repricing or global arbitrage freedom.
 Inspected [core VolSurface](../../../../finstack-quant/core/src/market_data/surfaces/vol_surface.rs),
 [shared axis admission](../../../../finstack-quant/core/src/market_data/surfaces/mod.rs),
 [model evaluator](../../../../finstack-quant/models/src/volatility/source.rs),
-[active convention resolution](../../../../finstack-quant/valuations/core/src/instruments/common_impl/vol_resolution.rs),
+[active convention resolution](../../../../finstack-quant/valuations/core/src/instruments/pricing/volatility.rs),
 [context scratch](../../../../finstack-quant/core/src/market_data/context/ops_bump.rs),
 [scenario adapter](../../../../finstack-quant/scenarios/src/adapters/vol.rs),
 [SABR materializer](../../../../finstack-quant/calibration/src/targets/vol.rs)

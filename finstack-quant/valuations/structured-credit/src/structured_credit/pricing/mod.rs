@@ -50,7 +50,10 @@ impl StructuredCredit {
     pub fn run_simulation(&self, market: &MarketContext, as_of: Date) -> Result<SimulationRun> {
         #[cfg(test)]
         SIMULATION_RUNS.with(|runs| runs.set(runs.get() + 1));
-        let lifecycle = finstack_quant_valuations_core::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
+        let lifecycle =
+            finstack_quant_valuations_core::instruments::lifecycle::ValidatedPricingLifecycle::new(
+                self,
+            )?;
         let effective_as_of = lifecycle.effective_as_of(market, as_of);
         simulation_engine::simulate_with_source(self, market, effective_as_of, None)
     }

@@ -29,7 +29,7 @@ globs:
   the lifts go. Do not re-export another workspace crate's items (the umbrella
   crates' whole-module mounts are the exception); import from the defining
   crate. No `pub use … as …` renames, no `pub use m::*` globs, no preludes.
-  `#[doc(hidden)] pub` modules (such as `valuations_core::instruments::common_impl`)
+  `#[doc(hidden)] pub` modules (such as `valuations_core::instruments::pricing::overnight`)
   hold only family-internal helpers that other workspace crates need; a public
   type is defined in a visible module, never inside a hidden one and lifted out.
   `scripts/check_single_path.py` (rustdoc JSON) enforces this and runs in

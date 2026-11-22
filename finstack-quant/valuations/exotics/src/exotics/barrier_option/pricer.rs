@@ -27,7 +27,7 @@ pub(crate) fn collect_barrier_inputs(
     as_of: Date,
 ) -> finstack_quant_core::Result<crate::exotics::bs_gbm::BlackScholesInputsDf> {
     use crate::exotics::bs_gbm::BlackScholesInputsDf;
-    use finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield;
+    use finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield;
     let t = inst.day_count.year_fraction(
         as_of,
         inst.expiry,
@@ -43,14 +43,13 @@ pub(crate) fn collect_barrier_inputs(
     }
     let spot = resolve_spot(inst, curves)?;
     let q = resolve_optional_dividend_yield(curves, inst.div_yield_id.as_ref())?;
-    let sigma =
-        finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &inst.instrument_pricing_overrides.market_quotes,
-            curves,
-            inst.vol_surface_id.as_str(),
-            t,
-            inst.strike,
-        )?;
+    let sigma = finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at(
+        &inst.instrument_pricing_overrides.market_quotes,
+        curves,
+        inst.vol_surface_id.as_str(),
+        t,
+        inst.strike,
+    )?;
     Ok(BlackScholesInputsDf {
         spot,
         df,
@@ -66,7 +65,7 @@ pub(crate) fn resolve_spot(
     curves: &MarketContext,
 ) -> finstack_quant_core::Result<f64> {
     let spot =
-        finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+        finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
             curves.get_price(&inst.spot_id)?,
             inst.currency,
         )?;
@@ -223,7 +222,7 @@ impl BarrierOptionMcPricer {
             .with_drift_schedule(std::sync::Arc::new(barrier_drift(inst, curves, as_of, q)?));
 
         let mut config =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::merged_path_config(
+            finstack_quant_valuations_core::instruments::pricing::monte_carlo::merged_path_config(
                 &self.config,
                 &inst.instrument_pricing_overrides,
             )?;

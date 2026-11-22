@@ -353,7 +353,7 @@ fn test_caplet_intrinsic_after_fixing() {
 
     let idx = ctx.get_inflation_index("US-CPI-U").unwrap();
     let reference = |date| {
-        finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_reference_inflation(
+        finstack_quant_valuations_core::instruments::pricing::inflation::resolve_reference_inflation(
         &ctx, "US-CPI-U", date, idx.knowledge_date(), InflationLag::months(3), SeriesInterpolation::Linear,
     ).unwrap().value
     };

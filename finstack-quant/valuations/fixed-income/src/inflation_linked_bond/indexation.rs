@@ -89,7 +89,7 @@ impl InflationLinkedBond {
         market: &MarketContext,
         _as_of: Date,
     ) -> Result<
-        finstack_quant_valuations_core::instruments::common_impl::helpers::InflationReferenceValue,
+        finstack_quant_valuations_core::instruments::pricing::inflation::InflationReferenceValue,
     > {
         let interpolation = self.reference_interpolation()?;
         let index = market.get_inflation_index(self.inflation_index_id.as_str())?;
@@ -98,7 +98,7 @@ impl InflationLinkedBond {
                 "inflation index currency does not match bond currency".into(),
             ));
         }
-        finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_reference_inflation(
+        finstack_quant_valuations_core::instruments::pricing::inflation::resolve_reference_inflation(
             market,
             self.inflation_index_id.as_str(),
             date,

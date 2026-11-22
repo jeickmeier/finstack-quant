@@ -56,7 +56,7 @@ use finstack_quant_valuations_core::instruments::{
 /// price rather than a unitless yield.
 fn extract_index_yield(trs: &FiIndexTotalReturnSwap, context: &MarketContext) -> Result<f64> {
     match &trs.underlying.yield_id {
-        Some(id) => finstack_quant_valuations_core::instruments::common_impl::helpers::get_unitless_scalar_strict(
+        Some(id) => finstack_quant_valuations_core::instruments::pricing::market_inputs::get_unitless_scalar_strict(
             context,
             id.as_str(),
             "FI index TRS yield",
@@ -85,7 +85,7 @@ fn extract_index_level(trs: &FiIndexTotalReturnSwap, context: &MarketContext) ->
         ))
     })?;
     let level =
-        finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+        finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
             scalar,
             trs.underlying.currency,
         )?;

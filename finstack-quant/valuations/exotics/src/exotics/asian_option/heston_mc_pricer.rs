@@ -77,7 +77,7 @@ impl AsianOptionHestonMcPricer {
             ));
         }
         let r =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
+            finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df(
                 discount_factor,
                 t,
                 "AsianOption Heston MC discount curve",
@@ -85,7 +85,7 @@ impl AsianOptionHestonMcPricer {
 
         let spot = super::pricer::resolve_spot(inst, market)?;
 
-        let q = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+        let q = finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield(
             market,
             inst.div_yield_id.as_ref(),
         )?;

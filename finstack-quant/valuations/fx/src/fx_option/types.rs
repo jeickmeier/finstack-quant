@@ -663,9 +663,7 @@ impl FxOption {
             .market_quotes
             .implied_volatility
         {
-            finstack_quant_valuations_core::instruments::common_impl::vol_resolution::validate_sigma(
-                iv,
-            )?
+            finstack_quant_valuations_core::instruments::pricing::volatility::validate_sigma(iv)?
         } else {
             crate::shared::collect_fx_option_inputs(crate::fx_option::pricer::input_request(
                 self, market, as_of,

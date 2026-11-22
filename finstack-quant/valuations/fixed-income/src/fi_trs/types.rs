@@ -179,7 +179,7 @@ impl FiIndexTotalReturnSwap {
                 "FI TRS duration risk requires duration_id and a supplied or calculated index duration".into(),
             )
         })?;
-        let duration = finstack_quant_valuations_core::instruments::common_impl::helpers::get_unitless_scalar_strict(
+        let duration = finstack_quant_valuations_core::instruments::pricing::market_inputs::get_unitless_scalar_strict(
             market,
             id.as_str(),
             "FI TRS index duration",

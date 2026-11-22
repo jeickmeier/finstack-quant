@@ -27,7 +27,7 @@ and the closed world around them.
 
 | Path | Role |
 |------|------|
-| [`core/src/instruments/`](core/src/instruments/README.md) | The `Instrument` trait and its hooks, `PricingOptions`, parameter and override types, the generic pricer, the shared pricing kernels (`common_impl`), the cashflow exporter engine |
+| [`core/src/instruments/`](core/src/instruments/README.md) | The `Instrument` trait and its hooks, `PricingOptions`, parameter and override types, the generic pricer, the `lifecycle` and `pricing` helpers, the cashflow exporter engine |
 | [`core/src/pricer/`](core/src/pricer/README.md) | `InstrumentType`/`ModelKey`/`PricerKey` dispatch, `Pricer`, `PricerRegistry`, `PricingDispatch`, the `Family` registration unit, metric enrichment, product defaults |
 | [`core/src/metrics/`](core/src/metrics/README.md) | `MetricId`, `MetricCalculator`, `MetricRegistry`, the universal calculators, sensitivities, historical VaR |
 | [`core/src/market/`](core/src/market/README.md) | Market quotes, convention registries, listed-product catalog |
@@ -79,7 +79,7 @@ instrument (types, pricer, optional cashflows, and a `metrics/` module):
 
 The `Instrument` trait, the shared parameter types and the pricing kernels the
 families build on are defined in [`core/src/instruments/`](core/src/instruments/README.md)
-(`common_impl/` is public but hidden from the rendered docs). Their re-exports
+(`instruments::pricing::overnight` and `variance_observations` are hidden from rendered docs). Their re-exports
 are at `instruments::*` and `instruments::pricing`, the same paths as before the
 split.
 

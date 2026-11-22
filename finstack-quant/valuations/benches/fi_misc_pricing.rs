@@ -29,7 +29,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::TrsScheduleSpec;
-use finstack_quant_valuations::instruments::common_impl::helpers::resolve_mc_paths;
 use finstack_quant_valuations::instruments::fixed_income::cmo::AgencyCmo;
 use finstack_quant_valuations::instruments::fixed_income::dollar_roll::DollarRoll;
 use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
@@ -41,6 +40,7 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
 };
 use finstack_quant_valuations::instruments::fixed_income::tba::{AgencyTba, TbaTerm};
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
+use finstack_quant_valuations::instruments::pricing::monte_carlo::resolve_mc_paths;
 use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal::Decimal;
 use serde_json::json;

@@ -333,7 +333,7 @@ fn run_case(case: Case, scenario: &str, use_parallel: bool, retain_path_bits: bo
     let rate = -df.ln() / t;
     let (hist_sum, hist_log, hist_count) = option.accumulated_state(as_of);
     let mut config =
-        finstack_quant_valuations_core::instruments::common_impl::helpers::merged_path_config(
+        finstack_quant_valuations_core::instruments::pricing::monte_carlo::merged_path_config(
             &PathDependentPricerConfig::default(),
             &option.instrument_pricing_overrides,
         )

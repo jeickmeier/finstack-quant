@@ -266,7 +266,7 @@ impl InflationCapFloor {
         _curves: &MarketContext,
         date: Date,
     ) -> finstack_quant_core::Result<Date> {
-        finstack_quant_valuations_core::instruments::common_impl::helpers::apply_inflation_lag(
+        finstack_quant_valuations_core::instruments::pricing::inflation::apply_inflation_lag(
             date,
             self.effective_lag()?,
         )
@@ -278,7 +278,7 @@ impl InflationCapFloor {
         _as_of: Date,
         date: Date,
     ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::helpers::InflationReferenceValue,
+        finstack_quant_valuations_core::instruments::pricing::inflation::InflationReferenceValue,
     > {
         let interpolation = self.interpolation.ok_or_else(|| {
             finstack_quant_core::Error::Validation(
@@ -286,7 +286,7 @@ impl InflationCapFloor {
             )
         })?;
         let index = curves.get_inflation_index(self.inflation_index_id.as_str())?;
-        let resolved = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_reference_inflation(
+        let resolved = finstack_quant_valuations_core::instruments::pricing::inflation::resolve_reference_inflation(
             curves,
             self.inflation_index_id.as_str(),
             date,

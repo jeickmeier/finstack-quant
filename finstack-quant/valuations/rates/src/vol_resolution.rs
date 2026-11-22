@@ -4,7 +4,7 @@ use finstack_quant_core::dates::VolatilityClock;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::volatility::{VolSource, VolatilityConvention};
-use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::validate_sigma;
+use finstack_quant_valuations_core::instruments::pricing::volatility::validate_sigma;
 use finstack_quant_valuations_core::instruments::pricing_overrides::MarketQuoteOverrides;
 use finstack_quant_valuations_core::market::resolve_vol_source;
 

@@ -26,7 +26,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::engine::PathCaptureMode;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
-use finstack_quant_valuations::instruments::common_impl::helpers::merged_path_config;
 use finstack_quant_valuations::instruments::exotics::callable_range_accrual::CallableRangeAccrual;
 use finstack_quant_valuations::instruments::exotics::range_accrual::RangeAccrual;
 use finstack_quant_valuations::instruments::exotics::snowball::Snowball;
@@ -34,6 +33,7 @@ use finstack_quant_valuations::instruments::exotics::tarn::Tarn;
 use finstack_quant_valuations::instruments::pricing::hw1f_params::{
     Hw1fParamFamily, resolve_hw1f_params,
 };
+use finstack_quant_valuations::instruments::pricing::monte_carlo::merged_path_config;
 use finstack_quant_valuations::instruments::pricing_overrides::{
     InstrumentPricingOverrides, ModelConfig,
 };

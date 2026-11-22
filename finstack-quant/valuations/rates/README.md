@@ -115,7 +115,7 @@ items surface through each leaf's `pub use`. Genuinely public submodules are
   and their risk paths. New swap-like legs reuse these kernels.
 - **Rates are `f64`, notionals are `Money`.** Spreads are basis points on the
   wire (`Bps`, `spread_bp`) and decimals internally. `Decimal`-typed wire fields
-  convert through `common_impl::numeric::decimal_to_f64` so a bad value is a
+  convert via checked `Decimal` → `f64` conversion so a bad value is a
   typed validation error.
 - **Negative rates.** Anything that can see a non-positive forward must offer a
   normal/Bachelier or shifted-lognormal path. `cms_swap`'s `StaticReplication`
@@ -208,7 +208,7 @@ mise run rust-bench          # all workspace benches, short sampling
 ## Related
 
 - [`../README.md`](../README.md) — `Instrument` trait, JSON contract, add-an-instrument checklist
-- [`../common_impl/README.md`](../common_impl/README.md) — shared leg pricing, parameter types and the trait plumbing
+- [`../core/src/instruments/README.md`](../core/src/instruments/README.md) — shared pricing helpers, parameter types and the trait plumbing
 - [`irs/README.md`](irs/README.md) — the reference leaf for this family
 - [`../fixed_income/README.md`](../fixed_income/README.md) — bonds, loans, mortgages, structured credit
 - [`../fx/README.md`](../fx/README.md) — FX instruments, including the `xccy_swap` pricer shard

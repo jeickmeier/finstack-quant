@@ -37,7 +37,7 @@ use finstack_quant_models::monte_carlo::seed::derive_seed;
 use finstack_quant_models::trees::two_factor_rates_credit::{
     BandTable, RatesCreditPathCheckpoint, RatesCreditPathState, RatesCreditTree,
 };
-use finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_mc_paths;
+use finstack_quant_valuations_core::instruments::pricing::monte_carlo::resolve_mc_paths;
 use rust_decimal::prelude::ToPrimitive;
 use smallvec::SmallVec;
 use std::collections::{BTreeMap, BTreeSet};

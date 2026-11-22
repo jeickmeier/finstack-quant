@@ -279,7 +279,7 @@ impl AsianOptionMcPricer {
         // A non-positive/non-finite df means a corrupted curve; error rather
         // than silently pricing at a zero rate.
         let r =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
+            finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df(
                 discount_factor,
                 t,
                 "AsianOption discount curve",
@@ -287,25 +287,26 @@ impl AsianOptionMcPricer {
 
         let spot = resolve_spot(inst, curves)?;
 
-        let q = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+        let q = finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield(
             curves,
             inst.div_yield_id.as_ref(),
         )?;
 
         // Get volatility (override → surface)
-        let sigma = finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &inst.instrument_pricing_overrides.market_quotes,
-            curves,
-            inst.vol_surface_id.as_str(),
-            t,
-            inst.strike,
-        )?;
+        let sigma =
+            finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at(
+                &inst.instrument_pricing_overrides.market_quotes,
+                curves,
+                inst.vol_surface_id.as_str(),
+                t,
+                inst.strike,
+            )?;
 
         let gbm_params = GbmParams::new(r, q, sigma)?;
         let process = GbmProcess::new(gbm_params);
 
         let base_cfg =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::merged_path_config(
+            finstack_quant_valuations_core::instruments::pricing::monte_carlo::merged_path_config(
                 &self.config,
                 &inst.instrument_pricing_overrides,
             )?;
@@ -546,7 +547,7 @@ pub(crate) fn resolve_spot(
     inst: &AsianOption,
     curves: &MarketContext,
 ) -> finstack_quant_core::Result<f64> {
-    finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+    finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
         curves.get_price(&inst.spot_id)?,
         inst.currency,
     )
@@ -572,18 +573,17 @@ fn analytic_inputs(
         )));
     }
     let spot = resolve_spot(inst, market)?;
-    let q = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+    let q = finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield(
         market,
         inst.div_yield_id.as_ref(),
     )?;
-    let sigma =
-        finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &inst.instrument_pricing_overrides.market_quotes,
-            market,
-            inst.vol_surface_id.as_str(),
-            t,
-            inst.strike,
-        )?;
+    let sigma = finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at(
+        &inst.instrument_pricing_overrides.market_quotes,
+        market,
+        inst.vol_surface_id.as_str(),
+        t,
+        inst.strike,
+    )?;
     Ok(BlackScholesInputsDf {
         spot,
         df,

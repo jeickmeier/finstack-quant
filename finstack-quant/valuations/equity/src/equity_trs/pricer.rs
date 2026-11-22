@@ -27,7 +27,7 @@ fn extract_underlying_data(
     context: &MarketContext,
 ) -> Result<(f64, f64)> {
     let spot =
-        finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+        finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
             context.get_price(&trs.underlying.spot_id)?,
             trs.underlying.currency,
         )?;
@@ -36,7 +36,7 @@ fn extract_underlying_data(
     // and return a unitless scalar. Silent fallback to 0.0 would mask market data
     // configuration errors.
     let div_yield =
-        finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+        finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield(
             context,
             trs.underlying.div_yield_id.as_ref(),
         )?;

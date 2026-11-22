@@ -24,7 +24,7 @@ use finstack_quant_models::volatility::VolatilityConvention;
 use finstack_quant_models::volatility::sabr::SabrParameters;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::PayReceive;
-use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::validate_sigma;
+use finstack_quant_valuations_core::instruments::pricing::volatility::validate_sigma;
 use finstack_quant_valuations_core::instruments::pricing_overrides::VolSurfaceExtrapolation;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;

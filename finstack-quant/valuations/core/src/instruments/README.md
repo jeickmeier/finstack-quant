@@ -19,15 +19,35 @@ documentation implements it for a one-payment note.
 | `dependencies.rs` | `MarketDependencies`, `InstrumentCurves`, `FxPair`, `RatesCurveKind`, `VolatilityDependency` |
 | `parameters/` | Multi-family parameter types (`NotionalExchange`, `ResettingSide`, `SettlementType`, `Monitoring`, `QuantoSpec`, `TrsScheduleSpec`) |
 | [`listed/`](listed/README.md) | Shared listed-future terms (`ListedFutureTerms`) and option-on-future mechanics (`FutureOptionTerms`) |
-| [`common_impl/`](common_impl/README.md) | Shared pricing helpers, volatility resolution, and `Marginable` helpers (hidden from rendered docs; families reach it by path) |
+| `lifecycle.rs` | `ValidatedPricingLifecycle`, scenario value application, and metric-context assembly |
+| `pricing/` | Shared pricing helpers (`market_inputs`, `discounting`, `monte_carlo`, `inflation`, `volatility`, `hw1f_params`, `heston_market`, `overnight_conventions`, `term_fixings`, `trs`, generic pricer) |
 | `cashflow_export.rs` | `instrument_cashflows`, `InstrumentCashflowEnvelope`, `CashflowRow`, `CashflowExportTerms` — the per-flow DF / survival / PV exporter behind the Python/WASM `instrument_cashflows` bindings and the explain trace; it decomposes an instrument through `Instrument::cashflow_export_terms` and `Instrument::validate_cashflow_export` |
 | `pricing_overrides/` | `InstrumentPricingOverrides`, `MetricPricingOverrides`, `ScenarioPricingOverrides`, `ModelConfig`, `BumpConfig` |
 | `position.rs` | `Position` (long/short direction) |
 | `breakeven.rs` | `BreakevenConfig`, `BreakevenMode`, `BreakevenTarget` |
 
 `instruments::pricing` is the public sub-namespace for the shared pricing
-infrastructure (`overnight_conventions`, `hw1f_params`, `heston_market`,
-`term_fixings`, the generic pricer).
+infrastructure (`discounting`, `heston_market`, `hw1f_params`, `inflation`,
+`market_inputs`, `monte_carlo`, `overnight_conventions`, `term_fixings`,
+`volatility`, and the generic pricer). Multi-family `Marginable` helpers
+(`assign_ir_tenor_bucket`, `netting_set_id_from_spec`) live in
+[`../margin.rs`](../margin.rs).
+
+## Contributor conventions
+
+- **One public path.** Contract types (`traits/`, `dependencies.rs`, `listed/`,
+  `parameters/`) live in private modules and are re-exported flat at
+  `instruments::*`. Shared helper modules under `instruments::pricing::*`,
+  `instruments::lifecycle`, and `margin` are public directly without re-exports.
+- **Lifecycle boundary.** `base_value` computes the unshocked model kernel;
+  `ValidatedPricingLifecycle` owns validation, effective `as_of` resolution,
+  and applying `ScenarioPricingOverrides` exactly once.
+- **Two clocks.** Pricers mixing an instrument day count with a curve day count
+  derive the model rate via `instruments::pricing::discounting::zero_rate_from_df`
+  (so `exp(-r·t_vol) = df`) or discount with `df_between_dates`.
+- **Volatility precedence.** Surface-driven pricers call
+  `instruments::pricing::volatility::{resolve_sigma_at, resolve_fx_sigma}` so
+  `MarketQuoteOverrides::implied_volatility` wins uniformly.
 
 ## Core trait
 

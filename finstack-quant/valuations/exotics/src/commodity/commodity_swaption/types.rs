@@ -467,7 +467,7 @@ impl CommoditySwaption {
         let (forward, annuity) = self.forward_and_annuity(market, as_of)?;
         validate_black76_domain(&self.id, forward, self.fixed_price, time, None, None)?;
         let sigma = if time > 0.0 {
-            finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at(
+            finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at(
                 &self.instrument_pricing_overrides.market_quotes,
                 market,
                 self.vol_surface_id.as_str(),

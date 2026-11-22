@@ -139,7 +139,9 @@ impl StructuredCredit {
         pricing_mode: StructuredCreditPricingMode,
     ) -> finstack_quant_core::Result<StochasticPricingResult> {
         let lifecycle =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
+            finstack_quant_valuations_core::instruments::lifecycle::ValidatedPricingLifecycle::new(
+                self,
+            )?;
         let effective_as_of = lifecycle.effective_as_of(market, as_of);
         let result = self.price_stochastic_base_with_mode(market, effective_as_of, pricing_mode)?;
         self.apply_stochastic_price_scenario(result)
@@ -423,7 +425,7 @@ impl StructuredCredit {
         context: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        finstack_quant_valuations_core::instruments::common_impl::helpers::apply_scenario_value(
+        finstack_quant_valuations_core::instruments::lifecycle::apply_scenario_value(
             self,
             self.value_tranche_cashflows_raw(cashflows, context, as_of)?,
         )

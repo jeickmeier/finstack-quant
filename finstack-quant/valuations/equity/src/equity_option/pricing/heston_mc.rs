@@ -90,7 +90,7 @@ impl EquityOptionHestonMcPricer {
         let maturity_step = time_grid.num_steps();
 
         let num_paths =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_mc_paths(
+            finstack_quant_valuations_core::instruments::pricing::monte_carlo::resolve_mc_paths(
                 inst.instrument_pricing_overrides.model_config.mc_paths,
                 self.num_paths,
             )?;

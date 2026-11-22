@@ -284,7 +284,7 @@ Inspected [core FX quote source](../../../../finstack-quant/core/src/market_data
 [model builder/evaluator](../../../../finstack-quant/models/src/volatility/fx.rs),
 [VolSource dispatch](../../../../finstack-quant/models/src/volatility/source.rs),
 [active source resolution](../../../../finstack-quant/valuations/core/src/market/volatility.rs),
-[shared volatility request](../../../../finstack-quant/valuations/core/src/instruments/common_impl/vol_resolution.rs),
+[shared volatility request](../../../../finstack-quant/valuations/core/src/instruments/pricing/volatility.rs),
 [FX pricing adapter](../../../../finstack-quant/valuations/fx/src/shared.rs),
 [product delta conventions](../../../../finstack-quant/valuations/fx/src/fx_option/types.rs)
 and [CurrencyPair](../../../../finstack-quant/core/src/money/fx/types.rs).

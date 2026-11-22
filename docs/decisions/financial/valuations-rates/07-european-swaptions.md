@@ -266,7 +266,7 @@ Cash-settlement annuities are materially distinct supported branches; equality o
 
 The existing [registry](../../../../finstack-quant/valuations/core/src/pricer/registry.rs)
 prices a base PV before running the inversion metric. The
-[shared quote resolver](../../../../finstack-quant/valuations/core/src/instruments/common_impl/vol_resolution.rs)
+[shared quote resolver](../../../../finstack-quant/valuations/core/src/instruments/pricing/volatility.rs)
 can probe a same-ID source even with a scalar override. Existing
 adapters include the [typed Python swaption](../../../../finstack-quant-py/src/bindings/valuations/typed_rates.rs)
 and [typed WASM swaption](../../../../finstack-quant-wasm/src/api/valuations/typed/rates.rs).

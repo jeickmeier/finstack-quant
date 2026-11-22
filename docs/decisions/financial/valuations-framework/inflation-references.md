@@ -198,7 +198,7 @@ first-of-month Step/Linear geometry, not alternative issue-specific anchors.
 
 ## Evidence
 
-- [helpers.rs](../../../../finstack-quant/valuations/core/src/instruments/common_impl/helpers.rs): `realized_inflation_index_tests` exercise observation priority, future/overdue/missing release facts, snapshot mismatch, lag geometry, unused anchors, extreme positive levels and calendar underflow. These are behavioral tests, not vendor calibration evidence.
+- [inflation.rs](../../../../finstack-quant/valuations/core/src/instruments/pricing/inflation.rs): `realized_inflation_index_tests` exercise observation priority, future/overdue/missing release facts, snapshot mismatch, lag geometry, unused anchors, extreme positive levels and calendar underflow. These are behavioral tests, not vendor calibration evidence.
 - [Deacon–Derry–Mirfendereski](../../../REFERENCES.md#deacon-derry-mirfendereski-2004) and [Kerkhof](../../../REFERENCES.md#kerkhof-2005) are canonical inflation-model context. The precise publication/default policy remains a repository choice awaiting approval.
 
 The live [indexed bond helper](../../../../finstack-quant/valuations/fixed-income/src/inflation_linked_bond/indexation.rs)

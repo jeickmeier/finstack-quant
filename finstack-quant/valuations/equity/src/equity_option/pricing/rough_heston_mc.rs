@@ -160,7 +160,7 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughHestonM
         // allocating, so a malicious or typo'd `mc_paths` override can't OOM
         // the host.
         let num_paths =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_mc_paths(
+            finstack_quant_valuations_core::instruments::pricing::monte_carlo::resolve_mc_paths(
                 equity_option
                     .instrument_pricing_overrides
                     .model_config

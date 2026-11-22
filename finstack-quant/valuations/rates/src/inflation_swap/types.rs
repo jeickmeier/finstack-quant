@@ -217,7 +217,7 @@ impl InflationSwap {
         })?;
         let index = curves.get_inflation_index(self.inflation_index_id.as_str())?;
         Ok(
-            finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_reference_inflation(
+            finstack_quant_valuations_core::instruments::pricing::inflation::resolve_reference_inflation(
                 curves,
                 self.inflation_index_id.as_str(),
                 date,
@@ -815,7 +815,7 @@ impl YoYInflationSwap {
         })?;
         let index = curves.get_inflation_index(self.inflation_index_id.as_str())?;
         Ok(
-            finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_reference_inflation(
+            finstack_quant_valuations_core::instruments::pricing::inflation::resolve_reference_inflation(
                 curves,
                 self.inflation_index_id.as_str(),
                 date,

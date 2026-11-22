@@ -223,7 +223,7 @@ impl FutureOptionTerms {
         let rate = if self.premium_style == FutureOptionPremiumStyle::FuturesStyle {
             0.0
         } else {
-            crate::instruments::common_impl::helpers::zero_rate_from_df(df, t, "FutureOptionTerms")?
+            crate::instruments::pricing::discounting::zero_rate_from_df(df, t, "FutureOptionTerms")?
         };
         let steps = tree_steps.unwrap_or(OFFICIAL_TREE_STEPS);
         match self.model {

@@ -214,7 +214,7 @@ The `validate_on_deserialize` macro invokes instrument invariants after serde pa
 
 ### Limitations, alternatives and evidence
 
-[registry.rs](../../../../finstack-quant/valuations/core/src/pricer/registry.rs), [enrichment.rs](../../../../finstack-quant/valuations/core/src/pricer/enrichment.rs), [instrument trait](../../../../finstack-quant/valuations/core/src/instruments/traits/instrument.rs), [helpers.rs](../../../../finstack-quant/valuations/core/src/instruments/common_impl/helpers.rs), [generic adapter](../../../../finstack-quant/valuations/core/src/instruments/pricing/generic.rs), and [family.rs](../../../../finstack-quant/valuations/core/src/pricer/family.rs) are the inspected execution owners. Inline tests provide dispatch/lifecycle behavior evidence, not model accuracy; none was run. This orchestration has no external quantitative standard to claim.
+[registry.rs](../../../../finstack-quant/valuations/core/src/pricer/registry.rs), [enrichment.rs](../../../../finstack-quant/valuations/core/src/pricer/enrichment.rs), [instrument trait](../../../../finstack-quant/valuations/core/src/instruments/traits/instrument.rs), [lifecycle.rs](../../../../finstack-quant/valuations/core/src/instruments/lifecycle.rs), [generic adapter](../../../../finstack-quant/valuations/core/src/instruments/pricing/generic.rs), and [family.rs](../../../../finstack-quant/valuations/core/src/pricer/family.rs) are the inspected execution owners. Inline tests provide dispatch/lifecycle behavior evidence, not model accuracy; none was run. This orchestration has no external quantitative standard to claim.
 
 A complete replay artifact would additionally need market/model/calibration state; present provenance should not be described as that artifact. Alternate registries and explicit models are supported choices; automatic failover is not.
 
@@ -246,7 +246,7 @@ A complete replay artifact would additionally need market/model/calibration stat
   The existing scalar-volatility branch can inherit a shift
   from a present same-ID cube. This illustrates the economic
   effect of treating a potential source as active.
-  [Volatility resolver](../../../../finstack-quant/valuations/core/src/instruments/common_impl/vol_resolution.rs).
+  [Volatility resolver](../../../../finstack-quant/valuations/core/src/instruments/pricing/volatility.rs).
 - A model-published native spread of `25bp` and a computed
   equivalent spread of `70bp` currently collapse to `25bp`
   if they use the same key and the last merge wins. Qualified

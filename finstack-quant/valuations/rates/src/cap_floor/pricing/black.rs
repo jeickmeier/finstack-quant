@@ -69,10 +69,9 @@ pub(crate) fn price_caplet_floorlet_raw(
     let strike = inputs.strike;
     let forward = inputs.forward;
     let df = inputs.discount_factor;
-    let sigma =
-        finstack_quant_valuations_core::instruments::common_impl::vol_resolution::validate_sigma(
-            inputs.sigma,
-        )?;
+    let sigma = finstack_quant_valuations_core::instruments::pricing::volatility::validate_sigma(
+        inputs.sigma,
+    )?;
     let t_fix = inputs.time_to_fixing;
     let tau = inputs.accrual_year_fraction;
 

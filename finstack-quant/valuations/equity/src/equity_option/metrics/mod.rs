@@ -117,7 +117,7 @@ impl MetricCalculator for SpeedCalculator {
         }
 
         let current_spot =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+            finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
                 context.curves.get_price(&option.spot_id)?,
                 option.currency,
             )?;

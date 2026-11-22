@@ -176,7 +176,7 @@ pub(crate) fn compute_greeks(
                         .filter(|(date, _)| *date > as_of && *date <= exercise.settlement_date)
                         .collect();
                     if dividends.is_empty() {
-                        let spot = finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+                        let spot = finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
                             curves.get_price(&inst.spot_id)?,
                             inst.currency,
                         )?;

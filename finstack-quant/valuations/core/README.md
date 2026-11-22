@@ -21,7 +21,7 @@ names a concrete instrument type.
 
 | Path | Role |
 |------|------|
-| `src/instruments/` | The `Instrument` trait and its hooks, `PricingOptions`, parameter and override types, the generic pricer, shared pricing kernels (`common_impl`), the per-flow cashflow exporter |
+| `src/instruments/` | The `Instrument` trait and its hooks, `PricingOptions`, parameter and override types, the generic pricer, `lifecycle` and `pricing` helpers, the per-flow cashflow exporter |
 | `src/pricer/` | `InstrumentType`/`ModelKey`/`PricerKey`, `Pricer`, `PricerRegistry`, `PricingDispatch`, `Family` (the registration unit), metric enrichment |
 | `src/metrics/` | `MetricId`, `MetricCalculator`, `MetricContext`, `MetricRegistry`, the universal calculators, generic sensitivities |
 | `src/market/` | Convention registries and option-volatility lookup policy |

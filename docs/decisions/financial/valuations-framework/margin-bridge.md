@@ -131,7 +131,7 @@ Credit delta requires explicit qualifying-sector or nonqualifying classification
 
 The accepted decision selects explicit reference-entity IDs, error-preserving extraction, prepared model selection, and exact qualified vertices. Margin-edition selection and production qualification remain open.
 
-[margin.rs](../../../../finstack-quant/valuations/core/src/instruments/common_impl/margin.rs) contains every algorithm in this record. Its inline tests cover explicit qualifying/nonqualifying routing and absent-classification rejection. The [DV01 record](finite-difference-rates.md) defines upstream shock signs and units. Independent tenor-boundary, duplicated-curve and pricing-failure behavior tests were not established in this scope; no tests were run.
+[margin.rs](../../../../finstack-quant/valuations/core/src/margin.rs) contains every algorithm in this record. Its inline tests cover explicit qualifying/nonqualifying routing and absent-classification rejection. The [DV01 record](finite-difference-rates.md) defines upstream shock signs and units. Independent tenor-boundary, duplicated-curve and pricing-failure behavior tests were not established in this scope; no tests were run.
 
 ## Independent review evidence
 

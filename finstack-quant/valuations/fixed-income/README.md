@@ -143,7 +143,7 @@ Criterion benches stay in the umbrella's `../benches/`: `bond_pricing`,
 ## Related
 
 - [`../README.md`](../README.md) — `Instrument` trait, JSON contract, add-an-instrument checklist
-- [`../common_impl/README.md`](../common_impl/README.md) — the internal plumbing every leaf implements against
+- [`../core/src/instruments/README.md`](../core/src/instruments/README.md) — the framework traits, lifecycle, and shared pricing helpers every leaf implements against
 - [`../rates/README.md`](../rates/README.md) — swaps, options and money-market instruments
 - [`../../metrics/README.md`](../../metrics/README.md) — `MetricId` and calculator registration
 - [`../../calibration/README.md`](../../calibration/README.md) — building the `MarketContext` these leaves read

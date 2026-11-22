@@ -89,7 +89,7 @@ impl RoughBergomiScalars {
     /// validation is done here; downstream constructors
     /// (`RoughBergomiParams::new`, `HurstExponent::new`) enforce invariants.
     pub(crate) fn from_market_strict(market: &MarketContext) -> finstack_quant_core::Result<Self> {
-        use finstack_quant_valuations_core::instruments::common_impl::helpers::get_unitless_scalar_strict;
+        use finstack_quant_valuations_core::instruments::pricing::market_inputs::get_unitless_scalar_strict;
         Ok(Self {
             eta: get_unitless_scalar_strict(market, "ROUGH_BERGOMI_ETA", "rough Bergomi")?,
             hurst: get_unitless_scalar_strict(market, "ROUGH_BERGOMI_HURST", "rough Bergomi")?,
@@ -409,7 +409,7 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughBergomi
         // allocating, so a malicious or typo'd `mc_paths` override can't OOM
         // the host.
         let num_paths =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_mc_paths(
+            finstack_quant_valuations_core::instruments::pricing::monte_carlo::resolve_mc_paths(
                 equity_option
                     .instrument_pricing_overrides
                     .model_config

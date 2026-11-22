@@ -6,7 +6,7 @@ use finstack_quant_models::closed_form::bs_price_unchecked;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::variance_replication::carr_madan_forward_variance;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df;
+use finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df;
 use finstack_quant_valuations_core::instruments::pricing::variance_observations::preceding_close;
 
 type OhlcVecs = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
@@ -1248,14 +1248,14 @@ mod tests {
             .year_fraction(as_of, maturity, DayCountContext::default())
             .expect("yf");
         let r_d_date =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
+            finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df(
                 df_dom_date,
                 t,
                 "dom",
             )
             .expect("r_d date");
         let r_f_date =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
+            finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df(
                 df_for_date,
                 t,
                 "for",
@@ -1264,12 +1264,12 @@ mod tests {
         let fwd_expected = spot * ((r_d_date - r_f_date) * t).exp();
 
         let r_d_bug =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
+            finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df(
                 df_dom_bug, t, "dom",
             )
             .expect("r_d bug");
         let r_f_bug =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
+            finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df(
                 df_for_bug, t, "for",
             )
             .expect("r_f bug");

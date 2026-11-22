@@ -24,7 +24,7 @@ use finstack_quant_models::monte_carlo::process::piecewise_gbm::{
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::Payoff;
-use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at;
+use finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at;
 use finstack_quant_valuations_core::instruments::pricing_overrides::{
     InstrumentPricingOverrides, MarketQuoteOverrides,
 };

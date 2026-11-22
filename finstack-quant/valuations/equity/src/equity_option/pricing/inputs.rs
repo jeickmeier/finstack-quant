@@ -60,7 +60,7 @@ pub(crate) fn resolve_lifecycle_value(
             intrinsic * settlement_df
         }
         SettlementType::Physical => {
-            let spot = finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+            let spot = finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
                 market.get_price(&inst.spot_id)?,
                 currency,
             )?;
@@ -303,14 +303,14 @@ pub(crate) fn collect_inputs(
     // Effective BSM rate on the vol clock — see the two-clock note above.
     // A non-positive/non-finite df means a corrupted curve; error rather than
     // derive an infinite rate that would poison the Black–Scholes price.
-    let r = finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
+    let r = finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df(
         df,
         t_vol,
         "EquityOption discount curve",
     )?;
 
     let raw_spot =
-        finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+        finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
             curves.get_price(&inst.spot_id)?,
             inst.currency,
         )?;
@@ -339,21 +339,20 @@ pub(crate) fn collect_inputs(
         // When a dividend yield ID is explicitly provided, we require the lookup to succeed
         // and return a unitless scalar. Silent fallback to 0.0 would mask market data
         // configuration errors.
-        let q = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+        let q = finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield(
             curves,
             inst.div_yield_id.as_ref(),
         )?;
         (raw_spot, q)
     };
 
-    let sigma =
-        finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &inst.instrument_pricing_overrides.market_quotes,
-            curves,
-            inst.vol_surface_id.as_str(),
-            t_vol,
-            inst.strike,
-        )?;
+    let sigma = finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at(
+        &inst.instrument_pricing_overrides.market_quotes,
+        curves,
+        inst.vol_surface_id.as_str(),
+        t_vol,
+        inst.strike,
+    )?;
 
     Ok(EquityOptionInputs {
         spot,
@@ -386,7 +385,7 @@ pub(crate) fn early_exercise_market_params(
     let spot = if dividends.is_empty() {
         inputs.spot
     } else {
-        finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+        finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
             curves.get_price(&inst.spot_id)?,
             inst.currency,
         )?

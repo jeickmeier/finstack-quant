@@ -21,7 +21,7 @@ impl MetricCalculator for Basis {
             .quoted_price
             .map_or_else(|| future.fair_price(&context.curves, context.as_of), Ok)?;
         let spot =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+            finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
                 context.curves.get_price(&future.spot_id)?,
                 future.underlying_currency,
             )?;

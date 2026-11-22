@@ -186,7 +186,7 @@ impl<N: Hw1fNote> Pricer for Hw1fNotePricer<N> {
         })?;
 
         let mut result = ValuationResult::stamped(note.id(), as_of, estimate.mean);
-        finstack_quant_valuations_core::instruments::common_impl::helpers::attach_mc_diagnostics(
+        finstack_quant_valuations_core::instruments::pricing::monte_carlo::attach_mc_diagnostics(
             &mut result,
             &estimate,
         );

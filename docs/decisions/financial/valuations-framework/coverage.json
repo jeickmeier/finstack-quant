@@ -151,6 +151,61 @@
       "sha256": "241f9ba41ec14145a1241559d7a97a71615fb24c49988731ee3fc3b2849d1c63"
     },
     {
+      "path": "finstack-quant/valuations/core/src/instruments/common_impl/parameters/bermudan_call.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FRAMEWORK-19"
+      ],
+      "reason": "Call-date strict ordering, positive percent-of-par validation and exclusive lockout filtering.",
+      "sha256": "9db9d23c0747c017d1a7e1f66e57b6e91570c09aff80dbc0b5c9e990d8a18b2b"
+    },
+    {
+      "path": "finstack-quant/valuations/core/src/instruments/common_impl/parameters/bond_quote.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FRAMEWORK-19"
+      ],
+      "reason": "Tagged quote vocabulary carrying price/yield/spread values; inversion and conversion kernels live with bonds.",
+      "sha256": "09d190884c3dace991e2987437edfc789cdbd0fae081704f2e0c5ef1273af2d2"
+    },
+    {
+      "path": "finstack-quant/valuations/core/src/instruments/common_impl/parameters/convertible.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FRAMEWORK-19"
+      ],
+      "reason": "Default price trigger, level formula/validation and dividend-protection selector; remaining conversion types carry data for product kernels.",
+      "sha256": "49d262604c2f38862cb83c55f2d8d1c211ff5cd3dae3d15be427312289f760dd"
+    },
+    {
+      "path": "finstack-quant/valuations/core/src/instruments/common_impl/parameters/merton_mc.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FRAMEWORK-19"
+      ],
+      "reason": "Ordered PIK step lookup, structural monitoring/recovery/grid constructor and embedded low-path calibration defaults.",
+      "sha256": "5b8b9b63bc300b6af8f2b53ac0a277e52f5519bd5be4af0ea25fb1bced587092"
+    },
+    {
+      "path": "finstack-quant/valuations/core/src/instruments/common_impl/parameters/underlying.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FRAMEWORK-19"
+      ],
+      "reason": "Equity/commodity/index routing validation and FX base/quote/curve presets; optional yield/duration defaults.",
+      "sha256": "608a49343cb64b7d44d16bd74a486e74208de8503d1292eb5313bad2b30eea80"
+    },
+    {
+      "path": "finstack-quant/valuations/core/src/instruments/common_impl/parameters/volatility.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FRAMEWORK-02",
+        "VALUATIONS-FRAMEWORK-19"
+      ],
+      "reason": "Shared Black-versus-normal model selector with Black default and exact canonical parser.",
+      "sha256": "68d4a2f9ff7293c651eb2d4a05b5fa61cdca3c543543cc85df03db5abfd925bf"
+    },
+    {
       "path": "finstack-quant/valuations/core/src/instruments/dependencies.rs",
       "classification": "algorithm",
       "records": [
@@ -162,16 +217,33 @@
       "sha256": "c43645bf567f94dbaaade5e9d7bf3e5dad77d10cadf52d3b43030e632b3082e0"
     },
     {
-      "path": "finstack-quant/valuations/core/src/instruments/common_impl/helpers.rs",
+      "path": "finstack-quant/valuations/core/src/instruments/envelope.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FRAMEWORK-01"
+      ],
+      "reason": "Persisted schema marker, byte cap and bounded-loader diagnostic formatting; actual JSON loading/validation runs in core/family owners.",
+      "sha256": "bc907e43ab045bd88876d769cca4fb00238c0891733e1e3af60bdd426b66d03f"
+    },
+    {
+      "path": "finstack-quant/valuations/core/src/instruments/legs.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FRAMEWORK-06",
+        "VALUATIONS-FRAMEWORK-19"
+      ],
+      "reason": "Leg signs, fixed/float schedule mapping/validation, protection recovery boundary and TRS constructor-versus-serde compounding selection.",
+      "sha256": "5bed81acd39824c1ea7ea5378df8117b569f854beccc93347a50d073c310f740"
+    },
+    {
+      "path": "finstack-quant/valuations/core/src/instruments/lifecycle.rs",
       "classification": "algorithm",
       "records": [
         "VALUATIONS-FRAMEWORK-01",
-        "VALUATIONS-FRAMEWORK-02",
-        "VALUATIONS-FRAMEWORK-15",
-        "VALUATIONS-FRAMEWORK-17"
+        "VALUATIONS-FRAMEWORK-15"
       ],
-      "reason": "Validated lifecycle, scenario shock, schedule PV, GBM drift/path controls and inflation publication/interpolation helpers including runtime after test modules.",
-      "sha256": "0efeda8fc1412a8382de443d0659b690b3d79652376fc3f7ec4fb90ee76804f0"
+      "reason": "Validated pricing lifecycle, scenario adjustment application, and metric-context dispatch.",
+      "sha256": "41be5882a39ae93d9ad49a42baf560adb5f65c7b8249249b31c612086adefd8c"
     },
     {
       "path": "finstack-quant/valuations/core/src/instruments/listed/future_option/instrument_impl.rs",
@@ -219,40 +291,22 @@
       "sha256": "c69dd5b435aba8fd26f6bd3cb094653d95d4ed3531def65dbf9f2e14850e555e"
     },
     {
-      "path": "finstack-quant/valuations/core/src/instruments/common_impl/margin.rs",
-      "classification": "algorithm",
-      "records": [
-        "VALUATIONS-FRAMEWORK-18"
-      ],
-      "reason": "Metric error-to-absence handling, standard-tenor extraction, ceiling buckets, entity suffix stripping, credit classification and netting IDs.",
-      "sha256": "402200eb2c90c6e429fa24a3c7b9d53f47984f5087a2ae3d8f178d5aa26ad93f"
-    },
-    {
-      "path": "finstack-quant/valuations/core/src/instruments/common_impl/mod.rs",
+      "path": "finstack-quant/valuations/core/src/instruments/mod.rs",
       "classification": "support",
       "records": [
         "VALUATIONS-FRAMEWORK-01"
       ],
-      "reason": "Common helper/module/re-export boundary; runtime algorithms reside in the mapped child modules.",
-      "sha256": "59e627f56b8c0afb3f88fd4ba53b0d063f7b5ab98c32dc456426da11143d2c99"
+      "reason": "Pricing-framework instrument module assembly and public re-exports, with product ownership in family crates.",
+      "sha256": "c91500d9a3fd01ca6ba7a991c0dbc938fd9468c72f1ebf737302bc581935a1cd"
     },
     {
-      "path": "finstack-quant/valuations/core/src/instruments/common_impl/parameters/bermudan_call.rs",
-      "classification": "algorithm",
-      "records": [
-        "VALUATIONS-FRAMEWORK-19"
-      ],
-      "reason": "Call-date strict ordering, positive percent-of-par validation and exclusive lockout filtering.",
-      "sha256": "9db9d23c0747c017d1a7e1f66e57b6e91570c09aff80dbc0b5c9e990d8a18b2b"
-    },
-    {
-      "path": "finstack-quant/valuations/core/src/instruments/common_impl/parameters/bond_quote.rs",
+      "path": "finstack-quant/valuations/core/src/instruments/model_params.rs",
       "classification": "support",
       "records": [
         "VALUATIONS-FRAMEWORK-19"
       ],
-      "reason": "Tagged quote vocabulary carrying price/yield/spread values; inversion and conversion kernels live with bonds.",
-      "sha256": "09d190884c3dace991e2987437edfc789cdbd0fae081704f2e0c5ef1273af2d2"
+      "reason": "Model-parameter snapshot enums carrying already selected structured-credit/conversion inputs without inference/calculation.",
+      "sha256": "e662f465f63b0b9b460164adc094f8e77f0c9ce9cad48deed25f692d5264920e"
     },
     {
       "path": "finstack-quant/valuations/core/src/instruments/parameters/conventions.rs",
@@ -264,15 +318,6 @@
       "sha256": "365ca9facadca59651359f5bcc69e098bba3059b8cb24439f136e89cec1805f0"
     },
     {
-      "path": "finstack-quant/valuations/core/src/instruments/common_impl/parameters/convertible.rs",
-      "classification": "algorithm",
-      "records": [
-        "VALUATIONS-FRAMEWORK-19"
-      ],
-      "reason": "Default price trigger, level formula/validation and dividend-protection selector; remaining conversion types carry data for product kernels.",
-      "sha256": "49d262604c2f38862cb83c55f2d8d1c211ff5cd3dae3d15be427312289f760dd"
-    },
-    {
       "path": "finstack-quant/valuations/core/src/instruments/parameters/market.rs",
       "classification": "algorithm",
       "records": [
@@ -280,15 +325,6 @@
       ],
       "reason": "Explicit recovery validator and corporate/sovereign recovery presets; settlement enum parsing carries canonical cash/physical meaning.",
       "sha256": "84fc5551d045e1eee14d9a3dea0aad2d51f2231afe73e351075b560d4871f976"
-    },
-    {
-      "path": "finstack-quant/valuations/core/src/instruments/common_impl/parameters/merton_mc.rs",
-      "classification": "algorithm",
-      "records": [
-        "VALUATIONS-FRAMEWORK-19"
-      ],
-      "reason": "Ordered PIK step lookup, structural monitoring/recovery/grid constructor and embedded low-path calibration defaults.",
-      "sha256": "5b8b9b63bc300b6af8f2b53ac0a277e52f5519bd5be4af0ea25fb1bced587092"
     },
     {
       "path": "finstack-quant/valuations/core/src/instruments/parameters/mod.rs",
@@ -327,119 +363,6 @@
       "sha256": "60b08e87323400b10974d112084bc6076974697040a7513dd4b35fedffaeec97"
     },
     {
-      "path": "finstack-quant/valuations/core/src/instruments/common_impl/parameters/underlying.rs",
-      "classification": "algorithm",
-      "records": [
-        "VALUATIONS-FRAMEWORK-19"
-      ],
-      "reason": "Equity/commodity/index routing validation and FX base/quote/curve presets; optional yield/duration defaults.",
-      "sha256": "608a49343cb64b7d44d16bd74a486e74208de8503d1292eb5313bad2b30eea80"
-    },
-    {
-      "path": "finstack-quant/valuations/core/src/instruments/common_impl/parameters/volatility.rs",
-      "classification": "algorithm",
-      "records": [
-        "VALUATIONS-FRAMEWORK-02",
-        "VALUATIONS-FRAMEWORK-19"
-      ],
-      "reason": "Shared Black-versus-normal model selector with Black default and exact canonical parser.",
-      "sha256": "68d4a2f9ff7293c651eb2d4a05b5fa61cdca3c543543cc85df03db5abfd925bf"
-    },
-    {
-      "path": "finstack-quant/valuations/core/src/instruments/traits/instrument.rs",
-      "classification": "algorithm",
-      "records": [
-        "VALUATIONS-FRAMEWORK-01",
-        "VALUATIONS-FRAMEWORK-08",
-        "VALUATIONS-FRAMEWORK-15"
-      ],
-      "reason": "Default instrument dispatch, validation, equivalent-metric, dependency/export and repricing hook contracts; default fallback behavior affects calculations.",
-      "sha256": "b44228b34c42968a059ae10bb0b00582afcf56555b50e6eddec1073925cfbba1"
-    },
-    {
-      "path": "finstack-quant/valuations/core/src/instruments/traits/macros.rs",
-      "classification": "algorithm",
-      "records": [
-        "VALUATIONS-FRAMEWORK-01",
-        "VALUATIONS-FRAMEWORK-15"
-      ],
-      "reason": "Instrument forwarding plus validation-on-deserialization and intentionally empty schedule generation with default notional/day count.",
-      "sha256": "ebee24558cb38d525ca4cacec96e3a56bf101e4038b4e871c9e41a285e30dae3"
-    },
-    {
-      "path": "finstack-quant/valuations/core/src/instruments/traits/mod.rs",
-      "classification": "support",
-      "records": [
-        "VALUATIONS-FRAMEWORK-01"
-      ],
-      "reason": "Trait-module declarations and public re-exports only.",
-      "sha256": "f11e3dd7dd4dd79fe12c568e0383b81ceb83dfb501a356659a8f0976c819a434"
-    },
-    {
-      "path": "finstack-quant/valuations/core/src/instruments/traits/option_greeks.rs",
-      "classification": "algorithm",
-      "records": [
-        "VALUATIONS-FRAMEWORK-11"
-      ],
-      "reason": "Native/selected-model Greek provider semantics, unavailable measures and model-specific higher-order finite differences.",
-      "sha256": "7eaf7cdb93f1f885491184a1799bba8aaec5250db5915c13f806cb1e0bc70616"
-    },
-    {
-      "path": "finstack-quant/valuations/core/src/instruments/traits/pricing_options.rs",
-      "classification": "algorithm",
-      "records": [
-        "VALUATIONS-FRAMEWORK-01"
-      ],
-      "reason": "Per-call model/registry/provider precedence inputs and trusted-validation flag; default choices enter lifecycle.",
-      "sha256": "0dfa4010c6dc8a81f36f0b8fcd20347ca2a80b2919cda174db5dd76725f8200d"
-    },
-    {
-      "path": "finstack-quant/valuations/core/src/instruments/common_impl/vol_resolution.rs",
-      "classification": "algorithm",
-      "records": [
-        "VALUATIONS-FRAMEWORK-02"
-      ],
-      "reason": "Scalar/source volatility precedence, normal/shifted Black admissibility, source-displacement consistency and strike-axis guard.",
-      "sha256": "20da6cbc01044b3a60da02fe012e9c3121add9fff10e7d120e544be55111457a"
-    },
-    {
-      "path": "finstack-quant/valuations/core/src/instruments/envelope.rs",
-      "classification": "support",
-      "records": [
-        "VALUATIONS-FRAMEWORK-01"
-      ],
-      "reason": "Persisted schema marker, byte cap and bounded-loader diagnostic formatting; actual JSON loading/validation runs in core/family owners.",
-      "sha256": "bc907e43ab045bd88876d769cca4fb00238c0891733e1e3af60bdd426b66d03f"
-    },
-    {
-      "path": "finstack-quant/valuations/core/src/instruments/legs.rs",
-      "classification": "algorithm",
-      "records": [
-        "VALUATIONS-FRAMEWORK-06",
-        "VALUATIONS-FRAMEWORK-19"
-      ],
-      "reason": "Leg signs, fixed/float schedule mapping/validation, protection recovery boundary and TRS constructor-versus-serde compounding selection.",
-      "sha256": "5bed81acd39824c1ea7ea5378df8117b569f854beccc93347a50d073c310f740"
-    },
-    {
-      "path": "finstack-quant/valuations/core/src/instruments/mod.rs",
-      "classification": "support",
-      "records": [
-        "VALUATIONS-FRAMEWORK-01"
-      ],
-      "reason": "Pricing-framework instrument module assembly and public re-exports, with product ownership in family crates.",
-      "sha256": "c91500d9a3fd01ca6ba7a991c0dbc938fd9468c72f1ebf737302bc581935a1cd"
-    },
-    {
-      "path": "finstack-quant/valuations/core/src/instruments/model_params.rs",
-      "classification": "support",
-      "records": [
-        "VALUATIONS-FRAMEWORK-19"
-      ],
-      "reason": "Model-parameter snapshot enums carrying already selected structured-credit/conversion inputs without inference/calculation.",
-      "sha256": "e662f465f63b0b9b460164adc094f8e77f0c9ce9cad48deed25f692d5264920e"
-    },
-    {
       "path": "finstack-quant/valuations/core/src/instruments/position.rs",
       "classification": "algorithm",
       "records": [
@@ -457,6 +380,16 @@
       ],
       "reason": "First future coupon inference of ACT/ACT ICMA quasi-period, month/year domain and end-of-month preservation.",
       "sha256": "233e41762dc0b1c40f6bc9959591cc504463dd61607bb5a4fef15427c3b3ac95"
+    },
+    {
+      "path": "finstack-quant/valuations/core/src/instruments/pricing/discounting.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FRAMEWORK-01",
+        "VALUATIONS-FRAMEWORK-15"
+      ],
+      "reason": "Discount-factor zero-rate conversion and curve-clock cashflow schedule PV.",
+      "sha256": "f4cf029b50c682e3c12c0ebd6b0988c0df569ad485be374a377eb226b23d7fcb"
     },
     {
       "path": "finstack-quant/valuations/core/src/instruments/pricing/floating_reset_descriptors.rs",
@@ -495,6 +428,24 @@
       "sha256": "5cce3bd74ba342a42986f5121f2a4e8480618efae8076be04ac8abc077c50553"
     },
     {
+      "path": "finstack-quant/valuations/core/src/instruments/pricing/inflation.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FRAMEWORK-17"
+      ],
+      "reason": "Inflation observation lag and reference CPI publication/interpolation resolution.",
+      "sha256": "33aae10deb75442ef938e99d766fe6e655f045eb900f1e5b0751d8c893b98ea6"
+    },
+    {
+      "path": "finstack-quant/valuations/core/src/instruments/pricing/market_inputs.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FRAMEWORK-02"
+      ],
+      "reason": "Market-scalar price, unitless scalar, and optional dividend-yield lookups.",
+      "sha256": "a3832da30107d51d4f8207162ad19536df854fc94ead9e47b13abe37983ad93a"
+    },
+    {
       "path": "finstack-quant/valuations/core/src/instruments/pricing/mod.rs",
       "classification": "support",
       "records": [
@@ -502,6 +453,15 @@
       ],
       "reason": "Shared pricing-module declarations/re-exports; no additional pricing calculation.",
       "sha256": "5dac897b61f84ab34c70764922602c78a4d1491c00e5030da946b5c612690113"
+    },
+    {
+      "path": "finstack-quant/valuations/core/src/instruments/pricing/monte_carlo.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FRAMEWORK-02"
+      ],
+      "reason": "Monte Carlo path-count capping, override merging, and diagnostics attachment.",
+      "sha256": "3ce3d9fd36a09375cbffe37a65af9ab3a40d55cbe153908e2302366d8bec7040"
     },
     {
       "path": "finstack-quant/valuations/core/src/instruments/pricing/overnight.rs",
@@ -568,6 +528,15 @@
       "sha256": "3a8eeb3e5e0c62dfb9688e3a8bb5a318be13aa2e1916f56f65379f3413b5cfbe"
     },
     {
+      "path": "finstack-quant/valuations/core/src/instruments/pricing/volatility.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FRAMEWORK-02"
+      ],
+      "reason": "Scalar/source volatility precedence, normal/shifted Black admissibility, source-displacement consistency and strike-axis guard.",
+      "sha256": "f8d2ab216c58a64fad8042dc966a604921324a8d9d1bb43f09f72f4d77e37e1f"
+    },
+    {
       "path": "finstack-quant/valuations/core/src/instruments/pricing_overrides.rs",
       "classification": "algorithm",
       "records": [
@@ -581,6 +550,54 @@
       "sha256": "59c2900285064dbff0483055dacc2af9a7773f45b715d2eacd59a7195747b3c4"
     },
     {
+      "path": "finstack-quant/valuations/core/src/instruments/traits/instrument.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FRAMEWORK-01",
+        "VALUATIONS-FRAMEWORK-08",
+        "VALUATIONS-FRAMEWORK-15"
+      ],
+      "reason": "Default instrument dispatch, validation, equivalent-metric, dependency/export and repricing hook contracts; default fallback behavior affects calculations.",
+      "sha256": "b44228b34c42968a059ae10bb0b00582afcf56555b50e6eddec1073925cfbba1"
+    },
+    {
+      "path": "finstack-quant/valuations/core/src/instruments/traits/macros.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FRAMEWORK-01",
+        "VALUATIONS-FRAMEWORK-15"
+      ],
+      "reason": "Instrument forwarding plus validation-on-deserialization and intentionally empty schedule generation with default notional/day count.",
+      "sha256": "ebee24558cb38d525ca4cacec96e3a56bf101e4038b4e871c9e41a285e30dae3"
+    },
+    {
+      "path": "finstack-quant/valuations/core/src/instruments/traits/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FRAMEWORK-01"
+      ],
+      "reason": "Trait-module declarations and public re-exports only.",
+      "sha256": "f11e3dd7dd4dd79fe12c568e0383b81ceb83dfb501a356659a8f0976c819a434"
+    },
+    {
+      "path": "finstack-quant/valuations/core/src/instruments/traits/option_greeks.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FRAMEWORK-11"
+      ],
+      "reason": "Native/selected-model Greek provider semantics, unavailable measures and model-specific higher-order finite differences.",
+      "sha256": "7eaf7cdb93f1f885491184a1799bba8aaec5250db5915c13f806cb1e0bc70616"
+    },
+    {
+      "path": "finstack-quant/valuations/core/src/instruments/traits/pricing_options.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FRAMEWORK-01"
+      ],
+      "reason": "Per-call model/registry/provider precedence inputs and trusted-validation flag; default choices enter lifecycle.",
+      "sha256": "0dfa4010c6dc8a81f36f0b8fcd20347ca2a80b2919cda174db5dd76725f8200d"
+    },
+    {
       "path": "finstack-quant/valuations/core/src/lib.rs",
       "classification": "support",
       "records": [
@@ -588,6 +605,15 @@
       ],
       "reason": "Framework module/re-export graph and hidden dependency re-exports for macros; no price kernel.",
       "sha256": "8420d9c28c39ffcce13546903d1db03194c4ec59fc3be02fd9bbf58d26a9e3f9"
+    },
+    {
+      "path": "finstack-quant/valuations/core/src/margin.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FRAMEWORK-18"
+      ],
+      "reason": "Metric error-to-absence handling, standard-tenor extraction, ceiling buckets, entity suffix stripping, credit classification and netting IDs.",
+      "sha256": "1713b77585e16aee6c50604bdd7fba55c38c94624418d6ddca327f3868870d5c"
     },
     {
       "path": "finstack-quant/valuations/core/src/market/conventions/defs.rs",

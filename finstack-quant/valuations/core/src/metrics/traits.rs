@@ -83,7 +83,7 @@ pub trait MetricCalculator: Send + Sync {
 ///
 /// Not re-exported from [`crate::metrics`]; the registry → metric boundary
 /// uses [`crate::instruments::PricingOptions`] plus crate-private
-/// [`crate::instruments::common_impl::helpers::MetricBuildOptions`].
+/// [`crate::instruments::lifecycle::MetricBuildOptions`].
 pub struct MetricPricingInputs {
     /// Instrument being valued.
     pub instrument: Arc<dyn Instrument>,

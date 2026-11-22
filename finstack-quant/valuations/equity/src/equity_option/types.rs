@@ -560,7 +560,7 @@ impl EquityOption {
         // Spot bump: ±`spot_bump_decimal` (relative, on the spot scalar).
         // Vol bump: ±`vol_bump_decimal` (absolute, parallel surface bump).
         let spot =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+            finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
                 market.get_price(&self.spot_id)?,
                 self.currency,
             )?;
@@ -746,7 +746,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for EquityOption {
             return Ok(None);
         }
         let spot =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+            finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
                 market.get_price(&self.spot_id)?,
                 self.currency,
             )?;

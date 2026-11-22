@@ -47,12 +47,10 @@
 //!
 //! - **Public**: `finstack_quant_valuations_core::instruments::*` — the contract
 //!   types (`Instrument`, `Attributes`, `PricingOptions`, market dependencies,
-//!   parameter specs, listed-contract terms, pricing overrides) and the
+//!   parameter specs, listed-contract terms, pricing overrides), the
+//!   [`lifecycle`](crate::instruments::lifecycle) pricing boundary, and the
 //!   [`pricing`](crate::instruments::pricing) module of shared pricing kernels
 //!   used by the families and by `finstack-quant-calibration`.
-//! - **Family-facing**: `common_impl` is public but hidden from the rendered docs;
-//!   it holds the helpers, volatility resolution and margin glue the instrument
-//!   families share.
 //!
 //! The concrete instrument types live in the family crates and are assembled into
 //! one namespace by the umbrella crate's `instruments` module.
@@ -77,10 +75,8 @@ pub(crate) mod dependencies;
 mod listed;
 mod parameters;
 
-// Family-facing helpers (removed in Slice 5b)
-#[doc(hidden)]
-pub mod common_impl;
 mod legs;
+pub mod lifecycle;
 
 pub mod pricing;
 

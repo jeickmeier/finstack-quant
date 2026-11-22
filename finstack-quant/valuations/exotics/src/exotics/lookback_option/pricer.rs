@@ -76,7 +76,7 @@ impl LookbackOptionMcPricer {
         let process = GbmProcess::new(gbm_params);
 
         let base_cfg =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::merged_path_config(
+            finstack_quant_valuations_core::instruments::pricing::monte_carlo::merged_path_config(
                 &self.config,
                 &inst.instrument_pricing_overrides,
             )?;
@@ -279,7 +279,7 @@ fn lookback_spot(
     inst: &LookbackOption,
     curves: &MarketContext,
 ) -> finstack_quant_core::Result<f64> {
-    finstack_quant_valuations_core::instruments::common_impl::helpers::scalar_price_amount(
+    finstack_quant_valuations_core::instruments::pricing::market_inputs::scalar_price_amount(
         curves.get_price(&inst.spot_id)?,
         inst.currency,
     )
@@ -379,7 +379,7 @@ fn collect_lookback_inputs(
     let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
     let df = disc_curve.df_between_dates(as_of, inst.expiry)?;
     // Keep analytical rate consistent with date-based discounting used by the curve.
-    let r = finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
+    let r = finstack_quant_valuations_core::instruments::pricing::discounting::zero_rate_from_df(
         df,
         t,
         "LookbackOption discount curve",
@@ -387,20 +387,19 @@ fn collect_lookback_inputs(
 
     let spot = lookback_spot(inst, curves)?;
 
-    let q = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+    let q = finstack_quant_valuations_core::instruments::pricing::market_inputs::resolve_optional_dividend_yield(
         curves,
         inst.div_yield_id.as_ref(),
     )?;
 
     let strike_val = inst.strike.unwrap_or(spot);
-    let sigma =
-        finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &inst.instrument_pricing_overrides.market_quotes,
-            curves,
-            inst.vol_surface_id.as_str(),
-            t,
-            strike_val,
-        )?;
+    let sigma = finstack_quant_valuations_core::instruments::pricing::volatility::resolve_sigma_at(
+        &inst.instrument_pricing_overrides.market_quotes,
+        curves,
+        inst.vol_surface_id.as_str(),
+        t,
+        strike_val,
+    )?;
 
     Ok(LookbackInputs {
         spot,
