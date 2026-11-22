@@ -8,10 +8,10 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurv
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
+use finstack_quant_valuations_exotics::commodity::commodity_swap::CommoditySwap;
 use time::Month;
 
 /// Helper to create a test market context with discount and price curves.
@@ -367,7 +367,7 @@ fn test_commodity_swap_cashflow_npv_consistency() {
 /// Test delta aggregation: sum of period deltas equals total delta
 #[test]
 fn test_commodity_swap_delta_analytical() {
-    use finstack_quant_valuations::metrics::MetricId;
+    use finstack_quant_valuations_core::metrics::MetricId;
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let market = create_test_market();
 
@@ -394,13 +394,13 @@ fn test_commodity_swap_delta_analytical() {
         .expect("should build");
 
     // Get delta from metric calculation
-    use finstack_quant_valuations::instruments::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     let result = swap
         .price_with_metrics(
             &market,
             as_of,
             &[MetricId::Delta],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .expect("should price with delta");
 

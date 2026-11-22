@@ -98,10 +98,10 @@ mod gbm_barrier {
     use finstack_quant_core::types::BarrierType;
     use finstack_quant_core::types::InstrumentId;
     use finstack_quant_models::types::OptionType;
-    use finstack_quant_valuations::instruments::exotics::barrier_option::BarrierOption;
-    use finstack_quant_valuations::metrics::MetricId;
+    use finstack_quant_valuations_core::metrics::MetricId;
+    use finstack_quant_valuations_exotics::exotics::barrier_option::BarrierOption;
 
-    use finstack_quant_valuations::pricer::{InstrumentType, ModelKey, PricerKey};
+    use finstack_quant_valuations_core::pricer::{InstrumentType, ModelKey, PricerKey};
     use time::Month;
 
     const SPOT: f64 = 100.0;
@@ -207,7 +207,7 @@ mod gbm_barrier {
             // false: no extra Gobet-Miri barrier shift. Both pricers still apply
             // the same Brownian-bridge hit correction inside the shared payoff;
             // keeping the flag identical is what makes the barrier cancel.
-            monitoring: finstack_quant_valuations::instruments::Monitoring::Continuous,
+            monitoring: finstack_quant_valuations_core::instruments::Monitoring::Continuous,
             discount_curve_id: "USD-OIS".into(),
             spot_id: "SPX".into(),
             vol_surface_id: "SPX-VOL".into(),
@@ -228,7 +228,7 @@ mod gbm_barrier {
         let market = market(as_of);
         let option = down_and_out_call(expiry);
 
-        let registry = finstack_quant_valuations::pricer::STANDARD.pricers();
+        let registry = finstack_quant_valuations_exotics::EXOTICS.pricers();
 
         // --- GBM barrier MC (ModelKey::MonteCarloGBM) ---------------------------
         let gbm_pricer = registry
@@ -567,8 +567,8 @@ mod asian_geometric {
     use finstack_quant_core::types::InstrumentId;
     use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
     use finstack_quant_models::types::OptionType;
-    use finstack_quant_valuations::instruments::exotics::asian_option::AsianOption;
-    use finstack_quant_valuations::pricer::{InstrumentType, ModelKey, PricerKey};
+    use finstack_quant_valuations_core::pricer::{InstrumentType, ModelKey, PricerKey};
+    use finstack_quant_valuations_exotics::exotics::asian_option::AsianOption;
     use time::Month;
 
     const SPOT: f64 = 100.0;
@@ -728,7 +728,7 @@ mod asian_geometric {
             .expect("year fraction");
         let df = (-RATE * t).exp();
 
-        let registry = finstack_quant_valuations::pricer::STANDARD.pricers();
+        let registry = finstack_quant_valuations_exotics::EXOTICS.pricers();
 
         // --- MC GBM pricer (ModelKey::MonteCarloGBM) ----------------------------
         let mc_pricer = registry

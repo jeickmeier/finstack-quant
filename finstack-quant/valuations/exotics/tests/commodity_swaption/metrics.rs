@@ -8,10 +8,11 @@ use finstack_quant_core::dates::{Date, Tenor, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::types::OptionType;
-use finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;
-use finstack_quant_valuations::instruments::{CommodityUnderlyingParams, Instrument};
-use finstack_quant_valuations::metrics::{MetricContext, MetricId};
-use finstack_quant_valuations::pricer::STANDARD;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
+use finstack_quant_valuations_exotics::EXOTICS;
+use finstack_quant_valuations_exotics::commodity::commodity_swaption::CommoditySwaption;
 use finstack_quant_valuations_test_support::commodity_curves::flat_price_curve;
 use finstack_quant_valuations_test_support::date::date;
 use finstack_quant_valuations_test_support::discount_forward_curves::flat_discount_with_tenor;
@@ -62,7 +63,7 @@ fn ng_swaption() -> (CommoditySwaption, MarketContext, Date) {
 /// with the parallel DV01.
 #[test]
 fn test_commodity_swaption_dv01_and_bucketed_dv01() -> finstack_quant_core::Result<()> {
-    let registry = STANDARD.metrics();
+    let registry = EXOTICS.metrics();
     let (swaption, market, as_of) = ng_swaption();
     let pv = swaption.value(&market, as_of)?;
     let mut ctx = MetricContext::new(
@@ -92,7 +93,7 @@ fn test_commodity_swaption_dv01_and_bucketed_dv01() -> finstack_quant_core::Resu
 #[test]
 fn commodity_swaption_zero_vol_delta_matches_parallel_price_shift()
 -> finstack_quant_core::Result<()> {
-    use finstack_quant_valuations::instruments::{GreekBumps, OptionGreeksProvider};
+    use finstack_quant_valuations_core::instruments::{GreekBumps, OptionGreeksProvider};
     for kind in [OptionType::Call, OptionType::Put] {
         for f in [2.0, 3.5, 5.0] {
             for quote_vol in [false, true] {
@@ -121,8 +122,9 @@ fn commodity_swaption_zero_vol_delta_matches_parallel_price_shift()
                     .option_greeks(
                         &market,
                         as_of,
-                        &finstack_quant_valuations::instruments::OptionGreeksRequest {
-                            greek: finstack_quant_valuations::instruments::OptionGreekKind::Delta,
+                        &finstack_quant_valuations_core::instruments::OptionGreeksRequest {
+                            greek:
+                                finstack_quant_valuations_core::instruments::OptionGreekKind::Delta,
                             base_pv: None,
                             bumps: GreekBumps::default(),
                         },
@@ -152,9 +154,9 @@ fn commodity_swaption_zero_vol_delta_matches_parallel_price_shift()
                         .option_greeks(
                             &market,
                             as_of,
-                            &finstack_quant_valuations::instruments::OptionGreeksRequest {
+                            &finstack_quant_valuations_core::instruments::OptionGreeksRequest {
                                 greek:
-                                    finstack_quant_valuations::instruments::OptionGreekKind::Delta,
+                                    finstack_quant_valuations_core::instruments::OptionGreekKind::Delta,
                                 base_pv: None,
                                 bumps: GreekBumps::default(),
                             },

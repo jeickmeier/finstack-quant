@@ -127,7 +127,11 @@ it:
 
 Integration tests that need only this crate, valuations-core and the
 test-support crate live in `tests/`, compiled into the single `exotics` target
-(`mise run rust-test-crate -- finstack-quant-valuations-exotics`). Tests that
-price through the standard registries, round-trip `InstrumentJson`, use the
-composite instrument or reach another family stay in the umbrella's
-`../tests/instruments/`. Benches stay in the umbrella.
+(`mise run rust-test-crate -- finstack-quant-valuations-exotics`):
+`barrier_option/`, `lookback_option/`, `exotic_harness/`, `commodity/`
+(forwards and swaps), `commodity_spot_option/`, `commodity_asian_option/`,
+`commodity_spread_option/`, `commodity_swaption/`, `test_asian_cv_notional`,
+and `test_cross_impl_parity`. Tests that round-trip `InstrumentJson`
+(`commodity_spot_option/metrics.rs`), use the composite/basket instruments, or
+reach another family (`production_barrier_ndf_audit.rs`) stay in the umbrella's
+`../tests/`. Benches stay in the umbrella.

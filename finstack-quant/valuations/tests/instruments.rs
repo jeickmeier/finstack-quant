@@ -97,24 +97,9 @@ mod fx_barrier_option;
 
 // Commodity Derivatives
 
-#[path = "instruments/commodity/mod.rs"]
-mod commodity;
-
-/// Commodity option tests
+/// Commodity option tests (JSON-pinned metrics regression; single-family commodity tests live in `exotics/tests/`)
 #[path = "instruments/commodity_spot_option/mod.rs"]
 mod commodity_spot_option;
-
-/// Commodity Asian option tests
-#[path = "instruments/commodity_asian_option/mod.rs"]
-mod commodity_asian_option;
-
-/// Commodity spread option tests
-#[path = "instruments/commodity_spread_option/mod.rs"]
-mod commodity_spread_option;
-
-/// Commodity swaption tests
-#[path = "instruments/commodity_swaption/mod.rs"]
-mod commodity_swaption;
 
 // Real Estate
 
