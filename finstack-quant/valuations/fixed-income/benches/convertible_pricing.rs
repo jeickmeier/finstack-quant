@@ -11,6 +11,7 @@
 //!
 //! Market Standards Review (Week 5)
 
+#[path = "../../benches/support/mod.rs"]
 mod support;
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
@@ -22,19 +23,17 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::GreekBumps;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
-use finstack_quant_valuations::instruments::fixed_income::convertible::{
-    ConvertibleBond, ConvertibleGreeks,
-};
-use finstack_quant_valuations::instruments::fixed_income::convertible::{
+use finstack_quant_valuations_core::instruments::GreekBumps;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_fixed_income::bond::{CallPut, CallPutSchedule};
+use finstack_quant_valuations_fixed_income::convertible::{ConvertibleBond, ConvertibleGreeks};
+use finstack_quant_valuations_fixed_income::convertible::{
     calculate_convertible_greeks, price_convertible_bond,
 };
-use finstack_quant_valuations::instruments::{
+use finstack_quant_valuations_fixed_income::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
 };
-use finstack_quant_valuations::metrics::MetricId;
 use std::hint::black_box;
 use time::Month;
 
@@ -143,13 +142,13 @@ fn create_standard_convertible() -> ConvertibleBond {
         soft_call_trigger: None,
         resolved_settlement: None,
         cashflow_spec:
-            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
+            finstack_quant_valuations_fixed_income::bond::CashflowSpec::Fixed(
                 fixed_coupon,
             ),
         settlement_days: None,
         recovery_rate: None,
         instrument_pricing_overrides:
-            finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
@@ -196,11 +195,11 @@ fn create_zero_coupon_convertible() -> ConvertibleBond {
         soft_call_trigger: None,
         resolved_settlement: None,
         cashflow_spec:
-            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::default(), // zero coupon
+            finstack_quant_valuations_fixed_income::bond::CashflowSpec::default(), // zero coupon
         settlement_days: None,
         recovery_rate: None,
         instrument_pricing_overrides:
-            finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
@@ -439,7 +438,7 @@ fn bench_metrics_suite(c: &mut Criterion) {
                     black_box(&market),
                     black_box(as_of),
                     black_box(&metrics),
-                    finstack_quant_valuations::instruments::PricingOptions::default(),
+                    finstack_quant_valuations_core::instruments::PricingOptions::default(),
                 )
                 .expect("convertible metrics")
             },

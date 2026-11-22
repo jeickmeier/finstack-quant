@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 description = "Interest-rate and inflation instruments of Finstack Quant valuations: deposits, FRAs, futures, swaps, basis and cross-currency swaps, caps/floors, swaptions, CMS products, repos and inflation derivatives"
+autobenches = false
 autotests = false
 
 [dependencies]
@@ -29,6 +30,7 @@ finstack-quant-test-utils = { path = "../../test-utils", version = "0.11.0-dev.2
 time = { workspace = true, features = ["macros"] }
 rust_decimal_macros = { workspace = true }
 proptest = "1.11.0"
+criterion = { workspace = true }
 
 [features]
 default = ["json-schema"]
@@ -47,3 +49,31 @@ workspace = true
 [[test]]
 name = "rates"
 path = "tests/main.rs"
+
+[[bench]]
+name = "cms_pricing"
+harness = false
+
+[[bench]]
+name = "future_option_pricing"
+harness = false
+
+[[bench]]
+name = "linear_rates"
+harness = false
+
+[[bench]]
+name = "mc_pricing"
+harness = false
+
+[[bench]]
+name = "swap_pricing"
+harness = false
+
+[[bench]]
+name = "swaption_pricing"
+harness = false
+
+[[bench]]
+name = "xccy_pricing"
+harness = false

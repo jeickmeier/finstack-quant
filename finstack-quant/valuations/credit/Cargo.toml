@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 description = "Credit derivatives of Finstack Quant valuations: single-name CDS, CDS indices, index tranches and CDS options with their ISDA-standard conventions and CS01 risk"
+autobenches = false
 autotests = false
 
 [dependencies]
@@ -26,6 +27,7 @@ schemars = { workspace = true, optional = true }
 [dev-dependencies]
 finstack-quant-valuations-test-support = { path = "../test-support", version = "0.11.0-dev.202610210600" }
 time = { workspace = true, features = ["macros"] }
+criterion = { workspace = true }
 
 [features]
 default = ["json-schema"]
@@ -44,3 +46,7 @@ workspace = true
 [[test]]
 name = "credit"
 path = "tests/main.rs"
+
+[[bench]]
+name = "cds_option_pricing"
+harness = false

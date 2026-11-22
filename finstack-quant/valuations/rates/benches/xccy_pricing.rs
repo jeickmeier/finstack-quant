@@ -15,6 +15,7 @@
 
 #![allow(clippy::unwrap_used)]
 
+#[path = "../../benches/support/mod.rs"]
 mod support;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
@@ -26,11 +27,11 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations::instruments::FloatLegSpec;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::NotionalExchange;
-use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::instruments::rates::xccy_swap::{XccySwap, XccySwapLeg};
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::NotionalExchange;
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_rates::FloatLegSpec;
+use finstack_quant_valuations_rates::xccy_swap::{XccySwap, XccySwapLeg};
 use rust_decimal::Decimal;
 use std::hint::black_box;
 use std::sync::Arc;

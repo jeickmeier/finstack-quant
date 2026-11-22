@@ -13,6 +13,7 @@
 //! Measure the single-threaded cost, which is what a WASM host pays, with
 //! `RAYON_NUM_THREADS=1`.
 
+#[path = "../../benches/support/mod.rs"]
 mod support;
 
 use criterion::{Criterion, criterion_group, criterion_main};
@@ -23,10 +24,10 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, Rate};
-use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule};
-use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
-use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations::pricer::ModelKey;
+use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_core::pricer::ModelKey;
+use finstack_quant_valuations_fixed_income::bond::{Bond, CallPut, CallPutSchedule};
 use time::macros::date;
 
 const AS_OF: Date = date!(2024 - 07 - 15);

@@ -30,24 +30,25 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::instruments::pricing::default_rate_calendar_id;
-use finstack_quant_valuations::instruments::pricing::overnight::{
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::instruments::pricing::default_rate_calendar_id;
+use finstack_quant_valuations_core::instruments::pricing::overnight::{
     OvernightCouponProjection, OvernightCouponProjectionInput, OvernightProjectionCurve,
     adjust_overnight_accrual_boundaries, project_overnight_coupon,
     resolve_overnight_fixing_calendar,
 };
-use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
-use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec};
-use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations::pricer::ModelKey;
-use finstack_quant_valuations::results::ValuationResult;
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_core::pricer::ModelKey;
+use finstack_quant_valuations_core::results::ValuationResult;
+use finstack_quant_valuations_rates::irs::InterestRateSwap;
+use finstack_quant_valuations_rates::{FixedLegSpec, FloatLegSpec};
 #[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
-#[path = "../rates/tests/support/rates.rs"]
+#[path = "../tests/support/rates.rs"]
 mod rates_support;
-#[path = "support/record.rs"]
+#[path = "../../benches/support/record.rs"]
 mod record;
+#[path = "../../benches/support/mod.rs"]
 mod support;
 use rust_decimal_macros::dec;
 use serde_json::{Value, json};
@@ -898,7 +899,7 @@ fn bench_ois_standard_metrics(c: &mut Criterion) {
                         black_box(&market),
                         black_box(as_of),
                         black_box(&OIS_METRICS),
-                        finstack_quant_valuations::instruments::PricingOptions::default(),
+                        finstack_quant_valuations_core::instruments::PricingOptions::default(),
                     )
                     .expect("standard OIS metrics")
                 },
@@ -969,7 +970,7 @@ fn bench_ois_controls_metrics(c: &mut Criterion) {
                         black_box(&market),
                         black_box(as_of),
                         black_box(&OIS_METRICS),
-                        finstack_quant_valuations::instruments::PricingOptions::default(),
+                        finstack_quant_valuations_core::instruments::PricingOptions::default(),
                     )
                     .expect("standard OIS control metrics")
                 },
@@ -1146,7 +1147,7 @@ fn bench_swap_dv01(c: &mut Criterion) {
                             black_box(&market),
                             black_box(as_of),
                             black_box(&[MetricId::Dv01]),
-                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                            finstack_quant_valuations_core::instruments::PricingOptions::default(),
                         )
                         .expect("IRS DV01")
                     },
@@ -1177,7 +1178,7 @@ fn bench_swap_par_rate(c: &mut Criterion) {
                             black_box(&market),
                             black_box(as_of),
                             black_box(&[MetricId::ParRate, MetricId::Annuity]),
-                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                            finstack_quant_valuations_core::instruments::PricingOptions::default(),
                         )
                         .expect("IRS par rate and annuity")
                     },
@@ -1211,7 +1212,7 @@ fn swap_standard_metrics(c: &mut Criterion) {
                     black_box(&market),
                     black_box(as_of),
                     black_box(&metrics),
-                    finstack_quant_valuations::instruments::PricingOptions::default(),
+                    finstack_quant_valuations_core::instruments::PricingOptions::default(),
                 )
                 .expect("standard IRS metrics should price successfully")
             },

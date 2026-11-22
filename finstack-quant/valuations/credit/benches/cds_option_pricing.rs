@@ -18,14 +18,15 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::OptionType;
-use finstack_quant_valuations::instruments::CreditParams;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_credit::CreditParams;
+use finstack_quant_valuations_credit::cds_option::{
     CdsOption, CdsOptionParams, CdsOptionStrike, ProtectionStartConvention,
 };
 use rust_decimal::Decimal;
 use std::hint::black_box;
 use time::Month;
+#[path = "../../benches/support/mod.rs"]
 mod support;
 
 fn validate_price(value: &Money) {
@@ -48,7 +49,7 @@ fn create_cds_option(
         expiry,
         underlying_maturity,
         notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        settlement: finstack_quant_valuations::instruments::SettlementType::Cash,
+        settlement: finstack_quant_valuations_core::instruments::SettlementType::Cash,
         underlying_is_index: false,
         index_factor: 1.0,
         strike_index_factor: None,

@@ -24,15 +24,17 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::sabr::SabrParameters;
-use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
-use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec};
-use finstack_quant_valuations::instruments::{Instrument, SettlementType, VolatilityModel};
-use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations::pricer::ModelKey;
+use finstack_quant_valuations_core::instruments::{Instrument, SettlementType};
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_core::pricer::ModelKey;
+use finstack_quant_valuations_rates::VolatilityModel;
+use finstack_quant_valuations_rates::swaption::{CashSettlementMethod, Swaption};
+use finstack_quant_valuations_rates::{FixedLegSpec, FloatLegSpec};
 use rust_decimal::Decimal;
 use std::hint::black_box;
 use time::Month;
 
+#[path = "../../benches/support/mod.rs"]
 mod support;
 
 fn create_swaption(expiry_months: i32, swap_tenor_years: i32) -> Swaption {
@@ -332,7 +334,7 @@ fn bench_swaption_greeks(c: &mut Criterion) {
                                 black_box(&market),
                                 black_box(as_of),
                                 black_box(&greeks),
-                                finstack_quant_valuations::instruments::PricingOptions::default(),
+                                finstack_quant_valuations_core::instruments::PricingOptions::default(),
                             )
                             .expect("swaption Greeks")
                     },

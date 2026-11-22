@@ -9,10 +9,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations::results::ValuationResult;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_core::results::ValuationResult;
+use finstack_quant_valuations_fixed_income::bond::Bond;
+#[path = "../../benches/support/mod.rs"]
 mod support;
 use std::hint::black_box;
 use time::Month;
@@ -104,7 +105,7 @@ fn bench_metrics_bond_standard(c: &mut Criterion) {
                     black_box(&market),
                     black_box(base_date),
                     black_box(&metric_ids),
-                    finstack_quant_valuations::instruments::PricingOptions::default(),
+                    finstack_quant_valuations_core::instruments::PricingOptions::default(),
                 )
                 .expect("standard bond metrics")
             },
@@ -134,7 +135,7 @@ fn bench_metrics_pricing_only(c: &mut Criterion) {
                     black_box(&market),
                     black_box(base_date),
                     black_box(&metric_ids),
-                    finstack_quant_valuations::instruments::PricingOptions::default(),
+                    finstack_quant_valuations_core::instruments::PricingOptions::default(),
                 )
                 .expect("bond pricing metrics")
             },
@@ -181,7 +182,7 @@ fn bench_metrics_scaling(c: &mut Criterion) {
                             black_box(&market),
                             black_box(base_date),
                             black_box(ids),
-                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                            finstack_quant_valuations_core::instruments::PricingOptions::default(),
                         )
                         .expect("bond metric scaling")
                     },
@@ -228,7 +229,7 @@ fn bench_metrics_portfolio(c: &mut Criterion) {
                             black_box(&market),
                             black_box(base_date),
                             black_box(&metric_ids),
-                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                            finstack_quant_valuations_core::instruments::PricingOptions::default(),
                         )
                     })
                     .collect::<Result<Vec<_>, _>>()

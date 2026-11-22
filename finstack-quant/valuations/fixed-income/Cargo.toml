@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 description = "Fixed-income instruments of Finstack Quant valuations: bonds and bond futures, convertibles, inflation-linked bonds, term loans and revolving credit, fixed-income index TRS, agency MBS pass-throughs, TBAs and dollar rolls"
+autobenches = false
 autotests = false
 
 [dependencies]
@@ -37,6 +38,7 @@ finstack-quant-test-utils = { path = "../../test-utils", version = "0.11.0-dev.2
 time = { workspace = true, features = ["macros"] }
 rust_decimal_macros = { workspace = true }
 proptest = "1.11.0"
+criterion = { workspace = true }
 
 [features]
 default = ["json-schema"]
@@ -56,3 +58,27 @@ workspace = true
 [[test]]
 name = "fixed-income"
 path = "tests/main.rs"
+
+[[bench]]
+name = "bond_pricing"
+harness = false
+
+[[bench]]
+name = "bond_rates_credit"
+harness = false
+
+[[bench]]
+name = "bond_future_bench"
+harness = false
+
+[[bench]]
+name = "convertible_pricing"
+harness = false
+
+[[bench]]
+name = "merton_mc_pricing"
+harness = false
+
+[[bench]]
+name = "metrics"
+harness = false

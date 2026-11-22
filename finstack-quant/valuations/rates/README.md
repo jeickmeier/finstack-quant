@@ -193,13 +193,14 @@ mise run rust-test
 Use `cargo nextest`, not `cargo test` — the latter also runs doc tests, which
 this project keeps out of the normal loop. Lint with `mise run rust-lint`.
 
-Criterion benches in `../benches/`: `swap_pricing` (IRS PV, DV01, par
-rate), `swaption_pricing` (Black and SABR), `cms_pricing`, `xccy_pricing`,
-`inflation_pricing`, and `linear_rates` (deposit, FRA, basis swap, cap/floor,
-repo, futures).
+Criterion benches in `benches/`: `swap_pricing` (IRS PV, DV01, par rate),
+`swaption_pricing` (Black and SABR), `cms_pricing`, `future_option_pricing`,
+`mc_pricing` (Hull-White Bermudan swaption LSMC and tree), `xccy_pricing`, and
+`linear_rates` (deposit, FRA, basis swap, cap/floor, repo, futures).
+Cross-family `inflation_pricing` stays in `../benches/`.
 
 ```bash
-cargo bench -p finstack-quant-valuations --bench swap_pricing
+mise run rust-bench-crate -- finstack-quant-valuations-rates swap_pricing
 mise run rust-bench          # all workspace benches, short sampling
 ```
 

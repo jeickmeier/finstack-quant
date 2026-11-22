@@ -143,9 +143,11 @@ that remain there. The agency mortgage leaves (`mbs_passthrough`, `tba`,
 `#[cfg(test)]` modules plus the umbrella's registry, serde and
 dependency-completeness contract tests.
 
-Criterion benches stay in the umbrella's `../benches/`: `bond_pricing`,
-`bond_future_bench`, `convertible_pricing`, `structured_credit_pricing`,
-`merton_mc_pricing`, `fi_misc_pricing`, `inflation_pricing`.
+Criterion benches in `benches/`: `bond_pricing`, `bond_rates_credit`,
+`bond_future_bench`, `convertible_pricing`, `merton_mc_pricing`, and `metrics`.
+Cross-family, umbrella-risk, and cross-crate benches (`cashflow_generation`,
+`fi_misc_pricing`, `fourier_var_pricing`, `inflation_pricing`) stay in the
+umbrella's `../benches/`.
 
 ## Related
 

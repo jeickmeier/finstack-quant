@@ -2,6 +2,7 @@
 
 #![allow(clippy::unwrap_used)]
 
+#[path = "../../benches/support/mod.rs"]
 mod support;
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
@@ -20,20 +21,18 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::types::ExerciseStyle;
-use finstack_quant_valuations::instruments::FloatLegSpec;
-use finstack_quant_valuations::instruments::PricingOptions;
-use finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;
-use finstack_quant_valuations::instruments::rates::cap_floor::{CapFloor, RateOptionType};
-use finstack_quant_valuations::instruments::rates::deposit::Deposit;
-use finstack_quant_valuations::instruments::rates::fra::ForwardRateAgreement;
-use finstack_quant_valuations::instruments::rates::ir_future::{
-    FutureContractSpecs, InterestRateFuture,
-};
-use finstack_quant_valuations::instruments::rates::repo::{CollateralSpec, Repo};
-use finstack_quant_valuations::instruments::{Instrument, PayReceive, SettlementType};
-use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
-use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations::pricer::ModelKey;
+use finstack_quant_valuations_core::instruments::PricingOptions;
+use finstack_quant_valuations_core::instruments::{Instrument, PayReceive, SettlementType};
+use finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_core::pricer::ModelKey;
+use finstack_quant_valuations_rates::FloatLegSpec;
+use finstack_quant_valuations_rates::basis_swap::BasisSwap;
+use finstack_quant_valuations_rates::cap_floor::{CapFloor, RateOptionType};
+use finstack_quant_valuations_rates::deposit::Deposit;
+use finstack_quant_valuations_rates::fra::ForwardRateAgreement;
+use finstack_quant_valuations_rates::ir_future::{FutureContractSpecs, InterestRateFuture};
+use finstack_quant_valuations_rates::repo::{CollateralSpec, Repo};
 use rust_decimal::Decimal;
 use std::hint::black_box;
 use time::Month;

@@ -11,6 +11,7 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
+#[path = "../../benches/support/mod.rs"]
 mod support;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
@@ -20,11 +21,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_models::types::ExerciseStyle;
-use finstack_quant_valuations::instruments::rates::ir_future_option::InterestRateFutureOption;
-use finstack_quant_valuations::instruments::{
+use finstack_quant_valuations_core::instruments::{
     FutureOptionModel, FutureOptionPremiumStyle, FutureOptionSettlement, FutureOptionTerms,
     Instrument,
 };
+use finstack_quant_valuations_rates::ir_future_option::InterestRateFutureOption;
 use std::hint::black_box;
 use time::macros::date;
 

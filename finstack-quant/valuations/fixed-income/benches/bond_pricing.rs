@@ -9,6 +9,7 @@
 //!
 //! Market Standards Review (Week 5)
 
+#[path = "../../benches/support/mod.rs"]
 mod support;
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
@@ -21,12 +22,10 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::fixed_income::bond::{
-    Bond, CallPut, CallPutSchedule, CashflowSpec,
-};
-use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_fixed_income::bond::{Bond, CallPut, CallPutSchedule, CashflowSpec};
 use std::hint::black_box;
 use time::Month;
 
@@ -36,7 +35,7 @@ fn check_money(value: &Money, currency: Currency) {
 }
 
 fn check_valuation(
-    result: &finstack_quant_valuations::results::ValuationResult,
+    result: &finstack_quant_valuations_core::results::ValuationResult,
     currency: Currency,
     metrics: &[MetricId],
 ) {
@@ -217,7 +216,7 @@ fn bench_bond_ytm(c: &mut Criterion) {
                             black_box(&market),
                             black_box(as_of),
                             black_box(&metrics),
-                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                            finstack_quant_valuations_core::instruments::PricingOptions::default(),
                         )
                         .expect("bond metrics")
                     },
@@ -247,7 +246,7 @@ fn bench_bond_duration(c: &mut Criterion) {
                             black_box(&market),
                             black_box(as_of),
                             black_box(&metrics),
-                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                            finstack_quant_valuations_core::instruments::PricingOptions::default(),
                         )
                         .expect("bond metrics")
                     },
@@ -277,7 +276,7 @@ fn bench_bond_dv01(c: &mut Criterion) {
                             black_box(&market),
                             black_box(as_of),
                             black_box(&metrics),
-                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                            finstack_quant_valuations_core::instruments::PricingOptions::default(),
                         )
                         .expect("bond metrics")
                     },
@@ -309,7 +308,7 @@ fn bench_bond_yield_dv01(c: &mut Criterion) {
                             black_box(&market),
                             black_box(as_of),
                             black_box(&metrics),
-                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                            finstack_quant_valuations_core::instruments::PricingOptions::default(),
                         )
                         .expect("bond metrics")
                     },
@@ -369,7 +368,7 @@ fn create_floating_note(maturity_years: i32) -> Bond {
     let issue = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2025 + maturity_years, Month::January, 1).unwrap();
     let mut bond = Bond::floating(
-        finstack_quant_valuations::instruments::fixed_income::bond::FloatingBondParams {
+        finstack_quant_valuations_fixed_income::bond::FloatingBondParams {
             id: format!("FRN-{}Y", maturity_years).into(),
             notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             forward_curve_id: "USD-SOFR-3M".into(),
@@ -450,7 +449,7 @@ fn bench_tree_oas_solver(c: &mut Criterion) {
                             black_box(&market),
                             black_box(as_of),
                             &metrics,
-                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                            finstack_quant_valuations_core::instruments::PricingOptions::default(),
                         )
                         .expect("tree OAS")
                     },
@@ -486,7 +485,7 @@ fn bench_tree_step_scaling(c: &mut Criterion) {
                         black_box(&market),
                         black_box(as_of),
                         &metrics,
-                        finstack_quant_valuations::instruments::PricingOptions::default(),
+                        finstack_quant_valuations_core::instruments::PricingOptions::default(),
                     )
                     .expect("100-step tree OAS")
                 },
@@ -519,7 +518,7 @@ fn bench_spread_metrics(c: &mut Criterion) {
                         black_box(&market),
                         black_box(as_of),
                         black_box(&metrics),
-                        finstack_quant_valuations::instruments::PricingOptions::default(),
+                        finstack_quant_valuations_core::instruments::PricingOptions::default(),
                     )
                     .expect(label)
                 },
@@ -539,7 +538,7 @@ fn bench_spread_metrics(c: &mut Criterion) {
                     black_box(&market),
                     black_box(as_of),
                     black_box(&metrics),
-                    finstack_quant_valuations::instruments::PricingOptions::default(),
+                    finstack_quant_valuations_core::instruments::PricingOptions::default(),
                 )
                 .expect("discount margin")
             },
@@ -560,7 +559,7 @@ fn create_stochastic_hazard_callable(
     let maturity = Date::from_calendar_date(2025 + maturity_years, Month::January, 1).unwrap();
     let mut bond = if floating_pik {
         let mut bond = Bond::floating(
-            finstack_quant_valuations::instruments::fixed_income::bond::FloatingBondParams {
+            finstack_quant_valuations_fixed_income::bond::FloatingBondParams {
                 id: format!("FRN-PIK-CALL-{}Y", maturity_years).into(),
                 notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
                 forward_curve_id: "USD-SOFR-3M".into(),
@@ -714,7 +713,7 @@ fn bench_call_window(c: &mut Criterion) {
                             black_box(&market),
                             black_box(as_of),
                             &metrics,
-                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                            finstack_quant_valuations_core::instruments::PricingOptions::default(),
                         )
                         .expect(label)
                 },

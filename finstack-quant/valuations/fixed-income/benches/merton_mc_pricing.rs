@@ -16,14 +16,15 @@
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_models::credit::{MertonBarrierType, MertonModel};
-use finstack_quant_valuations::instruments::fixed_income::bond::pricing::merton_mc::{
+use finstack_quant_valuations_fixed_income::bond::pricing::merton_mc::{
     MertonMcEngine, MertonMcResult, MertonMcRun,
 };
-use finstack_quant_valuations::instruments::{
+use finstack_quant_valuations_fixed_income::{
     BarrierCrossing, MertonMcConfig, PikMode, PikSchedule,
 };
 use std::hint::black_box;
 
+#[path = "../../benches/support/mod.rs"]
 mod support;
 
 fn assert_merton_result(result: &MertonMcResult, run: &MertonMcRun) {

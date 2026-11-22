@@ -1,8 +1,11 @@
 # Valuations Benchmarks
 
-Criterion benchmarks for valuation pricing, cashflows, and risk. The 34 targets
-are declared in [`Cargo.toml`](../Cargo.toml). With `autobenches = false`, adding a
-source file does not register a benchmark target.
+Criterion benchmarks for valuation pricing, cashflows, and risk. Cross-family
+and calibration-dependent targets are declared in [`Cargo.toml`](../Cargo.toml),
+while single-family targets live in their family crate's `benches/` directory
+and `Cargo.toml` (`rates`, `fixed-income`, `credit`, etc.). With
+`autobenches = false`, adding a source file does not register a benchmark
+target.
 
 ## Run
 
@@ -10,17 +13,17 @@ Run commands from the repository root. Prefer the scoped task while iterating:
 
 ```bash
 # Measure one target
-mise run rust-bench-crate -- finstack-quant-valuations bond_pricing
+mise run rust-bench-crate -- finstack-quant-valuations-fixed-income bond_pricing
 
 # Select case IDs with a regular expression
-mise run rust-bench-crate -- finstack-quant-valuations bond_pricing --filter '^bond_pv/5Y$'
+mise run rust-bench-crate -- finstack-quant-valuations-fixed-income bond_pricing --filter '^bond_pv/5Y$'
 
 # Exercise selected cases in Criterion correctness/smoke mode
-mise run rust-bench-crate -- finstack-quant-valuations bond_pricing --filter '^bond_pv/' --test
+mise run rust-bench-crate -- finstack-quant-valuations-fixed-income bond_pricing --filter '^bond_pv/' --test
 
 # Save and compare measurements for the same selected cases
-mise run rust-bench-crate -- finstack-quant-valuations bond_pricing --filter '^bond_pv/' --save-baseline before
-mise run rust-bench-crate -- finstack-quant-valuations bond_pricing --filter '^bond_pv/' --baseline before
+mise run rust-bench-crate -- finstack-quant-valuations-fixed-income bond_pricing --filter '^bond_pv/' --save-baseline before
+mise run rust-bench-crate -- finstack-quant-valuations-fixed-income bond_pricing --filter '^bond_pv/' --baseline before
 
 # Measure every registered benchmark across the workspace
 mise run rust-bench
@@ -46,7 +49,7 @@ For a longer measurement:
 
 ```bash
 FQ_BENCH_SAMPLE_SIZE=100 FQ_BENCH_WARM_UP_TIME=3 FQ_BENCH_MEASUREMENT_TIME=5 FQ_BENCH_NRESAMPLES=100000 \
-  mise run rust-bench-crate -- finstack-quant-valuations bond_pricing --filter '^bond_pv/'
+  mise run rust-bench-crate -- finstack-quant-valuations-fixed-income bond_pricing --filter '^bond_pv/'
 ```
 
 The valuation targets inherit these task settings without group-level timing

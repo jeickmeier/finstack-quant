@@ -17,17 +17,18 @@ use finstack_quant_models::rates::clock::ModelDiscountCurve;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use finstack_quant_models::rates::hw1f::{Hw1fMcConfig, build_event_aligned_grid};
 use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
-use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaptionLmmPricer;
-use finstack_quant_valuations::instruments::rates::swaption::{
+use finstack_quant_valuations_core::pricer::{ModelKey, Pricer};
+use finstack_quant_valuations_rates::swaption::BermudanSwaptionLmmPricer;
+use finstack_quant_valuations_rates::swaption::{
     BermudanSchedule, BermudanSwaption, BermudanSwaptionParams, BermudanSwaptionPricer,
     BermudanSwaptionPricerConfig, PreparedHullWhiteModel,
 };
-use finstack_quant_valuations::pricer::{ModelKey, Pricer};
 use std::hint::black_box;
 use time::Month;
 
-#[path = "support/record.rs"]
+#[path = "../../benches/support/record.rs"]
 mod record;
+#[path = "../../benches/support/mod.rs"]
 mod support;
 
 fn assert_usd_value(value: &Money) {
@@ -41,7 +42,7 @@ fn build_swaption(as_of: Date) -> BermudanSwaption {
     let first_exercise = Date::from_calendar_date(2026, Month::January, 1).expect("Valid date");
 
     let mut swaption = BermudanSwaption::new(
-        finstack_quant_valuations::instruments::rates::swaption::BermudanSwaptionParams {
+        finstack_quant_valuations_rates::swaption::BermudanSwaptionParams {
             id: "BERM-LSMC-BENCH".into(),
             option_type: OptionType::Call,
             notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),

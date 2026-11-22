@@ -74,35 +74,11 @@ jsonschema-validate = [
 ]
 
 [[bench]]
-name = "bond_pricing"
-harness = false
-
-[[bench]]
-name = "bond_rates_credit"
-harness = false
-
-[[bench]]
-name = "bond_future_bench"
-harness = false
-
-[[bench]]
-name = "swap_pricing"
-harness = false
-
-[[bench]]
 name = "option_pricing"
 harness = false
 
 [[bench]]
-name = "cms_pricing"
-harness = false
-
-[[bench]]
 name = "cds_pricing"
-harness = false
-
-[[bench]]
-name = "cds_option_pricing"
 harness = false
 
 [[bench]]
@@ -118,10 +94,6 @@ name = "structured_credit_pricing"
 harness = false
 
 [[bench]]
-name = "swaption_pricing"
-harness = false
-
-[[bench]]
 name = "fourier_var_pricing"
 harness = false
 
@@ -130,19 +102,7 @@ name = "cashflow_generation"
 harness = false
 
 [[bench]]
-name = "linear_rates"
-harness = false
-
-[[bench]]
-name = "mc_pricing"
-harness = false
-
-[[bench]]
 name = "mc_exotics_pricing"
-harness = false
-
-[[bench]]
-name = "merton_mc_pricing"
 harness = false
 
 [[bench]]
@@ -158,10 +118,6 @@ name = "equity_pricing"
 harness = false
 
 [[bench]]
-name = "convertible_pricing"
-harness = false
-
-[[bench]]
 name = "inflation_pricing"
 harness = false
 
@@ -171,10 +127,6 @@ harness = false
 
 [[bench]]
 name = "bucketed_risk"
-harness = false
-
-[[bench]]
-name = "metrics"
 harness = false
 
 [[bench]]
@@ -190,15 +142,7 @@ name = "composite_pricing"
 harness = false
 
 [[bench]]
-name = "future_option_pricing"
-harness = false
-
-[[bench]]
 name = "rate_exotics_pricing"
-harness = false
-
-[[bench]]
-name = "xccy_pricing"
 harness = false
 
 [[bench]]

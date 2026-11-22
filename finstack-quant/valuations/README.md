@@ -239,7 +239,7 @@ mise run rust-test                     # workspace nextest run
 
 # Targeted
 cargo nextest run -p finstack-quant-valuations --lib --test '*'
-cargo bench -p finstack-quant-valuations --bench bond_pricing
+mise run rust-bench-crate -- finstack-quant-valuations-fixed-income bond_pricing
 
 # Schemas (regenerate after changing any public serde type)
 mise run gen-write

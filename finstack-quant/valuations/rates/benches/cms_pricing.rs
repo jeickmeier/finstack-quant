@@ -11,6 +11,7 @@
 
 #![allow(clippy::unwrap_used)]
 
+#[path = "../../benches/support/mod.rs"]
 mod support;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
@@ -25,13 +26,13 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::types::OptionType;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::instruments::rates::cms_option::CmsOption;
-use finstack_quant_valuations::instruments::rates::cms_option::replication_pricer::CmsReplicationPricer;
-use finstack_quant_valuations::instruments::rates::cms_swap::{CmsSwap, FundingLegSpec};
-use finstack_quant_valuations::pricer::{ModelKey, Pricer};
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::pricer::{ModelKey, Pricer};
+use finstack_quant_valuations_rates::cms_option::CmsOption;
+use finstack_quant_valuations_rates::cms_option::replication_pricer::CmsReplicationPricer;
+use finstack_quant_valuations_rates::cms_swap::{CmsSwap, FundingLegSpec};
 use rust_decimal::Decimal;
 use std::hint::black_box;
 use time::Month;
@@ -226,7 +227,7 @@ fn bench_cms_swap_period_count(c: &mut Criterion) {
         let end = start + time::Duration::days(end_days);
 
         let swap = CmsSwap::from_schedule(
-            finstack_quant_valuations::instruments::rates::cms_swap::CmsSwapScheduleParams {
+            finstack_quant_valuations_rates::cms_swap::CmsSwapScheduleParams {
                 id: "CMSSWAP-BENCH".into(),
                 start_date: start,
                 maturity: end,
