@@ -1,25 +1,33 @@
-//! Bermudan swaption pricing engines.
+//! Swaption pricing engines (European and Bermudan).
 //!
-//! This module provides specialized pricing engines for Bermudan swaptions
-//! using tree-based and Monte Carlo methods.
+//! Owns every pricing engine registered for `Swaption` and `BermudanSwaption`:
 //!
-//! # Engines
-//!
-//! - `tree_valuator`: Hull-White tree backward induction
-//!   (`BermudanSwaptionTreeValuator`, re-exported at `swaption::`)
+//! - `black`: European Black-76 and Bachelier normal pricers
+//! - `hull_white`: European Hull-White 1-factor tree pricer
+//! - `bermudan`: Bermudan orchestration (`BermudanSwaptionPricer`, `PreparedHullWhiteModel`)
+//! - `lmm`: Bermudan LIBOR market model adapter (`BermudanSwaptionLmmPricer`)
+//! - `tree_valuator`: Hull-White tree backward induction (`BermudanSwaptionTreeValuator`)
 //! - `monte_carlo_lsmc`: Hull-White Longstaff-Schwartz Monte Carlo
-//! - `lmm_bermudan`: LIBOR market model Bermudan pricing
-//! - `swap_rate_utils`: the Hull-White zero-coupon bond price they share
+//! - `lmm_bermudan`: LIBOR market model Bermudan kernel
+//! - `hw_cashflows`: Hull-White exercise cashflow projection
+//! - `swap_rate_utils`: shared Hull-White zero-coupon bond pricing
 
-pub mod lmm_bermudan;
-pub mod monte_carlo_lsmc;
-pub mod swap_rate_utils;
-pub(crate) mod tree_valuator;
+mod bermudan;
+mod black;
+mod hull_white;
+pub(crate) mod hw_cashflows;
+mod lmm;
+mod lmm_bermudan;
+mod monte_carlo_lsmc;
+mod swap_rate_utils;
+mod tree_valuator;
 
 #[cfg(test)]
 #[path = "tests/numeraire.rs"]
 mod numeraire_tests;
 
+pub use bermudan::{BermudanSwaptionPricer, BermudanSwaptionPricerConfig, PreparedHullWhiteModel};
+pub use black::{SimpleSwaptionBlackPricer, SimpleSwaptionNormalPricer};
+pub(crate) use hull_white::SwaptionHullWhitePricer;
+pub use lmm::{BermudanSwaptionLmmPricer, lmm_bermudan_mc_config};
 pub use tree_valuator::BermudanSwaptionTreeValuator;
-
-pub(crate) mod hw_cashflows;

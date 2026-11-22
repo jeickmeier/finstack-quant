@@ -1,7 +1,10 @@
 //! Bermudan swaption pricer implementations.
 
-use crate::swaption::BermudanSwaption;
-use crate::swaption::pricing::BermudanSwaptionTreeValuator;
+use super::hw_cashflows::{HwExerciseTerms, HwSwaptionCashflows, value_with_exercise_today};
+use super::monte_carlo_lsmc::SwaptionLsmcPricer;
+use super::swap_rate_utils::hw_bond_price;
+use super::tree_valuator::BermudanSwaptionTreeValuator;
+use crate::swaption::{BermudanSwaption, CashSettlementMethod};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -23,12 +26,6 @@ use finstack_quant_valuations_core::pricer::{
 use finstack_quant_valuations_core::results::ValuationResult;
 use std::sync::Arc;
 
-use crate::swaption::CashSettlementMethod;
-use crate::swaption::pricing::hw_cashflows::{
-    HwExerciseTerms, HwSwaptionCashflows, value_with_exercise_today,
-};
-use crate::swaption::pricing::monte_carlo_lsmc::SwaptionLsmcPricer;
-use crate::swaption::pricing::swap_rate_utils::hw_bond_price;
 use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::process::ou::{
     HullWhite1FProcess, calibrate_theta_from_curve,
@@ -708,7 +705,8 @@ impl Pricer for BermudanSwaptionPricer {
             };
             let valuator =
                 BermudanSwaptionTreeValuator::new(&swaption, model, disc.as_ref(), context.as_of)?;
-            let expected = super::metrics::bermudan_greeks::expected_exercise_time(&valuator);
+            let expected =
+                crate::swaption::metrics::bermudan_greeks::expected_exercise_time(&valuator);
             context.computed.insert(exercise_metric, expected);
         }
         context.set_instrument(Arc::new(swaption));
@@ -1018,5 +1016,5 @@ mod lsmc_diagnostics_tests {
 }
 
 #[cfg(test)]
-#[path = "../../tests/performance/bermudan.rs"]
+#[path = "../../../tests/performance/bermudan.rs"]
 mod performance_accuracy;

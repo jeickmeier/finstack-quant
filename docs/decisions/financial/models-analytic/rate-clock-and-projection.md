@@ -325,7 +325,7 @@ already supplies a context. The
 matches sampled means. Its one-knot case adds a one-year fit
 interval, so a request shorter than one month can sample beyond
 its horizon. The
-[Bermudan](../../../../finstack-quant/valuations/rates/src/swaption/bermudan.rs)
+[Bermudan](../../../../finstack-quant/valuations/rates/src/swaption/pricing/bermudan.rs)
 and [MBS OAS](../../../../finstack-quant/valuations/fixed-income/src/mbs_passthrough/metrics/mc_oas.rs)
 paths also prepare or consume theta. The
 [revolver](../../../../finstack-quant/valuations/fixed-income/src/revolving_credit/pricing/path_generator.rs)

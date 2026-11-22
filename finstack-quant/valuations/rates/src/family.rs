@@ -42,14 +42,14 @@ fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
     // Caps/floors and European swaptions.
     registry.register(crate::cap_floor::pricing::pricer::SimpleCapFloorBlackPricer)?;
     registry.register(crate::cap_floor::hw_pricer::CapFloorHullWhitePricer)?;
-    registry.register(crate::swaption::pricer::SimpleSwaptionBlackPricer)?;
-    registry.register(crate::swaption::pricer::SimpleSwaptionNormalPricer)?;
-    registry.register(crate::swaption::hw_pricer::SwaptionHullWhitePricer::default())?;
+    registry.register(crate::swaption::SimpleSwaptionBlackPricer)?;
+    registry.register(crate::swaption::SimpleSwaptionNormalPricer)?;
+    registry.register(crate::swaption::pricing::SwaptionHullWhitePricer::default())?;
 
     // Bermudan swaptions.
     registry.register(crate::swaption::BermudanSwaptionPricer::lsmc())?;
     registry.register(crate::swaption::BermudanSwaptionPricer::tree())?;
-    registry.register(crate::swaption::lmm_pricer::BermudanSwaptionLmmPricer::default())?;
+    registry.register(crate::swaption::BermudanSwaptionLmmPricer::default())?;
 
     // CMS products.
     registry.register(crate::cms_option::pricer::CmsOptionPricer)?;

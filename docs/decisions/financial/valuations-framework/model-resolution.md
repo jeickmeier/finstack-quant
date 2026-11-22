@@ -302,7 +302,7 @@ Direct surface calibration, automatic scalar unit conversion, flat maturity drif
   before grid and storage checks. Call friction of 50 cents
   per 100 of par gives a threshold increment of 5,000 on
   one million outstanding.
-  [Observed Bermudan seed metric](../../../../finstack-quant/valuations/rates/src/swaption/bermudan.rs).
+  [Observed Bermudan seed metric](../../../../finstack-quant/valuations/rates/src/swaption/pricing/bermudan.rs).
 
 Production qualification includes typed source collision cases,
 dated lookup and fit replay, exact schedule restoration, actual

@@ -100,33 +100,27 @@
 //! - swaption metrics module for risk metrics
 //! - [`crate::swaption::SimpleSwaptionBlackPricer`] for Black-76 pricing
 //! - [`crate::swaption::SimpleSwaptionNormalPricer`] for Bachelier pricing
-//! - [`finstack_quant_valuations_rates::VolatilityModel`] for selecting Black vs Normal
+//! - [`crate::swaption::BermudanSwaptionPricer`] for Hull-White tree and LSMC Bermudan pricing
+//! - [`crate::swaption::BermudanSwaptionLmmPricer`] for LMM Bermudan pricing
+//! - [`crate::VolatilityModel`] for selecting Black vs Normal
 
 use finstack_quant_core::dates::Date;
 
-/// Bermudan swaption pricing orchestration.
-pub(crate) mod bermudan;
-/// Hull-White 1-factor tree pricer for European swaptions
-pub(crate) mod hw_pricer;
-/// Bermudan swaption LMM structure construction and Monte Carlo pricer.
-pub mod lmm_pricer;
 /// Swaption risk metrics (delta, vega, theta, rho)
 pub(crate) mod metrics;
-/// European swaption pricers for Black-76 and Bachelier normal models.
-pub(crate) mod pricer;
-/// Bermudan swaption pricing engines (tree, LSMC, LMM).
+/// European and Bermudan swaption pricing engines (Black/Normal, Hull-White, LSMC, LMM).
 ///
-/// Crate-private: the tree valuator is re-exported as
-/// [`BermudanSwaptionTreeValuator`]; the Monte Carlo engines
-/// ([`pricing::monte_carlo_lsmc`], [`pricing::lmm_bermudan`]) are exercised by
-/// no-arbitrage numéraire tests living in-crate under `#[cfg(test)]`, so the
-/// engines need no public visibility.
+/// Crate-private: the supported pricers and prepared-model types are
+/// re-exported once at `swaption::`; the internal Monte Carlo kernels are
+/// exercised by in-crate `#[cfg(test)]` no-arbitrage numéraire tests.
 pub(crate) mod pricing;
 pub(crate) mod types;
 
-pub use bermudan::{BermudanSwaptionPricer, BermudanSwaptionPricerConfig, PreparedHullWhiteModel};
-pub use pricer::{SimpleSwaptionBlackPricer, SimpleSwaptionNormalPricer};
-pub use pricing::BermudanSwaptionTreeValuator;
+pub use pricing::{
+    BermudanSwaptionLmmPricer, BermudanSwaptionPricer, BermudanSwaptionPricerConfig,
+    BermudanSwaptionTreeValuator, PreparedHullWhiteModel, SimpleSwaptionBlackPricer,
+    SimpleSwaptionNormalPricer, lmm_bermudan_mc_config,
+};
 pub use types::{
     BermudanSchedule, BermudanSwaption, BermudanSwaptionBuilder, BermudanSwaptionParams,
     BermudanType, CashSettlementMethod, GreekInputs, Swaption, SwaptionBuilder,

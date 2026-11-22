@@ -1,7 +1,7 @@
 //! Frozen CCM-I5 consumer panel; original dynamics and bond-ratio oracle.
 
 use super::*;
-use crate::swaption::lmm_pricer::BermudanSwaptionLmmPricer;
+use crate::swaption::BermudanSwaptionLmmPricer;
 use crate::swaption::{BermudanSchedule, BermudanSwaption, BermudanSwaptionParams};
 use finstack_quant_core::canonical::content_hash;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, Tenor};

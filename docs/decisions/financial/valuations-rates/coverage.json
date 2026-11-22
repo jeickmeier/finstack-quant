@@ -802,7 +802,7 @@
       "sha256": "58fb4aeb5f38d816e531e2fb4e8ac5905bf89f6ec90daad0a252f01d146bc443"
     },
     {
-      "path": "finstack-quant/valuations/rates/src/swaption/bermudan.rs",
+      "path": "finstack-quant/valuations/rates/src/swaption/pricing/bermudan.rs",
       "classification": "algorithm",
       "records": [
         "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS"
@@ -811,7 +811,7 @@
       "sha256": "180e1ff8bef4753041b0082d3b6488c4f5c2cd72ad8c785507f2ecab58a62f71"
     },
     {
-      "path": "finstack-quant/valuations/rates/src/swaption/hw_pricer.rs",
+      "path": "finstack-quant/valuations/rates/src/swaption/pricing/hull_white.rs",
       "classification": "algorithm",
       "records": [
         "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS"
@@ -820,7 +820,7 @@
       "sha256": "e2ca7f5510627ad07c553791789fa5337405b570f064e9b3be9bc1c546a53e54"
     },
     {
-      "path": "finstack-quant/valuations/rates/src/swaption/lmm_pricer.rs",
+      "path": "finstack-quant/valuations/rates/src/swaption/pricing/lmm.rs",
       "classification": "algorithm",
       "records": [
         "VALUATIONS-RATES-09-LMM-BERMUDANS"
@@ -898,7 +898,7 @@
       "sha256": "92cfe4602c6fbf2410ddc9e78d09a8931d779bae9caaf512548842151c86345b"
     },
     {
-      "path": "finstack-quant/valuations/rates/src/swaption/pricer.rs",
+      "path": "finstack-quant/valuations/rates/src/swaption/pricing/black.rs",
       "classification": "algorithm",
       "records": [
         "VALUATIONS-RATES-07-EUROPEAN-SWAPTIONS"

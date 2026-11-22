@@ -83,7 +83,7 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
     ) -> Result<Self> {
         if swaption.get_forward_curve_id() != swaption.get_discount_curve_id() {
             return Err(finstack_quant_core::Error::Validation(
-                crate::swaption::bermudan::single_curve_only_message("Bermudan tree"),
+                super::bermudan::single_curve_only_message("Bermudan tree"),
             ));
         }
 

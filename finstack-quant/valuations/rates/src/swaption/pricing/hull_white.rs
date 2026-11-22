@@ -15,8 +15,9 @@
 //!    swaption expiry, compute the exercise value:
 //!    - Payer: max(0, (S - K) * A * N)
 //!    - Receiver: max(0, (K - S) * A * N)
-//!   where S is the forward swap rate, A the annuity, N the notional.
-//!   4. The root node value is the present value.
+//!
+//!    where S is the forward swap rate, A the annuity, N the notional.
+//! 4. The root node value is the present value.
 //!
 //! # References
 //!
@@ -50,7 +51,7 @@ pub(crate) struct SwaptionHullWhitePricer {
 impl Default for SwaptionHullWhitePricer {
     fn default() -> Self {
         Self {
-            tree_steps: super::BermudanSwaptionPricerConfig::DEFAULT_TREE_STEPS,
+            tree_steps: super::bermudan::BermudanSwaptionPricerConfig::DEFAULT_TREE_STEPS,
         }
     }
 }
@@ -148,7 +149,7 @@ impl SwaptionHullWhitePricer {
                 .map_err(|e| {
                     PricingError::from_core(e, PricingErrorContext::from_instrument(swaption))
                 })?;
-        let cashflows = super::pricing::hw_cashflows::HwSwaptionCashflows::new(
+        let cashflows = super::hw_cashflows::HwSwaptionCashflows::new(
             &swaption.underlying_fixed_leg,
             &swaption.underlying_float_leg,
             swaption.expiry,
@@ -200,13 +201,13 @@ impl SwaptionHullWhitePricer {
         let pv = tree.backward_induction(&terminal, |step, node_idx, continuation| {
             if step == exercise_step {
                 let exercise_value = cashflows.value(
-                    super::pricing::hw_cashflows::HwExerciseNode {
+                    super::hw_cashflows::HwExerciseNode {
                         tree: &tree,
                         step,
                         index: node_idx,
                         discount: &discount,
                     },
-                    super::pricing::hw_cashflows::HwExerciseTerms {
+                    super::hw_cashflows::HwExerciseTerms {
                         strike,
                         notional,
                         option_type: swaption.option_type,

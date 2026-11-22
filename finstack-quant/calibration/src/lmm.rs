@@ -63,7 +63,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_models::closed_form::black_call;
 use finstack_quant_models::volatility::implied_vol_black;
 use finstack_quant_valuations_rates::swaption::BermudanSwaption;
-use finstack_quant_valuations_rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer;
+use finstack_quant_valuations_rates::swaption::BermudanSwaptionLmmPricer;
 
 /// Inputs describing the co-terminal swap underlying one European swaption
 /// slice of a Bermudan exercise schedule, expressed in LMM forward-rate
@@ -345,8 +345,8 @@ mod tests {
     use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
     use finstack_quant_models::types::OptionType;
     use finstack_quant_valuations_core::pricer::Pricer;
-    use finstack_quant_valuations_rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer;
-    use finstack_quant_valuations_rates::swaption::lmm_pricer::lmm_bermudan_mc_config;
+    use finstack_quant_valuations_rates::swaption::BermudanSwaptionLmmPricer;
+    use finstack_quant_valuations_rates::swaption::lmm_bermudan_mc_config;
     use finstack_quant_valuations_rates::swaption::{BermudanSchedule, BermudanSwaption};
     use time::Month;
 

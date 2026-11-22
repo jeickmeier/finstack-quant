@@ -78,7 +78,7 @@ pub struct LmmBermudanSwap {
 ///   least two independent pricing observations (2 estimators in-sample, 4
 ///   with out-of-sample pricing). `min_steps_between_events` is the minimum number
 ///   of simulation sub-steps between consecutive exercise dates. Use
-///   [`crate::swaption::lmm_pricer::lmm_bermudan_mc_config`] for the registry defaults.
+///   [`crate::swaption::lmm_bermudan_mc_config`] for the registry defaults.
 ///
 /// # Returns
 ///
@@ -850,7 +850,7 @@ mod tests {
                 discount_factor_terminal: df_terminal,
                 currency: Currency::USD,
             },
-            &crate::swaption::lmm_pricer::lmm_bermudan_mc_config(),
+            &crate::swaption::lmm_bermudan_mc_config(),
         )
         .expect("default price");
         assert_eq!(estimate.num_paths, 25_000);

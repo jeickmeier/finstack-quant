@@ -90,9 +90,9 @@ Swaptions use the shared `ExerciseStyle`, `SettlementType` and
 `finstack_quant_valuations::instruments`.
 
 Inside a leaf, `metrics/`, `types.rs`/`types/`, `pricer.rs`/`pricing/` and the
-model-specific pricers (`hw_pricer.rs`, `bermudan.rs`) are `pub(crate)` or private; supported
+model-specific pricers (`cap_floor/hw_pricer.rs`, `swaption/pricing/`) are `pub(crate)` or private; supported
 items surface through each leaf's `pub use`. Genuinely public submodules are
-`swaption::lmm_pricer`, `cms_option::pricer` and `cms_option::replication_pricer`; `cms_common`,
+`cms_option::pricer` and `cms_option::replication_pricer`; `cms_common`,
 `cms_swap::pricer` and `forward_swap_rate` are `pub(crate)`.
 
 ## Family conventions

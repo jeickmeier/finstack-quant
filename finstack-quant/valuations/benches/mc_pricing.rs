@@ -17,7 +17,7 @@ use finstack_quant_models::rates::clock::ModelDiscountCurve;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use finstack_quant_models::rates::hw1f::{Hw1fMcConfig, build_event_aligned_grid};
 use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
-use finstack_quant_valuations::instruments::rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer;
+use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaptionLmmPricer;
 use finstack_quant_valuations::instruments::rates::swaption::{
     BermudanSchedule, BermudanSwaption, BermudanSwaptionParams, BermudanSwaptionPricer,
     BermudanSwaptionPricerConfig, PreparedHullWhiteModel,

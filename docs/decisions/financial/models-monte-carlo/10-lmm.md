@@ -213,7 +213,7 @@ forward mean, loading endpoints and production-loop equality.
 The existing dispatch, Bermudan stepping and calibration inputs were
 traced through the current Rust and host surfaces.
 [Raw dispatch](../../../../finstack-quant/models/src/monte_carlo/simulate.rs),
-[Bermudan adapter](../../../../finstack-quant/valuations/rates/src/swaption/lmm_pricer.rs),
+[Bermudan adapter](../../../../finstack-quant/valuations/rates/src/swaption/pricing/lmm.rs),
 [Bermudan kernel](../../../../finstack-quant/valuations/rates/src/swaption/pricing/lmm_bermudan.rs),
 [calibration](../../../../finstack-quant/calibration/src/lmm.rs),
 [Python](../../../../finstack-quant-py/src/bindings/models/monte_carlo/engine.rs),

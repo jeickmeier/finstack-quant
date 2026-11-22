@@ -269,7 +269,7 @@ shifted by a floating-point elapsed fraction.
 [Callable-bond preparation](../../../../finstack-quant/valuations/fixed-income/src/bond/pricing/tree/tree_pricer.rs),
 [swaption cashflows](../../../../finstack-quant/valuations/rates/src/swaption/pricing/hw_cashflows.rs),
 [exercise diagnostics](../../../../finstack-quant/valuations/rates/src/swaption/pricing/tree_valuator.rs),
-[prepared Bermudan model and risk](../../../../finstack-quant/valuations/rates/src/swaption/bermudan.rs)
+[prepared Bermudan model and risk](../../../../finstack-quant/valuations/rates/src/swaption/pricing/bermudan.rs)
 
 ## Follow-up tracking
 
