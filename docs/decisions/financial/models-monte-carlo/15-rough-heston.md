@@ -234,8 +234,8 @@ Existing source and selected tests were inspected.
 [Process](../../../../finstack-quant/models/src/monte_carlo/process/rough_heston.rs),
 [hybrid and inline tests](../../../../finstack-quant/models/src/monte_carlo/discretization/rough_heston.rs),
 [raw dispatch](../../../../finstack-quant/models/src/monte_carlo/simulate.rs),
-[equity MC route](../../../../finstack-quant/valuations/equity/src/equity_option/rough_heston_mc_pricer.rs),
-[market scalars](../../../../finstack-quant/valuations/equity/src/equity_option/rough_heston_market.rs),
+[equity MC route](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/rough_heston_mc.rs),
+[market scalars](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/rough_heston_market.rs),
 [Python raw route](../../../../finstack-quant-py/src/bindings/models/monte_carlo/engine.rs),
 [WASM raw route](../../../../finstack-quant-wasm/src/api/models/monte_carlo.rs).
 

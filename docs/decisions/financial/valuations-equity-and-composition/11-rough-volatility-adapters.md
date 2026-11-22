@@ -143,7 +143,7 @@ ATM strip construction is not calibration of rough parameters, and a positive to
 
 ### Evidence
 
-[rough Bergomi](../../../REFERENCES.md#bayer-friz-gatheral-2016), [rough Heston](../../../REFERENCES.md#el-euch-rosenbaum-2019), [hybrid scheme](../../../REFERENCES.md#bennedsen-lunde-pakkanen-2017); inline `variance_strip_tests` in [rough_bergomi_mc_pricer.rs](../../../../finstack-quant/valuations/equity/src/equity_option/rough_bergomi_mc_pricer.rs) inspect total-variance conservation, invalid surfaces and deterministic-variance refinement. [test_rough_bergomi.rs](../../../../finstack-quant/valuations/tests/instruments/equity_option/test_rough_bergomi.rs) locates simulation cases. These are limit/identity/cross-engine evidence, not independent calibrated-market validation.
+[rough Bergomi](../../../REFERENCES.md#bayer-friz-gatheral-2016), [rough Heston](../../../REFERENCES.md#el-euch-rosenbaum-2019), [hybrid scheme](../../../REFERENCES.md#bennedsen-lunde-pakkanen-2017); inline `variance_strip_tests` in [rough_bergomi_mc.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/rough_bergomi_mc.rs) inspect total-variance conservation, invalid surfaces and deterministic-variance refinement. [test_rough_bergomi.rs](../../../../finstack-quant/valuations/tests/instruments/equity_option/test_rough_bergomi.rs) locates simulation cases. These are limit/identity/cross-engine evidence, not independent calibrated-market validation.
 
 ## Independent numerical checks
 
@@ -177,7 +177,7 @@ the [equity and composition follow-ups](../FOLLOW_UPS.md#equity-and-composition)
 
 ## Owned source files
 
-- [rough_heston_market.rs](../../../../finstack-quant/valuations/equity/src/equity_option/rough_heston_market.rs)
-- [rough_heston_fourier_pricer.rs](../../../../finstack-quant/valuations/equity/src/equity_option/rough_heston_fourier_pricer.rs)
-- [rough_heston_mc_pricer.rs](../../../../finstack-quant/valuations/equity/src/equity_option/rough_heston_mc_pricer.rs)
-- [rough_bergomi_mc_pricer.rs](../../../../finstack-quant/valuations/equity/src/equity_option/rough_bergomi_mc_pricer.rs)
+- [rough_heston_market.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/rough_heston_market.rs)
+- [rough_heston_fourier.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/rough_heston_fourier.rs)
+- [rough_heston_mc.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/rough_heston_mc.rs)
+- [rough_bergomi_mc.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/rough_bergomi_mc.rs)

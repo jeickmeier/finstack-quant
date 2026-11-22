@@ -348,8 +348,8 @@ Classical Heston is an implemented separate alternative. Adaptive contour/tail i
 
 [rough_heston.rs](../../../../finstack-quant/models/src/volatility/rough_heston.rs). `stiff_rough_heston_price_matches_refined_native_solver` compares against the same numerical kernel; deterministic-variance limit is an analytic Gaussian/Black check. [vol_models_quantlib_tests.rs](../../../../finstack-quant/models/tests/vol_models_quantlib_tests.rs) has classical-limit comparisons at H=.499, not independent finite-H rough-Heston references. Reference: [El Euch–Rosenbaum](../../../REFERENCES.md#el-euch-rosenbaum-2019).
 
-The [equity rough Fourier pricer](../../../../finstack-quant/valuations/equity/src/equity_option/rough_heston_fourier_pricer.rs)
-consumes the [six market parameters](../../../../finstack-quant/valuations/equity/src/equity_option/rough_heston_market.rs).
+The [equity rough Fourier pricer](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/rough_heston_fourier.rs)
+consumes the [six market parameters](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/rough_heston_market.rs).
 The [instrument override carrier](../../../../finstack-quant/valuations/core/src/instruments/pricing_overrides.rs)
 owns numerical configuration at that boundary. The
 [parity ledger](../../../../finstack-quant-py/parity_contract.toml)

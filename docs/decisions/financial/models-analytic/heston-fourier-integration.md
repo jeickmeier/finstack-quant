@@ -280,7 +280,7 @@ Adaptive integrators/COS are possible alternative numerical inversions; no alter
 
 [fourier_prices.rs](../../../../finstack-quant/models/src/closed_form/heston/fourier_prices.rs), [strip_pricer.rs](../../../../finstack-quant/models/src/closed_form/heston/strip_pricer.rs) and [params.rs](../../../../finstack-quant/models/src/closed_form/heston/params.rs). [tests.rs](../../../../finstack-quant/models/src/closed_form/heston/tests.rs) contains short-expiry reference numbers, unsupported-order/corruption/unresolved-grid rejection and scalar/strip consistency. [vol_models_quantlib_tests.rs](../../../../finstack-quant/models/tests/vol_models_quantlib_tests.rs) uses separately generated QuantLib Heston values. Reference: [Heston](../../../REFERENCES.md#heston-1993).
 
-The [equity Heston adapter](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/mod.rs)
+The [equity Heston adapter](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/heston_fourier.rs)
 currently calls the scalar model with omitted grid settings. Its
 [input collector](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/inputs.rs)
 shares an unused Black volatility lookup. The Python and WASM

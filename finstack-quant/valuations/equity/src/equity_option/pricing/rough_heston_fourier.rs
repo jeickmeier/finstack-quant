@@ -4,8 +4,8 @@
 //! to price European equity options under the rough Heston model (El Euch & Rosenbaum 2019).
 //! Model parameters are sourced from required market scalars.
 
-use super::pricing::{ModelInputs, stochastic_vol_inputs};
-use super::types::EquityOption;
+use super::{ModelInputs, stochastic_vol_inputs};
+use crate::equity_option::types::EquityOption;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::OptionType;
@@ -82,12 +82,10 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughHestonF
         .model(finstack_quant_valuations_core::pricer::ModelKey::RoughHestonFourier);
 
         // Source production rough-Heston parameters from explicit market scalars.
-        let s = crate::equity_option::rough_heston_market::RoughHestonScalars::from_market_strict(
-            market,
-        )
-        .map_err(|e| {
-            finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
-        })?;
+        let s = super::rough_heston_market::RoughHestonScalars::from_market_strict(market)
+            .map_err(|e| {
+                finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
+            })?;
 
         let params =
             finstack_quant_models::volatility::rough_heston::RoughHestonFourierParams::new(

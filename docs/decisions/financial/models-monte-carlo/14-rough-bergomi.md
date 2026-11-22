@@ -230,7 +230,7 @@ means and the small-eta lognormal limit. Loop equality reuses
 the same model law. [Process](../../../../finstack-quant/models/src/monte_carlo/process/rough_bergomi.rs),
 [stepper](../../../../finstack-quant/models/src/monte_carlo/discretization/rough_bergomi.rs),
 [raw non-Markov tests](../../../../finstack-quant/models/src/monte_carlo/simulate/tests/non_markov.rs),
-[equity pricing route](../../../../finstack-quant/valuations/equity/src/equity_option/rough_bergomi_mc_pricer.rs),
+[equity pricing route](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/rough_bergomi_mc.rs),
 [equity input resolution](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/inputs.rs),
 [equity tests](../../../../finstack-quant/valuations/tests/instruments/equity_option/test_rough_bergomi.rs),
 [primary references](../../../REFERENCES.md#rough-bergomi-adapted-steps-and-moment-limits).

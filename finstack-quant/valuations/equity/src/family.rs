@@ -51,20 +51,13 @@ fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
     // Equity options: closed-form, Fourier, PDE and Monte Carlo engines.
     registry.register(crate::equity_option::pricing::SimpleEquityOptionBlackPricer)?;
     registry.register(crate::equity_option::pricing::EquityOptionHestonFourierPricer)?;
-    registry.register(crate::equity_option::pde_pricer::EquityOptionPdePricer::default())?;
+    registry.register(crate::equity_option::pricing::EquityOptionPdePricer::default())?;
+    registry.register(crate::equity_option::pricing::EquityOptionHestonPdePricer::default())?;
+    registry.register(crate::equity_option::pricing::EquityOptionHestonMcPricer::default())?;
+    registry.register(crate::equity_option::pricing::EquityOptionRoughHestonFourierPricer)?;
+    registry.register(crate::equity_option::pricing::EquityOptionRoughHestonMcPricer::default())?;
     registry
-        .register(crate::equity_option::pde2d_pricer::EquityOptionHestonPdePricer::default())?;
-    registry
-        .register(crate::equity_option::heston_mc_pricer::EquityOptionHestonMcPricer::default())?;
-    registry.register(
-        crate::equity_option::rough_heston_fourier_pricer::EquityOptionRoughHestonFourierPricer,
-    )?;
-    registry.register(
-        crate::equity_option::rough_heston_mc_pricer::EquityOptionRoughHestonMcPricer::default(),
-    )?;
-    registry.register(
-        crate::equity_option::rough_bergomi_mc_pricer::EquityOptionRoughBergomiMcPricer::default(),
-    )?;
+        .register(crate::equity_option::pricing::EquityOptionRoughBergomiMcPricer::default())?;
 
     // Equity-linked structures.
     registry.register(crate::autocallable::pricer::AutocallableMcPricer::default())?;

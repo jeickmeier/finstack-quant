@@ -9,8 +9,8 @@
 //! hybrid scheme (`RiemannLiouvilleVolterra`). This differs from the rough
 //! Heston model, which uses standard Brownian motion with a singular kernel.
 
-use super::pricing::{ModelInputs, stochastic_vol_inputs};
-use super::types::EquityOption;
+use super::{ModelInputs, stochastic_vol_inputs};
+use crate::equity_option::types::EquityOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
@@ -623,14 +623,14 @@ mod variance_strip_tests {
         let option = EquityOption::european_with_market_data(
             "XI0-DETERMINISTIC-LIMIT",
             "SPX",
-            super::super::parameters::EquityOptionParams::new(
+            crate::equity_option::parameters::EquityOptionParams::new(
                 100.0,
                 expiry,
                 finstack_quant_models::types::OptionType::Call,
                 1.0,
                 Currency::USD,
             ),
-            super::super::parameters::EquityOptionMarketData::new(
+            crate::equity_option::parameters::EquityOptionMarketData::new(
                 "USD-OIS",
                 "EQUITY-SPOT",
                 example.vol_surface_id,

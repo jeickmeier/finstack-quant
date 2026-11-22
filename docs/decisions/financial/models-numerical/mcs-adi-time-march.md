@@ -187,7 +187,7 @@
 
 ## Startup, selection and controls
 
-`McsStepper::new(N)` has no startup damping. `with_damping(k,N)` replaces each of the first k intervals with two halfsteps of factorized implicit Euler: predictor u+hF0_old(u), then implicit x and y solves, with no MCS correction. Thus the mixed derivative remains explicit even during damping. This differs from the full-interval 1D startup. The bare Douglas selector exists only under tests; no production caller can select it. [equity pde2d caller](../../../../finstack-quant/valuations/equity/src/equity_option/pde2d_pricer.rs) chooses two damped intervals.
+`McsStepper::new(N)` has no startup damping. `with_damping(k,N)` replaces each of the first k intervals with two halfsteps of factorized implicit Euler: predictor u+hF0_old(u), then implicit x and y solves, with no MCS correction. Thus the mixed derivative remains explicit even during damping. This differs from the full-interval 1D startup. The bare Douglas selector exists only under tests; no production caller can select it. [equity pde2d caller](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/pde2d.rs) chooses two damped intervals.
 
 [solver2d.rs](../../../../finstack-quant/models/src/pde/solver2d.rs) requires positive finite maturity and N>0, initializes terminal full/interior arrays, enforces boundaries at maturity, marches uniform intervals, and reconstructs t=0 edges. It has no obstacle/early-exercise support. Homogeneous operator caches are scoped to each solve, with scalar edge updates; mixed terms use refreshed full boundary arrays.
 

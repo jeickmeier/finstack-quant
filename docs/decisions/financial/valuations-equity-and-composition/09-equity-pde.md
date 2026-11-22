@@ -145,7 +145,7 @@ The 1D adapter does not apply the explicit European arbitrage-bound check used b
 
 ### Evidence
 
-[ADI reference](../../../REFERENCES.md#in-t-hout-welfert-2009); inline cases in [pde_pricer.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pde_pricer.rs) and [pde2d_pricer.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pde2d_pricer.rs) and [test_alt_models.rs](../../../../finstack-quant/valuations/tests/instruments/equity_option/test_alt_models.rs) locate deterministic-limit, grid-bound and cross-engine comparisons. Cross-engine agreement can share input assumptions; production convergence budgets remain unqualified.
+[ADI reference](../../../REFERENCES.md#in-t-hout-welfert-2009); inline cases in [pde.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/pde.rs) and [pde2d.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/pde2d.rs) and [test_alt_models.rs](../../../../finstack-quant/valuations/tests/instruments/equity_option/test_alt_models.rs) locate deterministic-limit, grid-bound and cross-engine comparisons. Cross-engine agreement can share input assumptions; production convergence budgets remain unqualified.
 
 ## Independent numerical checks
 
@@ -177,5 +177,5 @@ the [equity and composition follow-ups](../FOLLOW_UPS.md#equity-and-composition)
 
 ## Owned source files
 
-- [pde_pricer.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pde_pricer.rs)
-- [pde2d_pricer.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pde2d_pricer.rs)
+- [pde.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/pde.rs)
+- [pde2d.rs](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/pde2d.rs)

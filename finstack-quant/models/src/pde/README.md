@@ -19,8 +19,8 @@ Three instrument pricers consume it, all in `crate::instruments`:
 
 | Pricer | Model key | Uses |
 |--------|-----------|------|
-| `equity/equity_option/pde_pricer.rs` | `PdeCrankNicolson1D` | `BlackScholesPde`, `Grid1D`, `Solver1D` |
-| `equity/equity_option/pde2d_pricer.rs` | `PdeAdi2D` | `HestonPde`, `Grid1D`, `Grid2D`, `Solver2D` |
+| `equity/equity_option/pricing/pde.rs` | `PdeCrankNicolson1D` | `BlackScholesPde`, `Grid1D`, `Solver1D` |
+| `equity/equity_option/pricing/pde2d.rs` | `PdeAdi2D` | `HestonPde`, `Grid1D`, `Grid2D`, `Solver2D` |
 | `exotics/barrier_option/pde_pricer.rs` | `PdeCrankNicolson1D` | `BoundaryCondition`, `Grid1D`, `PdeProblem1D`, `Solver1D` (its own `BarrierPde`) |
 
 Nothing here is bound in Python or WASM; the solvers are reached only through

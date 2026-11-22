@@ -279,7 +279,7 @@
       "sha256": "c7b78d39ae91e4a2e09c294437fec44e6d2a0f8d5ccc3d7151e2e74c52c1805e"
     },
     {
-      "path": "finstack-quant/valuations/equity/src/equity_option/heston_mc_pricer.rs",
+      "path": "finstack-quant/valuations/equity/src/equity_option/pricing/heston_mc.rs",
       "classification": "algorithm",
       "records": [
         "VALUATIONS-EQUITY-AND-COMPOSITION-10"
@@ -342,7 +342,7 @@
       "sha256": "9e40482a30e67de47b75379d207228f242c1bc84851d40ff528b8aac6c93b1fe"
     },
     {
-      "path": "finstack-quant/valuations/equity/src/equity_option/pde2d_pricer.rs",
+      "path": "finstack-quant/valuations/equity/src/equity_option/pricing/pde2d.rs",
       "classification": "algorithm",
       "records": [
         "VALUATIONS-EQUITY-AND-COMPOSITION-09"
@@ -351,7 +351,7 @@
       "sha256": "2cf4e275b4364b622a1694c1db298e2e21966336e07e41496b3d80964a44925c"
     },
     {
-      "path": "finstack-quant/valuations/equity/src/equity_option/pde_pricer.rs",
+      "path": "finstack-quant/valuations/equity/src/equity_option/pricing/pde.rs",
       "classification": "algorithm",
       "records": [
         "VALUATIONS-EQUITY-AND-COMPOSITION-09"
@@ -369,6 +369,15 @@
       "sha256": "c7a79c10318549d19eebf8711ae1d2e05ecf4c34048b85d06623e7983b3b607e"
     },
     {
+      "path": "finstack-quant/valuations/equity/src/equity_option/pricing/heston_fourier.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-10"
+      ],
+      "reason": "Heston Fourier semi-analytical adapter and discrete-dividend rejection.",
+      "sha256": "90342e59dea511c87494adee16cc0fcc317806a88e6bd0db40428651e10f4cac"
+    },
+    {
       "path": "finstack-quant/valuations/equity/src/equity_option/pricing/inputs.rs",
       "classification": "algorithm",
       "records": [
@@ -380,15 +389,20 @@
     },
     {
       "path": "finstack-quant/valuations/equity/src/equity_option/pricing/mod.rs",
-      "classification": "algorithm",
-      "records": [
-        "VALUATIONS-EQUITY-AND-COMPOSITION-10"
-      ],
-      "reason": "Native/alternative pricing adapters, lifecycle payoff values/Greeks and Heston Fourier delegation.",
-      "sha256": "30d69f46d83805e36be8860a534185266139a5e2f032a5d6ad46f7ec2d52fff7"
+      "classification": "support",
+      "records": [],
+      "reason": "Equity-option pricing module declarations and crate-internal re-exports only.",
+      "sha256": "a9c0f0a99fb6d5cbc8eac4a64a96c7568cc12a7543883a4caef570e672bf86e6"
     },
     {
-      "path": "finstack-quant/valuations/equity/src/equity_option/rough_bergomi_mc_pricer.rs",
+      "path": "finstack-quant/valuations/equity/src/equity_option/pricing/tests.rs",
+      "classification": "test",
+      "records": [],
+      "reason": "Unit tests for Black-Scholes, tree, lifecycle, and discrete-dividend equity-option pricing.",
+      "sha256": "d804a11a71e8235901dbf64bef5d09fe0ddc47d99a7857df6a29ca4e45d9c689"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/pricing/rough_bergomi_mc.rs",
       "classification": "algorithm",
       "records": [
         "VALUATIONS-EQUITY-AND-COMPOSITION-11"
@@ -397,7 +411,7 @@
       "sha256": "790d203bfefd4ff6ba6a1209ab80d186dfe102690d1c97d171f1b39bbe0a62c3"
     },
     {
-      "path": "finstack-quant/valuations/equity/src/equity_option/rough_heston_fourier_pricer.rs",
+      "path": "finstack-quant/valuations/equity/src/equity_option/pricing/rough_heston_fourier.rs",
       "classification": "algorithm",
       "records": [
         "VALUATIONS-EQUITY-AND-COMPOSITION-11"
@@ -406,7 +420,7 @@
       "sha256": "e26bf5c5f93fefa8a1036a1245e94c4b028553052f7cf9599cb9ecb5ed679f49"
     },
     {
-      "path": "finstack-quant/valuations/equity/src/equity_option/rough_heston_market.rs",
+      "path": "finstack-quant/valuations/equity/src/equity_option/pricing/rough_heston_market.rs",
       "classification": "algorithm",
       "records": [
         "VALUATIONS-EQUITY-AND-COMPOSITION-11"
@@ -415,7 +429,7 @@
       "sha256": "f8dec2714d02f64338d4982b1544578c50e0d0a81e5e7d3e4b7fed647566f835"
     },
     {
-      "path": "finstack-quant/valuations/equity/src/equity_option/rough_heston_mc_pricer.rs",
+      "path": "finstack-quant/valuations/equity/src/equity_option/pricing/rough_heston_mc.rs",
       "classification": "algorithm",
       "records": [
         "VALUATIONS-EQUITY-AND-COMPOSITION-11"

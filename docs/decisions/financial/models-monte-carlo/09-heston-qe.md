@@ -212,7 +212,7 @@ equity, Asian and barrier routes use the trapezoidal profile.
 [QE spot update](../../../../finstack-quant/models/src/monte_carlo/discretization/qe_heston.rs),
 [convenience pricing](../../../../finstack-quant/models/src/monte_carlo/pricer/heston.rs),
 [raw simulation](../../../../finstack-quant/models/src/monte_carlo/simulate.rs),
-[equity vanilla](../../../../finstack-quant/valuations/equity/src/equity_option/heston_mc_pricer.rs),
+[equity vanilla](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/heston_mc.rs),
 [Asian](../../../../finstack-quant/valuations/exotics/src/exotics/asian_option/heston_mc_pricer.rs),
 [barrier](../../../../finstack-quant/valuations/exotics/src/exotics/barrier_option/heston_mc_pricer.rs),
 [Python](../../../../finstack-quant-py/src/bindings/models/monte_carlo/engine.rs),

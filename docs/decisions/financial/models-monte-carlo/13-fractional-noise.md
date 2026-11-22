@@ -209,7 +209,7 @@ fixture exercises the shared helper with manually split streams.
 [selection and budgets](../../../../finstack-quant/models/src/monte_carlo/simulate/fractional.rs),
 [injection](../../../../finstack-quant/models/src/monte_carlo/engine/fractional.rs),
 [non-Markov tests](../../../../finstack-quant/models/src/monte_carlo/simulate/tests/non_markov.rs),
-[equity pricing loop](../../../../finstack-quant/valuations/equity/src/equity_option/rough_bergomi_mc_pricer.rs),
+[equity pricing loop](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/rough_bergomi_mc.rs),
 [Python parity](../../../../finstack-quant-py/tests/test_models_wasm_parity.py),
 [WASM parity](../../../../finstack-quant-wasm/tests/facade/models_parity.test.mjs).
 

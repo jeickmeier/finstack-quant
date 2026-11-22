@@ -262,7 +262,7 @@ and [stepper](../../../../finstack-quant/models/src/monte_carlo/discretization/r
 [Cheyette process](../../../../finstack-quant/models/src/monte_carlo/process/cheyette_rough.rs)
 and [stepper](../../../../finstack-quant/models/src/monte_carlo/discretization/cheyette_rough.rs),
 [simulation specs/dispatch](../../../../finstack-quant/models/src/monte_carlo/simulate.rs)
-and [equity strip/adapter](../../../../finstack-quant/valuations/equity/src/equity_option/rough_bergomi_mc_pricer.rs)
+and [equity strip/adapter](../../../../finstack-quant/valuations/equity/src/equity_option/pricing/rough_bergomi_mc.rs)
 were inspected. Existing source boundary/serde, model martingale/limit and proxy
 strip tests were inspected or located, not executed. Existing host owners are
 [Python simulation](../../../../finstack-quant-py/src/bindings/models/monte_carlo/engine.rs)

@@ -5,8 +5,8 @@
 //! fractional kernel internally using standard normal increments — no fBM generator
 //! is required.
 
-use super::pricing::{ModelInputs, stochastic_vol_inputs};
-use super::types::EquityOption;
+use super::{ModelInputs, stochastic_vol_inputs};
+use crate::equity_option::types::EquityOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_models::monte_carlo::engine::McPricingInputs;
@@ -21,7 +21,7 @@ use finstack_quant_valuations_core::pricer::expect_inst;
 /// The discretization is O(n^2) per path due to the non-Markovian variance kernel.
 ///
 /// Rough Heston parameters are read from market scalars with the `ROUGH_HESTON_*`
-/// prefix — see [`super::rough_heston_fourier_pricer`] for the full key listing.
+/// prefix — see [`super::rough_heston_fourier`] for the full key listing.
 pub(crate) struct EquityOptionRoughHestonMcPricer {
     /// Number of Monte Carlo paths.
     num_paths: usize,
@@ -105,12 +105,10 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughHestonM
         .model(finstack_quant_valuations_core::pricer::ModelKey::MonteCarloRoughHeston);
 
         // Source production rough-Heston parameters from explicit market scalars.
-        let s = crate::equity_option::rough_heston_market::RoughHestonScalars::from_market_strict(
-            market,
-        )
-        .map_err(|e| {
-            finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
-        })?;
+        let s = super::rough_heston_market::RoughHestonScalars::from_market_strict(market)
+            .map_err(|e| {
+                finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
+            })?;
 
         let hurst_exp = finstack_quant_core::math::fractional::HurstExponent::new(s.hurst)
             .map_err(|e| {
