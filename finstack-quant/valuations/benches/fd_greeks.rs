@@ -26,7 +26,7 @@ use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::pricer::{ModelKey, STANDARD};
 use finstack_quant_valuations::results::ValuationResult;
 #[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
-#[path = "../tests/support/equity_fx_options.rs"]
+#[path = "../equity/tests/support/options.rs"]
 mod option_support;
 use std::hint::black_box;
 use time::Month;

@@ -91,29 +91,9 @@ mod trs;
 
 // FX Derivatives
 
-/// FX forward tests - Outright FX forward contracts
-#[path = "instruments/fx_forward/mod.rs"]
-mod fx_forward;
-
-/// FX option tests - Currency options (vanilla and exotic)
-#[path = "instruments/fx_option/mod.rs"]
-mod fx_option;
-
-/// FX barrier option tests - Barrier options on FX rates
+/// FX barrier option tests - JSON/observed-state regression suite (single-family FX tests live in `fx/tests/`)
 #[path = "instruments/fx_barrier_option/mod.rs"]
 mod fx_barrier_option;
-
-/// FX spot tests - Spot foreign exchange transactions
-#[path = "instruments/fx_spot/mod.rs"]
-mod fx_spot;
-
-/// FX variance swap tests - Volatility exposure on FX
-#[path = "instruments/fx_variance_swap/mod.rs"]
-mod fx_variance_swap;
-
-/// NDF tests - Non-deliverable forwards for restricted currencies
-#[path = "instruments/ndf/mod.rs"]
-mod ndf;
 
 // Commodity Derivatives
 

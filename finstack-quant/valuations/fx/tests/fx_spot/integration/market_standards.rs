@@ -1,0 +1,263 @@
+//! Market standards and industry benchmark tests for FX Spot.
+
+use super::super::common::*;
+use finstack_quant_cashflows::CashflowProvider;
+use finstack_quant_core::FxHashMap;
+use finstack_quant_core::{
+    currency::Currency,
+    market_data::context::MarketContext,
+    money::{Money, fx::FxMatrix},
+    types::InstrumentId,
+};
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_fx::fx_spot::FxSpot;
+use std::sync::Arc;
+
+#[test]
+fn test_standard_eurusd_t_plus_2_settlement() {
+    // Market standard: FX spot settles T+2 business days
+    let fx = eurusd_with_notional(1_000_000.0, 1.20);
+    let market = MarketContext::new();
+    let as_of = d(2025, 1, 15); // Wednesday
+
+    let cashflows = fx.dated_cashflows(&market, as_of).unwrap();
+
+    assert_eq!(cashflows.len(), 1);
+    // T+2 from Wed = Fri (accounting for weekends)
+    assert_eq!(cashflows[0].0, d(2025, 1, 17));
+}
+
+#[test]
+fn test_standard_major_currency_pairs() {
+    // Test standard major currency pairs
+    let market = market_with_fx_matrix();
+    let as_of = test_date();
+
+    let pairs = vec![
+        (Currency::EUR, Currency::USD, "EURUSD", 1.20),
+        (Currency::GBP, Currency::USD, "GBPUSD", 1.40),
+        (Currency::USD, Currency::JPY, "USDJPY", 110.0),
+    ];
+
+    for (base, quote, name, expected_rate) in pairs {
+        let fx = FxSpot::builder()
+            .id(InstrumentId::new(name))
+            .base_currency(base)
+            .quote_currency(quote)
+            .notional(Money::new(1_000_000.0, base).expect("valid money fixture"))
+            .settlement_days(2)
+            .base_calendar_id("weekends_only".into())
+            .quote_calendar_id("weekends_only".into())
+            .build()
+            .expect("valid FX spot");
+
+        let pv = fx.value(&market, as_of).unwrap();
+        assert_eq!(pv.currency(), quote);
+
+        let expected_pv = 1_000_000.0 * expected_rate;
+        approx_eq(pv.amount(), expected_pv, LARGE_EPSILON, name);
+    }
+}
+
+#[test]
+fn test_standard_notional_sizes() {
+    // Test industry-standard notional sizes
+    let market = MarketContext::new();
+    let rate = 1.20;
+
+    let notionals = vec![
+        (1_000_000.0, "Standard"),
+        (5_000_000.0, "Large"),
+        (10_000_000.0, "Very Large"),
+        (100_000.0, "Small"),
+    ];
+
+    for (notional, desc) in notionals {
+        let fx = eurusd_with_notional(notional, rate);
+        let pv = fx.value(&market, test_date()).unwrap();
+
+        let expected = notional * rate;
+        approx_eq(pv.amount(), expected, LARGE_EPSILON, desc);
+    }
+}
+
+#[test]
+fn test_spot_rate_market_convention() {
+    // Spot rate convention: base per quote (e.g., EUR/USD = USD per 1 EUR)
+    let fx = eurusd_with_notional(1.0, 1.20); // 1 EUR = 1.20 USD
+    let market = MarketContext::new();
+    let pv = fx.value(&market, test_date()).unwrap();
+
+    assert_eq!(pv.amount(), 1.20, "1 EUR = 1.20 USD");
+}
+
+#[test]
+fn test_cross_rate_consistency() {
+    // Test cross-rate consistency: EUR/GBP = EUR/USD / GBP/USD
+    let market = market_with_fx_matrix();
+    let as_of = test_date();
+
+    let eur_usd = FxSpot {
+        notional: Money::new(1.0, Currency::EUR).expect("valid money fixture"),
+        ..sample_eurusd()
+    };
+    let gbp_usd = FxSpot {
+        notional: Money::new(1.0, Currency::GBP).expect("valid money fixture"),
+        ..sample_gbpusd()
+    };
+
+    let eur_usd_rate = eur_usd.value(&market, as_of).unwrap().amount(); // 1.20
+    let gbp_usd_rate = gbp_usd.value(&market, as_of).unwrap().amount(); // 1.40
+
+    let expected_eur_gbp = eur_usd_rate / gbp_usd_rate; // 1.20 / 1.40
+
+    let eur_gbp = FxSpot::builder()
+        .id(InstrumentId::new("EURGBP"))
+        .base_currency(Currency::EUR)
+        .quote_currency(Currency::GBP)
+        .notional(Money::new(1.0, Currency::EUR).expect("valid money fixture"))
+        .settlement_days(2)
+        .base_calendar_id("weekends_only".into())
+        .quote_calendar_id("weekends_only".into())
+        .build()
+        .expect("valid FX spot");
+
+    let eur_gbp_rate = eur_gbp.value(&market, as_of).unwrap().amount();
+
+    approx_eq(
+        eur_gbp_rate,
+        expected_eur_gbp,
+        LARGE_EPSILON,
+        "Cross-rate consistency",
+    );
+}
+
+#[test]
+fn test_inverse_pair_consistency() {
+    // EUR/USD and USD/EUR should be reciprocals
+    let market = market_with_fx_matrix();
+    let as_of = test_date();
+
+    let eur_usd = FxSpot {
+        notional: Money::new(1.0, Currency::EUR).expect("valid money fixture"),
+        ..sample_eurusd()
+    };
+    let usd_eur = FxSpot::builder()
+        .id(InstrumentId::new("USDEUR"))
+        .base_currency(Currency::USD)
+        .quote_currency(Currency::EUR)
+        .notional(Money::new(1.0, Currency::USD).expect("valid money fixture"))
+        .settlement_days(2)
+        .base_calendar_id("weekends_only".into())
+        .quote_calendar_id("weekends_only".into())
+        .build()
+        .expect("valid FX spot");
+
+    let eur_usd_rate = eur_usd.value(&market, as_of).unwrap().amount();
+    let usd_eur_rate = usd_eur.value(&market, as_of).unwrap().amount();
+
+    let product = eur_usd_rate * usd_eur_rate;
+    approx_eq(product, 1.0, LARGE_EPSILON, "Inverse pair consistency");
+}
+
+#[test]
+fn test_pip_value_calculation() {
+    // Standard pip value calculation for FX
+    // 1 pip = 0.0001 for most pairs
+    let fx = eurusd_with_notional(100_000.0, 1.2000);
+    let market = MarketContext::new();
+
+    let pv1 = fx.value(&market, test_date()).unwrap().amount();
+
+    let fx_plus_pip = eurusd_with_notional(100_000.0, 1.2001);
+    let pv2 = fx_plus_pip.value(&market, test_date()).unwrap().amount();
+
+    let pip_value = pv2 - pv1;
+
+    // 1 pip on 100k notional = 10 USD
+    approx_eq(pip_value, 10.0, LARGE_EPSILON, "Standard pip value");
+}
+
+#[test]
+fn test_basis_point_sensitivity() {
+    // Test 1 basis point (0.01%) sensitivity
+    let fx = eurusd_with_notional(1_000_000.0, 1.20);
+    let market = MarketContext::new();
+
+    let pv_base = fx.value(&market, test_date()).unwrap().amount();
+
+    // 1 bp change in rate
+    let fx_shifted = eurusd_with_notional(1_000_000.0, 1.20 * 1.0001);
+    let pv_shifted = fx_shifted.value(&market, test_date()).unwrap().amount();
+
+    let sensitivity = pv_shifted - pv_base;
+
+    // Expected: 1M * 1.20 * 0.0001 = 120
+    approx_eq(sensitivity, 120.0, LARGE_EPSILON, "Basis point sensitivity");
+}
+
+#[test]
+fn test_triangular_arbitrage_absence() {
+    // Verify no triangular arbitrage: EUR/USD * USD/JPY = EUR/JPY
+    // Need to add EUR/JPY to the mock provider
+    let mut rates = FxHashMap::default();
+    rates.insert((Currency::EUR, Currency::USD), 1.20);
+    rates.insert((Currency::USD, Currency::JPY), 110.0);
+    rates.insert((Currency::EUR, Currency::JPY), 1.20 * 110.0); // 132.0
+
+    let provider = MockFxProvider { rates };
+    let fx_matrix = FxMatrix::new(Arc::new(provider), None);
+    let market = MarketContext::new().insert_fx(fx_matrix);
+    let as_of = test_date();
+
+    let eur_usd = FxSpot {
+        notional: Money::new(1.0, Currency::EUR).expect("valid money fixture"),
+        ..sample_eurusd()
+    }
+    .value(&market, as_of)
+    .unwrap()
+    .amount();
+
+    let usd_jpy = FxSpot {
+        notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
+        ..sample_usdjpy()
+    }
+    .value(&market, as_of)
+    .unwrap()
+    .amount();
+
+    let eur_jpy_implied = eur_usd * usd_jpy;
+
+    let eur_jpy = FxSpot::builder()
+        .id(InstrumentId::new("EURJPY"))
+        .base_currency(Currency::EUR)
+        .quote_currency(Currency::JPY)
+        .notional(Money::new(1.0, Currency::EUR).expect("valid money fixture"))
+        .settlement_days(2)
+        .base_calendar_id("weekends_only".into())
+        .quote_calendar_id("weekends_only".into())
+        .build()
+        .expect("valid FX spot")
+        .value(&market, as_of)
+        .unwrap()
+        .amount();
+
+    approx_eq(
+        eur_jpy,
+        eur_jpy_implied,
+        LARGE_EPSILON,
+        "No triangular arbitrage",
+    );
+}
+
+#[test]
+fn test_zero_value_at_par() {
+    // At spot rate, the NPV represents the quote currency amount
+    // This is not zero-value like a swap at par, but confirms pricing logic
+    let fx = eurusd_with_notional(1_000_000.0, 1.20);
+    let market = MarketContext::new();
+    let pv = fx.value(&market, test_date()).unwrap();
+
+    assert_eq!(pv.currency(), Currency::USD);
+    approx_eq(pv.amount(), 1_200_000.0, EPSILON, "PV at spot");
+}

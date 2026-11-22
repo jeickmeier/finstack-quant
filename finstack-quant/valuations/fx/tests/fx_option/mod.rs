@@ -19,4 +19,12 @@
 //! 4. **Market Standards**: Include validation of no-arbitrage relationships
 //! 5. **Edge Coverage**: Comprehensive boundary and error testing
 
+mod helpers;
+mod test_calculator;
 mod test_conventions;
+mod test_edge_cases;
+mod test_fx_option_parity;
+mod test_greeks;
+mod test_implied_vol;
+mod test_instrument;
+mod test_put_call_parity;

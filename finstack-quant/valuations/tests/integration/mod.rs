@@ -4,11 +4,6 @@
 //!
 //! # Test Categories
 //!
-//! ## [`e2e`] - End-to-End Workflow Tests
-//!
-//! Complete workflow tests exercising multiple components:
-//! - `fx_settlement` - FX spot date calculations with joint holiday calendars
-//!
 //! ## [`metrics`] - Metrics Framework Tests
 //!
 //! Tests for the metrics computation system:
@@ -32,14 +27,10 @@
 //! cargo nextest run -p finstack-quant-valuations --test valuations integration::
 //!
 //! # Run specific category
-//! cargo nextest run -p finstack-quant-valuations --test valuations integration::e2e::
 //! cargo nextest run -p finstack-quant-valuations --test valuations integration::metrics::
 //! cargo nextest run -p finstack-quant-valuations --test valuations integration::serialization::
 //! cargo nextest run -p finstack-quant-valuations --test valuations integration::schema::
 //! ```
-
-// End-to-end workflow tests
-pub mod e2e;
 
 // Metrics framework tests
 pub mod metrics;

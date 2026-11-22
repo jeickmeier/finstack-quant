@@ -1,0 +1,89 @@
+//! Theta metric tests for FX Spot.
+
+use super::super::common::*;
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::{currency::Currency, dates::Date, money::Money};
+use finstack_quant_valuations_core::{instruments::Instrument, metrics::MetricId};
+use finstack_quant_valuations_fx::fx_spot::FxSpot;
+
+fn theta_for(fx: FxSpot, market: &MarketContext, as_of: Date) -> f64 {
+    let result = fx
+        .price_with_metrics(
+            market,
+            as_of,
+            &[MetricId::Theta],
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
+        )
+        .expect("pricing with theta should succeed");
+    result
+        .measures
+        .get(MetricId::Theta.as_str())
+        .copied()
+        .expect("requested theta metric must be present")
+}
+
+#[test]
+fn test_theta_basic() {
+    let fx = FxSpot {
+        settlement_date: Some(d(2025, 1, 17)),
+        ..eurusd_with_notional(1_000_000.0, 1.20)
+    };
+    let market = market_full();
+    let theta = theta_for(fx, &market, test_date());
+
+    // For FX spot with explicit rate, theta should be very small or zero
+    // since value doesn't change with time when rate is fixed
+    assert!(theta.abs() < 100.0, "Theta should be small for fixed rate");
+}
+
+#[test]
+fn test_theta_settled_position() {
+    let fx = FxSpot {
+        settlement_date: Some(d(2025, 1, 10)),
+        ..eurusd_with_notional(1_000_000.0, 1.20)
+    }; // Past
+    let market = market_full();
+    let theta = theta_for(fx, &market, test_date());
+
+    // Settled position has zero theta
+    approx_eq(theta, 0.0, EPSILON, "Theta zero for settled position");
+}
+
+#[test]
+fn test_theta_zero_notional() {
+    let fx = FxSpot {
+        notional: Money::new(0.0, Currency::EUR).expect("valid money fixture"),
+        quoted_spot: Some(1.20),
+        settlement_date: Some(d(2025, 1, 17)),
+        ..sample_eurusd()
+    };
+    let market = market_full();
+    let theta = theta_for(fx, &market, test_date());
+    approx_eq(theta, 0.0, EPSILON, "Theta zero for zero notional");
+}
+
+#[test]
+fn test_theta_calculation_completes() {
+    // Regression test: ensure theta calculation completes without error
+    let test_cases = vec![
+        FxSpot {
+            settlement_date: Some(d(2025, 1, 17)),
+            ..eurusd_with_notional(1_000_000.0, 1.20)
+        },
+        FxSpot {
+            settlement_date: Some(d(2025, 2, 15)),
+            ..eurusd_with_notional(5_000_000.0, 1.25)
+        },
+        FxSpot {
+            notional: Money::new(2_000_000.0, Currency::GBP).expect("valid money fixture"),
+            quoted_spot: Some(1.40),
+            settlement_date: Some(d(2025, 3, 15)),
+            ..sample_gbpusd()
+        },
+    ];
+
+    for fx in test_cases {
+        let market = market_full();
+        let _ = theta_for(fx, &market, test_date());
+    }
+}

@@ -126,27 +126,28 @@ Keep the key and the comment together if either moves.
 ## Tests and benches
 
 Integration tests that need only this crate, valuations-core and the
-test-support crate live in `tests/<leaf>/`, compiled into the single `fx`
+test-support crate live in `tests/`, compiled into the single `fx`
 target (`mise run rust-test-crate -- finstack-quant-valuations-fx`):
-`fx_forward`, `fx_swap`, `ndf`, `fx_option`, `fx_barrier_option` and
-`quanto_option`. Tests that price through the standard registries, round-trip
-`InstrumentJson` or reach another family stay in the umbrella's
-`../tests/instruments/<leaf>/` (`fx_spot`, `fx_variance_swap`, the pricer
-registry tests of `fx_forward` and `ndf`, the `fx_option` helpers-based suite,
-`fx_dependency_completeness`). `fx_digital_option` and `fx_touch_option` are
-covered by colocated `#[cfg(test)]` modules plus the umbrella's registry, serde
-and dependency contract tests. Benches stay in the umbrella.
+`fx_spot`, `fx_forward`, `fx_swap`, `ndf`, `fx_option` (including
+`test_fx_option_parity`), `fx_barrier_option`, `fx_variance_swap`,
+`quanto_option`, and `fx_settlement`. Shared FX option builders live in
+`tests/support/options.rs` and are also `#[path]`-included by umbrella
+cross-family tests and benches. Tests that round-trip `InstrumentJson` or reach
+another family stay in the umbrella's `../tests/` (`fx_barrier_option/
+theta_observed_state.rs`, `fx_dependency_completeness`, cross-family metrics).
+`fx_digital_option` and `fx_touch_option` are covered by colocated
+`#[cfg(test)]` modules plus the umbrella's registry, serde and dependency
+contract tests. Benches stay in the umbrella.
 
 ```bash
-# whole integration target
-mise run rust-test-integration -- finstack-quant-valuations valuations
+# FX crate unit and integration tests
+mise run rust-test-crate -- finstack-quant-valuations-fx
 
 # focused leaf tests
-mise run rust-test-filter -- finstack-quant-valuations fx_option --integration valuations
-mise run rust-test-filter -- finstack-quant-valuations fx_dependency_completeness --integration valuations
+mise run rust-test-filter -- finstack-quant-valuations-fx fx_option
 
-# crate unit and integration tests
-mise run rust-test-crate -- finstack-quant-valuations
+# umbrella FX contract tests
+mise run rust-test-filter -- finstack-quant-valuations fx_dependency_completeness
 
 # final workspace gate
 mise run rust-test

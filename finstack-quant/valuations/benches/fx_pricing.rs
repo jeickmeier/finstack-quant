@@ -29,7 +29,7 @@ use std::sync::Arc;
 use time::Month;
 
 #[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
-#[path = "../tests/support/equity_fx_options.rs"]
+#[path = "../fx/tests/support/options.rs"]
 mod option_support;
 
 fn base_date() -> Date {

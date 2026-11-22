@@ -7,5 +7,4 @@
 mod test_asian_cv_notional;
 mod test_cds_parity;
 mod test_cross_impl_parity;
-mod test_fx_option_parity;
 mod test_quantlib_external_parity;

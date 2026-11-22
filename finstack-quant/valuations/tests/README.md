@@ -66,8 +66,7 @@ tests/
 │
 ├── support/                # Instrument builders shared across modules
 │   ├── mod.rs              # re-exports local helpers plus path-included family/calibration helpers
-│   ├── credit.rs           # CDS builders and calibrated hazard curves (needs calibration)
-│   └── equity_fx_options.rs
+│   └── credit.rs           # CDS builders and calibrated hazard curves (needs calibration)
 │
 ├── core/                   # framework-behaviour tests (wired by core.rs)
 ├── instruments/            # product directories + contract tests + generated fixtures
@@ -75,7 +74,7 @@ tests/
 ├── cashflows/
 ├── performance/
 ├── sanity_invariants/
-├── integration/            # e2e/, metrics/, schema/, serialization/
+├── integration/            # metrics/, schema/, serialization/
 ├── golden/                 # runner + schema + data/ (bloomberg, quantlib, regression)
 ├── fixtures/               # JSON regression fixtures for production audits
 │

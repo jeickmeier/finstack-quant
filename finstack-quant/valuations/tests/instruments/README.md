@@ -39,7 +39,6 @@ larger ones split into subdirectories:
 | `bond` | `metrics/` (calibration-pinned credit-risk metrics; the single-family bond suite lives in `../../fixed-income/tests/bond/`) |
 | `structured_credit` | `unit/`, `integration/` (the JSON round-trip and `price_instrument` tests; the rest of the suite is in `../../structured-credit/tests/`) |
 | `term_loan` | `metrics/` (calibration-pinned credit-risk metrics; the single-family suite lives in `../../fixed-income/tests/term_loan/`) |
-| `fx_spot` | `metrics/`, `integration/` |
 | `equity` | `real_estate/` |
 
 Split only when a directory outgrows a flat layout. The authoritative module

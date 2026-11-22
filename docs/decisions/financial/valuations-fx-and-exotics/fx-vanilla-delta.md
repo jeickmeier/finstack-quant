@@ -125,7 +125,7 @@ A delta-coordinate smile with recalibrated delta strikes can change hedging risk
 - [finstack-quant/valuations/fx/src/fx_option/types.rs](../../../../finstack-quant/valuations/fx/src/fx_option/types.rs)
 
 - [finstack-quant/valuations/fx/tests/fx_option/test_conventions.rs](../../../../finstack-quant/valuations/fx/tests/fx_option/test_conventions.rs): Explicit delta-neutral ATM strike identities for unadjusted and premium-adjusted conventions.
-- [Put-call parity tests](../../../../finstack-quant/valuations/tests/instruments/fx_option/test_put_call_parity.rs) locate formula-identity evidence. The [QuantLib-labelled FX fixture](../../../../finstack-quant/valuations/tests/golden/data/pricing/quantlib/fx_option/eurusd_atm_call_3m_quantlib.json) carries provenance and tolerances whose generation was not requalified. Neither was executed in this audit.
+- [Put-call parity tests](../../../../finstack-quant/valuations/fx/tests/fx_option/test_put_call_parity.rs) locate formula-identity evidence. The [QuantLib-labelled FX fixture](../../../../finstack-quant/valuations/tests/golden/data/pricing/quantlib/fx_option/eurusd_atm_call_3m_quantlib.json) carries provenance and tolerances whose generation was not requalified. Neither was executed in this audit.
 
 References for the original audit are [Garman and Kohlhagen](../../../REFERENCES.md#garman-kohlhagen-1983) and [Clark FX Options](../../../REFERENCES.md#clark-fx-options).
 

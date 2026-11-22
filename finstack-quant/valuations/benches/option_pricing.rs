@@ -28,7 +28,7 @@ use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::ModelKey;
 
 #[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
-#[path = "../tests/support/equity_fx_options.rs"]
+#[path = "../equity/tests/support/options.rs"]
 mod option_support;
 mod support;
 use std::hint::black_box;
