@@ -125,33 +125,6 @@ pub struct CliquetOption {
 finstack_quant_valuations_core::validate_on_deserialize!(CliquetOption);
 
 impl CliquetOption {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> CliquetOptionBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .underlying_ticker(self.underlying_ticker.clone())
-            .reset_dates(self.reset_dates.clone())
-            .expiry(self.expiry)
-            .local_cap(self.local_cap)
-            .local_floor(self.local_floor)
-            .global_cap(self.global_cap)
-            .global_floor(self.global_floor)
-            .notional(self.notional)
-            .day_count(self.day_count)
-            .discount_curve_id(self.discount_curve_id.clone())
-            .spot_id(self.spot_id.clone())
-            .vol_surface_id(self.vol_surface_id.clone())
-            .path_model(self.path_model)
-            .div_yield_id_opt(self.div_yield_id.clone())
-            .initial_level_opt(self.initial_level)
-            .past_fixings(self.past_fixings.clone())
-            .payoff_type(self.payoff_type)
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     /// Validate structural invariants required by the pricing engine.
     ///
     /// # Errors

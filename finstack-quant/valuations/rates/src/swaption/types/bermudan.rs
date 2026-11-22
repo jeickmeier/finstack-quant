@@ -148,24 +148,6 @@ pub struct BermudanSwaptionParams {
 }
 
 impl BermudanSwaption {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> BermudanSwaptionBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .option_type(self.option_type)
-            .notional(self.notional)
-            .settlement(self.settlement)
-            .vol_surface_id(self.vol_surface_id.clone())
-            .exercise_schedule(self.exercise_schedule.clone())
-            .bermudan_type(self.bermudan_type)
-            .underlying_fixed_leg(self.underlying_fixed_leg.clone())
-            .underlying_float_leg(self.underlying_float_leg.clone())
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     /// Parse a persisted `bermudan_swaption` instrument envelope.
     ///
     /// Accepts exactly the wire form the umbrella crate writes for this

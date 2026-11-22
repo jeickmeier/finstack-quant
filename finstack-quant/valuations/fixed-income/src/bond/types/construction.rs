@@ -80,7 +80,7 @@ impl Bond {
     /// Create a standard fixed-rate bond (most common use case).
     ///
     /// Delegates to [`Self::with_convention`] with
-    /// [`finstack_quant_valuations_fixed_income::BondConvention::UsCorporate`]:
+    /// [`crate::BondConvention::UsCorporate`]:
     /// 30/360, semi-annual, T+1, Modified Following, `usny`. For EUR corporates
     /// use `BondConvention::EurCorporate` (ACT/ACT ICMA, annual, T+2, TARGET2).
     ///
@@ -316,7 +316,7 @@ impl Bond {
     /// Creates a bond with floating-rate coupons linked to a forward index
     /// (e.g., SOFR, EURIBOR) plus a margin. Settlement, calendar, and
     /// business-day convention come from a currency →
-    /// [`finstack_quant_valuations_fixed_income::BondConvention`] map:
+    /// [`crate::BondConvention`] map:
     ///
     /// - `USD` → `UsCorporate` (T+1, Modified Following, `usny`)
     /// - `EUR` → `EurCorporate` (T+2, Modified Following, `target2`)

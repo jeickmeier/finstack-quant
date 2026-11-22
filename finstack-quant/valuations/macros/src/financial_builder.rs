@@ -12,6 +12,8 @@ use syn::{Data, DeriveInput, Expr, Fields, Lit, Meta, parse_macro_input};
 /// - Optional fields (Option<T>)
 /// - Validation on build (e.g., start_date < maturity)
 /// - Ergonomic setter methods
+/// - `to_builder(&self)` for cloning an existing contract back into a builder
+///   (opt out with `#[builder(no_to_builder)]`)
 ///
 /// # Builder pattern: no-args entry point
 ///
@@ -67,14 +69,20 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
     let mut field_docs: HashMap<syn::Ident, String> = HashMap::new();
 
     let mut custom_validator: Option<Expr> = None;
+    let mut generate_to_builder = true;
     for attr in &input.attrs {
         if attr.path().is_ident("builder") {
             let parsed = attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident("validate") {
                     custom_validator = Some(meta.value()?.parse()?);
                     Ok(())
+                } else if meta.path.is_ident("no_to_builder") {
+                    generate_to_builder = false;
+                    Ok(())
                 } else {
-                    Err(meta.error("unsupported struct builder attribute; expected validate"))
+                    Err(meta.error(
+                        "unsupported struct builder attribute; expected validate or no_to_builder",
+                    ))
                 }
             });
             if let Err(error) = parsed {
@@ -273,6 +281,32 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
         .iter()
         .map(|(id, expr)| quote! { #id: #expr });
 
+    let to_builder_method = if generate_to_builder {
+        let to_builder_req = required_fields.iter().map(|(id, _)| {
+            quote! { #id: ::core::option::Option::Some(::core::clone::Clone::clone(&self.#id)) }
+        });
+        let to_builder_opt = optional_fields.iter().map(|(id, ty)| {
+            if option_inner(ty).is_some() {
+                quote! { #id: ::core::clone::Clone::clone(&self.#id) }
+            } else {
+                quote! { #id: ::core::option::Option::Some(::core::clone::Clone::clone(&self.#id)) }
+            }
+        });
+        let to_builder_doc = "Seed an independent builder with the complete existing contract.";
+        quote! {
+            #[doc = #to_builder_doc]
+            #[must_use]
+            pub fn to_builder(&self) -> #builder_name {
+                #builder_name {
+                    #(#to_builder_req,)*
+                    #(#to_builder_opt,)*
+                }
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     let builder_doc = format!("Builder for `{}`.", struct_name);
     let build_doc = "Builds the final instance.";
     let builder_method_doc = "Creates a new builder.";
@@ -311,6 +345,8 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
             #[doc = #builder_method_doc]
             #[must_use]
             pub fn builder() -> #builder_name { #builder_name::default() }
+
+            #to_builder_method
         }
     };
 

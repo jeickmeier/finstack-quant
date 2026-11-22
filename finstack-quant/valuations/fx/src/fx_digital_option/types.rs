@@ -141,28 +141,6 @@ pub struct FxDigitalOption {
 }
 
 impl FxDigitalOption {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> FxDigitalOptionBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .base_currency(self.base_currency)
-            .quote_currency(self.quote_currency)
-            .strike(self.strike)
-            .option_type(self.option_type)
-            .payout_type(self.payout_type)
-            .payout_amount(self.payout_amount)
-            .expiry(self.expiry)
-            .day_count(self.day_count)
-            .notional(self.notional)
-            .domestic_discount_curve_id(self.domestic_discount_curve_id.clone())
-            .foreign_discount_curve_id(self.foreign_discount_curve_id.clone())
-            .vol_surface_id(self.vol_surface_id.clone())
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     /// Validate FX digital option input invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         finstack_quant_core::validation::validate_distinct_currencies(

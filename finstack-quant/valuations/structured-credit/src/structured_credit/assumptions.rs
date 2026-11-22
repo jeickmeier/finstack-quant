@@ -44,6 +44,14 @@ pub(crate) const CMBS_STANDARD_CALIBRATION: CmbsCalibration = CmbsCalibration {
     cpr_volatility: 0.1,
 };
 
+pub(crate) const CMO_COLLATERAL_DEFAULTS: CmoCollateralDefaults = CmoCollateralDefaults {
+    wac: 0.045,
+    wam_months: 360,
+    servicing_fee_bp: 25.0,
+    guarantee_fee_bp: 25.0,
+    speed_multiplier: 1.0,
+};
+
 pub(crate) fn default_prepayment_spec() -> PrepaymentModelSpec {
     PrepaymentModelSpec::constant_cpr(DEFAULT_PREPAYMENT_CPR)
 }
@@ -158,6 +166,7 @@ impl StructuredCreditAssumptionRegistry {
         )
     }
 
+    #[cfg(test)]
     pub(crate) fn cmo_collateral_defaults(&self) -> CmoCollateralDefaults {
         CmoCollateralDefaults {
             wac: self.cmo_collateral_defaults.wac,
@@ -364,7 +373,7 @@ pub(crate) struct ConstructorDefaults {
     pub(crate) recovery_spec: RecoveryModelSpec,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct CmoCollateralDefaults {
     pub(crate) wac: f64,
     pub(crate) wam_months: u32,
@@ -799,6 +808,10 @@ mod tests {
         assert_eq!(
             super::default_recovery_spec(),
             registry.default_recovery_spec()
+        );
+        assert_eq!(
+            super::CMO_COLLATERAL_DEFAULTS,
+            registry.cmo_collateral_defaults()
         );
 
         assert_eq!(

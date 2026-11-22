@@ -351,3 +351,23 @@ impl LossRecognition {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::DealType;
+
+    #[test]
+    fn deal_type_display_matches_serde_wire_value() {
+        for d in [
+            DealType::Clo,
+            DealType::Cbo,
+            DealType::Abs,
+            DealType::Rmbs,
+            DealType::Cmbs,
+            DealType::Auto,
+            DealType::Card,
+        ] {
+            assert_eq!(serde_json::to_value(d).expect("ser"), d.to_string());
+        }
+    }
+}

@@ -44,8 +44,13 @@ pub(crate) struct OptionedCapletInputs {
     pub time_to_fixing: f64,
 }
 
-fn fixing_series_id(cap_floor: &CapFloor) -> String {
-    finstack_quant_core::market_data::fixings::fixing_series_id(cap_floor.forward_curve_id.as_str())
+fn fixing_series_id(cap_floor: &CapFloor) -> finstack_quant_core::Result<String> {
+    let index_id = finstack_quant_core::market_data::fixings::validate_fixing_index_id(
+        cap_floor.forward_curve_id.as_str(),
+    )?;
+    Ok(finstack_quant_core::market_data::fixings::fixing_series_id(
+        index_id,
+    ))
 }
 
 /// Resolve the exact coupon projection consumed by pricing, HW, and metrics.
@@ -90,8 +95,12 @@ pub(crate) fn resolve_optioned_coupon(
             cap_floor.notional.currency(),
             &format!("CapFloor '{}'", cap_floor.id),
         )?;
-        let series_id = fixing_series_id(cap_floor);
-        let fixings = market.get_series(&series_id).ok();
+        let series_id = fixing_series_id(cap_floor)?;
+        let fixings = match market.get_series(&series_id) {
+            Ok(series) => Some(series),
+            Err(err) if err.kind() == finstack_quant_core::ErrorKind::NotFound => None,
+            Err(err) => return Err(err),
+        };
         let compounded_spread = match overnight.spread_compounding {
             OvernightSpreadCompounding::Exclude => 0.0,
             OvernightSpreadCompounding::Include => spread,
@@ -137,15 +146,19 @@ pub(crate) fn resolve_optioned_coupon(
     // Valuation is at start of day: a fixing dated exactly `as_of` is not yet
     // published, while earlier fixings must be supplied as observations.
     let index_forward = if fixing_date < as_of {
-        let series_id = fixing_series_id(cap_floor);
-        let series = market.get_series(&series_id).map_err(|_| {
-            finstack_quant_core::Error::Validation(format!(
-                "Seasoned cap/floor requires historical fixing series '{}' for fixing date {}. \
-                 Fixed-but-unpaid coupons must be valued off observed fixings, not the live \
-                 forward curve.",
-                series_id, fixing_date
-            ))
-        })?;
+        let series_id = fixing_series_id(cap_floor)?;
+        let series = match market.get_series(&series_id) {
+            Ok(series) => series,
+            Err(err) if err.kind() == finstack_quant_core::ErrorKind::NotFound => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Seasoned cap/floor requires historical fixing series '{}' for fixing date {}. \
+                     Fixed-but-unpaid coupons must be valued off observed fixings, not the live \
+                     forward curve.",
+                    series_id, fixing_date
+                )));
+            }
+            Err(err) => return Err(err),
+        };
         series.get_value_exact(fixing_date)?
     } else {
         forward_curve.as_ref().rate_between_dates(
@@ -641,5 +654,27 @@ mod tests {
 
         assert!((resolved.coupon.forward - 0.12).abs() < 1e-13);
         assert_eq!(resolved.time_to_fixing, 0.0);
+    }
+
+    #[test]
+    fn overnight_caplet_propagates_invalid_fixing_index_id_instead_of_swallowing() {
+        let as_of = date!(2024 - 12 - 02);
+        let mut caplet = compounded_sofr_caplet();
+        caplet.forward_curve_id = "FIXING:USD-SOFR-OIS".into();
+        let period = caplet.pricing_periods().expect("periods").remove(0);
+
+        let forward = ForwardCurve::flat("FIXING:USD-SOFR-OIS", as_of, 0.04, DayCount::Act360)
+            .expect("forward");
+        let market = market(as_of)
+            .try_insert(forward)
+            .expect("insert market curve");
+
+        let err = resolve_optioned_coupon(&caplet, &period, &market, as_of)
+            .expect_err("malformed fixing index id must propagate Validation");
+        assert_eq!(
+            err.kind(),
+            finstack_quant_core::ErrorKind::Validation,
+            "unexpected error: {err}"
+        );
     }
 }

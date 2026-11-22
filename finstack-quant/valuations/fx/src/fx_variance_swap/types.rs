@@ -169,41 +169,6 @@ pub struct FxVarianceSwap {
 }
 
 impl FxVarianceSwap {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> FxVarianceSwapBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .base_currency(self.base_currency)
-            .quote_currency(self.quote_currency)
-            .spot_id_opt(self.spot_id.clone())
-            .notional(self.notional)
-            .strike_variance(self.strike_variance)
-            .start_date(self.start_date)
-            .maturity(self.maturity)
-            .settlement_date_opt(self.settlement_date)
-            .observation_frequency(self.observation_frequency)
-            .base_calendar_id(self.base_calendar_id.clone())
-            .quote_calendar_id(self.quote_calendar_id.clone())
-            .observation_business_day_convention(self.observation_business_day_convention)
-            .observation_end_of_month(self.observation_end_of_month)
-            .realized_var_method(self.realized_var_method)
-            .trading_days_per_year(self.trading_days_per_year)
-            .open_series_id_opt(self.open_series_id.clone())
-            .high_series_id_opt(self.high_series_id.clone())
-            .low_series_id_opt(self.low_series_id.clone())
-            .close_series_id_opt(self.close_series_id.clone())
-            .previous_close_date_opt(self.previous_close_date)
-            .side(self.side)
-            .domestic_discount_curve_id(self.domestic_discount_curve_id.clone())
-            .foreign_discount_curve_id(self.foreign_discount_curve_id.clone())
-            .vol_surface_id(self.vol_surface_id.clone())
-            .day_count(self.day_count)
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     /// Validate static contract invariants shared by builders, JSON, and direct
     /// instrument pricing.
     pub fn validate(&self) -> Result<()> {

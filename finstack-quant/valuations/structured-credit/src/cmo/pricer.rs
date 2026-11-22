@@ -7,7 +7,7 @@ use super::types::AgencyCmo;
 #[cfg(test)]
 use super::types::{CmoTranche, CmoTrancheType};
 use super::waterfall::execute_waterfall_with_principal_breakdown;
-use crate::structured_credit::assumptions::embedded_registry;
+use crate::structured_credit::assumptions::CMO_COLLATERAL_DEFAULTS;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
 use finstack_quant_core::Result;
@@ -208,7 +208,7 @@ pub(crate) fn build_reference_tranche_schedule(
 
 /// Create assumed collateral for CMO valuation.
 fn create_assumed_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyMbsPassthrough> {
-    let defaults = embedded_registry()?.cmo_collateral_defaults();
+    let defaults = CMO_COLLATERAL_DEFAULTS;
     let total_face = cmo.waterfall.total_current_face()?;
     let original_face = Money::new(
         cmo.waterfall

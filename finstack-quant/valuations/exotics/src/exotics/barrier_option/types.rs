@@ -123,34 +123,6 @@ pub struct BarrierOption {
 }
 
 impl BarrierOption {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> BarrierOptionBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .underlying_ticker(self.underlying_ticker.clone())
-            .strike(self.strike)
-            .barrier(self.barrier)
-            .rebate_opt(self.rebate)
-            .rebate_timing_opt(self.rebate_timing)
-            .option_type(self.option_type)
-            .barrier_type(self.barrier_type)
-            .expiry(self.expiry)
-            .expiry_fixing_opt(self.expiry_fixing)
-            .observed_barrier_breached_opt(self.observed_barrier_breached)
-            .quantity(self.quantity)
-            .currency(self.currency)
-            .day_count(self.day_count)
-            .monitoring(self.monitoring.clone())
-            .discount_curve_id(self.discount_curve_id.clone())
-            .spot_id(self.spot_id.clone())
-            .vol_surface_id(self.vol_surface_id.clone())
-            .div_yield_id_opt(self.div_yield_id.clone())
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     /// Create a canonical example barrier option (up-and-out call).
     ///
     /// Uses continuous contractual monitoring by default.

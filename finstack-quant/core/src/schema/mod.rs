@@ -302,3 +302,11 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
 /// Shared diagnostics for compiled JSON Schema validators.
 #[cfg(feature = "jsonschema-validate")]
 pub mod diagnostics;
+#[cfg(feature = "jsonschema-validate")]
+mod validator;
+
+#[cfg(feature = "jsonschema-validate")]
+pub use validator::{
+    ValidatorCache, build_trimmed_validator, collect_external_refs, format_validation_result,
+    reachable_resource_ids,
+};

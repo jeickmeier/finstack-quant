@@ -37,10 +37,7 @@ fn resources<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
     Ok(mapping)
 }
 
-schema_registry_functions!(
-    finstack_quant_cashflows::schema::ARTIFACTS,
-    "finstack_quant.cashflows.schema"
-);
+schema_registry_functions!("cashflows", "finstack_quant.cashflows.schema");
 
 /// Register the `finstack_quant.cashflows.schema` Python namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

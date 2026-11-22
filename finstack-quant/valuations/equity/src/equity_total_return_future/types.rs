@@ -79,23 +79,6 @@ struct TrfProjection {
 }
 
 impl EquityTotalReturnFuture {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> EquityTotalReturnFutureBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .underlying_ticker(self.underlying_ticker.clone())
-            .terms(self.terms.clone())
-            .spot_id(self.spot_id.clone())
-            .accrued_distributions_id(self.accrued_distributions_id.clone())
-            .accrued_funding_id(self.accrued_funding_id.clone())
-            .spread_bp_id(self.spread_bp_id.clone())
-            .spread_day_count(self.spread_day_count)
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     /// Validate contract and listed-position invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         self.terms.validate()?;

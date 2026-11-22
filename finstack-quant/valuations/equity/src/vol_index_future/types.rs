@@ -141,18 +141,6 @@ pub struct VolatilityIndexFuture {
 }
 
 impl VolatilityIndexFuture {
-    /// Seed an independent builder with the complete listed contract.
-    pub fn to_builder(&self) -> VolatilityIndexFutureBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .terms(self.terms.clone())
-            .vol_index_curve_id(self.vol_index_curve_id.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-            .attributes(self.attributes.clone())
-    }
-
     /// Create a canonical example VIX future for testing and documentation.
     pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_valuations_core::instruments::Position;

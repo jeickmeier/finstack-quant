@@ -167,25 +167,6 @@ pub struct FxSpot {
 finstack_quant_valuations_core::validate_on_deserialize!(FxSpot);
 
 impl FxSpot {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> FxSpotBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .base_currency(self.base_currency)
-            .quote_currency(self.quote_currency)
-            .settlement_date_opt(self.settlement_date)
-            .settlement_days_opt(self.settlement_days)
-            .quoted_spot_opt(self.quoted_spot)
-            .domestic_discount_curve_id_opt(self.domestic_discount_curve_id.clone())
-            .notional(self.notional)
-            .base_calendar_id_opt(self.base_calendar_id.clone())
-            .quote_calendar_id_opt(self.quote_calendar_id.clone())
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     /// Compute the effective settlement date for this FX spot.
     ///
     /// Returns the settlement date adjusted for business days according to the

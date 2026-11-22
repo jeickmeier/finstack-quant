@@ -191,30 +191,6 @@ pub struct AgencyTba {
 }
 
 impl AgencyTba {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> AgencyTbaBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .agency(self.agency)
-            .coupon(self.coupon)
-            .term(self.term)
-            .settlement_year(self.settlement_year)
-            .settlement_month(self.settlement_month)
-            .settlement_class(self.settlement_class)
-            .settlement_date_opt(self.settlement_date)
-            .notional(self.notional)
-            .trade_price(self.trade_price)
-            .trade_date_opt(self.trade_date)
-            .pool_factor_opt(self.pool_factor)
-            .assumed_pool_opt(self.assumed_pool.clone())
-            .prepayment_spec_opt(self.prepayment_spec.clone())
-            .discount_curve_id(self.discount_curve_id.clone())
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     /// Validate the TBA economic contract and optional assumed collateral.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         let context = format!("Agency TBA '{}'", self.id.as_str());

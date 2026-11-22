@@ -23,11 +23,18 @@
 //! assert!(!failures.is_empty());
 //! ```
 
-use finstack_quant_core::schema::SchemaArtifact;
+use finstack_quant_core::schema::diagnostics::Failure;
+use finstack_quant_core::schema::{
+    SchemaArtifact, ValidatorCache, format_validation_result, reachable_resource_ids,
+};
 use finstack_quant_core::{Error, Result};
 use serde_json::Value;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::sync::OnceLock;
+
+const INSTRUMENT_ENVELOPE_PATH: &str = "schemas/instruments/1/instrument.schema.json";
+const VALUATION_RESULT_PATH: &str = "schemas/results/1/valuation_result.schema.json";
+const INSTRUMENT_SCHEMA_PREFIX: &str = "schemas/instruments/1/";
 
 /// Every domain registry, labelled with its Python/WASM namespace name.
 ///
@@ -41,7 +48,7 @@ fn domain_registries() -> [(&'static str, &'static [SchemaArtifact]); 11] {
         ("attribution", finstack_quant_attribution::schema::ARTIFACTS),
         (
             "calibration",
-            finstack_quant_calibration::json_schema::artifacts(),
+            finstack_quant_calibration::schema::artifacts(),
         ),
         ("cashflows", finstack_quant_cashflows::schema::ARTIFACTS),
         ("factor_model", finstack_quant_factor::schema::ARTIFACTS),
@@ -137,6 +144,20 @@ pub fn domains() -> Vec<&'static str> {
     names
 }
 
+/// Process-wide lazy cache of rendered schemas, compiled `$ref` resources, and
+/// trimmed per-`$id` validators across all eleven domains.
+fn validator_cache() -> &'static ValidatorCache {
+    static CACHE: OnceLock<ValidatorCache> = OnceLock::new();
+    CACHE.get_or_init(|| ValidatorCache::new(artifacts()))
+}
+
+/// Return the cached rendered schema document for a registered workspace artifact.
+fn cached_document(artifact: &'static SchemaArtifact) -> Result<&'static Value> {
+    validator_cache()
+        .document(artifact.id)?
+        .ok_or_else(|| Error::Internal(format!("{} missing from validator cache", artifact.id)))
+}
+
 /// Render every artifact once, keyed by `$id`.
 ///
 /// Published schemas reference each other by absolute `$id` on a host that
@@ -150,152 +171,9 @@ pub fn domains() -> Vec<&'static str> {
 pub fn documents_by_id() -> Result<BTreeMap<String, Value>> {
     let mut documents = BTreeMap::new();
     for artifact in artifacts() {
-        documents.insert(artifact.id.to_string(), artifact.generate()?);
+        documents.insert(artifact.id.to_string(), cached_document(artifact)?.clone());
     }
     Ok(documents)
-}
-
-/// The whole corpus, rendered once and cached for the process lifetime.
-///
-/// # Errors
-///
-/// Returns [`Error::Internal`] if any single artifact fails to render; a
-/// partial corpus would silently degrade every cross-document `$ref`
-/// resolution and union-failure expansion that depends on it.
-fn corpus() -> Result<&'static BTreeMap<String, Value>> {
-    static CACHE: OnceLock<Result<BTreeMap<String, Value>>> = OnceLock::new();
-    CACHE
-        .get_or_init(documents_by_id)
-        .as_ref()
-        .map_err(Clone::clone)
-}
-
-/// Every corpus document as a compiled, in-process resolvable resource, keyed by `$id`.
-///
-/// # Errors
-///
-/// Returns [`Error::Internal`] if [`corpus`] fails to render, or if a
-/// rendered document is not a compilable JSON Schema resource.
-fn resources_by_id() -> Result<&'static BTreeMap<String, jsonschema::Resource>> {
-    static CACHE: OnceLock<Result<BTreeMap<String, jsonschema::Resource>>> = OnceLock::new();
-    CACHE
-        .get_or_init(|| {
-            corpus()?
-                .iter()
-                .map(|(id, document)| {
-                    jsonschema::Resource::from_contents(document.clone())
-                        .map(|resource| (id.clone(), resource))
-                        .map_err(|error| Error::Internal(format!("compile resource {id}: {error}")))
-                })
-                .collect()
-        })
-        .as_ref()
-        .map_err(Clone::clone)
-}
-
-/// Collect every external document URI referenced by `$ref` inside `value`.
-///
-/// Local fragment references (`#/...`) resolve inside the current document and
-/// are skipped. `examples` arrays hold instance payloads rather than schema
-/// assertions, so they are skipped as well.
-fn collect_external_refs(value: &Value, out: &mut Vec<String>) {
-    match value {
-        Value::Object(map) => {
-            if let Some(target) = map.get("$ref").and_then(Value::as_str) {
-                let doc_id = target.split('#').next().unwrap_or(target);
-                if !doc_id.is_empty() {
-                    out.push(doc_id.to_string());
-                }
-            }
-            for (key, nested) in map {
-                if key != "examples" {
-                    collect_external_refs(nested, out);
-                }
-            }
-        }
-        Value::Array(items) => {
-            for item in items {
-                collect_external_refs(item, out);
-            }
-        }
-        _ => {}
-    }
-}
-
-/// Compute the transitive set of external corpus `$id`s reachable from `schema`.
-fn reachable_resource_ids(schema: &Value, corpus: &BTreeMap<String, Value>) -> BTreeSet<String> {
-    let mut visited = BTreeSet::new();
-    let mut queue = Vec::new();
-    collect_external_refs(schema, &mut queue);
-    while let Some(id) = queue.pop() {
-        if visited.insert(id.clone())
-            && let Some(doc) = corpus.get(&id)
-        {
-            collect_external_refs(doc, &mut queue);
-        }
-    }
-    visited
-}
-
-/// Build a validator for one document, registering only the corpus resources
-/// transitively reachable from its `$ref` targets.
-///
-/// Format assertion is switched on. JSON Schema leaves `format` as an
-/// annotation by default, which would let `"01/15/2034"` pass a `format: date`
-/// field and reach the typed loader as a parse error instead of a validation
-/// error — a false pass for anyone validating against the published contract
-/// rather than calling the Rust loader.
-///
-/// # Errors
-///
-/// Returns [`Error::Internal`] if the document is not a compilable schema.
-fn build_validator(schema: &Value) -> Result<jsonschema::Validator> {
-    let corpus = corpus()?;
-    let all_resources = resources_by_id()?;
-    let reachable = reachable_resource_ids(schema, corpus);
-    let trimmed = reachable.iter().filter_map(|id| {
-        all_resources
-            .get(id)
-            .map(|resource| (id.as_str(), resource.clone()))
-    });
-    jsonschema::options()
-        .should_validate_formats(true)
-        .with_resources(trimmed)
-        .build(schema)
-        .map_err(|error| Error::Internal(format!("compile schema: {error}")))
-}
-
-/// Per-artifact compiled validators, keyed by canonical `$id`.
-///
-/// Slots are filled lazily on first [`validate`] call for an artifact so
-/// callers only pay compile time and resolver memory for the schemas they
-/// actually validate against.
-fn validator_cache() -> &'static BTreeMap<&'static str, OnceLock<Result<jsonschema::Validator>>> {
-    static CACHE: OnceLock<BTreeMap<&'static str, OnceLock<Result<jsonschema::Validator>>>> =
-        OnceLock::new();
-    CACHE.get_or_init(|| {
-        artifacts()
-            .into_iter()
-            .map(|artifact| (artifact.id, OnceLock::new()))
-            .collect()
-    })
-}
-
-/// Return the cached validator for a registered artifact, compiling it on first use.
-fn cached_validator(artifact: &SchemaArtifact) -> Result<Option<&'static jsonschema::Validator>> {
-    let Some(slot) = validator_cache().get(artifact.id) else {
-        return Ok(None);
-    };
-    let validator = slot
-        .get_or_init(|| {
-            let schema = corpus()?
-                .get(artifact.id)
-                .ok_or_else(|| Error::Internal(format!("{} missing from corpus", artifact.id)))?;
-            build_validator(schema)
-        })
-        .as_ref()
-        .map_err(Clone::clone)?;
-    Ok(Some(validator))
 }
 
 /// Look up one artifact by `$id`, full path, or trailing filename.
@@ -346,12 +224,9 @@ pub fn index() -> Result<Value> {
     static CACHE: OnceLock<Result<Value>> = OnceLock::new();
     CACHE
         .get_or_init(|| {
-            let corpus = corpus()?;
             let mut rows = Vec::new();
             for (domain, artifact) in artifacts_with_domain() {
-                let rendered = corpus.get(artifact.id).ok_or_else(|| {
-                    Error::Internal(format!("{} missing from rendered corpus", artifact.id))
-                })?;
+                let rendered = cached_document(artifact)?;
                 let mut row = finstack_quant_core::schema::schema_index_row(artifact, rendered)?;
                 row.insert("domain".to_string(), Value::String(domain.to_string()));
                 rows.push(Value::Object(row));
@@ -380,13 +255,10 @@ fn domain_index_cache() -> &'static BTreeMap<&'static str, OnceLock<Result<Value
 }
 
 /// Build one domain's schema index document from the cached rendered corpus.
-fn build_domain_index_from_corpus(registry: &[SchemaArtifact]) -> Result<Value> {
-    let corpus = corpus()?;
+fn build_domain_index_from_corpus(registry: &'static [SchemaArtifact]) -> Result<Value> {
     let mut rows = BTreeMap::new();
     for artifact in registry {
-        let rendered = corpus.get(artifact.id).ok_or_else(|| {
-            Error::Internal(format!("{} missing from rendered corpus", artifact.id))
-        })?;
+        let rendered = cached_document(artifact)?;
         let row = finstack_quant_core::schema::schema_index_row(artifact, rendered)?;
         if rows
             .insert(artifact.relative_path, Value::Object(row))
@@ -450,14 +322,18 @@ pub fn index_for_domain(domain: &str) -> Result<Value> {
 /// Returns an error for unknown profiles, failed schema generation, or failed
 /// corpus rendering or projection. A partial corpus is never substituted.
 pub fn render_profile(artifact: &SchemaArtifact, profile: &str) -> Result<Value> {
+    let cache = validator_cache();
+    let canonical = match cache.document(artifact.id)? {
+        Some(doc) => doc.clone(),
+        None => artifact.generate()?,
+    };
     match profile {
-        "canonical" => artifact.generate(),
+        "canonical" => Ok(canonical),
         "llm" => {
-            let corpus = corpus()?;
-            let canonical = artifact.generate()?;
+            let _ = reachable_resource_ids(&canonical, |id| cache.document(id))?;
             finstack_quant_core::schema::project_llm(
                 &canonical,
-                &|id: &str| corpus.get(id).cloned(),
+                &|id: &str| cache.document(id).ok().flatten().cloned(),
                 &finstack_quant_core::schema::LlmProfile::default(),
             )
         }
@@ -466,8 +342,6 @@ pub fn render_profile(artifact: &SchemaArtifact, profile: &str) -> Result<Value>
         ))),
     }
 }
-
-use finstack_quant_core::schema::diagnostics::Failure;
 
 /// Validate a payload against one published artifact.
 ///
@@ -498,34 +372,159 @@ use finstack_quant_core::schema::diagnostics::Failure;
 /// assert_eq!(failures[0].pointer, "/instrument/spec/cashflow_spec/fixed/day_count");
 /// ```
 pub fn validate(artifact: &SchemaArtifact, payload: &Value) -> Result<Vec<Failure>> {
-    if let Some(validator) = cached_validator(artifact)? {
-        if validator.is_valid(payload) {
-            return Ok(Vec::new());
+    validator_cache().validate_artifact(artifact, payload)
+}
+
+fn valuations_artifact_by_path(relative_path: &str) -> Result<&'static SchemaArtifact> {
+    finstack_quant_valuations::schema::artifacts_slice()
+        .iter()
+        .find(|artifact| artifact.relative_path == relative_path)
+        .ok_or_else(|| {
+            Error::Internal(format!(
+                "schema artifact missing from valuations registry: {relative_path}"
+            ))
+        })
+}
+
+fn instrument_artifacts() -> &'static BTreeMap<&'static str, &'static SchemaArtifact> {
+    static MAP: OnceLock<BTreeMap<&'static str, &'static SchemaArtifact>> = OnceLock::new();
+    MAP.get_or_init(|| {
+        finstack_quant_valuations::schema::artifacts_slice()
+            .iter()
+            .filter(|artifact| {
+                artifact.relative_path.starts_with(INSTRUMENT_SCHEMA_PREFIX)
+                    && artifact.relative_path != INSTRUMENT_ENVELOPE_PATH
+            })
+            .map(|artifact| (artifact.title, artifact))
+            .collect()
+    })
+}
+
+fn instrument_artifact(instrument_type: &str) -> Result<&'static SchemaArtifact> {
+    instrument_artifacts()
+        .get(instrument_type)
+        .copied()
+        .ok_or_else(|| {
+            finstack_quant_core::InputError::NotFound {
+                id: format!(
+                    "unknown instrument type '{instrument_type}'; call instrument_types() for the valid set"
+                ),
+            }
+            .into()
+        })
+}
+
+/// Return every canonical tagged-instrument discriminator, in registry order.
+#[must_use]
+pub fn instrument_types() -> &'static [&'static str] {
+    finstack_quant_valuations::schema::instrument_types()
+}
+
+/// Return the cached JSON Schema for the canonical instrument envelope.
+///
+/// Backed by the workspace-wide [`ValidatorCache`] so callers sharing this
+/// process never render or pin a second copy of the valuations schemas.
+///
+/// # Errors
+///
+/// Returns [`Error::Internal`] if the envelope schema cannot be rendered.
+pub fn instrument_envelope_schema() -> Result<&'static Value> {
+    cached_document(valuations_artifact_by_path(INSTRUMENT_ENVELOPE_PATH)?)
+}
+
+/// Return the cached JSON Schema for a single registered instrument type.
+///
+/// Backed by the workspace-wide [`ValidatorCache`].
+///
+/// # Arguments
+///
+/// * `instrument_type` - Canonical registered tagged-instrument discriminator
+///   from [`instrument_types`] (for example `"bond"` or `"interest_rate_swap"`).
+///
+/// # Errors
+///
+/// Returns [`Error::Input`] ([`InputError::NotFound`](finstack_quant_core::InputError::NotFound))
+/// when `instrument_type` is not registered, or [`Error::Internal`] if the
+/// schema cannot be rendered.
+pub fn instrument_schema(instrument_type: &str) -> Result<&'static Value> {
+    cached_document(instrument_artifact(instrument_type)?)
+}
+
+/// Return the cached JSON Schema for `ValuationResult`.
+///
+/// Backed by the workspace-wide [`ValidatorCache`].
+///
+/// # Errors
+///
+/// Returns [`Error::Internal`] if the valuation-result schema cannot be rendered.
+pub fn valuation_result_schema() -> Result<&'static Value> {
+    cached_document(valuations_artifact_by_path(VALUATION_RESULT_PATH)?)
+}
+
+/// Validate a parsed instrument envelope against the canonical envelope and
+/// selected per-type instrument schemas using the workspace-wide validator cache.
+///
+/// # Arguments
+///
+/// * `instance` - Parsed JSON instrument envelope (`finstack_quant.instrument/1`)
+///   to validate against the envelope schema and its `instrument.type` schema.
+///
+/// # Errors
+///
+/// Returns [`Error::Validation`] listing every violation when `instance` fails
+/// validation, or [`Error::Internal`] if a schema cannot be rendered or compiled.
+pub fn validate_instrument_envelope_json(instance: &Value) -> Result<()> {
+    let envelope_artifact = valuations_artifact_by_path(INSTRUMENT_ENVELOPE_PATH)?;
+    let cache = validator_cache();
+    let envelope_validator = cache.validator(envelope_artifact.id)?.ok_or_else(|| {
+        Error::Internal(format!(
+            "{} missing from validator cache",
+            envelope_artifact.id
+        ))
+    })?;
+    let envelope_valid = envelope_validator.is_valid(instance);
+
+    let instrument_type = instance.pointer("/instrument/type").and_then(Value::as_str);
+
+    if !envelope_valid {
+        if let Some(ty) = instrument_type
+            && instrument_types().contains(&ty)
+        {
+            validate_instrument_type_json(ty, instance)?;
         }
-        let schema = corpus()?
-            .get(artifact.id)
-            .ok_or_else(|| Error::Internal(format!("{} missing from corpus", artifact.id)))?;
-        return Ok(finstack_quant_core::schema::diagnostics::collect_failures(
-            validator,
-            schema,
-            payload,
-            &|id| corpus().ok()?.get(id).cloned(),
-            &build_validator,
-        ));
+        let envelope_schema = cached_document(envelope_artifact)?;
+        let failures = cache.collect_failures(envelope_validator, envelope_schema, instance);
+        return format_validation_result(&failures, "instrument envelope");
     }
 
-    let schema = artifact.generate()?;
-    let validator = build_validator(&schema)?;
-    if validator.is_valid(payload) {
-        return Ok(Vec::new());
-    }
-    Ok(finstack_quant_core::schema::diagnostics::collect_failures(
-        &validator,
-        &schema,
-        payload,
-        &|id| corpus().ok()?.get(id).cloned(),
-        &build_validator,
-    ))
+    let instrument_type = instrument_type.ok_or_else(|| {
+        Error::Validation(
+            "instrument envelope validation passed but instrument.type is missing".to_string(),
+        )
+    })?;
+
+    validate_instrument_type_json(instrument_type, instance)
+}
+
+/// Validate a parsed JSON value against one registered instrument type's schema
+/// using the workspace-wide validator cache.
+///
+/// # Arguments
+///
+/// * `instrument_type` - Canonical registered tagged-instrument discriminator
+///   from [`instrument_types`] (for example `"bond"`).
+/// * `instance` - Parsed JSON payload to check against that type's schema.
+///
+/// # Errors
+///
+/// Returns [`Error::Input`] ([`InputError::NotFound`](finstack_quant_core::InputError::NotFound))
+/// when `instrument_type` is not registered, [`Error::Validation`] listing
+/// every violation when `instance` does not conform, or [`Error::Internal`] if
+/// the schema cannot be rendered or compiled.
+pub fn validate_instrument_type_json(instrument_type: &str, instance: &Value) -> Result<()> {
+    let artifact = instrument_artifact(instrument_type)?;
+    let failures = validator_cache().validate_artifact(artifact, instance)?;
+    format_validation_result(&failures, instrument_type)
 }
 
 #[cfg(test)]
@@ -732,24 +731,30 @@ mod tests {
     #[test]
     fn cached_validator_is_reused_and_trimmed_to_reachable_refs() {
         let artifact = bond();
-        let corpus_map = corpus().expect("corpus");
-        let bond_doc = corpus_map.get(artifact.id).expect("bond in corpus");
-        let reachable = reachable_resource_ids(bond_doc, corpus_map);
+        let cache = validator_cache();
+        let bond_doc = cache
+            .document(artifact.id)
+            .expect("bond document")
+            .expect("bond in cache");
+        let reachable =
+            reachable_resource_ids(bond_doc, |id| cache.document(id)).expect("reachable");
         assert!(
             reachable.contains("https://finstack_quant.dev/schemas/common/1/money.schema.json"),
             "bond must reach money schema: {reachable:?}"
         );
         assert!(
-            reachable.len() < corpus_map.len() / 2,
+            reachable.len() < artifacts().len() / 2,
             "single-instrument validator should trim corpus resources ({} vs {})",
             reachable.len(),
-            corpus_map.len()
+            artifacts().len()
         );
 
-        let first = cached_validator(artifact)
+        let first = cache
+            .validator(artifact.id)
             .expect("compile")
             .expect("registered");
-        let second = cached_validator(artifact)
+        let second = cache
+            .validator(artifact.id)
             .expect("compile")
             .expect("registered");
         assert!(
@@ -769,6 +774,61 @@ mod tests {
                 .iter()
                 .any(|failure| failure.pointer == "/instrument/spec/maturity"),
             "cached validator must assert format: date, got {failures:?}"
+        );
+    }
+
+    #[test]
+    fn valuations_schema_helpers_share_workspace_cache_and_preserve_errors() {
+        let bond_artifact = bond();
+        let cached_doc = validator_cache()
+            .document(bond_artifact.id)
+            .expect("bond doc")
+            .expect("registered");
+        let helper_doc = instrument_schema("bond").expect("instrument_schema");
+        assert!(
+            std::ptr::eq(cached_doc, helper_doc),
+            "instrument_schema must borrow from the workspace ValidatorCache"
+        );
+        assert_eq!(
+            instrument_envelope_schema().expect("envelope")["title"],
+            "Finstack Quant Instrument"
+        );
+        assert_eq!(
+            valuation_result_schema().expect("result")["title"],
+            "Valuation Result"
+        );
+
+        let valid = bond_example();
+        validate_instrument_envelope_json(&valid).expect("valid envelope");
+        validate_instrument_type_json("bond", &valid).expect("valid typed");
+
+        let mut bad_date = valid;
+        bad_date["instrument"]["spec"]["maturity"] = json!("01/15/2034");
+        let envelope_err = validate_instrument_envelope_json(&bad_date)
+            .expect_err("malformed date must fail envelope validation")
+            .to_string();
+        assert!(
+            envelope_err.contains("bond validation failed")
+                && envelope_err.contains("/instrument/spec/maturity"),
+            "unexpected envelope error: {envelope_err}"
+        );
+        let typed_err = validate_instrument_type_json("bond", &bad_date)
+            .expect_err("malformed date must fail typed validation")
+            .to_string();
+        assert_eq!(envelope_err, typed_err);
+
+        let unknown_schema = instrument_schema("not_a_type").expect_err("unknown type");
+        assert_eq!(
+            unknown_schema.kind(),
+            finstack_quant_core::ErrorKind::NotFound
+        );
+        assert!(unknown_schema.to_string().contains("instrument_types()"));
+
+        let unknown_validate =
+            validate_instrument_type_json("not_a_type", &json!({})).expect_err("unknown type");
+        assert_eq!(
+            unknown_validate.kind(),
+            finstack_quant_core::ErrorKind::NotFound
         );
     }
 

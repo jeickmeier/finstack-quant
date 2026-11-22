@@ -145,30 +145,6 @@ pub struct FxTouchOption {
 }
 
 impl FxTouchOption {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> FxTouchOptionBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .base_currency(self.base_currency)
-            .quote_currency(self.quote_currency)
-            .barrier(self.barrier)
-            .touch_type(self.touch_type)
-            .barrier_direction(self.barrier_direction)
-            .payout_amount(self.payout_amount)
-            .payout_timing(self.payout_timing)
-            .expiry(self.expiry)
-            .monitoring_start_date_opt(self.monitoring_start_date)
-            .day_count(self.day_count)
-            .domestic_discount_curve_id(self.domestic_discount_curve_id.clone())
-            .foreign_discount_curve_id(self.foreign_discount_curve_id.clone())
-            .vol_surface_id(self.vol_surface_id.clone())
-            .observed_barrier_breached_opt(self.observed_barrier_breached)
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     /// Validate FX touch option input invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         finstack_quant_core::validation::validate_distinct_currencies(

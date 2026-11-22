@@ -416,15 +416,21 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
     {
         let disc = market.get_discount(irs.fixed_leg.discount_curve_id.as_ref())?;
         let proj = if irs.is_single_curve_ois() {
-            market.get_forward(float.forward_curve_id.as_str()).ok()
+            // `disc` already resolved under the shared curve ID; unified curve
+            // storage cannot also hold a forward curve under the same key.
+            None
         } else {
             Some(market.get_forward(float.forward_curve_id.as_str())?)
         };
-        let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
-            market,
+        let index_id = finstack_quant_core::market_data::fixings::validate_fixing_index_id(
             float.index_id.as_str(),
-        )
-        .ok();
+        )?;
+        let series_id = finstack_quant_core::market_data::fixings::fixing_series_id(index_id);
+        let fixings = match market.get_series(&series_id) {
+            Ok(series) => Some(series),
+            Err(err) if err.kind() == finstack_quant_core::ErrorKind::NotFound => None,
+            Err(err) => return Err(err),
+        };
         let valuation_date = as_of.unwrap_or_else(|| {
             proj.as_ref()
                 .map(|c| c.base_date())
@@ -1085,5 +1091,49 @@ mod tests {
             "single-curve OIS rate cut-off must change the floating coupon on a \
              steep curve: no_cutoff={pv_no_cutoff}, cutoff={pv_cutoff}"
         );
+    }
+
+    #[test]
+    fn compounded_float_leg_propagates_invalid_fixing_index_id_instead_of_swallowing() {
+        let as_of = date!(2024 - 12 - 02);
+        let mut irs = InterestRateSwap::example().expect("example IRS");
+        irs.float_leg.start = date!(2025 - 01 - 02);
+        irs.float_leg.end = date!(2025 - 04 - 02);
+        irs.float_leg.forward_curve_id = "USD-OIS".into();
+        irs.float_leg.compounding =
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
+        irs.float_leg.calendar_id = Some("weekends_only".into());
+        irs.float_leg.fixing_calendar_id = Some("weekends_only".into());
+
+        let market = MarketContext::new()
+            .try_insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .day_count(DayCount::Act365F)
+                    .knots([(0.0, 1.0), (1.0, 0.96)])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                    .build()
+                    .expect("discount"),
+            )
+            .expect("insert market curve");
+
+        // Valid index_id with absent fixing series falls back cleanly to curve projection.
+        irs.float_leg.index_id = "USD-SOFR".into();
+        assert!(
+            float_leg_schedule_with_curves_as_of(&irs, Some(&market), Some(as_of), false).is_ok()
+        );
+
+        // Malformed fixing index_id must propagate Validation instead of being swallowed.
+        for bad_id in ["", "FIXING:USD-SOFR"] {
+            irs.float_leg.index_id = bad_id.into();
+            let err = float_leg_schedule_with_curves_as_of(&irs, Some(&market), Some(as_of), false)
+                .expect_err("invalid fixing index_id must propagate error");
+            assert_eq!(
+                err.kind(),
+                finstack_quant_core::ErrorKind::Validation,
+                "expected Validation for index_id={bad_id:?}, got: {err}"
+            );
+        }
     }
 }

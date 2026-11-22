@@ -28,7 +28,7 @@ Public modules:
 - `recalibration`: cached implementations of the valuations replay port.
 - `hull_white`: explicit Hull-White parameter calibration.
 - `validation`: curve/surface validators and validation policy types.
-- `json_schema` (with the default `json-schema` feature): published schema registry.
+- `schema` (with the default `json-schema` feature): published schema registry.
 
 The crate root exports the two `calibrate_bermudan_lmm_base_vol*` functions.
 Their implementation module and methodology-version constants are private.

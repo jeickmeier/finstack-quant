@@ -413,7 +413,7 @@ impl ConvertibleBond {
 
     /// Effective conversion ratio after anti-dilution adjustments.
     ///
-    /// Applies all recorded [`DilutionEvent`](finstack_quant_valuations_fixed_income::DilutionEvent)s in chronological order using
+    /// Applies all recorded [`DilutionEvent`](crate::DilutionEvent)s in chronological order using
     /// the bond's [`AntiDilutionPolicy`]:
     ///
     /// - **None**: Returns the base conversion ratio unchanged.

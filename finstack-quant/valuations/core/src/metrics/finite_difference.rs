@@ -31,6 +31,11 @@ pub const CORRELATION_BUMP: f64 = 0.01;
 pub const VOL_POINTS_PER_ABSOLUTE_VOL: f64 = 100.0;
 
 /// Effective scalar implied volatility, when supplied by the instrument.
+///
+/// # Arguments
+///
+/// * `instrument` - Instrument whose `instrument_pricing_overrides` market
+///   quotes are inspected for a decimal implied-volatility override.
 pub fn volatility_override(instrument: &dyn crate::instruments::Instrument) -> Option<f64> {
     instrument
         .get_instrument_pricing_overrides()?
@@ -194,6 +199,15 @@ pub fn min_grid_vol(
 /// The returned tokens restore the scratch context in reverse application
 /// order. If any surface bump fails, already-applied bumps are reverted before
 /// the error is returned.
+///
+/// # Arguments
+///
+/// * `context` - Mutable scratch market context whose volatility surfaces are
+///   bumped in place.
+/// * `vol_surface_ids` - Unique identifiers of the volatility surfaces in
+///   `context` to shift together.
+/// * `bump_abs` - Signed additive shift in decimal volatility units (for
+///   example `0.01` for +1 vol point).
 pub fn apply_parallel_surface_bumps_in_place(
     context: &mut finstack_quant_core::market_data::context::MarketContext,
     vol_surface_ids: &[finstack_quant_core::types::CurveId],
@@ -222,6 +236,13 @@ pub fn apply_parallel_surface_bumps_in_place(
 }
 
 /// Restore a sequence of scratch bumps in reverse application order.
+///
+/// # Arguments
+///
+/// * `context` - Mutable scratch market context to restore to its pre-bump
+///   state.
+/// * `tokens` - Scratch bump tokens returned by prior in-place bump calls,
+///   reverted in LIFO order.
 pub fn revert_scratch_bumps(
     context: &mut finstack_quant_core::market_data::context::MarketContext,
     tokens: Vec<finstack_quant_core::market_data::context::ContextScratchBump>,

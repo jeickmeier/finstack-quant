@@ -118,27 +118,6 @@ pub struct Tarn {
 }
 
 impl Tarn {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> TarnBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .fixed_rate(self.fixed_rate)
-            .coupon_floor(self.coupon_floor)
-            .target_coupon(self.target_coupon)
-            .notional(self.notional)
-            .start_date(self.start_date)
-            .payment_dates(self.payment_dates.clone())
-            .index_tenor(self.index_tenor)
-            .forward_curve_id(self.forward_curve_id.clone())
-            .discount_curve_id(self.discount_curve_id.clone())
-            .vol_surface_id_opt(self.vol_surface_id.clone())
-            .day_count(self.day_count)
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     /// Validate the TARN parameters.
     ///
     /// Checks:

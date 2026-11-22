@@ -348,19 +348,6 @@ macro_rules! define_future_option {
             pub attributes: finstack_quant_core::types::Attributes,
         }
 
-        impl $name {
-            /// Copy the terms and overrides into an independent contract builder.
-            pub fn to_builder(&self) -> $builder {
-                Self::builder()
-                    .id(self.id.clone())
-                    .terms(self.terms.clone())
-                    .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-                    .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-                    .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-                    .attributes(self.attributes.clone())
-            }
-        }
-
         $crate::impl_future_option_instrument!(
             $name,
             $key,

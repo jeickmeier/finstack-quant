@@ -262,21 +262,33 @@ impl CmoWaterfall {
     }
 
     /// Get total current face across all tranches (excluding IO).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] if the waterfall has
+    /// no tranches, or [`finstack_quant_core::Error::CurrencyMismatch`] if
+    /// tranche current faces do not all share the same currency.
     pub fn total_current_face(&self) -> finstack_quant_core::Result<Money> {
-        let total: f64 = self
-            .tranches
-            .iter()
-            .filter(|t| t.receives_principal())
-            .map(|t| t.current_face.amount())
-            .sum();
-
-        let currency = self
-            .tranches
-            .first()
-            .map(|t| t.current_face.currency())
-            .unwrap_or(Currency::USD);
-
-        Money::from_model_value(total, currency)
+        let Some(first) = self.tranches.first() else {
+            return Err(finstack_quant_core::Error::Validation(
+                "CMO waterfall has no tranches".into(),
+            ));
+        };
+        let expected_currency = first.current_face.currency();
+        let mut total = Money::zero(expected_currency);
+        for tranche in &self.tranches {
+            let actual = tranche.current_face.currency();
+            if actual != expected_currency {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: expected_currency,
+                    actual,
+                });
+            }
+            if tranche.receives_principal() {
+                total = total.checked_add(tranche.current_face)?;
+            }
+        }
+        Ok(total)
     }
 }
 
@@ -353,25 +365,6 @@ pub struct AgencyCmo {
 }
 
 impl AgencyCmo {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> AgencyCmoBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .deal_name(self.deal_name.clone())
-            .agency(self.agency)
-            .issue_date(self.issue_date)
-            .waterfall(self.waterfall.clone())
-            .reference_tranche_id(self.reference_tranche_id.clone())
-            .collateral_opt(self.collateral.clone())
-            .collateral_wac_opt(self.collateral_wac)
-            .collateral_wam_months_opt(self.collateral_wam_months)
-            .discount_curve_id(self.discount_curve_id.clone())
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     /// Validate the tranche waterfall, collateral, and interest conservation.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         let context = format!("Agency CMO '{}'", self.id.as_str());
@@ -678,8 +671,7 @@ impl AgencyCmo {
             Some(pool) => (pool.coupon, pool.current_face.amount()),
             None => {
                 // Mirror the assumed-collateral construction in the pricer.
-                let defaults = crate::structured_credit::assumptions::embedded_registry()?
-                    .cmo_collateral_defaults();
+                let defaults = crate::structured_credit::assumptions::CMO_COLLATERAL_DEFAULTS;
                 let wac = cmo.collateral_wac.unwrap_or(defaults.wac);
                 let pass_through = wac
                     - defaults.servicing_fee_bp / BASIS_POINTS_PER_UNIT
@@ -806,7 +798,6 @@ mod tests {
 
     #[test]
     fn display_matches_serde_wire_value() {
-        use crate::structured_credit::DealType;
         for t in [
             CmoTrancheType::Sequential,
             CmoTrancheType::Pac,
@@ -816,17 +807,6 @@ mod tests {
             CmoTrancheType::Accrual,
         ] {
             assert_eq!(serde_json::to_value(t).expect("ser"), t.to_string());
-        }
-        for d in [
-            DealType::Clo,
-            DealType::Cbo,
-            DealType::Abs,
-            DealType::Rmbs,
-            DealType::Cmbs,
-            DealType::Auto,
-            DealType::Card,
-        ] {
-            assert_eq!(serde_json::to_value(d).expect("ser"), d.to_string());
         }
     }
 
@@ -883,6 +863,47 @@ mod tests {
 
         // 40M + 30M + 30M = 100M
         assert!((total.amount() - 100_000_000.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn total_current_face_rejects_empty_waterfall() {
+        let waterfall = CmoWaterfall::new(Vec::new());
+        let err = waterfall
+            .total_current_face()
+            .expect_err("empty waterfall must fail");
+        assert!(matches!(err, finstack_quant_core::Error::Validation(_)));
+    }
+
+    #[test]
+    fn total_current_face_rejects_mixed_currencies() {
+        let waterfall = CmoWaterfall::new(vec![
+            CmoTranche::sequential("A", Money::from((40_000_000_i64, Currency::USD)), 0.035, 1),
+            CmoTranche::sequential("B", Money::from((30_000_000_i64, Currency::EUR)), 0.04, 2),
+        ]);
+        let err = waterfall
+            .total_current_face()
+            .expect_err("mixed-currency waterfall must fail");
+        assert!(matches!(
+            err,
+            finstack_quant_core::Error::CurrencyMismatch {
+                expected: Currency::USD,
+                actual: Currency::EUR,
+            }
+        ));
+    }
+
+    #[test]
+    fn total_current_face_io_only_preserves_tranche_currency() {
+        let waterfall = CmoWaterfall::new(vec![CmoTranche::io_strip(
+            "IO",
+            Money::from((100_000_000_i64, Currency::EUR)),
+            0.035,
+        )]);
+        let total = waterfall
+            .total_current_face()
+            .expect("IO-only waterfall is valid");
+        assert_eq!(total.amount(), 0.0);
+        assert_eq!(total.currency(), Currency::EUR);
     }
 
     #[test]
@@ -1099,5 +1120,38 @@ mod tests {
             .notional()
             .expect_err("broken reference_tranche_id must not silently return None");
         assert_eq!(err.kind(), finstack_quant_core::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn to_builder_round_trip_preserves_all_fields() {
+        let mut original = AgencyCmo::example().expect("valid example");
+        original.attributes = Attributes::new()
+            .with_tag("desk-agency")
+            .with_meta("book", "cmo");
+        original.collateral_wac = Some(0.0525);
+        original.collateral_wam_months = Some(300);
+        original.metric_pricing_overrides.theta_period =
+            Some(finstack_quant_core::dates::Tenor::weekly());
+
+        let rebuilt = original.to_builder().build().expect("rebuilt AgencyCmo");
+        assert_eq!(
+            serde_json::to_value(&rebuilt).expect("ser rebuilt"),
+            serde_json::to_value(&original).expect("ser original")
+        );
+
+        let modified = original
+            .to_builder()
+            .reference_tranche_id("B".to_string())
+            .build()
+            .expect("modified AgencyCmo");
+        assert_eq!(modified.reference_tranche_id, "B");
+        assert_eq!(original.reference_tranche_id, "A");
+        assert_eq!(modified.collateral_wac, Some(0.0525));
+        assert_eq!(modified.collateral_wam_months, Some(300));
+        assert_eq!(
+            modified.metric_pricing_overrides.theta_period,
+            Some(finstack_quant_core::dates::Tenor::weekly())
+        );
+        assert!(modified.attributes.has_tag("desk-agency"));
     }
 }

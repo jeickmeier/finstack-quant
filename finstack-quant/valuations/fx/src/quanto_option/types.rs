@@ -125,34 +125,6 @@ pub struct QuantoOption {
 finstack_quant_valuations_core::validate_on_deserialize!(QuantoOption);
 
 impl QuantoOption {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> QuantoOptionBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .underlying_ticker(self.underlying_ticker.clone())
-            .strike(self.strike)
-            .option_type(self.option_type)
-            .expiry(self.expiry)
-            .notional(self.notional)
-            .quantity_opt(self.quantity)
-            .payoff_fx_rate_opt(self.payoff_fx_rate)
-            .base_currency(self.base_currency)
-            .quote_currency(self.quote_currency)
-            .correlation(self.correlation)
-            .day_count(self.day_count)
-            .domestic_discount_curve_id(self.domestic_discount_curve_id.clone())
-            .foreign_discount_curve_id(self.foreign_discount_curve_id.clone())
-            .spot_id(self.spot_id.clone())
-            .vol_surface_id(self.vol_surface_id.clone())
-            .div_yield_id_opt(self.div_yield_id.clone())
-            .fx_spot_id_opt(self.fx_spot_id.clone())
-            .fx_vol_surface_id_opt(self.fx_vol_surface_id.clone())
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     /// Create a canonical example quanto equity option (Nikkei in USD)
     /// expiring on the project-wide stable example epoch.
     pub fn example() -> finstack_quant_core::Result<Self> {

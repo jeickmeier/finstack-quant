@@ -113,19 +113,6 @@ pub struct LeveredRealEstateEquity {
 }
 
 impl LeveredRealEstateEquity {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> LeveredRealEstateEquityBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .currency(self.currency)
-            .asset(self.asset.clone())
-            .financing(self.financing.clone())
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     fn validate(&self) -> finstack_quant_core::Result<()> {
         self.asset.validate_for_pricing()?;
         if self.currency != self.asset.currency {

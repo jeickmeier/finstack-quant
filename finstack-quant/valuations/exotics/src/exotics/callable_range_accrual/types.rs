@@ -72,18 +72,6 @@ pub struct CallableRangeAccrual {
 }
 
 impl CallableRangeAccrual {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> CallableRangeAccrualBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .range_accrual(self.range_accrual.clone())
-            .call_provision(self.call_provision.clone())
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     /// Validate the callable range accrual parameters.
     ///
     /// Validates both the underlying range accrual spec and the call provision.

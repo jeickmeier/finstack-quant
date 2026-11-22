@@ -5,10 +5,7 @@ use crate::bindings::schema_registry::schema_registry_functions;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
-schema_registry_functions!(
-    finstack_quant_statements::schema::ARTIFACTS,
-    "finstack_quant.statements.schema"
-);
+schema_registry_functions!("statements", "finstack_quant.statements.schema");
 
 /// Register the statements schema namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

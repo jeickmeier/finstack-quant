@@ -111,11 +111,11 @@ pub mod hull_white;
 /// Bermudan LMM loading-scale calibration.
 mod lmm;
 pub use lmm::{calibrate_bermudan_lmm_base_vol, calibrate_bermudan_lmm_base_vol_from_json};
-/// Checked-in JSON Schema artifacts owned by this crate.
-#[cfg(feature = "json-schema")]
-pub mod json_schema;
 /// Raw market quote data-transfer objects.
 pub mod quotes;
+/// Checked-in JSON Schema artifacts owned by this crate.
+#[cfg(feature = "json-schema")]
+pub mod schema;
 /// Solver utilities and implementations used by calibration.
 pub(crate) mod solver;
 /// Calibration targets mapping API steps to domain execution.

@@ -11,9 +11,9 @@ instrument_class!(
     /// ```typescript
     /// import init, { valuations } from "finstack-quant-wasm";
     /// await init();
-    /// const future = valuations.instruments.AgencyCmo.example();
-    /// console.log(future.id);
-    /// future.free();
+    /// const cmo = valuations.instruments.AgencyCmo.example();
+    /// console.log(cmo.id);
+    /// cmo.free();
     /// ```
     JsAgencyCmo, "AgencyCmo", AgencyCmo
 );

@@ -175,32 +175,6 @@ pub struct InflationCapFloor {
 }
 
 impl InflationCapFloor {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> InflationCapFloorBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .rate_option_type(self.rate_option_type)
-            .notional(self.notional)
-            .strike(self.strike)
-            .start_date(self.start_date)
-            .maturity(self.maturity)
-            .frequency(self.frequency)
-            .day_count(self.day_count)
-            .stub(self.stub)
-            .business_day_convention(self.business_day_convention)
-            .calendar_id_opt(self.calendar_id.clone())
-            .inflation_index_id(self.inflation_index_id.clone())
-            .discount_curve_id(self.discount_curve_id.clone())
-            .vol_surface_id(self.vol_surface_id.clone())
-            .lag_opt(self.lag)
-            .interpolation_opt(self.interpolation)
-            .volatility_expiry(self.volatility_expiry)
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     /// Create a canonical example USD 5Y inflation cap (US-CPI, 3% strike, $1M notional).
     ///
     /// Returns a 5-year YoY inflation cap with annual frequency, 3-month CPI lag,

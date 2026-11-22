@@ -797,23 +797,8 @@ fn apply_metric_pricing_overrides(
     instrument: &mut dyn Instrument,
     overrides_json: &str,
 ) -> finstack_quant_core::Result<()> {
-    let id = instrument.id().to_owned();
-    let current = instrument
-        .get_metric_pricing_overrides_mut()
-        .ok_or_else(|| {
-            Error::Validation(with_id_suffix(
-                "instrument does not support metric pricing overrides".into(),
-                Some(&id),
-            ))
-        })?;
-    let patch = parse_metric_patch(overrides_json, Some(&id))?;
-    apply_validated_override_patch(
-        current,
-        &patch,
-        "metric_pricing_overrides",
-        &id,
-        merge_metric_override_values,
-    )
+    let patch = parse_metric_patch(overrides_json, Some(instrument.id()))?;
+    apply_metric_pricing_overrides_value(instrument, &patch)
 }
 
 fn apply_metric_pricing_overrides_value(
@@ -894,6 +879,17 @@ fn merge_override_values(current: &mut Value, patch: &Value) {
     }
 }
 
+fn raw_metric_overrides_mut(document: &mut Value) -> Option<&mut Value> {
+    let pointer = if document.pointer("/instrument/type").and_then(Value::as_str)
+        == Some("structured_credit_tranche")
+    {
+        "/instrument/spec/deal/metric_pricing_overrides"
+    } else {
+        "/instrument/spec/metric_pricing_overrides"
+    };
+    document.pointer_mut(pointer)
+}
+
 fn decode_envelope_with_metric_overrides(
     json: &str,
     metric_pricing_overrides: Option<&str>,
@@ -915,7 +911,7 @@ fn decode_envelope_with_metric_overrides(
     // `metric_pricing_overrides` object that the caller's patch repairs before
     // validation, patch that object in place so decoding can proceed to the
     // canonical typed override path below.
-    if let Some(existing) = document.pointer_mut("/instrument/spec/metric_pricing_overrides")
+    if let Some(existing) = raw_metric_overrides_mut(&mut document)
         && existing.is_object()
         && serde_json::from_value::<MetricPricingOverrides>(existing.clone()).is_err()
     {
@@ -1376,6 +1372,47 @@ mod tests {
             Some(finstack_quant_core::dates::Tenor::weekly())
         );
         assert_eq!(controls.bump_config.rate_bump_bp, Some(3.0));
+        assert_eq!(controls.bump_config.vol_bump_decimal, Some(0.02));
+    }
+
+    #[test]
+    fn structured_credit_tranche_corrupt_wire_metric_overrides_repaired_by_patch() {
+        let tranche =
+            crate::instruments::fixed_income::structured_credit::StructuredCreditTranche::example()
+                .expect("structured credit tranche example");
+        let mut document =
+            envelope_value(InstrumentJson::StructuredCreditTranche(Box::new(tranche)));
+        document["instrument"]["spec"]["deal"]["metric_pricing_overrides"] = serde_json::json!({
+            "theta_period": "invalid",
+            "bump_config": {"vol_bump_decimal": 0.02}
+        });
+        let json = document.to_string();
+
+        assert!(validate_instrument_json(&json, None).is_err());
+
+        let patch = r#"{"theta_period":{"count":1,"unit":"weeks"}}"#;
+        let validated = validate_instrument_json(&json, Some(patch))
+            .expect("call-time patch should repair corrupt tranche deal metric overrides");
+        let parsed: Value = serde_json::from_str(&validated).expect("canonical tranche json");
+        assert_eq!(
+            parsed["instrument"]["spec"]["deal"]["metric_pricing_overrides"]["theta_period"],
+            serde_json::json!({"count": 1, "unit": "weeks"})
+        );
+        assert_eq!(
+            parsed["instrument"]["spec"]["deal"]["metric_pricing_overrides"]["bump_config"]["vol_bump_decimal"],
+            0.02
+        );
+
+        let boxed = parse_boxed_instrument_from_json(&json, Some(patch), None)
+            .expect("parse_boxed should repair corrupt tranche deal metric overrides");
+        let controls = boxed
+            .as_instrument()
+            .get_metric_pricing_overrides()
+            .expect("tranche controls");
+        assert_eq!(
+            controls.theta_period,
+            Some(finstack_quant_core::dates::Tenor::weekly())
+        );
         assert_eq!(controls.bump_config.vol_bump_decimal, Some(0.02));
     }
 

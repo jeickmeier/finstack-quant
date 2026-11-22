@@ -369,31 +369,6 @@ pub struct NdfTradeDateParams {
 }
 
 impl Ndf {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> NdfBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .base_currency(self.base_currency)
-            .settlement_currency(self.settlement_currency)
-            .fixing_date(self.fixing_date)
-            .maturity(self.maturity)
-            .notional(self.notional)
-            .contract_rate_opt(self.contract_rate)
-            .domestic_discount_curve_id(self.domestic_discount_curve_id.clone())
-            .quote_convention(self.quote_convention)
-            .foreign_discount_curve_id_opt(self.foreign_discount_curve_id.clone())
-            .observed_fixing_opt(self.observed_fixing)
-            .fixing_source_opt(self.fixing_source)
-            .quoted_spot_opt(self.quoted_spot)
-            .quoted_forward_opt(self.quoted_forward)
-            .base_calendar_id_opt(self.base_calendar_id.clone())
-            .settlement_calendar_id_opt(self.settlement_calendar_id.clone())
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     const MIN_POSITIVE_RATE: f64 = 1.0e-12;
 
     /// Create a canonical example NDF for testing and documentation.

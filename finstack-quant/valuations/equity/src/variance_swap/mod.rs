@@ -65,7 +65,7 @@
 //!
 //! # See Also
 //!
-//! - [`VarianceSwap`](crate::variance_swap::VarianceSwap) for instrument struct
+//! - [`VarianceSwap`] for instrument struct
 //! - `RealizedVarMethod` for variance calculation methods
 //! - Variance calculation functions in [`finstack_quant_core::math::stats`]
 

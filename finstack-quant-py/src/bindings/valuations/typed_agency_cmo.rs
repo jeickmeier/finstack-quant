@@ -223,7 +223,7 @@ impl PyAgencyCmoBuilder {
     }
 }
 
-/// Register the bond future and its builder.
+/// Register the agency CMO and its builder.
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyAgencyCmo>()?;
     module.add_class::<PyAgencyCmoBuilder>()?;

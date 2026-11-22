@@ -14,7 +14,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 ///
 /// * `instrument` - The instrument providing cashflows.
 /// * `market` - Market data context.
-/// * `as_of` - Valuation date.
+/// * `as_of` - Valuation date used as the cashflow cutoff and the discounting
+///   anchor on the resolved discount curve.
 /// * `discount_curve_id` - ID of the discount curve to use.
 /// * `include_today` - Whether cash dated `as_of` is still owed; chosen by the
 ///   product, with no default.

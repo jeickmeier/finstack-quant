@@ -258,28 +258,6 @@ impl Default for FutureContractSpecs {
 }
 
 impl InterestRateFuture {
-    /// Seed an independent builder with the complete listed contract.
-    pub fn to_builder(&self) -> InterestRateFutureBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .terms(self.terms.clone())
-            .fixing_date_opt(self.fixing_date)
-            .period_start_opt(self.period_start)
-            .period_end_opt(self.period_end)
-            .day_count(self.day_count)
-            .contract_specs(self.contract_specs.clone())
-            .discount_curve_id(self.discount_curve_id.clone())
-            .forward_curve_id(self.forward_curve_id.clone())
-            .compounding(self.compounding)
-            .index_id_opt(self.index_id.clone())
-            .fixing_calendar_id_opt(self.fixing_calendar_id.clone())
-            .vol_surface_id_opt(self.vol_surface_id.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-            .attributes(self.attributes.clone())
-    }
-
     /// Validate contract scaling, dates, quotes, and convexity inputs.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         let context = format!("IR future '{}'", self.id.as_str());

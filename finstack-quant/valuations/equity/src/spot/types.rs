@@ -88,24 +88,6 @@ pub struct Equity {
 }
 
 impl Equity {
-    /// Seed an independent builder from the holding and its complete market-data references.
-    pub fn to_builder(&self) -> EquityBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .ticker(self.ticker.clone())
-            .currency(self.currency)
-            .quantity_opt(self.quantity)
-            .quoted_spot_opt(self.quoted_spot)
-            .spot_id_opt(self.spot_id.clone())
-            .div_yield_id_opt(self.div_yield_id.clone())
-            .discrete_dividends(self.discrete_dividends.clone())
-            .discount_curve_id(self.discount_curve_id.clone())
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     fn validate(&self) -> finstack_quant_core::Result<()> {
         use finstack_quant_core::validation;
 

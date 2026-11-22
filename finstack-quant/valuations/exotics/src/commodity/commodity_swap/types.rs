@@ -175,29 +175,6 @@ fn default_pay_receive() -> PayReceive {
 }
 
 impl CommoditySwap {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> CommoditySwapBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .underlying(self.underlying.clone())
-            .quantity(self.quantity)
-            .fixed_price(self.fixed_price)
-            .forward_curve_id(self.forward_curve_id.clone())
-            .side(self.side)
-            .start_date(self.start_date)
-            .maturity(self.maturity)
-            .frequency(self.frequency)
-            .calendar_id_opt(self.calendar_id.clone())
-            .business_day_convention(self.business_day_convention)
-            .discount_curve_id(self.discount_curve_id.clone())
-            .index_lag_days_opt(self.index_lag_days)
-            .past_fixings(self.past_fixings.clone())
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     fn validate(&self) -> Result<()> {
         use finstack_quant_core::validation;
 

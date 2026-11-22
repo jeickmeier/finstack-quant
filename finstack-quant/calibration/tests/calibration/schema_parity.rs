@@ -52,7 +52,7 @@ fn calibration_step_kinds_match_checked_in_schema() {
 #[test]
 #[cfg(feature = "json-schema")]
 fn published_quote_examples_pass_domain_validation() {
-    use finstack_quant_calibration::{json_schema, quotes::MarketQuote};
+    use finstack_quant_calibration::{quotes::MarketQuote, schema};
     for (file, class) in [
         ("rate_quote", "rates"),
         ("cds_quote", "cds"),
@@ -62,7 +62,7 @@ fn published_quote_examples_pass_domain_validation() {
         ("xccy_quote", "xccy"),
     ] {
         let path = format!("schemas/market/1/{file}.schema.json");
-        let artifact = json_schema::artifacts()
+        let artifact = schema::artifacts()
             .iter()
             .find(|artifact| artifact.relative_path == path)
             .expect("published quote family");

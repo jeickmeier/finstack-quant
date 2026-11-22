@@ -261,33 +261,6 @@ fn default_multiplier() -> f64 {
 }
 
 impl CommodityForward {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> CommodityForwardBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .underlying(self.underlying.clone())
-            .quantity(self.quantity)
-            .multiplier(self.multiplier)
-            .maturity(self.maturity)
-            .settlement(self.settlement)
-            .position(self.position)
-            .contract_price_opt(self.contract_price)
-            .quoted_forward_opt(self.quoted_forward)
-            .forward_curve_id(self.forward_curve_id.clone())
-            .spot_id_opt(self.spot_id.clone())
-            .discount_curve_id(self.discount_curve_id.clone())
-            .exchange_opt(self.exchange.clone())
-            .contract_month_opt(self.contract_month.clone())
-            .convention_opt(self.convention)
-            .settlement_days_opt(self.settlement_days)
-            .settlement_calendar_id_opt(self.settlement_calendar_id.clone())
-            .settlement_business_day_convention_opt(self.settlement_business_day_convention)
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     fn validate(&self) -> Result<()> {
         use finstack_quant_core::validation;
 
@@ -1317,5 +1290,32 @@ mod tests {
                 .amount()
                 != 0.0
         );
+    }
+
+    #[test]
+    fn to_builder_round_trip_preserves_builder_default_fields() {
+        let mut original = CommodityForward::example().expect("example");
+        // Non-default values for `#[builder(default = ...)]` fields (`1.0`, `Cash`).
+        original.multiplier = 42.0;
+        original.settlement = SettlementType::Physical;
+        original.contract_price = Some(71.5);
+        original.quoted_forward = Some(74.25);
+        original.attributes = Attributes::new()
+            .with_tag("commodities-desk")
+            .with_meta("book", "wti");
+
+        let rebuilt = original
+            .to_builder()
+            .build()
+            .expect("rebuilt CommodityForward");
+        assert_eq!(
+            serde_json::to_value(&rebuilt).expect("ser rebuilt"),
+            serde_json::to_value(&original).expect("ser original")
+        );
+        assert_eq!(rebuilt.multiplier, 42.0);
+        assert_eq!(rebuilt.settlement, SettlementType::Physical);
+        assert_eq!(rebuilt.contract_price, Some(71.5));
+        assert_eq!(rebuilt.quoted_forward, Some(74.25));
+        assert!(rebuilt.attributes.has_tag("commodities-desk"));
     }
 }

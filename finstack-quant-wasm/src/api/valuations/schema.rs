@@ -1,15 +1,16 @@
 //! Registry-backed JSON Schemas for the valuations wire format.
 //!
-//! The instrument envelope, the per-type instrument schemas and the valuation
-//! result schema are rendered on demand and cached in-process by the Rust
-//! accessors in `finstack_quant_valuations::schema`, so they always describe
-//! the wire format this build accepts. Each accessor returns the schema
-//! document as a plain object; the Python `finstack_quant.valuations.schema`
-//! accessors return the same document as JSON text.
+//! The instrument envelope, the per-type instrument schemas, the valuation
+//! result schema, and their compiled validators all route through the single
+//! process-wide cache in `finstack_quant::schema`, so a WASM instance never
+//! compiles or pins duplicate copies of the valuations schemas. Each accessor
+//! returns the schema document as a plain object; the Python
+//! `finstack_quant.valuations.schema` accessors return the same document as
+//! JSON text.
 
 use crate::utils::input::{from_js_json, js_string};
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_valuations::schema;
+use finstack_quant::schema;
 use wasm_bindgen::prelude::*;
 
 /// JSON Schema of the canonical instrument envelope.
@@ -44,7 +45,7 @@ pub fn instrument_schema(
     instrument_type: JsValue,
 ) -> Result<JsValue, JsValue> {
     let instrument_type = js_string(&instrument_type, "instrumentType")?;
-    to_js_value(&schema::instrument_schema(&instrument_type).map_err(to_js_err)?)
+    to_js_value(schema::instrument_schema(&instrument_type).map_err(to_js_err)?)
 }
 
 /// JSON Schema of the `ValuationResult` envelope returned by the pricing entry points.

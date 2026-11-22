@@ -185,36 +185,6 @@ pub struct Autocallable {
 finstack_quant_valuations_core::validate_on_deserialize!(Autocallable);
 
 impl Autocallable {
-    /// Seed an independent builder with the complete existing contract.
-    pub fn to_builder(&self) -> AutocallableBuilder {
-        Self::builder()
-            .id(self.id.clone())
-            .underlying_ticker(self.underlying_ticker.clone())
-            .observation_dates(self.observation_dates.clone())
-            .payment_dates(self.payment_dates.clone())
-            .expiry(self.expiry)
-            .autocall_barriers(self.autocall_barriers.clone())
-            .coupon_barriers(self.coupon_barriers.clone())
-            .coupons(self.coupons.clone())
-            .memory_coupons(self.memory_coupons)
-            .final_barrier(self.final_barrier)
-            .final_payoff_type(self.final_payoff_type)
-            .cap_level(self.cap_level)
-            .notional(self.notional)
-            .day_count(self.day_count)
-            .discount_curve_id(self.discount_curve_id.clone())
-            .spot_id(self.spot_id.clone())
-            .vol_surface_id(self.vol_surface_id.clone())
-            .path_model(self.path_model)
-            .div_yield_id_opt(self.div_yield_id.clone())
-            .initial_level_opt(self.initial_level)
-            .past_fixings(self.past_fixings.clone())
-            .attributes(self.attributes.clone())
-            .instrument_pricing_overrides(self.instrument_pricing_overrides.clone())
-            .metric_pricing_overrides(self.metric_pricing_overrides.clone())
-            .scenario_pricing_overrides(self.scenario_pricing_overrides.clone())
-    }
-
     /// Validate structural invariants required by the pricing engine.
     ///
     /// # Errors

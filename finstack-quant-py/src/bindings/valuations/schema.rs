@@ -1,10 +1,8 @@
-//! Python bindings for `finstack_quant_valuations::schema`.
+//! Python bindings for `finstack_quant.valuations.schema`.
 //!
-//! Every schema exposed here is rendered on demand from the crate's Rust serde
-//! types and cached in `OnceLock` by the canonical accessors in
-//! `finstack_quant_valuations::schema`, so a schema read from Python always
-//! describes the exact wire format the installed wheel accepts without
-//! embedding checked-in JSON in the extension module.
+//! Every schema and validator exposed here routes through the process-wide
+//! cache in `finstack_quant::schema`, so a Python process never compiles or
+//! pins duplicate copies of the valuations schemas or validators.
 
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::schema_registry::schema_registry_functions;
@@ -12,7 +10,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 use serde_json::Value;
 
-use finstack_quant_valuations::schema as canonical;
+use finstack_quant::schema as canonical;
 
 use crate::errors::{core_to_py, serde_json_to_py};
 
@@ -46,7 +44,7 @@ fn instrument_types() -> Vec<&'static str> {
 #[pyfunction]
 #[pyo3(text_signature = "(instrument_type)")]
 fn instrument_schema(instrument_type: &str) -> PyResult<String> {
-    schema_json(&canonical::instrument_schema(instrument_type).map_err(core_to_py)?)
+    schema_json(canonical::instrument_schema(instrument_type).map_err(core_to_py)?)
 }
 
 #[doc = pydoc!("finstack_quant.valuations.schema", "valuation_result_schema")]
@@ -86,10 +84,7 @@ fn canonical_json(instance: &Value) -> PyResult<String> {
     })
 }
 
-schema_registry_functions!(
-    finstack_quant_valuations::schema::artifacts_slice(),
-    "finstack_quant.valuations.schema"
-);
+schema_registry_functions!("valuations", "finstack_quant.valuations.schema");
 
 /// Register the `finstack_quant.valuations.schema` Python namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
