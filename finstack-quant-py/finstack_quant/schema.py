@@ -12,6 +12,8 @@ True
 
 from finstack_quant.finstack_quant import schema as _schema
 
+__doc__ = _schema.__doc__
+
 domains = _schema.domains
 get = _schema.get
 index = _schema.index

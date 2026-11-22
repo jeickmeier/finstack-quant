@@ -33,8 +33,8 @@ use std::collections::BTreeMap;
 /// The label is what makes a merged index navigable: two crates may both
 /// publish a `schema.json` basename, and the domain is how a caller tells them
 /// apart without parsing paths.
-fn domain_registries() -> Vec<(&'static str, &'static [SchemaArtifact])> {
-    vec![
+fn domain_registries() -> [(&'static str, &'static [SchemaArtifact]); 11] {
+    [
         ("analytics", finstack_quant_analytics::schema::ARTIFACTS),
         ("core", finstack_quant_core::schema::ARTIFACTS),
         ("attribution", finstack_quant_attribution::schema::ARTIFACTS),
@@ -199,8 +199,8 @@ fn build_validator(schema: &Value) -> Result<jsonschema::Validator> {
 ///
 /// # Errors
 ///
-/// Returns [`Error::Internal`] naming the domains searched when nothing
-/// matches.
+/// Returns [`Error::Input`] ([`InputError::NotFound`](finstack_quant_core::InputError::NotFound))
+/// when nothing matches `selector`.
 ///
 /// # Examples
 /// ```
@@ -285,27 +285,6 @@ pub fn render_profile(artifact: &SchemaArtifact, profile: &str) -> Result<Value>
 
 use finstack_quant_core::schema::diagnostics::Failure;
 
-/// Render a slice of failures as a JSON array.
-///
-/// # Arguments
-///
-/// * `failures` - Validation failures to render; each becomes a
-///   `{pointer, message}` object in the returned array, preserving order.
-///
-/// # Examples
-/// ```
-/// use serde_json::json;
-///
-/// let artifact = finstack_quant::schema::find("bond.schema.json").expect("bond");
-/// let failures = finstack_quant::schema::validate(artifact, &json!({})).expect("validate");
-/// let report = finstack_quant::schema::failures_to_value(&failures);
-/// assert!(report.as_array().expect("array").len() == failures.len());
-/// ```
-#[must_use]
-pub fn failures_to_value(failures: &[Failure]) -> Value {
-    Value::Array(failures.iter().map(|failure| serde_json::json!({"pointer": failure.pointer, "message": failure.message})).collect())
-}
-
 /// Validate a payload against one published artifact.
 ///
 /// Union failures are drilled into rather than reported at the union: see the
@@ -334,24 +313,10 @@ pub fn failures_to_value(failures: &[Failure]) -> Value {
 /// ```
 pub fn validate(artifact: &SchemaArtifact, payload: &Value) -> Result<Vec<Failure>> {
     let schema = artifact.generate()?;
-    validate_document(&schema, payload)
-}
-
-/// Validate a payload against an already-rendered schema document.
-///
-/// # Arguments
-///
-/// * `schema` - A rendered schema document, as written to disk.
-/// * `payload` - The parsed JSON value to check.
-///
-/// # Errors
-///
-/// Returns [`Error::Internal`] if the document is not a compilable schema.
-pub fn validate_document(schema: &Value, payload: &Value) -> Result<Vec<Failure>> {
-    let validator = build_validator(schema)?;
+    let validator = build_validator(&schema)?;
     Ok(finstack_quant_core::schema::diagnostics::collect_failures(
         &validator,
-        schema,
+        &schema,
         payload,
         &|id| corpus().ok()?.get(id).cloned(),
         &build_validator,

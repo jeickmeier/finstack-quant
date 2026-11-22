@@ -4,7 +4,7 @@ use jsonschema::error::ValidationErrorKind;
 use jsonschema::paths::{Location, LocationSegment};
 use serde_json::Value;
 /// One validation failure, located by JSON Pointer into the payload.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize)]
 pub struct Failure {
     /// JSON Pointer into the payload, naming the value that failed.
     pub pointer: String,

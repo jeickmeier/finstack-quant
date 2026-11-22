@@ -24,7 +24,7 @@ macro_rules! schema_registry_functions {
         #[pyo3(text_signature = "()")]
         fn index() -> PyResult<String> {
             let value = finstack_quant_core::schema::build_schema_index($registry)
-                .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
+                .map_err(crate::errors::core_to_py)?;
             serde_json::to_string_pretty(&value).map_err(|error| {
                 pyo3::exceptions::PyValueError::new_err(format!("serialize index: {error}"))
             })
@@ -37,9 +37,8 @@ macro_rules! schema_registry_functions {
             let artifact =
                 finstack_quant_core::schema::find_schema_artifact($registry, selector)
                     .map_err(crate::errors::core_to_py)?;
-            let value =
-                finstack_quant::schema::render_profile(artifact, profile)
-                    .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
+            let value = finstack_quant::schema::render_profile(artifact, profile)
+                .map_err(crate::errors::core_to_py)?;
             serde_json::to_string_pretty(&value).map_err(|error| {
                 pyo3::exceptions::PyValueError::new_err(format!("serialize schema: {error}"))
             })
@@ -55,10 +54,9 @@ macro_rules! schema_registry_functions {
             let parsed: serde_json::Value = serde_json::from_str(payload).map_err(|error| {
                 pyo3::exceptions::PyValueError::new_err(format!("payload is not JSON: {error}"))
             })?;
-            let failures =
-                finstack_quant::schema::validate(artifact, &parsed)
-                    .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
-            serde_json::to_string_pretty(&finstack_quant::schema::failures_to_value(&failures)).map_err(|error| {
+            let failures = finstack_quant::schema::validate(artifact, &parsed)
+                .map_err(crate::errors::core_to_py)?;
+            serde_json::to_string_pretty(&failures).map_err(|error| {
                 pyo3::exceptions::PyValueError::new_err(format!("serialize report: {error}"))
             })
         }

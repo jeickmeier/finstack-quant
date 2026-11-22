@@ -184,6 +184,7 @@ CONVERTED: dict[str, tuple[str, ...] | None] = {
     "finstack_quant.models.factor.schema": _SCHEMA_REGISTRY,
     "finstack_quant.portfolio.schema": _SCHEMA_REGISTRY,
     "finstack_quant.scenarios.schema": _SCHEMA_REGISTRY,
+    "finstack_quant.schema": None,
     "finstack_quant.statements.schema": None,
 }
 

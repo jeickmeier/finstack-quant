@@ -1,7 +1,7 @@
 //! Registry-backed JSON Schema access for every `*.schema` facade namespace.
 //!
 //! Each domain crate publishes its wire contracts through a `SchemaArtifact`
-//! registry; the umbrella crate merges the ten registries. The schemas are
+//! registry; the umbrella crate merges the eleven registries. The schemas are
 //! rendered from those registries on demand, so a schema read here always
 //! describes the wire format this build accepts.
 //!
@@ -36,7 +36,7 @@ fn render(artifact: &SchemaArtifact, profile: Option<JsValue>) -> Result<JsValue
 fn report(artifact: &SchemaArtifact, payload: &JsValue) -> Result<JsValue, JsValue> {
     let payload: serde_json::Value = from_js_json(payload, "payload")?;
     let failures = finstack_quant::schema::validate(artifact, &payload).map_err(to_js_err)?;
-    to_js_value(&finstack_quant::schema::failures_to_value(&failures))
+    to_js_value(&failures)
 }
 
 /// Emit the `index` / `get` / `validate` exports of one crate registry.
