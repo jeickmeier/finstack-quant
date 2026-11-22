@@ -4,5 +4,8 @@ mod support;
 
 #[path = "asset_backed_facility/mod.rs"]
 mod asset_backed_facility;
+mod production_structured_audit;
+mod production_structured_metrics_audit;
+mod production_waterfall_audit;
 #[path = "structured_credit/mod.rs"]
 mod structured_credit;

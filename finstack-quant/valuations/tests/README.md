@@ -58,7 +58,7 @@ Single-file modules:
 | `payment_boundaries` | Period-cash boundary behaviour across payment dates |
 | `performance_context_bump` | Context-bump capture and direct-stencil contract (`tests/performance/context_bump.rs`) |
 | `phase2_strictness` | Persisted calibration steps reject unknown flattened fields |
-| `production_*` | Production quant-audit regressions (`production_audit`, `production_barrier_ndf_audit`, `production_inflation_audit`, `production_risk_audit`, `production_simm_sensitivity_audit`, `production_simplicity_regressions`, `production_structured_audit`, `production_structured_metrics_audit`, `production_waterfall_audit`) |
+| `production_*` | Production quant-audit regressions (`production_audit`, `production_barrier_ndf_audit`, `production_inflation_audit`, `production_risk_audit`, `production_simm_sensitivity_audit`, `production_simplicity_regressions`) |
 | `registry_snapshot` | Pins the standard pricer and metric registries against `tests/data/registry_snapshot.json` |
 | `schema_audit` | Every instrument `example()` serializes to valid JSON, round-trips through `InstrumentEnvelope`, and matches the checked-in schema |
 

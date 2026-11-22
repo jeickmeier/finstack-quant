@@ -2,7 +2,7 @@
 
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{currency::Currency, money::Money};
-use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+use finstack_quant_valuations_structured_credit::structured_credit::{
     FundingSource, PaymentCalculation, PaymentType, Recipient, RecipientType, StructuredCredit,
     Waterfall, WaterfallContext, WaterfallDistribution, WaterfallTier, execute_waterfall,
 };

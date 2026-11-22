@@ -3,13 +3,10 @@
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::market_data::{context::MarketContext, term_structures::DiscountCurve};
-use finstack_quant_valuations::{
-    instruments::PricingOptions,
-    instruments::{
-        Instrument,
-        fixed_income::structured_credit::{StructuredCredit, tranche_metrics},
-    },
-    metrics::MetricId,
+use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_structured_credit::structured_credit::{
+    StructuredCredit, tranche_metrics,
 };
 use time::macros::date;
 
@@ -150,7 +147,7 @@ fn production_structured_metrics_spread_duration_uses_quoted_value() {
 fn production_structured_metrics_clean_quote_adds_accrued_once() {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations::instruments::fixed_income::structured_credit::calculate_tranche_z_spread;
+    use finstack_quant_valuations_structured_credit::structured_credit::calculate_tranche_z_spread;
     let (mut deal, market) = deal_and_market();
     let as_of = date!(2024 - 02 - 15);
     deal.instrument_pricing_overrides
@@ -184,9 +181,7 @@ fn production_structured_metrics_clean_quote_adds_accrued_once() {
 
 #[test]
 fn production_structured_metrics_settlement_crosses_coupon_once() {
-    use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-        OasConfig, tranche_oas,
-    };
+    use finstack_quant_valuations_structured_credit::structured_credit::{OasConfig, tranche_oas};
     let (mut deal, market) = deal_and_market();
     let as_of = date!(2024 - 02 - 15);
     let settlement = date!(2024 - 05 - 15);
@@ -307,7 +302,7 @@ fn production_structured_metrics_discount_margin_settles_clean_price_at_quote_da
         market_data::{scalars::ScalarTimeSeries, term_structures::ForwardCurve},
         types::CurveId,
     };
-    use finstack_quant_valuations::instruments::fixed_income::structured_credit::tranche_discount_margin;
+    use finstack_quant_valuations_structured_credit::structured_credit::tranche_discount_margin;
     use rust_decimal_macros::dec;
     let (mut deal, market) = deal_and_market();
     let as_of = date!(2024 - 02 - 15);

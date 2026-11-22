@@ -41,12 +41,6 @@ mod production_risk_audit;
 mod production_simm_sensitivity_audit;
 #[path = "production_simplicity_regressions.rs"]
 mod production_simplicity_regressions;
-#[path = "production_structured_audit.rs"]
-mod production_structured_audit;
-#[path = "production_structured_metrics_audit.rs"]
-mod production_structured_metrics_audit;
-#[path = "production_waterfall_audit.rs"]
-mod production_waterfall_audit;
 #[path = "registry_snapshot.rs"]
 mod registry_snapshot;
 #[path = "sanity_invariants.rs"]

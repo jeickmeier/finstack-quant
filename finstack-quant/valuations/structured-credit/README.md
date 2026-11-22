@@ -55,7 +55,10 @@ valuations-core `results::structured_credit` and re-exported from
 Integration tests that need only this crate, its two family dependencies,
 valuations-core and the test-support crate live in `tests/`, compiled into the
 single `structured-credit` target
-(`mise run rust-test-crate -- finstack-quant-valuations-structured-credit`).
+(`mise run rust-test-crate -- finstack-quant-valuations-structured-credit`):
+`structured_credit/`, `asset_backed_facility/`, and the production audit suites
+(`production_structured_audit`, `production_structured_metrics_audit`,
+`production_waterfall_audit`).
 `tests/support/` includes two builders by path from the crates that own
 them: the IRS builder (`rates/tests/support/rates.rs`) for deal hedge swaps
 and the stochastic revolver fixtures
