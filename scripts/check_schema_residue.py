@@ -63,7 +63,7 @@ ENUM_NAMING_EXCEPTIONS = {
     ("finstack-quant/core/src/dates/daycount/mod.rs", "DayCount"): "contractually fixed day-count spellings",
     ("finstack-quant/core/src/types/ratings.rs", "CreditRating"): "external agency rating codes",
     (
-        "finstack-quant/factor/src/credit/hierarchy.rs",
+        "finstack-quant/factor/src/credit/hierarchy/model.rs",
         "CreditFactorModelSchema",
     ): "exact namespaced schema marker",
     ("finstack-quant/factor/src/envelope.rs", "FactorModelConfigSchema"): "exact namespaced schema marker",

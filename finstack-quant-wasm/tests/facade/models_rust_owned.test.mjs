@@ -24,7 +24,7 @@ test('black76Price rejects a non-positive df like its inverse', () => {
   for (const df of [0, -0.95]) {
     assert.throws(
       () => models.black76Price(100, 100, df, 0.2, 1, true),
-      kind('validation', /Black-76 df must be positive/)
+      kind('validation', /Black-76 df must be finite and positive/)
     );
     assert.throws(() => models.black76ImpliedVol(100, 100, df, 1, 7.5, true), kind('validation'));
   }
@@ -34,19 +34,19 @@ test('black76Price rejects a non-positive df like its inverse', () => {
 test('forward kernels reject out-of-domain inputs in Rust', () => {
   assert.throws(
     () => models.black76Price(100, 100, 0.95, -0.2, 1, true),
-    kind('validation', /Black-76 vol must be non-negative/)
+    kind('validation', /Black-76 vol must be finite and non-negative/)
   );
   assert.throws(
     () => models.bachelierPrice(0.03, 0.03, -0.0075, 1, true),
-    kind('validation', /Bachelier normal_vol must be non-negative/)
+    kind('validation', /Bachelier normal_vol must be finite and non-negative/)
   );
   assert.throws(
     () => models.blackShiftedPrice(-0.005, -0.02, 0.25, 1, 0.01, false),
-    kind('validation', /shifted Black strike \+ shift must be positive/)
+    kind('validation', /shifted Black strike \+ shift must be finite and positive/)
   );
   assert.throws(
     () => models.blackShiftedVega(-0.02, 0.01, 0.25, 1, 0.01),
-    kind('validation', /shifted Black forward \+ shift must be positive/)
+    kind('validation', /shifted Black forward \+ shift must be finite and positive/)
   );
 });
 

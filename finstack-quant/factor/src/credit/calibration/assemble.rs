@@ -13,8 +13,8 @@ use super::statistics::{d_rho_d, ledoit_wolf_cov_and_corr, sample_correlation_fl
 use super::validation::validation_err;
 use crate::credit::hierarchy::{
     CreditCalibrationDiagnostics, CreditHierarchySpec, FactorCorrelationMatrix, FactorHistories,
-    FactorVolModel, FitQuality, FoldUpRecord, IdiosyncraticVolModel, IssuerBetaMode, IssuerBetaRow,
-    IssuerBetas, IssuerTags, LevelAnchor, LevelsAtAnchor, VolState,
+    FitQuality, FoldUpRecord, IssuerBetaMode, IssuerBetaRow, IssuerBetas, LevelAnchor,
+    LevelsAtAnchor, VolModel, VolState,
 };
 use crate::matching::MatchingConfig;
 use crate::matching::{CREDIT_GENERIC_FACTOR_ID, CreditHierarchicalConfig};
@@ -31,41 +31,26 @@ pub(super) struct AnchorOutcome {
 
 /// Step 7: anchor levels at as_of (level space, not return space).
 ///
-/// Implements the same peel-the-onion math as
-/// [`crate::credit::decomposition::decompose_levels`] but uses
-/// the calibrated betas from step 4-5. We don't have a complete
-/// `CreditFactorModel` yet, so this is a self-contained re-implementation.
+/// Reuses [`crate::credit::peel::peel_single_observation`] directly with the
+/// calibrated betas from steps 4–5 and the bucket paths pre-computed during
+/// inventory construction.
 pub(super) fn anchor_levels(
     hierarchy: &CreditHierarchySpec,
     as_of_spreads: &BTreeMap<IssuerId, f64>,
-    tags: &BTreeMap<IssuerId, IssuerTags>,
+    bucket_paths: &BTreeMap<IssuerId, Vec<String>>,
     generic_at_asof: f64,
     betas: &BTreeMap<IssuerId, IssuerBetas>,
     folded: &BTreeMap<IssuerId, Vec<bool>>,
     weights: &BTreeMap<IssuerId, f64>,
-) -> Result<AnchorOutcome> {
+) -> AnchorOutcome {
     let num_levels = hierarchy.levels.len();
-    // Resolve issuer → tags + bucket_paths.
-    let mut bucket_paths: BTreeMap<IssuerId, Vec<String>> = BTreeMap::new();
-    for issuer in as_of_spreads.keys() {
-        let issuer_tags = tags.get(issuer).cloned().unwrap_or_default();
-        let paths = hierarchy.bucket_paths(&issuer_tags).map_err(|missing| {
-            validation_err(format!(
-                "CreditCalibrator anchor: issuer {:?} missing tag {:?}",
-                issuer.as_str(),
-                missing
-            ))
-        })?;
-        bucket_paths.insert(issuer.clone(), paths);
-    }
-
     let betas_ref: BTreeMap<&IssuerId, &IssuerBetas> = betas.iter().collect();
     let peel =
         crate::credit::peel::peel_single_observation(crate::credit::peel::PeelSingleObservation {
             observed_spreads: as_of_spreads,
             observed_generic: generic_at_asof,
             betas: &betas_ref,
-            bucket_paths: &bucket_paths,
+            bucket_paths,
             folded,
             num_levels,
             weights,
@@ -81,13 +66,13 @@ pub(super) fn anchor_levels(
         })
         .collect();
 
-    Ok(AnchorOutcome {
+    AnchorOutcome {
         levels: LevelsAtAnchor {
             pc: generic_at_asof,
             by_level,
         },
         adder: peel.adder,
-    })
+    }
 }
 
 /// Canonical factor ID order: PC first, then bucket factors sorted lexicographically.
@@ -107,10 +92,38 @@ pub(super) fn build_factor_id_order(
     order
 }
 
+fn repaired_sample_cov_and_corr(
+    factor_id_order: &[FactorId],
+    factor_returns: &BTreeMap<FactorId, Vec<Option<f64>>>,
+    stds: &[f64],
+    label: &str,
+    ridge_alpha: Option<f64>,
+) -> Result<(FactorCorrelationMatrix, Vec<f64>)> {
+    let n = factor_id_order.len();
+    let rho_flat = sample_correlation_flat(factor_id_order, factor_returns)?;
+    let rho_repaired = if validate_correlation_matrix(&rho_flat, n).is_ok() {
+        rho_flat
+    } else {
+        nearest_correlation(&rho_flat, n, NearestCorrelationOpts::default())
+            .map_err(|e| validation_err(format!("{label}: nearest_correlation failed: {e}")))?
+    };
+    let corr_data =
+        unflatten_square(&rho_repaired, n).map_err(|e| validation_err(e.to_string()))?;
+    let corr = FactorCorrelationMatrix::new(factor_id_order.to_vec(), corr_data)
+        .map_err(|e| validation_err(format!("{label}: repaired correlation is not valid: {e}")))?;
+    let mut data = d_rho_d(stds, &rho_repaired, n);
+    if let Some(alpha) = ridge_alpha {
+        for i in 0..n {
+            data[i * n + i] += alpha;
+        }
+    }
+    Ok((corr, data))
+}
+
 /// Assemble `(FactorCorrelationMatrix, FactorModelConfig)` for a given strategy.
 ///
 /// Returns the static correlation matrix and the covariance-embedded config.
-pub(crate) fn assemble_factor_model_config(
+pub(super) fn assemble_factor_model_config(
     factor_id_order: &[FactorId],
     factor_variances: &BTreeMap<FactorId, f64>,
     factor_returns: &BTreeMap<FactorId, Vec<Option<f64>>>,
@@ -164,54 +177,23 @@ pub(crate) fn assemble_factor_model_config(
                 )));
             }
             // Sample correlation ρ (PSD-repaired if needed); Σ = D·ρ·D + α·I.
-            let rho_flat = sample_correlation_flat(factor_id_order, factor_returns)?;
-            // Repair ρ to PSD if needed (e.g. when n_factors > n_obs).
-            let rho_flat = if validate_correlation_matrix(&rho_flat, n).is_ok() {
-                rho_flat
-            } else {
-                nearest_correlation(&rho_flat, n, NearestCorrelationOpts::default()).map_err(
-                    |e| validation_err(format!("Ridge: nearest_correlation failed: {e}")),
-                )?
-            };
-            let corr_data =
-                unflatten_square(&rho_flat, n).map_err(|e| validation_err(e.to_string()))?;
-            let corr =
-                FactorCorrelationMatrix::new(factor_id_order.to_vec(), corr_data).map_err(|e| {
-                    validation_err(format!(
-                        "Ridge: repaired correlation is not a valid correlation matrix: {e}"
-                    ))
-                })?;
-            // Σ = D·ρ_repaired·D + α·I (row-major flat).
-            let mut data = d_rho_d(&stds, &rho_flat, n);
-            for i in 0..n {
-                data[i * n + i] += alpha;
-            }
-            (corr, data)
+            repaired_sample_cov_and_corr(
+                factor_id_order,
+                factor_returns,
+                &stds,
+                "Ridge",
+                Some(alpha),
+            )?
         }
         CovarianceStrategy::FullSampleRepaired => {
             // Sample correlation ρ; repair if not PSD; Σ = D·ρ_repaired·D.
-            let rho_flat = sample_correlation_flat(factor_id_order, factor_returns)?;
-            let rho_repaired = if validate_correlation_matrix(&rho_flat, n).is_ok() {
-                rho_flat
-            } else {
-                nearest_correlation(&rho_flat, n, NearestCorrelationOpts::default()).map_err(
-                    |e| {
-                        validation_err(format!(
-                            "FullSampleRepaired: nearest_correlation failed: {e}"
-                        ))
-                    },
-                )?
-            };
-            let corr_data =
-                unflatten_square(&rho_repaired, n).map_err(|e| validation_err(e.to_string()))?;
-            let corr =
-                FactorCorrelationMatrix::new(factor_id_order.to_vec(), corr_data).map_err(|e| {
-                    validation_err(format!(
-                        "FullSampleRepaired: repaired correlation is not valid: {e}"
-                    ))
-                })?;
-            let data = d_rho_d(&stds, &rho_repaired, n);
-            (corr, data)
+            repaired_sample_cov_and_corr(
+                factor_id_order,
+                factor_returns,
+                &stds,
+                "FullSampleRepaired",
+                None,
+            )?
         }
         CovarianceStrategy::LedoitWolf => {
             // Ledoit-Wolf shrinkage over complete-case observations. Unlike
@@ -299,29 +281,23 @@ pub(super) fn build_vol_state(
     issuer_betas: &[IssuerBetaRow],
     vol_model: VolModelChoice,
 ) -> VolState {
-    let mut factors = BTreeMap::new();
-    for (fid, var) in factor_variances {
-        let model = match vol_model {
-            VolModelChoice::Sample => FactorVolModel::Sample { variance: *var },
-            VolModelChoice::Ewma { lambda } => FactorVolModel::Ewma {
-                lambda,
-                variance: *var,
-            },
-        };
-        factors.insert(fid.clone(), model);
-    }
-    let mut idiosyncratic = BTreeMap::new();
-    for row in issuer_betas {
-        let var = row.adder_vol_annualized.powi(2);
-        let model = match vol_model {
-            VolModelChoice::Sample => IdiosyncraticVolModel::Sample { variance: var },
-            VolModelChoice::Ewma { lambda } => IdiosyncraticVolModel::Ewma {
-                lambda,
-                variance: var,
-            },
-        };
-        idiosyncratic.insert(row.issuer_id.clone(), model);
-    }
+    let make_model = |variance: f64| match vol_model {
+        VolModelChoice::Sample => VolModel::Sample { variance },
+        VolModelChoice::Ewma { lambda } => VolModel::Ewma { lambda, variance },
+    };
+    let factors = factor_variances
+        .iter()
+        .map(|(fid, &var)| (fid.clone(), make_model(var)))
+        .collect();
+    let idiosyncratic = issuer_betas
+        .iter()
+        .map(|row| {
+            (
+                row.issuer_id.clone(),
+                make_model(row.adder_vol_annualized.powi(2)),
+            )
+        })
+        .collect();
     VolState {
         factors,
         idiosyncratic,

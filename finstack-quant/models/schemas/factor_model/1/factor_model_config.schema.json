@@ -13,6 +13,7 @@
           "description": "Proxied from the peer-bucket distribution.",
           "properties": {
             "bucket_peer_proxy": {
+              "additionalProperties": false,
               "properties": {
                 "peer_bucket": {
                   "description": "Dotted bucket path used as proxy (e.g. `\"IG.EU.FIN\"`).",
@@ -1556,6 +1557,7 @@
           "description": "Parallel shift to one or more curves.",
           "properties": {
             "curve_parallel": {
+              "additionalProperties": false,
               "properties": {
                 "curve_ids": {
                   "description": "Curves bumped by the factor.",
@@ -1586,6 +1588,7 @@
           "description": "Bucketed curve shift with tenor weights.",
           "properties": {
             "curve_bucketed": {
+              "additionalProperties": false,
               "properties": {
                 "curve_id": {
                   "$ref": "#/$defs/Id",
@@ -1628,6 +1631,7 @@
           "description": "Equity spot move.",
           "properties": {
             "equity_spot": {
+              "additionalProperties": false,
               "properties": {
                 "tickers": {
                   "description": "Tickers moved by the factor.",
@@ -1653,6 +1657,7 @@
           "description": "FX rate move.",
           "properties": {
             "fx_rate": {
+              "additionalProperties": false,
               "properties": {
                 "pair": {
                   "description": "Currency pair moved by the factor.",
@@ -1685,6 +1690,7 @@
           "description": "Volatility shift.",
           "properties": {
             "vol_shift": {
+              "additionalProperties": false,
               "properties": {
                 "units": {
                   "$ref": "#/$defs/BumpUnits",
@@ -1793,6 +1799,7 @@
           "description": "Aggregate exposures using Value at Risk at a fixed one-sided loss confidence level.\n\nThis assumes the downstream aggregation engine is interpreting the factor\nmodel as a parametric, one-period loss distribution rather than a full\nhistorical or Monte Carlo simulation.\n\n# Sign convention\n\nVaR is reported as a **negative** number on the P&L axis: for a long-risk\nportfolio, `total_risk` at 99% is approximately `-sigma * z_{0.99}`.\nFactor contributions carry the same sign as the total. Downstream\naggregators and visualizations rely on this convention.",
           "properties": {
             "var": {
+              "additionalProperties": false,
               "properties": {
                 "confidence": {
                   "description": "Confidence level in the open interval `(0.5, 1)`.",
@@ -1818,6 +1825,7 @@
           "description": "Aggregate exposures using expected shortfall at a fixed one-sided loss confidence level.\n\nAs with [`Self::VaR`], this is intended for parametric factor-model\naggregation rather than full-path simulation, and ES is reported as a\n**negative** number using the P&L sign convention.",
           "properties": {
             "expected_shortfall": {
+              "additionalProperties": false,
               "properties": {
                 "confidence": {
                   "description": "Confidence level in the open interval `(0.5, 1)`.",

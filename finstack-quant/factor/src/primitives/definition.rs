@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 /// How a factor movement translates to market-data perturbations.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum MarketMapping {
     /// Parallel shift to one or more curves.
     CurveParallel {

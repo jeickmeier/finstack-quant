@@ -2,8 +2,8 @@
 //!
 //! The host bindings expose `EuropeanPricer`, `PathDependentPricer` and an
 //! American LSMC pricer whose every setting is optional. The defaults live in
-//! the embedded Monte Carlo registry
-//! ([`crate::monte_carlo::registry::ConvenienceDefaults`]); the functions here
+//! Default values come from the internal embedded Monte Carlo registry
+//! (`monte_carlo::registry`); the functions here
 //! resolve omitted construction settings to their registry values, and the
 //! pricing entry points (`EuropeanPricer::price_gbm`,
 //! `PathDependentPricer::price_asian` / `price_with_lrm_greeks`) take their
@@ -56,7 +56,7 @@ fn defaults() -> Result<&'static ConvenienceDefaults> {
 ///
 /// Returns [`Error::Validation`] if the registry default is not a valid
 /// currency code.
-pub fn resolve_currency(currency: Option<Currency>) -> Result<Currency> {
+pub(crate) fn resolve_currency(currency: Option<Currency>) -> Result<Currency> {
     match currency {
         Some(currency) => Ok(currency),
         None => {

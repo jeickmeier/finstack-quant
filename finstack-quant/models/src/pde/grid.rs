@@ -4,6 +4,8 @@
 //! Grid concentration near strikes/barriers dramatically improves FD accuracy
 //! without increasing the total number of nodes.
 
+use super::error::PdeError;
+
 /// A sorted one-dimensional grid of spatial points.
 ///
 /// Supports uniform spacing, sinh-based concentration near a point of interest
@@ -18,21 +20,22 @@ pub struct Grid1D {
 impl Grid1D {
     /// Create a uniform grid with `n` points from `x_min` to `x_max` (inclusive).
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Returns an error if `n < 3` or `x_min >= x_max`.
+    /// Returns [`PdeError`] if `n < 3`, bounds are non-finite or `x_min >= x_max`,
+    /// or adjacent points collapse under floating-point arithmetic.
     ///
     /// # Arguments
     ///
     /// * `x_min` - Finite lower bound of the numerical state grid.
     /// * `x_max` - Finite upper bound of the numerical state grid.
     /// * `n` - Count of elements, paths, or periods requested by the caller
-    pub fn uniform(x_min: f64, x_max: f64, n: usize) -> Result<Self, PdeGridError> {
+    pub fn uniform(x_min: f64, x_max: f64, n: usize) -> Result<Self, PdeError> {
         if n < 3 {
-            return Err(PdeGridError::TooFewPoints { n, min: 3 });
+            return Err(PdeError::TooFewPoints { n, min: 3 });
         }
         if !x_min.is_finite() || !x_max.is_finite() || x_min >= x_max {
-            return Err(PdeGridError::InvalidBounds { x_min, x_max });
+            return Err(PdeError::InvalidBounds { x_min, x_max });
         }
         let dx = (x_max - x_min) / (n - 1) as f64;
         let mut points: Vec<f64> = (0..n).map(|i| x_min + i as f64 * dx).collect();
@@ -42,7 +45,7 @@ impl Grid1D {
             .windows(2)
             .all(|w| w[0].is_finite() && w[1].is_finite() && w[1] > w[0])
         {
-            return Err(PdeGridError::NotMonotonic);
+            return Err(PdeError::NotMonotonic);
         }
         Ok(Self { points })
     }
@@ -69,22 +72,22 @@ impl Grid1D {
         n: usize,
         center: f64,
         intensity: f64,
-    ) -> Result<Self, PdeGridError> {
+    ) -> Result<Self, PdeError> {
         if n < 3 {
-            return Err(PdeGridError::TooFewPoints { n, min: 3 });
+            return Err(PdeError::TooFewPoints { n, min: 3 });
         }
         if !x_min.is_finite() || !x_max.is_finite() || x_min >= x_max {
-            return Err(PdeGridError::InvalidBounds { x_min, x_max });
+            return Err(PdeError::InvalidBounds { x_min, x_max });
         }
         if !center.is_finite() {
-            return Err(PdeGridError::InvalidParameter {
+            return Err(PdeError::InvalidParameter {
                 name: "center",
                 value: center,
                 reason: "must be finite",
             });
         }
         if !intensity.is_finite() || intensity <= 0.0 {
-            return Err(PdeGridError::InvalidParameter {
+            return Err(PdeError::InvalidParameter {
                 name: "intensity",
                 value: intensity,
                 reason: "must be positive",
@@ -110,7 +113,7 @@ impl Grid1D {
             // far outside the domain. Silently returning a uniform grid would
             // hand back a grid with none of the requested strike resolution
             // and no signal — so this is reported as an error instead.
-            return Err(PdeGridError::DegenerateConcentration {
+            return Err(PdeError::DegenerateConcentration {
                 intensity,
                 center,
                 x_min,
@@ -133,7 +136,7 @@ impl Grid1D {
             .windows(2)
             .all(|w| w[0].is_finite() && w[1].is_finite() && w[1] > w[0])
         {
-            return Err(PdeGridError::DegenerateConcentration {
+            return Err(PdeError::DegenerateConcentration {
                 intensity,
                 center,
                 x_min,
@@ -147,19 +150,19 @@ impl Grid1D {
     /// Create a grid from user-supplied points.
     ///
     /// Points must be sorted in strictly increasing order with at least 3 elements.
-    pub fn from_points(points: Vec<f64>) -> Result<Self, PdeGridError> {
+    pub fn from_points(points: Vec<f64>) -> Result<Self, PdeError> {
         if points.len() < 3 {
-            return Err(PdeGridError::TooFewPoints {
+            return Err(PdeError::TooFewPoints {
                 n: points.len(),
                 min: 3,
             });
         }
         if !points[0].is_finite() {
-            return Err(PdeGridError::NotMonotonic);
+            return Err(PdeError::NotMonotonic);
         }
         for i in 1..points.len() {
             if !points[i].is_finite() || points[i] <= points[i - 1] {
-                return Err(PdeGridError::NotMonotonic);
+                return Err(PdeError::NotMonotonic);
             }
         }
         Ok(Self { points })
@@ -274,65 +277,6 @@ pub(crate) fn find_nearest(pts: &[f64], x: f64) -> usize {
     }
 }
 
-/// Errors during grid construction.
-#[derive(Debug, Clone, PartialEq, thiserror::Error)]
-#[non_exhaustive]
-pub enum PdeGridError {
-    /// Grid requires more points.
-    #[error("Grid needs at least {min} points, got {n}")]
-    TooFewPoints {
-        /// Number of points provided.
-        n: usize,
-        /// Minimum required.
-        min: usize,
-    },
-    /// Invalid domain bounds.
-    #[error("Invalid bounds: x_min={x_min} must be less than x_max={x_max}")]
-    InvalidBounds {
-        /// Lower bound.
-        x_min: f64,
-        /// Upper bound.
-        x_max: f64,
-    },
-    /// Grid points are not monotonically increasing.
-    #[error("Grid points must be strictly increasing")]
-    NotMonotonic,
-    /// Invalid construction parameter.
-    #[error("Invalid parameter '{name}'={value}: {reason}")]
-    InvalidParameter {
-        /// Parameter name.
-        name: &'static str,
-        /// Parameter value.
-        value: f64,
-        /// Reason it is invalid.
-        reason: &'static str,
-    },
-    /// A `sinh_concentrated` grid degenerated to (effectively) uniform.
-    ///
-    /// The sinh parameter range collapsed below numerical resolution, so the
-    /// transformation is effectively linear and the requested concentration
-    /// near `center` is entirely lost. This happens when `intensity` is so
-    /// large that the local scale dwarfs the domain width, or when `center`
-    /// lies far outside `[x_min, x_max]`. Use a smaller `intensity`, place
-    /// `center` inside the domain, or call [`Grid1D::uniform`] explicitly.
-    #[error(
-        "sinh_concentrated grid degenerated to uniform: intensity={intensity} with \
-         center={center} on domain [{x_min}, {x_max}] collapses the sinh range — \
-         the requested strike concentration is lost; use a smaller intensity, a \
-         center inside the domain, or Grid1D::uniform"
-    )]
-    DegenerateConcentration {
-        /// The `intensity` argument that produced the degenerate grid.
-        intensity: f64,
-        /// The `center` argument.
-        center: f64,
-        /// Lower domain bound.
-        x_min: f64,
-        /// Upper domain bound.
-        x_max: f64,
-    },
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -374,14 +318,14 @@ mod tests {
     /// An enormous `intensity` makes the local scale `d` dwarf the domain
     /// width, collapsing `a_range` below `1e-15`. The old code silently
     /// returned `Grid1D::uniform` here; the fix reports
-    /// [`PdeGridError::DegenerateConcentration`].
+    /// [`PdeError::DegenerateConcentration`].
     #[test]
     fn sinh_concentrated_errors_on_degenerate_concentration() {
         // intensity = 1e16 on a unit domain with a centred concentration
         // point collapses the sinh range (a_range ≈ 1e-16 < 1e-15).
         let result = Grid1D::sinh_concentrated(0.0, 1.0, 51, 0.5, 1e16);
         match result {
-            Err(PdeGridError::DegenerateConcentration {
+            Err(PdeError::DegenerateConcentration {
                 intensity,
                 center,
                 x_min,

@@ -1,7 +1,7 @@
 //! Python bindings for `finstack_quant_models::credit::migration`.
 
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::table_builders::TableBuilder;
 use crate::errors::{kinded_to_py, value_error};
@@ -361,24 +361,6 @@ impl PyTransitionMatrix {
         labelled_square_pandas(py, self.to_arrow_table()?)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.horizon")]
-    #[getter]
-    fn horizon(&self) -> f64 {
-        self.inner.horizon()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.n_states")]
-    #[getter]
-    fn n_states(&self) -> usize {
-        self.inner.n_states()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.scale")]
-    #[getter]
-    fn scale(&self) -> PyRatingScale {
-        PyRatingScale::from_inner(self.inner.scale().clone())
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.default_probabilities")]
     #[pyo3(text_signature = "($self)")]
     fn default_probabilities(&self) -> Option<Vec<f64>> {
@@ -395,6 +377,15 @@ impl PyTransitionMatrix {
         )
     }
 }
+
+py_getters!(PyTransitionMatrix |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.horizon")]
+    horizon -> f64 = s.inner.horizon();
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.n_states")]
+    n_states -> usize = s.inner.n_states();
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "TransitionMatrix.scale")]
+    scale -> PyRatingScale = PyRatingScale::from_inner(s.inner.scale().clone());
+});
 
 impl PyTransitionMatrix {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -488,30 +479,6 @@ impl PyGeneratorMatrix {
         labelled_square_pandas(py, self.to_arrow_table()?)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.n_states")]
-    #[getter]
-    fn n_states(&self) -> usize {
-        self.inner.n_states()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.scale")]
-    #[getter]
-    fn scale(&self) -> PyRatingScale {
-        PyRatingScale::from_inner(self.inner.scale().clone())
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.regularization_l1")]
-    #[getter]
-    fn regularization_l1(&self) -> f64 {
-        self.inner.regularization_l1()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.round_trip_error")]
-    #[getter]
-    fn round_trip_error(&self) -> f64 {
-        self.inner.round_trip_error()
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.__repr__")]
     fn __repr__(&self) -> String {
         format!(
@@ -522,6 +489,17 @@ impl PyGeneratorMatrix {
         )
     }
 }
+
+py_getters!(PyGeneratorMatrix |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.n_states")]
+    n_states -> usize = s.inner.n_states();
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.scale")]
+    scale -> PyRatingScale = PyRatingScale::from_inner(s.inner.scale().clone());
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.regularization_l1")]
+    regularization_l1 -> f64 = s.inner.regularization_l1();
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "GeneratorMatrix.round_trip_error")]
+    round_trip_error -> f64 = s.inner.round_trip_error();
+});
 
 impl PyGeneratorMatrix {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -598,18 +576,6 @@ impl PyRatingPath {
         self.inner.transitions().to_vec()
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPath.horizon")]
-    #[getter]
-    fn horizon(&self) -> f64 {
-        self.inner.horizon()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPath.scale")]
-    #[getter]
-    fn scale(&self) -> PyRatingScale {
-        PyRatingScale::from_inner(self.inner.scale().clone())
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPath.__repr__")]
     fn __repr__(&self) -> String {
         let default_time = match self.inner.default_time() {
@@ -624,6 +590,13 @@ impl PyRatingPath {
         )
     }
 }
+
+py_getters!(PyRatingPath |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPath.horizon")]
+    horizon -> f64 = s.inner.horizon();
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPath.scale")]
+    scale -> PyRatingScale = PyRatingScale::from_inner(s.inner.scale().clone());
+});
 
 wire_methods!(
     PyRatingPath,
@@ -646,22 +619,6 @@ pub(crate) struct PyRatingPaths {
 
 #[pymethods]
 impl PyRatingPaths {
-    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPaths.paths")]
-    #[getter]
-    fn paths(&self) -> Vec<PyRatingPath> {
-        self.inner
-            .iter()
-            .cloned()
-            .map(PyRatingPath::from_inner)
-            .collect()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPaths.default_rate")]
-    #[getter]
-    fn default_rate(&self) -> f64 {
-        migration::default_rate(&self.inner)
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPaths.__len__")]
     fn __len__(&self) -> usize {
         self.inner.len()
@@ -686,10 +643,22 @@ impl PyRatingPaths {
         format!(
             "RatingPaths(n_paths={}, default_rate={})",
             self.inner.len(),
-            self.default_rate()
+            migration::default_rate(&self.inner)
         )
     }
 }
+
+py_getters!(PyRatingPaths |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPaths.paths")]
+    paths -> Vec<PyRatingPath> = s
+        .inner
+        .iter()
+        .cloned()
+        .map(PyRatingPath::from_inner)
+        .collect();
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "RatingPaths.default_rate")]
+    default_rate -> f64 = migration::default_rate(&s.inner);
+});
 
 impl PyRatingPaths {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -788,18 +757,6 @@ impl PyMigrationSimulator {
             .map_err(kinded_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.migration", "MigrationSimulator.horizon")]
-    #[getter]
-    fn horizon(&self) -> f64 {
-        self.inner.horizon()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.migration", "MigrationSimulator.generator")]
-    #[getter]
-    fn generator(&self) -> PyGeneratorMatrix {
-        PyGeneratorMatrix::from_inner(self.inner.generator().clone())
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.migration", "MigrationSimulator.__repr__")]
     fn __repr__(&self) -> String {
         format!(
@@ -809,6 +766,13 @@ impl PyMigrationSimulator {
         )
     }
 }
+
+py_getters!(PyMigrationSimulator |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "MigrationSimulator.horizon")]
+    horizon -> f64 = s.inner.horizon();
+    #[doc = pydoc!("finstack_quant.models.credit.migration", "MigrationSimulator.generator")]
+    generator -> PyGeneratorMatrix = PyGeneratorMatrix::from_inner(s.inner.generator().clone());
+});
 
 wire_methods!(
     PyMigrationSimulator,

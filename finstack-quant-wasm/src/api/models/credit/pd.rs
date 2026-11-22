@@ -225,16 +225,11 @@ impl JsMasterScale {
         let mapped = self.inner.map_score(&result).map_err(to_js_err)?;
         to_js_value(&mapped)
     }
-
-    /// Number of grades in the scale.
-    #[wasm_bindgen(getter, js_name = nGrades)]
-    pub fn n_grades(&self) -> usize {
-        self.inner.n_grades()
-    }
-
-    /// Grades in ascending PD order, as `MasterScaleGrade` objects.
-    #[wasm_bindgen(getter, unchecked_return_type = "generated.models.MasterScaleGrade[]")]
-    pub fn grades(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&self.inner.grades())
-    }
 }
+
+wasm_getters!(JsMasterScale, MasterScale |s| {
+    /// Number of grades in the scale.
+    n_grades as nGrades -> usize = s.inner.n_grades();
+    /// Grades in ascending PD order, as `MasterScaleGrade` objects.
+    grades returns "generated.models.MasterScaleGrade[]" -> Result<JsValue, JsValue> = to_js_value(&s.inner.grades());
+});

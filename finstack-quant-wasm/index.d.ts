@@ -4331,14 +4331,6 @@ export interface ModelsCorrelationNamespace {
    * semi-definiteness. Returns nothing on success; raises a descriptive error
    * (including the failing dimension or constraint) otherwise.
    *
-   * # Arguments
-   *
-   * * `matrix` - Flat row-major `n * n` correlation coefficients; unit
-   *   diagonal, off-diagonals in `[-1, 1]`.
-   * * `n` - Finite non-negative integer square-matrix dimension no greater
-   *   than `4294967295`; `matrix` must contain exactly `n * n` entries, and
-   *   an empty matrix uses zero.
-   *
    * # Errors
    *
    * Throws a JavaScript exception if `n` is non-finite, fractional, negative,
@@ -4357,17 +4349,6 @@ export interface ModelsCorrelationNamespace {
    * matrix but fails Cholesky by a small margin, returns the nearest valid
    * correlation matrix (symmetric, unit diagonal, PSD) in Frobenius norm.
    * Gross input violations raise rather than being silently reshaped.
-   *
-   * # Arguments
-   *
-   * * `matrix` - Flat row-major `n * n` near-correlation matrix to project
-   *   onto the correlation set.
-   * * `n` - Non-negative integer square-matrix dimension; `matrix` must
-   *   contain exactly `n * n` entries, and an empty matrix uses zero.
-   * * `max_iter` - Optional non-negative integer limit on Higham projection
-   *   iterations; omitted uses Rust `NearestCorrelationOpts::default()` (200).
-   * * `tol` - Optional positive convergence tolerance for the projection;
-   *   omitted uses Rust `NearestCorrelationOpts::default()` (`1e-10`).
    *
    * # Errors
    *
@@ -4918,12 +4899,12 @@ export interface ModelsFactorCreditNamespace {
    * # Arguments
    *
    * * `model` - Calibrated credit factor hierarchy used for the peel.
-   * * `observed_spreads_json` - JSON `{issuer_id: spread}` map in decimal
+   * * `observed_spreads` - JSON or plain `{issuer_id: spread}` map in decimal
    *   (`0.012` = 120 bp). Values that look like bp (e.g. `100.0`) are rejected.
    * * `observed_generic` - Generic (PC) factor value at `as_of`, same decimal
    *   convention as the spreads.
    * * `as_of` - ISO-8601 valuation date for the snapshot.
-   * * `runtime_tags_json` - Optional JSON `{issuer_id: {dim_key: tag}}` for
+   * * `runtime_tags` - Optional JSON or plain `{issuer_id: {dim_key: tag}}` for
    *   issuers not present in the model artifact.
    *
    * # Errors
@@ -4932,10 +4913,10 @@ export interface ModelsFactorCreditNamespace {
    * `runtime_tags` entry, and a `validation` error if `as_of` cannot be parsed
    * or a spread is outside the decimal band.
    * @param model - Calibrated credit factor hierarchy used for the peel.
-   * @param observedSpreadsJson - JSON `{issuer_id: spread}` map in decimal (`0.012` = 120 bp). Values that look like bp (e.g. `100.0`) are rejected.
+   * @param observedSpreads - JSON or plain `{issuer_id: spread}` map in decimal (`0.012` = 120 bp). Values that look like bp (e.g. `100.0`) are rejected.
    * @param observedGeneric - Generic (PC) factor value at `as_of`, same decimal convention as the spreads.
    * @param asOf - ISO-8601 valuation date for the snapshot.
-   * @param runtimeTagsJson - Optional JSON `{issuer_id: {dim_key: tag}}` for issuers not present in the model artifact.
+   * @param runtimeTags - Optional JSON or plain `{issuer_id: {dim_key: tag}}` for issuers not present in the model artifact.
    * @returns Per-level factor values and residual adders at the requested date, in bp.
    */
   readonly decomposeLevels: typeof wasm.decomposeLevels;
@@ -5866,13 +5847,6 @@ export interface ModelsVolatilityNamespace {
    *
    * Gatheral (2004): see docs/REFERENCES.md#gatheral-2004-svi.
    *
-   * # Arguments
-   *
-   * * `strikes` - Positive strikes (at least five).
-   * * `vols` - Black implied vols (decimal) aligned one-for-one with `strikes`.
-   * * `forward` - Positive forward at `expiry`.
-   * * `expiry` - Positive time to expiry in years.
-   *
    * # Errors
    *
    * Throws a JavaScript exception if lengths differ, fewer than five quotes are
@@ -5891,18 +5865,6 @@ export interface ModelsVolatilityNamespace {
    * Prices are equated at the money (strike = forward) and the target vol is
    * solved deterministically.
    *
-   * # Arguments
-   *
-   * * `vol` - Input volatility in the source convention: decimal Black vol for
-   *   `"lognormal"` / shifted-lognormal, absolute vol in the forward's rate units
-   *   for `"normal"`. Must be positive.
-   * * `from_convention` - `"normal"`, `"lognormal"`, or
-   *   `{"shifted_lognormal": {"shift": s}}` (serde form of `VolatilityConvention`).
-   * * `to_convention` - Target convention in the same encoding.
-   * * `forward_rate` - ATM forward rate or price; must satisfy the target
-   *   convention's domain.
-   * * `time_to_expiry` - Time to expiry in years (non-negative).
-   *
    * # Errors
    *
    * Throws a JavaScript exception if a convention cannot be decoded, an input
@@ -5917,14 +5879,6 @@ export interface ModelsVolatilityNamespace {
   readonly convertAtmVolatility: typeof wasm.convertAtmVolatility;
   /**
    * Convert premium-unadjusted forward delta magnitude to strike.
-   *
-   * # Arguments
-   *
-   * * `is_call` - `true` for a call option, `false` for a put option.
-   * * `delta_abs` - Forward delta magnitude as a decimal probability in `(0, 1)`.
-   * * `forward` - Positive outright forward in quote units per base unit.
-   * * `vol` - Positive annualized Black volatility as a decimal.
-   * * `expiry` - Positive option expiry in years.
    *
    * # Errors
    *
@@ -5942,18 +5896,6 @@ export interface ModelsVolatilityNamespace {
   /**
    * Evaluate a core SABR cube in the requested quote convention.
    *
-   * # Arguments
-   *
-   * * `cube` - Structurally validated data-only volatility cube.
-   * * `expiry` - Positive option expiry in years within the cube grid.
-   * * `tenor` - Positive underlying tenor in years within the cube grid.
-   * * `strike` - Finite strike in the same rate units as the stored forwards.
-   * * `convention` - Output quote convention: `"lognormal"` (decimal Black,
-   *   shifted by the cube's own SABR shifts where it stores them) or `"normal"`
-   *   (absolute Bachelier vol in the forward's rate units). The serde form
-   *   `{"shifted_lognormal": {"shift": s}}` is rejected because the cube already
-   *   carries its own shifts.
-   *
    * # Errors
    *
    * Throws a JavaScript exception for out-of-grid coordinates, invalid SABR
@@ -5969,18 +5911,6 @@ export interface ModelsVolatilityNamespace {
   /**
    * Evaluate a core SABR cube in the requested convention with flat coordinate
    * clamping; throws on undefined volatility.
-   *
-   * # Arguments
-   *
-   * * `cube` - Structurally validated data-only volatility cube.
-   * * `expiry` - Finite option expiry in years; clamped to the stored grid.
-   * * `tenor` - Finite underlying tenor in years; clamped to the stored grid.
-   * * `strike` - Finite strike in the same rate units as the stored forwards.
-   * * `convention` - Output quote convention: `"lognormal"` (decimal Black,
-   *   shifted by the cube's own SABR shifts where it stores them) or `"normal"`
-   *   (absolute Bachelier vol in the forward's rate units). The serde form
-   *   `{"shifted_lognormal": {"shift": s}}` is rejected because the cube already
-   *   carries its own shifts.
    *
    * # Errors
    *
@@ -6023,11 +5953,6 @@ export interface ModelsVolatilityNamespace {
   /**
    * Return ATM, 25-delta put/call, and optional 10-delta put/call vols at a stored FX expiry.
    *
-   * # Arguments
-   *
-   * * `surface` - Structurally validated data-only FX delta surface.
-   * * `expiry_index` - Zero-based stored expiry index.
-   *
    * # Errors
    *
    * Throws a JavaScript exception when `expiry_index` is non-finite, fractional,
@@ -6040,13 +5965,6 @@ export interface ModelsVolatilityNamespace {
   readonly getFxDeltaPillarVols: typeof wasm.getFxDeltaPillarVols;
   /**
    * Evaluate an FX delta-quoted surface at an expiry, strike, and forward.
-   *
-   * # Arguments
-   *
-   * * `surface` - Structurally validated data-only FX delta surface.
-   * * `expiry` - Positive option expiry in years.
-   * * `strike` - Positive strike in the FX quote currency.
-   * * `forward` - Positive FX forward in quote currency per base currency.
    *
    * # Errors
    *
@@ -6064,15 +5982,6 @@ export interface ModelsVolatilityNamespace {
    *
    * Inverts the Bachelier price per unit annuity (`df = 1`); forward and
    * strike may be zero or negative.
-   *
-   * # Arguments
-   *
-   * * `price` - Non-negative undiscounted option price (forward premium per
-   *   unit annuity) in the forward's units.
-   * * `forward` - Finite forward rate or price; negative values are allowed.
-   * * `strike` - Finite strike in the forward's units; negative values are allowed.
-   * * `t` - Strictly positive time to expiry in years.
-   * * `is_call` - `true` for a call, `false` for a put.
    *
    * @returns Normal volatility in absolute forward units per square-root year;
    * `0` when `price` equals intrinsic value.
@@ -6094,15 +6003,6 @@ export interface ModelsVolatilityNamespace {
    *
    * Inverts the Black-76 price per unit annuity (`df = 1`); for a discounted
    * price use `models.black76ImpliedVol`.
-   *
-   * # Arguments
-   *
-   * * `price` - Non-negative undiscounted option price (forward premium per
-   *   unit annuity) in the forward's units.
-   * * `forward` - Strictly positive forward rate or price.
-   * * `strike` - Strictly positive strike in the forward's units.
-   * * `t` - Strictly positive time to expiry in years.
-   * * `is_call` - `true` for a call, `false` for a put.
    *
    * @returns Black volatility as an annualized decimal; `0` when `price`
    * equals intrinsic value.
@@ -6220,14 +6120,6 @@ export interface ModelsVolatilityNamespace {
   /**
    * Convert strike to premium-unadjusted forward delta magnitude.
    *
-   * # Arguments
-   *
-   * * `is_call` - `true` for a call option, `false` for a put option.
-   * * `strike` - Positive strike in the same units as `forward`.
-   * * `forward` - Positive forward in the same units as `strike`.
-   * * `vol` - Positive annualized Black volatility as a decimal.
-   * * `expiry` - Positive option expiry in years.
-   *
    * # Errors
    *
    * Throws a `TypeError` for mistyped arguments or a `FinstackError` (kind `validation`)
@@ -6243,12 +6135,6 @@ export interface ModelsVolatilityNamespace {
   readonly strikeToDelta: typeof wasm.strikeToDelta;
   /**
    * Black implied volatility from SVI parameters at log-moneyness `k = ln(K / F)`.
-   *
-   * # Arguments
-   *
-   * * `params` - SVI parameter object `{a, b, rho, m, sigma}` (validated on decode).
-   * * `k` - Log-moneyness `ln(K / F)`.
-   * * `t` - Positive time to expiry in years.
    *
    * # Errors
    *
@@ -6420,12 +6306,6 @@ export interface ModelsVolatilityNamespace {
   /**
    * Materialize an FX delta-quoted surface as an expiry by strike volatility surface.
    *
-   * # Arguments
-   *
-   * * `surface` - Structurally validated `core.FxDeltaVolSurface` handle.
-   * * `delivery_forwards` - Outright FX delivery forwards in quote units per base unit, one positive finite value per surface expiry.
-   * * `interpolation_mode` - Select direct implied volatility or total-variance interpolation on the output grid.
-   *
    * # Errors
    *
    * Throws a `TypeError` for mistyped arguments or a `validation` error if
@@ -6464,18 +6344,6 @@ export interface ModelsNamespace {
    *
    * One call replaces choosing and sequencing `bsPrice`, `black76Price`,
    * `bachelierPrice`, their implied-volatility inverses and their Greeks.
-   *
-   * # Arguments
-   *
-   * * `request` - `OptionCalculation` object or JSON text: `model` tagged by
-   *   `kind` (`"black_scholes"` with `spot`, `strike`, continuously compounded
-   *   decimal `rate` and `div_yield`, `expiry` in years, `is_call` and an
-   *   optional `theta_days_per_year` defaulting to 365; `"black76"` with
-   *   `forward`, `strike`, discount factor `df`, `expiry`, `is_call`;
-   *   `"bachelier"` with `forward`, `strike`, `expiry`, `is_call`) and `solve`
-   *   (`{kind: "price", vol}` with a decimal Black vol or an absolute normal vol
-   *   for Bachelier, or `{kind: "implied_vol", price}` discounted for
-   *   Black-Scholes and Black-76, undiscounted for Bachelier).
    *
    * # Errors
    *

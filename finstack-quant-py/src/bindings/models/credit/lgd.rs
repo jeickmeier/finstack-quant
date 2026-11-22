@@ -8,7 +8,7 @@
 //! - Exposure-at-default for term loans and revolvers.
 
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::table_builders::{TableBuilder, serde_rows_to_arrow_table};
 use finstack_quant_models::credit::lgd::{
@@ -41,48 +41,6 @@ impl PyBetaRecovery {
         BetaRecovery::new(mean, std_dev)
             .map(|inner| Self { inner })
             .map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.mean")]
-    #[getter]
-    fn mean(&self) -> f64 {
-        self.inner.mean()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.std_dev")]
-    #[getter]
-    fn std_dev(&self) -> f64 {
-        self.inner.std_dev()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.alpha")]
-    #[getter]
-    fn alpha(&self) -> f64 {
-        self.inner.alpha()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.beta_param")]
-    #[getter]
-    fn beta_param(&self) -> f64 {
-        self.inner.beta_param()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.variance")]
-    #[getter]
-    fn variance(&self) -> f64 {
-        self.inner.variance()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.mode")]
-    #[getter]
-    fn mode(&self) -> Option<f64> {
-        self.inner.mode()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.mean_lgd")]
-    #[getter]
-    fn mean_lgd(&self) -> f64 {
-        self.inner.mean_lgd()
     }
 
     #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.quantile")]
@@ -127,6 +85,23 @@ wire_methods!(
     module = "finstack_quant.models.credit.lgd"
 );
 
+py_getters!(PyBetaRecovery |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.mean")]
+    mean -> f64 = s.inner.mean();
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.std_dev")]
+    std_dev -> f64 = s.inner.std_dev();
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.alpha")]
+    alpha -> f64 = s.inner.alpha();
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.beta_param")]
+    beta_param -> f64 = s.inner.beta_param();
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.variance")]
+    variance -> f64 = s.inner.variance();
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.mode")]
+    mode -> Option<f64> = s.inner.mode();
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "BetaRecovery.mean_lgd")]
+    mean_lgd -> f64 = s.inner.mean_lgd();
+});
+
 #[doc = pydoc!("finstack_quant.models.credit.lgd", "seniority_recovery_stats")]
 #[pyfunction]
 #[pyo3(signature = (seniority, calibration_id))]
@@ -170,35 +145,22 @@ impl PyCollateralPiece {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece.collateral_type")]
-    #[getter]
-    fn collateral_type(&self) -> PyResult<String> {
-        finstack_quant_core::wire::serde_label(&self.inner.collateral_type).map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece.book_value")]
-    #[getter]
-    fn book_value(&self) -> f64 {
-        self.inner.book_value
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece.haircut")]
-    #[getter]
-    fn haircut(&self) -> f64 {
-        self.inner.haircut
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece.liquidation_value")]
-    #[getter]
-    fn liquidation_value(&self) -> f64 {
-        self.inner.liquidation_value()
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CollateralPiece", &self.inner)
     }
 }
+
+py_getters!(PyCollateralPiece |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece.collateral_type")]
+    collateral_type -> PyResult<String> = finstack_quant_core::wire::serde_label(&s.inner.collateral_type).map_err(core_to_py);
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece.book_value")]
+    book_value -> f64 = s.inner.book_value;
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece.haircut")]
+    haircut -> f64 = s.inner.haircut;
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece.liquidation_value")]
+    liquidation_value -> f64 = s.inner.liquidation_value();
+});
 
 wire_methods!(
     PyCollateralPiece,
@@ -248,29 +210,20 @@ impl PyWorkoutCosts {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutCosts.direct_cost_rate")]
-    #[getter]
-    fn direct_cost_rate(&self) -> f64 {
-        self.inner.direct_cost_rate
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutCosts.indirect_cost_rate")]
-    #[getter]
-    fn indirect_cost_rate(&self) -> f64 {
-        self.inner.indirect_cost_rate
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutCosts.total_rate")]
-    #[getter]
-    fn total_rate(&self) -> f64 {
-        self.inner.total_rate()
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutCosts.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("WorkoutCosts", &self.inner)
     }
 }
+
+py_getters!(PyWorkoutCosts |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutCosts.direct_cost_rate")]
+    direct_cost_rate -> f64 = s.inner.direct_cost_rate;
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutCosts.indirect_cost_rate")]
+    indirect_cost_rate -> f64 = s.inner.indirect_cost_rate;
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutCosts.total_rate")]
+    total_rate -> f64 = s.inner.total_rate();
+});
 
 wire_methods!(
     PyWorkoutCosts,
@@ -294,29 +247,20 @@ pub(crate) struct PyWorkoutLgdResult {
 
 #[pymethods]
 impl PyWorkoutLgdResult {
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdResult.net_recovery")]
-    #[getter]
-    fn net_recovery(&self) -> f64 {
-        self.inner.net_recovery
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdResult.lgd")]
-    #[getter]
-    fn lgd(&self) -> f64 {
-        self.inner.lgd
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdResult.recovery_rate")]
-    #[getter]
-    fn recovery_rate(&self) -> f64 {
-        self.inner.recovery_rate
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdResult.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("WorkoutLgdResult", &self.inner)
     }
 }
+
+py_getters!(PyWorkoutLgdResult |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdResult.net_recovery")]
+    net_recovery -> f64 = s.inner.net_recovery;
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdResult.lgd")]
+    lgd -> f64 = s.inner.lgd;
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgdResult.recovery_rate")]
+    recovery_rate -> f64 = s.inner.recovery_rate;
+});
 
 impl PyWorkoutLgdResult {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -378,41 +322,29 @@ impl PyWorkoutLgd {
         self.inner.net_recovery(ead).map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.collateral")]
-    #[getter]
-    fn collateral(&self) -> Vec<PyCollateralPiece> {
-        self.inner
-            .collateral()
-            .iter()
-            .map(|piece| PyCollateralPiece { inner: *piece })
-            .collect()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.workout_years")]
-    #[getter]
-    fn workout_years(&self) -> f64 {
-        self.inner.workout_years()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.discount_rate")]
-    #[getter]
-    fn discount_rate(&self) -> f64 {
-        self.inner.discount_rate()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.costs")]
-    #[getter]
-    fn costs(&self) -> PyWorkoutCosts {
-        PyWorkoutCosts {
-            inner: *self.inner.costs(),
-        }
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("WorkoutLgd", &self.inner)
     }
 }
+
+py_getters!(PyWorkoutLgd |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.collateral")]
+    collateral -> Vec<PyCollateralPiece> = s
+        .inner
+        .collateral()
+        .iter()
+        .map(|piece| PyCollateralPiece { inner: *piece })
+        .collect();
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.workout_years")]
+    workout_years -> f64 = s.inner.workout_years();
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.discount_rate")]
+    discount_rate -> f64 = s.inner.discount_rate();
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "WorkoutLgd.costs")]
+    costs -> PyWorkoutCosts = PyWorkoutCosts {
+        inner: *s.inner.costs(),
+    };
+});
 
 impl PyWorkoutLgd {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -652,24 +584,6 @@ impl PyEadCalculator {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "EadCalculator.ead")]
-    #[getter]
-    fn ead(&self) -> f64 {
-        self.inner.ead()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "EadCalculator.utilization")]
-    #[getter]
-    fn utilization(&self) -> f64 {
-        self.inner.utilization()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.lgd", "EadCalculator.total_commitment")]
-    #[getter]
-    fn total_commitment(&self) -> f64 {
-        self.inner.total_commitment()
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.lgd", "EadCalculator.leq_from_observed_ead")]
     #[pyo3(text_signature = "($self, observed_ead)")]
     fn leq_from_observed_ead(&self, observed_ead: f64) -> Option<f64> {
@@ -681,6 +595,15 @@ impl PyEadCalculator {
         crate::bindings::repr_support::repr_from_serde("EadCalculator", &self.inner)
     }
 }
+
+py_getters!(PyEadCalculator |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "EadCalculator.ead")]
+    ead -> f64 = s.inner.ead();
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "EadCalculator.utilization")]
+    utilization -> f64 = s.inner.utilization();
+    #[doc = pydoc!("finstack_quant.models.credit.lgd", "EadCalculator.total_commitment")]
+    total_commitment -> f64 = s.inner.total_commitment();
+});
 
 wire_methods!(
     PyEadCalculator,

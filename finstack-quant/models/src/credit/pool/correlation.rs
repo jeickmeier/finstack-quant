@@ -136,9 +136,7 @@ impl CorrelationStructure {
             asset_correlation,
             prepay_default_correlation,
         };
-        structure
-            .validate()
-            .map_err(finstack_quant_core::Error::Validation)?;
+        structure.validate()?;
         Ok(structure)
     }
 
@@ -163,9 +161,7 @@ impl CorrelationStructure {
             inter_sector,
             prepay_default,
         };
-        structure
-            .validate()
-            .map_err(finstack_quant_core::Error::Validation)?;
+        structure.validate()?;
         Ok(structure)
     }
 
@@ -187,9 +183,7 @@ impl CorrelationStructure {
             correlations,
             labels,
         };
-        structure
-            .validate()
-            .map_err(finstack_quant_core::Error::Validation)?;
+        structure.validate()?;
         Ok(structure)
     }
 
@@ -383,8 +377,8 @@ impl CorrelationStructure {
     ///
     /// # Errors
     ///
-    /// Returns a description of the first validation failure found.
-    pub fn validate(&self) -> Result<(), String> {
+    /// Returns [`finstack_quant_core::Error::Validation`] on the first validation failure found.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
         match self {
             CorrelationStructure::Flat {
                 asset_correlation,
@@ -416,7 +410,7 @@ impl CorrelationStructure {
                 correlations,
                 labels.len(),
             )
-            .map_err(|e| e.to_string()),
+            .map_err(Into::into),
         }
     }
 
@@ -496,11 +490,16 @@ impl CorrelationStructure {
 }
 
 /// Validate that a single correlation value is within an inclusive range.
-fn validate_correlation_value(rho: f64, lo: f64, hi: f64, name: &str) -> Result<(), String> {
+fn validate_correlation_value(
+    rho: f64,
+    lo: f64,
+    hi: f64,
+    name: &str,
+) -> finstack_quant_core::Result<()> {
     if !(lo..=hi).contains(&rho) {
-        return Err(format!(
+        return Err(finstack_quant_core::Error::Validation(format!(
             "Correlation {name} = {rho} outside valid range [{lo}, {hi}]"
-        ));
+        )));
     }
     Ok(())
 }
@@ -641,6 +640,7 @@ mod tests {
         assert!(
             result
                 .expect_err("expected validation error for non-unit diagonal")
+                .to_string()
                 .contains("Diagonal")
         );
     }
@@ -656,6 +656,7 @@ mod tests {
         assert!(
             result
                 .expect_err("expected validation error for non-symmetric matrix")
+                .to_string()
                 .contains("symmetric")
         );
     }

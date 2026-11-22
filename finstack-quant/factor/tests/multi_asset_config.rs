@@ -141,7 +141,7 @@ fn factor_model_config_supports_multi_asset_factor_universe() {
     };
 
     config
-        .validate_matching_factor_ids()
+        .validate()
         .expect("all mapping-table factors are declared");
     let round_trip: FactorModelConfig =
         serde_json::from_str(&serde_json::to_string(&config).expect("serialize config"))
@@ -181,7 +181,7 @@ fn matching_config_validation_rejects_undeclared_non_credit_factor() {
         unmatched_policy: None,
     };
 
-    assert!(config.validate_matching_factor_ids().is_err());
+    assert!(config.validate().is_err());
 }
 
 fn curve_factor(

@@ -902,29 +902,6 @@
     },
     {
       "additionalProperties": false,
-      "description": "Composite credit-index market data.\n\nThe identifier resolves through `MarketContext::get_credit_index` and\nrepresents the aggregate hazard curve, base correlation, and optional\nissuer-level curves as one pricing dependency.",
-      "properties": {
-        "credit_index": {
-          "additionalProperties": false,
-          "properties": {
-            "id": {
-              "$ref": "#/$defs/Id",
-              "description": "Credit-index aggregate identifier."
-            }
-          },
-          "required": [
-            "id"
-          ],
-          "type": "object"
-        }
-      },
-      "required": [
-        "credit_index"
-      ],
-      "type": "object"
-    },
-    {
-      "additionalProperties": false,
       "description": "Equity or commodity spot.",
       "properties": {
         "spot": {

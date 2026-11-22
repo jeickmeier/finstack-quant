@@ -14,7 +14,7 @@ use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
 use crate::bindings::core::types::extract_credit_rating;
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::json_bridge::serde_to_py;
-use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::table_builders::{TableBuilder, serde_object_to_single_row_arrow_table};
 use crate::errors::core_to_py;
@@ -76,29 +76,20 @@ impl PyRatingFactorTable {
         self.inner.get_factor(rating).map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit", "RatingFactorTable.agency")]
-    #[getter]
-    fn agency(&self) -> String {
-        self.inner.agency().to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "RatingFactorTable.methodology")]
-    #[getter]
-    fn methodology(&self) -> String {
-        self.inner.methodology().to_string()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "RatingFactorTable.default_factor")]
-    #[getter]
-    fn default_factor(&self) -> f64 {
-        self.inner.default_factor()
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit", "RatingFactorTable.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("RatingFactorTable", &self.inner)
     }
 }
+
+py_getters!(PyRatingFactorTable |s| {
+    #[doc = pydoc!("finstack_quant.models.credit", "RatingFactorTable.agency")]
+    agency -> String = s.inner.agency().to_string();
+    #[doc = pydoc!("finstack_quant.models.credit", "RatingFactorTable.methodology")]
+    methodology -> String = s.inner.methodology().to_string();
+    #[doc = pydoc!("finstack_quant.models.credit", "RatingFactorTable.default_factor")]
+    default_factor -> f64 = s.inner.default_factor();
+});
 
 wire_methods!(
     PyRatingFactorTable,
@@ -377,48 +368,6 @@ impl PyMertonModel {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.asset_value")]
-    #[getter]
-    fn asset_value(&self) -> f64 {
-        self.inner.asset_value()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.asset_vol")]
-    #[getter]
-    fn asset_vol(&self) -> f64 {
-        self.inner.asset_vol()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.debt_barrier")]
-    #[getter]
-    fn debt_barrier(&self) -> f64 {
-        self.inner.debt_barrier()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.risk_free_rate")]
-    #[getter]
-    fn risk_free_rate(&self) -> f64 {
-        self.inner.risk_free_rate()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.payout_rate")]
-    #[getter]
-    fn payout_rate(&self) -> f64 {
-        self.inner.payout_rate()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.barrier_type")]
-    #[getter]
-    fn barrier_type(&self) -> PyBarrierType {
-        PyBarrierType::from_inner(*self.inner.barrier_type())
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.dynamics")]
-    #[getter]
-    fn dynamics(&self) -> PyAssetDynamics {
-        PyAssetDynamics::from_inner(*self.inner.dynamics())
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.distance_to_default")]
     fn distance_to_default(&self, horizon: f64) -> f64 {
         self.inner.distance_to_default(horizon)
@@ -522,6 +471,23 @@ impl PyMertonModel {
     }
 }
 
+py_getters!(PyMertonModel |s| {
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.asset_value")]
+    asset_value -> f64 = s.inner.asset_value();
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.asset_vol")]
+    asset_vol -> f64 = s.inner.asset_vol();
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.debt_barrier")]
+    debt_barrier -> f64 = s.inner.debt_barrier();
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.risk_free_rate")]
+    risk_free_rate -> f64 = s.inner.risk_free_rate();
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.payout_rate")]
+    payout_rate -> f64 = s.inner.payout_rate();
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.barrier_type")]
+    barrier_type -> PyBarrierType = PyBarrierType::from_inner(*s.inner.barrier_type());
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.dynamics")]
+    dynamics -> PyAssetDynamics = PyAssetDynamics::from_inner(*s.inner.dynamics());
+});
+
 impl PyMertonModel {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         serde_object_to_single_row_arrow_table(
@@ -565,102 +531,56 @@ pub(crate) struct PyMertonReport {
 
 #[pymethods]
 impl PyMertonReport {
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.model")]
-    #[getter]
-    fn model(&self) -> PyMertonModel {
-        PyMertonModel {
-            inner: self.inner.model.clone(),
-        }
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.default_point")]
-    #[getter]
-    fn default_point(&self) -> Option<f64> {
-        self.inner.default_point
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.horizons")]
-    #[getter]
-    fn horizons(&self) -> Vec<f64> {
-        self.inner.horizons.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.default_probabilities")]
-    #[getter]
-    fn default_probabilities(&self) -> Vec<f64> {
-        self.inner.default_probabilities.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.distance_to_default")]
-    #[getter]
-    fn distance_to_default(&self) -> Vec<f64> {
-        self.inner.distance_to_default.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.grades")]
-    #[getter]
-    fn grades(&self) -> Vec<pd::PyMasterScaleResult> {
-        self.inner
-            .grades
-            .iter()
-            .cloned()
-            .map(pd::PyMasterScaleResult::from_inner)
-            .collect()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.implied_spread")]
-    #[getter]
-    fn implied_spread(&self) -> Option<Vec<f64>> {
-        self.inner.implied_spread.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.debt_spread")]
-    #[getter]
-    fn debt_spread(&self) -> Option<Vec<f64>> {
-        self.inner.debt_spread.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.maturity")]
-    #[getter]
-    fn maturity(&self) -> f64 {
-        self.inner.maturity
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.recovery")]
-    #[getter]
-    fn recovery(&self) -> f64 {
-        self.inner.recovery
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.cds_par_spread")]
-    #[getter]
-    fn cds_par_spread(&self) -> Option<f64> {
-        self.inner.cds_par_spread
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.implied_equity")]
-    #[getter]
-    fn implied_equity(&self) -> Option<(f64, f64)> {
-        self.inner
-            .implied_equity
-            .map(|equity| (equity.value, equity.vol))
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.errors")]
-    #[getter]
-    fn errors(&self) -> std::collections::BTreeMap<&'static str, String> {
-        self.inner
-            .errors
-            .iter()
-            .map(|(measure, message)| (measure.as_str(), message.clone()))
-            .collect()
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("MertonReport", &self.inner)
     }
 }
+
+py_getters!(PyMertonReport |s| {
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.model")]
+    model -> PyMertonModel = PyMertonModel {
+        inner: s.inner.model.clone(),
+    };
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.default_point")]
+    default_point -> Option<f64> = s.inner.default_point;
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.horizons")]
+    horizons -> Vec<f64> = s.inner.horizons.clone();
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.default_probabilities")]
+    default_probabilities -> Vec<f64> = s.inner.default_probabilities.clone();
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.distance_to_default")]
+    distance_to_default -> Vec<f64> = s.inner.distance_to_default.clone();
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.grades")]
+    grades -> Vec<pd::PyMasterScaleResult> = s
+        .inner
+        .grades
+        .iter()
+        .cloned()
+        .map(pd::PyMasterScaleResult::from_inner)
+        .collect();
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.implied_spread")]
+    implied_spread -> Option<Vec<f64>> = s.inner.implied_spread.clone();
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.debt_spread")]
+    debt_spread -> Option<Vec<f64>> = s.inner.debt_spread.clone();
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.maturity")]
+    maturity -> f64 = s.inner.maturity;
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.recovery")]
+    recovery -> f64 = s.inner.recovery;
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.cds_par_spread")]
+    cds_par_spread -> Option<f64> = s.inner.cds_par_spread;
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.implied_equity")]
+    implied_equity -> Option<(f64, f64)> = s
+        .inner
+        .implied_equity
+        .map(|equity| (equity.value, equity.vol));
+    #[doc = pydoc!("finstack_quant.models.credit", "MertonReport.errors")]
+    errors -> std::collections::BTreeMap<&'static str, String> = s
+        .inner
+        .errors
+        .iter()
+        .map(|(measure, message)| (measure.as_str(), message.clone()))
+        .collect();
+});
 
 impl PyMertonReport {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -738,36 +658,6 @@ impl PySimulatedPaths {
 
 #[pymethods]
 impl PySimulatedPaths {
-    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.times")]
-    #[getter]
-    fn times(&self) -> Vec<f64> {
-        self.inner.times.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.asset_values")]
-    #[getter]
-    fn asset_values(&self) -> Vec<f64> {
-        self.inner.asset_values.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.num_paths")]
-    #[getter]
-    fn num_paths(&self) -> usize {
-        self.inner.num_paths
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.num_steps")]
-    #[getter]
-    fn num_steps(&self) -> usize {
-        self.inner.num_steps
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.values_per_path")]
-    #[getter]
-    fn values_per_path(&self) -> usize {
-        self.inner.values_per_path()
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.to_numpy")]
     fn to_numpy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, numpy::PyArray2<f64>>> {
         use numpy::{PyArray1, PyArrayMethods};
@@ -805,6 +695,19 @@ impl PySimulatedPaths {
         crate::bindings::repr_support::repr_from_serde("SimulatedPaths", &self.inner)
     }
 }
+
+py_getters!(PySimulatedPaths |s| {
+    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.times")]
+    times -> Vec<f64> = s.inner.times.clone();
+    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.asset_values")]
+    asset_values -> Vec<f64> = s.inner.asset_values.clone();
+    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.num_paths")]
+    num_paths -> usize = s.inner.num_paths;
+    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.num_steps")]
+    num_steps -> usize = s.inner.num_steps;
+    #[doc = pydoc!("finstack_quant.models.credit", "SimulatedPaths.values_per_path")]
+    values_per_path -> usize = s.inner.values_per_path();
+});
 
 impl PySimulatedPaths {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -914,28 +817,10 @@ impl PyDynamicRecoverySpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.kind")]
-    #[getter]
-    fn kind(&self) -> PyResult<String> {
-        finstack_quant_core::wire::serde_tag(self.inner.model()).map_err(core_to_py)
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.recovery_at_notional")]
     #[pyo3(text_signature = "($self, notional)")]
     fn recovery_at_notional(&self, notional: f64) -> f64 {
         self.inner.recovery_at_notional(notional)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.base_recovery")]
-    #[getter]
-    fn base_recovery(&self) -> f64 {
-        self.inner.base_recovery()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.base_notional")]
-    #[getter]
-    fn base_notional(&self) -> f64 {
-        self.inner.base_notional()
     }
 
     #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.model")]
@@ -948,6 +833,15 @@ impl PyDynamicRecoverySpec {
         crate::bindings::repr_support::repr_from_serde("DynamicRecoverySpec", &self.inner)
     }
 }
+
+py_getters!(PyDynamicRecoverySpec |s| {
+    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.kind")]
+    kind -> PyResult<String> = finstack_quant_core::wire::serde_tag(s.inner.model()).map_err(core_to_py);
+    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.base_recovery")]
+    base_recovery -> f64 = s.inner.base_recovery();
+    #[doc = pydoc!("finstack_quant.models.credit", "DynamicRecoverySpec.base_notional")]
+    base_notional -> f64 = s.inner.base_notional();
+});
 
 impl PyDynamicRecoverySpec {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -1019,12 +913,6 @@ impl PyEndogenousHazardSpec {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.kind")]
-    #[getter]
-    fn kind(&self) -> PyResult<String> {
-        finstack_quant_core::wire::serde_tag(self.inner.leverage_hazard_map()).map_err(core_to_py)
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.hazard_at_leverage")]
     #[pyo3(text_signature = "($self, leverage)")]
     fn hazard_at_leverage(&self, leverage: f64) -> f64 {
@@ -1038,18 +926,6 @@ impl PyEndogenousHazardSpec {
             .hazard_after_pik_accrual(accreted_notional, asset_value)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.base_hazard_rate")]
-    #[getter]
-    fn base_hazard_rate(&self) -> f64 {
-        self.inner.base_hazard_rate()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.base_leverage")]
-    #[getter]
-    fn base_leverage(&self) -> f64 {
-        self.inner.base_leverage()
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.leverage_hazard_map")]
     #[getter]
     fn leverage_hazard_map<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -1060,6 +936,15 @@ impl PyEndogenousHazardSpec {
         crate::bindings::repr_support::repr_from_serde("EndogenousHazardSpec", &self.inner)
     }
 }
+
+py_getters!(PyEndogenousHazardSpec |s| {
+    #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.kind")]
+    kind -> PyResult<String> = finstack_quant_core::wire::serde_tag(s.inner.leverage_hazard_map()).map_err(core_to_py);
+    #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.base_hazard_rate")]
+    base_hazard_rate -> f64 = s.inner.base_hazard_rate();
+    #[doc = pydoc!("finstack_quant.models.credit", "EndogenousHazardSpec.base_leverage")]
+    base_leverage -> f64 = s.inner.base_leverage();
+});
 
 impl PyEndogenousHazardSpec {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -1126,46 +1011,25 @@ impl PyCreditState {
         .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.hazard_rate")]
-    #[getter]
-    fn hazard_rate(&self) -> f64 {
-        self.inner.hazard_rate
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.distance_to_default")]
-    #[getter]
-    fn distance_to_default(&self) -> Option<f64> {
-        self.inner.distance_to_default
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.leverage")]
-    #[getter]
-    fn leverage(&self) -> f64 {
-        self.inner.leverage
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.accreted_notional")]
-    #[getter]
-    fn accreted_notional(&self) -> f64 {
-        self.inner.accreted_notional
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.coupon_due")]
-    #[getter]
-    fn coupon_due(&self) -> f64 {
-        self.inner.coupon_due
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.asset_value")]
-    #[getter]
-    fn asset_value(&self) -> Option<f64> {
-        self.inner.asset_value
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CreditState", &self.inner)
     }
 }
+
+py_getters!(PyCreditState |s| {
+    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.hazard_rate")]
+    hazard_rate -> f64 = s.inner.hazard_rate;
+    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.distance_to_default")]
+    distance_to_default -> Option<f64> = s.inner.distance_to_default;
+    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.leverage")]
+    leverage -> f64 = s.inner.leverage;
+    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.accreted_notional")]
+    accreted_notional -> f64 = s.inner.accreted_notional;
+    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.coupon_due")]
+    coupon_due -> f64 = s.inner.coupon_due;
+    #[doc = pydoc!("finstack_quant.models.credit", "CreditState.asset_value")]
+    asset_value -> Option<f64> = s.inner.asset_value;
+});
 
 impl PyCreditState {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {

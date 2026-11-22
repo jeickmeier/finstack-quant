@@ -1,5 +1,10 @@
 {
   "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
     "HierarchyDimension": {
       "description": "A single level in the credit factor hierarchy.\n\nBuilt-in variants (`Rating`, `Region`, `Sector`) have canonical tag keys.\n`Custom(key)` reads `issuer_tags[key]` for arbitrary user-defined dimensions\nsuch as `\"Currency\"` or `\"AssetType\"`.",
       "oneOf": [
@@ -34,6 +39,7 @@
       ]
     },
     "LevelValuesAtDate": {
+      "additionalProperties": false,
       "description": "Per-level bucket values produced by a single decomposition.\n\nThe `values` map is keyed by the dotted bucket path (e.g. `\"IG.EU.FIN\"`),\nmatching the convention used elsewhere in the credit hierarchy artifact.",
       "properties": {
         "dimension": {
@@ -65,6 +71,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/models/1/levels_at_date.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Snapshot of all hierarchy-level factor values at a single date, produced from observed issuer spreads.",
   "properties": {
     "adder": {
@@ -83,8 +90,8 @@
       "type": "array"
     },
     "date": {
-      "description": "Date the spreads were observed.",
-      "type": "string"
+      "$ref": "#/$defs/DateWire",
+      "description": "Date the spreads were observed."
     },
     "generic": {
       "description": "Generic (PC) factor value at `date`. Equal to the input\n`observed_generic` and propagated unchanged.",

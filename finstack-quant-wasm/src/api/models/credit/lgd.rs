@@ -30,6 +30,23 @@ pub struct JsBetaRecovery {
 
 json_round_trip!(JsBetaRecovery, BetaRecovery);
 
+wasm_getters!(JsBetaRecovery, BetaRecovery |s| {
+    /// Mean recovery rate, as a fraction.
+    mean -> f64 = s.inner.mean();
+    /// Standard deviation of the recovery rate, as a fraction.
+    std_dev as stdDev -> f64 = s.inner.std_dev();
+    /// Beta shape parameter `alpha` implied by the moments.
+    alpha -> f64 = s.inner.alpha();
+    /// Beta shape parameter `beta` implied by the moments.
+    beta_param as betaParam -> f64 = s.inner.beta_param();
+    /// Variance of the recovery rate.
+    variance -> f64 = s.inner.variance();
+    /// Mode of the distribution, or `undefined` when it has no interior mode.
+    mode -> Option<f64> = s.inner.mode();
+    /// Mean loss given default, `1 - mean`.
+    mean_lgd as meanLgd -> f64 = s.inner.mean_lgd();
+});
+
 #[wasm_bindgen(js_class = BetaRecovery)]
 impl JsBetaRecovery {
     /// Beta recovery distribution matched to a mean and standard deviation.
@@ -48,48 +65,6 @@ impl JsBetaRecovery {
         BetaRecovery::new(js_f64(&mean, "mean")?, js_f64(&std_dev, "stdDev")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
-    }
-
-    /// Mean recovery rate, as a fraction.
-    #[wasm_bindgen(getter)]
-    pub fn mean(&self) -> f64 {
-        self.inner.mean()
-    }
-
-    /// Standard deviation of the recovery rate, as a fraction.
-    #[wasm_bindgen(getter, js_name = stdDev)]
-    pub fn std_dev(&self) -> f64 {
-        self.inner.std_dev()
-    }
-
-    /// Beta shape parameter `alpha` implied by the moments.
-    #[wasm_bindgen(getter)]
-    pub fn alpha(&self) -> f64 {
-        self.inner.alpha()
-    }
-
-    /// Beta shape parameter `beta` implied by the moments.
-    #[wasm_bindgen(getter, js_name = betaParam)]
-    pub fn beta_param(&self) -> f64 {
-        self.inner.beta_param()
-    }
-
-    /// Variance of the recovery rate.
-    #[wasm_bindgen(getter)]
-    pub fn variance(&self) -> f64 {
-        self.inner.variance()
-    }
-
-    /// Mode of the distribution, or `undefined` when it has no interior mode.
-    #[wasm_bindgen(getter)]
-    pub fn mode(&self) -> Option<f64> {
-        self.inner.mode()
-    }
-
-    /// Mean loss given default, `1 - mean`.
-    #[wasm_bindgen(getter, js_name = meanLgd)]
-    pub fn mean_lgd(&self) -> f64 {
-        self.inner.mean_lgd()
     }
 
     /// Recovery-rate quantile at a probability level.
@@ -180,6 +155,15 @@ pub struct JsWorkoutCosts {
 
 json_round_trip!(JsWorkoutCosts, WorkoutCosts);
 
+wasm_getters!(JsWorkoutCosts, WorkoutCosts |s| {
+    /// Direct cost rate, as a fraction of EAD.
+    direct_cost_rate as directCostRate -> f64 = s.inner.direct_cost_rate;
+    /// Indirect cost rate, as a fraction of EAD.
+    indirect_cost_rate as indirectCostRate -> f64 = s.inner.indirect_cost_rate;
+    /// Direct plus indirect cost rate, as a fraction of EAD.
+    total_rate as totalRate -> f64 = s.inner.total_rate();
+});
+
 #[wasm_bindgen(js_class = WorkoutCosts)]
 impl JsWorkoutCosts {
     /// Workout cost rates.
@@ -223,24 +207,6 @@ impl JsWorkoutCosts {
             .map(|inner| Self { inner })
             .map_err(to_js_err)
     }
-
-    /// Direct cost rate, as a fraction of EAD.
-    #[wasm_bindgen(getter, js_name = directCostRate)]
-    pub fn direct_cost_rate(&self) -> f64 {
-        self.inner.direct_cost_rate
-    }
-
-    /// Indirect cost rate, as a fraction of EAD.
-    #[wasm_bindgen(getter, js_name = indirectCostRate)]
-    pub fn indirect_cost_rate(&self) -> f64 {
-        self.inner.indirect_cost_rate
-    }
-
-    /// Direct plus indirect cost rate, as a fraction of EAD.
-    #[wasm_bindgen(getter, js_name = totalRate)]
-    pub fn total_rate(&self) -> f64 {
-        self.inner.total_rate()
-    }
 }
 
 /// Workout LGD model: collateral waterfall, resolution costs and time value.
@@ -264,6 +230,19 @@ pub struct JsWorkoutLgd {
 }
 
 json_round_trip!(JsWorkoutLgd, WorkoutLgd);
+
+wasm_getters!(JsWorkoutLgd, WorkoutLgd |s| {
+    /// Collateral pieces in waterfall order, as `CollateralPiece` objects.
+    collateral returns "generated.models.CollateralPiece[]" -> Result<JsValue, JsValue> = to_js_value(&s.inner.collateral());
+    /// Expected workout duration in years.
+    workout_years as workoutYears -> f64 = s.inner.workout_years();
+    /// Annual discount rate applied over the workout period, as a decimal.
+    discount_rate as discountRate -> f64 = s.inner.discount_rate();
+    /// Direct and indirect resolution cost rates.
+    costs -> JsWorkoutCosts = JsWorkoutCosts {
+        inner: *s.inner.costs(),
+    };
+});
 
 #[wasm_bindgen(js_class = WorkoutLgd)]
 impl JsWorkoutLgd {
@@ -309,32 +288,6 @@ impl JsWorkoutLgd {
         self.inner
             .net_recovery(js_f64(&ead, "ead")?)
             .map_err(to_js_err)
-    }
-
-    /// Collateral pieces in waterfall order, as `CollateralPiece` objects.
-    #[wasm_bindgen(getter, unchecked_return_type = "generated.models.CollateralPiece[]")]
-    pub fn collateral(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&self.inner.collateral())
-    }
-
-    /// Expected workout duration in years.
-    #[wasm_bindgen(getter, js_name = workoutYears)]
-    pub fn workout_years(&self) -> f64 {
-        self.inner.workout_years()
-    }
-
-    /// Annual discount rate applied over the workout period, as a decimal.
-    #[wasm_bindgen(getter, js_name = discountRate)]
-    pub fn discount_rate(&self) -> f64 {
-        self.inner.discount_rate()
-    }
-
-    /// Direct and indirect resolution cost rates.
-    #[wasm_bindgen(getter)]
-    pub fn costs(&self) -> JsWorkoutCosts {
-        JsWorkoutCosts {
-            inner: *self.inner.costs(),
-        }
     }
 }
 
@@ -596,19 +549,14 @@ impl JsDownturnLgd {
             .adjust(js_f64(&base_lgd, "baseLgd")?)
             .map_err(to_js_err)
     }
-
-    /// Canonical name of the adjustment method: `"stressed_approximation"` or `"regulatory_floor"`.
-    #[wasm_bindgen(getter)]
-    pub fn method(&self) -> Result<String, JsValue> {
-        finstack_quant_core::wire::serde_tag(self.inner.method()).map_err(to_js_err)
-    }
-
-    /// Method parameters as a plain object in canonical JSON form.
-    #[wasm_bindgen(getter, unchecked_return_type = "generated.models.DownturnMethod")]
-    pub fn params(&self) -> Result<JsValue, JsValue> {
-        to_js_value(self.inner.method())
-    }
 }
+
+wasm_getters!(JsDownturnLgd, DownturnLgd |s| {
+    /// Canonical name of the adjustment method: `"stressed_approximation"` or `"regulatory_floor"`.
+    method -> Result<String, JsValue> = finstack_quant_core::wire::serde_tag(s.inner.method()).map_err(to_js_err);
+    /// Method parameters as a plain object in canonical JSON form.
+    params returns "generated.models.DownturnMethod" -> Result<JsValue, JsValue> = to_js_value(s.inner.method());
+});
 
 /// Exposure-at-default calculator for drawn and undrawn commitments.
 ///
@@ -626,6 +574,15 @@ pub struct JsEadCalculator {
 }
 
 json_round_trip!(JsEadCalculator, EadCalculator);
+
+wasm_getters!(JsEadCalculator, EadCalculator |s| {
+    /// Exposure at default: `drawn + ccf * undrawn`, in monetary units.
+    ead -> f64 = s.inner.ead();
+    /// Drawn balance as a fraction of the total commitment.
+    utilization -> f64 = s.inner.utilization();
+    /// Drawn plus undrawn commitment, in monetary units.
+    total_commitment as totalCommitment -> f64 = s.inner.total_commitment();
+});
 
 #[wasm_bindgen(js_class = EadCalculator)]
 impl JsEadCalculator {
@@ -680,24 +637,6 @@ impl JsEadCalculator {
         EadCalculator::revolver(js_f64(&drawn, "drawn")?, js_f64(&undrawn, "undrawn")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
-    }
-
-    /// Exposure at default: `drawn + ccf * undrawn`, in monetary units.
-    #[wasm_bindgen(getter)]
-    pub fn ead(&self) -> f64 {
-        self.inner.ead()
-    }
-
-    /// Drawn balance as a fraction of the total commitment.
-    #[wasm_bindgen(getter)]
-    pub fn utilization(&self) -> f64 {
-        self.inner.utilization()
-    }
-
-    /// Drawn plus undrawn commitment, in monetary units.
-    #[wasm_bindgen(getter, js_name = totalCommitment)]
-    pub fn total_commitment(&self) -> f64 {
-        self.inner.total_commitment()
     }
 
     /// Loan-equivalent factor implied by an observed exposure at default.

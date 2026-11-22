@@ -38,7 +38,7 @@
 //!   [`control_variate`].
 //! - Results and diagnostics: [`estimate`],
 //!   [`OnlineStats`](finstack_quant_core::math::stats::OnlineStats), [`paths`], and [`results`].
-//! - Runtime defaults and reproducibility: [`registry`] and [`seed`].
+//! - Reproducibility: [`seed`] (runtime defaults are loaded internally).
 //!
 //! # Conventions
 //!
@@ -98,7 +98,7 @@ pub mod engine;
 pub mod greeks;
 pub mod payoff;
 pub mod pricer;
-pub mod registry;
+pub(crate) mod registry;
 pub mod results;
 pub mod seed;
 pub mod simulate;

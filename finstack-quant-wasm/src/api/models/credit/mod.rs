@@ -131,25 +131,16 @@ impl JsRatingFactorTable {
             .get_factor(js_parse::<CreditRating>(&rating, "rating")?)
             .map_err(to_js_err)
     }
-
-    /// Rating agency the table belongs to, such as `"Moodys"`.
-    #[wasm_bindgen(getter)]
-    pub fn agency(&self) -> String {
-        self.inner.agency().to_string()
-    }
-
-    /// Methodology label of the table, such as the CLO methodology it was taken from.
-    #[wasm_bindgen(getter)]
-    pub fn methodology(&self) -> String {
-        self.inner.methodology().to_string()
-    }
-
-    /// Factor applied to ratings the table does not list.
-    #[wasm_bindgen(getter, js_name = defaultFactor)]
-    pub fn default_factor(&self) -> f64 {
-        self.inner.default_factor()
-    }
 }
+
+wasm_getters!(JsRatingFactorTable, RatingFactorTable |s| {
+    /// Rating agency the table belongs to, such as `"Moodys"`.
+    agency -> String = s.inner.agency().to_string();
+    /// Methodology label of the table, such as the CLO methodology it was taken from.
+    methodology -> String = s.inner.methodology().to_string();
+    /// Factor applied to ratings the table does not list.
+    default_factor as defaultFactor -> f64 = s.inner.default_factor();
+});
 
 /// Default-barrier monitoring rule of a structural model: terminal (Merton) or
 /// first-passage (Black-Cox).
@@ -304,6 +295,27 @@ pub struct JsMertonModel {
 }
 
 json_round_trip!(JsMertonModel, MertonModel);
+
+wasm_getters!(JsMertonModel, MertonModel |s| {
+    /// Current fair value of the firm's assets, in monetary units.
+    asset_value as assetValue -> f64 = s.inner.asset_value();
+    /// Annualized asset-return volatility, as a decimal.
+    asset_vol as assetVol -> f64 = s.inner.asset_vol();
+    /// Debt face value that defines the default barrier, in monetary units.
+    debt_barrier as debtBarrier -> f64 = s.inner.debt_barrier();
+    /// Continuously compounded risk-free rate, as a decimal.
+    risk_free_rate as riskFreeRate -> f64 = s.inner.risk_free_rate();
+    /// Continuous payout rate on assets, as a decimal.
+    payout_rate as payoutRate -> f64 = s.inner.payout_rate();
+    /// Default-barrier monitoring rule of this model.
+    barrier_type as barrierType -> JsMertonBarrierType = JsMertonBarrierType {
+        inner: *s.inner.barrier_type(),
+    };
+    /// Asset-value dynamics of this model.
+    dynamics -> JsAssetDynamics = JsAssetDynamics {
+        inner: *s.inner.dynamics(),
+    };
+});
 
 #[wasm_bindgen(js_class = MertonModel)]
 impl JsMertonModel {
@@ -556,52 +568,6 @@ impl JsMertonModel {
         )
         .map(|inner| Self { inner })
         .map_err(to_js_err)
-    }
-
-    /// Current fair value of the firm's assets, in monetary units.
-    #[wasm_bindgen(getter, js_name = assetValue)]
-    pub fn asset_value(&self) -> f64 {
-        self.inner.asset_value()
-    }
-
-    /// Annualized asset-return volatility, as a decimal.
-    #[wasm_bindgen(getter, js_name = assetVol)]
-    pub fn asset_vol(&self) -> f64 {
-        self.inner.asset_vol()
-    }
-
-    /// Debt face value that defines the default barrier, in monetary units.
-    #[wasm_bindgen(getter, js_name = debtBarrier)]
-    pub fn debt_barrier(&self) -> f64 {
-        self.inner.debt_barrier()
-    }
-
-    /// Continuously compounded risk-free rate, as a decimal.
-    #[wasm_bindgen(getter, js_name = riskFreeRate)]
-    pub fn risk_free_rate(&self) -> f64 {
-        self.inner.risk_free_rate()
-    }
-
-    /// Continuous payout rate on assets, as a decimal.
-    #[wasm_bindgen(getter, js_name = payoutRate)]
-    pub fn payout_rate(&self) -> f64 {
-        self.inner.payout_rate()
-    }
-
-    /// Default-barrier monitoring rule of this model.
-    #[wasm_bindgen(getter, js_name = barrierType)]
-    pub fn barrier_type(&self) -> JsMertonBarrierType {
-        JsMertonBarrierType {
-            inner: *self.inner.barrier_type(),
-        }
-    }
-
-    /// Asset-value dynamics of this model.
-    #[wasm_bindgen(getter)]
-    pub fn dynamics(&self) -> JsAssetDynamics {
-        JsAssetDynamics {
-            inner: *self.inner.dynamics(),
-        }
     }
 
     /// Risk-neutral distance to default `d2` over a horizon.
@@ -889,38 +855,21 @@ pub struct JsSimulatedPaths {
 
 json_round_trip!(JsSimulatedPaths, SimulatedPaths);
 
+wasm_getters!(JsSimulatedPaths, SimulatedPaths |s| {
+    /// Time grid in years from 0 to the simulation horizon.
+    times -> Box<[f64]> = s.inner.times.clone().into_boxed_slice();
+    /// Asset values in row-major order (path by path).
+    asset_values as assetValues -> Box<[f64]> = s.inner.asset_values.clone().into_boxed_slice();
+    /// Number of simulated paths.
+    num_paths as numPaths -> usize = s.inner.num_paths;
+    /// Number of time steps between grid points.
+    num_steps as numSteps -> usize = s.inner.num_steps;
+    /// Number of stored values per path (`numSteps + 1`, including `t = 0`).
+    values_per_path as valuesPerPath -> usize = s.inner.values_per_path();
+});
+
 #[wasm_bindgen(js_class = SimulatedPaths)]
 impl JsSimulatedPaths {
-    /// Time grid in years from 0 to the simulation horizon.
-    #[wasm_bindgen(getter)]
-    pub fn times(&self) -> Box<[f64]> {
-        self.inner.times.clone().into_boxed_slice()
-    }
-
-    /// Asset values in row-major order (path by path).
-    #[wasm_bindgen(getter, js_name = assetValues)]
-    pub fn asset_values(&self) -> Box<[f64]> {
-        self.inner.asset_values.clone().into_boxed_slice()
-    }
-
-    /// Number of simulated paths.
-    #[wasm_bindgen(getter, js_name = numPaths)]
-    pub fn num_paths(&self) -> usize {
-        self.inner.num_paths
-    }
-
-    /// Number of time steps between grid points.
-    #[wasm_bindgen(getter, js_name = numSteps)]
-    pub fn num_steps(&self) -> usize {
-        self.inner.num_steps
-    }
-
-    /// Number of stored values per path (`numSteps + 1`, including `t = 0`).
-    #[wasm_bindgen(getter, js_name = valuesPerPath)]
-    pub fn values_per_path(&self) -> usize {
-        self.inner.values_per_path()
-    }
-
     /// One asset value by path and time-grid index.
     /// @param pathIdx - Zero-based path index.
     /// @param timeIdx - Zero-based time-grid index (index 0 is `t = 0`).
@@ -982,6 +931,20 @@ pub struct JsDynamicRecoverySpec {
 }
 
 json_round_trip!(JsDynamicRecoverySpec, DynamicRecoverySpec);
+
+wasm_getters!(JsDynamicRecoverySpec, DynamicRecoverySpec |s| {
+    /// Canonical name of the active recovery model: `"constant"`,
+    /// `"inverse_linear"`, `"inverse_power"`, `"floored_inverse"` or
+    /// `"linear_decline"`.
+    kind -> Result<String, JsValue> = serde_tag(s.inner.model()).map_err(to_js_err);
+    /// Base (reference) recovery rate `R0`, as a fraction from 0 through 1.
+    base_recovery as baseRecovery -> f64 = s.inner.base_recovery();
+    /// Base (reference) notional `N0` the recovery mapping is anchored to.
+    base_notional as baseNotional -> f64 = s.inner.base_notional();
+    /// Notional-to-recovery mapping in canonical JSON form: a tag string for
+    /// the parameterless models, or a single-key object carrying the parameters.
+    model returns "generated.models.DynamicRecoveryModel" -> Result<JsValue, JsValue> = to_js_value(s.inner.model());
+});
 
 #[wasm_bindgen(js_class = DynamicRecoverySpec)]
 impl JsDynamicRecoverySpec {
@@ -1104,36 +1067,6 @@ impl JsDynamicRecoverySpec {
         .map_err(to_js_err)
     }
 
-    /// Canonical name of the active recovery model: `"constant"`,
-    /// `"inverse_linear"`, `"inverse_power"`, `"floored_inverse"` or
-    /// `"linear_decline"`.
-    #[wasm_bindgen(getter)]
-    pub fn kind(&self) -> Result<String, JsValue> {
-        serde_tag(self.inner.model()).map_err(to_js_err)
-    }
-
-    /// Base (reference) recovery rate `R0`, as a fraction from 0 through 1.
-    #[wasm_bindgen(getter, js_name = baseRecovery)]
-    pub fn base_recovery(&self) -> f64 {
-        self.inner.base_recovery()
-    }
-
-    /// Base (reference) notional `N0` the recovery mapping is anchored to.
-    #[wasm_bindgen(getter, js_name = baseNotional)]
-    pub fn base_notional(&self) -> f64 {
-        self.inner.base_notional()
-    }
-
-    /// Notional-to-recovery mapping in canonical JSON form: a tag string for
-    /// the parameterless models, or a single-key object carrying the parameters.
-    #[wasm_bindgen(
-        getter,
-        unchecked_return_type = "generated.models.DynamicRecoveryModel"
-    )]
-    pub fn model(&self) -> Result<JsValue, JsValue> {
-        to_js_value(self.inner.model())
-    }
-
     /// Recovery rate at a given current notional, clamped to `[0, baseRecovery]`.
     /// @param notional - Current (accreted) notional in the instrument's currency.
     /// @returns Recovery rate as a fraction of par.
@@ -1168,6 +1101,19 @@ pub struct JsEndogenousHazardSpec {
 }
 
 json_round_trip!(JsEndogenousHazardSpec, EndogenousHazardSpec);
+
+wasm_getters!(JsEndogenousHazardSpec, EndogenousHazardSpec |s| {
+    /// Canonical name of the active mapping: `"power_law"`, `"exponential"` or
+    /// `"tabular"`.
+    kind -> Result<String, JsValue> = serde_tag(s.inner.leverage_hazard_map()).map_err(to_js_err);
+    /// Base (reference) hazard rate, annualized, as a decimal.
+    base_hazard_rate as baseHazardRate -> f64 = s.inner.base_hazard_rate();
+    /// Base (reference) leverage the hazard mapping is anchored to.
+    base_leverage as baseLeverage -> f64 = s.inner.base_leverage();
+    /// Leverage-to-hazard mapping in canonical JSON form: a single-key object
+    /// (`power_law`, `exponential`, `tabular`) carrying that model's parameters.
+    leverage_hazard_map as leverageHazardMap returns "generated.models.LeverageHazardMap" -> Result<JsValue, JsValue> = to_js_value(s.inner.leverage_hazard_map());
+});
 
 #[wasm_bindgen(js_class = EndogenousHazardSpec)]
 impl JsEndogenousHazardSpec {
@@ -1244,32 +1190,6 @@ impl JsEndogenousHazardSpec {
         )
         .map(|inner| Self { inner })
         .map_err(to_js_err)
-    }
-
-    /// Canonical name of the active mapping: `"power_law"`, `"exponential"` or
-    /// `"tabular"`.
-    #[wasm_bindgen(getter)]
-    pub fn kind(&self) -> Result<String, JsValue> {
-        serde_tag(self.inner.leverage_hazard_map()).map_err(to_js_err)
-    }
-
-    /// Base (reference) hazard rate, annualized, as a decimal.
-    #[wasm_bindgen(getter, js_name = baseHazardRate)]
-    pub fn base_hazard_rate(&self) -> f64 {
-        self.inner.base_hazard_rate()
-    }
-
-    /// Base (reference) leverage the hazard mapping is anchored to.
-    #[wasm_bindgen(getter, js_name = baseLeverage)]
-    pub fn base_leverage(&self) -> f64 {
-        self.inner.base_leverage()
-    }
-
-    /// Leverage-to-hazard mapping in canonical JSON form: a single-key object
-    /// (`power_law`, `exponential`, `tabular`) carrying that model's parameters.
-    #[wasm_bindgen(getter, js_name = leverageHazardMap, unchecked_return_type = "generated.models.LeverageHazardMap")]
-    pub fn leverage_hazard_map(&self) -> Result<JsValue, JsValue> {
-        to_js_value(self.inner.leverage_hazard_map())
     }
 
     /// Annualized hazard rate at a leverage ratio, floored at zero.
@@ -1441,21 +1361,16 @@ impl JsToggleExerciseModel {
             .should_pik(&state, js_f64(&u, "u")?)
             .map_err(to_js_err)
     }
+}
 
+wasm_getters!(JsToggleExerciseModel, ToggleExerciseModel |s| {
     /// Which rule this model carries: `"threshold"`, `"stochastic"` or
     /// `"optimal_exercise"` (the canonical serde tag).
-    #[wasm_bindgen(getter)]
-    pub fn kind(&self) -> Result<String, JsValue> {
-        serde_tag(&self.inner).map_err(to_js_err)
-    }
-
+    kind -> Result<String, JsValue> = serde_tag(&s.inner).map_err(to_js_err);
     /// Parameters of the active rule as a plain object in canonical JSON form.
-    #[wasm_bindgen(getter, unchecked_return_type = "Record<string, unknown>")]
-    pub fn params(&self) -> Result<JsValue, JsValue> {
-        match &self.inner {
-            ToggleExerciseModel::Threshold(spec) => to_js_value(spec),
-            ToggleExerciseModel::Stochastic(spec) => to_js_value(spec),
-            ToggleExerciseModel::OptimalExercise(spec) => to_js_value(spec),
-        }
-    }
-}
+    params returns "Record<string, unknown>" -> Result<JsValue, JsValue> = match &s.inner {
+        ToggleExerciseModel::Threshold(spec) => to_js_value(spec),
+        ToggleExerciseModel::Stochastic(spec) => to_js_value(spec),
+        ToggleExerciseModel::OptimalExercise(spec) => to_js_value(spec),
+    };
+});

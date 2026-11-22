@@ -12,9 +12,8 @@ use finstack_quant_factor::credit::calibration::{
     HistoryPanel, IssuerTagPanel, PanelFrequency, PanelSpace, VolModelChoice,
 };
 use finstack_quant_factor::credit::hierarchy::{
-    AdderVolSource, CreditFactorModel, CreditHierarchySpec, FactorVolModel, GenericFactorSpec,
-    HierarchyDimension, IdiosyncraticVolModel, IssuerBetaMode, IssuerBetaOverride,
-    IssuerBetaPolicy, IssuerTags,
+    AdderVolSource, CreditFactorModel, CreditHierarchySpec, GenericFactorSpec, HierarchyDimension,
+    IssuerBetaMode, IssuerBetaOverride, IssuerBetaPolicy, IssuerTags, VolModel,
 };
 use time::Month;
 
@@ -601,7 +600,7 @@ fn ewma_vol_model_calibrates_and_persists_estimator() {
 
     assert!(!model.vol_state.factors.is_empty());
     for (fid, vol_model) in &model.vol_state.factors {
-        let FactorVolModel::Ewma { lambda, variance } = vol_model else {
+        let VolModel::Ewma { lambda, variance } = vol_model else {
             panic!("factor {fid} must persist the EWMA estimator, got {vol_model:?}");
         };
         assert!((lambda - 0.94).abs() < 1e-15);
@@ -630,14 +629,14 @@ fn ewma_vol_model_calibrates_and_persists_estimator() {
             .factors
             .get(fid)
             .unwrap_or_else(|| panic!("round-tripped vol_state missing factor {fid}"));
-        let FactorVolModel::Ewma {
+        let VolModel::Ewma {
             lambda: orig_lambda,
             variance: orig_variance,
         } = orig_vol_model
         else {
             panic!("factor {fid} must persist the EWMA estimator, got {orig_vol_model:?}");
         };
-        let FactorVolModel::Ewma {
+        let VolModel::Ewma {
             lambda: back_lambda,
             variance: back_variance,
         } = back_vol_model
@@ -673,14 +672,14 @@ fn ewma_vol_model_calibrates_and_persists_estimator() {
             .unwrap_or_else(|| {
                 panic!("round-tripped vol_state missing idiosyncratic for issuer {issuer_id}")
             });
-        let IdiosyncraticVolModel::Ewma {
+        let VolModel::Ewma {
             lambda: orig_lambda,
             variance: orig_variance,
         } = orig_vol_model
         else {
             panic!("issuer {issuer_id} must persist the EWMA estimator, got {orig_vol_model:?}");
         };
-        let IdiosyncraticVolModel::Ewma {
+        let VolModel::Ewma {
             lambda: back_lambda,
             variance: back_variance,
         } = back_vol_model
@@ -760,7 +759,7 @@ fn ewma_vol_model_composes_with_ledoit_wolf_covariance() {
 
     assert!(!model.vol_state.factors.is_empty());
     for (fid, vol_model) in &model.vol_state.factors {
-        let FactorVolModel::Ewma { lambda, variance } = vol_model else {
+        let VolModel::Ewma { lambda, variance } = vol_model else {
             panic!("factor {fid} must persist the Ewma variant, got {vol_model:?}");
         };
         assert!((lambda - 0.94).abs() < 1e-15);
@@ -840,11 +839,11 @@ fn ledoit_wolf_covariance_is_independent_of_vol_model() {
 
     let vols_differ = ids.iter().any(|fid| {
         let sample_var = match sample_model.vol_state.factors.get(fid) {
-            Some(FactorVolModel::Sample { variance }) => *variance,
+            Some(VolModel::Sample { variance }) => *variance,
             other => panic!("factor {fid} must persist the Sample variant, got {other:?}"),
         };
         let ewma_var = match ewma_model.vol_state.factors.get(fid) {
-            Some(FactorVolModel::Ewma { variance, .. }) => *variance,
+            Some(VolModel::Ewma { variance, .. }) => *variance,
             other => panic!("factor {fid} must persist the Ewma variant, got {other:?}"),
         };
         (sample_var - ewma_var).abs() > 1e-12
@@ -1816,125 +1815,6 @@ fn full_sample_repaired_preserves_determinism() {
     assert_eq!(
         json_a, json_b,
         "FullSampleRepaired calibration must be bit-identical for same inputs"
-    );
-}
-
-// PR-5b Test 5: Golden artifact regression test
-
-const REGEN_CREDIT_FACTOR_MODEL_GOLDEN_ENV: &str = "FQ_UPDATE_CANONICAL_GOLDENS";
-
-fn calibrate_canonical_credit_model() -> CreditFactorModel {
-    let mut inputs = fixture_panel().into_inputs();
-    inputs.spread_durations = inputs
-        .as_of_spreads
-        .keys()
-        .cloned()
-        .map(|id| (id, 5.0))
-        .collect();
-    let cfg = CreditCalibrationConfig {
-        covariance_strategy: CovarianceStrategy::Diagonal,
-        vol_model: VolModelChoice::Sample,
-        min_bucket_size_per_level: BucketSizeThresholds {
-            per_level: vec![1, 1],
-        },
-        bucket_weighting: BucketWeighting::Dts,
-        ..config_with(
-            IssuerBetaPolicy::Dynamic {
-                min_history: 12,
-                overrides: BTreeMap::new(),
-            },
-            vec![HierarchyDimension::Rating, HierarchyDimension::Region],
-        )
-    };
-    CreditCalibrator::new(cfg)
-        .calibrate(inputs)
-        .expect("canonical credit model calibrates")
-}
-
-fn stabilize_canonical_bytes(model: &CreditFactorModel) -> Vec<u8> {
-    let mut bytes = finstack_quant_core::canonical::to_canonical_bytes(model)
-        .expect("credit factor model canonicalizes");
-    for _ in 0..8 {
-        let (reloaded, _) = CreditFactorModel::from_slice_strict(
-            &bytes,
-            &finstack_quant_core::contract::LoadLimits::default(),
-        )
-        .expect("reload while stabilizing canonical bytes");
-        let next = finstack_quant_core::canonical::to_canonical_bytes(&reloaded)
-            .expect("reloaded model canonicalizes");
-        if next == bytes {
-            return bytes;
-        }
-        bytes = next;
-    }
-    panic!("credit factor model canonical bytes did not reach a JSON f64 fixed point")
-}
-
-/// Generate (or regenerate) the factor-model-owned canonical artifact and hash.
-/// Run manually with:
-/// `FQ_UPDATE_CANONICAL_GOLDENS=1 mise run rust-test-filter -- finstack-quant-factor generate_golden_artifact --integration factor`
-#[test]
-fn generate_golden_artifact() {
-    if std::env::var_os(REGEN_CREDIT_FACTOR_MODEL_GOLDEN_ENV).is_none() {
-        return;
-    }
-
-    let golden_path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/data/canonical/credit_factor_model.json"
-    );
-    let hash_path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/data/canonical/credit_factor_model.sha256"
-    );
-
-    let model = calibrate_canonical_credit_model();
-    let json = stabilize_canonical_bytes(&model);
-    let (reloaded, _) = CreditFactorModel::from_slice_strict(
-        &json,
-        &finstack_quant_core::contract::LoadLimits::default(),
-    )
-    .expect("reload stabilized golden");
-    let hash =
-        finstack_quant_core::canonical::content_hash(&reloaded).expect("hash canonical model JSON");
-    std::fs::create_dir_all(std::path::Path::new(golden_path).parent().unwrap())
-        .expect("create golden dir");
-    std::fs::write(golden_path, &json).expect("write golden file");
-    std::fs::write(hash_path, format!("{hash}\n")).expect("write golden hash");
-    println!("Canonical fixture written to {golden_path}");
-}
-
-/// Calibrate with the canonical fixture (Diagonal + Sample), serialize to
-/// canonical JSON, and compare byte-for-byte against the checked-in
-/// factor-model fixture at
-/// `tests/data/canonical/credit_factor_model.json`.
-///
-/// On first run after generating the golden file, this test confirms the
-/// file matches a fresh calibration. On subsequent runs it catches any
-/// accidental changes to the serialization or calibration math.
-#[test]
-fn golden_credit_factor_model_matches_checked_in_json() {
-    let golden_path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/data/canonical/credit_factor_model.json"
-    );
-
-    let model = calibrate_canonical_credit_model();
-    let produced = stabilize_canonical_bytes(&model);
-
-    let golden = std::fs::read(golden_path).unwrap_or_else(|e| {
-        panic!(
-            "Golden file not found at {golden_path}: {e}\n\
-             Bootstrap it by running:\n  \
-             {REGEN_CREDIT_FACTOR_MODEL_GOLDEN_ENV}=1 mise run rust-test-filter -- finstack-quant-factor \
-             credit_factor_model_has_exact_canonical_bytes_and_hash --integration factor"
-        )
-    });
-
-    assert_eq!(
-        produced, golden,
-        "Calibration output does not match golden file at {golden_path}.\n\
-         If this change is intentional, regenerate the golden file."
     );
 }
 

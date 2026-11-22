@@ -108,6 +108,31 @@ macro_rules! json_round_trip {
     };
 }
 
+/// Generate read-only `#[wasm_bindgen(getter)]` methods on a handle.
+macro_rules! wasm_getters {
+    (
+        $js:ident, $class:ident |$s:ident| {
+            $(
+                $(#[$doc:meta])*
+                $name:ident $(as $js_name:ident)? $(returns $ts:literal)? -> $ret:ty = $body:expr_2021;
+            )+
+        }
+    ) => {
+        #[finstack_quant_wasm_macros::plain_docs]
+        #[wasm_bindgen::prelude::wasm_bindgen(js_class = $class)]
+        impl $js {
+            $(
+                $(#[$doc])*
+                #[wasm_bindgen(getter $(, js_name = $js_name)? $(, unchecked_return_type = $ts)?)]
+                pub fn $name(&self) -> $ret {
+                    let $s = self;
+                    $body
+                }
+            )+
+        }
+    };
+}
+
 pub mod analytics;
 pub mod attribution;
 pub mod calibration;

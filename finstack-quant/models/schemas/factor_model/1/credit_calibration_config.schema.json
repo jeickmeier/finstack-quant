@@ -13,6 +13,7 @@
           "description": "Convex shrinkage toward 1.0: `β ← (1 - α) · β_fit + α · 1.0`.",
           "properties": {
             "toward_one": {
+              "additionalProperties": false,
               "properties": {
                 "alpha": {
                   "description": "Shrinkage weight in `[0, 1]`.",
@@ -82,6 +83,7 @@
           "description": "Sample correlation (PSD-repaired if needed) plus diagonal ridge:\nΣ = D·ρ·D + α·I. Requires `alpha >= 0`. See design spec §4.1.",
           "properties": {
             "ridge": {
+              "additionalProperties": false,
               "properties": {
                 "alpha": {
                   "description": "Ridge regularisation in annualized **bp²**; must be `>= 0`.",
@@ -191,6 +193,7 @@
           "description": "Regression is gated on a minimum history threshold with per-issuer overrides.",
           "properties": {
             "dynamic": {
+              "additionalProperties": false,
               "properties": {
                 "min_history": {
                   "description": "Minimum number of monthly return observations needed to attempt OLS.\n\nDefault is 24 months.",
@@ -273,6 +276,7 @@
           "description": "RiskMetrics exponentially weighted moving-average variance.\n\nUncentered (zero-mean) squared moves, no demeaning step — see the\nenum-level docs above. Implemented by `ewma_variance`. `lambda` must\nbe in the open interval `(0, 1)`; validated by\n`validate_calibration_config`.\n\n# References\n\n- Longerstaey, J., & Spencer, M. (1996). *RiskMetrics — Technical\n  Document* (4th ed.). J.P. Morgan/Reuters. §5.2. `docs/REFERENCES.md#jpmorgan1996RiskMetrics`",
           "properties": {
             "ewma": {
+              "additionalProperties": false,
               "properties": {
                 "lambda": {
                   "description": "Smoothing parameter λ ∈ (0, 1) (RiskMetrics daily default 0.94).",

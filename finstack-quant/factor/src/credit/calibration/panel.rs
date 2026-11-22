@@ -2,11 +2,12 @@ use std::collections::BTreeMap;
 
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::types::IssuerId;
+use finstack_quant_core::{Error, Result};
 
 use super::config::{BucketWeighting, PanelSpace};
 use super::inputs::CreditCalibrationInputs;
 use crate::credit::hierarchy::{IssuerBetaMode, IssuerBetaOverride, IssuerBetaPolicy};
-use crate::credit::peel::dts_spread_duration;
+use crate::credit::peel::{dts_spread_duration, dts_weight};
 use crate::credit::units::decimal_to_bp;
 
 /// Step 1: classify an issuer as `IssuerBeta` or `BucketOnly`.
@@ -62,7 +63,7 @@ pub(super) struct WorkingPanel {
 
 /// First-difference a sparse series: `d[t] = s[t+1] - s[t]` where both
 /// observations exist, `None` otherwise. Length is `len - 1`.
-pub(crate) fn diff_sparse(series: &[Option<f64>]) -> Vec<Option<f64>> {
+pub(super) fn diff_sparse(series: &[Option<f64>]) -> Vec<Option<f64>> {
     series
         .windows(2)
         .map(|w| match (w[0], w[1]) {
@@ -121,7 +122,7 @@ pub(super) fn convert_inputs_to_bp(inputs: &mut CreditCalibrationInputs) {
 ///
 /// # Errors
 ///
-/// Returns a diagnostic string when DTS is selected and a duration is
+/// Returns [`Error::Validation`] when DTS is selected and a duration is
 /// missing, non-finite, or `<= 0`, a panel observation is missing, or
 /// `SD × spread_bp` is not `> 0` at any date.
 pub(super) fn issuer_bucket_weight_series(
@@ -129,7 +130,7 @@ pub(super) fn issuer_bucket_weight_series(
     space: &PanelSpace,
     spreads_bp: &BTreeMap<IssuerId, Vec<Option<f64>>>,
     spread_durations: &BTreeMap<IssuerId, f64>,
-) -> Result<BTreeMap<IssuerId, Vec<f64>>, String> {
+) -> Result<BTreeMap<IssuerId, Vec<f64>>> {
     let mut out = BTreeMap::new();
     for (issuer, series) in spreads_bp {
         let len = match space {
@@ -141,23 +142,21 @@ pub(super) fn issuer_bucket_weight_series(
             BucketWeighting::Dts => {
                 let sd = dts_spread_duration(issuer, spread_durations)?;
                 let mut weights = Vec::with_capacity(len);
+                let context_prefix = " at panel index ";
                 for t in 0..len {
                     let spread = series.get(t).copied().flatten().ok_or_else(|| {
-                        format!(
+                        Error::Validation(format!(
                             "dts weighting requires a spread (bp) for issuer {:?} at panel \
                              index {t}",
                             issuer.as_str()
-                        )
+                        ))
                     })?;
-                    let dts = sd * spread;
-                    if !dts.is_finite() || dts <= 0.0 {
-                        return Err(format!(
-                            "dts for issuer {:?} at panel index {t} must be > 0 \
-                             (spread_duration {sd} × spread_bp {spread} = {dts})",
-                            issuer.as_str()
-                        ));
-                    }
-                    weights.push(dts);
+                    weights.push(dts_weight(
+                        issuer,
+                        sd,
+                        spread,
+                        &format!("{context_prefix}{t}"),
+                    )?);
                 }
                 weights
             }

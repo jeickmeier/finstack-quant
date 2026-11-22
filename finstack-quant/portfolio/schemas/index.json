@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/credit_vol_report.schema.json",
-      "bytes": 7684,
+      "bytes": 7774,
       "kind": "output",
       "path": "schemas/portfolio/1/credit_vol_report.schema.json",
       "summary": "Aggregated credit risk grouped by hierarchy level.",
@@ -119,7 +119,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_assignment_report.schema.json",
-      "bytes": 29700,
+      "bytes": 28867,
       "kind": "output",
       "path": "schemas/portfolio/1/factor_assignment_report.schema.json",
       "summary": "Assignment results for a portfolio-level factor mapping pass.",
@@ -425,7 +425,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/stress_result.schema.json",
-      "bytes": 13099,
+      "bytes": 13382,
       "kind": "output",
       "path": "schemas/portfolio/1/stress_result.schema.json",
       "summary": "Result of a factor-stress scenario.",
@@ -461,7 +461,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/what_if_result.schema.json",
-      "bytes": 14320,
+      "bytes": 14603,
       "kind": "output",
       "path": "schemas/portfolio/1/what_if_result.schema.json",
       "summary": "Result of a position what-if scenario.",

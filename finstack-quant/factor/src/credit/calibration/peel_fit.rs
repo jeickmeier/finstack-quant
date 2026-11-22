@@ -5,10 +5,9 @@ use finstack_quant_core::types::IssuerId;
 use super::config::{BetaShrinkage, CreditCalibrationConfig};
 use super::panel::WorkingPanel;
 use crate::FactorId;
-use crate::credit::hierarchy::{
-    CreditHierarchySpec, FitQuality, IssuerBetaMode, IssuerBetas, IssuerTags, dimension_key,
-};
-use crate::matching::{CREDIT_GENERIC_FACTOR_ID, bucket_factor_id};
+use crate::credit::hierarchy::{FitQuality, IssuerBetaMode, IssuerBetas};
+use crate::credit::peel::is_folded;
+use crate::matching::{CREDIT_GENERIC_FACTOR_ID, bucket_factor_id_from_path};
 
 /// Outcome of the PC + per-level peel (steps 4 + 5).
 pub(super) struct PeelOutcome {
@@ -120,11 +119,7 @@ pub(super) fn run_peel(
         // residuals unchanged.
         let mut bucket_members: BTreeMap<&str, Vec<&IssuerId>> = BTreeMap::new();
         for issuer in panel.issuers.keys() {
-            let folded_at_k = folded
-                .get(issuer)
-                .map(|f| f.get(k).copied().unwrap_or(false))
-                .unwrap_or(false);
-            if folded_at_k {
+            if is_folded(folded, issuer, k) {
                 continue;
             }
             let path = bucket_paths[issuer][k].as_str();
@@ -149,20 +144,19 @@ pub(super) fn run_peel(
             let factor_series = &stats.means;
             // A child that does not refine its parent has the same members;
             // LOO would regress on a peer leftover, not a new common factor.
+            // Both `members` lists are built in `panel.issuers.keys()` (`BTreeMap`)
+            // order, so sorted slice equality matches set equality.
             let non_refining = k > 0
-                && parent_bucket_path(bucket)
-                    .and_then(|parent| prev_bucket_members.get(parent))
-                    .is_some_and(|parent_members| same_member_set(parent_members, members));
-            static EMPTY_WEIGHTS: &[f64] = &[];
+                && bucket
+                    .rsplit_once('.')
+                    .and_then(|(parent, _)| prev_bucket_members.get(parent))
+                    .is_some_and(|parent_members| parent_members == members);
             for issuer in members {
                 let mode = modes
                     .get(*issuer)
                     .copied()
                     .unwrap_or(IssuerBetaMode::BucketOnly);
-                let exclude_w = weights
-                    .get(*issuer)
-                    .map(Vec::as_slice)
-                    .unwrap_or(EMPTY_WEIGHTS);
+                let exclude_w = weights.get(*issuer).map(Vec::as_slice).unwrap_or(&[]);
                 let beta_k = {
                     let r_series = residuals.get(*issuer).map(Vec::as_slice).unwrap_or(&[]);
                     match mode {
@@ -172,13 +166,17 @@ pub(super) fn run_peel(
                             // non-refining child level has a ~0 full mean even
                             // when the LOO series (the other names) still varies.
                             // Singleton / degenerate LOO then falls back to unit β.
-                            gather_aligned_sparse(r_series, factor_series, &mut xs, &mut ys);
-                            let fitted = if non_refining || ols_slope_pairs(&ys, &xs)?.is_none() {
+                            let fitted = if non_refining {
                                 None
                             } else {
-                                fill_loo_series(r_series, exclude_w, stats, &mut loo_series);
-                                gather_aligned_sparse(r_series, &loo_series, &mut xs, &mut ys);
-                                ols_slope_pairs(&ys, &xs)?
+                                gather_aligned_sparse(r_series, factor_series, &mut xs, &mut ys);
+                                if is_degenerate_regressor(&ys, &xs) {
+                                    None
+                                } else {
+                                    fill_loo_series(r_series, exclude_w, stats, &mut loo_series);
+                                    gather_aligned_sparse(r_series, &loo_series, &mut xs, &mut ys);
+                                    ols_slope_pairs(&ys, &xs)?
+                                }
                             };
                             let shrunk =
                                 apply_shrinkage(&config.beta_shrinkage, fitted.unwrap_or(1.0));
@@ -217,16 +215,7 @@ pub(super) fn run_peel(
         // `build_factor_histories` (missing dates are a validation error).
         // `factor_variances` computes variance over only the `Some` entries.
         for (bucket, stats) in bucket_stats {
-            // Reconstruct an IssuerTags for path → use a synthetic helper:
-            // We need bucket_factor_id. The existing helper requires IssuerTags;
-            // we don't have them here, but we can build a minimal tag map by
-            // splitting the path on '.'.
-            let tags = synth_tags_from_path(&config.hierarchy, bucket);
-            // bucket_factor_id is `Some(_)` whenever every dimension key in
-            // `levels[0..=k]` appears in `tags` — which `synth_tags_from_path`
-            // guarantees by construction. Fall through with `continue` defensively
-            // rather than panic via `.expect()`.
-            let Some(factor_id) = bucket_factor_id(&config.hierarchy, &tags, k) else {
+            let Some(factor_id) = bucket_factor_id_from_path(&config.hierarchy, k, bucket) else {
                 continue;
             };
             factor_returns.insert(factor_id, stats.means);
@@ -340,44 +329,6 @@ fn loo_at(
     }
 }
 
-/// Parent path of a dotted bucket path (`"IG.TECH"` → `"IG"`).
-fn parent_bucket_path(path: &str) -> Option<&str> {
-    path.rfind('.').map(|i| &path[..i])
-}
-
-/// True when both member lists name the same issuers (order-independent).
-fn same_member_set(left: &[&IssuerId], right: &[&IssuerId]) -> bool {
-    if left.len() != right.len() {
-        return false;
-    }
-    let mut ids: BTreeMap<&IssuerId, usize> = BTreeMap::new();
-    for issuer in left {
-        *ids.entry(*issuer).or_insert(0) += 1;
-    }
-    for issuer in right {
-        match ids.get_mut(*issuer) {
-            Some(count) if *count > 0 => *count -= 1,
-            _ => return false,
-        }
-    }
-    ids.values().all(|c| *c == 0)
-}
-
-/// Reconstruct an [`IssuerTags`] from a dotted bucket path so that callers
-/// can re-use [`bucket_factor_id`].
-///
-/// The path has `k+1` segments aligned with `hierarchy.levels[0..=k]`.
-fn synth_tags_from_path(hierarchy: &CreditHierarchySpec, path: &str) -> IssuerTags {
-    let segments: Vec<&str> = path.split('.').collect();
-    let mut map = BTreeMap::new();
-    for (i, seg) in segments.iter().enumerate() {
-        if let Some(dim) = hierarchy.levels.get(i) {
-            map.insert(dimension_key(dim).to_owned(), (*seg).to_owned());
-        }
-    }
-    IssuerTags(map)
-}
-
 /// Apply shrinkage rule to an OLS β estimate.
 fn apply_shrinkage(rule: &BetaShrinkage, beta_fit: f64) -> f64 {
     match rule {
@@ -433,20 +384,25 @@ fn gather_aligned_sparse(
     }
 }
 
+fn is_degenerate_regressor(ys: &[f64], xs: &[f64]) -> bool {
+    let n = xs.len();
+    if n < 2 {
+        return false;
+    }
+    let nf = n as f64;
+    let mean_x = xs.iter().sum::<f64>() / nf;
+    let mean_y = ys.iter().sum::<f64>() / nf;
+    let var_x = xs.iter().map(|v| (v - mean_x).powi(2)).sum::<f64>();
+    let var_y = ys.iter().map(|v| (v - mean_y).powi(2)).sum::<f64>();
+    // Shared (n − 1) denominator cancels in the ratio test.
+    var_x <= DEGENERATE_REGRESSOR_REL_TOL * var_y
+}
+
 /// Shared OLS core over aligned pairs: degenerate-regressor gate, then
 /// delegate to `finstack_quant_analytics::beta`.
 fn ols_slope_pairs(ys: &[f64], xs: &[f64]) -> finstack_quant_core::Result<Option<f64>> {
-    let n = xs.len();
-    if n >= 2 {
-        let nf = n as f64;
-        let mean_x = xs.iter().sum::<f64>() / nf;
-        let mean_y = ys.iter().sum::<f64>() / nf;
-        let var_x = xs.iter().map(|v| (v - mean_x).powi(2)).sum::<f64>();
-        let var_y = ys.iter().map(|v| (v - mean_y).powi(2)).sum::<f64>();
-        // Shared (n − 1) denominator cancels in the ratio test.
-        if var_x <= DEGENERATE_REGRESSOR_REL_TOL * var_y {
-            return Ok(None);
-        }
+    if is_degenerate_regressor(ys, xs) {
+        return Ok(None);
     }
     let result = finstack_quant_analytics::beta(ys, xs)?;
     Ok((!result.beta.is_nan()).then_some(result.beta))

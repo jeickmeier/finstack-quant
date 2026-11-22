@@ -10,7 +10,7 @@
 
 use crate::bindings::core::market_data::curves::PyVolSurface;
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
 use crate::bindings::module_utils::spec_from_py;
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::table_builders::TableBuilder;
@@ -38,24 +38,6 @@ pub struct PyArbitrageReport {
 
 #[pymethods]
 impl PyArbitrageReport {
-    #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "ArbitrageReport.vol_surface_id")]
-    #[getter]
-    fn vol_surface_id(&self) -> &str {
-        &self.inner.vol_surface_id
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "ArbitrageReport.passed")]
-    #[getter]
-    fn passed(&self) -> bool {
-        self.inner.passed
-    }
-
-    #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "ArbitrageReport.total_violations")]
-    #[getter]
-    fn total_violations(&self) -> usize {
-        self.inner.violations.len()
-    }
-
     #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "ArbitrageReport.violations")]
     #[getter]
     fn violations<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -83,6 +65,17 @@ impl PyArbitrageReport {
         )
     }
 }
+
+py_getters!(PyArbitrageReport |s| {
+    #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "ArbitrageReport.vol_surface_id")]
+    vol_surface_id -> &str = &s.inner.vol_surface_id;
+
+    #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "ArbitrageReport.passed")]
+    passed -> bool = s.inner.passed;
+
+    #[doc = pydoc!("finstack_quant.models.volatility._volatility_arbitrage", "ArbitrageReport.total_violations")]
+    total_violations -> usize = s.inner.violations.len();
+});
 
 impl PyArbitrageReport {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {

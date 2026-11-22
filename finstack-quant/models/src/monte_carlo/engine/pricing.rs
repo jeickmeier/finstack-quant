@@ -877,30 +877,9 @@ impl McEngine {
     {
         let mut moments = OnlineCovariance::new();
         for path_id in range {
-            let (target, control) = match rng {
-                RngSource::Split(root) => {
-                    let mut path_rng = root.split(path_id as u64).ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "RandomStream reports splitting support but split() returned None"
-                                .to_string(),
-                        )
-                    })?;
-                    self.simulate_discounted_pair(
-                        &mut path_rng,
-                        inputs,
-                        scratch,
-                        path_id,
-                        control_value,
-                    )?
-                }
-                RngSource::Sequential(stream) => self.simulate_discounted_pair(
-                    &mut **stream,
-                    inputs,
-                    scratch,
-                    path_id,
-                    control_value,
-                )?,
-            };
+            let (target, control) = rng.with_path_rng(path_id, |path_rng| {
+                self.simulate_discounted_pair(path_rng, inputs, scratch, path_id, control_value)
+            })?;
             moments.update(target, control)?;
         }
         Ok(moments)
@@ -930,30 +909,15 @@ impl McEngine {
     {
         let mut stats = OnlineStats::new();
         for path_id in range {
-            let discounted_value = match rng {
-                RngSource::Split(root) => {
-                    let mut path_rng = root.split(path_id as u64).ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "RandomStream reports splitting support but split() returned None"
-                                .to_string(),
-                        )
-                    })?;
-                    self.simulate_discounted(
-                        &mut path_rng,
-                        inputs,
-                        scratch,
-                        path_id,
-                        captured.as_deref_mut(),
-                    )?
-                }
-                RngSource::Sequential(stream) => self.simulate_discounted(
-                    &mut **stream,
+            let discounted_value = rng.with_path_rng(path_id, |path_rng| {
+                self.simulate_discounted(
+                    path_rng,
                     inputs,
                     scratch,
                     path_id,
                     captured.as_deref_mut(),
-                )?,
-            };
+                )
+            })?;
             stats.update(discounted_value)?;
 
             if let Some(target) = self.config.target_ci_half_width
@@ -1246,4 +1210,25 @@ enum RngSource<'a, R> {
     Split(&'a R),
     /// One non-splittable stream consumed path after path.
     Sequential(&'a mut R),
+}
+
+impl<R: RandomStream> RngSource<'_, R> {
+    fn with_path_rng<T>(
+        &mut self,
+        path_id: usize,
+        f: impl FnOnce(&mut R) -> Result<T>,
+    ) -> Result<T> {
+        match self {
+            Self::Split(root) => {
+                let mut path_rng = root.split(path_id as u64).ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "RandomStream reports splitting support but split() returned None"
+                            .to_string(),
+                    )
+                })?;
+                f(&mut path_rng)
+            }
+            Self::Sequential(stream) => f(&mut **stream),
+        }
+    }
 }

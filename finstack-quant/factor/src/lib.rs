@@ -13,6 +13,7 @@
 //!
 //! - [`MatchingConfig`] and [`FactorMatcher`] for dependency-to-factor matching.
 //! - [`credit`] for credit hierarchy artifacts, calibration, and decomposition.
+//! - [`risk`] for factor and position risk decomposition kernels.
 //! - [`schema`] for versioned JSON Schema contracts.
 //!
 //! # Quick Start
@@ -95,14 +96,11 @@ mod sensitivity_matrix;
 
 pub use config::{BumpSizeConfig, FactorModelConfig, RiskMeasure, UnmatchedPolicy};
 pub use covariance::FactorCovarianceMatrix;
-pub use envelope::{
-    FACTOR_MODEL_CONFIG_CONTRACT, FactorModelConfigEnvelope, FactorModelConfigSchema,
-};
+pub use envelope::{FactorModelConfigEnvelope, FactorModelConfigSchema};
 pub use matching::{
     AttributeFilter, CREDIT_GENERIC_FACTOR_ID, CreditHierarchicalConfig, DependencyFilter,
     FactorMatchEntry, FactorMatchError, FactorMatcher, FactorNode, HierarchicalConfig,
-    ISSUER_ID_META_KEY, MappingRule, MappingTableMatcher, MatchingConfig, bucket_factor_id,
-    parse_bucket_factor_id,
+    ISSUER_ID_META_KEY, MappingRule, MatchingConfig, bucket_factor_id, parse_bucket_factor_id,
 };
 pub use primitives::{
     CurveType, DependencyType, FactorDefinition, FactorId, FactorType, MarketDependency,

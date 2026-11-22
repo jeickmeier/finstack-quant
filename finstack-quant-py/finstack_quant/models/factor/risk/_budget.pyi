@@ -164,6 +164,21 @@ class PositionBudgetEntry:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Serialize through canonical JSON for Python pickling.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reducer tuple ``(from_json, (json,))`` used by :mod:`pickle`.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+        ...
+
     @property
     def position_id(self) -> str:
         """
@@ -386,6 +401,21 @@ class RiskBudgetResult:
         -------
         str
             Canonical JSON representation of this `RiskBudgetResult`, suitable for a matching `from_json` call.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Serialize through canonical JSON for Python pickling.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reducer tuple ``(from_json, (json,))`` used by :mod:`pickle`.
 
         Raises
         ------

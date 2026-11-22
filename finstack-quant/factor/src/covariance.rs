@@ -78,7 +78,7 @@ impl FactorCovarianceMatrix {
     /// positive semidefinite.
     pub fn new(factor_ids: Vec<FactorId>, data: Vec<f64>) -> finstack_quant_core::Result<Self> {
         let n = factor_ids.len();
-        if data.len() != n * n {
+        if n.checked_mul(n) != Some(data.len()) {
             return Err(finstack_quant_core::InputError::DimensionMismatch.into());
         }
 
@@ -120,14 +120,8 @@ impl FactorCovarianceMatrix {
     }
 
     /// Row/column index of `factor`, or `None` if the identifier is unknown.
-    ///
-    /// # Arguments
-    ///
-    /// * `factor` - Identifier to locate on the matrix axes. A missing id
-    ///   returns `None` rather than `0`; pair this with the `*_at` accessors
-    ///   when a caller already walked [`Self::factor_ids`].
     #[must_use]
-    pub fn index_of(&self, factor: &FactorId) -> Option<usize> {
+    fn index_of(&self, factor: &FactorId) -> Option<usize> {
         self.index.get(factor).copied()
     }
 
@@ -135,14 +129,13 @@ impl FactorCovarianceMatrix {
     ///
     /// # Arguments
     ///
-    /// * `idx` - Row/column in `[0, n_factors)`. Out of range is a hard
-    ///   assert, matching [`crate::SensitivityMatrix::position_deltas`].
+    /// * `idx` - Row/column in `[0, n_factors)`.
     ///
     /// # Panics
     ///
     /// Panics when `idx` is out of bounds.
     #[must_use]
-    pub fn variance_at(&self, idx: usize) -> f64 {
+    pub(crate) fn variance_at(&self, idx: usize) -> f64 {
         assert!(
             idx < self.n,
             "idx {idx} out of bounds for {} factors",
@@ -193,7 +186,7 @@ impl FactorCovarianceMatrix {
     ///
     /// Panics when `i` or `j` is out of bounds.
     #[must_use]
-    pub fn correlation_at(&self, i: usize, j: usize) -> f64 {
+    pub(crate) fn correlation_at(&self, i: usize, j: usize) -> f64 {
         assert!(
             i < self.n && j < self.n,
             "correlation index ({i}, {j}) out of bounds for {} factors",
@@ -211,10 +204,9 @@ impl FactorCovarianceMatrix {
     ///
     /// The `0.0` fallback means an unknown (e.g. mistyped) factor ID silently
     /// contributes zero risk. Use [`Self::factor_ids`] to validate a query
-    /// universe up front, or rely on
-    /// [`crate::FactorModelConfig::validate_matching_factor_ids`] (called by
-    /// `CreditFactorModel::validate`) to reject undeclared factors at
-    /// config-load time.
+    /// universe up front, or rely on [`crate::FactorModelConfig::validate`]
+    /// (called by `CreditFactorModel::validate`) to reject undeclared factors
+    /// at config-load time.
     ///
     /// # Arguments
     ///
@@ -259,7 +251,7 @@ impl FactorCovarianceMatrix {
         factor_ids: &[FactorId],
     ) -> finstack_quant_core::Result<FxHashMap<FactorId, usize>> {
         let mut index = FxHashMap::with_capacity_and_hasher(factor_ids.len(), Default::default());
-        for (idx, factor_id) in factor_ids.iter().cloned().enumerate() {
+        for (idx, factor_id) in factor_ids.iter().enumerate() {
             if index.insert(factor_id.clone(), idx).is_some() {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "Duplicate factor id '{factor_id}' in covariance matrix"
@@ -291,12 +283,6 @@ impl<'de> Deserialize<'de> for FactorCovarianceMatrix {
         if helper.factor_ids.len() != helper.n {
             return Err(serde::de::Error::custom(
                 "Factor covariance matrix factor count does not match n",
-            ));
-        }
-
-        if helper.data.len() != helper.n * helper.n {
-            return Err(serde::de::Error::custom(
-                "Factor covariance matrix data length does not match n x n",
             ));
         }
 

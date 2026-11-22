@@ -8,6 +8,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
+pub(crate) mod config;
 pub(crate) mod credit;
 pub(crate) mod definitions;
 pub(crate) mod risk;
@@ -18,13 +19,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "factor")?;
     m.setattr(
         "__doc__",
-        "Factor-model primitives, credit calibration, and decomposition.",
+        crate::bindings::pydoc::pydoc!("finstack_quant.models.factor", "__module__"),
     )?;
 
     let credit = crate::bindings::module_utils::new_submodule(&m, "credit")?;
     credit.setattr(
         "__doc__",
-        "Credit factor hierarchy artifacts, calibration, and decomposition.",
+        crate::bindings::pydoc::pydoc!("finstack_quant.models.factor.credit", "__module__"),
     )?;
     credit::register(py, &credit)?;
 
@@ -45,13 +46,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::bindings::module_utils::attach_submodule(
         &m,
         &credit,
-        crate::bindings::module_utils::Exposure::Python,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     let risk = crate::bindings::module_utils::new_submodule(&m, "risk")?;
     risk.setattr(
         "__doc__",
-        "Product-independent factor and position risk decomposition kernels.",
+        crate::bindings::pydoc::pydoc!("finstack_quant.models.factor.risk", "__module__"),
     )?;
     risk::register(&risk)?;
     let risk_all = PyList::new(
@@ -87,15 +88,15 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::bindings::module_utils::attach_submodule(
         &m,
         &risk,
-        crate::bindings::module_utils::Exposure::Python,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     schema::register(py, &m)?;
 
     // Exported at the Rust crate root (`finstack_quant_factor`), so
     // they live on `finstack_quant.models.factor`, not under `credit`.
-    m.add_class::<credit::PyFactorCovarianceMatrix>()?;
-    m.add_class::<credit::PyFactorModelConfig>()?;
+    m.add_class::<config::PyFactorCovarianceMatrix>()?;
+    m.add_class::<config::PyFactorModelConfig>()?;
     m.add_class::<definitions::PyFactorDefinition>()?;
     m.add_class::<definitions::PyMarketMapping>()?;
 

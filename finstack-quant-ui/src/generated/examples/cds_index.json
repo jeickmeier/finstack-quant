@@ -36,6 +36,7 @@
       },
       "series": 42,
       "side": "pay",
+      "valuation_convention": "bloomberg_cdsw_clean",
       "version": 1
     },
     "type": "cds_index"

@@ -5,7 +5,7 @@
 //! mirroring the Rust module [`finstack_quant_models::correlation`].
 
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::table_builders::TableBuilder;
 use crate::errors::{core_to_py, correlation_to_py};
@@ -81,35 +81,25 @@ impl PyCopulaSpec {
             .map_err(correlation_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.is_gaussian")]
-    #[getter]
-    fn is_gaussian(&self) -> bool {
-        self.inner.is_gaussian()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.is_student_t")]
-    #[getter]
-    fn is_student_t(&self) -> bool {
-        self.inner.is_student_t()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.is_rfl")]
-    #[getter]
-    fn is_rfl(&self) -> bool {
-        self.inner.is_rfl()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.is_multi_factor")]
-    #[getter]
-    fn is_multi_factor(&self) -> bool {
-        self.inner.is_multi_factor()
-    }
-
     #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CopulaSpec", &self.inner)
     }
 }
+
+py_getters!(PyCopulaSpec |s| {
+    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.is_gaussian")]
+    is_gaussian -> bool = s.inner.is_gaussian();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.is_student_t")]
+    is_student_t -> bool = s.inner.is_student_t();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.is_rfl")]
+    is_rfl -> bool = s.inner.is_rfl();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "CopulaSpec.is_multi_factor")]
+    is_multi_factor -> bool = s.inner.is_multi_factor();
+});
 
 wire_methods!(
     PyCopulaSpec,
@@ -140,18 +130,6 @@ impl PyCopula {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.correlation", "Copula.num_factors")]
-    #[getter]
-    fn num_factors(&self) -> usize {
-        self.inner.num_factors()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "Copula.model_name")]
-    #[getter]
-    fn model_name(&self) -> &'static str {
-        self.inner.model_name()
-    }
-
     #[doc = pydoc!("finstack_quant.models.correlation", "Copula.tail_dependence")]
     #[pyo3(text_signature = "(self, correlation)")]
     fn tail_dependence(&self, correlation: f64) -> f64 {
@@ -170,6 +148,14 @@ impl PyCopula {
         format!("Copula('{}')", self.inner.model_name())
     }
 }
+
+py_getters!(PyCopula |s| {
+    #[doc = pydoc!("finstack_quant.models.correlation", "Copula.num_factors")]
+    num_factors -> usize = s.inner.num_factors();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "Copula.model_name")]
+    model_name -> &'static str = s.inner.model_name();
+});
 
 #[doc = pydoc!("finstack_quant.models.correlation", "RecoverySpec")]
 #[pyclass(
@@ -259,24 +245,12 @@ pub struct PyRecoveryModel {
 
 #[pymethods]
 impl PyRecoveryModel {
-    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.expected_recovery")]
-    #[getter]
-    fn expected_recovery(&self) -> f64 {
-        self.inner.expected_recovery()
-    }
-
     #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.conditional_recovery")]
     #[pyo3(text_signature = "(self, market_factor)")]
     fn conditional_recovery(&self, market_factor: f64) -> PyResult<f64> {
         self.inner
             .conditional_recovery(market_factor)
             .map_err(correlation_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.lgd")]
-    #[getter]
-    fn lgd(&self) -> f64 {
-        self.inner.lgd()
     }
 
     #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.conditional_lgd")]
@@ -295,30 +269,6 @@ impl PyRecoveryModel {
             .map_err(correlation_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.has_idiosyncratic_dispersion")]
-    #[getter]
-    fn has_idiosyncratic_dispersion(&self) -> bool {
-        self.inner.has_idiosyncratic_dispersion()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.recovery_volatility")]
-    #[getter]
-    fn recovery_volatility(&self) -> f64 {
-        self.inner.recovery_volatility()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.is_stochastic")]
-    #[getter]
-    fn is_stochastic(&self) -> bool {
-        self.inner.is_stochastic()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.model_name")]
-    #[getter]
-    fn model_name(&self) -> &'static str {
-        self.inner.model_name()
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "RecoveryModel('{}', expected={:.4})",
@@ -327,6 +277,26 @@ impl PyRecoveryModel {
         )
     }
 }
+
+py_getters!(PyRecoveryModel |s| {
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.expected_recovery")]
+    expected_recovery -> f64 = s.inner.expected_recovery();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.lgd")]
+    lgd -> f64 = s.inner.lgd();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.has_idiosyncratic_dispersion")]
+    has_idiosyncratic_dispersion -> bool = s.inner.has_idiosyncratic_dispersion();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.recovery_volatility")]
+    recovery_volatility -> f64 = s.inner.recovery_volatility();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.is_stochastic")]
+    is_stochastic -> bool = s.inner.is_stochastic();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "RecoveryModel.model_name")]
+    model_name -> &'static str = s.inner.model_name();
+});
 
 #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorSpec")]
 #[pyclass(
@@ -409,36 +379,6 @@ pub struct PyLatentFactorKind {
 
 #[pymethods]
 impl PyLatentFactorKind {
-    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind.num_factors")]
-    #[getter]
-    fn num_factors(&self) -> usize {
-        self.inner.num_factors()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind.correlation_matrix")]
-    #[getter]
-    fn correlation_matrix(&self) -> Vec<f64> {
-        self.inner.correlation_matrix().to_vec()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind.volatilities")]
-    #[getter]
-    fn volatilities(&self) -> Vec<f64> {
-        self.inner.volatilities().to_vec()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind.factor_names")]
-    #[getter]
-    fn factor_names(&self) -> Vec<&'static str> {
-        self.inner.factor_names()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind.model_name")]
-    #[getter]
-    fn model_name(&self) -> &'static str {
-        self.inner.model_name()
-    }
-
     #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind.diagonal_factor_contribution")]
     #[pyo3(text_signature = "(self, factor_index, z)")]
     fn diagonal_factor_contribution(&self, factor_index: usize, z: f64) -> f64 {
@@ -453,6 +393,23 @@ impl PyLatentFactorKind {
         )
     }
 }
+
+py_getters!(PyLatentFactorKind |s| {
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind.num_factors")]
+    num_factors -> usize = s.inner.num_factors();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind.correlation_matrix")]
+    correlation_matrix -> Vec<f64> = s.inner.correlation_matrix().to_vec();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind.volatilities")]
+    volatilities -> Vec<f64> = s.inner.volatilities().to_vec();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind.factor_names")]
+    factor_names -> Vec<&'static str> = s.inner.factor_names();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentFactorKind.model_name")]
+    model_name -> &'static str = s.inner.model_name();
+});
 
 #[doc = pydoc!("finstack_quant.models.correlation", "LatentSingleFactor")]
 #[pyclass(
@@ -478,24 +435,6 @@ impl PyLatentSingleFactor {
             .map_err(correlation_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.correlation", "LatentSingleFactor.volatility")]
-    #[getter]
-    fn volatility(&self) -> f64 {
-        self.inner.volatility()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "LatentSingleFactor.mean_reversion")]
-    #[getter]
-    fn mean_reversion(&self) -> f64 {
-        self.inner.mean_reversion()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "LatentSingleFactor.num_factors")]
-    #[getter]
-    fn num_factors(&self) -> usize {
-        self.inner.num_factors()
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "LatentSingleFactor(vol={:.4}, mr={:.4})",
@@ -504,6 +443,17 @@ impl PyLatentSingleFactor {
         )
     }
 }
+
+py_getters!(PyLatentSingleFactor |s| {
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentSingleFactor.volatility")]
+    volatility -> f64 = s.inner.volatility();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentSingleFactor.mean_reversion")]
+    mean_reversion -> f64 = s.inner.mean_reversion();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentSingleFactor.num_factors")]
+    num_factors -> usize = s.inner.num_factors();
+});
 
 #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor")]
 #[pyclass(
@@ -545,42 +495,6 @@ impl PyLatentTwoFactor {
             .map_err(correlation_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.prepay_vol")]
-    #[getter]
-    fn prepay_vol(&self) -> f64 {
-        self.inner.prepay_vol()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.credit_vol")]
-    #[getter]
-    fn credit_vol(&self) -> f64 {
-        self.inner.credit_vol()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.correlation")]
-    #[getter]
-    fn correlation(&self) -> f64 {
-        self.inner.correlation()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.num_factors")]
-    #[getter]
-    fn num_factors(&self) -> usize {
-        self.inner.num_factors()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.cholesky_l10")]
-    #[getter]
-    fn cholesky_l10(&self) -> f64 {
-        self.inner.cholesky_l10()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.cholesky_l11")]
-    #[getter]
-    fn cholesky_l11(&self) -> f64 {
-        self.inner.cholesky_l11()
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "LatentTwoFactor(prepay={:.4}, credit={:.4}, corr={:.4})",
@@ -590,6 +504,26 @@ impl PyLatentTwoFactor {
         )
     }
 }
+
+py_getters!(PyLatentTwoFactor |s| {
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.prepay_vol")]
+    prepay_vol -> f64 = s.inner.prepay_vol();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.credit_vol")]
+    credit_vol -> f64 = s.inner.credit_vol();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.correlation")]
+    correlation -> f64 = s.inner.correlation();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.num_factors")]
+    num_factors -> usize = s.inner.num_factors();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.cholesky_l10")]
+    cholesky_l10 -> f64 = s.inner.cholesky_l10();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentTwoFactor.cholesky_l11")]
+    cholesky_l11 -> f64 = s.inner.cholesky_l11();
+});
 
 #[doc = pydoc!("finstack_quant.models.correlation", "LatentMultiFactor")]
 #[pyclass(
@@ -633,24 +567,6 @@ impl PyLatentMultiFactor {
             .map_err(correlation_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.correlation", "LatentMultiFactor.num_factors")]
-    #[getter]
-    fn num_factors(&self) -> usize {
-        self.inner.num_factors()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "LatentMultiFactor.correlation_matrix")]
-    #[getter]
-    fn correlation_matrix(&self) -> Vec<f64> {
-        self.inner.correlation_matrix().to_vec()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "LatentMultiFactor.volatilities")]
-    #[getter]
-    fn volatilities(&self) -> Vec<f64> {
-        self.inner.volatilities().to_vec()
-    }
-
     #[doc = pydoc!("finstack_quant.models.correlation", "LatentMultiFactor.generate_correlated_factors")]
     #[pyo3(text_signature = "(self, independent_z)")]
     fn generate_correlated_factors(&self, independent_z: Vec<f64>) -> PyResult<Vec<f64>> {
@@ -663,6 +579,17 @@ impl PyLatentMultiFactor {
         format!("LatentMultiFactor(n={})", self.inner.num_factors())
     }
 }
+
+py_getters!(PyLatentMultiFactor |s| {
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentMultiFactor.num_factors")]
+    num_factors -> usize = s.inner.num_factors();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentMultiFactor.correlation_matrix")]
+    correlation_matrix -> Vec<f64> = s.inner.correlation_matrix().to_vec();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "LatentMultiFactor.volatilities")]
+    volatilities -> Vec<f64> = s.inner.volatilities().to_vec();
+});
 
 #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli")]
 #[pyclass(
@@ -686,48 +613,6 @@ impl PyCorrelatedBernoulli {
         Ok(Self {
             inner: CorrelatedBernoulli::new(p1, p2, correlation).map_err(core_to_py)?,
         })
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.p1")]
-    #[getter]
-    fn p1(&self) -> f64 {
-        self.inner.p1()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.p2")]
-    #[getter]
-    fn p2(&self) -> f64 {
-        self.inner.p2()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.correlation")]
-    #[getter]
-    fn correlation(&self) -> f64 {
-        self.inner.correlation()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.joint_p11")]
-    #[getter]
-    fn joint_p11(&self) -> f64 {
-        self.inner.joint_p11()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.joint_p10")]
-    #[getter]
-    fn joint_p10(&self) -> f64 {
-        self.inner.joint_p10()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.joint_p01")]
-    #[getter]
-    fn joint_p01(&self) -> f64 {
-        self.inner.joint_p01()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.joint_p00")]
-    #[getter]
-    fn joint_p00(&self) -> f64 {
-        self.inner.joint_p00()
     }
 
     #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.joint_probabilities")]
@@ -760,6 +645,29 @@ impl PyCorrelatedBernoulli {
         )
     }
 }
+
+py_getters!(PyCorrelatedBernoulli |s| {
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.p1")]
+    p1 -> f64 = s.inner.p1();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.p2")]
+    p2 -> f64 = s.inner.p2();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.correlation")]
+    correlation -> f64 = s.inner.correlation();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.joint_p11")]
+    joint_p11 -> f64 = s.inner.joint_p11();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.joint_p10")]
+    joint_p10 -> f64 = s.inner.joint_p10();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.joint_p01")]
+    joint_p01 -> f64 = s.inner.joint_p01();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.joint_p00")]
+    joint_p00 -> f64 = s.inner.joint_p00();
+});
 
 #[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure")]
 #[pyclass(
@@ -796,40 +704,27 @@ impl PyCreditExposure {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure.id")]
-    #[getter]
-    fn id(&self) -> String {
-        self.inner.id.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure.notional")]
-    #[getter]
-    fn notional(&self) -> f64 {
-        self.inner.notional
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure.default_probability")]
-    #[getter]
-    fn default_probability(&self) -> f64 {
-        self.inner.default_probability
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure.lgd")]
-    #[getter]
-    fn lgd(&self) -> f64 {
-        self.inner.lgd
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure.factor_loadings")]
-    #[getter]
-    fn factor_loadings(&self) -> Vec<f64> {
-        self.inner.factor_loadings.clone()
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CreditExposure", &self.inner)
     }
 }
+
+py_getters!(PyCreditExposure |s| {
+    #[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure.id")]
+    id -> String = s.inner.id.clone();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure.notional")]
+    notional -> f64 = s.inner.notional;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure.default_probability")]
+    default_probability -> f64 = s.inner.default_probability;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure.lgd")]
+    lgd -> f64 = s.inner.lgd;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "CreditExposure.factor_loadings")]
+    factor_loadings -> Vec<f64> = s.inner.factor_loadings.clone();
+});
 
 wire_methods!(
     PyCreditExposure,
@@ -866,34 +761,24 @@ impl PyPortfolioLossConfig {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossConfig.num_paths")]
-    #[getter]
-    fn num_paths(&self) -> usize {
-        self.inner.num_paths
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossConfig.seed")]
-    #[getter]
-    fn seed(&self) -> u64 {
-        self.inner.seed
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossConfig.confidence")]
-    #[getter]
-    fn confidence(&self) -> f64 {
-        self.inner.confidence
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossConfig.copula")]
-    #[getter]
-    fn copula(&self) -> PyCopulaSpec {
-        PyCopulaSpec::from_inner(self.inner.copula.clone())
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("PortfolioLossConfig", &self.inner)
     }
 }
+
+py_getters!(PyPortfolioLossConfig |s| {
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossConfig.num_paths")]
+    num_paths -> usize = s.inner.num_paths;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossConfig.seed")]
+    seed -> u64 = s.inner.seed;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossConfig.confidence")]
+    confidence -> f64 = s.inner.confidence;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossConfig.copula")]
+    copula -> PyCopulaSpec = PyCopulaSpec::from_inner(s.inner.copula.clone());
+});
 
 wire_methods!(
     PyPortfolioLossConfig,
@@ -923,36 +808,6 @@ impl PyPortfolioLossResult {
         PortfolioLossResult::from_losses(losses, confidence)
             .map(|inner| Self { inner })
             .map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.losses")]
-    #[getter]
-    fn losses(&self) -> Vec<f64> {
-        self.inner.losses.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.expected_loss")]
-    #[getter]
-    fn expected_loss(&self) -> f64 {
-        self.inner.expected_loss
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.var")]
-    #[getter]
-    fn var(&self) -> f64 {
-        self.inner.var
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.expected_shortfall")]
-    #[getter]
-    fn expected_shortfall(&self) -> f64 {
-        self.inner.expected_shortfall
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.confidence")]
-    #[getter]
-    fn confidence(&self) -> f64 {
-        self.inner.confidence
     }
 
     #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.tranche_loss_statistics")]
@@ -990,6 +845,23 @@ impl PyPortfolioLossResult {
     }
 }
 
+py_getters!(PyPortfolioLossResult |s| {
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.losses")]
+    losses -> Vec<f64> = s.inner.losses.clone();
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.expected_loss")]
+    expected_loss -> f64 = s.inner.expected_loss;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.var")]
+    var -> f64 = s.inner.var;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.expected_shortfall")]
+    expected_shortfall -> f64 = s.inner.expected_shortfall;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "PortfolioLossResult.confidence")]
+    confidence -> f64 = s.inner.confidence;
+});
+
 impl PyPortfolioLossResult {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
         TableBuilder::new()
@@ -1024,76 +896,45 @@ pub struct PyTrancheLossStatistics {
 
 #[pymethods]
 impl PyTrancheLossStatistics {
-    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.attachment")]
-    #[getter]
-    fn attachment(&self) -> f64 {
-        self.inner.attachment
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.detachment")]
-    #[getter]
-    fn detachment(&self) -> f64 {
-        self.inner.detachment
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.tranche_notional")]
-    #[getter]
-    fn tranche_notional(&self) -> f64 {
-        self.inner.tranche_notional
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.expected_loss_fraction")]
-    #[getter]
-    fn expected_loss_fraction(&self) -> f64 {
-        self.inner.expected_loss_fraction
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.expected_loss_amount")]
-    #[getter]
-    fn expected_loss_amount(&self) -> f64 {
-        self.inner.expected_loss_amount
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.var_fraction")]
-    #[getter]
-    fn var_fraction(&self) -> f64 {
-        self.inner.var_fraction
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.var_amount")]
-    #[getter]
-    fn var_amount(&self) -> f64 {
-        self.inner.var_amount
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.expected_shortfall_fraction")]
-    #[getter]
-    fn expected_shortfall_fraction(&self) -> f64 {
-        self.inner.expected_shortfall_fraction
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.expected_shortfall_amount")]
-    #[getter]
-    fn expected_shortfall_amount(&self) -> f64 {
-        self.inner.expected_shortfall_amount
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.prob_attachment_breached")]
-    #[getter]
-    fn prob_attachment_breached(&self) -> f64 {
-        self.inner.prob_attachment_breached
-    }
-
-    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.prob_full_writedown")]
-    #[getter]
-    fn prob_full_writedown(&self) -> f64 {
-        self.inner.prob_full_writedown
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("TrancheLossStatistics", &self.inner)
     }
 }
+
+py_getters!(PyTrancheLossStatistics |s| {
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.attachment")]
+    attachment -> f64 = s.inner.attachment;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.detachment")]
+    detachment -> f64 = s.inner.detachment;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.tranche_notional")]
+    tranche_notional -> f64 = s.inner.tranche_notional;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.expected_loss_fraction")]
+    expected_loss_fraction -> f64 = s.inner.expected_loss_fraction;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.expected_loss_amount")]
+    expected_loss_amount -> f64 = s.inner.expected_loss_amount;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.var_fraction")]
+    var_fraction -> f64 = s.inner.var_fraction;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.var_amount")]
+    var_amount -> f64 = s.inner.var_amount;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.expected_shortfall_fraction")]
+    expected_shortfall_fraction -> f64 = s.inner.expected_shortfall_fraction;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.expected_shortfall_amount")]
+    expected_shortfall_amount -> f64 = s.inner.expected_shortfall_amount;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.prob_attachment_breached")]
+    prob_attachment_breached -> f64 = s.inner.prob_attachment_breached;
+
+    #[doc = pydoc!("finstack_quant.models.correlation", "TrancheLossStatistics.prob_full_writedown")]
+    prob_full_writedown -> f64 = s.inner.prob_full_writedown;
+});
 
 impl PyTrancheLossStatistics {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {

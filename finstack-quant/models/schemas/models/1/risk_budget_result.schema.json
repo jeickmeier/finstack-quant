@@ -35,6 +35,7 @@
       ]
     },
     "PositionBudgetEntry": {
+      "additionalProperties": false,
       "description": "Budget comparison for a single position.",
       "properties": {
         "actual_component_var": {
@@ -73,6 +74,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/models/1/risk_budget_result.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Result of comparing actual risk decomposition against a risk budget.",
   "properties": {
     "has_breach": {

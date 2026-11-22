@@ -50,6 +50,7 @@
       ]
     },
     "PositionBudgetEntry": {
+      "additionalProperties": false,
       "description": "Budget comparison for a single position.",
       "properties": {
         "actual_component_var": {
@@ -86,10 +87,11 @@
       "type": "object"
     },
     "PositionEsContribution": {
+      "additionalProperties": false,
       "description": "Expected Shortfall decomposition result for a single portfolio position.",
       "properties": {
         "component_es": {
-          "description": "Component ES: position's contribution to portfolio Expected Shortfall.\n\nParametric: analytical formula using truncated normal moments.\n```text\nCES_i = w_i * (Sigma * w)_i / sigma_p * phi(z_alpha) / (1 - alpha)\n```\n\nHistorical: probability-weighted position P&L over the exact loss-tail\nmass. Boundary ties share their tail weight equally.\n```text\nCES_i = E[L_i | L_portfolio > VaR_portfolio]\n```",
+          "description": "Component ES: position's contribution to portfolio Expected Shortfall.\n\nParametric: analytical formula using truncated normal moments.\n```text\nCES_i = -w_i * (Sigma * w)_i / sigma_p * phi(z_alpha) / (1 - alpha)\n```\n\nHistorical: probability-weighted position P&L over the exact loss-tail\nmass. Boundary ties share their tail weight equally.\n```text\nCES_i = E[L_i | L_portfolio > VaR_portfolio]\n```",
           "format": "double",
           "type": "number"
         },
@@ -119,6 +121,7 @@
       "type": "object"
     },
     "PositionRiskDecomposition": {
+      "additionalProperties": false,
       "description": "Complete position-level risk decomposition of a portfolio.\n\nContains VaR and ES decompositions for every position, along with\nportfolio-level totals. All values are in the portfolio's base currency.\n\n# Euler Decomposition Property\n\nUnder the parametric (normal) assumption:\n```text\nsum(component_var_i) == portfolio_var  (exact)\nsum(component_es_i)  == portfolio_es   (exact)\n```\n\nUnder historical simulation, the Euler property holds approximately.\n\n# References\n\n- Tasche (2008): Capital allocation with Euler's method. `docs/REFERENCES.md#tasche-2008-capital-allocation`\n- Meucci (2005): Risk and Asset Allocation. `docs/REFERENCES.md#meucci-risk-and-asset-allocation`\n- Litterman (1996): Hot Spots and Hedges. `docs/REFERENCES.md#litterman-1996-hotspots`",
       "properties": {
         "confidence": {
@@ -181,6 +184,7 @@
       "type": "object"
     },
     "PositionVarContribution": {
+      "additionalProperties": false,
       "description": "Risk decomposition result for a single portfolio position.\n\nAll monetary fields are in the same units as the portfolio VaR\n(typically the portfolio's base currency).",
       "properties": {
         "component_var": {
@@ -222,6 +226,7 @@
       "type": "object"
     },
     "RiskBudgetResult": {
+      "additionalProperties": false,
       "description": "Result of comparing actual risk decomposition against a risk budget.\n\nUtilization is measured on the *consuming* side: a position's component\nVaR is positive utilization when it carries the same sign as the portfolio\nVaR (it consumes risk) and negative utilization when it offsets portfolio\nrisk (a diversifier / hedge). Diversifiers can never breach the budget and\nnever contribute to [`Self::total_overbudget`].",
       "properties": {
         "has_breach": {
@@ -249,6 +254,7 @@
       "type": "object"
     },
     "StressAttribution": {
+      "additionalProperties": false,
       "description": "Per-position attribution of portfolio losses in tail scenarios.\n\nFor each scenario that breaches the VaR threshold, reports which\npositions contributed the most to the portfolio loss.",
       "properties": {
         "n_tail_scenarios": {
@@ -294,6 +300,7 @@
       "type": "object"
     },
     "StressPositionEntry": {
+      "additionalProperties": false,
       "description": "Single position's contribution to tail stress.",
       "properties": {
         "avg_tail_pnl": {
@@ -325,6 +332,7 @@
       "type": "object"
     },
     "TailScenarioBreakdown": {
+      "additionalProperties": false,
       "description": "Breakdown of a single tail scenario.",
       "properties": {
         "portfolio_pnl": {

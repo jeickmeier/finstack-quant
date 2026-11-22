@@ -1,5 +1,5 @@
 //! WASM bindings for the credit factor hierarchy: calibration, level and
-//! period decomposition, covariance forecasts and factor-covariance helpers.
+//! period decomposition, and covariance forecasts.
 //!
 //! Exposed through the `models.factor.credit` facade namespace.
 //!
@@ -9,18 +9,18 @@
 //! Horizon strings accepted by the covariance forecast methods:
 //!
 //! - `"one_step"` — calibrated annualized variance unchanged.
-//! - `"unconditional"` — long-run (identical to `"one_step"` for `Sample` vol
-//!   model).
+//! - `"unconditional"` — long-run (identical to `"one_step"` for `Sample` and
+//!   `Ewma` vol models).
 //! - JSON string `'{"n_steps": N}'` — variance scaled by `N`.
 //! - JSON string `'{"years": Y}'` — variance scaled by the fractional year `Y`.
 //! - JSON string `'{"n_steps": N, "periods_per_year": P}'` — the same as
 //!   `'{"years": N / P}'`.
 
 use crate::utils::input::{from_js_json, js_f64, js_string, js_uint, json_text, opt_from_js_json};
+use crate::utils::wire::{js_date, label};
 use crate::utils::{to_js_err, to_js_value};
 
 use finstack_quant_factor::credit::VolHorizon;
-use finstack_quant_factor::{FactorCovarianceMatrix, FactorId, FactorModelConfig};
 use wasm_bindgen::prelude::*;
 
 /// Calibrated credit factor hierarchy artifact.
@@ -46,14 +46,61 @@ pub struct JsCreditFactorModel {
 
 json_round_trip!(JsCreditFactorModel, CreditFactorModel, rust_json finstack_quant_factor::credit::hierarchy::CreditFactorModel);
 
-#[wasm_bindgen(js_class = CreditFactorModel)]
-impl JsCreditFactorModel {
+wasm_getters!(JsCreditFactorModel, CreditFactorModel |s| {
     /// Return the exact namespaced contract marker.
     ///
     /// @returns The string `"finstack_quant.credit_factor_model/1"`.
-    #[wasm_bindgen(getter)]
-    pub fn schema(&self) -> String {
-        self.inner.schema.as_str().to_owned()
+    schema -> String = s.inner.schema.as_str().to_owned();
+    /// Calibration date of the model, in ISO-8601 form.
+    as_of as asOf -> String = s.inner.as_of.to_string();
+    /// First and last date of the calibration window, as `[start, end]` ISO-8601 strings.
+    calibration_window as calibrationWindow -> Vec<String> = vec![
+        s.inner.calibration_window.start.to_string(),
+        s.inner.calibration_window.end.to_string(),
+    ];
+    /// Issuer-beta policy the model was calibrated with: `"dynamic"` or `"globally_off"`.
+    policy -> String = s.inner.policy.kind().to_owned();
+    /// Sampling frequency of the calibration panel, as its canonical label.
+    panel_frequency as panelFrequency -> Result<String, JsValue> = label(&s.inner.panel_frequency);
+    /// Bucket weighting used for the level returns, as its canonical label.
+    bucket_weighting as bucketWeighting -> Result<String, JsValue> = label(&s.inner.bucket_weighting);
+    /// Factor-model configuration (factors, covariance, matching, risk measure) as a `FactorModelConfig` object.
+    config returns "FactorModelConfig" -> Result<JsValue, JsValue> = to_js_value(&s.inner.config);
+    /// Calibrated factor covariance as a `FactorCovarianceMatrix` object (`factor_ids`, row-major `data`).
+    covariance returns "FactorCovarianceMatrix" -> Result<JsValue, JsValue> = to_js_value(&s.inner.config.covariance);
+    /// Calibration diagnostics (fit quality, fold-ups, dropped factors) as a plain object.
+    diagnostics returns "Record<string, unknown>" -> Result<JsValue, JsValue> = to_js_value(&s.inner.diagnostics);
+    /// Static factor correlation matrix the covariance forecasts are built on, as a plain object.
+    static_correlation as staticCorrelation returns "generated.models.FactorCorrelationMatrix" -> Result<JsValue, JsValue> = to_js_value(&s.inner.static_correlation);
+    /// Number of hierarchy levels.
+    n_levels as nLevels -> usize = s.inner.hierarchy.levels.len();
+    /// Number of calibrated issuers.
+    n_issuers as nIssuers -> usize = s.inner.issuer_betas.len();
+    /// Number of factors in the model configuration.
+    n_factors as nFactors -> usize = s.inner.config.factors.len();
+});
+
+#[wasm_bindgen(js_class = CreditFactorModel)]
+impl JsCreditFactorModel {
+    /// Names of the hierarchy levels, broadest first.
+    /// @returns Dimension keys such as `"rating"`, `"region"`, `"sector"` or a custom dimension key — the same keys as the issuer tags and the serialized model.
+    #[wasm_bindgen(js_name = levelNames)]
+    pub fn level_names(&self) -> Vec<String> {
+        self.inner.level_names()
+    }
+
+    /// Identifiers of the calibrated issuers, in issuer-beta row order.
+    /// @returns The issuer identifiers.
+    #[wasm_bindgen(js_name = issuerIds)]
+    pub fn issuer_ids(&self) -> Vec<String> {
+        self.inner.issuer_ids()
+    }
+
+    /// Identifiers of the factors, in covariance order.
+    /// @returns The factor identifiers.
+    #[wasm_bindgen(js_name = factorIds)]
+    pub fn factor_ids(&self) -> Vec<String> {
+        self.inner.factor_ids()
     }
 }
 
@@ -82,18 +129,14 @@ impl JsCreditCalibrator {
     /// Construct a calibrator from a JSON-serialized `CreditCalibrationConfig`.
     ///
     /// # Errors
-    /// Throws if `config_json` is not a valid `CreditCalibrationConfig`.
-    /// @param configJson - Optional credit-factor calibration configuration JSON; omitted or `null` uses the Rust `CreditCalibrationConfig::default()`.
+    /// Throws if `config` is not a valid `CreditCalibrationConfig`.
+    /// @param config - Optional credit-factor calibration configuration JSON or plain object; omitted or `null` uses the Rust `CreditCalibrationConfig::default()`.
     #[wasm_bindgen(constructor)]
     pub fn new(
-        #[wasm_bindgen(
-            js_name = "configJson",
-            unchecked_optional_param_type = "JsonInput | null"
-        )]
-        config_json: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "JsonInput | null")] config: Option<JsValue>,
     ) -> Result<JsCreditCalibrator, JsValue> {
         let config: finstack_quant_factor::credit::calibration::CreditCalibrationConfig =
-            opt_from_js_json(config_json.as_ref(), "configJson")?.unwrap_or_default();
+            opt_from_js_json(config.as_ref(), "config")?.unwrap_or_default();
         Ok(Self {
             inner: finstack_quant_factor::credit::calibration::CreditCalibrator::new(config),
         })
@@ -101,23 +144,27 @@ impl JsCreditCalibrator {
 
     /// Run the full calibration pipeline and return a `CreditFactorModel`.
     ///
-    /// `inputs_json` must be a JSON-serialized `CreditCalibrationInputs`.
+    /// `inputs` must be a JSON-serialized or plain `CreditCalibrationInputs`.
     ///
     /// # Errors
     /// Throws if inputs are structurally invalid or calibration fails.
-    /// @param inputsJson - Credit-factor calibration input JSON containing issuers, spreads, and observations.
+    /// @param inputs - Credit-factor calibration input JSON or plain object containing issuers, spreads, and observations.
     /// @returns A calibrated `CreditFactorModel` handle.
     pub fn calibrate(
         &self,
-        #[wasm_bindgen(js_name = "inputsJson", unchecked_param_type = "JsonInput")]
-        inputs_json: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] inputs: JsValue,
     ) -> Result<JsCreditFactorModel, JsValue> {
         let inputs: finstack_quant_factor::credit::calibration::CreditCalibrationInputs =
-            from_js_json(&inputs_json, "inputsJson")?;
+            from_js_json(&inputs, "inputs")?;
         let model = self.inner.calibrate(inputs).map_err(to_js_err)?;
         Ok(JsCreditFactorModel { inner: model })
     }
 }
+
+wasm_getters!(JsCreditCalibrator, CreditCalibrator |s| {
+    /// Calibration configuration in canonical JSON form, as a `CreditCalibrationConfig` object.
+    config returns "generated.models.CreditCalibrationConfig" -> Result<JsValue, JsValue> = to_js_value(s.inner.config());
+});
 
 // LevelsAtDate  (opaque handle — not exposed as a JS class, just passed through)
 
@@ -147,26 +194,17 @@ pub struct JsLevelsAtDate {
 
 json_round_trip!(JsLevelsAtDate, LevelsAtDate, rust_json finstack_quant_factor::credit::decomposition::LevelsAtDate);
 
+wasm_getters!(JsLevelsAtDate, LevelsAtDate |s| {
+    /// Observation date as an ISO-8601 string.
+    date -> String = s.inner.date.to_string();
+    /// Generic factor level in basis points.
+    generic -> f64 = s.inner.generic;
+    /// Number of hierarchy levels in this snapshot.
+    n_levels as nLevels -> usize = s.inner.by_level.len();
+});
+
 #[wasm_bindgen(js_class = LevelsAtDate)]
 impl JsLevelsAtDate {
-    /// Observation date as an ISO-8601 string.
-    #[wasm_bindgen(getter)]
-    pub fn date(&self) -> String {
-        self.inner.date.to_string()
-    }
-
-    /// Generic factor level in basis points.
-    #[wasm_bindgen(getter)]
-    pub fn generic(&self) -> f64 {
-        self.inner.generic
-    }
-
-    /// Number of hierarchy levels in this snapshot.
-    #[wasm_bindgen(getter, js_name = nLevels)]
-    pub fn n_levels(&self) -> usize {
-        self.inner.by_level.len()
-    }
-
     /// Return the bucket-value map for one zero-based hierarchy level.
     ///
     /// # Arguments
@@ -234,32 +272,19 @@ pub struct JsPeriodDecomposition {
 
 json_round_trip!(JsPeriodDecomposition, PeriodDecomposition, rust_json finstack_quant_factor::credit::decomposition::PeriodDecomposition);
 
+wasm_getters!(JsPeriodDecomposition, PeriodDecomposition |s| {
+    /// Earlier snapshot date as an ISO-8601 string.
+    from_date as fromDate -> String = s.inner.from.to_string();
+    /// Later snapshot date as an ISO-8601 string.
+    to_date as toDate -> String = s.inner.to.to_string();
+    /// Change in the generic factor in basis points.
+    d_generic as dGeneric -> f64 = s.inner.d_generic;
+    /// Number of hierarchy levels in this decomposition.
+    n_levels as nLevels -> usize = s.inner.by_level.len();
+});
+
 #[wasm_bindgen(js_class = PeriodDecomposition)]
 impl JsPeriodDecomposition {
-    /// Earlier snapshot date as an ISO-8601 string.
-    #[wasm_bindgen(getter, js_name = fromDate)]
-    pub fn from_date(&self) -> String {
-        self.inner.from.to_string()
-    }
-
-    /// Later snapshot date as an ISO-8601 string.
-    #[wasm_bindgen(getter, js_name = toDate)]
-    pub fn to_date(&self) -> String {
-        self.inner.to.to_string()
-    }
-
-    /// Change in the generic factor in basis points.
-    #[wasm_bindgen(getter, js_name = dGeneric)]
-    pub fn d_generic(&self) -> f64 {
-        self.inner.d_generic
-    }
-
-    /// Number of hierarchy levels in this decomposition.
-    #[wasm_bindgen(getter, js_name = nLevels)]
-    pub fn n_levels(&self) -> usize {
-        self.inner.by_level.len()
-    }
-
     /// Return the bucket-delta map for one zero-based hierarchy level.
     ///
     /// # Arguments
@@ -308,12 +333,12 @@ impl JsPeriodDecomposition {
 /// # Arguments
 ///
 /// * `model` - Calibrated credit factor hierarchy used for the peel.
-/// * `observed_spreads_json` - JSON `{issuer_id: spread}` map in decimal
+/// * `observed_spreads` - JSON or plain `{issuer_id: spread}` map in decimal
 ///   (`0.012` = 120 bp). Values that look like bp (e.g. `100.0`) are rejected.
 /// * `observed_generic` - Generic (PC) factor value at `as_of`, same decimal
 ///   convention as the spreads.
 /// * `as_of` - ISO-8601 valuation date for the snapshot.
-/// * `runtime_tags_json` - Optional JSON `{issuer_id: {dim_key: tag}}` for
+/// * `runtime_tags` - Optional JSON or plain `{issuer_id: {dim_key: tag}}` for
 ///   issuers not present in the model artifact.
 ///
 /// # Errors
@@ -322,37 +347,35 @@ impl JsPeriodDecomposition {
 /// `runtime_tags` entry, and a `validation` error if `as_of` cannot be parsed
 /// or a spread is outside the decimal band.
 /// @param model - Calibrated credit factor hierarchy used for the peel.
-/// @param observedSpreadsJson - JSON `{issuer_id: spread}` map in decimal (`0.012` = 120 bp). Values that look like bp (e.g. `100.0`) are rejected.
+/// @param observedSpreads - JSON or plain `{issuer_id: spread}` map in decimal (`0.012` = 120 bp). Values that look like bp (e.g. `100.0`) are rejected.
 /// @param observedGeneric - Generic (PC) factor value at `as_of`, same decimal convention as the spreads.
 /// @param asOf - ISO-8601 valuation date for the snapshot.
-/// @param runtimeTagsJson - Optional JSON `{issuer_id: {dim_key: tag}}` for issuers not present in the model artifact.
+/// @param runtimeTags - Optional JSON or plain `{issuer_id: {dim_key: tag}}` for issuers not present in the model artifact.
 /// @returns Per-level factor values and residual adders at the requested date, in bp.
 #[wasm_bindgen(js_name = decomposeLevels)]
 pub fn decompose_levels(
     model: &JsCreditFactorModel,
-    #[wasm_bindgen(js_name = "observedSpreadsJson", unchecked_param_type = "JsonInput")]
-    observed_spreads_json: JsValue,
+    #[wasm_bindgen(js_name = "observedSpreads", unchecked_param_type = "JsonInput")]
+    observed_spreads: JsValue,
     #[wasm_bindgen(js_name = "observedGeneric", unchecked_param_type = "number")] observed_generic: JsValue,
     #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
     #[wasm_bindgen(
-        js_name = "runtimeTagsJson",
-        unchecked_optional_param_type = "JsonInput"
+        js_name = "runtimeTags",
+        unchecked_optional_param_type = "JsonInput | null"
     )]
-    runtime_tags_json: Option<JsValue>,
+    runtime_tags: Option<JsValue>,
 ) -> Result<JsLevelsAtDate, JsValue> {
     let observed_generic = js_f64(&observed_generic, "observedGeneric")?;
     let observed_spreads: std::collections::BTreeMap<finstack_quant_core::types::IssuerId, f64> =
-        from_js_json(&observed_spreads_json, "observedSpreadsJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
-
-    let date = finstack_quant_core::dates::parse_iso_date(as_of).map_err(to_js_err)?;
+        from_js_json(&observed_spreads, "observedSpreads")?;
+    let date = js_date(&as_of, "asOf")?;
 
     let runtime_tags: Option<
         std::collections::BTreeMap<
             finstack_quant_core::types::IssuerId,
             finstack_quant_factor::credit::hierarchy::IssuerTags,
         >,
-    > = opt_from_js_json(runtime_tags_json.as_ref(), "runtimeTagsJson")?;
+    > = opt_from_js_json(runtime_tags.as_ref(), "runtimeTags")?;
 
     let inner = finstack_quant_factor::credit::decomposition::decompose_levels(
         &model.inner,
@@ -446,7 +469,7 @@ impl JsFactorCovarianceForecast {
     ///
     /// Returns a structured `FactorCovarianceMatrix` JavaScript object.
     ///
-    /// `horizon_json` accepts a `VolHorizon` handle, `"one_step"`,
+    /// `horizon` accepts a `VolHorizon` handle, `"one_step"`,
     /// `"unconditional"`, `'{"n_steps": N}'`, `'{"years": Y}'`, or
     /// `'{"n_steps": N, "periods_per_year": P}'` (years = N / P).
     ///
@@ -454,14 +477,13 @@ impl JsFactorCovarianceForecast {
     /// Throws if the horizon string is invalid or the model data is
     /// inconsistent.
     /// @returns Structured covariance matrix with ordered factor axes and row-major data.
-    /// @param horizonJson - JSON-serialized forecast horizon defining the future covariance date or period.
+    /// @param horizon - Forecast horizon (`VolHorizon` handle, descriptor string, or JSON object) defining the future covariance date or period.
     #[wasm_bindgen(js_name = covarianceAt, unchecked_return_type = "FactorCovarianceMatrix")]
     pub fn covariance_at(
         &self,
-        #[wasm_bindgen(js_name = "horizonJson", unchecked_param_type = "JsonInput")]
-        horizon_json: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "VolHorizon | JsonInput")] horizon: JsValue,
     ) -> Result<JsValue, JsValue> {
-        let h = parse_vol_horizon(&horizon_json, "horizonJson")?;
+        let h = parse_vol_horizon(&horizon, "horizon")?;
         let forecast = finstack_quant_factor::credit::FactorCovarianceForecast::new(&self.model);
         let cov = forecast.covariance_at(h).map_err(to_js_err)?;
         crate::utils::to_js_value(&cov)
@@ -475,16 +497,15 @@ impl JsFactorCovarianceForecast {
     /// calibrated variance is negative.
     /// @returns Issuer idiosyncratic volatility (standard deviation) in basis points of spread, scaled to the horizon.
     /// @param issuerId - Stable issuer identifier used to select the required domain object.
-    /// @param horizonJson - JSON-serialized forecast horizon defining the future covariance date or period.
+    /// @param horizon - Forecast horizon (`VolHorizon` handle, descriptor string, or JSON object) defining the future covariance date or period.
     #[wasm_bindgen(js_name = idiosyncraticVol)]
     pub fn idiosyncratic_vol(
         &self,
         #[wasm_bindgen(js_name = "issuerId", unchecked_param_type = "string")] issuer_id: JsValue,
-        #[wasm_bindgen(js_name = "horizonJson", unchecked_param_type = "JsonInput")]
-        horizon_json: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "VolHorizon | JsonInput")] horizon: JsValue,
     ) -> Result<f64, JsValue> {
         let issuer_id: &str = &js_string(&issuer_id, "issuerId")?;
-        let h = parse_vol_horizon(&horizon_json, "horizonJson")?;
+        let h = parse_vol_horizon(&horizon, "horizon")?;
         let id = finstack_quant_core::types::IssuerId::new(issuer_id);
         let forecast = finstack_quant_factor::credit::FactorCovarianceForecast::new(&self.model);
         forecast.idiosyncratic_vol(&id, h).map_err(to_js_err)
@@ -497,24 +518,23 @@ impl JsFactorCovarianceForecast {
     /// Throws if the horizon or risk measure is invalid, or the model builder
     /// rejects the assembled configuration.
     /// @returns Structured factor-model configuration ready for portfolio risk workflows.
-    /// @param horizonJson - JSON-serialized forecast horizon defining the future covariance date or period.
-    /// @param riskMeasureJson - Optional `RiskMeasure` wire value for the horizon factor model: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omitted or `null` uses the Rust `RiskMeasure::default()` (`"variance"`).
+    /// @param horizon - Forecast horizon (`VolHorizon` handle, descriptor string, or JSON object) defining the future covariance date or period.
+    /// @param riskMeasure - Optional `RiskMeasure` wire value for the horizon factor model: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omitted or `null` uses the Rust `RiskMeasure::default()` (`"variance"`).
     #[wasm_bindgen(js_name = factorModelAt, unchecked_return_type = "FactorModelConfig")]
     pub fn factor_model_at(
         &self,
-        #[wasm_bindgen(js_name = "horizonJson", unchecked_param_type = "JsonInput")]
-        horizon_json: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "VolHorizon | JsonInput")] horizon: JsValue,
         #[wasm_bindgen(
-            js_name = "riskMeasureJson",
+            js_name = "riskMeasure",
             unchecked_optional_param_type = "JsonInput | null"
         )]
-        risk_measure_json: Option<JsValue>,
+        risk_measure: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let h = parse_vol_horizon(&horizon_json, "horizonJson")?;
+        let h = parse_vol_horizon(&horizon, "horizon")?;
         // `js_opt_wire`: the unit variants are bare wire strings (`"variance"`),
         // which are not JSON text.
         let measure: finstack_quant_factor::RiskMeasure =
-            crate::utils::wire::js_opt_wire(risk_measure_json.as_ref(), "riskMeasureJson")?
+            crate::utils::wire::js_opt_wire(risk_measure.as_ref(), "riskMeasure")?
                 .unwrap_or_default();
         let forecast = finstack_quant_factor::credit::FactorCovarianceForecast::new(&self.model);
         let config = forecast.factor_model_at(h, measure).map_err(to_js_err)?;
@@ -522,122 +542,9 @@ impl JsFactorCovarianceForecast {
     }
 }
 
-// Accessors of the calibrated model (twins of the Python getters)
-
-#[wasm_bindgen(js_class = CreditFactorModel)]
-impl JsCreditFactorModel {
-    /// Calibration date of the model, in ISO-8601 form.
-    #[wasm_bindgen(getter, js_name = asOf)]
-    pub fn as_of(&self) -> String {
-        self.inner.as_of.to_string()
-    }
-
-    /// First and last date of the calibration window, as `[start, end]` ISO-8601 strings.
-    #[wasm_bindgen(getter, js_name = calibrationWindow)]
-    pub fn calibration_window(&self) -> Vec<String> {
-        vec![
-            self.inner.calibration_window.start.to_string(),
-            self.inner.calibration_window.end.to_string(),
-        ]
-    }
-
-    /// Issuer-beta policy the model was calibrated with: `"dynamic"` or `"globally_off"`.
-    #[wasm_bindgen(getter)]
-    pub fn policy(&self) -> String {
-        self.inner.policy.kind().to_owned()
-    }
-
-    /// Sampling frequency of the calibration panel, as its canonical label.
-    #[wasm_bindgen(getter, js_name = panelFrequency)]
-    pub fn panel_frequency(&self) -> Result<String, JsValue> {
-        finstack_quant_core::wire::serde_label(&self.inner.panel_frequency).map_err(to_js_err)
-    }
-
-    /// Bucket weighting used for the level returns, as its canonical label.
-    #[wasm_bindgen(getter, js_name = bucketWeighting)]
-    pub fn bucket_weighting(&self) -> Result<String, JsValue> {
-        finstack_quant_core::wire::serde_label(&self.inner.bucket_weighting).map_err(to_js_err)
-    }
-
-    /// Factor-model configuration (factors, covariance, matching, risk measure) as a `FactorModelConfig` object.
-    #[wasm_bindgen(getter, unchecked_return_type = "FactorModelConfig")]
-    pub fn config(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&self.inner.config)
-    }
-
-    /// Calibrated factor covariance as a `FactorCovarianceMatrix` object (`factor_ids`, row-major `data`).
-    #[wasm_bindgen(getter, unchecked_return_type = "FactorCovarianceMatrix")]
-    pub fn covariance(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&self.inner.config.covariance)
-    }
-
-    /// Calibration diagnostics (fit quality, fold-ups, dropped factors) as a plain object.
-    #[wasm_bindgen(getter, unchecked_return_type = "Record<string, unknown>")]
-    pub fn diagnostics(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&self.inner.diagnostics)
-    }
-
-    /// Static factor correlation matrix the covariance forecasts are built on, as a plain object.
-    #[wasm_bindgen(getter, js_name = staticCorrelation, unchecked_return_type = "generated.models.FactorCorrelationMatrix")]
-    pub fn static_correlation(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&self.inner.static_correlation)
-    }
-
-    /// Number of hierarchy levels.
-    #[wasm_bindgen(getter, js_name = nLevels)]
-    pub fn n_levels(&self) -> usize {
-        self.inner.hierarchy.levels.len()
-    }
-
-    /// Number of calibrated issuers.
-    #[wasm_bindgen(getter, js_name = nIssuers)]
-    pub fn n_issuers(&self) -> usize {
-        self.inner.issuer_betas.len()
-    }
-
-    /// Number of factors in the model configuration.
-    #[wasm_bindgen(getter, js_name = nFactors)]
-    pub fn n_factors(&self) -> usize {
-        self.inner.config.factors.len()
-    }
-
-    /// Names of the hierarchy levels, broadest first.
-    /// @returns Dimension keys such as `"rating"`, `"region"`, `"sector"` or a custom dimension key — the same keys as the issuer tags and the serialized model.
-    #[wasm_bindgen(js_name = levelNames)]
-    pub fn level_names(&self) -> Vec<String> {
-        self.inner.level_names()
-    }
-
-    /// Identifiers of the calibrated issuers, in issuer-beta row order.
-    /// @returns The issuer identifiers.
-    #[wasm_bindgen(js_name = issuerIds)]
-    pub fn issuer_ids(&self) -> Vec<String> {
-        self.inner.issuer_ids()
-    }
-
-    /// Identifiers of the factors, in covariance order.
-    /// @returns The factor identifiers.
-    #[wasm_bindgen(js_name = factorIds)]
-    pub fn factor_ids(&self) -> Vec<String> {
-        self.inner.factor_ids()
-    }
-}
-
-#[wasm_bindgen(js_class = CreditCalibrator)]
-impl JsCreditCalibrator {
-    /// Calibration configuration in canonical JSON form, as a `CreditCalibrationConfig` object.
-    #[wasm_bindgen(
-        getter,
-        unchecked_return_type = "generated.models.CreditCalibrationConfig"
-    )]
-    pub fn config(&self) -> Result<JsValue, JsValue> {
-        to_js_value(self.inner.config())
-    }
-}
-
 /// Forecast horizon for the covariance and idiosyncratic-vol forecasts.
 ///
-/// The forecast methods take the horizon descriptor; pass `horizon.toString()`.
+/// The forecast methods accept a `VolHorizon` handle directly or its descriptor string.
 ///
 /// @example
 /// ```typescript
@@ -651,6 +558,21 @@ impl JsCreditCalibrator {
 pub struct JsVolHorizon {
     pub(crate) inner: VolHorizon,
 }
+
+wasm_getters!(JsVolHorizon, VolHorizon |s| {
+    /// Variant label: `"one_step"`, `"unconditional"`, `"n_steps"` or `"years"`.
+    kind -> String = s.inner.kind().to_owned();
+    /// Step count when `kind` is `"n_steps"`, otherwise `undefined`.
+    n -> Option<usize> = match s.inner {
+        VolHorizon::NSteps(n) => Some(n),
+        _ => None,
+    };
+    /// Horizon in years when `kind` is `"years"`, otherwise `undefined`.
+    years_value as yearsValue -> Option<f64> = match s.inner {
+        VolHorizon::Years(years) => Some(years),
+        _ => None,
+    };
+});
 
 #[wasm_bindgen(js_class = VolHorizon)]
 impl JsVolHorizon {
@@ -717,425 +639,11 @@ impl JsVolHorizon {
             .map_err(to_js_err)
     }
 
-    /// Variant label: `"one_step"`, `"unconditional"`, `"n_steps"` or `"years"`.
-    #[wasm_bindgen(getter)]
-    pub fn kind(&self) -> String {
-        self.inner.kind().to_owned()
-    }
-
-    /// Step count when `kind` is `"n_steps"`, otherwise `undefined`.
-    #[wasm_bindgen(getter)]
-    pub fn n(&self) -> Option<usize> {
-        match self.inner {
-            VolHorizon::NSteps(n) => Some(n),
-            _ => None,
-        }
-    }
-
-    /// Horizon in years when `kind` is `"years"`, otherwise `undefined`.
-    #[wasm_bindgen(getter, js_name = yearsValue)]
-    pub fn years_value(&self) -> Option<f64> {
-        match self.inner {
-            VolHorizon::Years(years) => Some(years),
-            _ => None,
-        }
-    }
-
     /// Canonical descriptor accepted by `parse` and by the forecast methods.
     /// @returns `"one_step"`, `"unconditional"`, `{"n_steps": N}` or `{"years": Y}`.
     #[wasm_bindgen(js_name = toString)]
     #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
         self.inner.descriptor()
-    }
-}
-
-// FactorCovarianceMatrix / FactorModelConfig computations. Both types cross
-// the boundary as plain objects, so their Rust methods are free functions here.
-
-/// Variance of one factor in a factor covariance matrix.
-/// @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
-/// @param factorId - Factor whose diagonal variance is requested; an unknown identifier returns 0.
-/// @returns The factor's variance.
-///
-/// # Errors
-///
-/// Throws a `validation` error if `matrix` is malformed or not a valid
-/// covariance matrix.
-#[wasm_bindgen(js_name = factorVariance)]
-pub fn factor_variance(
-    #[wasm_bindgen(unchecked_param_type = "FactorCovarianceMatrix | string")] matrix: JsValue,
-    #[wasm_bindgen(js_name = "factorId", unchecked_param_type = "string")] factor_id: JsValue,
-) -> Result<f64, JsValue> {
-    let matrix: FactorCovarianceMatrix = from_js_json(&matrix, "matrix")?;
-    Ok(matrix.variance(&FactorId::new(js_string(&factor_id, "factorId")?)))
-}
-
-/// Covariance between two factors in a factor covariance matrix.
-/// @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
-/// @param lhs - First factor identifier; an unknown identifier returns 0.
-/// @param rhs - Second factor identifier; an unknown identifier returns 0.
-/// @returns The covariance of the two factors.
-///
-/// # Errors
-///
-/// Throws a `validation` error if `matrix` is malformed or not a valid
-/// covariance matrix.
-#[wasm_bindgen(js_name = factorCovariance)]
-pub fn factor_covariance(
-    #[wasm_bindgen(unchecked_param_type = "FactorCovarianceMatrix | string")] matrix: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "string")] lhs: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "string")] rhs: JsValue,
-) -> Result<f64, JsValue> {
-    let matrix: FactorCovarianceMatrix = from_js_json(&matrix, "matrix")?;
-    Ok(matrix.covariance(
-        &FactorId::new(js_string(&lhs, "lhs")?),
-        &FactorId::new(js_string(&rhs, "rhs")?),
-    ))
-}
-
-/// Correlation between two factors in a factor covariance matrix.
-/// @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
-/// @param lhs - First factor identifier; an unknown identifier or a non-positive variance returns 0.
-/// @param rhs - Second factor identifier; an unknown identifier or a non-positive variance returns 0.
-/// @returns The correlation of the two factors, from -1 through 1.
-///
-/// # Errors
-///
-/// Throws a `validation` error if `matrix` is malformed or not a valid
-/// covariance matrix.
-#[wasm_bindgen(js_name = factorCorrelation)]
-pub fn factor_correlation(
-    #[wasm_bindgen(unchecked_param_type = "FactorCovarianceMatrix | string")] matrix: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "string")] lhs: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "string")] rhs: JsValue,
-) -> Result<f64, JsValue> {
-    let matrix: FactorCovarianceMatrix = from_js_json(&matrix, "matrix")?;
-    Ok(matrix.correlation(
-        &FactorId::new(js_string(&lhs, "lhs")?),
-        &FactorId::new(js_string(&rhs, "rhs")?),
-    ))
-}
-
-/// Factor covariance matrix as one row per factor (the twin of Python `to_numpy`).
-/// @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
-/// @returns An array of `number[]` rows, `nFactors` by `nFactors`, in `factor_ids` order.
-///
-/// # Errors
-///
-/// Throws a `validation` error if `matrix` is malformed or not a valid
-/// covariance matrix.
-#[wasm_bindgen(js_name = factorCovarianceRows, unchecked_return_type = "number[][]")]
-pub fn factor_covariance_rows(
-    #[wasm_bindgen(unchecked_param_type = "FactorCovarianceMatrix | string")] matrix: JsValue,
-) -> Result<JsValue, JsValue> {
-    let matrix: FactorCovarianceMatrix = from_js_json(&matrix, "matrix")?;
-    to_js_value(&matrix.to_rows())
-}
-
-/// Validate a factor-model configuration: factor ordering, matching rules and the risk measure.
-/// @param config - `FactorModelConfig` object or JSON, as returned by the credit factor model `config` getter or `factorModelAt`.
-///
-/// # Errors
-///
-/// Throws a `validation` error naming the first inconsistency.
-#[wasm_bindgen(js_name = validateFactorModelConfig)]
-pub fn validate_factor_model_config(
-    #[wasm_bindgen(unchecked_param_type = "FactorModelConfig | string")] config: JsValue,
-) -> Result<(), JsValue> {
-    let config: FactorModelConfig = from_js_json(&config, "config")?;
-    config.validate().map_err(to_js_err)
-}
-
-// Native tests call underlying Rust APIs directly — WASM wrapper methods that
-// invoke `js_sys::Error::new` cannot run on non-wasm32 targets.  The WASM
-// surface is exercised end-to-end by `wasm-pack test`.
-#[cfg(test)]
-mod tests {
-    use finstack_quant_core::dates::create_date;
-    use finstack_quant_core::types::IssuerId;
-    use finstack_quant_factor::credit::calibration::{
-        BucketSizeThresholds, CovarianceStrategy, CreditCalibrationConfig, CreditCalibrationInputs,
-        CreditCalibrator, GenericFactorSeries, HistoryPanel, IssuerTagPanel, PanelSpace,
-        VolModelChoice,
-    };
-    use finstack_quant_factor::credit::hierarchy::{
-        CreditFactorModel, CreditFactorModelSchema, CreditHierarchySpec, GenericFactorSpec,
-        HierarchyDimension, IssuerTags,
-    };
-    use std::collections::BTreeMap;
-    use time::Month;
-
-    // Fixture helpers
-
-    fn d(year: i32, month: Month, day: u8) -> finstack_quant_core::dates::Date {
-        create_date(year, month, day).expect("valid date")
-    }
-
-    fn monthly_dates(
-        n: usize,
-        end: finstack_quant_core::dates::Date,
-    ) -> Vec<finstack_quant_core::dates::Date> {
-        use finstack_quant_core::dates::DateExt;
-        let mut out = Vec::with_capacity(n);
-        let mut current = end;
-        for _ in 0..n {
-            out.push(current);
-            current = if current == current.end_of_month() {
-                current
-                    .add_months(-1)
-                    .expect("valid date shift")
-                    .end_of_month()
-            } else {
-                current.add_months(-1).expect("valid date shift")
-            };
-        }
-        out.reverse();
-        out
-    }
-
-    fn fixture_config() -> CreditCalibrationConfig {
-        CreditCalibrationConfig {
-            hierarchy: CreditHierarchySpec {
-                levels: vec![HierarchyDimension::Rating, HierarchyDimension::Region],
-            },
-            min_bucket_size_per_level: BucketSizeThresholds {
-                per_level: vec![1, 1],
-            },
-            vol_model: VolModelChoice::Sample,
-            covariance_strategy: CovarianceStrategy::Diagonal,
-            use_returns_or_levels: PanelSpace::Returns,
-            panel_frequency: finstack_quant_factor::credit::calibration::PanelFrequency::Monthly,
-            bucket_weighting: finstack_quant_factor::credit::calibration::BucketWeighting::Equal,
-            ..Default::default()
-        }
-    }
-
-    fn fixture_inputs() -> CreditCalibrationInputs {
-        let n = 24usize;
-        let as_of = d(2024, Month::March, 31);
-        let dates = monthly_dates(n, as_of);
-
-        let generic_values: Vec<f64> = (0..n)
-            .map(|i| 0.0100 + 0.00005 * (i as f64).sin())
-            .collect();
-
-        let issuer_specs = [
-            ("ISSUER-A", "IG", "EU"),
-            ("ISSUER-B", "IG", "NA"),
-            ("ISSUER-C", "HY", "EU"),
-        ];
-
-        let mut spreads: BTreeMap<IssuerId, Vec<Option<f64>>> = BTreeMap::new();
-        let mut tags: BTreeMap<IssuerId, IssuerTags> = BTreeMap::new();
-        let mut as_of_spreads: BTreeMap<IssuerId, f64> = BTreeMap::new();
-
-        for (idx, (id, rating, region)) in issuer_specs.iter().enumerate() {
-            let issuer_id = IssuerId::new(*id);
-            let base = 0.0100 + (idx as f64) * 0.0025;
-            let series: Vec<Option<f64>> = (0..n)
-                .map(|i| {
-                    Some(
-                        base + 0.0050 * generic_values[i] / 0.0100
-                            + 0.0005 * (i as f64 + idx as f64).sin(),
-                    )
-                })
-                .collect();
-            as_of_spreads.insert(issuer_id.clone(), series[n - 1].unwrap());
-            spreads.insert(issuer_id.clone(), series);
-            let mut t = BTreeMap::new();
-            t.insert("rating".to_owned(), rating.to_string());
-            t.insert("region".to_owned(), region.to_string());
-            tags.insert(issuer_id, IssuerTags(t));
-        }
-
-        CreditCalibrationInputs {
-            history_panel: HistoryPanel { dates, spreads },
-            issuer_tags: IssuerTagPanel { tags },
-            generic_factor: GenericFactorSeries {
-                spec: GenericFactorSpec {
-                    name: "CDX IG 5Y".to_owned(),
-                    series_id: "cdx.ig.5y".to_owned(),
-                },
-                values: generic_values,
-            },
-            as_of,
-            as_of_spreads,
-            idiosyncratic_overrides: BTreeMap::new(),
-            spread_durations: BTreeMap::new(),
-        }
-    }
-
-    // Smoke test: calibrate → serialize → deserialize round-trip
-
-    #[test]
-    fn calibrate_serialize_deserialize_roundtrip() {
-        let cal = CreditCalibrator::new(fixture_config());
-        let model = cal.calibrate(fixture_inputs()).expect("calibrate");
-
-        // Serialize to JSON.
-        let json = serde_json::to_string_pretty(&model).expect("serialize");
-        assert!(!json.is_empty());
-        let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
-        assert_eq!(
-            parsed["schema"].as_str().unwrap(),
-            CreditFactorModelSchema::CreditFactorModel.as_str()
-        );
-
-        // Deserialize and validate — structural round-trip.
-        let model2: CreditFactorModel = serde_json::from_str(&json).expect("deserialize");
-        model2.validate().expect("validate round-tripped model");
-
-        // Key structural properties are preserved.
-        assert_eq!(model.as_of, model2.as_of);
-        assert_eq!(model.hierarchy.levels.len(), model2.hierarchy.levels.len());
-        assert_eq!(model.issuer_betas.len(), model2.issuer_betas.len());
-
-        // Re-serialize the deserialized model — must also be valid JSON.
-        let json2 = serde_json::to_string_pretty(&model2).expect("re-serialize");
-        let parsed2: serde_json::Value = serde_json::from_str(&json2).expect("valid JSON 2");
-        assert_eq!(
-            parsed2["schema"].as_str().unwrap(),
-            CreditFactorModelSchema::CreditFactorModel.as_str()
-        );
-    }
-
-    #[test]
-    fn decompose_levels_and_period_smoke() {
-        let cal = CreditCalibrator::new(fixture_config());
-        let model = cal.calibrate(fixture_inputs()).expect("calibrate");
-
-        let spreads_t0: BTreeMap<IssuerId, f64> = [
-            (IssuerId::new("ISSUER-A"), 0.0150_f64),
-            (IssuerId::new("ISSUER-B"), 0.0175_f64),
-        ]
-        .into_iter()
-        .collect();
-        let spreads_t1: BTreeMap<IssuerId, f64> = [
-            (IssuerId::new("ISSUER-A"), 0.0155_f64),
-            (IssuerId::new("ISSUER-B"), 0.0170_f64),
-        ]
-        .into_iter()
-        .collect();
-
-        let levels_t0 = finstack_quant_factor::credit::decomposition::decompose_levels(
-            &model,
-            &spreads_t0,
-            0.0100,
-            d(2024, Month::March, 28),
-            None,
-        )
-        .expect("decompose_levels t0");
-
-        let levels_t1 = finstack_quant_factor::credit::decomposition::decompose_levels(
-            &model,
-            &spreads_t1,
-            0.01005,
-            d(2024, Month::March, 29),
-            None,
-        )
-        .expect("decompose_levels t1");
-
-        // Serde serialization must produce valid JSON.
-        let l0_val = serde_json::to_value(&levels_t0).expect("LevelsAtDate serializes");
-        assert!(l0_val.is_object());
-        assert_eq!(l0_val["date"].as_str().unwrap(), "2024-03-28");
-
-        // decompose_period.
-        let period =
-            finstack_quant_factor::credit::decomposition::decompose_period(&levels_t0, &levels_t1)
-                .expect("decompose_period");
-        let p_val = serde_json::to_value(&period).expect("PeriodDecomposition serializes");
-        assert!(p_val.is_object());
-        assert!(p_val["d_generic"].as_f64().is_some());
-    }
-
-    #[test]
-    fn factor_covariance_forecast_covariance_at_one_step() {
-        let cal = CreditCalibrator::new(fixture_config());
-        let model = cal.calibrate(fixture_inputs()).expect("calibrate");
-
-        let forecast = finstack_quant_factor::credit::FactorCovarianceForecast::new(&model);
-        let cov = forecast
-            .covariance_at(finstack_quant_factor::credit::VolHorizon::OneStep)
-            .expect("covariance_at");
-        let cov_json = serde_json::to_string_pretty(&cov).expect("serialize");
-        let cov_val: serde_json::Value = serde_json::from_str(&cov_json).expect("valid json");
-        assert!(cov_val.is_object());
-    }
-
-    /// `HierarchyDimension` serde must emit the binding's public snake-case
-    /// JSON convention.
-    #[test]
-    fn levels_at_date_dimension_matches_serde_convention() {
-        use finstack_quant_factor::credit::hierarchy::HierarchyDimension;
-        use serde_json::json;
-
-        // Unit-level checks against serde round-trip.
-        let cases: &[(HierarchyDimension, serde_json::Value)] = &[
-            (HierarchyDimension::Rating, json!("rating")),
-            (HierarchyDimension::Region, json!("region")),
-            (HierarchyDimension::Sector, json!("sector")),
-            (
-                HierarchyDimension::Custom("Currency".to_owned()),
-                json!({"custom": "Currency"}),
-            ),
-        ];
-
-        for (dim, expected) in cases {
-            let serde_got = serde_json::to_value(dim).expect("serde serializes HierarchyDimension");
-            assert_eq!(
-                serde_got, *expected,
-                "serde({dim:?}) mismatch: got {serde_got}, want {expected}"
-            );
-        }
-    }
-
-    /// Full integration: `decompose_levels` serde emits
-    /// dimension keys that match serde convention in a real calibrated model.
-    #[test]
-    fn decompose_levels_dimension_keys_match_serde() {
-        let cal = CreditCalibrator::new(fixture_config());
-        let model = cal.calibrate(fixture_inputs()).expect("calibrate");
-
-        let spreads: std::collections::BTreeMap<IssuerId, f64> = [
-            (IssuerId::new("ISSUER-A"), 0.0150_f64),
-            (IssuerId::new("ISSUER-B"), 0.0175_f64),
-        ]
-        .into_iter()
-        .collect();
-
-        let levels = finstack_quant_factor::credit::decomposition::decompose_levels(
-            &model,
-            &spreads,
-            0.0100,
-            d(2024, Month::March, 28),
-            None,
-        )
-        .expect("decompose_levels");
-
-        let val = serde_json::to_value(&levels).expect("LevelsAtDate serializes");
-        let by_level = val["by_level"].as_array().expect("by_level is array");
-        for entry in by_level {
-            let dim = &entry["dimension"];
-            // Must be a lowercase string (Rating/Region/Sector) or an object
-            // with a single "custom" key — never a PascalCase string.
-            match dim {
-                serde_json::Value::String(s) => {
-                    assert_eq!(
-                        *s,
-                        s.to_lowercase(),
-                        "dimension string must be lowercase, got {s:?}"
-                    );
-                }
-                serde_json::Value::Object(obj) => {
-                    assert!(
-                        obj.contains_key("custom"),
-                        "object dimension must have 'custom' key, got {obj:?}"
-                    );
-                }
-                other => panic!("unexpected dimension JSON: {other:?}"),
-            }
-        }
     }
 }

@@ -172,6 +172,7 @@ fn cds_and_index_use_the_same_election_for_coupon_and_upfront() {
     let mut cds = CreditDefaultSwap::example().expect("cds");
     cds.valuation_convention = CdsValuationConvention::IsdaDirty;
     let mut index = CdsIndex::example().expect("index");
+    index.valuation_convention = CdsValuationConvention::IsdaDirty;
     index.premium_leg.end = cds.premium_leg.end;
     let upfront = Money::new(125.0, cds.notional.currency()).expect("upfront");
     cds.upfront = Some((payment, upfront));

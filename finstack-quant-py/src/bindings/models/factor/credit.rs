@@ -1,30 +1,33 @@
 //! Python bindings for the credit factor hierarchy.
 //!
-//! Exposes [`PyCreditFactorModel`], [`PyCreditCalibrator`], the free functions
-//! [`decompose_levels`] and [`decompose_period`], and
-//! [`PyFactorCovarianceForecast`] which wraps the vol-forecast engine from
-//! `finstack-quant-models`.
+//! Exposes [`PyCreditFactorModel`], [`PyCreditCalibrator`], [`PyLevelsAtDate`],
+//! [`PyPeriodDecomposition`], the free functions [`decompose_levels`] and
+//! [`decompose_period`], [`PyVolHorizon`], and [`PyFactorCovarianceForecast`].
 
+use super::config::{PyFactorCovarianceMatrix, PyFactorModelConfig};
 use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
+use crate::bindings::dataframe_utils::{
+    extract_f64_vec, has_arrow_c_stream, is_dataframe_like, is_missing_cell, is_polars_dataframe,
+    table_column_names, table_column_to_pylist, table_to_py_records,
+};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::json_bridge::serde_to_py;
-use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::macros::{py_getters, tabular_methods, typed_or_label, wire_methods};
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pickle_support::reduce_via_json;
-use crate::bindings::table_builders::{TableBuilder, serde_rows_to_arrow_table};
+use crate::bindings::pydoc::pydoc;
+use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::{core_to_py, kinded_to_py, serde_json_to_py, value_error};
 use finstack_quant_core::types::IssuerId;
 use finstack_quant_core::wire::serde_label;
 use finstack_quant_factor::credit::VolHorizon;
 use finstack_quant_factor::credit::calibration::{
-    CreditCalibrationConfig, CreditCalibrationInputs, GenericFactorSeries, HistoryPanel,
-    IssuerTagPanel,
+    BucketWeighting, CovarianceStrategy, CreditCalibrationConfig, CreditCalibrationInputs,
+    GenericFactorSeries, HistoryPanel, IssuerTagPanel, VolModelChoice,
 };
 use finstack_quant_factor::credit::hierarchy::{
     CreditFactorModel, GenericFactorSpec, IssuerTags, dimension_key,
 };
-use finstack_quant_factor::{FactorCovarianceMatrix, FactorId, FactorModelConfig};
-use numpy::{PyArray2, PyArrayMethods};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple, PyType};
 use std::collections::BTreeMap;
@@ -94,25 +97,7 @@ fn py_to_serde_any<'py, T: serde::de::DeserializeOwned>(
     serde_json::from_value(value).map_err(|e| serde_json_to_py(e, &format!("invalid {label}")))
 }
 
-/// Calibrated credit factor hierarchy artifact.
-///
-/// Produced by ``CreditCalibrator`` or loaded from JSON via ``from_json``.
-/// All fields are read-only; mutations require re-calibrating.
-///
-/// Example:
-///     >>> from finstack_quant.models.factor.credit import CreditCalibrator, CreditFactorModel
-///     >>> config = {"hierarchy": {"levels": []}, "covariance_strategy": "diagonal",
-///     ...           "bucket_weighting": "equal"}
-///     >>> inputs = {"history_panel": {"dates": ["2024-01-01", "2024-02-01"],
-///     ...                             "spreads": {"A": [0.010, 0.0101]}},
-///     ...           "issuer_tags": {"tags": {"A": {}}},
-///     ...           "generic_factor": {"spec": {"name": "G", "series_id": "G"},
-///     ...                              "values": [0.010, 0.0101]},
-///     ...           "as_of": "2024-02-01", "as_of_spreads": {"A": 0.0101},
-///     ...           "idiosyncratic_overrides": {}}
-///     >>> calibrated = CreditCalibrator(config).calibrate(inputs)
-///     >>> CreditFactorModel.from_json(calibrated.to_json()).schema
-///     'finstack_quant.credit_factor_model/1'
+#[doc = pydoc!("finstack_quant.models.factor.credit", "CreditFactorModel")]
 #[pyclass(
     name = "CreditFactorModel",
     module = "finstack_quant.models.factor.credit",
@@ -134,25 +119,33 @@ wire_methods!(
     PyCreditFactorModel,
     CreditFactorModel,
     "CreditFactorModel",
+    module = "finstack_quant.models.factor.credit",
     rust_json
 );
 
+py_getters!(PyCreditFactorModel |s| {
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditFactorModel.schema")]
+    schema -> &'static str = s.inner.schema.as_str();
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditFactorModel.as_of")]
+    as_of -> String = s.inner.as_of.to_string();
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditFactorModel.policy")]
+    policy -> &'static str = s.inner.policy.kind();
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditFactorModel.config")]
+    config -> PyFactorModelConfig = PyFactorModelConfig::from_inner(s.inner.config.clone());
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditFactorModel.covariance")]
+    covariance -> PyFactorCovarianceMatrix =
+        PyFactorCovarianceMatrix::from_inner(s.inner.config.covariance.clone());
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditFactorModel.n_levels")]
+    n_levels -> usize = s.inner.hierarchy.levels.len();
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditFactorModel.n_issuers")]
+    n_issuers -> usize = s.inner.issuer_betas.len();
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditFactorModel.n_factors")]
+    n_factors -> usize = s.inner.config.factors.len();
+});
+
 #[pymethods]
 impl PyCreditFactorModel {
-    /// Namespaced schema marker (``"finstack_quant.credit_factor_model/1"``).
-    #[getter]
-    fn schema(&self) -> &'static str {
-        self.inner.schema.as_str()
-    }
-
-    /// Calibration anchor date (ISO 8601 string).
-    #[getter]
-    fn as_of(&self) -> String {
-        self.inner.as_of.to_string()
-    }
-
-    /// History window consumed by calibration as ``(start, end)``
-    /// ``datetime.date`` values (both inclusive).
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditFactorModel.calibration_window")]
     #[getter]
     fn calibration_window<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let start = date_to_py(py, self.inner.calibration_window.start)?;
@@ -160,87 +153,41 @@ impl PyCreditFactorModel {
         PyTuple::new(py, [start, end])
     }
 
-    /// Issuer-beta policy used during calibration (serde label, e.g.
-    /// ``"globally_off"``).
-    #[getter]
-    fn policy(&self) -> &'static str {
-        self.inner.policy.kind()
-    }
-
-    /// Panel observation frequency (``"daily"``, ``"monthly"`` or
-    /// ``"quarterly"``) that fixed the annualization factor.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditFactorModel.panel_frequency")]
     #[getter]
     fn panel_frequency(&self) -> PyResult<String> {
         serde_label(&self.inner.panel_frequency).map_err(core_to_py)
     }
 
-    /// Bucket-mean weighting used at calibration (``"equal"`` or ``"dts"``).
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditFactorModel.bucket_weighting")]
     #[getter]
     fn bucket_weighting(&self) -> PyResult<String> {
         serde_label(&self.inner.bucket_weighting).map_err(core_to_py)
     }
 
-    /// Point-in-time factor-model configuration (factors, covariance,
-    /// matching) embedded in the artifact.
-    #[getter]
-    fn config(&self) -> PyFactorModelConfig {
-        PyFactorModelConfig::from_inner(self.inner.config.clone())
-    }
-
-    /// Point-in-time factor covariance matrix (``config.covariance``).
-    #[getter]
-    fn covariance(&self) -> PyFactorCovarianceMatrix {
-        PyFactorCovarianceMatrix::from_inner(self.inner.config.covariance.clone())
-    }
-
-    /// Structured calibration diagnostics (``mode_counts``,
-    /// ``bucket_sizes_per_level``, ``fold_ups``, ...) as a dict.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditFactorModel.diagnostics")]
     #[getter]
     fn diagnostics<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.diagnostics)
     }
 
-    /// Static factor correlation matrix ``rho`` as a dict with
-    /// ``factor_ids`` and nested-list ``data``.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditFactorModel.static_correlation")]
     #[getter]
     fn static_correlation<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.static_correlation)
     }
 
-    /// Number of hierarchy levels (broadest → narrowest).
-    #[getter]
-    fn n_levels(&self) -> usize {
-        self.inner.hierarchy.levels.len()
-    }
-
-    /// Number of issuer beta rows in the artifact.
-    #[getter]
-    fn n_issuers(&self) -> usize {
-        self.inner.issuer_betas.len()
-    }
-
-    /// Number of factors in the model configuration.
-    #[getter]
-    fn n_factors(&self) -> usize {
-        self.inner.config.factors.len()
-    }
-
-    /// Hierarchy level names as a list of strings.
-    ///
-    /// Returns:
-    ///     List of dimension keys, broadest first (e.g.
-    ///     ``["rating", "region", "sector"]`` or a custom dimension's own
-    ///     key) — the same keys as the issuer tags and ``to_json``.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditFactorModel.level_names")]
     fn level_names(&self) -> Vec<String> {
         self.inner.level_names()
     }
 
-    /// Issuer IDs present in the artifact.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditFactorModel.issuer_ids")]
     fn issuer_ids(&self) -> Vec<String> {
         self.inner.issuer_ids()
     }
 
-    /// Factor IDs in the model configuration.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditFactorModel.factor_ids")]
     fn factor_ids(&self) -> Vec<String> {
         self.inner.factor_ids()
     }
@@ -279,28 +226,13 @@ impl PyCreditFactorModel {
     }
 }
 
-tabular_methods!(PyCreditFactorModel);
+tabular_methods!(
+    PyCreditFactorModel,
+    "CreditFactorModel",
+    module = "finstack_quant.models.factor.credit"
+);
 
-/// Deterministic calibrator that produces a ``CreditFactorModel``.
-///
-/// The configuration is a ``CreditCalibrationConfig`` given as a dict or a
-/// JSON string; every field has a default, so a partial dict such as
-/// ``{"hierarchy": {"levels": ["rating"]}}`` is accepted. Pass ``None`` for
-/// the all-defaults configuration.
-///
-/// Example:
-///     >>> from finstack_quant.models.factor.credit import CreditCalibrator
-///     >>> config = {"hierarchy": {"levels": []}, "covariance_strategy": "diagonal",
-///     ...           "bucket_weighting": "equal"}
-///     >>> inputs = {"history_panel": {"dates": ["2024-01-01", "2024-02-01"],
-///     ...                             "spreads": {"A": [0.010, 0.0101]}},
-///     ...           "issuer_tags": {"tags": {"A": {}}},
-///     ...           "generic_factor": {"spec": {"name": "G", "series_id": "G"},
-///     ...                              "values": [0.010, 0.0101]},
-///     ...           "as_of": "2024-02-01", "as_of_spreads": {"A": 0.0101},
-///     ...           "idiosyncratic_overrides": {}}
-///     >>> CreditCalibrator(config).calibrate(inputs).n_issuers
-///     1
+#[doc = pydoc!("finstack_quant.models.factor.credit", "CreditCalibrator")]
 #[pyclass(
     name = "CreditCalibrator",
     module = "finstack_quant.models.factor.credit",
@@ -329,9 +261,6 @@ fn extract_issuer_tags_map(
     tags: &Bound<'_, PyAny>,
     label: &str,
 ) -> PyResult<BTreeMap<IssuerId, IssuerTags>> {
-    use crate::bindings::dataframe_utils::{
-        has_arrow_c_stream, is_polars_dataframe, table_column_names, table_to_py_records,
-    };
     if is_polars_dataframe(tags)? || has_arrow_c_stream(tags)? {
         let cols = table_column_names(tags)?;
         let id_col = cols
@@ -339,9 +268,9 @@ fn extract_issuer_tags_map(
             .find(|c| c.as_str() == "issuer" || c.as_str() == "issuer_id")
             .cloned()
             .or_else(|| cols.first().cloned())
-            .ok_or_else(|| crate::errors::value_error("tags DataFrame cannot be empty"))?;
+            .ok_or_else(|| value_error("tags DataFrame cannot be empty"))?;
         let records = table_to_py_records(py, tags)?
-            .ok_or_else(|| crate::errors::value_error("tags DataFrame has no records"))?;
+            .ok_or_else(|| value_error("tags DataFrame has no records"))?;
         let rows: Vec<Bound<'_, PyDict>> = records.extract()?;
         let mut out = BTreeMap::new();
         for row in rows {
@@ -349,15 +278,13 @@ fn extract_issuer_tags_map(
             let issuer: String = copy
                 .call_method1("pop", (&id_col,))
                 .map_err(|_| {
-                    crate::errors::value_error(format!(
-                        "tags DataFrame row missing issuer key {id_col:?}"
-                    ))
+                    value_error(format!("tags DataFrame row missing issuer key {id_col:?}"))
                 })?
                 .str()?
                 .extract()?;
             let mut tags_map = BTreeMap::new();
             for (k, v) in copy.iter() {
-                if !crate::bindings::dataframe_utils::is_missing_cell(&v)? {
+                if !is_missing_cell(&v)? {
                     tags_map.insert(k.extract::<String>()?, v.str()?.extract::<String>()?);
                 }
             }
@@ -376,19 +303,17 @@ fn extract_issuer_tags_map(
     serde_json::from_value(value).map_err(|e| serde_json_to_py(e, &format!("invalid {label}")))
 }
 
-fn extract_spread_durations(
+fn extract_issuer_f64_map(
     py: Python<'_>,
     obj: &Bound<'_, PyAny>,
+    label: &str,
+    col_hint: &str,
 ) -> PyResult<BTreeMap<IssuerId, f64>> {
-    use crate::bindings::dataframe_utils::{
-        extract_f64_vec, is_dataframe_like, is_polars_dataframe, table_column_names,
-        table_column_to_pylist,
-    };
     if is_dataframe_like(obj)? {
         let cols = table_column_names(obj)?;
         if cols.len() != 2 {
-            return Err(crate::errors::value_error(format!(
-                "spread_durations DataFrame must have 2 columns (issuer, duration), got {}",
+            return Err(value_error(format!(
+                "{label} DataFrame must have 2 columns (issuer, {col_hint}), got {}",
                 cols.len()
             )));
         }
@@ -412,7 +337,7 @@ fn extract_spread_durations(
             .map(|(k, v)| (IssuerId::new(k), v))
             .collect());
     }
-    py_to_serde_any(py, obj, "spread_durations")
+    py_to_serde_any(py, obj, label)
 }
 
 /// Convert pandas, Polars, or Arrow objects into the Rust panel types and hand
@@ -442,11 +367,13 @@ fn inputs_from_dataframe(
     }
 
     let tag_map = extract_issuer_tags_map(py, tags, "issuer tags")?;
-    let values = crate::bindings::dataframe_utils::extract_f64_vec(generic, "generic")?;
+    let values = extract_f64_vec(generic, "generic")?;
     let spec: GenericFactorSpec = py_to_serde_any(py, generic_spec, "GenericFactorSpec")?;
 
     let spread_durations: BTreeMap<IssuerId, f64> = match spread_durations {
-        Some(obj) if !obj.is_none() => extract_spread_durations(py, obj)?,
+        Some(obj) if !obj.is_none() => {
+            extract_issuer_f64_map(py, obj, "spread_durations", "duration")?
+        }
         _ => BTreeMap::new(),
     };
 
@@ -464,18 +391,6 @@ fn inputs_from_dataframe(
 
 #[pymethods]
 impl PyCreditCalibrator {
-    /// Construct a calibrator from a ``CreditCalibrationConfig``.
-    ///
-    /// Args:
-    ///     config: Dict or JSON string of a ``CreditCalibrationConfig``; omitted
-    ///         fields take their defaults. ``None`` selects the all-defaults
-    ///         configuration (``policy="globally_off"``, empty hierarchy,
-    ///         ``covariance_strategy="full_sample_repaired"``,
-    ///         ``bucket_weighting="dts"``, monthly panel).
-    ///
-    /// Raises:
-    ///     ValueError: If ``config`` is not a valid ``CreditCalibrationConfig``
-    ///         (unknown field, bad enum label).
     #[new]
     #[pyo3(signature = (config = None))]
     fn new(py: Python<'_>, config: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
@@ -485,21 +400,7 @@ impl PyCreditCalibrator {
         })
     }
 
-    /// Run the full calibration pipeline and return a ``CreditFactorModel``.
-    ///
-    /// Args:
-    ///     inputs: Dict or JSON string of a ``CreditCalibrationInputs`` object
-    ///         (``history_panel`` with decimal spreads, ``issuer_tags``,
-    ///         ``generic_factor``, ``as_of``, ``as_of_spreads``, optional
-    ///         ``idiosyncratic_overrides`` / ``spread_durations``). Overrides are decimal
-    ///         spread volatility per square-root year (``0.001`` = 10 bp/√year).
-    ///
-    /// Returns:
-    ///     Calibrated ``CreditFactorModel`` artifact.
-    ///
-    /// Raises:
-    ///     ValueError: If ``inputs`` is structurally invalid or calibration
-    ///         rejects the panel.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditCalibrator.calibrate")]
     fn calibrate(
         &self,
         py: Python<'_>,
@@ -513,38 +414,7 @@ impl PyCreditCalibrator {
         Ok(PyCreditFactorModel::from_inner(model))
     }
 
-    /// Calibrate straight from pandas objects.
-    ///
-    /// Converts the frames to the Rust panel types; Rust
-    /// ``CreditCalibrationInputs::from_panel`` then anchors the run at the last
-    /// index date (the only anchor calibration accepts) with the last row as the
-    /// anchor spreads, and ``calibrate`` runs under ``config``.
-    ///
-    /// Args:
-    ///     spreads: ``pandas.DataFrame`` of decimal spreads (``0.01`` = 100 bp)
-    ///         with a date index (sorted, regular grid) and one column per
-    ///         issuer; ``NaN`` marks a gap. The last index date is ``as_of``.
-    ///     tags: Issuer tags — a mapping ``{issuer: {dimension_key: tag}}`` or
-    ///         a ``pandas.DataFrame`` indexed by issuer with one column per
-    ///         hierarchy dimension (``"rating"``, ``"region"``, ...).
-    ///     generic: Generic (PC) factor values aligned with ``spreads.index`` —
-    ///         a ``pandas.Series`` or a list of decimal values. Its ``name`` is
-    ///         not used.
-    ///     generic_spec: ``GenericFactorSpec`` dict / JSON string
-    ///         ``{"name": ..., "series_id": ...}`` naming the generic series;
-    ///         persisted into the model artifact.
-    ///     spread_durations: Optional ``{issuer: years}`` mapping or
-    ///         ``pandas.Series``; required when ``bucket_weighting="dts"``.
-    ///     config: ``CreditCalibrationConfig`` dict / JSON string / ``None``
-    ///         (see ``CreditCalibrator.__init__``).
-    ///
-    /// Returns:
-    ///     Calibrated ``CreditFactorModel``.
-    ///
-    /// Raises:
-    ///     ValueError: If the panel is empty, ``generic_spec`` is not a valid
-    ///         ``GenericFactorSpec``, the frames are misaligned, or calibration
-    ///         rejects the inputs.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditCalibrator.from_dataframe")]
     #[staticmethod]
     #[pyo3(signature = (spreads, tags, generic, generic_spec, spread_durations = None, config = None, *, date_col = None))]
     fn from_dataframe(
@@ -573,7 +443,7 @@ impl PyCreditCalibrator {
         Ok(PyCreditFactorModel::from_inner(model))
     }
 
-    /// The calibration configuration as a dict (canonical serde fields).
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "CreditCalibrator.config")]
     #[getter]
     fn config<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, self.inner.config())
@@ -581,37 +451,35 @@ impl PyCreditCalibrator {
 
     fn __repr__(&self) -> String {
         let config = self.inner.config();
+        let vol_model = match config.vol_model {
+            VolModelChoice::Sample => "sample",
+            VolModelChoice::Ewma { .. } => "ewma",
+            _ => "unknown",
+        };
+        let covariance_strategy = match config.covariance_strategy {
+            CovarianceStrategy::Diagonal => "diagonal",
+            CovarianceStrategy::Ridge { .. } => "ridge",
+            CovarianceStrategy::FullSampleRepaired => "full_sample_repaired",
+            CovarianceStrategy::LedoitWolf => "ledoit_wolf",
+            _ => "unknown",
+        };
+        let bucket_weighting = match config.bucket_weighting {
+            BucketWeighting::Equal => "equal",
+            BucketWeighting::Dts => "dts",
+            _ => "unknown",
+        };
         format!(
             "CreditCalibrator(policy={:?}, n_levels={}, vol_model={:?}, covariance_strategy={:?}, bucket_weighting={:?})",
-            serde_label(&config.policy).unwrap_or_default(),
+            config.policy.kind(),
             config.hierarchy.levels.len(),
-            serde_label(&config.vol_model).unwrap_or_default(),
-            serde_label(&config.covariance_strategy).unwrap_or_default(),
-            serde_label(&config.bucket_weighting).unwrap_or_default(),
+            vol_model,
+            covariance_strategy,
+            bucket_weighting,
         )
     }
 }
 
-/// Snapshot of all hierarchy-level factor values at a single date.
-///
-/// Produced by ``decompose_levels``. Carry this into ``decompose_period`` to
-/// compute period-over-period changes. Values are in basis points.
-///
-/// Example:
-///     >>> from finstack_quant.models.factor.credit import CreditCalibrator, decompose_levels
-///     >>> config = {"hierarchy": {"levels": []}, "covariance_strategy": "diagonal",
-///     ...           "bucket_weighting": "equal"}
-///     >>> inputs = {"history_panel": {"dates": ["2024-01-01", "2024-02-01"],
-///     ...                             "spreads": {"A": [0.010, 0.0101]}},
-///     ...           "issuer_tags": {"tags": {"A": {}}},
-///     ...           "generic_factor": {"spec": {"name": "G", "series_id": "G"},
-///     ...                              "values": [0.010, 0.0101]},
-///     ...           "as_of": "2024-02-01", "as_of_spreads": {"A": 0.0101},
-///     ...           "idiosyncratic_overrides": {}}
-///     >>> model = CreditCalibrator(config).calibrate(inputs)
-///     >>> levels = decompose_levels(model, {"A": 0.0105}, 0.010, "2024-03-01")
-///     >>> (levels.date, levels.generic, levels.adder())
-///     ('2024-03-01', 100.0, {'A': 5.0})
+#[doc = pydoc!("finstack_quant.models.factor.credit", "LevelsAtDate")]
 #[pyclass(
     name = "LevelsAtDate",
     module = "finstack_quant.models.factor.credit",
@@ -633,36 +501,22 @@ wire_methods!(
     PyLevelsAtDate,
     finstack_quant_factor::credit::decomposition::LevelsAtDate,
     "LevelsAtDate",
+    module = "finstack_quant.models.factor.credit",
     rust_json
 );
 
+py_getters!(PyLevelsAtDate |s| {
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "LevelsAtDate.date")]
+    date -> String = s.inner.date.to_string();
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "LevelsAtDate.generic")]
+    generic -> f64 = s.inner.generic;
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "LevelsAtDate.n_levels")]
+    n_levels -> usize = s.inner.by_level.len();
+});
+
 #[pymethods]
 impl PyLevelsAtDate {
-    /// Observation date (ISO 8601 string).
-    #[getter]
-    fn date(&self) -> String {
-        self.inner.date.to_string()
-    }
-
-    /// Generic (PC) factor value at this date, in basis points.
-    #[getter]
-    fn generic(&self) -> f64 {
-        self.inner.generic
-    }
-
-    /// Number of hierarchy levels.
-    #[getter]
-    fn n_levels(&self) -> usize {
-        self.inner.by_level.len()
-    }
-
-    /// Bucket values for a given level index as a dict ``{bucket_path: value}``.
-    ///
-    /// Args:
-    ///     level_index: Zero-based hierarchy level index.
-    ///
-    /// Raises:
-    ///     ValueError: If ``level_index`` is out of range.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "LevelsAtDate.level_values")]
     fn level_values<'py>(
         &self,
         py: Python<'py>,
@@ -676,8 +530,7 @@ impl PyLevelsAtDate {
         Ok(d)
     }
 
-    /// Per-issuer residual adder after peeling all levels, as a dict
-    /// ``{issuer_id: adder_bp}``.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "LevelsAtDate.adder")]
     fn adder<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let d = PyDict::new(py);
         for (issuer, val) in &self.inner.adder {
@@ -686,8 +539,7 @@ impl PyLevelsAtDate {
         Ok(d)
     }
 
-    /// Export the per-issuer residual adders as a :class:`~finstack_quant.core.table.LabeledSeries`
-    /// named ``adder`` and indexed by issuer ID (sorted), in basis points.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "LevelsAtDate.to_series")]
     #[pyo3(text_signature = "($self)")]
     fn to_series(&self) -> PyResult<PyLabeledSeries> {
         let labels: Vec<String> = self
@@ -731,31 +583,13 @@ impl PyLevelsAtDate {
     }
 }
 
-tabular_methods!(PyLevelsAtDate);
+tabular_methods!(
+    PyLevelsAtDate,
+    "LevelsAtDate",
+    module = "finstack_quant.models.factor.credit"
+);
 
-/// Component-wise difference between two ``LevelsAtDate`` snapshots.
-///
-/// Produced by ``decompose_period``. Satisfies the linear reconciliation
-/// invariant ``dS_i = beta_i^PC * d_generic + sum_k beta_i^k * dL_k + d_adder_i``
-/// for every issuer present in both snapshots.
-///
-/// Example:
-///     >>> from finstack_quant.models.factor.credit import CreditCalibrator, decompose_levels, decompose_period
-///     >>> config = {"hierarchy": {"levels": []}, "covariance_strategy": "diagonal",
-///     ...           "bucket_weighting": "equal"}
-///     >>> inputs = {"history_panel": {"dates": ["2024-01-01", "2024-02-01"],
-///     ...                             "spreads": {"A": [0.010, 0.0101]}},
-///     ...           "issuer_tags": {"tags": {"A": {}}},
-///     ...           "generic_factor": {"spec": {"name": "G", "series_id": "G"},
-///     ...                              "values": [0.010, 0.0101]},
-///     ...           "as_of": "2024-02-01", "as_of_spreads": {"A": 0.0101},
-///     ...           "idiosyncratic_overrides": {}}
-///     >>> model = CreditCalibrator(config).calibrate(inputs)
-///     >>> start = decompose_levels(model, {"A": 0.0105}, 0.010, "2024-03-01")
-///     >>> end = decompose_levels(model, {"A": 0.01065}, 0.01015, "2024-03-02")
-///     >>> period = decompose_period(start, end)
-///     >>> (period.from_date, period.to_date, period.d_generic)
-///     ('2024-03-01', '2024-03-02', 1.5)
+#[doc = pydoc!("finstack_quant.models.factor.credit", "PeriodDecomposition")]
 #[pyclass(
     name = "PeriodDecomposition",
     module = "finstack_quant.models.factor.credit",
@@ -779,42 +613,28 @@ wire_methods!(
     PyPeriodDecomposition,
     finstack_quant_factor::credit::decomposition::PeriodDecomposition,
     "PeriodDecomposition",
+    module = "finstack_quant.models.factor.credit",
     rust_json
 );
 
+py_getters!(PyPeriodDecomposition |s| {
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "PeriodDecomposition.to_date")]
+    to_date -> String = s.inner.to.to_string();
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "PeriodDecomposition.d_generic")]
+    d_generic -> f64 = s.inner.d_generic;
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "PeriodDecomposition.n_levels")]
+    n_levels -> usize = s.inner.by_level.len();
+});
+
 #[pymethods]
 impl PyPeriodDecomposition {
-    /// Earlier snapshot date (ISO 8601).
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "PeriodDecomposition.from_date")]
     #[getter(from_date)]
     fn get_from_date(&self) -> String {
         self.inner.from.to_string()
     }
 
-    /// Later snapshot date (ISO 8601).
-    #[getter]
-    fn to_date(&self) -> String {
-        self.inner.to.to_string()
-    }
-
-    /// Change in the generic (PC) factor value, in basis points.
-    #[getter]
-    fn d_generic(&self) -> f64 {
-        self.inner.d_generic
-    }
-
-    /// Number of hierarchy levels.
-    #[getter]
-    fn n_levels(&self) -> usize {
-        self.inner.by_level.len()
-    }
-
-    /// Bucket value deltas for a given level index as a dict.
-    ///
-    /// Args:
-    ///     level_index: Zero-based hierarchy level index.
-    ///
-    /// Raises:
-    ///     ValueError: If ``level_index`` is out of range.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "PeriodDecomposition.level_deltas")]
     fn level_deltas<'py>(
         &self,
         py: Python<'py>,
@@ -828,7 +648,7 @@ impl PyPeriodDecomposition {
         Ok(d)
     }
 
-    /// Per-issuer adder deltas as a dict ``{issuer_id: d_adder_bp}``.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "PeriodDecomposition.d_adder")]
     fn d_adder<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let d = PyDict::new(py);
         for (issuer, val) in &self.inner.d_adder {
@@ -837,12 +657,7 @@ impl PyPeriodDecomposition {
         Ok(d)
     }
 
-    /// Export the per-level bucket deltas as an ``ArrowTable``.
-    ///
-    /// Columns: ``from_date``, ``to_date``, ``level_index``, ``dimension``,
-    /// ``bucket``, ``delta``. One row per (level, bucket) pair, ordered by
-    /// ``level_index`` then ``bucket``; a level-free decomposition yields a
-    /// zero-row table that still carries the columns.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "PeriodDecomposition.to_level_table")]
     #[pyo3(text_signature = "($self)")]
     fn to_level_table(&self) -> PyResult<PyArrowTable> {
         let from_date = self.inner.from.to_string();
@@ -864,10 +679,7 @@ impl PyPeriodDecomposition {
         serde_rows_to_arrow_table(&rows, LEVEL_DELTA_COLUMNS)
     }
 
-    /// Export the per-issuer adder deltas as an ``ArrowTable``.
-    ///
-    /// Columns: ``from_date``, ``to_date``, ``issuer_id``, ``d_adder``. One
-    /// row per issuer, ordered by ``issuer_id``.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "PeriodDecomposition.to_adder_table")]
     #[pyo3(text_signature = "($self)")]
     fn to_adder_table(&self) -> PyResult<PyArrowTable> {
         let from_date = self.inner.from.to_string();
@@ -905,48 +717,13 @@ impl PyPeriodDecomposition {
     }
 }
 
-tabular_methods!(PyPeriodDecomposition);
+tabular_methods!(
+    PyPeriodDecomposition,
+    "PeriodDecomposition",
+    module = "finstack_quant.models.factor.credit"
+);
 
-/// Decompose observed issuer spreads at a point in time into per-level factor
-/// values and per-issuer residual adders.
-///
-/// Args:
-///     model: Calibrated ``CreditFactorModel`` artifact.
-///     observed_spreads: Mapping from issuer ID to observed **decimal** spread
-///         (``0.01`` = 100 bp) — a dict, a ``pandas.Series`` indexed by
-///         issuer, or a JSON string of the same object.
-///     observed_generic: Generic (PC) factor value at ``as_of``, decimal.
-///     as_of: Valuation date, either a date-like object (``datetime.date``,
-///         ``pandas.Timestamp``) or an ISO 8601 string.
-///     runtime_tags: Optional ``{issuer_id: {dim_key: tag_value}}`` mapping
-///         (dict, ``pandas.DataFrame`` indexed by issuer, or JSON string) for
-///         issuers not present in the model.
-///
-/// Returns:
-///     ``LevelsAtDate`` snapshot with generic value, per-level bucket values
-///     and per-issuer residual adders, all in basis points.
-///
-/// Raises:
-///     KeyError: If an issuer has no model row and no ``runtime_tags`` entry.
-///     ValueError: If a spread is not a finite decimal in ``(-0.5, 2.0)``, an
-///         issuer is missing a required hierarchy tag, or a DTS weight cannot
-///         be formed.
-///     RuntimeError: If the model artifact is internally inconsistent.
-///
-/// Example:
-///     >>> from finstack_quant.models.factor.credit import CreditCalibrator, decompose_levels
-///     >>> config = {"hierarchy": {"levels": []}, "covariance_strategy": "diagonal",
-///     ...           "bucket_weighting": "equal"}
-///     >>> inputs = {"history_panel": {"dates": ["2024-01-01", "2024-02-01"],
-///     ...                             "spreads": {"A": [0.010, 0.0101]}},
-///     ...           "issuer_tags": {"tags": {"A": {}}},
-///     ...           "generic_factor": {"spec": {"name": "G", "series_id": "G"},
-///     ...                              "values": [0.010, 0.0101]},
-///     ...           "as_of": "2024-02-01", "as_of_spreads": {"A": 0.0101},
-///     ...           "idiosyncratic_overrides": {}}
-///     >>> model = CreditCalibrator(config).calibrate(inputs)
-///     >>> decompose_levels(model, {"A": 0.0125}, 0.0120, "2025-06-30").generic
-///     120.0
+#[doc = pydoc!("finstack_quant.models.factor.credit", "decompose_levels")]
 #[pyfunction]
 #[pyo3(signature = (model, observed_spreads, observed_generic, as_of, runtime_tags=None))]
 fn decompose_levels(
@@ -957,20 +734,13 @@ fn decompose_levels(
     as_of: &Bound<'_, PyAny>,
     runtime_tags: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyLevelsAtDate> {
-    let observed_spreads: BTreeMap<IssuerId, f64> =
-        if crate::bindings::dataframe_utils::is_dataframe_like(observed_spreads)? {
-            extract_spread_durations(py, observed_spreads)?
-        } else {
-            py_to_serde_any(py, observed_spreads, "observed_spreads")?
-        };
-
+    let observed_spreads =
+        extract_issuer_f64_map(py, observed_spreads, "observed_spreads", "spread")?;
     let date = py_to_date(as_of)?;
-
     let runtime_tags: Option<BTreeMap<IssuerId, IssuerTags>> = match runtime_tags {
         Some(obj) if !obj.is_none() => Some(extract_issuer_tags_map(py, obj, "runtime_tags")?),
         _ => None,
     };
-
     let result = finstack_quant_factor::credit::decomposition::decompose_levels(
         &model.inner,
         &observed_spreads,
@@ -979,43 +749,10 @@ fn decompose_levels(
         runtime_tags.as_ref(),
     )
     .map_err(kinded_to_py)?;
-
     Ok(PyLevelsAtDate::from_inner(result))
 }
 
-/// Difference two ``LevelsAtDate`` snapshots component-wise.
-///
-/// Output buckets and issuers are restricted to those present in **both**
-/// snapshots so the linear reconciliation invariant holds for every entry.
-///
-/// Args:
-///     from_levels: Earlier ``LevelsAtDate`` snapshot.
-///     to_levels: Later ``LevelsAtDate`` snapshot.
-///
-/// Returns:
-///     ``PeriodDecomposition`` with ``d_generic``, per-level bucket deltas and
-///     per-issuer adder deltas (basis points).
-///
-/// Raises:
-///     ValueError: If ``from_levels.date > to_levels.date`` or the two
-///         snapshots disagree on hierarchy depth or dimensions.
-///
-/// Example:
-///     >>> from finstack_quant.models.factor.credit import CreditCalibrator, decompose_levels, decompose_period
-///     >>> config = {"hierarchy": {"levels": []}, "covariance_strategy": "diagonal",
-///     ...           "bucket_weighting": "equal"}
-///     >>> inputs = {"history_panel": {"dates": ["2024-01-01", "2024-02-01"],
-///     ...                             "spreads": {"A": [0.010, 0.0101]}},
-///     ...           "issuer_tags": {"tags": {"A": {}}},
-///     ...           "generic_factor": {"spec": {"name": "G", "series_id": "G"},
-///     ...                              "values": [0.010, 0.0101]},
-///     ...           "as_of": "2024-02-01", "as_of_spreads": {"A": 0.0101},
-///     ...           "idiosyncratic_overrides": {}}
-///     >>> model = CreditCalibrator(config).calibrate(inputs)
-///     >>> start = decompose_levels(model, {"A": 0.0105}, 0.010, "2024-03-01")
-///     >>> end = decompose_levels(model, {"A": 0.01065}, 0.01015, "2024-03-02")
-///     >>> decompose_period(start, end).d_generic
-///     1.5
+#[doc = pydoc!("finstack_quant.models.factor.credit", "decompose_period")]
 #[pyfunction]
 fn decompose_period(
     from_levels: &PyLevelsAtDate,
@@ -1029,366 +766,14 @@ fn decompose_period(
     Ok(PyPeriodDecomposition::from_inner(result))
 }
 
-/// Validated factor covariance matrix with deterministic row-major storage.
-///
-/// Entries are annualized covariances in the factors' native units. The
-/// constructor validates squareness, unique identifiers, symmetry and
-/// positive semidefiniteness.
-///
-/// Example:
-///     >>> from finstack_quant.models.factor import FactorCovarianceMatrix
-///     >>> matrix = FactorCovarianceMatrix(["a", "b"], [[0.04, 0.0], [0.0, 0.01]])
-///     >>> (matrix.variance("a"), matrix.to_pandas().loc["b", "b"])
-///     (0.04, 0.01)
-#[pyclass(
-    name = "FactorCovarianceMatrix",
-    module = "finstack_quant.models.factor",
-    frozen,
-    eq,
-    skip_from_py_object
-)]
-#[derive(Clone, PartialEq)]
-pub struct PyFactorCovarianceMatrix {
-    pub(crate) inner: FactorCovarianceMatrix,
-}
-
-impl PyFactorCovarianceMatrix {
-    fn from_inner(inner: FactorCovarianceMatrix) -> Self {
-        Self { inner }
-    }
-}
-
-#[pymethods]
-impl PyFactorCovarianceMatrix {
-    /// Build and validate a covariance matrix.
-    ///
-    /// Args:
-    ///     factor_ids: Ordered, unique factor identifiers defining both axes.
-    ///     data: Annualized covariances — a nested list or 2-D NumPy array of
-    ///         shape ``(n, n)``, or a flat row-major list of ``n * n`` values,
-    ///         in ``factor_ids`` order.
-    ///
-    /// Raises:
-    ///     ValueError: If ``data`` is not ``n x n``, an identifier repeats, the
-    ///         matrix is asymmetric, or it is not positive semidefinite.
-    #[new]
-    #[pyo3(signature = (factor_ids, data))]
-    fn new(factor_ids: Vec<String>, data: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let n = factor_ids.len();
-        let flat =
-            crate::bindings::matrix_input::extract_square_matrix(data.py(), data, n, "data")?;
-        let ids: Vec<FactorId> = factor_ids.into_iter().map(FactorId::new).collect();
-        let inner = FactorCovarianceMatrix::new(ids, flat).map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
-
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.models.factor", "FactorCovarianceMatrix.from_dataframe")]
-    #[staticmethod]
-    fn from_dataframe(df: &Bound<'_, PyAny>) -> PyResult<Self> {
-        use crate::bindings::dataframe_utils::{
-            extract_2d_f64, extract_f64_vec, has_arrow_c_stream, is_polars_dataframe,
-            table_column_names, table_column_to_pylist,
-        };
-        if is_polars_dataframe(df)? || has_arrow_c_stream(df)? {
-            let cols = table_column_names(df)?;
-            if cols.is_empty() {
-                return Self::new(Vec::new(), df);
-            }
-            if let Ok(Some((flat, nrows, ncols))) = extract_2d_f64(df, "data")
-                && nrows == ncols
-            {
-                let ids: Vec<FactorId> = cols.into_iter().map(FactorId::new).collect();
-                let inner = FactorCovarianceMatrix::new(ids, flat).map_err(core_to_py)?;
-                return Ok(Self { inner });
-            }
-            let row_labels: Vec<String> = table_column_to_pylist(df, &cols[0])?
-                .unwrap_or_default()
-                .into_iter()
-                .map(|item| item.str()?.extract::<String>())
-                .collect::<PyResult<_>>()?;
-            let names = cols[1..].to_vec();
-            if row_labels != names {
-                return Err(crate::errors::value_error(
-                    "DataFrame row and column factor identifiers must match in order",
-                ));
-            }
-            let n = names.len();
-            let mut col_data = Vec::with_capacity(n);
-            if is_polars_dataframe(df)? {
-                for col in &names {
-                    col_data.push(extract_f64_vec(&df.get_item(col)?, col)?);
-                }
-            } else {
-                let tbl = crate::bindings::dataframe_utils::arrow_to_pyarrow_table(df.py(), df)?;
-                for col in &names {
-                    let py_col: Vec<f64> = tbl
-                        .call_method1("column", (col,))?
-                        .call_method0("to_pylist")?
-                        .extract()?;
-                    col_data.push(py_col);
-                }
-            }
-            let mut flat = Vec::with_capacity(n * n);
-            for r in 0..n {
-                for col in &col_data {
-                    flat.push(col[r]);
-                }
-            }
-            let ids: Vec<FactorId> = names.into_iter().map(FactorId::new).collect();
-            let inner = FactorCovarianceMatrix::new(ids, flat).map_err(core_to_py)?;
-            return Ok(Self { inner });
-        }
-        let pandas = df.py().import("pandas")?;
-        if !df.is_instance(&pandas.getattr("DataFrame")?)? {
-            return Err(pyo3::exceptions::PyTypeError::new_err(
-                "df must be a pandas DataFrame, Polars DataFrame, or Arrow table",
-            ));
-        }
-        let names: Vec<String> = df.getattr("columns")?.call_method0("tolist")?.extract()?;
-        let rows: Vec<String> = df.getattr("index")?.call_method0("tolist")?.extract()?;
-        if rows != names {
-            return Err(crate::errors::value_error(
-                "DataFrame row and column factor identifiers must match in order",
-            ));
-        }
-        Self::new(names, &df.call_method1("to_numpy", ("float64",))?)
-    }
-
-    /// Number of factors represented by the matrix.
-    #[getter]
-    fn n_factors(&self) -> usize {
-        self.inner.n_factors()
-    }
-
-    /// Ordered factor identifiers corresponding to rows and columns.
-    #[getter]
-    fn factor_ids(&self) -> Vec<String> {
-        self.inner
-            .factor_ids()
-            .iter()
-            .map(ToString::to_string)
-            .collect()
-    }
-
-    /// Row-major covariance data with ``n_factors * n_factors`` entries.
-    #[getter]
-    fn data(&self) -> Vec<f64> {
-        self.inner.as_slice().to_vec()
-    }
-
-    /// Variance for ``factor_id``, or zero when the factor is unknown.
-    fn variance(&self, factor_id: &str) -> f64 {
-        self.inner.variance(&FactorId::new(factor_id))
-    }
-
-    /// Covariance between two factors, or zero when either factor is unknown.
-    fn covariance(&self, lhs: &str, rhs: &str) -> f64 {
-        self.inner
-            .covariance(&FactorId::new(lhs), &FactorId::new(rhs))
-    }
-
-    /// Correlation between two factors, or zero for unknown/zero-variance factors.
-    fn correlation(&self, lhs: &str, rhs: &str) -> f64 {
-        self.inner
-            .correlation(&FactorId::new(lhs), &FactorId::new(rhs))
-    }
-
-    /// The matrix as an ``(n, n)`` float64 NumPy array in ``factor_ids`` order.
-    #[pyo3(text_signature = "($self)")]
-    fn to_numpy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray2<f64>>> {
-        let n = self.inner.n_factors();
-        let flat = PyArray2::<f64>::zeros(py, [n, n], false);
-        {
-            let mut view = flat.readwrite();
-            let mut target = view.as_array_mut();
-            for (i, row) in target.rows_mut().into_iter().enumerate() {
-                for (j, cell) in row.into_iter().enumerate() {
-                    *cell = self.inner.covariance_at(i, j);
-                }
-            }
-        }
-        Ok(flat)
-    }
-
-    /// The matrix as a square pandas ``DataFrame`` indexed and columned by
-    /// ``factor_ids``.
-    #[pyo3(text_signature = "($self)")]
-    fn to_pandas<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let bound = Bound::new(py, self.to_arrow_table()?)?;
-        let frame = PyArrowTable::to_pandas(&bound, py)?;
-        frame
-            .call_method1("set_index", ("factor_id",))?
-            .call_method1("rename_axis", (py.None(),))
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "FactorCovarianceMatrix(factor_ids={:?}, n_factors={})",
-            self.factor_ids(),
-            self.inner.n_factors()
-        )
-    }
-}
-
-impl PyFactorCovarianceMatrix {
-    fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
-        let ids = self.factor_ids();
-        let n = ids.len();
-        let mut builder = TableBuilder::new().utf8("factor_id", ids.clone())?;
-        for (j, id) in ids.iter().enumerate() {
-            let column: Vec<f64> = (0..n).map(|i| self.inner.covariance_at(i, j)).collect();
-            builder = builder.f64(id, column)?;
-        }
-        builder.build()
-    }
-}
-
-tabular_methods!(PyFactorCovarianceMatrix, custom_pandas);
-
-wire_methods!(
-    PyFactorCovarianceMatrix,
-    FactorCovarianceMatrix,
-    "FactorCovarianceMatrix"
+typed_or_label!(
+    pub(crate) fn extract_vol_horizon -> VolHorizon,
+    PyVolHorizon,
+    "VolHorizon or descriptor string (\"one_step\", \"unconditional\", '{\"n_steps\": N}', '{\"years\": Y}')",
+    |label| VolHorizon::parse(label).map_err(core_to_py)
 );
 
-/// Portfolio factor-model configuration assembled at a forecast horizon.
-///
-/// Example:
-///     >>> from finstack_quant.models.factor import FactorModelConfig
-///     >>> config = FactorModelConfig.from_json('{"factors":[],"covariance":{"factor_ids":[],"n":0,"data":[]},"matching":{"mapping_table":[]},"risk_measure":"variance"}')
-///     >>> config.n_factors
-///     0
-#[pyclass(
-    name = "FactorModelConfig",
-    module = "finstack_quant.models.factor",
-    frozen,
-    skip_from_py_object
-)]
-#[derive(Clone)]
-pub struct PyFactorModelConfig {
-    pub(crate) inner: FactorModelConfig,
-}
-
-impl PyFactorModelConfig {
-    fn from_inner(inner: FactorModelConfig) -> Self {
-        Self { inner }
-    }
-}
-
-#[pymethods]
-impl PyFactorModelConfig {
-    /// Number of configured factors.
-    #[getter]
-    fn n_factors(&self) -> usize {
-        self.inner.factors.len()
-    }
-
-    /// Ordered factor identifiers used by definitions and covariance axes.
-    #[getter]
-    fn factor_ids(&self) -> Vec<String> {
-        self.inner
-            .factors
-            .iter()
-            .map(|factor| factor.id.to_string())
-            .collect()
-    }
-
-    /// Factor definitions as Python dictionaries following canonical serde fields.
-    #[getter]
-    fn factors<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.factors)
-    }
-
-    /// Covariance matrix aligned to ``factor_ids``.
-    #[getter]
-    fn covariance(&self) -> PyFactorCovarianceMatrix {
-        PyFactorCovarianceMatrix::from_inner(self.inner.covariance.clone())
-    }
-
-    /// Declarative dependency-to-factor matching configuration.
-    #[getter]
-    fn matching<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.matching)
-    }
-    /// Risk measure as its canonical Python value: ``"variance"``,
-    /// ``"volatility"``, ``{"var": {"confidence": c}}`` or
-    /// ``{"expected_shortfall": {"confidence": c}}``.
-    #[getter]
-    fn risk_measure<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.risk_measure)
-    }
-
-    /// Optional finite-difference bump overrides as a Python dictionary.
-    #[getter]
-    fn bump_config<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.inner
-            .bump_config
-            .as_ref()
-            .map(|value| serde_to_py(py, value))
-            .transpose()
-    }
-
-    /// Policy for unmatched dependencies: ``strict`` or ``warn``, or ``None``
-    /// for the strict default. Calibrated artifacts may explicitly select ``warn``.
-    #[getter]
-    fn unmatched_policy(&self) -> Option<String> {
-        self.inner.unmatched_policy.map(|policy| policy.to_string())
-    }
-
-    /// Validate that matching rules emit only declared factor identifiers.
-    ///
-    /// Raises:
-    ///     ValueError: If a matching rule references an undeclared factor.
-    fn validate(&self) -> PyResult<()> {
-        self.inner.validate().map_err(core_to_py)
-    }
-
-    fn __repr__(&self) -> String {
-        format!("FactorModelConfig(n_factors={})", self.inner.factors.len(),)
-    }
-}
-
-wire_methods!(
-    PyFactorModelConfig,
-    FactorModelConfig,
-    "FactorModelConfig",
-    validate
-);
-
-/// Extract a [`VolHorizon`] from either a `VolHorizon` instance or a
-/// descriptor string (`"one_step"`, `"unconditional"`, `'{"n_steps": N}'`,
-/// `'{"years": Y}'`).
-pub(crate) fn extract_vol_horizon(obj: &Bound<'_, PyAny>) -> PyResult<VolHorizon> {
-    if let Ok(horizon) = obj.extract::<PyRef<'_, PyVolHorizon>>() {
-        return Ok(horizon.inner);
-    }
-    if let Ok(descriptor) = obj.extract::<std::borrow::Cow<'_, str>>() {
-        return VolHorizon::parse(&descriptor).map_err(value_error);
-    }
-    Err(pyo3::exceptions::PyTypeError::new_err(
-        "horizon must be a VolHorizon or a descriptor string such as \"one_step\", \
-         \"unconditional\", '{\"n_steps\": N}' or '{\"years\": Y}'",
-    ))
-}
-
-/// Forecast horizon used to scale a calibrated ``Sample`` vol estimate.
-///
-/// Construct with one of the classmethods:
-///
-/// - ``VolHorizon.one_step()`` — calibrated annualized variance unchanged.
-/// - ``VolHorizon.unconditional()`` — long-run variance (identical to
-///   ``one_step`` for the ``Sample`` and ``Ewma`` vol models).
-/// - ``VolHorizon.n_steps(n)`` — variance scaled by ``n`` model periods.
-/// - ``VolHorizon.years(years)`` — variance scaled by a fractional year.
-/// - ``VolHorizon.parse(s)`` — from a descriptor string.
-///
-/// Every ``FactorCovarianceForecast`` method also accepts the descriptor
-/// string directly, so a ``VolHorizon`` instance is optional.
-///
-/// Example:
-///     >>> from finstack_quant.models.factor.credit import VolHorizon
-///     >>> VolHorizon.n_steps(5) == VolHorizon.parse('{"n_steps": 5}')
-///     True
+#[doc = pydoc!("finstack_quant.models.factor.credit", "VolHorizon")]
 #[pyclass(
     name = "VolHorizon",
     module = "finstack_quant.models.factor.credit",
@@ -1407,95 +792,69 @@ impl PyVolHorizon {
     }
 }
 
+py_getters!(PyVolHorizon |s| {
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "VolHorizon.kind")]
+    kind -> &'static str = s.inner.kind();
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "VolHorizon.n")]
+    n -> Option<usize> = match s.inner {
+        VolHorizon::NSteps(n) => Some(n),
+        _ => None,
+    };
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "VolHorizon.years_value")]
+    years_value -> Option<f64> = match s.inner {
+        VolHorizon::Years(years) => Some(years),
+        _ => None,
+    };
+});
+
 #[pymethods]
 impl PyVolHorizon {
-    /// One-period horizon: the calibrated annualized variance unchanged.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "VolHorizon.one_step")]
     #[classmethod]
     #[pyo3(text_signature = "(cls)")]
     fn one_step(_cls: &Bound<'_, PyType>) -> Self {
         Self::from_inner(VolHorizon::OneStep)
     }
 
-    /// Long-run horizon; numerically identical to ``one_step`` for the
-    /// ``Sample`` and ``Ewma`` vol models.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "VolHorizon.unconditional")]
     #[classmethod]
     #[pyo3(text_signature = "(cls)")]
     fn unconditional(_cls: &Bound<'_, PyType>) -> Self {
         Self::from_inner(VolHorizon::Unconditional)
     }
 
-    /// ``n`` annualized model periods; variance scales linearly with ``n``.
-    ///
-    /// Args:
-    ///     n: Non-negative period count (``0`` yields zero variance).
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "VolHorizon.n_steps")]
     #[classmethod]
     #[pyo3(text_signature = "(cls, n)")]
     fn n_steps(_cls: &Bound<'_, PyType>, n: usize) -> Self {
         Self::from_inner(VolHorizon::NSteps(n))
     }
 
-    /// Fractional-year horizon; variance scales linearly with ``years``.
-    ///
-    /// Args:
-    ///     years: Finite, non-negative horizon in years (``10 / 252`` for ten
-    ///         trading days of an annualized variance).
-    ///
-    /// Raises:
-    ///     ValueError: If ``years`` is negative or non-finite.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "VolHorizon.years")]
     #[classmethod]
     #[pyo3(text_signature = "(cls, years)")]
     fn years(_cls: &Bound<'_, PyType>, years: f64) -> PyResult<Self> {
         VolHorizon::years(years)
             .map(Self::from_inner)
-            .map_err(value_error)
+            .map_err(core_to_py)
     }
 
-    /// Parse a horizon descriptor string (matches the Rust ``VolHorizon::parse``).
-    ///
-    /// Args:
-    ///     s: ``"one_step"``, ``"unconditional"``, ``'{"n_steps": N}'``,
-    ///         ``'{"years": Y}'`` or ``'{"n_steps": N, "periods_per_year": P}'``.
-    ///
-    /// Raises:
-    ///     ValueError: If ``s`` is not one of the accepted forms.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "VolHorizon.parse")]
     #[classmethod]
     #[pyo3(text_signature = "(cls, s)")]
     fn parse(_cls: &Bound<'_, PyType>, s: &str) -> PyResult<Self> {
         VolHorizon::parse(s)
             .map(Self::from_inner)
-            .map_err(value_error)
+            .map_err(core_to_py)
     }
 
-    /// Support pickle through the canonical descriptor string.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "VolHorizon.__reduce__")]
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let parse = py.get_type::<Self>().getattr("parse")?;
         reduce_via_json(parse, self.inner.descriptor())
     }
 
-    /// Variant label: ``"one_step"`` / ``"unconditional"`` / ``"n_steps"`` / ``"years"``.
-    #[getter]
-    fn kind(&self) -> &'static str {
-        self.inner.kind()
-    }
-
-    /// Step count when ``kind == "n_steps"``, ``None`` otherwise.
-    #[getter]
-    fn n(&self) -> Option<usize> {
-        match self.inner {
-            VolHorizon::NSteps(n) => Some(n),
-            _ => None,
-        }
-    }
-
-    /// Fractional-year horizon when ``kind == "years"``, ``None`` otherwise.
-    #[getter]
-    fn years_value(&self) -> Option<f64> {
-        match self.inner {
-            VolHorizon::Years(years) => Some(years),
-            _ => None,
-        }
-    }
-
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "VolHorizon.__repr__")]
     fn __repr__(&self) -> String {
         match self.inner {
             VolHorizon::OneStep => "VolHorizon.one_step()".to_owned(),
@@ -1506,32 +865,7 @@ impl PyVolHorizon {
     }
 }
 
-/// Vol-forecast view over a calibrated ``CreditFactorModel``.
-///
-/// Every method takes a ``horizon`` that is either a ``VolHorizon`` instance
-/// or a descriptor string:
-///
-/// - ``"one_step"`` — calibrated annualized variance unchanged.
-/// - ``"unconditional"`` — long-run variance (identical to ``"one_step"``
-///   for the ``Sample`` and ``Ewma`` vol models).
-/// - ``'{"n_steps": N}'`` — variance scaled by ``N`` model periods.
-/// - ``'{"years": Y}'`` — variance scaled by a fractional year.
-///
-/// Example:
-///     >>> from finstack_quant.models.factor.credit import CreditCalibrator, FactorCovarianceForecast, VolHorizon
-///     >>> config = {"hierarchy": {"levels": []}, "covariance_strategy": "diagonal",
-///     ...           "bucket_weighting": "equal"}
-///     >>> inputs = {"history_panel": {"dates": ["2024-01-01", "2024-02-01"],
-///     ...                             "spreads": {"A": [0.010, 0.0101]}},
-///     ...           "issuer_tags": {"tags": {"A": {}}},
-///     ...           "generic_factor": {"spec": {"name": "G", "series_id": "G"},
-///     ...                              "values": [0.010, 0.0101]},
-///     ...           "as_of": "2024-02-01", "as_of_spreads": {"A": 0.0101},
-///     ...           "idiosyncratic_overrides": {}}
-///     >>> model = CreditCalibrator(config).calibrate(inputs)
-///     >>> forecast = FactorCovarianceForecast(model)
-///     >>> forecast.covariance_at(VolHorizon.one_step()).factor_ids
-///     ['credit::generic']
+#[doc = pydoc!("finstack_quant.models.factor.credit", "FactorCovarianceForecast")]
 #[pyclass(
     name = "FactorCovarianceForecast",
     module = "finstack_quant.models.factor.credit",
@@ -1539,17 +873,11 @@ impl PyVolHorizon {
 )]
 #[derive(Clone)]
 pub(crate) struct PyFactorCovarianceForecast {
-    /// The model is stored by value (cloned from the Python wrapper) so that
-    /// `FactorCovarianceForecast<'a>` lifetime requirements don't escape.
     model: CreditFactorModel,
 }
 
 #[pymethods]
 impl PyFactorCovarianceForecast {
-    /// Wrap a ``CreditFactorModel`` for vol forecasting.
-    ///
-    /// Args:
-    ///     model: Calibrated ``CreditFactorModel`` artifact.
     #[new]
     fn new(model: &PyCreditFactorModel) -> Self {
         Self {
@@ -1557,18 +885,7 @@ impl PyFactorCovarianceForecast {
         }
     }
 
-    /// Scale the calibrated factor covariance to the requested horizon,
-    /// preserving its shrinkage or ridge estimator.
-    ///
-    /// Args:
-    ///     horizon: ``VolHorizon`` or descriptor string (see the class doc).
-    ///
-    /// Returns:
-    ///     Typed ``FactorCovarianceMatrix`` at the requested horizon.
-    ///
-    /// Raises:
-    ///     ValueError: If the horizon is invalid or the model data is
-    ///         inconsistent (mismatched axes, negative variance).
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "FactorCovarianceForecast.covariance_at")]
     fn covariance_at(
         &self,
         py: Python<'_>,
@@ -1585,19 +902,7 @@ impl PyFactorCovarianceForecast {
         Ok(PyFactorCovarianceMatrix::from_inner(cov))
     }
 
-    /// Idiosyncratic vol (std dev) for a specific issuer at the requested horizon.
-    ///
-    /// Args:
-    ///     issuer_id: Issuer identifier string.
-    ///     horizon: ``VolHorizon`` or descriptor string (see the class doc).
-    ///
-    /// Returns:
-    ///     Idiosyncratic standard deviation in basis points of spread,
-    ///     scaled to the horizon.
-    ///
-    /// Raises:
-    ///     ValueError: If the issuer is not present in the model's vol state,
-    ///         the horizon is invalid, or the calibrated variance is negative.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "FactorCovarianceForecast.idiosyncratic_vol")]
     fn idiosyncratic_vol(
         &self,
         py: Python<'_>,
@@ -1614,22 +919,7 @@ impl PyFactorCovarianceForecast {
         .map_err(core_to_py)
     }
 
-    /// Build a typed portfolio-level factor-model configuration using
-    /// ``Σ(t, h)`` at the given horizon and risk measure.
-    ///
-    /// Args:
-    ///     horizon: ``VolHorizon`` or descriptor string (see the class doc).
-    ///     risk_measure: ``"variance"`` (default), ``"volatility"``, or a dict
-    ///         such as ``{"var": {"confidence": 0.99}}`` /
-    ///         ``{"expected_shortfall": {"confidence": 0.975}}``; a JSON string
-    ///         of any of these is also accepted.
-    ///
-    /// Returns:
-    ///     Typed ``FactorModelConfig`` ready for portfolio risk or ``to_json()``.
-    ///
-    /// Raises:
-    ///     ValueError: If the horizon or risk measure is invalid (confidence
-    ///         outside ``(0.5, 1)``), or the covariance cannot be built.
+    #[doc = pydoc!("finstack_quant.models.factor.credit", "FactorCovarianceForecast.factor_model_at")]
     #[pyo3(signature = (horizon, risk_measure = None))]
     fn factor_model_at(
         &self,

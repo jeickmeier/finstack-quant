@@ -95,13 +95,13 @@ mod tests {
     use finstack_quant_core::types::{Attributes, CurveId};
     use finstack_quant_factor::{
         AttributeFilter, DependencyFilter, FactorMatchEntry, FactorMatchError, MappingRule,
-        MappingTableMatcher,
+        MatchingConfig,
     };
     use finstack_quant_factor::{CurveType, DependencyType, FactorId, MarketDependency};
 
     #[test]
     fn test_assign_position_factors_reports_matches_and_unmatched() {
-        let matcher = MappingTableMatcher::new(vec![MappingRule {
+        let matcher = MatchingConfig::MappingTable(vec![MappingRule {
             dependency_filter: DependencyFilter {
                 dependency_type: Some(DependencyType::Discount),
                 curve_type: Some(CurveType::Discount),
@@ -109,7 +109,8 @@ mod tests {
             },
             attribute_filter: AttributeFilter::default(),
             factor_id: FactorId::new("Rates"),
-        }]);
+        }])
+        .build_matcher();
         let dependencies = vec![
             MarketDependency::Curve {
                 id: CurveId::new("USD-OIS"),
@@ -122,7 +123,7 @@ mod tests {
             &PositionId::new("pos-1"),
             &dependencies,
             &Attributes::default(),
-            &matcher,
+            matcher.as_ref(),
         )
         .expect("assignment should succeed");
 

@@ -1,7 +1,7 @@
 //! Python bindings for `finstack_quant_models::credit::recovery_waterfall`.
 
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::table_builders::serde_rows_to_arrow_table;
 use crate::errors::core_to_py;
@@ -52,60 +52,6 @@ impl PyRecoveryClaim {
         Ok(Self { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.id")]
-    #[getter]
-    fn id(&self) -> String {
-        self.inner.id.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.seniority")]
-    #[getter]
-    fn seniority(&self) -> String {
-        self.inner.seniority.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.priority")]
-    #[getter]
-    fn priority(&self) -> u32 {
-        self.inner.priority
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.principal")]
-    #[getter]
-    fn principal(&self) -> f64 {
-        self.inner.principal
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.accrued")]
-    #[getter]
-    fn accrued(&self) -> f64 {
-        self.inner.accrued
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.penalties")]
-    #[getter]
-    fn penalties(&self) -> f64 {
-        self.inner.penalties
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.collateral_value")]
-    #[getter]
-    fn collateral_value(&self) -> Option<f64> {
-        self.inner.collateral_value
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.collateral_haircut")]
-    #[getter]
-    fn collateral_haircut(&self) -> f64 {
-        self.inner.collateral_haircut
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.total_claim")]
-    #[getter]
-    fn total_claim(&self) -> f64 {
-        self.inner.total_claim()
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "RecoveryClaim(id={:?}, seniority={:?}, priority={}, total_claim={})",
@@ -116,6 +62,27 @@ impl PyRecoveryClaim {
         )
     }
 }
+
+py_getters!(PyRecoveryClaim |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.id")]
+    id -> String = s.inner.id.clone();
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.seniority")]
+    seniority -> String = s.inner.seniority.clone();
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.priority")]
+    priority -> u32 = s.inner.priority;
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.principal")]
+    principal -> f64 = s.inner.principal;
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.accrued")]
+    accrued -> f64 = s.inner.accrued;
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.penalties")]
+    penalties -> f64 = s.inner.penalties;
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.collateral_value")]
+    collateral_value -> Option<f64> = s.inner.collateral_value;
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.collateral_haircut")]
+    collateral_haircut -> f64 = s.inner.collateral_haircut;
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.total_claim")]
+    total_claim -> f64 = s.inner.total_claim();
+});
 
 wire_methods!(
     PyRecoveryClaim,
@@ -139,64 +106,31 @@ pub struct PyRecoveryAllocation {
 
 #[pymethods]
 impl PyRecoveryAllocation {
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.id")]
-    #[getter]
-    fn id(&self) -> String {
-        self.inner.id.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.seniority")]
-    #[getter]
-    fn seniority(&self) -> String {
-        self.inner.seniority.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.priority")]
-    #[getter]
-    fn priority(&self) -> u32 {
-        self.inner.priority
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.total_claim")]
-    #[getter]
-    fn total_claim(&self) -> f64 {
-        self.inner.total_claim
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.collateral_recovery")]
-    #[getter]
-    fn collateral_recovery(&self) -> f64 {
-        self.inner.collateral_recovery
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.general_recovery")]
-    #[getter]
-    fn general_recovery(&self) -> f64 {
-        self.inner.general_recovery
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.total_recovery")]
-    #[getter]
-    fn total_recovery(&self) -> f64 {
-        self.inner.total_recovery
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.recovery_rate")]
-    #[getter]
-    fn recovery_rate(&self) -> f64 {
-        self.inner.recovery_rate
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.deficiency")]
-    #[getter]
-    fn deficiency(&self) -> f64 {
-        self.inner.deficiency
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("RecoveryAllocation", &self.inner)
     }
 }
+
+py_getters!(PyRecoveryAllocation |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.id")]
+    id -> String = s.inner.id.clone();
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.seniority")]
+    seniority -> String = s.inner.seniority.clone();
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.priority")]
+    priority -> u32 = s.inner.priority;
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.total_claim")]
+    total_claim -> f64 = s.inner.total_claim;
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.collateral_recovery")]
+    collateral_recovery -> f64 = s.inner.collateral_recovery;
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.general_recovery")]
+    general_recovery -> f64 = s.inner.general_recovery;
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.total_recovery")]
+    total_recovery -> f64 = s.inner.total_recovery;
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.recovery_rate")]
+    recovery_rate -> f64 = s.inner.recovery_rate;
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryAllocation.deficiency")]
+    deficiency -> f64 = s.inner.deficiency;
+});
 
 impl PyRecoveryAllocation {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -230,39 +164,27 @@ pub struct PyRecoveryWaterfallResult {
 
 #[pymethods]
 impl PyRecoveryWaterfallResult {
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryWaterfallResult.total_distributed")]
-    #[getter]
-    fn total_distributed(&self) -> f64 {
-        self.inner.total_distributed
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryWaterfallResult.undistributed_estate")]
-    #[getter]
-    fn undistributed_estate(&self) -> f64 {
-        self.inner.undistributed_estate
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryWaterfallResult.apr_satisfied")]
-    #[getter]
-    fn apr_satisfied(&self) -> bool {
-        self.inner.apr_satisfied
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryWaterfallResult.allocations")]
-    #[getter]
-    fn allocations(&self) -> Vec<PyRecoveryAllocation> {
-        self.inner
-            .allocations
-            .iter()
-            .cloned()
-            .map(|inner| PyRecoveryAllocation { inner })
-            .collect()
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("RecoveryWaterfallResult", &self.inner)
     }
 }
+
+py_getters!(PyRecoveryWaterfallResult |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryWaterfallResult.total_distributed")]
+    total_distributed -> f64 = s.inner.total_distributed;
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryWaterfallResult.undistributed_estate")]
+    undistributed_estate -> f64 = s.inner.undistributed_estate;
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryWaterfallResult.apr_satisfied")]
+    apr_satisfied -> bool = s.inner.apr_satisfied;
+    #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryWaterfallResult.allocations")]
+    allocations -> Vec<PyRecoveryAllocation> = s
+        .inner
+        .allocations
+        .iter()
+        .cloned()
+        .map(|inner| PyRecoveryAllocation { inner })
+        .collect();
+});
 
 impl PyRecoveryWaterfallResult {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {

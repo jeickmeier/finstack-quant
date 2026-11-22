@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 
 use finstack_quant_core::types::IssuerId;
+use finstack_quant_core::{Error, Result};
 
 use super::calibration::BucketWeighting;
 use super::hierarchy::IssuerBetas;
@@ -16,25 +17,49 @@ use super::hierarchy::IssuerBetas;
 ///
 /// # Errors
 ///
-/// Returns a diagnostic string when the duration is missing, non-finite, or
+/// Returns [`Error::Validation`] when the duration is missing, non-finite, or
 /// `<= 0`.
 pub(crate) fn dts_spread_duration(
     issuer: &IssuerId,
     spread_durations: &BTreeMap<IssuerId, f64>,
-) -> Result<f64, String> {
+) -> Result<f64> {
     let sd = spread_durations.get(issuer).copied().ok_or_else(|| {
-        format!(
+        Error::Validation(format!(
             "dts weighting requires spread_duration (years, > 0) for issuer {:?}",
             issuer.as_str()
-        )
+        ))
     })?;
     if !sd.is_finite() || sd <= 0.0 {
-        return Err(format!(
+        return Err(Error::Validation(format!(
             "spread_duration for issuer {:?} must be finite and > 0 years, got {sd}",
             issuer.as_str()
-        ));
+        )));
     }
     Ok(sd)
+}
+
+/// Compute and validate one issuer's DTS bucket weight (`sd × spread_bp > 0`).
+///
+/// # Arguments
+///
+/// * `issuer` - Issuer whose DTS weight is computed.
+/// * `sd` - Positive spread duration in years.
+/// * `spread_bp` - Observed spread in basis points.
+/// * `context` - Context phrase inserted before `" must be > 0"` (empty or `" at panel index N"`).
+///
+/// # Errors
+///
+/// Returns [`Error::Validation`] when `sd × spread_bp` is non-finite or `<= 0`.
+pub(crate) fn dts_weight(issuer: &IssuerId, sd: f64, spread_bp: f64, context: &str) -> Result<f64> {
+    let dts = sd * spread_bp;
+    if !dts.is_finite() || dts <= 0.0 {
+        return Err(Error::Validation(format!(
+            "dts for issuer {:?}{context} must be > 0 (spread_duration {sd} × spread_bp \
+             {spread_bp} = {dts})",
+            issuer.as_str()
+        )));
+    }
+    Ok(dts)
 }
 
 /// Output from peeling one cross-section of issuer spreads.
@@ -114,7 +139,7 @@ pub(crate) fn peel_single_observation(params: PeelSingleObservation<'_>) -> Sing
             let Some(weight) = weights.get(issuer).copied() else {
                 continue;
             };
-            if weight <= 0.0 {
+            if !weight.is_finite() || weight <= 0.0 {
                 continue;
             }
             let entry = sums.entry(path.as_str()).or_insert((0.0, 0.0));
@@ -163,7 +188,11 @@ pub(crate) fn peel_single_observation(params: PeelSingleObservation<'_>) -> Sing
     }
 }
 
-fn is_folded(folded: &BTreeMap<IssuerId, Vec<bool>>, issuer: &IssuerId, k: usize) -> bool {
+pub(crate) fn is_folded(
+    folded: &BTreeMap<IssuerId, Vec<bool>>,
+    issuer: &IssuerId,
+    k: usize,
+) -> bool {
     folded
         .get(issuer)
         .and_then(|levels| levels.get(k))
@@ -182,14 +211,14 @@ fn is_folded(folded: &BTreeMap<IssuerId, Vec<bool>>, issuer: &IssuerId, k: usize
 ///
 /// # Errors
 ///
-/// Returns a diagnostic string when DTS is selected and a duration is
+/// Returns [`Error::Validation`] when DTS is selected and a duration is
 /// missing, non-finite, or `<= 0`, or when `SD × spread_bp` is not `> 0`.
 pub(crate) fn issuer_bucket_weights<'a>(
     weighting: BucketWeighting,
     issuers: impl Iterator<Item = &'a IssuerId>,
     spread_durations: &BTreeMap<IssuerId, f64>,
     spreads_bp: &BTreeMap<IssuerId, f64>,
-) -> Result<BTreeMap<IssuerId, f64>, String> {
+) -> Result<BTreeMap<IssuerId, f64>> {
     let mut weights = BTreeMap::new();
     for issuer in issuers {
         let weight = match weighting {
@@ -197,20 +226,12 @@ pub(crate) fn issuer_bucket_weights<'a>(
             BucketWeighting::Dts => {
                 let sd = dts_spread_duration(issuer, spread_durations)?;
                 let spread = spreads_bp.get(issuer).copied().ok_or_else(|| {
-                    format!(
+                    Error::Validation(format!(
                         "dts weighting requires a spread (bp) for issuer {:?}",
                         issuer.as_str()
-                    )
+                    ))
                 })?;
-                let dts = sd * spread;
-                if !dts.is_finite() || dts <= 0.0 {
-                    return Err(format!(
-                        "dts for issuer {:?} must be > 0 (spread_duration {sd} × spread_bp \
-                         {spread} = {dts})",
-                        issuer.as_str()
-                    ));
-                }
-                dts
+                dts_weight(issuer, sd, spread, "")?
             }
         };
         weights.insert(issuer.clone(), weight);

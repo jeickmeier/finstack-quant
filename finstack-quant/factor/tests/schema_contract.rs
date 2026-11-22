@@ -1,7 +1,7 @@
 //! JSON Schema contract tests for factor-model configuration envelopes.
 
 use finstack_quant_factor::FactorModelConfigEnvelope;
-use finstack_quant_factor::schema::ARTIFACTS;
+use finstack_quant_factor::schema::{ARTIFACTS, MODELS_ARTIFACTS};
 use serde_json::{Value, json};
 
 /// Render through the registry: only that path applies the packager, the
@@ -16,6 +16,15 @@ fn registry_artifact(filename: &str) -> &'static finstack_quant_core::schema::Sc
         .iter()
         .find(|artifact| artifact.relative_path.ends_with(filename))
         .unwrap_or_else(|| panic!("no registry entry for {filename}"))
+}
+
+fn models_registry_schema(filename: &str) -> Value {
+    MODELS_ARTIFACTS
+        .iter()
+        .find(|artifact| artifact.relative_path.ends_with(filename))
+        .unwrap_or_else(|| panic!("no models registry entry for {filename}"))
+        .generate()
+        .expect("models registry artifact renders")
 }
 
 fn registry_schema(filename: &str) -> Value {
@@ -439,4 +448,76 @@ fn factor_model_schema_rejects_noncanonical_unmatched_policy_values() {
             "serde must reject noncanonical value {alias}"
         );
     }
+}
+
+#[test]
+fn decomposition_schemas_use_date_wire_and_close_additional_properties() {
+    let levels = models_registry_schema("levels_at_date.schema.json");
+    assert_eq!(levels["additionalProperties"], false);
+    assert_eq!(
+        levels.pointer("/$defs/LevelValuesAtDate/additionalProperties"),
+        Some(&json!(false))
+    );
+    assert_eq!(
+        levels.pointer("/$defs/DateWire/format"),
+        Some(&json!("date"))
+    );
+    assert_eq!(
+        levels.pointer("/properties/date/$ref"),
+        Some(&json!("#/$defs/DateWire"))
+    );
+
+    let period = models_registry_schema("period_decomposition.schema.json");
+    assert_eq!(period["additionalProperties"], false);
+    assert_eq!(
+        period.pointer("/$defs/LevelValuesDelta/additionalProperties"),
+        Some(&json!(false))
+    );
+    assert_eq!(
+        period.pointer("/$defs/DateWire/format"),
+        Some(&json!("date"))
+    );
+    assert_eq!(
+        period.pointer("/properties/from/$ref"),
+        Some(&json!("#/$defs/DateWire"))
+    );
+    assert_eq!(
+        period.pointer("/properties/to/$ref"),
+        Some(&json!("#/$defs/DateWire"))
+    );
+}
+
+#[test]
+fn credit_factor_model_schema_shares_vol_model_and_market_dependency_drops_credit_index() {
+    let credit_model = registry_schema(CREDIT_FACTOR_MODEL_SCHEMA_FILENAME);
+    assert!(credit_model.pointer("/$defs/VolModel").is_some());
+    assert!(credit_model.pointer("/$defs/FactorVolModel").is_none());
+    assert!(
+        credit_model
+            .pointer("/$defs/IdiosyncraticVolModel")
+            .is_none()
+    );
+    assert_eq!(
+        credit_model.pointer("/$defs/VolState/properties/factors/additionalProperties/$ref"),
+        Some(&json!("#/$defs/VolModel"))
+    );
+    assert_eq!(
+        credit_model.pointer("/$defs/VolState/properties/idiosyncratic/additionalProperties/$ref"),
+        Some(&json!("#/$defs/VolModel"))
+    );
+
+    let dependency = models_registry_schema("market_dependency.schema.json");
+    let variants = dependency["oneOf"]
+        .as_array()
+        .expect("MarketDependency schema has oneOf variants");
+    assert!(
+        !variants.iter().any(|variant| {
+            variant
+                .get("required")
+                .and_then(Value::as_array)
+                .is_some_and(|req| req.iter().any(|k| k == "credit_index"))
+                || variant.pointer("/properties/credit_index").is_some()
+        }),
+        "MarketDependency schema must not retain unused credit_index variant"
+    );
 }

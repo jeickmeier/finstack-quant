@@ -21,17 +21,31 @@
 /// - Append `json_only` for a [`label_enum!`] wrapper: it emits `to_json` /
 ///   `from_json` without `__reduce__`, because label enums pickle through
 ///   their class constant.
-/// - Append `rust_json` when the Rust type owns its wire form through inherent
-///   `from_json(&str)` / `to_json()` methods (both returning
-///   `finstack_quant_core::Result`), so both directions run the Rust checks.
-///   Unknown-field rejection follows each object's declared closure: closed
-///   objects reject unknown keys, while a declared open extension object (for
-///   example `CreditCalibrationDiagnostics`) accepts and discards them.
+/// - Append `from_inner` with `module = "finstack_quant.domain"` when the
+///   wrapper defines `fn from_inner(RustType) -> Self` to attach extra
+///   wrapper-only state (e.g. cached metadata that defaults to `None` on JSON
+///   deserialization).
+/// - Append `rust_json` (with optional `module = "finstack_quant.domain"`) when
+///   the Rust type owns its wire form through inherent `from_json(&str)` /
+///   `to_json()` methods (both returning `finstack_quant_core::Result`), so both
+///   directions run the Rust checks. Unknown-field rejection follows each
+///   object's declared closure: closed objects reject unknown keys, while a
+///   declared open extension object (for example `CreditCalibrationDiagnostics`)
+///   accepts and discards them.
 macro_rules! wire_methods {
     ($py_type:ident, $rust_type:ty, $name:literal, module = $module:literal) => {
         $crate::bindings::macros::wire_methods!(@documented_json $py_type, $rust_type, $name, [], |inner| inner,
             $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_json")),
             $crate::bindings::pydoc::pydoc!($module, concat!($name, ".from_json")));
+        $crate::bindings::macros::wire_methods!(@reduce $py_type, $crate::bindings::pydoc::pydoc!($module, concat!($name, ".__reduce__")));
+    };
+
+    ($py_type:ident, $rust_type:ty, $name:literal, module = $module:literal, from_inner) => {
+        $crate::bindings::macros::wire_methods!(
+            @documented_json_ctor $py_type, $rust_type, $name, [], |inner| Self::from_inner(inner),
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_json")),
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".from_json"))
+        );
         $crate::bindings::macros::wire_methods!(@reduce $py_type, $crate::bindings::pydoc::pydoc!($module, concat!($name, ".__reduce__")));
     };
 
@@ -138,26 +152,44 @@ macro_rules! wire_methods {
     ($py_type:ident, $rust_type:ty, $name:literal, json_only) => {
         $crate::bindings::macros::wire_methods!(@json $py_type, $rust_type, $name, [], |inner| inner);
     };
+    ($py_type:ident, $rust_type:ty, $name:literal, module = $module:literal, rust_json) => {
+        $crate::bindings::macros::wire_methods!(
+            @rust_json $py_type,
+            $rust_type,
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_json")),
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".from_json"))
+        );
+        $crate::bindings::macros::wire_methods!(@reduce $py_type, $crate::bindings::pydoc::pydoc!($module, concat!($name, ".__reduce__")));
+    };
     ($py_type:ident, $rust_type:ty, $name:literal, rust_json) => {
-        #[::pyo3::pymethods]
-        impl $py_type {
-            #[doc = concat!(
+        $crate::bindings::macros::wire_methods!(
+            @rust_json $py_type,
+            $rust_type,
+            concat!(
                 "Serialize this ", $name, " to its canonical JSON wire form.\n\n",
                 "Returns\n-------\nstr\n    Compact JSON that ``from_json`` accepts.\n\n",
                 "Raises\n------\nValueError\n    If the value cannot be serialized."
-            )]
+            ),
+            concat!(
+                "Deserialize a ", $name, " from its canonical JSON wire form.\n\n",
+                "Parameters\n----------\njson : str\n    JSON produced by ``to_json`` (strict field names).\n\n",
+                "Returns\n-------\n", $name, "\n    The reconstructed value.\n\n",
+                "Raises\n------\nValueError\n    If the JSON is malformed, carries a key its object's declared closure rejects, or fails validation."
+            )
+        );
+        $crate::bindings::macros::wire_methods!(@reduce $py_type);
+    };
+    (@rust_json $py_type:ident, $rust_type:ty, $to_doc:expr_2021, $from_doc:expr_2021) => {
+        #[::pyo3::pymethods]
+        impl $py_type {
+            #[doc = $to_doc]
             #[allow(clippy::wrong_self_convention)]
             #[pyo3(text_signature = "($self)")]
             fn to_json(&self) -> ::pyo3::PyResult<String> {
                 self.inner.to_json().map_err($crate::errors::core_to_py)
             }
 
-            #[doc = concat!(
-                "Deserialize a ", $name, " from its canonical JSON wire form.\n\n",
-                "Parameters\n----------\njson : str\n    JSON produced by ``to_json`` (strict field names).\n\n",
-                "Returns\n-------\n", $name, "\n    The reconstructed value.\n\n",
-                "Raises\n------\nValueError\n    If the JSON is malformed, carries a key its object's declared closure rejects, or fails validation."
-            )]
+            #[doc = $from_doc]
             #[staticmethod]
             #[pyo3(text_signature = "(json)")]
             fn from_json(json: &str) -> ::pyo3::PyResult<Self> {
@@ -166,7 +198,6 @@ macro_rules! wire_methods {
                 })
             }
         }
-        $crate::bindings::macros::wire_methods!(@reduce $py_type);
     };
     (@json $py_type:ident, $rust_type:ty, $name:literal, [$($deref:tt)?], |$inner:ident| $checked:expr_2021) => {
         $crate::bindings::macros::wire_methods!(@documented_json $py_type, $rust_type, $name, [$($deref)?], |$inner| $checked,
@@ -183,6 +214,12 @@ macro_rules! wire_methods {
             ));
     };
     (@documented_json $py_type:ident, $rust_type:ty, $name:literal, [$($deref:tt)?], |$inner:ident| $checked:expr_2021, $to_doc:expr_2021, $from_doc:expr_2021) => {
+        $crate::bindings::macros::wire_methods!(
+            @documented_json_ctor $py_type, $rust_type, $name, [$($deref)?],
+            |$inner| Self { inner: $checked }, $to_doc, $from_doc
+        );
+    };
+    (@documented_json_ctor $py_type:ident, $rust_type:ty, $name:literal, [$($deref:tt)?], |$inner:ident| $ctor:expr_2021, $to_doc:expr_2021, $from_doc:expr_2021) => {
         #[::pyo3::pymethods]
         impl $py_type {
             #[doc = $to_doc]
@@ -204,7 +241,7 @@ macro_rules! wire_methods {
                         json,
                         concat!("invalid ", $name, " JSON"),
                     )?;
-                Ok(Self { inner: $checked })
+                Ok($ctor)
             }
         }
     };

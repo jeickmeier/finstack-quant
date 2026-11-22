@@ -6,10 +6,10 @@
 //! Greeks.
 
 use super::adi::{AdiWorkBuffers, McsStepper, fill_boundaries};
+use super::error::PdeError;
 use super::grid::find_nearest;
 use super::grid2d::Grid2D;
 use super::problem2d::PdeProblem2D;
-use super::stepper::StepperError;
 
 /// Two-dimensional PDE solver using Modified Craig-Sneyd (MCS) ADI splitting.
 pub struct Solver2D {
@@ -45,28 +45,26 @@ impl Solver2D {
     ///
     /// # Errors
     ///
-    /// - [`PdeSolver2DError::NonPositiveMaturity`] if `maturity <= 0`.
-    /// - [`PdeSolver2DError::ZeroTimeSteps`] if the stepper has no time steps
+    /// - [`PdeError::NonPositiveMaturity`] if `maturity <= 0`.
+    /// - [`PdeError::ZeroTimeSteps`] if the stepper has no time steps
     ///   (the backward march would never run).
-    /// - [`PdeSolver2DError::Stepper`] if a Modified Craig-Sneyd ADI step
-    ///   fails — a convection-dominated grid outside the scheme's reliably
-    ///   stable regime, or a degenerate tridiagonal solve. The previous
-    ///   implementation could diverge silently to inf / NaN in these cases.
+    /// - [`PdeError::NonPositiveStep`] / [`PdeError::DegeneratePivot`] if a
+    ///   Modified Craig-Sneyd ADI step fails.
     pub fn solve(
         &self,
         problem: &dyn PdeProblem2D,
         maturity: f64,
-    ) -> Result<PdeSolution2D, PdeSolver2DError> {
+    ) -> Result<PdeSolution2D, PdeError> {
         // Validate maturity / step count up front — a non-positive or
         // non-finite maturity, or zero steps, would otherwise yield a
         // degenerate "solution" (NaN time grid, or the bare terminal payoff
         // with no time evolution). The `is_finite` check also rejects NaN.
         if !maturity.is_finite() || maturity <= 0.0 {
-            return Err(PdeSolver2DError::NonPositiveMaturity { maturity });
+            return Err(PdeError::NonPositiveMaturity { maturity });
         }
         let n_steps = self.stepper.n_steps();
         if n_steps == 0 {
-            return Err(PdeSolver2DError::ZeroTimeSteps);
+            return Err(PdeError::ZeroTimeSteps);
         }
 
         let nx = self.grid.nx();
@@ -162,27 +160,6 @@ impl PdeSolution2D {
         let j = find_nearest(self.grid.y().points(), y);
         super::solver::gamma_1d(self.grid.x().points(), x, |i| self.values[i * ny + j])
     }
-}
-
-/// Errors during 2D solver construction or execution.
-#[derive(Debug, Clone, PartialEq, thiserror::Error)]
-#[non_exhaustive]
-pub enum PdeSolver2DError {
-    /// The maturity passed to `solve` was not strictly positive.
-    #[error("2D PDE solve requires a strictly positive maturity, got {maturity:e}")]
-    NonPositiveMaturity {
-        /// The offending maturity.
-        maturity: f64,
-    },
-    /// The stepper was configured with zero time steps, so the backward time
-    /// march never runs and the "solution" would be the bare terminal payoff.
-    #[error("2D PDE solve requires at least one time step, got n_steps = 0")]
-    ZeroTimeSteps,
-    /// The ADI time-stepper failed — e.g. a convection-dominated grid outside
-    /// the Modified Craig-Sneyd stable regime, or a degenerate tridiagonal
-    /// solve.
-    #[error(transparent)]
-    Stepper(#[from] StepperError),
 }
 
 #[cfg(test)]
@@ -492,14 +469,14 @@ mod tests {
         assert!(
             matches!(
                 solver.solve(&Heat2D, 0.0),
-                Err(PdeSolver2DError::NonPositiveMaturity { .. })
+                Err(PdeError::NonPositiveMaturity { .. })
             ),
             "maturity = 0 must be rejected"
         );
         assert!(
             matches!(
                 solver.solve(&Heat2D, -1.0),
-                Err(PdeSolver2DError::NonPositiveMaturity { .. })
+                Err(PdeError::NonPositiveMaturity { .. })
             ),
             "negative maturity must be rejected"
         );
@@ -508,7 +485,7 @@ mod tests {
         assert!(
             matches!(
                 zero_step_solver.solve(&Heat2D, 1.0),
-                Err(PdeSolver2DError::ZeroTimeSteps)
+                Err(PdeError::ZeroTimeSteps)
             ),
             "a zero-step stepper must be rejected"
         );

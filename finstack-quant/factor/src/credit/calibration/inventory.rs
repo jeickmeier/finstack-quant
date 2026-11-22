@@ -5,9 +5,7 @@ use finstack_quant_core::types::IssuerId;
 
 use super::config::BucketSizeThresholds;
 use super::validation::validation_err;
-use crate::credit::hierarchy::{
-    CreditHierarchySpec, FoldUpRecord, IssuerBetaMode, IssuerTags, dimension_key,
-};
+use crate::credit::hierarchy::{CreditHierarchySpec, FoldUpRecord, IssuerTags, dimension_key};
 
 /// Inventory built in step 3, before any fold-up.
 pub(super) struct BucketInventory {
@@ -27,10 +25,10 @@ pub(super) struct BucketInventory {
     pub(super) tag_taxonomy: BTreeMap<String, BTreeSet<String>>,
 }
 
-pub(super) fn build_bucket_inventory(
+pub(super) fn build_bucket_inventory<'a>(
     hierarchy: &CreditHierarchySpec,
     tags: &BTreeMap<IssuerId, IssuerTags>,
-    modes: &BTreeMap<IssuerId, IssuerBetaMode>,
+    issuers: impl Iterator<Item = &'a IssuerId>,
 ) -> Result<BucketInventory> {
     let num_levels = hierarchy.levels.len();
     let mut bucket_paths: BTreeMap<IssuerId, Vec<String>> = BTreeMap::new();
@@ -49,14 +47,12 @@ pub(super) fn build_bucket_inventory(
             .or_default();
     }
 
-    // Every issuer in the panel is inventoried; `modes` supplies the universe
-    // (its keys are the panel issuers) and is otherwise unused now that bucket
-    // occupancy counts all member modes.
-    for issuer in modes.keys() {
-        let issuer_tags = tags.get(issuer).cloned().unwrap_or_default();
+    let empty_tags = IssuerTags::default();
+    for issuer in issuers {
+        let issuer_tags = tags.get(issuer).unwrap_or(&empty_tags);
         // Tag values used by hierarchy dimensions must not contain the '.'
         // bucket-path separator: a dotted value would mis-segment
-        // `synth_tags_from_path`, the fold-up parent computation, and the
+        // bucket paths, the fold-up parent computation, and the
         // matcher's factor IDs, silently corrupting factor identity.
         for dim in &hierarchy.levels {
             let key = dimension_key(dim);
@@ -75,7 +71,7 @@ pub(super) fn build_bucket_inventory(
                 .or_default()
                 .insert(v.clone());
         }
-        let paths = hierarchy.bucket_paths(&issuer_tags).map_err(|missing| {
+        let paths = hierarchy.bucket_paths(issuer_tags).map_err(|missing| {
             validation_err(format!(
                 "CreditCalibrator: issuer {:?} is missing tag for dimension {:?}",
                 issuer.as_str(),

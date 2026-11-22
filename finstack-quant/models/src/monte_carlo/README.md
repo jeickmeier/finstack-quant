@@ -29,7 +29,7 @@ Per-item detail is in the rustdoc (`cargo doc -p finstack-quant-models --open`).
 | `estimate.rs` | `Estimate`: raw f64 mean / stderr / CI / optional distribution statistics |
 | `results.rs` | `MoneyEstimate`, `MonteCarloResult`, `RunMetadata` — currency-tagged outputs |
 | `paths.rs` | `PathDataset`, `SimulatedPath`, `PathPoint`, `PathSamplingMethod`, `ProcessParams`, `CashflowType` |
-| `registry.rs` | Embedded runtime defaults from `../data/defaults/pricer_defaults.v1.json`; `embedded_defaults()` and `MonteCarloDefaults` |
+| `registry.rs` | Crate-internal (`pub(crate)`): embedded runtime defaults from `../data/defaults/pricer_defaults.v1.json` |
 | `seed.rs` | `derive_seed` — FNV-1a seed derivation from instrument id + scenario name |
 | `simulate.rs` | `simulate_paths`: one entry point returning a compact `PathSummary` for any built-in process (Markov, LMM or rough-volatility) and scheme named by a serializable `PathSimulationSpec` (`ProcessSpec`, `SchemeSpec`, `TimeGridSpec`) |
 | `captured_path_stats.rs` | Private: folds captured-path distribution statistics into an `Estimate` |

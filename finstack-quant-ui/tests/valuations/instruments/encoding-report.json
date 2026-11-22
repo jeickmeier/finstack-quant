@@ -10706,7 +10706,8 @@
           { "pointer": "#/$defs/d_69148dfad1155676d8a6", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_ae08d495fff86ea9db9a", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_86136b061c9def2cf9ef", "keyword": "oneOf" },
-          { "pointer": "#/$defs/d_4ef216f41776daf2c898", "keyword": "oneOf" }
+          { "pointer": "#/$defs/d_4ef216f41776daf2c898", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_5206b71fe62d3564c6ab", "keyword": "oneOf" }
         ]
       }
     },

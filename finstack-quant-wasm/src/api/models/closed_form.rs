@@ -47,18 +47,6 @@ use wasm_bindgen::prelude::*;
 /// One call replaces choosing and sequencing `bsPrice`, `black76Price`,
 /// `bachelierPrice`, their implied-volatility inverses and their Greeks.
 ///
-/// # Arguments
-///
-/// * `request` - `OptionCalculation` object or JSON text: `model` tagged by
-///   `kind` (`"black_scholes"` with `spot`, `strike`, continuously compounded
-///   decimal `rate` and `div_yield`, `expiry` in years, `is_call` and an
-///   optional `theta_days_per_year` defaulting to 365; `"black76"` with
-///   `forward`, `strike`, discount factor `df`, `expiry`, `is_call`;
-///   `"bachelier"` with `forward`, `strike`, `expiry`, `is_call`) and `solve`
-///   (`{kind: "price", vol}` with a decimal Black vol or an absolute normal vol
-///   for Bachelier, or `{kind: "implied_vol", price}` discounted for
-///   Black-Scholes and Black-76, undiscounted for Bachelier).
-///
 /// # Errors
 ///
 /// Throws a `validation` error for a malformed request, an unknown field or

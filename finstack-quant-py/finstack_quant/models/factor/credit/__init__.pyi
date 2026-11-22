@@ -102,6 +102,17 @@ class CreditFactorModel:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Serialize through JSON for Python pickling.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reducer tuple ``(from_json, (json,))`` for :mod:`pickle`.
+        """
+        ...
+
     @property
     def schema(self) -> str:
         """
@@ -530,32 +541,32 @@ class CreditCalibrator:
 
     def calibrate(self, inputs: Mapping[str, Any] | str) -> CreditFactorModel:
         """
-            Run calibration and return a validated factor model.
+        Run calibration and return a validated factor model.
 
-            Parameters
-            ----------
-            inputs : Mapping[str, Any] | str
-                ``CreditCalibrationInputs`` as a dict or JSON string:
-                ``history_panel`` (``dates`` + per-issuer decimal spread lists),
-                ``issuer_tags``, ``generic_factor``, ``as_of``, ``as_of_spreads``
-                and optional ``idiosyncratic_overrides`` / ``spread_durations``.
-                Spreads are decimal (``0.01`` = 100 bp). Overrides are decimal
-                spread volatility per square-root year (``0.001`` = 10 bp/√year).
+        Parameters
+        ----------
+        inputs : Mapping[str, Any] | str
+            ``CreditCalibrationInputs`` as a dict or JSON string:
+            ``history_panel`` (``dates`` + per-issuer decimal spread lists),
+            ``issuer_tags``, ``generic_factor``, ``as_of``, ``as_of_spreads``
+            and optional ``idiosyncratic_overrides`` / ``spread_durations``.
+            Spreads are decimal (``0.01`` = 100 bp). Overrides are decimal
+            spread volatility per square-root year (``0.001`` = 10 bp/√year).
 
-            Returns
-            -------
-            CreditFactorModel
-                Calibrated hierarchy artifact.
+        Returns
+        -------
+        CreditFactorModel
+            Calibrated hierarchy artifact.
 
-            Raises
-            ------
-            ValueError
-                If ``inputs`` is structurally invalid or calibration rejects the
-                panel (irregular grid, missing tags, bad EWMA lambda, ...).
+        Raises
+        ------
+        ValueError
+            If ``inputs`` is structurally invalid or calibration rejects the
+            panel (irregular grid, missing tags, bad EWMA lambda, ...).
 
-            Examples
-            --------
-            >>> from finstack_quant.models.factor.credit import CreditCalibrator
+        Examples
+        --------
+        >>> from finstack_quant.models.factor.credit import CreditCalibrator
         >>> config = {"hierarchy": {"levels": []}, "covariance_strategy": "diagonal", "bucket_weighting": "equal"}
         >>> inputs = {
         ...     "history_panel": {"dates": ["2024-01-01", "2024-02-01"], "spreads": {"A": [0.010, 0.0101]}},
@@ -565,8 +576,8 @@ class CreditCalibrator:
         ...     "as_of_spreads": {"A": 0.0101},
         ...     "idiosyncratic_overrides": {},
         ... }
-            >>> CreditCalibrator(config).calibrate(inputs).n_factors
-            1
+        >>> CreditCalibrator(config).calibrate(inputs).n_factors
+        1
         """
         ...
 
@@ -731,6 +742,17 @@ class LevelsAtDate:
         ------
         ValueError
             If a numeric field is non-finite or serialization fails.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Serialize through JSON for Python pickling.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reducer tuple ``(from_json, (json,))`` for :mod:`pickle`.
         """
         ...
 
@@ -1003,6 +1025,17 @@ class PeriodDecomposition:
         ------
         ValueError
             If a numeric field is non-finite or serialization fails.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Serialize through JSON for Python pickling.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reducer tuple ``(from_json, (json,))`` for :mod:`pickle`.
         """
         ...
 
@@ -1345,32 +1378,32 @@ class FactorCovarianceForecast:
         risk_measure: RiskMeasure | str | Mapping[str, Any] | None = None,
     ) -> FactorModelConfig:
         """
-            Return a typed portfolio-ready factor model at a horizon.
+        Return a typed portfolio-ready factor model at a horizon.
 
-            Parameters
-            ----------
-            horizon : str | VolHorizon
-                :class:`VolHorizon` or descriptor string (see :meth:`covariance_at`).
-            risk_measure : str | Mapping[str, Any] | None
-                ``"variance"`` (default), ``"volatility"``, or a dict such as
-                ``{"var": {"confidence": 0.99}}`` /
-                ``{"expected_shortfall": {"confidence": 0.975}}``; a JSON string of
-                any of these is also accepted.
+        Parameters
+        ----------
+        horizon : str | VolHorizon
+            :class:`VolHorizon` or descriptor string (see :meth:`covariance_at`).
+        risk_measure : str | Mapping[str, Any] | None
+            ``"variance"`` (default), ``"volatility"``, or a dict such as
+            ``{"var": {"confidence": 0.99}}`` /
+            ``{"expected_shortfall": {"confidence": 0.975}}``; a JSON string of
+            any of these is also accepted.
 
-            Returns
-            -------
-            FactorModelConfig
-                Configuration with the horizon covariance and requested measure.
+        Returns
+        -------
+        FactorModelConfig
+            Configuration with the horizon covariance and requested measure.
 
-            Raises
-            ------
-            ValueError
-                If the horizon or risk measure is invalid (confidence outside
-                ``(0.5, 1)``) or the covariance cannot be built.
+        Raises
+        ------
+        ValueError
+            If the horizon or risk measure is invalid (confidence outside
+            ``(0.5, 1)``) or the covariance cannot be built.
 
-            Examples
-            --------
-            >>> from finstack_quant.models.factor.credit import CreditCalibrator, FactorCovarianceForecast
+        Examples
+        --------
+        >>> from finstack_quant.models.factor.credit import CreditCalibrator, FactorCovarianceForecast
         >>> config = {"hierarchy": {"levels": []}, "covariance_strategy": "diagonal", "bucket_weighting": "equal"}
         >>> inputs = {
         ...     "history_panel": {"dates": ["2024-01-01", "2024-02-01"], "spreads": {"A": [0.010, 0.0101]}},
@@ -1380,9 +1413,9 @@ class FactorCovarianceForecast:
         ...     "as_of_spreads": {"A": 0.0101},
         ...     "idiosyncratic_overrides": {},
         ... }
-            >>> model = CreditCalibrator(config).calibrate(inputs)
-            >>> FactorCovarianceForecast(model).factor_model_at("one_step", {"var": {"confidence": 0.99}}).risk_measure
-            {'var': {'confidence': 0.99}}
+        >>> model = CreditCalibrator(config).calibrate(inputs)
+        >>> FactorCovarianceForecast(model).factor_model_at("one_step", {"var": {"confidence": 0.99}}).risk_measure
+        {'var': {'confidence': 0.99}}
         """
         ...
 
@@ -1495,7 +1528,7 @@ def decompose_period(
 
 class VolHorizon:
     """
-    Forecast horizon used to scale a calibrated ``Sample`` vol estimate.
+    Forecast horizon used to scale calibrated ``Sample`` and ``Ewma`` vol estimates.
 
     Instances compare equal by variant and value, and pickle through their
     descriptor string.
@@ -1636,6 +1669,17 @@ class VolHorizon:
         """
         ...
 
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Serialize through its descriptor string for Python pickling.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reducer tuple ``(parse, (descriptor,))`` for :mod:`pickle`.
+        """
+        ...
+
     @property
     def kind(self) -> str:
         """
@@ -1659,6 +1703,7 @@ class VolHorizon:
 
         Returns
         -------
+        int | None
             Step count for ``n_steps`` horizons.
 
         Notes
@@ -1674,6 +1719,7 @@ class VolHorizon:
 
         Returns
         -------
+        float | None
             Year fraction for ``years`` horizons.
 
         Notes

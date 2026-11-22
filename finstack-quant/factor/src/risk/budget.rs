@@ -25,6 +25,7 @@ pub const DEFAULT_UTILIZATION_THRESHOLD: f64 = 1.20;
 /// never contribute to [`Self::total_overbudget`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct RiskBudgetResult {
     /// Per-position budget comparison.
     pub positions: Vec<PositionBudgetEntry>,
@@ -39,6 +40,7 @@ pub struct RiskBudgetResult {
 /// Budget comparison for a single position.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PositionBudgetEntry {
     /// Position identifier.
     pub position_id: String,
@@ -337,28 +339,18 @@ mod tests {
         utilization_threshold: f64,
         decomposition: &PositionRiskDecomposition,
     ) -> finstack_quant_core::Result<RiskBudgetResult> {
-        let ids: Vec<String> = decomposition
-            .var_contributions
-            .iter()
-            .map(|c| c.position_id.clone())
-            .collect();
         assert!(
-            ids.iter()
-                .map(String::as_str)
+            decomposition
+                .var_contributions
+                .iter()
+                .map(|c| c.position_id.as_str())
                 .eq(targets.iter().map(|(id, _)| *id))
         );
-        let actual: Vec<f64> = decomposition
-            .var_contributions
-            .iter()
-            .map(|c| c.component_var)
-            .collect();
         let target_pct: Vec<f64> = targets.iter().map(|(_, pct)| *pct).collect();
-        evaluate_risk_budget(
-            ids,
-            &actual,
+        evaluate_risk_budget_from_decomposition(
+            decomposition,
             &target_pct,
-            decomposition.portfolio_var,
-            utilization_threshold,
+            Some(utilization_threshold),
         )
     }
 

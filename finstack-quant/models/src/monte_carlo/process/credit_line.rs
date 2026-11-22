@@ -498,7 +498,7 @@ impl ProcessMetadata for CreditLineProcess {
 /// * `t` - Query time in years (same clock as `times`).
 /// * `times` - Sorted (non-decreasing) knot times in years.
 /// * `rates` - Rates at each knot (decimal, e.g. `0.05` for 5%).
-pub fn interpolate_rate(t: f64, times: &[f64], rates: &[f64]) -> f64 {
+pub(crate) fn interpolate_rate(t: f64, times: &[f64], rates: &[f64]) -> f64 {
     if times.is_empty() || rates.is_empty() {
         return 0.0;
     }

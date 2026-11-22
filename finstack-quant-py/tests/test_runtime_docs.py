@@ -53,6 +53,9 @@ CONVERTED: dict[str, tuple[str, ...] | None] = {
     "finstack_quant.models.rates": None,
     "finstack_quant.models.liquidity": None,
     "finstack_quant.models.volatility": None,
+    "finstack_quant.models.factor": None,
+    "finstack_quant.models.factor.credit": None,
+    "finstack_quant.models.factor.risk": None,
     "finstack_quant.models": None,
     "finstack_quant.calibration": (
         "validate_surface",

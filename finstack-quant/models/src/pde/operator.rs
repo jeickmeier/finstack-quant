@@ -6,6 +6,7 @@
 //! the resulting system in O(n) time.
 
 use super::boundary::BoundaryCondition;
+use super::error::PdeError;
 use super::grid::Grid1D;
 use super::problem::PdeProblem1D;
 
@@ -18,48 +19,18 @@ use super::problem::PdeProblem1D;
 /// genuinely well-conditioned — pivot is not flagged.
 const THOMAS_PIVOT_REL_EPS: f64 = 1e-12;
 
-/// Error raised by the tridiagonal Thomas solver.
-#[derive(Debug, Clone, PartialEq, thiserror::Error)]
-#[non_exhaustive]
-pub enum ThomasError {
-    /// A pivot in the Thomas forward elimination became degenerate — either
-    /// non-finite, or negligibly small relative to the terms that formed it.
-    ///
-    /// The Thomas algorithm divides by each pivot; a degenerate pivot makes
-    /// the solve produce silent `inf` / `NaN`. For the implicit operator
-    /// `(I - alpha * A)` this signals that diagonal dominance has been
-    /// eroded — most often by a Neumann / Linear boundary-condition
-    /// modification on a near-degenerate row — so the solve cannot be trusted.
-    #[error(
-        "Thomas solver: degenerate pivot at row {row} of {n}: |pivot| = {pivot:e} \
-         is negligible relative to the row scale {row_scale:e} (or non-finite); \
-         the implicit operator (I - alpha*A) has lost diagonal dominance — \
-         check the boundary conditions or grid"
-    )]
-    DegeneratePivot {
-        /// Row index of the degenerate pivot.
-        row: usize,
-        /// Total number of interior rows.
-        n: usize,
-        /// The degenerate pivot value.
-        pivot: f64,
-        /// Magnitude of the terms that formed the pivot.
-        row_scale: f64,
-    },
-}
-
 /// Check that a freshly computed Thomas pivot `d` (formed as the difference of
 /// terms whose magnitudes are `term_a` and `term_b`) is non-degenerate.
 ///
-/// Returns [`ThomasError::DegeneratePivot`] if `d` is non-finite or its
+/// Returns [`PdeError::DegeneratePivot`] if `d` is non-finite or its
 /// magnitude has collapsed below [`THOMAS_PIVOT_REL_EPS`] times the row scale.
 #[inline]
-fn check_pivot(d: f64, term_a: f64, term_b: f64, row: usize, n: usize) -> Result<(), ThomasError> {
+fn check_pivot(d: f64, term_a: f64, term_b: f64, row: usize, n: usize) -> Result<(), PdeError> {
     // Row scale: largest constituent magnitude, floored at 1.0 so that a row
     // whose terms are all genuinely tiny still requires a non-zero pivot.
     let row_scale = term_a.abs().max(term_b.abs()).max(1.0);
     if !d.is_finite() || d.abs() <= THOMAS_PIVOT_REL_EPS * row_scale {
-        return Err(ThomasError::DegeneratePivot {
+        return Err(PdeError::DegeneratePivot {
             row,
             n,
             pivot: d,
@@ -274,11 +245,11 @@ impl TridiagOperator {
     /// * `rhs` — right-hand side vector (length `n`)
     ///
     /// Returns the solution vector of length `n`, or
-    /// `ThomasError::DegeneratePivot` if the forward elimination hits a
+    /// [`PdeError::DegeneratePivot`] if the forward elimination hits a
     /// degenerate pivot (a sign that `(I - alpha*A)` has lost diagonal
     /// dominance, e.g. via a boundary-condition modification). Without the
     /// guard such a pivot would yield a silent `inf` / `NaN` solution.
-    pub fn solve_thomas(&self, alpha: f64, rhs: &[f64]) -> Result<Vec<f64>, ThomasError> {
+    pub fn solve_thomas(&self, alpha: f64, rhs: &[f64]) -> Result<Vec<f64>, PdeError> {
         let mut x = vec![0.0; self.n];
         let mut scratch = vec![0.0; self.n];
         self.solve_thomas_into(alpha, rhs, &mut x, &mut scratch)?;
@@ -291,7 +262,7 @@ impl TridiagOperator {
     /// Like [`solve_thomas`](Self::solve_thomas) but allocation-free: `out`
     /// holds the forward-eliminated right-hand side before back-substitution
     /// and `scratch` holds the modified main diagonal. Returns
-    /// `ThomasError::DegeneratePivot` on a degenerate pivot.
+    /// [`PdeError::DegeneratePivot`] on a degenerate pivot.
     ///
     /// # Arguments
     ///
@@ -305,7 +276,7 @@ impl TridiagOperator {
         rhs: &[f64],
         out: &mut [f64],
         scratch: &mut [f64],
-    ) -> Result<(), ThomasError> {
+    ) -> Result<(), PdeError> {
         debug_assert_eq!(rhs.len(), self.n);
         debug_assert_eq!(out.len(), self.n);
         debug_assert_eq!(scratch.len(), self.n);
@@ -564,7 +535,7 @@ mod tests {
     }
 
     /// [P6-5] `solve_thomas` must reject a degenerate pivot with
-    /// [`ThomasError::DegeneratePivot`] rather than dividing by it and
+    /// [`PdeError::DegeneratePivot`] rather than dividing by it and
     /// returning a silent `inf` / `NaN` solution.
     ///
     /// A `(I - alpha*A)` system whose first pivot `d[0] = 1 - alpha*main[0]`
@@ -589,7 +560,7 @@ mod tests {
 
         let result = op.solve_thomas(1.0, &rhs);
         match result {
-            Err(ThomasError::DegeneratePivot { row, pivot, .. }) => {
+            Err(PdeError::DegeneratePivot { row, pivot, .. }) => {
                 assert_eq!(row, 0, "the engineered zero pivot is at row 0");
                 assert!(
                     pivot.abs() < 1e-12,
@@ -605,7 +576,7 @@ mod tests {
         assert!(
             matches!(
                 op.solve_thomas_into(1.0, &rhs, &mut out, &mut scratch),
-                Err(ThomasError::DegeneratePivot { .. })
+                Err(PdeError::DegeneratePivot { .. })
             ),
             "solve_thomas_into must also reject the degenerate pivot"
         );

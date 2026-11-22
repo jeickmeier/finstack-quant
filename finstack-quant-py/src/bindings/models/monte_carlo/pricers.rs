@@ -2,6 +2,7 @@
 
 use super::engine::extract_optional_currency;
 use super::results::{PyLrmGreeks, PyLsmcResult, PyMoneyEstimate};
+use crate::bindings::macros::py_getters;
 use crate::bindings::models::closed_form::option_market;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
@@ -41,22 +42,6 @@ impl PyEuropeanPricer {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "EuropeanPricer.num_paths")]
-    #[getter]
-    fn num_paths(&self) -> usize {
-        self.inner.num_paths()
-    }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "EuropeanPricer.seed")]
-    #[getter]
-    fn seed(&self) -> u64 {
-        self.inner.seed()
-    }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "EuropeanPricer.use_parallel")]
-    #[getter]
-    fn use_parallel(&self) -> bool {
-        self.inner.use_parallel()
-    }
-
     #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "EuropeanPricer.price_gbm")]
     #[pyo3(signature = (market, num_steps=None, currency=None))]
     fn price_gbm(
@@ -83,6 +68,17 @@ impl PyEuropeanPricer {
         )
     }
 }
+
+py_getters!(PyEuropeanPricer |s| {
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "EuropeanPricer.num_paths")]
+    num_paths -> usize = s.inner.num_paths();
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "EuropeanPricer.seed")]
+    seed -> u64 = s.inner.seed();
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "EuropeanPricer.use_parallel")]
+    use_parallel -> bool = s.inner.use_parallel();
+});
 
 #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer")]
 #[pyclass(
@@ -156,37 +152,6 @@ impl PyPathDependentPricer {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.num_paths")]
-    #[getter]
-    fn num_paths(&self) -> usize {
-        self.inner.config().num_paths
-    }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.seed")]
-    #[getter]
-    fn seed(&self) -> u64 {
-        self.inner.config().seed
-    }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.use_parallel")]
-    #[getter]
-    fn use_parallel(&self) -> bool {
-        self.inner.config().use_parallel
-    }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.antithetic")]
-    #[getter]
-    fn antithetic(&self) -> bool {
-        self.inner.config().antithetic
-    }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.use_sobol")]
-    #[getter]
-    fn use_sobol(&self) -> bool {
-        self.inner.config().use_sobol
-    }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.use_brownian_bridge")]
-    #[getter]
-    fn use_brownian_bridge(&self) -> bool {
-        self.inner.config().use_brownian_bridge
-    }
-
     fn __repr__(&self) -> String {
         let config = self.inner.config();
         format!(
@@ -200,6 +165,26 @@ impl PyPathDependentPricer {
         )
     }
 }
+
+py_getters!(PyPathDependentPricer |s| {
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.num_paths")]
+    num_paths -> usize = s.inner.config().num_paths;
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.seed")]
+    seed -> u64 = s.inner.config().seed;
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.use_parallel")]
+    use_parallel -> bool = s.inner.config().use_parallel;
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.antithetic")]
+    antithetic -> bool = s.inner.config().antithetic;
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.use_sobol")]
+    use_sobol -> bool = s.inner.config().use_sobol;
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "PathDependentPricer.use_brownian_bridge")]
+    use_brownian_bridge -> bool = s.inner.config().use_brownian_bridge;
+});
 
 #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer")]
 #[pyclass(
@@ -244,37 +229,6 @@ impl PyLsmcPricer {
         )
         .map(|inner| Self { inner })
         .map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.num_paths")]
-    #[getter]
-    fn num_paths(&self) -> usize {
-        self.inner.pricer().config().num_paths
-    }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.seed")]
-    #[getter]
-    fn seed(&self) -> u64 {
-        self.inner.pricer().config().seed
-    }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.use_parallel")]
-    #[getter]
-    fn use_parallel(&self) -> bool {
-        self.inner.pricer().config().use_parallel
-    }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.antithetic")]
-    #[getter]
-    fn antithetic(&self) -> bool {
-        self.inner.pricer().config().antithetic
-    }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.basis")]
-    #[getter]
-    fn basis(&self) -> &'static str {
-        self.inner.basis().as_str()
-    }
-    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.basis_degree")]
-    #[getter]
-    fn basis_degree(&self) -> usize {
-        self.inner.basis_degree()
     }
 
     #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.price_american")]
@@ -342,6 +296,26 @@ impl PyLsmcPricer {
         )
     }
 }
+
+py_getters!(PyLsmcPricer |s| {
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.num_paths")]
+    num_paths -> usize = s.inner.pricer().config().num_paths;
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.seed")]
+    seed -> u64 = s.inner.pricer().config().seed;
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.use_parallel")]
+    use_parallel -> bool = s.inner.pricer().config().use_parallel;
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.antithetic")]
+    antithetic -> bool = s.inner.pricer().config().antithetic;
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.basis")]
+    basis -> &'static str = s.inner.basis().as_str();
+
+    #[doc = pydoc!("finstack_quant.models.monte_carlo._pricers", "LsmcPricer.basis_degree")]
+    basis_degree -> usize = s.inner.basis_degree();
+});
 
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyEuropeanPricer>()?;

@@ -13,106 +13,85 @@ use finstack_quant_models::credit::scoring::{
 };
 use wasm_bindgen::prelude::*;
 
-/// Original Altman (1968) Z-Score for publicly traded manufacturers.
-/// @param input - `AltmanZScoreInput` object or JSON text: `working_capital_to_total_assets` (X1), `retained_earnings_to_total_assets` (X2), `ebit_to_total_assets` (X3), `market_equity_to_total_liabilities` (X4, market equity over book liabilities) and `sales_to_total_assets` (X5), all decimal ratios.
-/// @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is `null`.
-///
-/// # Errors
-///
-/// Throws a `validation` error if the input is malformed, has an unknown
-/// field, or a ratio is non-finite.
-#[wasm_bindgen(js_name = altmanZScore, unchecked_return_type = "generated.models.ScoringResult")]
-pub fn altman_z_score(
-    #[wasm_bindgen(unchecked_param_type = "generated.models.AltmanZScoreInput | string")]
-    input: JsValue,
-) -> Result<JsValue, JsValue> {
-    let input: AltmanZScoreInput = from_js_json(&input, "input")?;
-    to_js_value(&scoring::altman_z_score(&input).map_err(to_js_err)?)
+macro_rules! scoring_wasm_fn {
+    ($(
+        $(#[$doc:meta])*
+        $fn_name:ident as $js_name:ident ($input_ty:ty, $param_ty:literal);
+    )+) => {
+        $(
+            #[finstack_quant_wasm_macros::plain_docs]
+            $(#[$doc])*
+            #[wasm_bindgen(js_name = $js_name, unchecked_return_type = "generated.models.ScoringResult")]
+            pub fn $fn_name(
+                #[wasm_bindgen(unchecked_param_type = $param_ty)] input: JsValue,
+            ) -> Result<JsValue, JsValue> {
+                let input: $input_ty = from_js_json(&input, "input")?;
+                to_js_value(&scoring::$fn_name(&input).map_err(to_js_err)?)
+            }
+        )+
+    };
 }
 
-/// Altman Z'-Score for private firms (book equity replaces market equity).
-/// @param input - `AltmanZPrimeInput` object or JSON text: `working_capital_to_total_assets` (X1), `retained_earnings_to_total_assets` (X2), `ebit_to_total_assets` (X3), `book_equity_to_total_liabilities` (X4, book equity over book liabilities) and `sales_to_total_assets` (X5), all decimal ratios.
-/// @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is `null`.
-///
-/// # Errors
-///
-/// Throws a `validation` error if the input is malformed, has an unknown
-/// field, or a ratio is non-finite.
-#[wasm_bindgen(js_name = altmanZPrime, unchecked_return_type = "generated.models.ScoringResult")]
-pub fn altman_z_prime(
-    #[wasm_bindgen(unchecked_param_type = "generated.models.AltmanZPrimeInput | string")]
-    input: JsValue,
-) -> Result<JsValue, JsValue> {
-    let input: AltmanZPrimeInput = from_js_json(&input, "input")?;
-    to_js_value(&scoring::altman_z_prime(&input).map_err(to_js_err)?)
-}
+scoring_wasm_fn! {
+    /// Original Altman (1968) Z-Score for publicly traded manufacturers.
+    /// @param input - `AltmanZScoreInput` object or JSON text: `working_capital_to_total_assets` (X1), `retained_earnings_to_total_assets` (X2), `ebit_to_total_assets` (X3), `market_equity_to_total_liabilities` (X4, market equity over book liabilities) and `sales_to_total_assets` (X5), all decimal ratios.
+    /// @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is `null`.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if the input is malformed, has an unknown
+    /// field, or a ratio is non-finite.
+    altman_z_score as altmanZScore (AltmanZScoreInput, "generated.models.AltmanZScoreInput | string");
 
-/// Altman Z''-Score for non-manufacturers (no sales ratio).
-/// @param input - `AltmanZDoublePrimeInput` object or JSON text: `working_capital_to_total_assets` (X1), `retained_earnings_to_total_assets` (X2), `ebit_to_total_assets` (X3) and `book_equity_to_total_liabilities` (X4), all decimal ratios.
-/// @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is `null`.
-///
-/// # Errors
-///
-/// Throws a `validation` error if the input is malformed, has an unknown
-/// field, or a ratio is non-finite.
-#[wasm_bindgen(js_name = altmanZDoublePrime, unchecked_return_type = "generated.models.ScoringResult")]
-pub fn altman_z_double_prime(
-    #[wasm_bindgen(unchecked_param_type = "generated.models.AltmanZDoublePrimeInput | string")]
-    input: JsValue,
-) -> Result<JsValue, JsValue> {
-    let input: AltmanZDoublePrimeInput = from_js_json(&input, "input")?;
-    to_js_value(&scoring::altman_z_double_prime(&input).map_err(to_js_err)?)
-}
+    /// Altman Z'-Score for private firms (book equity replaces market equity).
+    /// @param input - `AltmanZPrimeInput` object or JSON text: `working_capital_to_total_assets` (X1), `retained_earnings_to_total_assets` (X2), `ebit_to_total_assets` (X3), `book_equity_to_total_liabilities` (X4, book equity over book liabilities) and `sales_to_total_assets` (X5), all decimal ratios.
+    /// @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is `null`.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if the input is malformed, has an unknown
+    /// field, or a ratio is non-finite.
+    altman_z_prime as altmanZPrime (AltmanZPrimeInput, "generated.models.AltmanZPrimeInput | string");
 
-/// Altman emerging-market score: the Z''-Score plus a constant of 3.25.
-/// @param input - `AltmanZDoublePrimeInput` object or JSON text: `working_capital_to_total_assets` (X1), `retained_earnings_to_total_assets` (X2), `ebit_to_total_assets` (X3) and `book_equity_to_total_liabilities` (X4), all decimal ratios.
-/// @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is `null`.
-///
-/// # Errors
-///
-/// Throws a `validation` error if the input is malformed, has an unknown
-/// field, or a ratio is non-finite.
-#[wasm_bindgen(js_name = altmanEmScore, unchecked_return_type = "generated.models.ScoringResult")]
-pub fn altman_em_score(
-    #[wasm_bindgen(unchecked_param_type = "generated.models.AltmanZDoublePrimeInput | string")]
-    input: JsValue,
-) -> Result<JsValue, JsValue> {
-    let input: AltmanZDoublePrimeInput = from_js_json(&input, "input")?;
-    to_js_value(&scoring::altman_em_score(&input).map_err(to_js_err)?)
-}
+    /// Altman Z''-Score for non-manufacturers (no sales ratio).
+    /// @param input - `AltmanZDoublePrimeInput` object or JSON text: `working_capital_to_total_assets` (X1), `retained_earnings_to_total_assets` (X2), `ebit_to_total_assets` (X3) and `book_equity_to_total_liabilities` (X4), all decimal ratios.
+    /// @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is `null`.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if the input is malformed, has an unknown
+    /// field, or a ratio is non-finite.
+    altman_z_double_prime as altmanZDoublePrime (AltmanZDoublePrimeInput, "generated.models.AltmanZDoublePrimeInput | string");
 
-/// Ohlson (1980) O-Score logit bankruptcy model.
-/// @param input - `OhlsonOScoreInput` object or JSON text: `log_total_assets_adjusted` (log of total assets over the GNP price-level index), `total_liabilities_to_total_assets`, `working_capital_to_total_assets`, `current_liabilities_to_current_assets`, `liabilities_exceed_assets` (indicator, exactly 0 or 1), `net_income_to_total_assets`, `funds_from_operations_to_total_liabilities`, `negative_net_income_two_years` (indicator, exactly 0 or 1) and `net_income_change` (`(NI_t - NI_{t-1}) / (|NI_t| + |NI_{t-1}|)`).
-/// @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is the logistic probability.
-///
-/// # Errors
-///
-/// Throws a `validation` error if the input is malformed, has an unknown
-/// field, a ratio is non-finite, or an indicator is not exactly 0 or 1.
-#[wasm_bindgen(js_name = ohlsonOScore, unchecked_return_type = "generated.models.ScoringResult")]
-pub fn ohlson_o_score(
-    #[wasm_bindgen(unchecked_param_type = "generated.models.OhlsonOScoreInput | string")]
-    input: JsValue,
-) -> Result<JsValue, JsValue> {
-    let input: OhlsonOScoreInput = from_js_json(&input, "input")?;
-    to_js_value(&scoring::ohlson_o_score(&input).map_err(to_js_err)?)
-}
+    /// Altman emerging-market score: the Z''-Score plus a constant of 3.25.
+    /// @param input - `AltmanZDoublePrimeInput` object or JSON text: `working_capital_to_total_assets` (X1), `retained_earnings_to_total_assets` (X2), `ebit_to_total_assets` (X3) and `book_equity_to_total_liabilities` (X4), all decimal ratios.
+    /// @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is `null`.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if the input is malformed, has an unknown
+    /// field, or a ratio is non-finite.
+    altman_em_score as altmanEmScore (AltmanZDoublePrimeInput, "generated.models.AltmanZDoublePrimeInput | string");
 
-/// Zmijewski (1984) probit financial-distress model.
-/// @param input - `ZmijewskiInput` object or JSON text: `net_income_to_total_assets` (ROA), `total_liabilities_to_total_assets` (debt ratio) and `current_assets_to_current_liabilities` (current ratio), all decimal ratios.
-/// @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is the probit probability.
-///
-/// # Errors
-///
-/// Throws a `validation` error if the input is malformed, has an unknown
-/// field, or a ratio is non-finite.
-#[wasm_bindgen(js_name = zmijewskiScore, unchecked_return_type = "generated.models.ScoringResult")]
-pub fn zmijewski_score(
-    #[wasm_bindgen(unchecked_param_type = "generated.models.ZmijewskiInput | string")]
-    input: JsValue,
-) -> Result<JsValue, JsValue> {
-    let input: ZmijewskiInput = from_js_json(&input, "input")?;
-    to_js_value(&scoring::zmijewski_score(&input).map_err(to_js_err)?)
+    /// Ohlson (1980) O-Score logit bankruptcy model.
+    /// @param input - `OhlsonOScoreInput` object or JSON text: `log_total_assets_adjusted` (log of total assets over the GNP price-level index), `total_liabilities_to_total_assets`, `working_capital_to_total_assets`, `current_liabilities_to_current_assets`, `liabilities_exceed_assets` (indicator, exactly 0 or 1), `net_income_to_total_assets`, `funds_from_operations_to_total_liabilities`, `negative_net_income_two_years` (indicator, exactly 0 or 1) and `net_income_change` (`(NI_t - NI_{t-1}) / (|NI_t| + |NI_{t-1}|)`).
+    /// @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is the logistic probability.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if the input is malformed, has an unknown
+    /// field, a ratio is non-finite, or an indicator is not exactly 0 or 1.
+    ohlson_o_score as ohlsonOScore (OhlsonOScoreInput, "generated.models.OhlsonOScoreInput | string");
+
+    /// Zmijewski (1984) probit financial-distress model.
+    /// @param input - `ZmijewskiInput` object or JSON text: `net_income_to_total_assets` (ROA), `total_liabilities_to_total_assets` (debt ratio) and `current_assets_to_current_liabilities` (current ratio), all decimal ratios.
+    /// @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is the probit probability.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if the input is malformed, has an unknown
+    /// field, or a ratio is non-finite.
+    zmijewski_score as zmijewskiScore (ZmijewskiInput, "generated.models.ZmijewskiInput | string");
 }
 
 /// Score one model and grade its implied PD on the default PD master scale.

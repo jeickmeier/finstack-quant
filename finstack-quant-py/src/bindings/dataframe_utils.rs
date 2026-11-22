@@ -421,7 +421,7 @@ pub(crate) fn extract_opt_f64_vec(
     Ok(out)
 }
 
-fn transpose_cols_to_row_major(cols: &[Vec<f64>]) -> (Vec<f64>, usize, usize) {
+pub(crate) fn transpose_cols_to_row_major(cols: &[Vec<f64>]) -> (Vec<f64>, usize, usize) {
     let ncols = cols.len();
     let nrows = cols.first().map_or(0, Vec::len);
     let mut out = Vec::with_capacity(nrows * ncols);

@@ -14,9 +14,7 @@ from finstack_quant.models import (
 )
 
 # Rust `closed_form::forward` names the model and the rejected argument.
-NEGATIVE_INPUT = (
-    r"(?:Black-76|Bachelier|shifted Black|Shifted Black)[\w -]* (?:vol|normal_vol|expiry) must be non-negative"
-)
+NEGATIVE_INPUT = r"(?:Black-76|Bachelier|shifted Black|Shifted Black)[\w -]* (?:vol|normal_vol|expiry) must be finite and non-negative"
 
 
 @pytest.mark.parametrize("invalid", [math.nan, math.inf, -math.inf])
@@ -38,7 +36,7 @@ def test_invalid_quotes_raise_before_intrinsic(invalid: float, expiry: float) ->
 
 @pytest.mark.parametrize("df", [0.0, -0.95, math.nan, math.inf])
 def test_black76_rejects_invalid_discount_factor(df: float) -> None:
-    with pytest.raises(ValueError, match=r"Black-76 df must be (?:finite|positive)"):
+    with pytest.raises(ValueError, match="Black-76 df must be finite and positive"):
         black76_price(100.0, 100.0, df, 0.2, 1.0, True)
 
 

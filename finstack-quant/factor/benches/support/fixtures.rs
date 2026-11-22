@@ -9,7 +9,7 @@
 
 use std::collections::BTreeMap;
 
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::types::{Attributes, CurveId, IssuerId};
 use finstack_quant_factor::credit::calibration::{
     BetaShrinkage, BucketSizeThresholds, BucketWeighting, CovarianceStrategy,
@@ -76,8 +76,8 @@ pub fn monthly_dates(n: usize) -> Vec<Date> {
     let origin = Date::from_calendar_date(2020, Month::January, 28).expect("valid origin");
     (0..n)
         .map(|i| {
-            PanelFrequency::Monthly
-                .date_after(origin, i32::try_from(i).expect("panel fits i32"))
+            origin
+                .add_months(i32::try_from(i).expect("panel fits i32"))
                 .expect("date in range")
         })
         .collect()

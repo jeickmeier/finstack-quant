@@ -797,7 +797,7 @@ mod calibration_pipeline {
             .expect("calibration succeeds");
 
         for (fid, vol_model) in &model.vol_state.factors {
-            let crate::credit::hierarchy::FactorVolModel::Sample { variance } = vol_model else {
+            let crate::credit::hierarchy::VolModel::Sample { variance } = vol_model else {
                 panic!("expected Sample vol model");
             };
             assert!(

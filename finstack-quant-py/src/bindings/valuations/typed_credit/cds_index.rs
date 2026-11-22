@@ -12,7 +12,7 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
     CdsIndexConstituent, CdsIndexParams, IndexPricing,
 };
 use finstack_quant_valuations::instruments::{CreditParams, Instrument};
-use finstack_quant_valuations::market::conventions::CdsConvention;
+use finstack_quant_valuations::market::conventions::{CdsConvention, CdsValuationConvention};
 use rust_decimal::prelude::ToPrimitive;
 
 use super::super::convert::enum_from_str;
@@ -412,6 +412,9 @@ crate::bindings::macros::py_getters!(PyCdsIndex |s| {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.num_constituents")]
     num_constituents -> Option<u32> = s.inner.num_constituents;
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndex.valuation_convention")]
+    valuation_convention -> PyResult<String> = enum_to_py_string(&s.inner.valuation_convention);
 });
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder")]
@@ -572,6 +575,21 @@ impl PyCdsIndexBuilder {
             num_constituents,
             value.to_string(),
             |b: CdsIndexBuilder| b.num_constituents(value)
+        )
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_index", "CdsIndexBuilder.valuation_convention")]
+    #[pyo3(text_signature = "($self, value)")]
+    fn valuation_convention<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &str,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let convention: CdsValuationConvention = enum_from_str(value, "valuation_convention")?;
+        builder_set!(
+            slf,
+            valuation_convention,
+            format!("{value:?}"),
+            |b: CdsIndexBuilder| b.valuation_convention(convention)
         )
     }
 

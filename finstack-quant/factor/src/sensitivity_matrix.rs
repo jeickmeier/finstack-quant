@@ -24,7 +24,6 @@ pub struct SensitivityMatrix {
     position_ids: Vec<String>,
     factor_ids: Vec<FactorId>,
     data: Vec<f64>,
-    n_factors: usize,
 }
 
 #[derive(Deserialize)]
@@ -37,8 +36,9 @@ struct SensitivityMatrixWire {
 
 impl Serialize for SensitivityMatrix {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let n_factors = self.n_factors();
         let rows: Vec<&[f64]> = (0..self.n_positions())
-            .map(|index| &self.data[index * self.n_factors..(index + 1) * self.n_factors])
+            .map(|index| &self.data[index * n_factors..(index + 1) * n_factors])
             .collect();
         let mut state = serializer.serialize_struct("SensitivityMatrix", 3)?;
         state.serialize_field("position_ids", &self.position_ids)?;
@@ -139,7 +139,6 @@ impl SensitivityMatrix {
             position_ids,
             factor_ids,
             data,
-            n_factors,
         })
     }
 
@@ -157,7 +156,6 @@ impl SensitivityMatrix {
             position_ids,
             factor_ids,
             data: vec![0.0; n_positions * n_factors],
-            n_factors,
         }
     }
 
@@ -182,7 +180,7 @@ impl SensitivityMatrix {
     /// Return the number of factors.
     #[must_use]
     pub fn n_factors(&self) -> usize {
-        self.n_factors
+        self.factor_ids.len()
     }
 
     /// Set a matrix element.
@@ -200,17 +198,17 @@ impl SensitivityMatrix {
     /// out-of-range `factor_idx` can land inside another position's row,
     /// and a silent wrong write in release builds is a risk bug.
     pub fn set_delta(&mut self, position_idx: usize, factor_idx: usize, value: f64) {
+        let n_factors = self.n_factors();
         assert!(
             position_idx < self.n_positions(),
             "position_idx {position_idx} out of bounds for {} positions",
             self.n_positions()
         );
         assert!(
-            factor_idx < self.n_factors,
-            "factor_idx {factor_idx} out of bounds for {} factors",
-            self.n_factors
+            factor_idx < n_factors,
+            "factor_idx {factor_idx} out of bounds for {n_factors} factors"
         );
-        self.data[position_idx * self.n_factors + factor_idx] = value;
+        self.data[position_idx * n_factors + factor_idx] = value;
     }
 
     fn check_position(&self, position_idx: usize) -> finstack_quant_core::Result<()> {
@@ -224,12 +222,12 @@ impl SensitivityMatrix {
     }
 
     fn check_factor(&self, factor_idx: usize) -> finstack_quant_core::Result<()> {
-        if factor_idx < self.n_factors {
+        let n_factors = self.n_factors();
+        if factor_idx < n_factors {
             return Ok(());
         }
         Err(finstack_quant_core::Error::Validation(format!(
-            "factor_idx {factor_idx} out of bounds for {} factors",
-            self.n_factors
+            "factor_idx {factor_idx} out of bounds for {n_factors} factors"
         )))
     }
 
@@ -254,7 +252,7 @@ impl SensitivityMatrix {
     ) -> finstack_quant_core::Result<f64> {
         self.check_position(position_idx)?;
         self.check_factor(factor_idx)?;
-        Ok(self.data[position_idx * self.n_factors + factor_idx])
+        Ok(self.data[position_idx * self.n_factors() + factor_idx])
     }
 
     /// Return one position's row across all factors, rejecting an out-of-range index.
@@ -269,8 +267,9 @@ impl SensitivityMatrix {
     /// is out of bounds.
     pub fn position_deltas(&self, position_idx: usize) -> finstack_quant_core::Result<&[f64]> {
         self.check_position(position_idx)?;
-        let start = position_idx * self.n_factors;
-        Ok(&self.data[start..start + self.n_factors])
+        let n_factors = self.n_factors();
+        let start = position_idx * n_factors;
+        Ok(&self.data[start..start + n_factors])
     }
 
     /// Return one factor's column across all positions, rejecting an out-of-range index.
@@ -289,7 +288,7 @@ impl SensitivityMatrix {
             .data
             .iter()
             .skip(factor_idx)
-            .step_by(self.n_factors)
+            .step_by(self.n_factors())
             .copied()
             .collect())
     }

@@ -62,6 +62,15 @@ const modelsService = createModelsService(
     portfolio: { Portfolio: native.Portfolio },
   }),
 );
+/** Parse a deal once, pass it to `run`, and free the WASM handle on exit. */
+function withDeal<T>(instrumentJson: string, run: (deal: any) => T): T {
+  const deal = native.StructuredCredit.fromJson(instrumentJson);
+  try {
+    return run(deal);
+  } finally {
+    deal.free();
+  }
+}
 beforeEach(() => {
   vi.stubGlobal("Worker", class {});
   call = vi.fn(async (method: string, request: any) => {
@@ -142,6 +151,40 @@ beforeEach(() => {
           deal.free();
         }
       }
+      case "trancheMetricFieldUnits":
+        return native.trancheMetricFieldUnits(request);
+      case "trancheSolveFieldUnits":
+        return native.trancheSolveFieldUnits();
+      case "trancheBreakevenCdr":
+        return withDeal(request.instrumentJson, (deal) =>
+          native.trancheBreakevenCdr(
+            deal,
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+          ),
+        );
+      case "trancheDiscountMargin":
+        return withDeal(request.instrumentJson, (deal) =>
+          native.trancheDiscountMargin(
+            deal,
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+            request.marketPricePct,
+          ),
+        );
+      case "trancheOas":
+        return withDeal(request.instrumentJson, (deal) =>
+          native.trancheOas(
+            deal,
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+            request.marketPricePct,
+            request.configJson,
+          ),
+        );
       case "poolReport": {
         const deal = native.StructuredCredit.fromJson(request.instrumentJson);
         try {
@@ -234,6 +277,8 @@ beforeEach(() => {
         } catch (error) {
           throw new FinstackError(errorValue(error));
         }
+      default:
+        throw new Error(`Unexpected worker call: ${method}`);
     }
   });
   close = vi.fn();

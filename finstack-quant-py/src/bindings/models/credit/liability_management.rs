@@ -1,7 +1,7 @@
 //! Python bindings for `finstack_quant_models::credit::liability_management`.
 
 use crate::bindings::core::table::PyArrowTable;
-use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
@@ -28,60 +28,6 @@ pub struct PyExchangeOfferAnalysis {
 
 #[pymethods]
 impl PyExchangeOfferAnalysis {
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.exchange_type")]
-    #[getter]
-    fn exchange_type(&self) -> PyResult<String> {
-        serde_label(&self.inner.exchange_type).map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.old_npv")]
-    #[getter]
-    fn old_npv(&self) -> f64 {
-        self.inner.old_npv
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.new_npv")]
-    #[getter]
-    fn new_npv(&self) -> f64 {
-        self.inner.new_npv
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.consent_fee")]
-    #[getter]
-    fn consent_fee(&self) -> f64 {
-        self.inner.consent_fee
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.equity_sweetener_value")]
-    #[getter]
-    fn equity_sweetener_value(&self) -> f64 {
-        self.inner.equity_sweetener_value
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.tender_total")]
-    #[getter]
-    fn tender_total(&self) -> f64 {
-        self.inner.tender_total
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.delta_npv")]
-    #[getter]
-    fn delta_npv(&self) -> f64 {
-        self.inner.delta_npv
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.breakeven_recovery")]
-    #[getter]
-    fn breakeven_recovery(&self) -> f64 {
-        self.inner.breakeven_recovery
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.tender_recommended")]
-    #[getter]
-    fn tender_recommended(&self) -> bool {
-        self.inner.tender_recommended
-    }
-
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
             "ExchangeOfferAnalysis(exchange_type='{}', tender_total={}, delta_npv={}, \
@@ -93,6 +39,27 @@ impl PyExchangeOfferAnalysis {
         ))
     }
 }
+
+py_getters!(PyExchangeOfferAnalysis |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.exchange_type")]
+    exchange_type -> PyResult<String> = serde_label(&s.inner.exchange_type).map_err(core_to_py);
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.old_npv")]
+    old_npv -> f64 = s.inner.old_npv;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.new_npv")]
+    new_npv -> f64 = s.inner.new_npv;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.consent_fee")]
+    consent_fee -> f64 = s.inner.consent_fee;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.equity_sweetener_value")]
+    equity_sweetener_value -> f64 = s.inner.equity_sweetener_value;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.tender_total")]
+    tender_total -> f64 = s.inner.tender_total;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.delta_npv")]
+    delta_npv -> f64 = s.inner.delta_npv;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.breakeven_recovery")]
+    breakeven_recovery -> f64 = s.inner.breakeven_recovery;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOfferAnalysis.tender_recommended")]
+    tender_recommended -> bool = s.inner.tender_recommended;
+});
 
 impl PyExchangeOfferAnalysis {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -140,36 +107,6 @@ pub struct PyLeverageImpact {
 
 #[pymethods]
 impl PyLeverageImpact {
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact.pre_total_debt")]
-    #[getter]
-    fn pre_total_debt(&self) -> f64 {
-        self.inner.pre_total_debt
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact.post_total_debt")]
-    #[getter]
-    fn post_total_debt(&self) -> f64 {
-        self.inner.post_total_debt
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact.pre_leverage")]
-    #[getter]
-    fn pre_leverage(&self) -> f64 {
-        self.inner.pre_leverage
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact.post_leverage")]
-    #[getter]
-    fn post_leverage(&self) -> f64 {
-        self.inner.post_leverage
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact.leverage_reduction")]
-    #[getter]
-    fn leverage_reduction(&self) -> f64 {
-        self.inner.leverage_reduction
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "LeverageImpact(pre_leverage={}, post_leverage={}, leverage_reduction={})",
@@ -177,6 +114,19 @@ impl PyLeverageImpact {
         )
     }
 }
+
+py_getters!(PyLeverageImpact |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact.pre_total_debt")]
+    pre_total_debt -> f64 = s.inner.pre_total_debt;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact.post_total_debt")]
+    post_total_debt -> f64 = s.inner.post_total_debt;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact.pre_leverage")]
+    pre_leverage -> f64 = s.inner.pre_leverage;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact.post_leverage")]
+    post_leverage -> f64 = s.inner.post_leverage;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LeverageImpact.leverage_reduction")]
+    leverage_reduction -> f64 = s.inner.leverage_reduction;
+});
 
 impl PyLeverageImpact {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -217,51 +167,6 @@ pub struct PyLmeAnalysis {
 
 #[pymethods]
 impl PyLmeAnalysis {
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.lme_type")]
-    #[getter]
-    fn lme_type(&self) -> PyResult<String> {
-        serde_label(&self.inner.lme_type).map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.cost")]
-    #[getter]
-    fn cost(&self) -> f64 {
-        self.inner.cost
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.notional_reduction")]
-    #[getter]
-    fn notional_reduction(&self) -> f64 {
-        self.inner.notional_reduction
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.discount_capture")]
-    #[getter]
-    fn discount_capture(&self) -> f64 {
-        self.inner.discount_capture
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.discount_capture_pct")]
-    #[getter]
-    fn discount_capture_pct(&self) -> f64 {
-        self.inner.discount_capture_pct
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.remaining_holder_impact_pct")]
-    #[getter]
-    fn remaining_holder_impact_pct(&self) -> f64 {
-        self.inner.remaining_holder_impact_pct
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.leverage_impact")]
-    #[getter]
-    fn leverage_impact(&self) -> Option<PyLeverageImpact> {
-        self.inner
-            .leverage_impact
-            .clone()
-            .map(|inner| PyLeverageImpact { inner })
-    }
-
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
             "LmeAnalysis(lme_type='{}', cost={}, notional_reduction={}, discount_capture={})",
@@ -272,6 +177,27 @@ impl PyLmeAnalysis {
         ))
     }
 }
+
+py_getters!(PyLmeAnalysis |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.lme_type")]
+    lme_type -> PyResult<String> = serde_label(&s.inner.lme_type).map_err(core_to_py);
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.cost")]
+    cost -> f64 = s.inner.cost;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.notional_reduction")]
+    notional_reduction -> f64 = s.inner.notional_reduction;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.discount_capture")]
+    discount_capture -> f64 = s.inner.discount_capture;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.discount_capture_pct")]
+    discount_capture_pct -> f64 = s.inner.discount_capture_pct;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.remaining_holder_impact_pct")]
+    remaining_holder_impact_pct -> f64 = s.inner.remaining_holder_impact_pct;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeAnalysis.leverage_impact")]
+    leverage_impact -> Option<PyLeverageImpact> = s
+        .inner
+        .leverage_impact
+        .clone()
+        .map(|inner| PyLeverageImpact { inner });
+});
 
 impl PyLmeAnalysis {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -349,41 +275,24 @@ impl PyExchangeOffer {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.old_pv")]
-    #[getter]
-    fn old_pv(&self) -> f64 {
-        self.inner.old_pv
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.new_pv")]
-    #[getter]
-    fn new_pv(&self) -> f64 {
-        self.inner.new_pv
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.consent_fee")]
-    #[getter]
-    fn consent_fee(&self) -> f64 {
-        self.inner.consent_fee
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.equity_sweetener_value")]
-    #[getter]
-    fn equity_sweetener_value(&self) -> f64 {
-        self.inner.equity_sweetener_value
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.exchange_type")]
-    #[getter]
-    fn exchange_type(&self) -> PyResult<String> {
-        serde_label(&self.inner.exchange_type).map_err(core_to_py)
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("ExchangeOffer", &self.inner)
     }
 }
+
+py_getters!(PyExchangeOffer |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.old_pv")]
+    old_pv -> f64 = s.inner.old_pv;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.new_pv")]
+    new_pv -> f64 = s.inner.new_pv;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.consent_fee")]
+    consent_fee -> f64 = s.inner.consent_fee;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.equity_sweetener_value")]
+    equity_sweetener_value -> f64 = s.inner.equity_sweetener_value;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "ExchangeOffer.exchange_type")]
+    exchange_type -> PyResult<String> = serde_label(&s.inner.exchange_type).map_err(core_to_py);
+});
 
 wire_methods!(
     PyExchangeOffer,
@@ -428,41 +337,24 @@ impl PyLmeTerms {
         })
     }
 
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.lme_type")]
-    #[getter]
-    fn lme_type(&self) -> PyResult<String> {
-        serde_label(&self.inner.lme_type).map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.notional")]
-    #[getter]
-    fn notional(&self) -> f64 {
-        self.inner.notional
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.repurchase_price_pct")]
-    #[getter]
-    fn repurchase_price_pct(&self) -> f64 {
-        self.inner.repurchase_price_pct
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.opt_acceptance_pct")]
-    #[getter]
-    fn opt_acceptance_pct(&self) -> f64 {
-        self.inner.opt_acceptance_pct
-    }
-
-    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.ebitda")]
-    #[getter]
-    fn ebitda(&self) -> Option<f64> {
-        self.inner.ebitda
-    }
-
     #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.__repr__")]
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("LmeTerms", &self.inner)
     }
 }
+
+py_getters!(PyLmeTerms |s| {
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.lme_type")]
+    lme_type -> PyResult<String> = serde_label(&s.inner.lme_type).map_err(core_to_py);
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.notional")]
+    notional -> f64 = s.inner.notional;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.repurchase_price_pct")]
+    repurchase_price_pct -> f64 = s.inner.repurchase_price_pct;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.opt_acceptance_pct")]
+    opt_acceptance_pct -> f64 = s.inner.opt_acceptance_pct;
+    #[doc = pydoc!("finstack_quant.models.credit.liability_management", "LmeTerms.ebitda")]
+    ebitda -> Option<f64> = s.inner.ebitda;
+});
 
 wire_methods!(
     PyLmeTerms,

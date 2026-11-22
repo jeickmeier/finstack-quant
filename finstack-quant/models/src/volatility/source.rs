@@ -818,6 +818,68 @@ pub fn materialize_cube_tenor_slice(
     )
 }
 
+enum CubeSliceAxis {
+    Tenor(f64),
+    Expiry(f64),
+}
+
+fn evaluate_cube_slice_grid(
+    cube: &VolCube,
+    axis: CubeSliceAxis,
+    strikes: &[f64],
+    normal: bool,
+) -> Result<(Vec<f64>, Option<Vec<f64>>, VolQuoteType)> {
+    let (label, fixed_axis, fixed_coord, sampled_axis) = match axis {
+        CubeSliceAxis::Tenor(tenor) => ("tenor", cube.tenors(), tenor, cube.expiries()),
+        CubeSliceAxis::Expiry(expiry) => ("expiry", cube.expiries(), expiry, cube.tenors()),
+    };
+    if strikes.is_empty()
+        || !fixed_coord.is_finite()
+        || strikes.iter().any(|value| !value.is_finite())
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{label} slice needs a finite {label} and a non-empty, finite strike grid"
+        )));
+    }
+    segment(fixed_axis, fixed_coord)?;
+    let convention = if normal {
+        VolatilityConvention::Normal
+    } else {
+        VolatilityConvention::Lognormal
+    };
+    let coords = |sample: f64| match axis {
+        CubeSliceAxis::Tenor(tenor) => (sample, tenor),
+        CubeSliceAxis::Expiry(expiry) => (expiry, sample),
+    };
+    let mut values = Vec::with_capacity(sampled_axis.len() * strikes.len());
+    for &sample in sampled_axis {
+        let (expiry, tenor) = coords(sample);
+        for &strike in strikes {
+            values.push(get_cube_vol(cube, expiry, tenor, strike, convention)?);
+        }
+    }
+    let displacements = if normal {
+        None
+    } else {
+        let shifts = sampled_axis
+            .iter()
+            .map(|&sample| {
+                let (expiry, tenor) = coords(sample);
+                cube_black_shift(cube, expiry, tenor)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        materialized_displacements(shifts)?
+    };
+    let quote_type = if normal {
+        VolQuoteType::Normal
+    } else if displacements.is_some() {
+        VolQuoteType::ShiftedBlackLognormal
+    } else {
+        VolQuoteType::BlackLognormal
+    };
+    Ok((values, displacements, quote_type))
+}
+
 fn materialize_cube_tenor_slice_with_convention(
     cube: &VolCube,
     tenor: f64,
@@ -825,38 +887,8 @@ fn materialize_cube_tenor_slice_with_convention(
     normal: bool,
     interpolation_mode: VolInterpolationMode,
 ) -> Result<VolSurface> {
-    if strikes.is_empty() || !tenor.is_finite() || strikes.iter().any(|value| !value.is_finite()) {
-        return Err(finstack_quant_core::Error::Validation(
-            "tenor slice needs a finite tenor and a non-empty, finite strike grid".to_string(),
-        ));
-    }
-    segment(cube.tenors(), tenor)?;
-    let mut values = Vec::with_capacity(cube.expiries().len() * strikes.len());
-    for &expiry in cube.expiries() {
-        for &strike in strikes {
-            values.push(get_cube_vol(
-                cube,
-                expiry,
-                tenor,
-                strike,
-                if normal {
-                    VolatilityConvention::Normal
-                } else {
-                    VolatilityConvention::Lognormal
-                },
-            )?);
-        }
-    }
-    let displacements = if normal {
-        None
-    } else {
-        let shifts = cube
-            .expiries()
-            .iter()
-            .map(|&expiry| cube_black_shift(cube, expiry, tenor))
-            .collect::<Result<Vec<_>>>()?;
-        materialized_displacements(shifts)?
-    };
+    let (values, displacements, quote_type) =
+        evaluate_cube_slice_grid(cube, CubeSliceAxis::Tenor(tenor), strikes, normal)?;
     if interpolation_mode == VolInterpolationMode::TotalVariance
         && displacements.as_ref().is_some_and(|shifts| {
             shifts
@@ -869,13 +901,6 @@ fn materialize_cube_tenor_slice_with_convention(
                 .into(),
         ));
     }
-    let quote_type = if normal {
-        VolQuoteType::Normal
-    } else if displacements.is_some() {
-        VolQuoteType::ShiftedBlackLognormal
-    } else {
-        VolQuoteType::BlackLognormal
-    };
     let mut surface = VolSurface::from_grid(
         cube.id().as_str(),
         cube.expiries(),
@@ -924,45 +949,8 @@ fn materialize_cube_expiry_slice_with_convention(
     strikes: &[f64],
     normal: bool,
 ) -> Result<VolCubeExpirySlice> {
-    if strikes.is_empty() || !expiry.is_finite() || strikes.iter().any(|value| !value.is_finite()) {
-        return Err(finstack_quant_core::Error::Validation(
-            "expiry slice needs a finite expiry and a non-empty, finite strike grid".to_string(),
-        ));
-    }
-    segment(cube.expiries(), expiry)?;
-    let mut values = Vec::with_capacity(cube.tenors().len() * strikes.len());
-    for &tenor in cube.tenors() {
-        for &strike in strikes {
-            values.push(get_cube_vol(
-                cube,
-                expiry,
-                tenor,
-                strike,
-                if normal {
-                    VolatilityConvention::Normal
-                } else {
-                    VolatilityConvention::Lognormal
-                },
-            )?);
-        }
-    }
-    let displacements = if normal {
-        None
-    } else {
-        let shifts = cube
-            .tenors()
-            .iter()
-            .map(|&tenor| cube_black_shift(cube, expiry, tenor))
-            .collect::<Result<Vec<_>>>()?;
-        materialized_displacements(shifts)?
-    };
-    let quote_type = if normal {
-        VolQuoteType::Normal
-    } else if displacements.is_some() {
-        VolQuoteType::ShiftedBlackLognormal
-    } else {
-        VolQuoteType::BlackLognormal
-    };
+    let (values, displacements, quote_type) =
+        evaluate_cube_slice_grid(cube, CubeSliceAxis::Expiry(expiry), strikes, normal)?;
     let mut slice = VolCubeExpirySlice::from_grid(
         cube.id().as_str(),
         expiry,

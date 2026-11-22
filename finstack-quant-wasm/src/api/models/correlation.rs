@@ -99,31 +99,18 @@ impl JsCopulaSpec {
             .map(|inner| JsCopula { inner })
             .map_err(to_js_err)
     }
-
-    /// True if this is a Gaussian spec.
-    #[wasm_bindgen(getter, js_name = isGaussian)]
-    pub fn is_gaussian(&self) -> bool {
-        self.inner.is_gaussian()
-    }
-
-    /// True if this is a Student-t spec.
-    #[wasm_bindgen(getter, js_name = isStudentT)]
-    pub fn is_student_t(&self) -> bool {
-        self.inner.is_student_t()
-    }
-
-    /// True if this is a Random Factor Loading spec.
-    #[wasm_bindgen(getter, js_name = isRfl)]
-    pub fn is_rfl(&self) -> bool {
-        self.inner.is_rfl()
-    }
-
-    /// True if this is a Multi-factor spec.
-    #[wasm_bindgen(getter, js_name = isMultiFactor)]
-    pub fn is_multi_factor(&self) -> bool {
-        self.inner.is_multi_factor()
-    }
 }
+
+wasm_getters!(JsCopulaSpec, CopulaSpec |s| {
+    /// True if this is a Gaussian spec.
+    is_gaussian as isGaussian -> bool = s.inner.is_gaussian();
+    /// True if this is a Student-t spec.
+    is_student_t as isStudentT -> bool = s.inner.is_student_t();
+    /// True if this is a Random Factor Loading spec.
+    is_rfl as isRfl -> bool = s.inner.is_rfl();
+    /// True if this is a Multi-factor spec.
+    is_multi_factor as isMultiFactor -> bool = s.inner.is_multi_factor();
+});
 
 /// Concrete copula model for portfolio default correlation.
 ///
@@ -139,6 +126,13 @@ impl JsCopulaSpec {
 pub struct JsCopula {
     inner: Box<dyn Copula + Send + Sync>,
 }
+
+wasm_getters!(JsCopula, Copula |s| {
+    /// Number of systematic factors in the model.
+    num_factors as numFactors -> usize = s.inner.num_factors();
+    /// Model name for diagnostics.
+    model_name as modelName -> String = s.inner.model_name().to_string();
+});
 
 #[wasm_bindgen(js_class = Copula)]
 impl JsCopula {
@@ -168,18 +162,6 @@ impl JsCopula {
         self.inner
             .conditional_default_prob_checked(default_threshold, factor_realization, correlation)
             .map_err(to_js_err)
-    }
-
-    /// Number of systematic factors in the model.
-    #[wasm_bindgen(getter, js_name = numFactors)]
-    pub fn num_factors(&self) -> usize {
-        self.inner.num_factors()
-    }
-
-    /// Model name for diagnostics.
-    #[wasm_bindgen(getter, js_name = modelName)]
-    pub fn model_name(&self) -> String {
-        self.inner.model_name().to_string()
     }
 
     /// Strict lower-tail dependence coefficient `λ_L` at the given
@@ -328,12 +310,6 @@ pub struct JsRecoveryModel {
 
 #[wasm_bindgen(js_class = RecoveryModel)]
 impl JsRecoveryModel {
-    /// Expected (unconditional) recovery rate.
-    #[wasm_bindgen(getter, js_name = expectedRecovery)]
-    pub fn expected_recovery(&self) -> f64 {
-        self.inner.expected_recovery()
-    }
-
     /// Expected recovery conditional on the systematic market factor, integrating the independent obligor shock.
     /// @returns Conditional mean recovery in `[0, 1]`.
     /// @throws Throws a `validation` error for a non-finite factor or a `computation` error if integration fails.
@@ -348,12 +324,6 @@ impl JsRecoveryModel {
         self.inner
             .conditional_recovery(market_factor)
             .map_err(to_js_err)
-    }
-
-    /// Loss given default (1 − recovery).
-    #[wasm_bindgen(getter, js_name = lgd)]
-    pub fn lgd(&self) -> f64 {
-        self.inner.lgd()
     }
 
     /// Conditional expected LGD given the systematic market factor.
@@ -389,31 +359,22 @@ impl JsRecoveryModel {
             .sample_recovery(market_factor, idiosyncratic_normal)
             .map_err(to_js_err)
     }
-
-    /// Whether sampling needs an independent obligor recovery draw.
-    #[wasm_bindgen(getter, js_name = hasIdiosyncraticDispersion)]
-    pub fn has_idiosyncratic_dispersion(&self) -> bool {
-        self.inner.has_idiosyncratic_dispersion()
-    }
-
-    /// Local recovery shock scale in decimals, not realized recovery standard deviation.
-    #[wasm_bindgen(getter, js_name = recoveryVolatility)]
-    pub fn recovery_volatility(&self) -> f64 {
-        self.inner.recovery_volatility()
-    }
-
-    /// Whether the recovery distribution is nonconstant, including obligor-only variation.
-    #[wasm_bindgen(getter, js_name = isStochastic)]
-    pub fn is_stochastic(&self) -> bool {
-        self.inner.is_stochastic()
-    }
-
-    /// Model name for diagnostics.
-    #[wasm_bindgen(getter, js_name = modelName)]
-    pub fn model_name(&self) -> String {
-        self.inner.model_name().to_string()
-    }
 }
+
+wasm_getters!(JsRecoveryModel, RecoveryModel |s| {
+    /// Expected (unconditional) recovery rate.
+    expected_recovery as expectedRecovery -> f64 = s.inner.expected_recovery();
+    /// Loss given default (1 − recovery).
+    lgd -> f64 = s.inner.lgd();
+    /// Whether sampling needs an independent obligor recovery draw.
+    has_idiosyncratic_dispersion as hasIdiosyncraticDispersion -> bool = s.inner.has_idiosyncratic_dispersion();
+    /// Local recovery shock scale in decimals, not realized recovery standard deviation.
+    recovery_volatility as recoveryVolatility -> f64 = s.inner.recovery_volatility();
+    /// Whether the recovery distribution is nonconstant, including obligor-only variation.
+    is_stochastic as isStochastic -> bool = s.inner.is_stochastic();
+    /// Model name for diagnostics.
+    model_name as modelName -> String = s.inner.model_name().to_string();
+});
 
 /// Fréchet-Hoeffding correlation bounds for two Bernoulli marginals.
 ///
@@ -444,14 +405,6 @@ pub fn correlation_bounds(
 /// semi-definiteness. Returns nothing on success; raises a descriptive error
 /// (including the failing dimension or constraint) otherwise.
 ///
-/// # Arguments
-///
-/// * `matrix` - Flat row-major `n * n` correlation coefficients; unit
-///   diagonal, off-diagonals in `[-1, 1]`.
-/// * `n` - Finite non-negative integer square-matrix dimension no greater
-///   than `4294967295`; `matrix` must contain exactly `n * n` entries, and
-///   an empty matrix uses zero.
-///
 /// # Errors
 ///
 /// Throws a JavaScript exception if `n` is non-finite, fractional, negative,
@@ -477,17 +430,6 @@ pub fn validate_correlation_matrix(
 /// matrix but fails Cholesky by a small margin, returns the nearest valid
 /// correlation matrix (symmetric, unit diagonal, PSD) in Frobenius norm.
 /// Gross input violations raise rather than being silently reshaped.
-///
-/// # Arguments
-///
-/// * `matrix` - Flat row-major `n * n` near-correlation matrix to project
-///   onto the correlation set.
-/// * `n` - Non-negative integer square-matrix dimension; `matrix` must
-///   contain exactly `n * n` entries, and an empty matrix uses zero.
-/// * `max_iter` - Optional non-negative integer limit on Higham projection
-///   iterations; omitted uses Rust `NearestCorrelationOpts::default()` (200).
-/// * `tol` - Optional positive convergence tolerance for the projection;
-///   omitted uses Rust `NearestCorrelationOpts::default()` (`1e-10`).
 ///
 /// # Errors
 ///
@@ -548,6 +490,19 @@ pub struct JsPortfolioLossResult {
 
 json_round_trip!(JsPortfolioLossResult, PortfolioLossResult);
 
+wasm_getters!(JsPortfolioLossResult, PortfolioLossResult |s| {
+    /// Loss per simulated path, in path order.
+    losses -> Box<[f64]> = s.inner.losses.clone().into_boxed_slice();
+    /// Arithmetic mean path loss.
+    expected_loss as expectedLoss -> f64 = s.inner.expected_loss;
+    /// Loss-positive nearest-rank VaR at `confidence` (larger is worse).
+    var -> f64 = s.inner.var;
+    /// Probability-weighted mean loss in the worst `1 - confidence` tail.
+    expected_shortfall as expectedShortfall -> f64 = s.inner.expected_shortfall;
+    /// Confidence used for `var` and `expectedShortfall`, in `(0, 1)`.
+    confidence -> f64 = s.inner.confidence;
+});
+
 #[wasm_bindgen(js_class = PortfolioLossResult)]
 impl JsPortfolioLossResult {
     /// Aggregate a finite loss distribution under loss-positive conventions.
@@ -574,36 +529,6 @@ impl JsPortfolioLossResult {
         corr::PortfolioLossResult::from_losses(losses, confidence)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
-    }
-
-    /// Loss per simulated path, in path order.
-    #[wasm_bindgen(getter)]
-    pub fn losses(&self) -> Box<[f64]> {
-        self.inner.losses.clone().into_boxed_slice()
-    }
-
-    /// Arithmetic mean path loss.
-    #[wasm_bindgen(getter, js_name = expectedLoss)]
-    pub fn expected_loss(&self) -> f64 {
-        self.inner.expected_loss
-    }
-
-    /// Loss-positive nearest-rank VaR at `confidence` (larger is worse).
-    #[wasm_bindgen(getter)]
-    pub fn var(&self) -> f64 {
-        self.inner.var
-    }
-
-    /// Probability-weighted mean loss in the worst `1 - confidence` tail.
-    #[wasm_bindgen(getter, js_name = expectedShortfall)]
-    pub fn expected_shortfall(&self) -> f64 {
-        self.inner.expected_shortfall
-    }
-
-    /// Confidence used for `var` and `expectedShortfall`, in `(0, 1)`.
-    #[wasm_bindgen(getter)]
-    pub fn confidence(&self) -> f64 {
-        self.inner.confidence
     }
 
     /// Tranche loss statistics for one attachment/detachment pair.
@@ -665,6 +590,23 @@ pub struct JsCorrelatedBernoulli {
     pub(crate) inner: CorrelatedBernoulli,
 }
 
+wasm_getters!(JsCorrelatedBernoulli, CorrelatedBernoulli |s| {
+    /// First marginal probability.
+    p1 -> f64 = s.inner.p1();
+    /// Second marginal probability.
+    p2 -> f64 = s.inner.p2();
+    /// Feasible correlation supplied at construction.
+    correlation -> f64 = s.inner.correlation();
+    /// Probability that both variables equal one.
+    joint_p11 as jointP11 -> f64 = s.inner.joint_p11();
+    /// Probability that the first is one and the second zero.
+    joint_p10 as jointP10 -> f64 = s.inner.joint_p10();
+    /// Probability that the first is zero and the second one.
+    joint_p01 as jointP01 -> f64 = s.inner.joint_p01();
+    /// Probability that both variables equal zero.
+    joint_p00 as jointP00 -> f64 = s.inner.joint_p00();
+});
+
 #[wasm_bindgen(js_class = CorrelatedBernoulli)]
 impl JsCorrelatedBernoulli {
     /// Joint distribution of two Bernoulli variables with a target correlation.
@@ -689,48 +631,6 @@ impl JsCorrelatedBernoulli {
         )
         .map(|inner| Self { inner })
         .map_err(to_js_err)
-    }
-
-    /// First marginal probability.
-    #[wasm_bindgen(getter)]
-    pub fn p1(&self) -> f64 {
-        self.inner.p1()
-    }
-
-    /// Second marginal probability.
-    #[wasm_bindgen(getter)]
-    pub fn p2(&self) -> f64 {
-        self.inner.p2()
-    }
-
-    /// Feasible correlation supplied at construction.
-    #[wasm_bindgen(getter)]
-    pub fn correlation(&self) -> f64 {
-        self.inner.correlation()
-    }
-
-    /// Probability that both variables equal one.
-    #[wasm_bindgen(getter, js_name = jointP11)]
-    pub fn joint_p11(&self) -> f64 {
-        self.inner.joint_p11()
-    }
-
-    /// Probability that the first is one and the second zero.
-    #[wasm_bindgen(getter, js_name = jointP10)]
-    pub fn joint_p10(&self) -> f64 {
-        self.inner.joint_p10()
-    }
-
-    /// Probability that the first is zero and the second one.
-    #[wasm_bindgen(getter, js_name = jointP01)]
-    pub fn joint_p01(&self) -> f64 {
-        self.inner.joint_p01()
-    }
-
-    /// Probability that both variables equal zero.
-    #[wasm_bindgen(getter, js_name = jointP00)]
-    pub fn joint_p00(&self) -> f64 {
-        self.inner.joint_p00()
     }
 
     /// The four joint probabilities.
@@ -877,42 +777,26 @@ pub struct JsLatentFactorKind {
     inner: LatentFactorKind,
 }
 
+wasm_getters!(JsLatentFactorKind, LatentFactorKind |s| {
+    /// Number of systematic factors.
+    num_factors as numFactors -> usize = s.inner.num_factors();
+    /// Factor correlation matrix, flat row-major (`numFactors * numFactors`).
+    correlation_matrix as correlationMatrix -> Box<[f64]> = s.inner.correlation_matrix().into();
+    /// Annualized factor volatilities, one per factor.
+    volatilities -> Box<[f64]> = s.inner.volatilities().into();
+    /// Descriptive factor names, one per factor.
+    factor_names as factorNames -> Vec<String> = s
+        .inner
+        .factor_names()
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+    /// Model name for diagnostics.
+    model_name as modelName -> String = s.inner.model_name().to_string();
+});
+
 #[wasm_bindgen(js_class = LatentFactorKind)]
 impl JsLatentFactorKind {
-    /// Number of systematic factors.
-    #[wasm_bindgen(getter, js_name = numFactors)]
-    pub fn num_factors(&self) -> usize {
-        self.inner.num_factors()
-    }
-
-    /// Factor correlation matrix, flat row-major (`numFactors * numFactors`).
-    #[wasm_bindgen(getter, js_name = correlationMatrix)]
-    pub fn correlation_matrix(&self) -> Box<[f64]> {
-        self.inner.correlation_matrix().into()
-    }
-
-    /// Annualized factor volatilities, one per factor.
-    #[wasm_bindgen(getter)]
-    pub fn volatilities(&self) -> Box<[f64]> {
-        self.inner.volatilities().into()
-    }
-
-    /// Descriptive factor names, one per factor.
-    #[wasm_bindgen(getter, js_name = factorNames)]
-    pub fn factor_names(&self) -> Vec<String> {
-        self.inner
-            .factor_names()
-            .into_iter()
-            .map(str::to_owned)
-            .collect()
-    }
-
-    /// Model name for diagnostics.
-    #[wasm_bindgen(getter, js_name = modelName)]
-    pub fn model_name(&self) -> String {
-        self.inner.model_name().to_string()
-    }
-
     /// Contribution of one factor's own (diagonal) shock to its value.
     /// @param factorIndex - Zero-based factor index; an index beyond the model returns 0.
     /// @param z - Independent standard normal draw for that factor.
@@ -973,25 +857,16 @@ impl JsLatentSingleFactor {
             .map_err(to_js_err)?,
         })
     }
-
-    /// Annualized factor volatility, as a decimal.
-    #[wasm_bindgen(getter)]
-    pub fn volatility(&self) -> f64 {
-        self.inner.volatility()
-    }
-
-    /// Mean-reversion speed per year.
-    #[wasm_bindgen(getter, js_name = meanReversion)]
-    pub fn mean_reversion(&self) -> f64 {
-        self.inner.mean_reversion()
-    }
-
-    /// Number of systematic factors (always 1).
-    #[wasm_bindgen(getter, js_name = numFactors)]
-    pub fn num_factors(&self) -> usize {
-        self.inner.num_factors()
-    }
 }
+
+wasm_getters!(JsLatentSingleFactor, LatentSingleFactor |s| {
+    /// Annualized factor volatility, as a decimal.
+    volatility -> f64 = s.inner.volatility();
+    /// Mean-reversion speed per year.
+    mean_reversion as meanReversion -> f64 = s.inner.mean_reversion();
+    /// Number of systematic factors (always 1).
+    num_factors as numFactors -> usize = s.inner.num_factors();
+});
 
 /// Correlated prepayment and credit latent factors.
 ///
@@ -1052,43 +927,22 @@ impl JsLatentTwoFactor {
             .map(|inner| Self { inner })
             .map_err(to_js_err)
     }
-
-    /// Annualized prepayment-factor volatility, as a decimal.
-    #[wasm_bindgen(getter, js_name = prepayVol)]
-    pub fn prepay_vol(&self) -> f64 {
-        self.inner.prepay_vol()
-    }
-
-    /// Annualized credit-factor volatility, as a decimal.
-    #[wasm_bindgen(getter, js_name = creditVol)]
-    pub fn credit_vol(&self) -> f64 {
-        self.inner.credit_vol()
-    }
-
-    /// Correlation between the prepayment and credit factors.
-    #[wasm_bindgen(getter)]
-    pub fn correlation(&self) -> f64 {
-        self.inner.correlation()
-    }
-
-    /// Number of systematic factors (always 2).
-    #[wasm_bindgen(getter, js_name = numFactors)]
-    pub fn num_factors(&self) -> usize {
-        self.inner.num_factors()
-    }
-
-    /// Off-diagonal Cholesky entry `L[1,0]`, equal to the correlation.
-    #[wasm_bindgen(getter, js_name = choleskyL10)]
-    pub fn cholesky_l10(&self) -> f64 {
-        self.inner.cholesky_l10()
-    }
-
-    /// Diagonal Cholesky entry `L[1,1]`, equal to `sqrt(1 - correlation^2)`.
-    #[wasm_bindgen(getter, js_name = choleskyL11)]
-    pub fn cholesky_l11(&self) -> f64 {
-        self.inner.cholesky_l11()
-    }
 }
+
+wasm_getters!(JsLatentTwoFactor, LatentTwoFactor |s| {
+    /// Annualized prepayment-factor volatility, as a decimal.
+    prepay_vol as prepayVol -> f64 = s.inner.prepay_vol();
+    /// Annualized credit-factor volatility, as a decimal.
+    credit_vol as creditVol -> f64 = s.inner.credit_vol();
+    /// Correlation between the prepayment and credit factors.
+    correlation -> f64 = s.inner.correlation();
+    /// Number of systematic factors (always 2).
+    num_factors as numFactors -> usize = s.inner.num_factors();
+    /// Off-diagonal Cholesky entry `L[1,0]`, equal to the correlation.
+    cholesky_l10 as choleskyL10 -> f64 = s.inner.cholesky_l10();
+    /// Diagonal Cholesky entry `L[1,1]`, equal to `sqrt(1 - correlation^2)`.
+    cholesky_l11 as choleskyL11 -> f64 = s.inner.cholesky_l11();
+});
 
 /// General correlated latent-factor model with a Cholesky factorization.
 ///
@@ -1104,6 +958,15 @@ impl JsLatentTwoFactor {
 pub struct JsLatentMultiFactor {
     inner: LatentMultiFactor,
 }
+
+wasm_getters!(JsLatentMultiFactor, LatentMultiFactor |s| {
+    /// Number of systematic factors.
+    num_factors as numFactors -> usize = s.inner.num_factors();
+    /// Factor correlation matrix, flat row-major.
+    correlation_matrix as correlationMatrix -> Box<[f64]> = s.inner.correlation_matrix().into();
+    /// Annualized factor volatilities, one per factor.
+    volatilities -> Box<[f64]> = s.inner.volatilities().into();
+});
 
 #[wasm_bindgen(js_class = LatentMultiFactor)]
 impl JsLatentMultiFactor {
@@ -1153,24 +1016,6 @@ impl JsLatentMultiFactor {
         )
         .map(|inner| Self { inner })
         .map_err(to_js_err)
-    }
-
-    /// Number of systematic factors.
-    #[wasm_bindgen(getter, js_name = numFactors)]
-    pub fn num_factors(&self) -> usize {
-        self.inner.num_factors()
-    }
-
-    /// Factor correlation matrix, flat row-major.
-    #[wasm_bindgen(getter, js_name = correlationMatrix)]
-    pub fn correlation_matrix(&self) -> Box<[f64]> {
-        self.inner.correlation_matrix().into()
-    }
-
-    /// Annualized factor volatilities, one per factor.
-    #[wasm_bindgen(getter)]
-    pub fn volatilities(&self) -> Box<[f64]> {
-        self.inner.volatilities().into()
     }
 
     /// Turn independent standard normal draws into correlated, volatility-scaled factors.

@@ -35,8 +35,8 @@ the storage type they fill in.
 ## Public surface
 
 The crate root exports configuration, covariance, envelope, factor,
-dependency, and sensitivity types. The public submodules are `matching`,
-`credit`, and `schema`.
+dependency, matching config, and sensitivity types. The public submodules are
+`credit`, `risk`, and `schema`.
 
 | Group | Items |
 |-------|-------|
@@ -44,11 +44,12 @@ dependency, and sensitivity types. The public submodules are `matching`,
 | Market mapping | `MarketMapping` (`CurveParallel`, `CurveBucketed`, `EquitySpot`, `FxRate`, `VolShift`), `MarketDependency`, `DependencyType`, `CurveType` |
 | Run configuration | `FactorModelConfig`, `RiskMeasure`, `BumpSizeConfig`, `UnmatchedPolicy` |
 | Covariance | `FactorCovarianceMatrix` |
-| Persistence | `FactorModelConfigEnvelope`, `FactorModelConfigSchema`, `FACTOR_MODEL_CONFIG_CONTRACT` |
-| Matching (`matching`) | `MatchingConfig`, `MappingRule`, `DependencyFilter`, `AttributeFilter`, `FactorMatcher`, `CascadeMatcher`, `HierarchicalMatcher`, `MappingTableMatcher`, `CreditHierarchicalMatcher`, `HierarchicalConfig`, `CreditHierarchicalConfig`, `FactorMatchEntry`, `FactorMatchError`, `FactorNode`, `bucket_factor_id`, `dimension_key`, `CREDIT_GENERIC_FACTOR_ID`, `ISSUER_ID_META_KEY` |
+| Persistence | `FactorModelConfigEnvelope`, `FactorModelConfigSchema` |
+| Matching | `MatchingConfig`, `MappingRule`, `DependencyFilter`, `AttributeFilter`, `FactorMatcher`, `FactorNode`, `HierarchicalConfig`, `CreditHierarchicalConfig`, `FactorMatchEntry`, `FactorMatchError`, `bucket_factor_id`, `parse_bucket_factor_id`, `CREDIT_GENERIC_FACTOR_ID`, `ISSUER_ID_META_KEY` |
 | Sensitivity | `SensitivityMatrix` |
 | Credit (`credit`) | `credit::hierarchy`, `credit::calibration`, `credit::decomposition` |
-| Schemas (`schema`) | `ARTIFACTS` and the four checked-in `*_schema()` accessors |
+| Risk (`risk`) | `decompose_factors`, `position_risk_report`, `evaluate_risk_budget`, `build_stress_attribution` |
+| Schemas (`schema`) | `ARTIFACTS` and `MODELS_ARTIFACTS` |
 
 ```rust
 use finstack_quant_factor::{FactorDefinition, FactorId, FactorType, MarketMapping};
@@ -270,18 +271,11 @@ semantic validation.
 
 ## Bindings
 
-Only the credit surface is bound; the generic primitives, matching, and
-`SensitivityMatrix` are Rust-only.
-
-- **Python** — `finstack_quant.models.factor.credit` exposes
-  `CreditFactorModel`, `CreditCalibrator`, `LevelsAtDate`,
-  `PeriodDecomposition`, `FactorCovarianceForecast`, `decompose_levels`, and
-  `decompose_period`. `finstack_quant.models.factor.schema` exposes the JSON
-  Schema accessors.
-- **WASM** — the same seven names under `models.factor.credit`
-  ([`exports/models/factor.js`](../../finstack-quant-wasm/exports/models/factor.js));
-  classes keep their Rust names, the two free functions become
-  `decomposeLevels` / `decomposePeriod`. No schema twin.
+Python (`finstack_quant.models.factor`) and WASM (`models.factor`) bind factor
+configuration/covariance wrappers, credit hierarchy calibration and
+decomposition (`credit`), factor/position risk and budget kernels (`risk`), and
+JSON schemas (`schema`), while matching internals and `SensitivityMatrix`
+builder details remain Rust-owned.
 
 The authoritative contract is
 [`parity_contract.toml`](../../finstack-quant-py/parity_contract.toml).
@@ -290,10 +284,10 @@ The authoritative contract is
 
 | Path | Contents |
 |------|----------|
-| [`tests/credit_calibration.rs`](tests/credit_calibration.rs) | Credit calibrator end to end, including the canonical `credit_factor_model.json` golden |
+| [`tests/credit_calibration.rs`](tests/credit_calibration.rs) | Credit calibrator end to end |
 | [`tests/credit_decomposition.rs`](tests/credit_decomposition.rs) | Level and period decomposition |
 | [`tests/host_bridges.rs`](tests/host_bridges.rs) | Accessors and labels the Python and WASM bindings call |
-| [`tests/canonical_contract.rs`](tests/canonical_contract.rs) | Serialization matches the checked-in canonical artifacts byte for byte |
+| [`tests/canonical_contract.rs`](tests/canonical_contract.rs) | Serialization matches the checked-in `credit_factor_model.json` and `factor_model_config.json` goldens byte for byte |
 | [`tests/credit_peel_parity.rs`](tests/credit_peel_parity.rs) | Calibration peel vs. decomposition agreement |
 | [`tests/multi_asset_config.rs`](tests/multi_asset_config.rs) | Generic `FactorModelConfig` across asset classes |
 | [`tests/strictness.rs`](tests/strictness.rs) | `deny_unknown_fields` behavior |

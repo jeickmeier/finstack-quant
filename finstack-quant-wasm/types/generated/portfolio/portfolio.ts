@@ -1084,7 +1084,6 @@ export type RiskMeasure =
          * Confidence level in the open interval `(0.5, 1)`.
          */
         confidence: number;
-        [k: string]: unknown;
       };
     }
   | {
@@ -1093,7 +1092,6 @@ export type RiskMeasure =
          * Confidence level in the open interval `(0.5, 1)`.
          */
         confidence: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -1642,14 +1640,6 @@ export type MarketDependency =
       };
     }
   | {
-      credit_index: {
-        /**
-         * Credit-index aggregate identifier.
-         */
-        id: Id;
-      };
-    }
-  | {
       spot: {
         /**
          * Spot identifier or ticker.
@@ -1964,11 +1954,9 @@ export type ResidualContributionSource =
        */
       issuer_id: string;
       kind: "from_credit_model";
-      [k: string]: unknown;
     }
   | {
       kind: "other";
-      [k: string]: unknown;
     };
 /**
  * What to compute at each replay step.
@@ -4336,7 +4324,6 @@ export interface FactorContribution {
    * denominator cancel).
    */
   relative_risk: number;
-  [k: string]: unknown;
 }
 /**
  * Base/after delta for a single factor contribution.
@@ -7080,7 +7067,6 @@ export interface PositionFactorContribution {
    * Risk attributed to this position-factor pair.
    */
   risk_contribution: number;
-  [k: string]: unknown;
 }
 /**
  * Annualized residual variance contributed by a single position.
@@ -7105,7 +7091,6 @@ export interface PositionResidualContribution {
    * Where the residual variance came from.
    */
   source: ResidualContributionSource;
-  [k: string]: unknown;
 }
 /**
  * Report from reconciling an attribution's effect buckets against its total.

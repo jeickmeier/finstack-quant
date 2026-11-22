@@ -210,165 +210,163 @@ pub fn kyle_lambda(
     Ok(liquidity::kyle_lambda(&returns, &volumes, reference_price))
 }
 
-/// Absolute bid-ask spread of a liquidity profile.
-///
-/// Twin of the Rust `LiquidityProfile::spread` and the Python property
-/// `LiquidityProfile.spread`.
-/// @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
-/// @returns `ask - bid`, in price units.
-///
-/// @example
-/// ```typescript
-/// import init, { models } from "finstack-quant-wasm";
-/// await init();
-/// const profile = {
-///   instrument_id: "XYZ",
-///   mid: 100,
-///   bid: 99.5,
-///   ask: 100.5,
-///   avg_daily_volume: 1_000_000,
-///   avg_trade_size: 200,
-///   spread_volatility: 0.05,
-///   spread_volatility_kind: "absolute" as const,
-///   observation_days: 20,
-/// };
-/// console.log(models.liquidity.liquidityProfileSpread(profile)); // 1
-/// ```
-///
-/// # Errors
-///
-/// Throws a `TypeError` if `profile` is neither a string nor a plain object,
-/// and a `validation` error if it is malformed or fails the profile's
-/// quote and volume checks.
-#[wasm_bindgen(js_name = liquidityProfileSpread)]
-pub fn liquidity_profile_spread(
-    #[wasm_bindgen(unchecked_param_type = "generated.models.LiquidityProfile | string")]
-    profile: JsValue,
-) -> Result<f64, JsValue> {
-    let profile: LiquidityProfile = from_js_json(&profile, "profile")?;
-    Ok(profile.spread())
+macro_rules! liquidity_profile_metric {
+    (
+        $(#[$doc:meta])*
+        $name:ident as $js_name:ident => $method:ident
+    ) => {
+        #[finstack_quant_wasm_macros::plain_docs]
+        $(#[$doc])*
+        #[wasm_bindgen(js_name = $js_name)]
+        pub fn $name(
+            #[wasm_bindgen(unchecked_param_type = "generated.models.LiquidityProfile | string")]
+            profile: JsValue,
+        ) -> Result<f64, JsValue> {
+            let profile: LiquidityProfile = from_js_json(&profile, "profile")?;
+            Ok(profile.$method())
+        }
+    };
 }
 
-/// Relative bid-ask spread of a liquidity profile, as a fraction of mid.
-///
-/// Twin of the Rust `LiquidityProfile::relative_spread` and the Python
-/// property `LiquidityProfile.relative_spread`.
-/// @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
-/// @returns `(ask - bid) / mid`, as a decimal fraction of the mid price.
-///
-/// @example
-/// ```typescript
-/// import init, { models } from "finstack-quant-wasm";
-/// await init();
-/// const profile = {
-///   instrument_id: "XYZ",
-///   mid: 100,
-///   bid: 99.5,
-///   ask: 100.5,
-///   avg_daily_volume: 1_000_000,
-///   avg_trade_size: 200,
-///   spread_volatility: 0.05,
-///   spread_volatility_kind: "absolute" as const,
-///   observation_days: 20,
-/// };
-/// console.log(models.liquidity.liquidityProfileRelativeSpread(profile)); // 0.01
-/// ```
-///
-/// # Errors
-///
-/// Throws a `TypeError` if `profile` is neither a string nor a plain object,
-/// and a `validation` error if it is malformed or fails the profile's
-/// quote and volume checks.
-#[wasm_bindgen(js_name = liquidityProfileRelativeSpread)]
-pub fn liquidity_profile_relative_spread(
-    #[wasm_bindgen(unchecked_param_type = "generated.models.LiquidityProfile | string")]
-    profile: JsValue,
-) -> Result<f64, JsValue> {
-    let profile: LiquidityProfile = from_js_json(&profile, "profile")?;
-    Ok(profile.relative_spread())
-}
+liquidity_profile_metric!(
+    /// Absolute bid-ask spread of a liquidity profile.
+    ///
+    /// Twin of the Rust `LiquidityProfile::spread` and the Python property
+    /// `LiquidityProfile.spread`.
+    /// @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+    /// @returns `ask - bid`, in price units.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { models } from "finstack-quant-wasm";
+    /// await init();
+    /// const profile = {
+    ///   instrument_id: "XYZ",
+    ///   mid: 100,
+    ///   bid: 99.5,
+    ///   ask: 100.5,
+    ///   avg_daily_volume: 1_000_000,
+    ///   avg_trade_size: 200,
+    ///   spread_volatility: 0.05,
+    ///   spread_volatility_kind: "absolute" as const,
+    ///   observation_days: 20,
+    /// };
+    /// console.log(models.liquidity.liquidityProfileSpread(profile)); // 1
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Throws a `TypeError` if `profile` is neither a string nor a plain object,
+    /// and a `validation` error if it is malformed or fails the profile's
+    /// quote and volume checks.
+    liquidity_profile_spread as liquidityProfileSpread => spread
+);
 
-/// Half the absolute bid-ask spread of a liquidity profile: the one-way
-/// transaction cost at mid.
-///
-/// Twin of the Rust `LiquidityProfile::half_spread` and the Python property
-/// `LiquidityProfile.half_spread`.
-/// @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
-/// @returns `0.5 * (ask - bid)`, in price units.
-///
-/// @example
-/// ```typescript
-/// import init, { models } from "finstack-quant-wasm";
-/// await init();
-/// const profile = {
-///   instrument_id: "XYZ",
-///   mid: 100,
-///   bid: 99.5,
-///   ask: 100.5,
-///   avg_daily_volume: 1_000_000,
-///   avg_trade_size: 200,
-///   spread_volatility: 0.05,
-///   spread_volatility_kind: "absolute" as const,
-///   observation_days: 20,
-/// };
-/// console.log(models.liquidity.liquidityProfileHalfSpread(profile)); // 0.5
-/// ```
-///
-/// # Errors
-///
-/// Throws a `TypeError` if `profile` is neither a string nor a plain object,
-/// and a `validation` error if it is malformed or fails the profile's
-/// quote and volume checks.
-#[wasm_bindgen(js_name = liquidityProfileHalfSpread)]
-pub fn liquidity_profile_half_spread(
-    #[wasm_bindgen(unchecked_param_type = "generated.models.LiquidityProfile | string")]
-    profile: JsValue,
-) -> Result<f64, JsValue> {
-    let profile: LiquidityProfile = from_js_json(&profile, "profile")?;
-    Ok(profile.half_spread())
-}
+liquidity_profile_metric!(
+    /// Relative bid-ask spread of a liquidity profile, as a fraction of mid.
+    ///
+    /// Twin of the Rust `LiquidityProfile::relative_spread` and the Python
+    /// property `LiquidityProfile.relative_spread`.
+    /// @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+    /// @returns `(ask - bid) / mid`, as a decimal fraction of the mid price.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { models } from "finstack-quant-wasm";
+    /// await init();
+    /// const profile = {
+    ///   instrument_id: "XYZ",
+    ///   mid: 100,
+    ///   bid: 99.5,
+    ///   ask: 100.5,
+    ///   avg_daily_volume: 1_000_000,
+    ///   avg_trade_size: 200,
+    ///   spread_volatility: 0.05,
+    ///   spread_volatility_kind: "absolute" as const,
+    ///   observation_days: 20,
+    /// };
+    /// console.log(models.liquidity.liquidityProfileRelativeSpread(profile)); // 0.01
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Throws a `TypeError` if `profile` is neither a string nor a plain object,
+    /// and a `validation` error if it is malformed or fails the profile's
+    /// quote and volume checks.
+    liquidity_profile_relative_spread as liquidityProfileRelativeSpread => relative_spread
+);
 
-/// Spread volatility of a liquidity profile normalised to relative
-/// (fraction-of-mid) units.
-///
-/// A `"relative"` `spread_volatility_kind` returns the stored value; an
-/// `"absolute"` one divides it by `mid`. Twin of the Rust
-/// `LiquidityProfile::relative_spread_volatility` and the Python property
-/// `LiquidityProfile.relative_spread_volatility`.
-/// @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
-/// @returns The spread standard deviation as a decimal fraction of the mid price.
-///
-/// @example
-/// ```typescript
-/// import init, { models } from "finstack-quant-wasm";
-/// await init();
-/// const profile = {
-///   instrument_id: "XYZ",
-///   mid: 100,
-///   bid: 99.5,
-///   ask: 100.5,
-///   avg_daily_volume: 1_000_000,
-///   avg_trade_size: 200,
-///   spread_volatility: 0.05,
-///   spread_volatility_kind: "absolute" as const,
-///   observation_days: 20,
-/// };
-/// console.log(models.liquidity.liquidityProfileRelativeSpreadVolatility(profile)); // 0.0005
-/// ```
-///
-/// # Errors
-///
-/// Throws a `TypeError` if `profile` is neither a string nor a plain object,
-/// and a `validation` error if it is malformed or fails the profile's
-/// quote and volume checks.
-#[wasm_bindgen(js_name = liquidityProfileRelativeSpreadVolatility)]
-pub fn liquidity_profile_relative_spread_volatility(
-    #[wasm_bindgen(unchecked_param_type = "generated.models.LiquidityProfile | string")]
-    profile: JsValue,
-) -> Result<f64, JsValue> {
-    let profile: LiquidityProfile = from_js_json(&profile, "profile")?;
-    Ok(profile.relative_spread_volatility())
-}
+liquidity_profile_metric!(
+    /// Half the absolute bid-ask spread of a liquidity profile: the one-way
+    /// transaction cost at mid.
+    ///
+    /// Twin of the Rust `LiquidityProfile::half_spread` and the Python property
+    /// `LiquidityProfile.half_spread`.
+    /// @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+    /// @returns `0.5 * (ask - bid)`, in price units.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { models } from "finstack-quant-wasm";
+    /// await init();
+    /// const profile = {
+    ///   instrument_id: "XYZ",
+    ///   mid: 100,
+    ///   bid: 99.5,
+    ///   ask: 100.5,
+    ///   avg_daily_volume: 1_000_000,
+    ///   avg_trade_size: 200,
+    ///   spread_volatility: 0.05,
+    ///   spread_volatility_kind: "absolute" as const,
+    ///   observation_days: 20,
+    /// };
+    /// console.log(models.liquidity.liquidityProfileHalfSpread(profile)); // 0.5
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Throws a `TypeError` if `profile` is neither a string nor a plain object,
+    /// and a `validation` error if it is malformed or fails the profile's
+    /// quote and volume checks.
+    liquidity_profile_half_spread as liquidityProfileHalfSpread => half_spread
+);
+
+liquidity_profile_metric!(
+    /// Spread volatility of a liquidity profile normalised to relative
+    /// (fraction-of-mid) units.
+    ///
+    /// A `"relative"` `spread_volatility_kind` returns the stored value; an
+    /// `"absolute"` one divides it by `mid`. Twin of the Rust
+    /// `LiquidityProfile::relative_spread_volatility` and the Python property
+    /// `LiquidityProfile.relative_spread_volatility`.
+    /// @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+    /// @returns The spread standard deviation as a decimal fraction of the mid price.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { models } from "finstack-quant-wasm";
+    /// await init();
+    /// const profile = {
+    ///   instrument_id: "XYZ",
+    ///   mid: 100,
+    ///   bid: 99.5,
+    ///   ask: 100.5,
+    ///   avg_daily_volume: 1_000_000,
+    ///   avg_trade_size: 200,
+    ///   spread_volatility: 0.05,
+    ///   spread_volatility_kind: "absolute" as const,
+    ///   observation_days: 20,
+    /// };
+    /// console.log(models.liquidity.liquidityProfileRelativeSpreadVolatility(profile)); // 0.0005
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Throws a `TypeError` if `profile` is neither a string nor a plain object,
+    /// and a `validation` error if it is malformed or fails the profile's
+    /// quote and volume checks.
+    liquidity_profile_relative_spread_volatility as liquidityProfileRelativeSpreadVolatility => relative_spread_volatility
+);
 
 /// Reference price a trade actually uses: its explicit `reference_price`, or
 /// the profile's `mid` when that is `null`.
@@ -435,6 +433,78 @@ pub struct JsAlmgrenChrissModel {
 
 json_round_trip!(JsAlmgrenChrissModel, AlmgrenChrissModel);
 
+wasm_getters!(JsAlmgrenChrissModel, AlmgrenChrissModel |s| {
+    /// Permanent-impact coefficient.
+    gamma -> f64 = s.inner.gamma();
+    /// Temporary-impact coefficient.
+    eta -> f64 = s.inner.eta();
+    /// Temporary-impact exponent on the trading rate.
+    delta -> f64 = s.inner.delta();
+});
+
+macro_rules! impact_model_methods {
+    (
+        $js:ident, $class:ident {
+            $(#[$traj_doc:meta])*
+            optimal_trajectory
+        }
+    ) => {
+        #[finstack_quant_wasm_macros::plain_docs]
+        #[wasm_bindgen(js_class = $class)]
+        impl $js {
+            /// Expected cost and risk of executing a trade at a uniform rate.
+            /// @param params - `TradeParams` object or JSON: `quantity` (signed, in units), `horizon_days`, `daily_volatility`, `profile` (a `LiquidityProfile`), and optional `risk_aversion` and `reference_price`.
+            /// @returns The `ImpactEstimate` object (`permanent_impact`, `temporary_impact`, `total_cost`, `cost_bp`, `execution_risk`).
+            ///
+            /// # Errors
+            ///
+            /// Throws a `validation` error if the parameters are malformed or out of range.
+            #[wasm_bindgen(js_name = estimateCost, unchecked_return_type = "ImpactEstimate")]
+            pub fn estimate_cost(
+                &self,
+                #[wasm_bindgen(unchecked_param_type = "generated.models.TradeParams | string")]
+                params: JsValue,
+            ) -> Result<JsValue, JsValue> {
+                let params: TradeParams = from_js_json(&params, "params")?;
+                to_js_value(&self.inner.estimate_cost(&params).map_err(to_js_err)?)
+            }
+
+            $(#[$traj_doc])*
+            #[wasm_bindgen(js_name = optimalTrajectory, unchecked_return_type = "generated.models.ExecutionTrajectory")]
+            pub fn optimal_trajectory(
+                &self,
+                #[wasm_bindgen(unchecked_param_type = "generated.models.TradeParams | string")]
+                params: JsValue,
+                #[wasm_bindgen(js_name = "numBuckets", unchecked_param_type = "number")]
+                num_buckets: JsValue,
+            ) -> Result<JsValue, JsValue> {
+                let params: TradeParams = from_js_json(&params, "params")?;
+                let trajectory = self
+                    .inner
+                    .optimal_trajectory(&params, js_uint(&num_buckets, "numBuckets")?)
+                    .map_err(to_js_err)?;
+                to_js_value(&trajectory)
+            }
+        }
+    };
+}
+
+impact_model_methods!(
+    JsAlmgrenChrissModel,
+    AlmgrenChrissModel {
+        /// Risk-averse optimal execution schedule (Almgren-Chriss 2000).
+        /// @param params - `TradeParams` object or JSON; `risk_aversion` selects the urgency of the schedule.
+        /// @param numBuckets - Number of equal time buckets over the horizon; a positive safe integer.
+        /// @returns The `ExecutionTrajectory` object (`quantities`, `remaining`, `time_points`, `expected_cost`, `cost_variance`).
+        ///
+        /// # Errors
+        ///
+        /// Throws a `validation` error if the parameters are malformed or
+        /// `numBuckets` is zero.
+        optimal_trajectory
+    }
+);
+
 #[wasm_bindgen(js_class = AlmgrenChrissModel)]
 impl JsAlmgrenChrissModel {
     /// Model from explicit impact coefficients.
@@ -481,66 +551,6 @@ impl JsAlmgrenChrissModel {
         AlmgrenChrissModel::from_profile(&profile, js_f64(&daily_volatility, "dailyVolatility")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
-    }
-
-    /// Permanent-impact coefficient.
-    #[wasm_bindgen(getter)]
-    pub fn gamma(&self) -> f64 {
-        self.inner.gamma()
-    }
-
-    /// Temporary-impact coefficient.
-    #[wasm_bindgen(getter)]
-    pub fn eta(&self) -> f64 {
-        self.inner.eta()
-    }
-
-    /// Temporary-impact exponent on the trading rate.
-    #[wasm_bindgen(getter)]
-    pub fn delta(&self) -> f64 {
-        self.inner.delta()
-    }
-
-    /// Expected cost and risk of executing a trade at a uniform rate.
-    /// @param params - `TradeParams` object or JSON: `quantity` (signed, in units), `horizon_days`, `daily_volatility`, `profile` (a `LiquidityProfile`), and optional `risk_aversion` and `reference_price`.
-    /// @returns The `ImpactEstimate` object (`permanent_impact`, `temporary_impact`, `total_cost`, `cost_bp`, `execution_risk`).
-    ///
-    /// # Errors
-    ///
-    /// Throws a `validation` error if the parameters are malformed or out of range.
-    #[wasm_bindgen(js_name = estimateCost, unchecked_return_type = "ImpactEstimate")]
-    pub fn estimate_cost(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "generated.models.TradeParams | string")]
-        params: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let params: TradeParams = from_js_json(&params, "params")?;
-        to_js_value(&self.inner.estimate_cost(&params).map_err(to_js_err)?)
-    }
-
-    /// Risk-averse optimal execution schedule (Almgren-Chriss 2000).
-    /// @param params - `TradeParams` object or JSON; `risk_aversion` selects the urgency of the schedule.
-    /// @param numBuckets - Number of equal time buckets over the horizon; a positive safe integer.
-    /// @returns The `ExecutionTrajectory` object (`quantities`, `remaining`, `time_points`, `expected_cost`, `cost_variance`).
-    ///
-    /// # Errors
-    ///
-    /// Throws a `validation` error if the parameters are malformed or
-    /// `numBuckets` is zero.
-    #[wasm_bindgen(js_name = optimalTrajectory, unchecked_return_type = "generated.models.ExecutionTrajectory")]
-    pub fn optimal_trajectory(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "generated.models.TradeParams | string")]
-        params: JsValue,
-        #[wasm_bindgen(js_name = "numBuckets", unchecked_param_type = "number")]
-        num_buckets: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let params: TradeParams = from_js_json(&params, "params")?;
-        let trajectory = self
-            .inner
-            .optimal_trajectory(&params, js_uint(&num_buckets, "numBuckets")?)
-            .map_err(to_js_err)?;
-        to_js_value(&trajectory)
     }
 }
 
@@ -606,46 +616,20 @@ impl JsKyleLambdaModel {
     pub fn lambda(&self) -> f64 {
         self.inner.lambda()
     }
-
-    /// Expected cost and risk of executing a trade at a uniform rate.
-    /// @param params - `TradeParams` object or JSON: `quantity` (signed, in units), `horizon_days`, `daily_volatility`, `profile` (a `LiquidityProfile`), and optional `risk_aversion` and `reference_price`.
-    /// @returns The `ImpactEstimate` object (`permanent_impact`, `temporary_impact`, `total_cost`, `cost_bp`, `execution_risk`).
-    ///
-    /// # Errors
-    ///
-    /// Throws a `validation` error if the parameters are malformed or out of range.
-    #[wasm_bindgen(js_name = estimateCost, unchecked_return_type = "ImpactEstimate")]
-    pub fn estimate_cost(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "generated.models.TradeParams | string")]
-        params: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let params: TradeParams = from_js_json(&params, "params")?;
-        to_js_value(&self.inner.estimate_cost(&params).map_err(to_js_err)?)
-    }
-
-    /// Execution schedule under linear impact.
-    /// @param params - `TradeParams` object or JSON describing the trade.
-    /// @param numBuckets - Number of equal time buckets over the horizon; a positive safe integer.
-    /// @returns The `ExecutionTrajectory` object (`quantities`, `remaining`, `time_points`, `expected_cost`, `cost_variance`).
-    ///
-    /// # Errors
-    ///
-    /// Throws a `validation` error if the parameters are malformed or
-    /// `numBuckets` is zero.
-    #[wasm_bindgen(js_name = optimalTrajectory, unchecked_return_type = "generated.models.ExecutionTrajectory")]
-    pub fn optimal_trajectory(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "generated.models.TradeParams | string")]
-        params: JsValue,
-        #[wasm_bindgen(js_name = "numBuckets", unchecked_param_type = "number")]
-        num_buckets: JsValue,
-    ) -> Result<JsValue, JsValue> {
-        let params: TradeParams = from_js_json(&params, "params")?;
-        let trajectory = self
-            .inner
-            .optimal_trajectory(&params, js_uint(&num_buckets, "numBuckets")?)
-            .map_err(to_js_err)?;
-        to_js_value(&trajectory)
-    }
 }
+
+impact_model_methods!(
+    JsKyleLambdaModel,
+    KyleLambdaModel {
+        /// Execution schedule under linear impact.
+        /// @param params - `TradeParams` object or JSON describing the trade.
+        /// @param numBuckets - Number of equal time buckets over the horizon; a positive safe integer.
+        /// @returns The `ExecutionTrajectory` object (`quantities`, `remaining`, `time_points`, `expected_cost`, `cost_variance`).
+        ///
+        /// # Errors
+        ///
+        /// Throws a `validation` error if the parameters are malformed or
+        /// `numBuckets` is zero.
+        optimal_trajectory
+    }
+);

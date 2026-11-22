@@ -51,6 +51,7 @@ pub enum DecompositionMethod {
 /// (typically the portfolio's base currency).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PositionVarContribution {
     /// Position identifier.
     pub position_id: String,
@@ -101,6 +102,7 @@ pub struct PositionVarContribution {
 /// Expected Shortfall decomposition result for a single portfolio position.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PositionEsContribution {
     /// Position identifier.
     pub position_id: String,
@@ -109,7 +111,7 @@ pub struct PositionEsContribution {
     ///
     /// Parametric: analytical formula using truncated normal moments.
     /// ```text
-    /// CES_i = w_i * (Sigma * w)_i / sigma_p * phi(z_alpha) / (1 - alpha)
+    /// CES_i = -w_i * (Sigma * w)_i / sigma_p * phi(z_alpha) / (1 - alpha)
     /// ```
     ///
     /// Historical: probability-weighted position P&L over the exact loss-tail
@@ -153,6 +155,7 @@ pub struct PositionEsContribution {
 /// - Litterman (1996): Hot Spots and Hedges. `docs/REFERENCES.md#litterman-1996-hotspots`
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PositionRiskDecomposition {
     /// Total portfolio VaR.
     ///
@@ -225,237 +228,9 @@ impl PositionRiskDecomposition {
     }
 }
 
-// Stress attribution (historical)
-
-/// Per-position attribution of portfolio losses in tail scenarios.
-///
-/// For each scenario that breaches the VaR threshold, reports which
-/// positions contributed the most to the portfolio loss.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct StressAttribution {
-    /// Portfolio VaR threshold (scenarios with P&L at or below this are
-    /// "tail events"). Loss convention: reported as a negative number.
-    pub var_threshold: f64,
-
-    /// Number of tail scenarios analyzed.
-    pub n_tail_scenarios: usize,
-
-    /// Canonical position ordering shared by every [`tail_scenarios`] entry.
-    ///
-    /// `tail_scenarios[k].position_pnls[i]` is the P&L for `position_ids[i]`.
-    /// Storing the id list once here (rather than re-attaching it to every tail
-    /// scenario) avoids duplicating it `n_tail_scenarios` times.
-    ///
-    /// [`tail_scenarios`]: Self::tail_scenarios
-    pub position_ids: Vec<String>,
-
-    /// Per-position average contribution to tail losses.
-    ///
-    /// Sorted by absolute contribution (largest risk driver first).
-    pub position_contributions: Vec<StressPositionEntry>,
-
-    /// Individual tail scenario breakdowns.
-    ///
-    /// Contains `n_tail_scenarios` entries, each with per-position P&L
-    /// index-aligned to [`position_ids`](Self::position_ids).
-    /// Sorted by portfolio loss (worst first).
-    pub tail_scenarios: Vec<TailScenarioBreakdown>,
-}
-
-/// Single position's contribution to tail stress.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct StressPositionEntry {
-    /// Position identifier.
-    pub position_id: String,
-
-    /// Average P&L contribution in tail scenarios.
-    pub avg_tail_pnl: f64,
-
-    /// Fraction of total portfolio tail loss attributable to this position.
-    pub pct_of_tail_loss: f64,
-
-    /// Worst single-scenario P&L for this position.
-    pub worst_scenario_pnl: f64,
-}
-
-/// Breakdown of a single tail scenario.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct TailScenarioBreakdown {
-    /// Scenario index in the original history.
-    pub scenario_index: usize,
-
-    /// Total portfolio P&L for this scenario.
-    pub portfolio_pnl: f64,
-
-    /// Per-position P&L contributions, index-aligned to
-    /// [`StressAttribution::position_ids`]. Entry `i` is the P&L for
-    /// `StressAttribution::position_ids[i]`.
-    pub position_pnls: Vec<f64>,
-}
-
-/// Build tail-scenario stress attribution from position-level historical P&Ls.
-///
-/// The `position_pnls` buffer is row-major with shape
-/// `n_scenarios × position_ids.len()`: for scenario `s` and position `i`, the
-/// P&L is stored at `position_pnls[s * n_positions + i]`. Tail scenarios are
-/// selected using the same boundary convention as
-/// [`historical_var_decomposition`]: sort portfolio P&Ls
-/// ascending, take the shared snapped-ceil tail count (see
-/// `super::tail_scenario_count`) of scenarios, and set
-/// `var_threshold` to the signed P&L of the least-bad tail scenario
-/// (losses-negative convention).
-///
-/// # Errors
-///
-/// Returns a validation error when dimensions do not match, confidence is not
-/// in `(0.5, 1)`, the requested tail has fewer than one scenario, or any P&L is
-/// non-finite.
-///
-/// # Arguments
-///
-/// * `position_ids` - Position identifiers in the same column order as each
-///   scenario row in `position_pnls`.
-/// * `position_pnls` - Scenario-major flat P&L buffer with shape
-///   `n_scenarios * position_ids.len()`; entries are reporting-currency P&L
-///   amounts.
-/// * `n_scenarios` - Number of scenario rows encoded in `position_pnls`.
-/// * `confidence` - Tail confidence level strictly between 0.5 and 1.0, such
-///   as `0.99` for a 99% stress-tail attribution. `None` defaults to `0.95`.
-pub fn build_stress_attribution(
-    position_ids: &[String],
-    position_pnls: &[f64],
-    n_scenarios: usize,
-    confidence: Option<f64>,
-) -> finstack_quant_core::Result<StressAttribution> {
-    let confidence = confidence.unwrap_or(0.95);
-    let n_positions = position_ids.len();
-
-    if n_positions == 0 || n_scenarios == 0 {
-        if position_pnls.is_empty() {
-            return Ok(StressAttribution {
-                var_threshold: 0.0,
-                n_tail_scenarios: 0,
-                position_ids: Vec::new(),
-                position_contributions: Vec::new(),
-                tail_scenarios: Vec::new(),
-            });
-        }
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "position_pnls length ({}) must be n_scenarios ({n_scenarios}) * n_positions ({n_positions})",
-            position_pnls.len()
-        )));
-    }
-
-    let expected_len = n_scenarios * n_positions;
-    if position_pnls.len() != expected_len {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "position_pnls length ({}) must be n_scenarios ({n_scenarios}) * n_positions ({n_positions}) = {expected_len}",
-            position_pnls.len()
-        )));
-    }
-
-    crate::config::validate_confidence(confidence)?;
-
-    if let Some(bad_idx) = position_pnls.iter().position(|p| !p.is_finite()) {
-        let scenario = bad_idx / n_positions;
-        let position = bad_idx % n_positions;
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "position_pnls contains non-finite value at scenario {scenario}, position {position} (value = {})",
-            position_pnls[bad_idx]
-        )));
-    }
-
-    // Reject configurations whose exact tail is below one scenario before
-    // taking the shared snapped-ceil count (which would round 0.5 up to 1).
-    if ((1.0 - confidence) * (n_scenarios as f64)) < 1.0 - super::TAIL_COUNT_SNAP_TOLERANCE {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "confidence {confidence} with {n_scenarios} scenarios yields zero tail scenarios; lower confidence or provide more scenarios"
-        )));
-    }
-    let n_tail = super::tail_scenario_count(confidence, n_scenarios);
-
-    let mut portfolio_pnls: Vec<(usize, f64)> = (0..n_scenarios)
-        .map(|scenario| {
-            let row_start = scenario * n_positions;
-            let pnl = position_pnls[row_start..row_start + n_positions]
-                .iter()
-                .sum();
-            (scenario, pnl)
-        })
-        .collect();
-    portfolio_pnls.sort_by(|a, b| a.1.total_cmp(&b.1));
-
-    // Loss convention (workspace-wide): the threshold follows the P&L sign,
-    // so tail losses are negative. Clamp to zero only if the boundary
-    // scenario is actually a gain.
-    let var_idx = (n_tail - 1).min(n_scenarios - 1);
-    let var_threshold = portfolio_pnls[var_idx].1.min(0.0);
-
-    let tail = &portfolio_pnls[..n_tail];
-    let avg_tail_loss = -tail.iter().map(|(_, pnl)| *pnl).sum::<f64>() / n_tail as f64;
-
-    let mut pnl_sums = vec![0.0; n_positions];
-    let mut worst_pnls = vec![f64::INFINITY; n_positions];
-    let mut tail_scenarios = Vec::with_capacity(n_tail);
-
-    for &(scenario_index, portfolio_pnl) in tail {
-        let row_start = scenario_index * n_positions;
-        let row = &position_pnls[row_start..row_start + n_positions];
-        for (idx, pnl) in row.iter().copied().enumerate() {
-            pnl_sums[idx] += pnl;
-            worst_pnls[idx] = worst_pnls[idx].min(pnl);
-        }
-        // Store only the `f64` row; the position id for column `i` is
-        // `StressAttribution::position_ids[i]`, carried once on the parent
-        // result instead of cloned into every tail scenario.
-        tail_scenarios.push(TailScenarioBreakdown {
-            scenario_index,
-            portfolio_pnl,
-            position_pnls: row.to_vec(),
-        });
-    }
-
-    let mut position_contributions: Vec<StressPositionEntry> = position_ids
-        .iter()
-        .enumerate()
-        .map(|(idx, position_id)| {
-            let avg_tail_pnl = pnl_sums[idx] / n_tail as f64;
-            let pct_of_tail_loss = if avg_tail_loss.abs() > f64::EPSILON {
-                -avg_tail_pnl / avg_tail_loss
-            } else {
-                0.0
-            };
-            StressPositionEntry {
-                position_id: position_id.clone(),
-                avg_tail_pnl,
-                pct_of_tail_loss,
-                worst_scenario_pnl: worst_pnls[idx],
-            }
-        })
-        .collect();
-
-    position_contributions.sort_by(|a, b| {
-        b.avg_tail_pnl
-            .abs()
-            .total_cmp(&a.avg_tail_pnl.abs())
-            .then_with(|| a.position_id.as_str().cmp(b.position_id.as_str()))
-    });
-
-    Ok(StressAttribution {
-        var_threshold,
-        n_tail_scenarios: n_tail,
-        position_ids: position_ids.to_vec(),
-        position_contributions,
-        tail_scenarios,
-    })
-}
-
 // Shared math helpers
 
-use super::{VARIANCE_TOLERANCE, tail_multipliers};
+use super::{MinTail, PreparedHistoricalScenarios, VARIANCE_TOLERANCE, tail_multipliers};
 
 #[cfg(test)]
 use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
@@ -521,7 +296,7 @@ fn validate_decomposition_inputs(
 ///
 /// ```text
 ///   variance_excl_k = w' Σ w  -  2 w_k (Σ w)_k  +  w_k²  Σ_{kk}
-///   var_excl_k      = z_α · sqrt(max(variance_excl_k, 0))
+///   var_excl_k      = -z_α · sqrt(max(variance_excl_k, 0))
 ///   incremental_k   = portfolio_var - var_excl_k
 /// ```
 ///
@@ -630,32 +405,15 @@ pub fn parametric_var_decomposition(
 
     let (z_alpha, es_multiplier) = tail_multipliers(confidence)?;
 
-    // Sigma * w (matrix-vector product).
-    let mut sigma_w = vec![0.0; n];
-    for i in 0..n {
-        let mut dot = 0.0;
-        for j in 0..n {
-            dot += covariance[i * n + j] * weights[j];
-        }
-        sigma_w[i] = dot;
-    }
+    let sigma_w = super::matvec_square(covariance, weights);
 
-    // Portfolio variance = w' * Sigma * w. A materially negative value
-    // means the covariance matrix is not PSD at the supplied weights —
-    // reject it like the factor-level `decompose_factors` does
-    // (`validated_variance`) instead of clamping to a silent VaR of -0.
-    // Only the numerical rounding band [-tolerance, 0) is clamped.
+    // Portfolio variance = w' * Sigma * w. Reject non-finite or materially negative
+    // values (clamping only the numerical rounding band [-tolerance, 0)).
     let mut raw_variance = 0.0;
     for i in 0..n {
         raw_variance += weights[i] * sigma_w[i];
     }
-    if raw_variance < -VARIANCE_TOLERANCE {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Portfolio variance must be non-negative, got {raw_variance}; covariance \
-             matrix is not positive semi-definite at the supplied weights"
-        )));
-    }
-    let variance = raw_variance.max(0.0);
+    let variance = super::validated_variance(raw_variance)?;
     let sigma_p = variance.sqrt();
 
     // Loss convention (workspace-wide): VaR and ES follow the P&L sign,
@@ -808,22 +566,27 @@ pub fn historical_var_decomposition(
     n_scenarios: usize,
     confidence: Option<f64>,
 ) -> finstack_quant_core::Result<PositionRiskDecomposition> {
-    let confidence = confidence.unwrap_or(0.95);
+    let prepared = PreparedHistoricalScenarios::prepare(
+        position_ids,
+        position_pnls,
+        n_scenarios,
+        confidence,
+        MinTail::AtLeastTwo,
+    )?;
+    Ok(historical_var_decomposition_prepared(&prepared))
+}
+
+pub(super) fn historical_var_decomposition_prepared(
+    prepared: &PreparedHistoricalScenarios<'_>,
+) -> PositionRiskDecomposition {
+    let position_ids = prepared.position_ids;
+    let position_pnls = prepared.position_pnls;
+    let n_scenarios = prepared.n_scenarios;
+    let confidence = prepared.confidence;
     let n = position_ids.len();
 
-    if position_pnls.len() != n_scenarios * n {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "position_pnls length ({}) must equal n_scenarios ({}) * n_positions ({})",
-            position_pnls.len(),
-            n_scenarios,
-            n
-        )));
-    }
-
-    crate::config::validate_confidence(confidence)?;
-
     if n == 0 || n_scenarios == 0 {
-        return Ok(PositionRiskDecomposition {
+        return PositionRiskDecomposition {
             portfolio_var: 0.0,
             portfolio_es: 0.0,
             confidence,
@@ -832,56 +595,11 @@ pub fn historical_var_decomposition(
             es_contributions: Vec::new(),
             n_positions: n,
             euler_residual: None,
-        });
+        };
     }
 
-    // Number of tail scenarios needed to locate the boundary (see
-    // `super::tail_scenario_count`). Require at least two tail observations:
-    // a one-scenario tail collapses VaR and ES onto a single extreme
-    // observation and cannot support a VaR/ES split.
     let n_tail = super::tail_scenario_count(confidence, n_scenarios);
-    if n_tail < 2 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "historical decomposition requires at least two tail scenarios for confidence {confidence} \
-             (got {n_tail} from {n_scenarios} scenarios); increase n_scenarios or lower \
-             the confidence level"
-        )));
-    }
-    if n_tail < 30 {
-        warn!(
-            n_tail,
-            n_scenarios,
-            confidence,
-            "Tail sample size is small; historical VaR/ES decomposition may lack statistical reliability"
-        );
-    }
-
-    // Pre-flight: any non-finite P&L corrupts the sort below
-    // (`partial_cmp(NaN, _) = None`) and silently degrades the tail
-    // ordering. Surface this as an explicit error so an upstream
-    // numerical fault (e.g. a near-singular covariance feeding a Cholesky)
-    // is caught rather than masked.
-    if let Some(bad_idx) = position_pnls.iter().position(|p| !p.is_finite()) {
-        let scenario = bad_idx / n;
-        let position = bad_idx % n;
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "position_pnls contains non-finite value at scenario {scenario}, \
-             position {position} (value = {}); upstream P&L generator must \
-             produce finite values",
-            position_pnls[bad_idx]
-        )));
-    }
-
-    let mut portfolio_pnls: Vec<(usize, f64)> = (0..n_scenarios)
-        .map(|s| {
-            let row_start = s * n;
-            let pnl: f64 = position_pnls[row_start..row_start + n].iter().sum();
-            (s, pnl)
-        })
-        .collect();
-
-    // Sort ascending by portfolio P&L (worst first).
-    portfolio_pnls.sort_by(|a, b| a.1.total_cmp(&b.1));
+    let portfolio_pnls = &prepared.portfolio_pnls;
 
     // Portfolio VaR: the signed P&L at the tail boundary scenario. The
     // tail spans sorted indices 0..n_tail (ascending P&L), so the VaR
@@ -992,7 +710,7 @@ pub fn historical_var_decomposition(
     // CVaR_i = CES_i * (VaR/ES) and sum(CES_i) = ES by construction.
     // Reporting it as None avoids implying a diagnostic that does not
     // exist here.
-    Ok(PositionRiskDecomposition {
+    PositionRiskDecomposition {
         portfolio_var,
         portfolio_es,
         confidence,
@@ -1001,7 +719,7 @@ pub fn historical_var_decomposition(
         es_contributions,
         n_positions: n,
         euler_residual: None,
-    })
+    }
 }
 
 /// Flatten per-position scenario P&Ls into a scenario-major buffer.
@@ -1009,14 +727,15 @@ pub fn historical_var_decomposition(
 /// # Errors
 ///
 /// Returns [`finstack_quant_core::Error::Validation`] when the number of rows
-/// does not equal `n_positions` or rows have inconsistent scenario counts.
+/// does not equal `n_positions`, rows have inconsistent scenario counts, or the
+/// flattened buffer size overflows `usize`.
 ///
 /// # Arguments
 ///
 /// * `position_pnls` - Position-major P&L matrix with one row per position.
 /// * `n_positions` - Expected number of position rows.
 pub fn flatten_position_pnls(
-    position_pnls: Vec<Vec<f64>>,
+    position_pnls: &[Vec<f64>],
     n_positions: usize,
 ) -> finstack_quant_core::Result<(Vec<f64>, usize)> {
     if position_pnls.len() != n_positions {
@@ -1037,9 +756,15 @@ pub fn flatten_position_pnls(
             )));
         }
     }
-    let mut flat = Vec::with_capacity(n_scenarios * n_positions);
+    let capacity = n_scenarios.checked_mul(n_positions).ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "flattened P&L buffer size overflows usize for n_scenarios ({n_scenarios}) * \
+             n_positions ({n_positions})"
+        ))
+    })?;
+    let mut flat = Vec::with_capacity(capacity);
     for scenario in 0..n_scenarios {
-        for row in &position_pnls {
+        for row in position_pnls {
             flat.push(row[scenario]);
         }
     }
@@ -1053,18 +778,11 @@ mod tests {
     type TestResult = finstack_quant_core::Result<()>;
 
     fn entry_point_inputs() -> (Vec<String>, Vec<f64>, Vec<f64>, Vec<f64>, usize) {
-        let ids: Vec<String> = vec!["A".into(), "B".into(), "C".into()];
         let weights = vec![0.5, 0.3, 0.2];
         let covariance = vec![
             0.04, 0.012, -0.004, 0.012, 0.09, 0.006, -0.004, 0.006, 0.0225,
         ];
-        let n_scenarios = 200;
-        let pnls: Vec<f64> = (0..n_scenarios * 3)
-            .map(|k| {
-                let x = (k as f64 * 0.731).sin() * 100.0;
-                x - (k % 7) as f64 * 3.5
-            })
-            .collect();
+        let (ids, pnls, n_scenarios) = crate::risk::historical_sample_pnls();
         (ids, weights, covariance, pnls, n_scenarios)
     }
 
@@ -1326,20 +1044,6 @@ mod tests {
             assert_eq!(decomposition_bits(&result), expected, "{confidence:?}");
             assert_eq!(result.method, DecompositionMethod::Historical);
         }
-        Ok(())
-    }
-
-    #[test]
-    fn stress_attribution_defaults_to_the_historical_95_confidence() -> TestResult {
-        let (ids, _, _, pnls, n_scenarios) = entry_point_inputs();
-        let default = build_stress_attribution(&ids, &pnls, n_scenarios, None)?;
-        let explicit = build_stress_attribution(&ids, &pnls, n_scenarios, Some(0.95))?;
-        assert_eq!(
-            default.var_threshold.to_bits(),
-            explicit.var_threshold.to_bits()
-        );
-        assert_eq!(default.n_tail_scenarios, explicit.n_tail_scenarios);
-        assert_eq!(default.n_tail_scenarios, 10);
         Ok(())
     }
 
@@ -1909,108 +1613,6 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn stress_attribution_uses_historical_tail_boundary() -> TestResult {
-        let ids = [String::from("A"), String::from("B")];
-        let n_scenarios = 20;
-        let mut pnls = Vec::with_capacity(n_scenarios * ids.len());
-        for scenario in 0..n_scenarios {
-            match scenario {
-                0 => {
-                    pnls.push(-8.0);
-                    pnls.push(-2.0);
-                }
-                1 => {
-                    pnls.push(-3.0);
-                    pnls.push(-1.0);
-                }
-                _ => {
-                    pnls.push(1.0);
-                    pnls.push(0.5);
-                }
-            }
-        }
-
-        let attr = build_stress_attribution(&ids, &pnls, n_scenarios, Some(0.95))?;
-
-        assert_eq!(attr.n_tail_scenarios, 1);
-        assert!((attr.var_threshold - (-10.0)).abs() < 1e-12);
-        assert_eq!(attr.tail_scenarios[0].scenario_index, 0);
-        assert_eq!(attr.tail_scenarios[0].portfolio_pnl, -10.0);
-        // Per-position P&L is index-aligned to the shared `position_ids` list
-        // carried once on the parent (no per-scenario id duplication).
-        assert_eq!(
-            attr.position_ids,
-            vec![String::from("A"), String::from("B")]
-        );
-        assert_eq!(attr.tail_scenarios[0].position_pnls, vec![-8.0, -2.0]);
-        assert_eq!(
-            attr.position_contributions[0].position_id,
-            String::from("A")
-        );
-        assert!((attr.position_contributions[0].avg_tail_pnl + 8.0).abs() < 1e-12);
-        assert!((attr.position_contributions[0].pct_of_tail_loss - 0.8).abs() < 1e-12);
-        assert!((attr.position_contributions[1].pct_of_tail_loss - 0.2).abs() < 1e-12);
-
-        Ok(())
-    }
-
-    #[test]
-    fn stress_attribution_averages_multiple_tail_scenarios() -> TestResult {
-        let ids = [String::from("A"), String::from("B")];
-        let n_scenarios = 40;
-        let mut pnls = Vec::with_capacity(n_scenarios * ids.len());
-        for scenario in 0..n_scenarios {
-            match scenario {
-                0 => {
-                    pnls.push(-8.0);
-                    pnls.push(-2.0);
-                }
-                1 => {
-                    pnls.push(-2.0);
-                    pnls.push(-4.0);
-                }
-                _ => {
-                    pnls.push(0.5);
-                    pnls.push(0.5);
-                }
-            }
-        }
-
-        let attr = build_stress_attribution(&ids, &pnls, n_scenarios, Some(0.95))?;
-
-        assert_eq!(attr.n_tail_scenarios, 2);
-        assert!((attr.var_threshold - (-6.0)).abs() < 1e-12);
-        assert_eq!(attr.tail_scenarios[0].scenario_index, 0);
-        assert_eq!(attr.tail_scenarios[1].scenario_index, 1);
-
-        let contrib_a = attr
-            .position_contributions
-            .iter()
-            .find(|entry| entry.position_id == "A")
-            .expect("A contribution should exist");
-        let contrib_b = attr
-            .position_contributions
-            .iter()
-            .find(|entry| entry.position_id == "B")
-            .expect("B contribution should exist");
-
-        assert!((contrib_a.avg_tail_pnl + 5.0).abs() < 1e-12);
-        assert!((contrib_b.avg_tail_pnl + 3.0).abs() < 1e-12);
-        assert!((contrib_a.pct_of_tail_loss - 0.625).abs() < 1e-12);
-        assert!((contrib_b.pct_of_tail_loss - 0.375).abs() < 1e-12);
-
-        Ok(())
-    }
-
-    #[test]
-    fn stress_attribution_rejects_underspecified_tail() {
-        let ids = [String::from("A")];
-        let pnls = vec![0.0; 50];
-        let result = build_stress_attribution(&ids, &pnls, 50, Some(0.99));
-        assert!(result.is_err());
-    }
-
     // C1 regression: VaR quantile index is the boundary of the tail, not
     // one-past-the-end. With 100 equally-spaced sorted P&Ls and 95%
     // confidence, the tail spans indices 0..5; VaR = -pnl[4] (index n_tail-1),
@@ -2266,20 +1868,7 @@ mod tests {
         );
     }
 
-    #[test]
-    fn stress_attribution_tail_count_is_exact_at_rational_boundaries() -> TestResult {
-        // Same exact-rational boundary as the historical engine: the tail
-        // at 90% of 1000 scenarios is exactly 100 scenarios.
-        let n_scenarios = 1000;
-        let pnls: Vec<f64> = (0..n_scenarios).map(|s| s as f64 - 500.0).collect();
-        let ids = [String::from("A")];
-
-        let attr = build_stress_attribution(&ids, &pnls, n_scenarios, Some(0.90))?;
-        assert_eq!(attr.n_tail_scenarios, 100);
-        Ok(())
-    }
-
-    // B5 regression: negative w' Sigma w must error, not clamp to VaR = -0.
+    // B5 / H2 regression: negative or non-finite w' Sigma w must error.
 
     #[test]
     fn parametric_rejects_negative_portfolio_variance() {
@@ -2295,6 +1884,19 @@ mod tests {
         assert!(
             result.is_err(),
             "negative portfolio variance must error, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn parametric_rejects_non_finite_overflow_portfolio_variance() {
+        let weights = [1e200];
+        let covariance = [1e200];
+        let ids = [String::from("A")];
+
+        let result = parametric_var_decomposition(&ids, &weights, &covariance, Some(0.95), false);
+        assert!(
+            result.is_err(),
+            "overflowing portfolio variance must fail via validated_variance, got {result:?}"
         );
     }
 

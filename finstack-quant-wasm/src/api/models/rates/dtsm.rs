@@ -84,6 +84,23 @@ pub struct JsYieldPanel {
 
 json_round_trip!(JsYieldPanel, YieldPanel);
 
+wasm_getters!(JsYieldPanel, YieldPanel |s| {
+    /// Maturities in years, one per column.
+    tenors -> Box<[f64]> = s.inner.tenors.clone().into_boxed_slice();
+    /// Observation dates as ISO-8601 strings, or `undefined` when the panel has none.
+    dates -> Option<Vec<String>> = s
+        .inner
+        .dates
+        .as_ref()
+        .map(|dates| dates.iter().map(ToString::to_string).collect());
+    /// Yields as nested rows: one `number[]` per date.
+    yields returns "number[][]" -> Result<JsValue, JsValue> = to_js_value(&rows_of(&s.inner.yields));
+    /// Number of observation dates (rows).
+    num_dates as numDates -> usize = s.inner.num_dates();
+    /// Number of tenors (columns).
+    num_tenors as numTenors -> usize = s.inner.num_tenors();
+});
+
 #[wasm_bindgen(js_class = YieldPanel)]
 impl JsYieldPanel {
     /// Panel from tenors and yield rows.
@@ -116,39 +133,6 @@ impl JsYieldPanel {
             .map_err(to_js_err)
     }
 
-    /// Maturities in years, one per column.
-    #[wasm_bindgen(getter)]
-    pub fn tenors(&self) -> Box<[f64]> {
-        self.inner.tenors.clone().into_boxed_slice()
-    }
-
-    /// Observation dates as ISO-8601 strings, or `undefined` when the panel has none.
-    #[wasm_bindgen(getter)]
-    pub fn dates(&self) -> Option<Vec<String>> {
-        self.inner
-            .dates
-            .as_ref()
-            .map(|dates| dates.iter().map(ToString::to_string).collect())
-    }
-
-    /// Yields as nested rows: one `number[]` per date.
-    #[wasm_bindgen(getter, unchecked_return_type = "number[][]")]
-    pub fn yields(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&rows_of(&self.inner.yields))
-    }
-
-    /// Number of observation dates (rows).
-    #[wasm_bindgen(getter, js_name = numDates)]
-    pub fn num_dates(&self) -> usize {
-        self.inner.num_dates()
-    }
-
-    /// Number of tenors (columns).
-    #[wasm_bindgen(getter, js_name = numTenors)]
-    pub fn num_tenors(&self) -> usize {
-        self.inner.num_tenors()
-    }
-
     /// First differences of the yields across dates.
     /// @returns Nested rows with `numDates - 1` rows of per-tenor yield changes.
     ///
@@ -178,6 +162,33 @@ pub struct JsDieboldLi {
 
 json_round_trip!(JsDieboldLi, DieboldLi);
 
+wasm_getters!(JsDieboldLi, DieboldLi |s| {
+    /// Exponential decay parameter (Python `lambda_`).
+    lambda -> f64 = s.inner.lambda();
+    /// Tenors in years of the fitted panel (empty before factor extraction).
+    tenors -> Box<[f64]> = s.inner.tenors().into();
+    /// VAR(1) transition matrix as 3 by 3 nested rows, or `undefined` before `fitVar`.
+    phi returns "number[][] | undefined" -> Result<JsValue, JsValue> = match s.inner.phi() {
+        Some(phi) => to_js_value(&rows_of(phi)),
+        None => Ok(JsValue::UNDEFINED),
+    };
+    /// Extracted level, slope and curvature factors as a `FactorTimeSeries` object, or `undefined` before extraction.
+    factors returns "generated.models.FactorTimeSeries | undefined" -> Result<JsValue, JsValue> = match s.inner.factors() {
+        Some(factors) => to_js_value(factors),
+        None => Ok(JsValue::UNDEFINED),
+    };
+    /// VAR(1) intercept `[level, slope, curvature]`, or `undefined` before `fitVar`.
+    mu -> Option<Box<[f64]>> = s
+        .inner
+        .mu()
+        .map(|mu| mu.iter().copied().collect::<Vec<f64>>().into_boxed_slice());
+    /// VAR(1) innovation covariance as 3 by 3 nested rows, or `undefined` before `fitVar`.
+    q_cov as qCov returns "number[][] | undefined" -> Result<JsValue, JsValue> = match s.inner.q_cov() {
+        Some(q_cov) => to_js_value(&rows_of(q_cov)),
+        None => Ok(JsValue::UNDEFINED),
+    };
+});
+
 #[wasm_bindgen(js_class = DieboldLi)]
 impl JsDieboldLi {
     /// Unfitted model with a decay parameter.
@@ -193,56 +204,6 @@ impl JsDieboldLi {
         DieboldLi::new(js_opt_f64(lambda.as_ref(), "lambda")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
-    }
-
-    /// Exponential decay parameter (Python `lambda_`).
-    #[wasm_bindgen(getter)]
-    pub fn lambda(&self) -> f64 {
-        self.inner.lambda()
-    }
-
-    /// Tenors in years of the fitted panel (empty before factor extraction).
-    #[wasm_bindgen(getter)]
-    pub fn tenors(&self) -> Box<[f64]> {
-        self.inner.tenors().into()
-    }
-
-    /// Extracted level, slope and curvature factors as a `FactorTimeSeries` object, or `undefined` before extraction.
-    #[wasm_bindgen(
-        getter,
-        unchecked_return_type = "generated.models.FactorTimeSeries | undefined"
-    )]
-    pub fn factors(&self) -> Result<JsValue, JsValue> {
-        match self.inner.factors() {
-            Some(factors) => to_js_value(factors),
-            None => Ok(JsValue::UNDEFINED),
-        }
-    }
-
-    /// VAR(1) transition matrix as 3 by 3 nested rows, or `undefined` before `fitVar`.
-    #[wasm_bindgen(getter, unchecked_return_type = "number[][] | undefined")]
-    pub fn phi(&self) -> Result<JsValue, JsValue> {
-        match self.inner.phi() {
-            Some(phi) => to_js_value(&rows_of(phi)),
-            None => Ok(JsValue::UNDEFINED),
-        }
-    }
-
-    /// VAR(1) intercept `[level, slope, curvature]`, or `undefined` before `fitVar`.
-    #[wasm_bindgen(getter)]
-    pub fn mu(&self) -> Option<Box<[f64]>> {
-        self.inner
-            .mu()
-            .map(|mu| mu.iter().copied().collect::<Vec<f64>>().into_boxed_slice())
-    }
-
-    /// VAR(1) innovation covariance as 3 by 3 nested rows, or `undefined` before `fitVar`.
-    #[wasm_bindgen(getter, js_name = qCov, unchecked_return_type = "number[][] | undefined")]
-    pub fn q_cov(&self) -> Result<JsValue, JsValue> {
-        match self.inner.q_cov() {
-            Some(q_cov) => to_js_value(&rows_of(q_cov)),
-            None => Ok(JsValue::UNDEFINED),
-        }
     }
 
     /// Nelson-Siegel loading matrix for the fitted tenors.
@@ -346,6 +307,31 @@ pub struct JsYieldPca {
 
 json_round_trip!(JsYieldPca, YieldPca);
 
+wasm_getters!(JsYieldPca, YieldPca |s| {
+    /// Number of principal components (equal to the number of tenors).
+    num_components as numComponents -> usize = s.inner.num_components();
+    /// Eigenvalues of the covariance of yield changes, largest first.
+    eigenvalues -> Box<[f64]> = s.inner.eigenvalues().into();
+    /// Loadings as nested rows: one row per tenor, one column per component.
+    loadings returns "number[][]" -> Result<JsValue, JsValue> = to_js_value(&rows_of(s.inner.loadings()));
+    /// Scores as nested rows: one row per date, one column per component.
+    scores returns "number[][]" -> Result<JsValue, JsValue> = to_js_value(&rows_of(s.inner.scores()));
+    /// Tenors in years, one per loading row.
+    tenors -> Box<[f64]> = s.inner.tenors().into();
+    /// Fraction of total variance explained by each component.
+    variance_explained as varianceExplained -> Box<[f64]> = s.inner.variance_explained().into();
+    /// Cumulative fraction of variance explained by the leading components.
+    cumulative_variance as cumulativeVariance -> Box<[f64]> = s.inner.cumulative_variance().into();
+    /// Mean yield change per tenor removed before the decomposition.
+    mean_change as meanChange -> Box<[f64]> = s
+        .inner
+        .mean_change()
+        .iter()
+        .copied()
+        .collect::<Vec<f64>>()
+        .into_boxed_slice();
+});
+
 #[wasm_bindgen(js_class = YieldPca)]
 impl JsYieldPca {
     /// Fit the PCA to the yield changes of a panel.
@@ -378,59 +364,6 @@ impl JsYieldPca {
         YieldPca::fit_yield_changes(js_f64_matrix(&yield_changes, "yieldChanges")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
-    }
-
-    /// Number of principal components (equal to the number of tenors).
-    #[wasm_bindgen(getter, js_name = numComponents)]
-    pub fn num_components(&self) -> usize {
-        self.inner.num_components()
-    }
-
-    /// Eigenvalues of the covariance of yield changes, largest first.
-    #[wasm_bindgen(getter)]
-    pub fn eigenvalues(&self) -> Box<[f64]> {
-        self.inner.eigenvalues().into()
-    }
-
-    /// Loadings as nested rows: one row per tenor, one column per component.
-    #[wasm_bindgen(getter, unchecked_return_type = "number[][]")]
-    pub fn loadings(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&rows_of(self.inner.loadings()))
-    }
-
-    /// Scores as nested rows: one row per date, one column per component.
-    #[wasm_bindgen(getter, unchecked_return_type = "number[][]")]
-    pub fn scores(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&rows_of(self.inner.scores()))
-    }
-
-    /// Tenors in years, one per loading row.
-    #[wasm_bindgen(getter)]
-    pub fn tenors(&self) -> Box<[f64]> {
-        self.inner.tenors().into()
-    }
-
-    /// Fraction of total variance explained by each component.
-    #[wasm_bindgen(getter, js_name = varianceExplained)]
-    pub fn variance_explained(&self) -> Box<[f64]> {
-        self.inner.variance_explained().into()
-    }
-
-    /// Cumulative fraction of variance explained by the leading components.
-    #[wasm_bindgen(getter, js_name = cumulativeVariance)]
-    pub fn cumulative_variance(&self) -> Box<[f64]> {
-        self.inner.cumulative_variance().into()
-    }
-
-    /// Mean yield change per tenor removed before the decomposition.
-    #[wasm_bindgen(getter, js_name = meanChange)]
-    pub fn mean_change(&self) -> Box<[f64]> {
-        self.inner
-            .mean_change()
-            .iter()
-            .copied()
-            .collect::<Vec<f64>>()
-            .into_boxed_slice()
     }
 
     /// Loading vector of one component across tenors.

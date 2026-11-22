@@ -34,20 +34,20 @@ from finstack_quant.models.volatility import SabrCalibrator, SabrParameters, Sab
 
 @pytest.mark.parametrize("df", [0.0, -0.95])
 def test_black76_price_rejects_non_positive_df_like_its_inverse(df: float) -> None:
-    with pytest.raises(ValueError, match="Black-76 df must be positive"):
+    with pytest.raises(ValueError, match="Black-76 df must be finite and positive"):
         black76_price(100.0, 100.0, df, 0.2, 1.0, True)
     with pytest.raises(ValueError, match="implied vol requires positive forward, strike, df"):
         black76_implied_vol(100.0, 100.0, df, 1.0, 7.5, True)
 
 
 def test_forward_kernels_reject_out_of_domain_inputs() -> None:
-    with pytest.raises(ValueError, match="Black-76 vol must be non-negative"):
+    with pytest.raises(ValueError, match="Black-76 vol must be finite and non-negative"):
         black76_price(100.0, 100.0, 0.95, -0.2, 1.0, True)
-    with pytest.raises(ValueError, match="Bachelier normal_vol must be non-negative"):
+    with pytest.raises(ValueError, match="Bachelier normal_vol must be finite and non-negative"):
         bachelier_price(0.03, 0.03, -0.0075, 1.0, True)
-    with pytest.raises(ValueError, match=r"shifted Black strike \+ shift must be positive"):
+    with pytest.raises(ValueError, match=r"shifted Black strike \+ shift must be finite and positive"):
         black_shifted_price(-0.005, -0.02, 0.25, 1.0, 0.01, False)
-    with pytest.raises(ValueError, match=r"shifted Black forward \+ shift must be positive"):
+    with pytest.raises(ValueError, match=r"shifted Black forward \+ shift must be finite and positive"):
         black_shifted_vega(-0.02, 0.01, 0.25, 1.0, 0.01)
 
 

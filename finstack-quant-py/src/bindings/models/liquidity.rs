@@ -10,7 +10,7 @@
 //! pickle and pandas exits.
 
 use crate::bindings::core::table::{PyArrowTable, PyLabeledSeries};
-use crate::bindings::macros::{tabular_methods, wire_methods};
+use crate::bindings::macros::{py_getters, tabular_methods, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::bindings::table_builders::TableBuilder;
 use crate::errors::core_to_py;
@@ -53,89 +53,51 @@ impl PyLiquidityProfile {
         Ok(Self { inner })
     }
 
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.instrument_id")]
-    #[getter]
-    fn instrument_id(&self) -> String {
-        self.inner.instrument_id.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.mid")]
-    #[getter]
-    fn mid(&self) -> f64 {
-        self.inner.mid
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.bid")]
-    #[getter]
-    fn bid(&self) -> f64 {
-        self.inner.bid
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.ask")]
-    #[getter]
-    fn ask(&self) -> f64 {
-        self.inner.ask
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.avg_daily_volume")]
-    #[getter]
-    fn avg_daily_volume(&self) -> f64 {
-        self.inner.avg_daily_volume
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.avg_trade_size")]
-    #[getter]
-    fn avg_trade_size(&self) -> f64 {
-        self.inner.avg_trade_size
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.spread_volatility")]
-    #[getter]
-    fn spread_volatility(&self) -> f64 {
-        self.inner.spread_volatility
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.spread_volatility_kind")]
-    #[getter]
-    fn spread_volatility_kind(&self) -> PyResult<String> {
-        finstack_quant_core::wire::serde_label(&self.inner.spread_volatility_kind)
-            .map_err(core_to_py)
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.observation_days")]
-    #[getter]
-    fn observation_days(&self) -> u32 {
-        self.inner.observation_days
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.spread")]
-    #[getter]
-    fn spread(&self) -> f64 {
-        self.inner.spread()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.relative_spread")]
-    #[getter]
-    fn relative_spread(&self) -> f64 {
-        self.inner.relative_spread()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.half_spread")]
-    #[getter]
-    fn half_spread(&self) -> f64 {
-        self.inner.half_spread()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.relative_spread_volatility")]
-    #[getter]
-    fn relative_spread_volatility(&self) -> f64 {
-        self.inner.relative_spread_volatility()
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("LiquidityProfile", &self.inner)
     }
 }
+
+py_getters!(PyLiquidityProfile |s| {
+    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.instrument_id")]
+    instrument_id -> String = s.inner.instrument_id.clone();
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.mid")]
+    mid -> f64 = s.inner.mid;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.bid")]
+    bid -> f64 = s.inner.bid;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.ask")]
+    ask -> f64 = s.inner.ask;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.avg_daily_volume")]
+    avg_daily_volume -> f64 = s.inner.avg_daily_volume;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.avg_trade_size")]
+    avg_trade_size -> f64 = s.inner.avg_trade_size;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.spread_volatility")]
+    spread_volatility -> f64 = s.inner.spread_volatility;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.spread_volatility_kind")]
+    spread_volatility_kind -> PyResult<String> = finstack_quant_core::wire::serde_label(&s.inner.spread_volatility_kind).map_err(core_to_py);
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.observation_days")]
+    observation_days -> u32 = s.inner.observation_days;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.spread")]
+    spread -> f64 = s.inner.spread();
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.relative_spread")]
+    relative_spread -> f64 = s.inner.relative_spread();
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.half_spread")]
+    half_spread -> f64 = s.inner.half_spread();
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "LiquidityProfile.relative_spread_volatility")]
+    relative_spread_volatility -> f64 = s.inner.relative_spread_volatility();
+});
 
 wire_methods!(
     PyLiquidityProfile,
@@ -183,52 +145,33 @@ impl PyTradeParams {
         }
     }
 
-    #[doc = pydoc!("finstack_quant.models.liquidity", "TradeParams.quantity")]
-    #[getter]
-    fn quantity(&self) -> f64 {
-        self.inner.quantity
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "TradeParams.horizon_days")]
-    #[getter]
-    fn horizon_days(&self) -> f64 {
-        self.inner.horizon_days
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "TradeParams.daily_volatility")]
-    #[getter]
-    fn daily_volatility(&self) -> f64 {
-        self.inner.daily_volatility
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "TradeParams.profile")]
-    #[getter]
-    fn profile(&self) -> PyLiquidityProfile {
-        PyLiquidityProfile::from_inner(self.inner.profile.clone())
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "TradeParams.risk_aversion")]
-    #[getter]
-    fn risk_aversion(&self) -> Option<f64> {
-        self.inner.risk_aversion
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "TradeParams.reference_price")]
-    #[getter]
-    fn reference_price(&self) -> Option<f64> {
-        self.inner.reference_price
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "TradeParams.effective_reference_price")]
-    #[getter]
-    fn effective_reference_price(&self) -> f64 {
-        self.inner.effective_reference_price()
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("TradeParams", &self.inner)
     }
 }
+
+py_getters!(PyTradeParams |s| {
+    #[doc = pydoc!("finstack_quant.models.liquidity", "TradeParams.quantity")]
+    quantity -> f64 = s.inner.quantity;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "TradeParams.horizon_days")]
+    horizon_days -> f64 = s.inner.horizon_days;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "TradeParams.daily_volatility")]
+    daily_volatility -> f64 = s.inner.daily_volatility;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "TradeParams.profile")]
+    profile -> PyLiquidityProfile = PyLiquidityProfile::from_inner(s.inner.profile.clone());
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "TradeParams.risk_aversion")]
+    risk_aversion -> Option<f64> = s.inner.risk_aversion;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "TradeParams.reference_price")]
+    reference_price -> Option<f64> = s.inner.reference_price;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "TradeParams.effective_reference_price")]
+    effective_reference_price -> f64 = s.inner.effective_reference_price();
+});
 
 wire_methods!(
     PyTradeParams,
@@ -266,36 +209,6 @@ impl PyImpactEstimate {
 
 #[pymethods]
 impl PyImpactEstimate {
-    #[doc = pydoc!("finstack_quant.models.liquidity", "ImpactEstimate.permanent_impact")]
-    #[getter]
-    fn permanent_impact(&self) -> f64 {
-        self.inner.permanent_impact
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "ImpactEstimate.temporary_impact")]
-    #[getter]
-    fn temporary_impact(&self) -> f64 {
-        self.inner.temporary_impact
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "ImpactEstimate.total_cost")]
-    #[getter]
-    fn total_cost(&self) -> f64 {
-        self.inner.total_cost
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "ImpactEstimate.cost_bp")]
-    #[getter]
-    fn cost_bp(&self) -> f64 {
-        self.inner.cost_bp
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "ImpactEstimate.execution_risk")]
-    #[getter]
-    fn execution_risk(&self) -> f64 {
-        self.inner.execution_risk
-    }
-
     #[doc = pydoc!("finstack_quant.models.liquidity", "ImpactEstimate.to_series")]
     fn to_series(&self) -> PyResult<PyLabeledSeries> {
         let labels: Vec<String> = IMPACT_ESTIMATE_COLUMNS
@@ -320,6 +233,23 @@ impl PyImpactEstimate {
         crate::bindings::repr_support::repr_from_serde("ImpactEstimate", &self.inner)
     }
 }
+
+py_getters!(PyImpactEstimate |s| {
+    #[doc = pydoc!("finstack_quant.models.liquidity", "ImpactEstimate.permanent_impact")]
+    permanent_impact -> f64 = s.inner.permanent_impact;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "ImpactEstimate.temporary_impact")]
+    temporary_impact -> f64 = s.inner.temporary_impact;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "ImpactEstimate.total_cost")]
+    total_cost -> f64 = s.inner.total_cost;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "ImpactEstimate.cost_bp")]
+    cost_bp -> f64 = s.inner.cost_bp;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "ImpactEstimate.execution_risk")]
+    execution_risk -> f64 = s.inner.execution_risk;
+});
 
 impl PyImpactEstimate {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -365,40 +295,27 @@ impl PyExecutionTrajectory {
 
 #[pymethods]
 impl PyExecutionTrajectory {
-    #[doc = pydoc!("finstack_quant.models.liquidity", "ExecutionTrajectory.quantities")]
-    #[getter]
-    fn quantities(&self) -> Vec<f64> {
-        self.inner.quantities.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "ExecutionTrajectory.remaining")]
-    #[getter]
-    fn remaining(&self) -> Vec<f64> {
-        self.inner.remaining.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "ExecutionTrajectory.time_points")]
-    #[getter]
-    fn time_points(&self) -> Vec<f64> {
-        self.inner.time_points.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "ExecutionTrajectory.expected_cost")]
-    #[getter]
-    fn expected_cost(&self) -> f64 {
-        self.inner.expected_cost
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "ExecutionTrajectory.cost_variance")]
-    #[getter]
-    fn cost_variance(&self) -> f64 {
-        self.inner.cost_variance
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("ExecutionTrajectory", &self.inner)
     }
 }
+
+py_getters!(PyExecutionTrajectory |s| {
+    #[doc = pydoc!("finstack_quant.models.liquidity", "ExecutionTrajectory.quantities")]
+    quantities -> Vec<f64> = s.inner.quantities.clone();
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "ExecutionTrajectory.remaining")]
+    remaining -> Vec<f64> = s.inner.remaining.clone();
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "ExecutionTrajectory.time_points")]
+    time_points -> Vec<f64> = s.inner.time_points.clone();
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "ExecutionTrajectory.expected_cost")]
+    expected_cost -> f64 = s.inner.expected_cost;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "ExecutionTrajectory.cost_variance")]
+    cost_variance -> f64 = s.inner.cost_variance;
+});
 
 impl PyExecutionTrajectory {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -448,30 +365,6 @@ impl PyLvarBangiaScalar {
 
 #[pymethods]
 impl PyLvarBangiaScalar {
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LvarBangiaScalar.var")]
-    #[getter]
-    fn var(&self) -> f64 {
-        self.inner.var
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LvarBangiaScalar.spread_cost")]
-    #[getter]
-    fn spread_cost(&self) -> f64 {
-        self.inner.spread_cost
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LvarBangiaScalar.lvar")]
-    #[getter]
-    fn lvar(&self) -> f64 {
-        self.inner.lvar
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "LvarBangiaScalar.lvar_ratio")]
-    #[getter]
-    fn lvar_ratio(&self) -> f64 {
-        self.inner.lvar_ratio
-    }
-
     #[doc = pydoc!("finstack_quant.models.liquidity", "LvarBangiaScalar.to_series")]
     fn to_series(&self) -> PyResult<PyLabeledSeries> {
         let labels: Vec<String> = LVAR_COLUMNS
@@ -495,6 +388,20 @@ impl PyLvarBangiaScalar {
         crate::bindings::repr_support::repr_from_serde("LvarBangiaScalar", &self.inner)
     }
 }
+
+py_getters!(PyLvarBangiaScalar |s| {
+    #[doc = pydoc!("finstack_quant.models.liquidity", "LvarBangiaScalar.var")]
+    var -> f64 = s.inner.var;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "LvarBangiaScalar.spread_cost")]
+    spread_cost -> f64 = s.inner.spread_cost;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "LvarBangiaScalar.lvar")]
+    lvar -> f64 = s.inner.lvar;
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "LvarBangiaScalar.lvar_ratio")]
+    lvar_ratio -> f64 = s.inner.lvar_ratio;
+});
 
 impl PyLvarBangiaScalar {
     fn to_arrow_table(&self) -> PyResult<PyArrowTable> {
@@ -561,24 +468,6 @@ impl PyAlmgrenChrissModel {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.models.liquidity", "AlmgrenChrissModel.gamma")]
-    #[getter]
-    fn gamma(&self) -> f64 {
-        self.inner.gamma()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "AlmgrenChrissModel.eta")]
-    #[getter]
-    fn eta(&self) -> f64 {
-        self.inner.eta()
-    }
-
-    #[doc = pydoc!("finstack_quant.models.liquidity", "AlmgrenChrissModel.delta")]
-    #[getter]
-    fn delta(&self) -> f64 {
-        self.inner.delta()
-    }
-
     #[doc = pydoc!("finstack_quant.models.liquidity", "AlmgrenChrissModel.estimate_cost")]
     #[pyo3(text_signature = "(self, params)")]
     fn estimate_cost(&self, py: Python<'_>, params: PyTradeParams) -> PyResult<PyImpactEstimate> {
@@ -604,6 +493,17 @@ impl PyAlmgrenChrissModel {
         crate::bindings::repr_support::repr_from_serde("AlmgrenChrissModel", &self.inner)
     }
 }
+
+py_getters!(PyAlmgrenChrissModel |s| {
+    #[doc = pydoc!("finstack_quant.models.liquidity", "AlmgrenChrissModel.gamma")]
+    gamma -> f64 = s.inner.gamma();
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "AlmgrenChrissModel.eta")]
+    eta -> f64 = s.inner.eta();
+
+    #[doc = pydoc!("finstack_quant.models.liquidity", "AlmgrenChrissModel.delta")]
+    delta -> f64 = s.inner.delta();
+});
 
 wire_methods!(
     PyAlmgrenChrissModel,
