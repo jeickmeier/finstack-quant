@@ -123,7 +123,6 @@ RESULT_ALIAS_EXCEPTIONS = tuple(
         ("portfolio", "src/error.rs"),
         ("scenarios", "src/error.rs"),
         ("statements", "src/error.rs"),
-        ("valuations-core", "src/error.rs"),
     )
     for entry in _classification(
         crate,
