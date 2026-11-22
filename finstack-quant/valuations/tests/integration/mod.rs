@@ -7,7 +7,6 @@
 //! ## [`e2e`] - End-to-End Workflow Tests
 //!
 //! Complete workflow tests exercising multiple components:
-//! - `bond_portfolio` - Multi-currency 100-bond portfolio pricing with metrics
 //! - `fx_settlement` - FX spot date calculations with joint holiday calendars
 //!
 //! ## [`metrics`] - Metrics Framework Tests

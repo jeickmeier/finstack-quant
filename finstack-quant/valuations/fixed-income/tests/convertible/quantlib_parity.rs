@@ -26,17 +26,17 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::GreekBumps;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
-use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
-use finstack_quant_valuations::instruments::fixed_income::convertible::{
+use finstack_quant_valuations_core::instruments::GreekBumps;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_fixed_income::bond::{CallPut, CallPutSchedule};
+use finstack_quant_valuations_fixed_income::convertible::ConvertibleBond;
+use finstack_quant_valuations_fixed_income::convertible::{
     calculate_convertible_greeks, calculate_parity, price_convertible_bond,
 };
-use finstack_quant_valuations::instruments::{
+use finstack_quant_valuations_fixed_income::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
 };
-use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations_test_support::assert_parity;
 use finstack_quant_valuations_test_support::parity::ParityConfig;
 use time::macros::date;
@@ -140,10 +140,9 @@ fn create_quantlib_convertible(
         call_put: None,
         soft_call_trigger: None,
         resolved_settlement: None,
-        cashflow_spec:
-            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
-                fixed_coupon,
-            ),
+        cashflow_spec: finstack_quant_valuations_fixed_income::bond::CashflowSpec::Fixed(
+            fixed_coupon,
+        ),
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
@@ -639,8 +638,7 @@ fn quantlib_parity_zero_coupon_convertible() {
         call_put: None,
         soft_call_trigger: None,
         resolved_settlement: None,
-        cashflow_spec:
-            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::default(), // zero coupon
+        cashflow_spec: finstack_quant_valuations_fixed_income::bond::CashflowSpec::default(), // zero coupon
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
@@ -718,7 +716,7 @@ fn quantlib_parity_conversion_premium() {
             &market,
             as_of,
             &[MetricId::ConversionPremium],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -872,10 +870,9 @@ fn quantlib_parity_mandatory_conversion() {
         call_put: None,
         soft_call_trigger: None,
         resolved_settlement: None,
-        cashflow_spec:
-            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
-                fixed_coupon,
-            ),
+        cashflow_spec: finstack_quant_valuations_fixed_income::bond::CashflowSpec::Fixed(
+            fixed_coupon,
+        ),
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
@@ -962,10 +959,9 @@ fn quantlib_parity_window_conversion() {
         call_put: None,
         soft_call_trigger: None,
         resolved_settlement: None,
-        cashflow_spec:
-            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
-                fixed_coupon,
-            ),
+        cashflow_spec: finstack_quant_valuations_fixed_income::bond::CashflowSpec::Fixed(
+            fixed_coupon,
+        ),
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),

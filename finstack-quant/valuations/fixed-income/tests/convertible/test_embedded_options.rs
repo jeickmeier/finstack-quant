@@ -9,8 +9,8 @@
 
 use super::fixtures::*;
 use finstack_quant_core::dates::Date;
-use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
-use finstack_quant_valuations::instruments::fixed_income::convertible::price_convertible_bond;
+use finstack_quant_valuations_fixed_income::bond::{CallPut, CallPutSchedule};
+use finstack_quant_valuations_fixed_income::convertible::price_convertible_bond;
 use time::Month;
 
 #[test]
@@ -382,7 +382,7 @@ fn test_put_price_at_discount() {
 
 #[test]
 fn test_call_before_conversion_window() {
-    use finstack_quant_valuations::instruments::ConversionPolicy;
+    use finstack_quant_valuations_fixed_income::ConversionPolicy;
 
     let call_date = Date::from_calendar_date(2026, Month::January, 1).unwrap();
     let window_start = Date::from_calendar_date(2027, Month::January, 1).unwrap();
@@ -419,7 +419,7 @@ fn test_call_before_conversion_window() {
 
 #[test]
 fn test_call_during_conversion_window() {
-    use finstack_quant_valuations::instruments::ConversionPolicy;
+    use finstack_quant_valuations_fixed_income::ConversionPolicy;
 
     let call_date = Date::from_calendar_date(2028, Month::January, 1).unwrap();
     let window_start = Date::from_calendar_date(2027, Month::January, 1).unwrap();

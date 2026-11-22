@@ -36,9 +36,9 @@ larger ones split into subdirectories:
 
 | Directory | Subdirectories |
 |-----------|----------------|
-| `bond` | `metrics/`, `validation/`, `integration/` |
+| `bond` | `metrics/` (calibration-pinned credit-risk metrics; the single-family bond suite lives in `../../fixed-income/tests/bond/`) |
 | `structured_credit` | `unit/`, `integration/` (the JSON round-trip and `price_instrument` tests; the rest of the suite is in `../../structured-credit/tests/`) |
-| `term_loan`, `revolving_credit` | `metrics/`, `validation/` |
+| `term_loan` | `metrics/` (calibration-pinned credit-risk metrics; the single-family suite lives in `../../fixed-income/tests/term_loan/`) |
 | `fx_spot` | `metrics/`, `integration/` |
 | `equity` | `real_estate/` |
 

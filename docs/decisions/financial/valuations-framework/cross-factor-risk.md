@@ -220,7 +220,7 @@ Direct hazard shocks are not a fallback for credit cross gamma. The replay provi
   show the actual corner-fit interface and source/target resolution.
 - [Attribution consumer](../../../../finstack-quant/attribution/src/metrics_based/cross_factor.rs)
   shows the current family-move matching and reduction.
-- [Existing cross-factor tests](../../../../finstack-quant/valuations/tests/cross_factor_metrics_tests.rs)
+- [Existing cross-factor tests](../../../../finstack-quant/valuations/fixed-income/tests/cross_factor_metrics_tests.rs)
   include a missing-replay case. This does not qualify joint replay.
 
 ### Independent review evidence

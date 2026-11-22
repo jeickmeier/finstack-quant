@@ -14,7 +14,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::convertible::price_convertible_bond;
+use finstack_quant_valuations_fixed_income::convertible::price_convertible_bond;
 use time::Month;
 
 #[test]
@@ -94,7 +94,7 @@ fn test_floating_coupon_with_reset_events() {
 #[test]
 fn test_day_count_propagation_for_call_put() {
     use finstack_quant_core::dates::Date;
-    use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
+    use finstack_quant_valuations_fixed_income::bond::{CallPut, CallPutSchedule};
 
     let issue = dates::issue();
     let maturity = dates::maturity_1y();
@@ -166,12 +166,12 @@ fn test_time_mapping_with_quarterly_coupons() {
     let issue = dates::issue();
     let maturity = dates::maturity_1y();
 
-    let conversion_spec = finstack_quant_valuations::instruments::ConversionSpec {
+    let conversion_spec = finstack_quant_valuations_fixed_income::ConversionSpec {
         ratio: Some(bond_params::CONVERSION_RATIO),
         price: None,
-        policy: finstack_quant_valuations::instruments::ConversionPolicy::Voluntary,
-        anti_dilution: finstack_quant_valuations::instruments::AntiDilutionPolicy::None,
-        dividend_adjustment: finstack_quant_valuations::instruments::DividendAdjustment::None,
+        policy: finstack_quant_valuations_fixed_income::ConversionPolicy::Voluntary,
+        anti_dilution: finstack_quant_valuations_fixed_income::AntiDilutionPolicy::None,
+        dividend_adjustment: finstack_quant_valuations_fixed_income::DividendAdjustment::None,
         dilution_events: Vec::new(),
     };
 
@@ -198,7 +198,7 @@ fn test_time_mapping_with_quarterly_coupons() {
         },
     };
 
-    let bond = finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond {
+    let bond = finstack_quant_valuations_fixed_income::convertible::ConvertibleBond {
         id: "TEST_QUARTERLY".to_string().into(),
         notional: Money::new(bond_params::NOTIONAL, Currency::USD).expect("valid money fixture"),
         issue_date: issue,
@@ -214,10 +214,9 @@ fn test_time_mapping_with_quarterly_coupons() {
         call_put: None,
         soft_call_trigger: None,
         resolved_settlement: None,
-        cashflow_spec:
-            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
-                fixed_coupon,
-            ),
+        cashflow_spec: finstack_quant_valuations_fixed_income::bond::CashflowSpec::Fixed(
+            fixed_coupon,
+        ),
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
@@ -237,7 +236,7 @@ fn test_time_mapping_with_quarterly_coupons() {
 
 #[test]
 fn test_narrow_conversion_window_with_few_steps() {
-    use finstack_quant_valuations::instruments::ConversionPolicy;
+    use finstack_quant_valuations_fixed_income::ConversionPolicy;
 
     let window_start = Date::from_calendar_date(2027, Month::June, 1).unwrap();
     let window_end = Date::from_calendar_date(2027, Month::July, 1).unwrap();
@@ -262,7 +261,7 @@ fn test_narrow_conversion_window_with_few_steps() {
 
 #[test]
 fn test_call_put_on_same_date() {
-    use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
+    use finstack_quant_valuations_fixed_income::bond::{CallPut, CallPutSchedule};
 
     let option_date = dates::mid_date();
 
@@ -295,7 +294,7 @@ fn test_call_put_on_same_date() {
 
 #[test]
 fn test_call_put_at_maturity() {
-    use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
+    use finstack_quant_valuations_fixed_income::bond::{CallPut, CallPutSchedule};
 
     let mut bond = create_standard_convertible();
     let mut call_put = CallPutSchedule::default();
@@ -321,7 +320,7 @@ fn test_call_put_at_maturity() {
 #[test]
 fn test_call_put_before_issue() {
     use finstack_quant_core::dates::Date;
-    use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
+    use finstack_quant_valuations_fixed_income::bond::{CallPut, CallPutSchedule};
 
     let mut bond = create_standard_convertible();
     let mut call_put = CallPutSchedule::default();
@@ -349,7 +348,7 @@ fn test_call_put_before_issue() {
 #[test]
 fn test_call_put_after_maturity() {
     use finstack_quant_core::dates::Date;
-    use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
+    use finstack_quant_valuations_fixed_income::bond::{CallPut, CallPutSchedule};
 
     let mut bond = create_standard_convertible();
     let mut call_put = CallPutSchedule::default();
@@ -376,15 +375,15 @@ fn test_call_put_after_maturity() {
 
 #[test]
 fn test_zero_conversion_ratio() {
-    use finstack_quant_valuations::instruments::{ConversionPolicy, ConversionSpec};
+    use finstack_quant_valuations_fixed_income::{ConversionPolicy, ConversionSpec};
 
     let mut bond = create_standard_convertible();
     bond.conversion = ConversionSpec {
         ratio: Some(0.0),
         price: None,
         policy: ConversionPolicy::Voluntary,
-        anti_dilution: finstack_quant_valuations::instruments::AntiDilutionPolicy::None,
-        dividend_adjustment: finstack_quant_valuations::instruments::DividendAdjustment::None,
+        anti_dilution: finstack_quant_valuations_fixed_income::AntiDilutionPolicy::None,
+        dividend_adjustment: finstack_quant_valuations_fixed_income::DividendAdjustment::None,
         dilution_events: Vec::new(),
     };
 
@@ -397,15 +396,15 @@ fn test_zero_conversion_ratio() {
 
 #[test]
 fn test_very_high_conversion_ratio() {
-    use finstack_quant_valuations::instruments::{ConversionPolicy, ConversionSpec};
+    use finstack_quant_valuations_fixed_income::{ConversionPolicy, ConversionSpec};
 
     let mut bond = create_standard_convertible();
     bond.conversion = ConversionSpec {
         ratio: Some(1000.0), // Very high conversion ratio
         price: None,
         policy: ConversionPolicy::Voluntary,
-        anti_dilution: finstack_quant_valuations::instruments::AntiDilutionPolicy::None,
-        dividend_adjustment: finstack_quant_valuations::instruments::DividendAdjustment::None,
+        anti_dilution: finstack_quant_valuations_fixed_income::AntiDilutionPolicy::None,
+        dividend_adjustment: finstack_quant_valuations_fixed_income::DividendAdjustment::None,
         dilution_events: Vec::new(),
     };
 
@@ -514,9 +513,7 @@ fn test_empty_call_put_schedule() {
     bond.instrument_pricing_overrides
         .market_quotes
         .implied_volatility = Some(0.01);
-    bond.call_put = Some(
-        finstack_quant_valuations::instruments::fixed_income::bond::CallPutSchedule::default(),
-    ); // Empty schedule
+    bond.call_put = Some(finstack_quant_valuations_fixed_income::bond::CallPutSchedule::default()); // Empty schedule
 
     let market = create_market_context();
 
@@ -530,8 +527,8 @@ fn test_empty_call_put_schedule() {
 /// valuation date, so carry does too, and buying the bond at issue is not income.
 #[test]
 fn test_theta_carry_leaves_out_issue_draw_and_coupon_on_valuation_date() {
-    use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
-    use finstack_quant_valuations::metrics::MetricId;
+    use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
+    use finstack_quant_valuations_core::metrics::MetricId;
 
     let bond = create_standard_convertible();
     let market = create_market_context();

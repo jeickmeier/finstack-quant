@@ -13,7 +13,7 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::convertible::{
+use finstack_quant_valuations_fixed_income::convertible::{
     ConvertibleBond, price_convertible_bond,
 };
 use time::macros::date;
@@ -72,12 +72,12 @@ fn credit_bond(recovery: f64) -> ConvertibleBond {
 #[test]
 fn convertible_frp_matches_european_closed_form() {
     use finstack_quant_core::math::special_functions::norm_cdf;
-    use finstack_quant_valuations::instruments::ConversionPolicy;
+    use finstack_quant_valuations_fixed_income::ConversionPolicy;
     for spot in [50.0, 100.0, 150.0] {
         for recovery in [0.0, 0.4, 1.0] {
             let mut bond = credit_bond(recovery);
             bond.cashflow_spec =
-                finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::default();
+                finstack_quant_valuations_fixed_income::bond::CashflowSpec::default();
             bond.conversion.policy = ConversionPolicy::Window {
                 start: bond.maturity,
                 end: bond.maturity,
@@ -128,23 +128,21 @@ fn deep_otm_convertible(steps: usize) -> ConvertibleBond {
     bond.credit_curve_id = Some("USD-CREDIT".into());
     bond.recovery_rate = Some(0.0);
     bond.cashflow_spec =
-        finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
-            FixedCouponSpec {
-                coupon_type: CouponType::Cash,
-                rate: rust_decimal::Decimal::new(5, 2),
-                schedule: ScheduleParams {
-                    frequency: Tenor::semi_annual(),
-                    day_count: DayCount::Thirty360,
-                    business_day_convention: BusinessDayConvention::Following,
-                    calendar_id: "weekends_only".into(),
-                    stub: StubKind::ShortFront,
-                    end_of_month: false,
-                    payment_lag_days: 0,
-                    adjust_accrual_dates: true,
-                    roll_rule: RollRule::None,
-                },
+        finstack_quant_valuations_fixed_income::bond::CashflowSpec::Fixed(FixedCouponSpec {
+            coupon_type: CouponType::Cash,
+            rate: rust_decimal::Decimal::new(5, 2),
+            schedule: ScheduleParams {
+                frequency: Tenor::semi_annual(),
+                day_count: DayCount::Thirty360,
+                business_day_convention: BusinessDayConvention::Following,
+                calendar_id: "weekends_only".into(),
+                stub: StubKind::ShortFront,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: true,
+                roll_rule: RollRule::None,
             },
-        );
+        });
     with_tree_steps(&bond, steps)
 }
 

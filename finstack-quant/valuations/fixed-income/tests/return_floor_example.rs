@@ -25,12 +25,10 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PricingOptions;
-use finstack_quant_valuations::instruments::fixed_income::bond::{
-    Bond, ProtectionWindow, ReturnFloorSpec,
-};
-use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::PricingOptions;
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_fixed_income::bond::{Bond, ProtectionWindow, ReturnFloorSpec};
 use time::macros::date;
 
 /// Build a flat continuously-compounded discount curve (Act/365F knots).
@@ -55,7 +53,7 @@ fn flat_curve(id: &str, rate: f64, as_of: finstack_quant_core::dates::Date) -> D
 /// Attach the Hull-White short-rate model the tree prices the floor with.
 fn with_short_rate_model(mut loan: Bond) -> Bond {
     loan.instrument_pricing_overrides =
-        finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides::default()
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
             .with_hw1f_mean_reversion(0.03)
             .with_hw1f_sigma(0.01);
     loan

@@ -374,7 +374,7 @@ bounded below by the floor target. When the natural maturity return is below
 the target, the maturity path is the worst case and the metric reports it. The
 floor's actual guarantee (every early-call path meets the target) is verified by
 the unit tests in `pricing/return_floor.rs` and by
-[`tests/return_floor_example.rs`](../../../../tests/return_floor_example.rs).
+[`tests/return_floor_example.rs`](../../tests/return_floor_example.rs).
 
 ### Convenience limitation
 

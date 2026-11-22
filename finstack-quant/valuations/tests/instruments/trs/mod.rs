@@ -14,15 +14,15 @@
 //! - `test_utils` - Common fixtures and helper functions
 //! - `test_trs_types` - Core types and enums
 //! - `test_equity_trs` - Equity TRS specific tests
-//! - `test_fi_index_trs` - Fixed Income Index TRS specific tests
 //! - `test_trs_metrics` - All risk metrics calculations
 //! - `test_trs_pricing_engine` - Shared pricing engine logic
 //! - `test_trs_edge_cases` - Boundary conditions and error handling
+//!
+//! Fixed-income index TRS tests live in `fixed-income/tests/fi_trs/`.
 
 mod test_utils;
 
 mod test_equity_trs;
-mod test_fi_index_trs;
 mod test_trs_curve_dependencies;
 mod test_trs_edge_cases;
 mod test_trs_metrics;

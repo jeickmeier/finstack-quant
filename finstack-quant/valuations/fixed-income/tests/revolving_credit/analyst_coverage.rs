@@ -11,14 +11,14 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_core::pricer::ModelKey;
+use finstack_quant_valuations_fixed_income::revolving_credit::{
     CreditSpreadProcessSpec, DrawRepayEvent, DrawRepaySpec, McConfig, RevolvingCredit,
     RevolvingCreditFees, StochasticUtilizationSpec, UtilizationProcess,
 };
-use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations::pricer::ModelKey;
 use time::macros::date;
 
 const COMMITMENT: finstack_quant_core::dates::Date = date!(2024 - 01 - 15);
@@ -87,7 +87,7 @@ fn zero_vol_stochastic() -> DrawRepaySpec {
 }
 
 fn metrics(facility: &RevolvingCredit, model: ModelKey) -> (f64, f64, f64) {
-    let result = finstack_quant_valuations::pricer::STANDARD
+    let result = finstack_quant_valuations_fixed_income::FIXED_INCOME
         .pricers()
         .price_with_metrics(
             facility,
@@ -336,9 +336,7 @@ fn business_day_convention_is_honoured_on_payment_dates() {
 // ---------------------------------------------------------------------------
 
 use finstack_quant_core::cashflow::CFKind;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
-    CommitmentStep, FeeStep, MarginStep,
-};
+use finstack_quant_valuations_fixed_income::loan_terms::{CommitmentStep, FeeStep, MarginStep};
 
 fn flows_of(facility: &RevolvingCredit) -> Vec<finstack_quant_core::cashflow::CashFlow> {
     use finstack_quant_cashflows::CashflowScheduleSource;
@@ -453,7 +451,7 @@ fn commitment_step_below_the_drawn_balance_is_rejected() {
 fn stochastic_utilization_books_the_principal_implied_by_a_commitment_step() {
     let facility =
         stepped(5_000_000.0, zero_vol_stochastic_at(0.5), step_to_6m()).expect("facility");
-    let result = finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer::price_with_paths(&facility, &market(), AS_OF)
+    let result = finstack_quant_valuations_fixed_income::revolving_credit::RevolvingCreditPricer::price_with_paths(&facility, &market(), AS_OF)
         .expect("paths");
     let flows = result.path_results[0].cashflows.get_flows().to_vec();
     let notional: Vec<_> = flows
@@ -502,7 +500,7 @@ fn capacity_metrics_read_the_stepped_commitment() {
     )
     .expect("facility");
     let after = date!(2026 - 03 - 01);
-    let result = finstack_quant_valuations::pricer::STANDARD
+    let result = finstack_quant_valuations_fixed_income::FIXED_INCOME
         .pricers()
         .price_with_metrics(
             &facility,
@@ -657,9 +655,7 @@ fn intra_period_margin_step_is_honoured_by_both_engines() {
 
 use finstack_quant_cashflows::builder::FloatingRateSpec;
 use finstack_quant_core::market_data::term_structures::{ForwardCurve, HazardCurve};
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
-    LcEvent, LetterOfCreditSpec,
-};
+use finstack_quant_valuations_fixed_income::loan_terms::{LcEvent, LetterOfCreditSpec};
 
 fn sofr_plus(spread_bp: i64) -> RateSpec {
     RateSpec::Floating(FloatingRateSpec {
@@ -786,7 +782,7 @@ fn letters_of_credit_reduce_availability_and_pay_lc_and_fronting_fees() {
     // Usage fee tier at 50% utilization (3M drawn + 2M LC) applies 25 bp to the drawn 3M.
     assert!((flow_amount(&flows, CFKind::UsageFee, pay) - 3_000_000.0 * 0.0025 * dt).abs() < 1e-6);
 
-    let result = finstack_quant_valuations::pricer::STANDARD
+    let result = finstack_quant_valuations_fixed_income::FIXED_INCOME
         .pricers()
         .price_with_metrics(
             &facility,
@@ -885,7 +881,7 @@ fn stochastic_utilization_is_capped_by_outstanding_letters_of_credit() {
         }),
     }));
     let facility = with_lc(spec, lc_spec(2_000_000.0, vec![], 0.0), None).expect("facility");
-    let result = finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer::price_with_paths(&facility, &market_with_forward(), AS_OF)
+    let result = finstack_quant_valuations_fixed_income::revolving_credit::RevolvingCreditPricer::price_with_paths(&facility, &market_with_forward(), AS_OF)
         .expect("paths");
     for path in &result.path_results {
         let data = path.path_data.as_ref().expect("path data");
@@ -991,7 +987,7 @@ fn quote_facility(
 }
 
 fn quote_metric(facility: &RevolvingCredit, market: &MarketContext, id: MetricId) -> f64 {
-    let result = finstack_quant_valuations::pricer::STANDARD
+    let result = finstack_quant_valuations_fixed_income::FIXED_INCOME
         .pricers()
         .price_with_metrics(
             facility,
@@ -1179,7 +1175,7 @@ fn exposure_facility(drawn: f64, leq: f64, credit: bool) -> RevolvingCredit {
 }
 
 fn measure(facility: &RevolvingCredit, market: &MarketContext, id: MetricId) -> f64 {
-    let result = finstack_quant_valuations::pricer::STANDARD
+    let result = finstack_quant_valuations_fixed_income::FIXED_INCOME
         .pricers()
         .price_with_metrics(
             facility,
@@ -1253,7 +1249,7 @@ fn undrawn_exposure_shows_in_hazard_cs01_but_not_in_the_z_spread_fallback() {
         (bucketed - hazard_leq).abs() < 0.02 * hazard_leq.abs(),
         "bucketed {bucketed} vs parallel {hazard_leq}"
     );
-    let unreplayable_err = finstack_quant_valuations::pricer::STANDARD
+    let unreplayable_err = finstack_quant_valuations_fixed_income::FIXED_INCOME
         .pricers()
         .price_with_metrics(
             &exposure_facility(1_000_000.0, 0.5, true),
@@ -1322,7 +1318,7 @@ fn expected_loss_grows_with_the_contingent_exposure() {
 // Task 10: upfront fee percentage and OID effective rate
 // ---------------------------------------------------------------------------
 
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::{ScheduledFee, UpfrontFee};
+use finstack_quant_valuations_fixed_income::loan_terms::{ScheduledFee, UpfrontFee};
 
 fn origination_facility(upfront: Option<UpfrontFee>, fees_bp: f64) -> RevolvingCredit {
     let mut fees = RevolvingCreditFees::flat(fees_bp, 0.0, 0.0).expect("fees");
@@ -1380,7 +1376,7 @@ fn oid_effective_rate_exceeds_the_running_rate_with_an_upfront_fee() {
     let m = market();
     let with_fee = origination_facility(Some(UpfrontFee::FractionOfCommitment(0.02)), 0.0);
     let run = |facility: &RevolvingCredit| {
-        finstack_quant_valuations::pricer::STANDARD
+        finstack_quant_valuations_fixed_income::FIXED_INCOME
             .pricers()
             .price_with_metrics(
                 facility,
@@ -1401,7 +1397,7 @@ fn oid_effective_rate_exceeds_the_running_rate_with_an_upfront_fee() {
 
     let mut without_fees = with_fee;
     without_fees.oid_eir = Some(
-        finstack_quant_valuations::instruments::fixed_income::loan_terms::OidEirSpec {
+        finstack_quant_valuations_fixed_income::loan_terms::OidEirSpec {
             include_fees: false,
         },
     );
@@ -1421,7 +1417,7 @@ fn oid_effective_rate_is_requestable_directly() {
     assert!(facility.oid_eir.is_none());
     let run = |ids: &[&str]| {
         let ids: Vec<MetricId> = ids.iter().map(|id| MetricId::custom(*id)).collect();
-        finstack_quant_valuations::pricer::STANDARD
+        finstack_quant_valuations_fixed_income::FIXED_INCOME
             .pricers()
             .price_with_metrics(
                 &facility,
@@ -1622,7 +1618,7 @@ fn accordion_allows_draws_above_the_opening_commitment() {
         .value(&market, AS_OF)
         .expect("prices with the default leg");
     assert!(pv.amount().is_finite());
-    let result = finstack_quant_valuations::pricer::STANDARD
+    let result = finstack_quant_valuations_fixed_income::FIXED_INCOME
         .pricers()
         .price_with_metrics(
             &facility,
@@ -1652,7 +1648,7 @@ fn historical_commitment_steps_book_no_principal() {
     }];
     facility.drawn = usd(5_000_000.0);
     facility.validate().expect("seasoned facility");
-    let result = finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer::price_with_paths(&facility, &market(), AS_OF)
+    let result = finstack_quant_valuations_fixed_income::revolving_credit::RevolvingCreditPricer::price_with_paths(&facility, &market(), AS_OF)
         .expect("paths");
     let flows = result.path_results[0].cashflows.get_flows().to_vec();
     let notional: Vec<_> = flows

@@ -1,8 +1,5 @@
-//! Comprehensive revolving credit test suite.
+//! Calibration-pinned revolving credit tests.
 //!
-//! # Test Organization
-//!
-//! - `mc`: Monte Carlo pricing tests
+//! Single-family revolving credit tests live in `fixed-income/tests/revolving_credit/`.
 
-mod analyst_coverage;
 mod basic;

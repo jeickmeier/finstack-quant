@@ -44,7 +44,6 @@ Single-file modules:
 |--------|--------|
 | `canonical_contracts` | Canonical byte encoding, content hashes, and key-insertion-order invariance for the instrument and calibration envelopes |
 | `cashflow_export_schema` | JSON Schema coverage of `InstrumentCashflowEnvelope` and its row fields |
-| `cross_factor_metrics_tests` | Cross-factor gamma against manual four-corner repricing |
 | `default_attribute_consistency` | Static source audit over every instrument `types.rs`: builder defaults carry a matching `#[serde(default)]`, and no type stores the legacy full-override bag |
 | `field_units` | Field-unit tables (`results::*_field_units`) cover every field of each family result type in struct order |
 | `metric_request_contract` | Requested metrics on JSON pricing entry points either appear in `ValuationResult::measures` or return an error |
@@ -53,7 +52,6 @@ Single-file modules:
 | `phase2_strictness` | Persisted calibration steps reject unknown flattened fields |
 | `production_*` | Production quant-audit regressions (`production_audit`, `production_barrier_ndf_audit`, `production_inflation_audit`, `production_risk_audit`, `production_simm_sensitivity_audit`, `production_simplicity_regressions`, `production_structured_audit`, `production_structured_metrics_audit`, `production_waterfall_audit`) |
 | `registry_snapshot` | Pins the standard pricer and metric registries against `tests/data/registry_snapshot.json` |
-| `return_floor_example` | Readable public-API example: MOIC/XIRR return-floor loan, priced and verified through public APIs only |
 | `schema_audit` | Every instrument `example()` serializes to valid JSON, round-trips through `InstrumentEnvelope`, and matches the checked-in schema |
 
 ## Directory map

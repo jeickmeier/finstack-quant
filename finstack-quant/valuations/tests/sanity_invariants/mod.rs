@@ -5,7 +5,6 @@
 //! NOT external-reference parity (see `tests/golden/` for that).
 
 mod test_asian_cv_notional;
-mod test_bond_pricing_parity;
 mod test_cds_parity;
 mod test_cross_impl_parity;
 mod test_equity_option_parity;

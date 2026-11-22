@@ -120,19 +120,26 @@ sites, which are *not* all named after the directory:
 ## Tests and benches
 
 Integration tests that need only this crate, valuations-core and the
-test-support crate live in `tests/<leaf>/`, compiled into the single
-`fixed-income` target (`mise run rust-test-crate -- finstack-quant-valuations-fixed-income`):
-most of `bond/`, `term_loan/` and `revolving_credit/`, `inflation_linked_bond/`
-whole and `bond_future/serde.rs`. Tests that bootstrap hazard curves or build
-`PricingOptions` through `finstack-quant-calibration` (`tests/support/credit.rs`),
-price through the standard registries or round-trip `InstrumentJson` stay in
-the umbrella's `../tests/instruments/<leaf>/`: `convertible/`, the credit-risk
-metrics of `bond/` and `term_loan/`, `bond_future/integration.rs`,
-`revolving_credit/{basic,analyst_coverage}.rs`, `term_loan/term_loan_tests.rs`,
-the whole `trs/` suite and the loan-facility wire-key tests. `tests/support/
-revolver_draws.rs` (the stochastic-revolver fixtures) is also `#[path]`-included
-by the structured-credit crate's loan-pool tests. The agency mortgage leaves (`mbs_passthrough`,
-`tba`, `dollar_roll`) have no test directory — they are covered by colocated
+test-support crate live in `tests/`, compiled into the single `fixed-income`
+target (`mise run rust-test-crate -- finstack-quant-valuations-fixed-income`):
+most of `bond/` (including `metrics/asw` and `test_bond_pricing_parity`),
+`convertible/` (all calibration-free suites plus `fixtures`), `fi_trs/`,
+`term_loan/`, `revolving_credit/` (including `analyst_coverage`),
+`inflation_linked_bond/` whole, `bond_future/serde.rs`, and the single-family
+root suites (`bond_portfolio`, `cross_factor_metrics_tests`,
+`graceful_metrics_test`, `return_floor_example`). Tests that bootstrap hazard
+curves or build `PricingOptions` through `finstack-quant-calibration`
+(`tests/support/credit.rs`), cross-family TRS tests, or tests that round-trip
+`InstrumentJson` stay in the umbrella's `../tests/instruments/<leaf>/`:
+`convertible/test_credit_curve.rs`, the credit-risk metrics of `bond/` and
+`term_loan/`, `bond_future/integration.rs`, `revolving_credit/basic.rs`,
+`term_loan/term_loan_tests.rs`, the cross-family `trs/` suite and the
+loan-facility wire-key tests. `tests/support/revolver_draws.rs` (the
+stochastic-revolver fixtures) is also `#[path]`-included by the
+structured-credit crate's loan-pool tests, and `tests/support/trs.rs` and
+`tests/convertible/fixtures.rs` are `#[path]`-included by the umbrella tests
+that remain there. The agency mortgage leaves (`mbs_passthrough`, `tba`,
+`dollar_roll`) have no test directory — they are covered by colocated
 `#[cfg(test)]` modules plus the umbrella's registry, serde and
 dependency-completeness contract tests.
 

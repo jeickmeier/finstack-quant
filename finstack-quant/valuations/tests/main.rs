@@ -11,8 +11,6 @@ mod cashflow_export_schema;
 mod cashflows;
 #[path = "core.rs"]
 mod core_framework;
-#[path = "cross_factor_metrics_tests.rs"]
-mod cross_factor_metrics_tests;
 #[path = "default_attribute_consistency.rs"]
 mod default_attribute_consistency;
 #[path = "field_units.rs"]
@@ -51,8 +49,6 @@ mod production_structured_metrics_audit;
 mod production_waterfall_audit;
 #[path = "registry_snapshot.rs"]
 mod registry_snapshot;
-#[path = "return_floor_example.rs"]
-mod return_floor_example;
 #[path = "sanity_invariants.rs"]
 mod sanity_invariants;
 #[path = "schema_audit.rs"]

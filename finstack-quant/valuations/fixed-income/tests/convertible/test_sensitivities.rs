@@ -8,7 +8,7 @@
 //! - Monotonicity and convexity properties
 
 use super::fixtures::*;
-use finstack_quant_valuations::instruments::fixed_income::convertible::price_convertible_bond;
+use finstack_quant_valuations_fixed_income::convertible::price_convertible_bond;
 
 #[test]
 fn test_sensitivity_to_spot_price() {

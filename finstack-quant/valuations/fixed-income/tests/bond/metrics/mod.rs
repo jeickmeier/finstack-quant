@@ -21,6 +21,7 @@
 //! comprehensive coverage across Bond, IRS, and Deposit instruments.
 
 mod accrued;
+mod asw;
 mod bucketed_dv01;
 mod convexity;
 mod dm;

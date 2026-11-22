@@ -7,9 +7,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_fixed_income::bond::Bond;
 use time::macros::date;
 
 fn build_discount_curve(id: &str, as_of: Date, rate: f64) -> DiscountCurve {
@@ -71,7 +71,7 @@ fn cross_gamma_credit_rejects_unreplayable_hazard_curve() {
             &market,
             as_of,
             &[MetricId::CrossGammaRatesCredit],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap_err();
     assert!(error.to_string().contains("lossless calibration recipe"));

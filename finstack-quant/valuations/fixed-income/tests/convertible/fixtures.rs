@@ -16,9 +16,9 @@ use time::Month;
 use finstack_quant_cashflows::builder::{
     CouponType, FixedCouponSpec, FloatingCouponSpec, FloatingRateSpec,
 };
-use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
-use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
-use finstack_quant_valuations::instruments::{
+use finstack_quant_valuations_fixed_income::bond::{CallPut, CallPutSchedule};
+use finstack_quant_valuations_fixed_income::convertible::ConvertibleBond;
+use finstack_quant_valuations_fixed_income::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
 };
 
@@ -215,10 +215,9 @@ pub fn create_convertible_with_policy(policy: ConversionPolicy) -> ConvertibleBo
         call_put: None,
         soft_call_trigger: None,
         resolved_settlement: None,
-        cashflow_spec:
-            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
-                fixed_coupon,
-            ),
+        cashflow_spec: finstack_quant_valuations_fixed_income::bond::CashflowSpec::Fixed(
+            fixed_coupon,
+        ),
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
@@ -279,10 +278,9 @@ pub fn create_convertible_with_conversion_price() -> ConvertibleBond {
         call_put: None,
         soft_call_trigger: None,
         resolved_settlement: None,
-        cashflow_spec:
-            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
-                fixed_coupon,
-            ),
+        cashflow_spec: finstack_quant_valuations_fixed_income::bond::CashflowSpec::Fixed(
+            fixed_coupon,
+        ),
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
@@ -354,10 +352,9 @@ pub fn create_floating_convertible() -> ConvertibleBond {
         call_put: None,
         soft_call_trigger: None,
         resolved_settlement: None,
-        cashflow_spec:
-            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Floating(
-                floating,
-            ),
+        cashflow_spec: finstack_quant_valuations_fixed_income::bond::CashflowSpec::Floating(
+            floating,
+        ),
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
@@ -463,8 +460,7 @@ pub fn create_zero_coupon_convertible() -> ConvertibleBond {
         call_put: None,
         soft_call_trigger: None,
         resolved_settlement: None,
-        cashflow_spec:
-            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::default(), // zero coupon
+        cashflow_spec: finstack_quant_valuations_fixed_income::bond::CashflowSpec::default(), // zero coupon
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
@@ -504,6 +500,7 @@ pub fn theoretical_parity(spot: f64, conversion_ratio: f64, notional: f64) -> f6
 /// the cash component sits `credit_spread_bp` above the risk-free rate. It
 /// exercises the TZ credit/equity decomposition path, which is skipped when
 /// `credit_curve_id` is `None`.
+#[allow(dead_code)] // Used by umbrella's calibration-pinned `test_credit_curve.rs` via #[path].
 pub fn create_market_context_with_credit(credit_spread_bp: f64) -> MarketContext {
     let base_date = dates::base_date();
     let rf_rate = market_params::RISK_FREE_RATE;

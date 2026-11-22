@@ -8,8 +8,8 @@
 //! - price_with_metrics interface
 
 use super::fixtures::*;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::MetricId;
 use time::Month;
 
 #[test]
@@ -22,7 +22,7 @@ fn test_parity_metric() {
         &market,
         as_of,
         &[MetricId::Parity],
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
 
     assert!(
@@ -63,7 +63,7 @@ fn test_conversion_premium_metric() {
         &market,
         as_of,
         &[MetricId::ConversionPremium],
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
 
     assert!(
@@ -98,7 +98,7 @@ fn test_delta_metric() {
         &market,
         as_of,
         &[MetricId::Delta],
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
 
     assert!(result.is_ok(), "Delta metric should calculate successfully");
@@ -132,7 +132,7 @@ fn test_gamma_metric() {
         &market,
         as_of,
         &[MetricId::Gamma],
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
 
     assert!(result.is_ok(), "Gamma metric should calculate successfully");
@@ -159,7 +159,7 @@ fn test_vega_metric() {
         &market,
         as_of,
         &[MetricId::Vega],
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
 
     assert!(result.is_ok(), "Vega metric should calculate successfully");
@@ -186,7 +186,7 @@ fn test_rho_metric() {
         &market,
         as_of,
         &[MetricId::Rho],
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
 
     assert!(result.is_ok(), "Rho metric should calculate successfully");
@@ -213,7 +213,7 @@ fn test_theta_metric() {
         &market,
         as_of,
         &[MetricId::Theta],
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
 
     assert!(result.is_ok(), "Theta metric should calculate successfully");
@@ -248,7 +248,7 @@ fn test_multiple_metrics() {
         &market,
         as_of,
         &metrics,
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
 
     assert!(
@@ -279,7 +279,7 @@ fn test_metrics_with_callable_bond() {
         &market,
         as_of,
         &metrics,
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
 
     assert!(
@@ -301,7 +301,7 @@ fn test_metrics_with_puttable_bond() {
         &market,
         as_of,
         &metrics,
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
 
     assert!(
@@ -322,7 +322,7 @@ fn test_metrics_with_zero_coupon() {
         &market,
         as_of,
         &metrics,
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
 
     assert!(
@@ -342,7 +342,7 @@ fn test_valuation_result_structure() {
             &market,
             as_of,
             &[MetricId::Delta],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -369,7 +369,7 @@ fn test_clean_dirty_price_reconciles_with_canonical_accrual() {
             &market,
             as_of,
             &[MetricId::Accrued, MetricId::CleanPrice],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .expect("convertible clean and accrued metrics should calculate");
     let accrued = result.measures["accrued"];
@@ -395,7 +395,7 @@ fn test_empty_metrics_request() {
         &market,
         as_of,
         &[],
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
 
     assert!(result.is_ok(), "Should work with empty metrics request");
@@ -420,7 +420,7 @@ fn test_metrics_consistency_with_direct_calculation() {
             &market,
             as_of,
             &[MetricId::Parity],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -448,7 +448,7 @@ fn test_bucketed_dv01_metric() {
         &market,
         as_of,
         &[MetricId::BucketedDv01],
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
 
     // BucketedDv01 should work for convertibles
@@ -471,7 +471,7 @@ fn test_custom_metrics_only() {
             &market,
             as_of,
             &metrics,
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 
@@ -495,7 +495,7 @@ fn test_standard_metrics_only() {
             &market,
             as_of,
             &metrics,
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
 

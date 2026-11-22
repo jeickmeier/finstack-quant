@@ -9,8 +9,8 @@
 
 use super::fixtures::*;
 use finstack_quant_core::dates::Date;
-use finstack_quant_valuations::instruments::fixed_income::convertible::price_convertible_bond;
-use finstack_quant_valuations::instruments::{ConversionEvent, ConversionPolicy, PriceTrigger};
+use finstack_quant_valuations_fixed_income::convertible::price_convertible_bond;
+use finstack_quant_valuations_fixed_income::{ConversionEvent, ConversionPolicy, PriceTrigger};
 use time::Month;
 
 #[test]

@@ -1,28 +1,8 @@
-//! Comprehensive test suite for convertible bond instruments.
+//! Calibration-pinned convertible bond credit-curve tests.
 //!
-//! Tests are organized into focused modules:
-//! - `fixtures`: Common test fixtures, market contexts, and helper functions
-//! - `test_pricing_basic`: Basic valuation, parity, conversion value
-//! - `test_pricing_trees`: Binomial tree pricing and convergence
-//! - `test_greeks`: Greeks calculations and sensitivities
-//! - `test_conversion_policies`: Voluntary, mandatory, window, event-triggered
-//! - `test_embedded_options`: Calls, puts, and combinations
-//! - `test_sensitivities`: Market parameter sensitivities
-//! - `test_edge_cases`: Edge cases, error handling, currency safety
-//! - `test_metrics`: Metric calculator framework integration
-//! - `quantlib_parity`: QuantLib parity tests for convertible bonds
+//! Single-family convertible bond tests live in `fixed-income/tests/convertible/`.
 
-// Test modules
+#[allow(dead_code)]
+#[path = "../../../fixed-income/tests/convertible/fixtures.rs"]
 mod fixtures;
-mod quantlib_parity;
-mod test_conversion_policies;
 mod test_credit_curve;
-mod test_edge_cases;
-mod test_embedded_options;
-mod test_greeks;
-mod test_hazard_credit;
-mod test_metrics;
-mod test_pricing_basic;
-mod test_production_audit;
-mod test_sensitivities;
-mod test_tree_convergence;

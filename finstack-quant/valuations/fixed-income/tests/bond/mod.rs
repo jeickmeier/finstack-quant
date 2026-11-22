@@ -18,5 +18,6 @@ mod merton_mc_convergence;
 mod metrics;
 mod pricing;
 mod test_bond_pricing;
+mod test_bond_pricing_parity;
 mod test_ytm_edge_cases;
 mod validation;

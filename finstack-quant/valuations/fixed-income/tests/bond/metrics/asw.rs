@@ -8,11 +8,11 @@ use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-use finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec;
-use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::metrics::{MetricContext, MetricId};
-use finstack_quant_valuations::pricer::STANDARD;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations_fixed_income::FIXED_INCOME;
+use finstack_quant_valuations_fixed_income::bond::Bond;
+use finstack_quant_valuations_fixed_income::bond::CashflowSpec;
 use std::sync::Arc;
 use time::macros::date;
 
@@ -96,7 +96,7 @@ fn test_asw_par_tracks_coupon_minus_par_rate() {
         .try_insert(disc.clone())
         .expect("insert market curve");
 
-    let registry = STANDARD.metrics();
+    let registry = FIXED_INCOME.metrics();
     let mut ctx = MetricContext::new(
         Arc::new(bond.clone()),
         Arc::new(market),
@@ -168,7 +168,7 @@ fn test_asw_market_tightens_when_price_rises() {
         .try_insert(disc)
         .expect("insert market curve");
 
-    let registry = STANDARD.metrics();
+    let registry = FIXED_INCOME.metrics();
 
     let mut ctx_rich = MetricContext::new(
         Arc::new(rich_bond),
@@ -210,7 +210,7 @@ fn test_asw_market_tightens_when_price_rises() {
 #[test]
 fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
     use finstack_quant_core::dates::Schedule;
-    use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::{
+    use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::{
         fixed_leg_annuity, par_rate_and_annuity_from_discount,
     };
 
@@ -237,7 +237,7 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
         .try_insert(disc.clone())
         .expect("insert market curve");
 
-    let registry = STANDARD.metrics();
+    let registry = FIXED_INCOME.metrics();
     let mut ctx = MetricContext::new(
         Arc::new(bond.clone()),
         Arc::new(market.clone()),
@@ -376,7 +376,7 @@ fn test_asw_par_metric_rejects_matured_schedule() {
     let market = MarketContext::new()
         .try_insert(disc)
         .expect("insert market curve");
-    let registry = STANDARD.metrics();
+    let registry = FIXED_INCOME.metrics();
 
     let mut ctx = MetricContext::new(
         Arc::new(bond),
@@ -418,7 +418,7 @@ fn test_asw_market_metric_rejects_matured_schedule() {
     let market = MarketContext::new()
         .try_insert(disc)
         .expect("insert market curve");
-    let registry = STANDARD.metrics();
+    let registry = FIXED_INCOME.metrics();
 
     let mut ctx = MetricContext::new(
         Arc::new(bond),
@@ -450,27 +450,25 @@ fn test_asw_par_with_forward_day_count_override_changes_result() {
         .try_insert(fwd)
         .expect("insert market curve");
 
-    let par_default =
-        finstack_quant_valuations::instruments::fixed_income::bond::asw_par_with_forward(
-            &bond,
-            &market,
-            as_of,
-            "USD-SOFR-3M",
-            0.0,
-            None,
-        )
-        .expect("par asw default");
+    let par_default = finstack_quant_valuations_fixed_income::bond::asw_par_with_forward(
+        &bond,
+        &market,
+        as_of,
+        "USD-SOFR-3M",
+        0.0,
+        None,
+    )
+    .expect("par asw default");
 
-    let par_act365f =
-        finstack_quant_valuations::instruments::fixed_income::bond::asw_par_with_forward(
-            &bond,
-            &market,
-            as_of,
-            "USD-SOFR-3M",
-            0.0,
-            Some(DayCount::Act365F),
-        )
-        .expect("par asw override");
+    let par_act365f = finstack_quant_valuations_fixed_income::bond::asw_par_with_forward(
+        &bond,
+        &market,
+        as_of,
+        "USD-SOFR-3M",
+        0.0,
+        Some(DayCount::Act365F),
+    )
+    .expect("par asw override");
 
     assert!(
         par_default.is_finite() && par_act365f.is_finite(),
@@ -495,7 +493,7 @@ fn test_asw_market_with_forward_requires_dirty_price() {
         .try_insert(fwd)
         .expect("insert market curve");
 
-    let err = finstack_quant_valuations::instruments::fixed_income::bond::asw_market_with_forward(
+    let err = finstack_quant_valuations_fixed_income::bond::asw_market_with_forward(
         &bond,
         &market,
         as_of,
@@ -526,7 +524,7 @@ fn test_asw_market_with_forward_moves_with_dirty_price() {
         .try_insert(fwd)
         .expect("insert market curve");
 
-    let par_asw = finstack_quant_valuations::instruments::fixed_income::bond::asw_par_with_forward(
+    let par_asw = finstack_quant_valuations_fixed_income::bond::asw_par_with_forward(
         &bond,
         &market,
         as_of,
@@ -536,29 +534,27 @@ fn test_asw_market_with_forward_moves_with_dirty_price() {
     )
     .expect("par asw");
 
-    let ann_asw_par_px =
-        finstack_quant_valuations::instruments::fixed_income::bond::asw_market_with_forward(
-            &bond,
-            &market,
-            as_of,
-            "USD-SOFR-3M",
-            0.0,
-            Some(bond.notional.amount()),
-            None,
-        )
-        .expect("asw mkt at par");
+    let ann_asw_par_px = finstack_quant_valuations_fixed_income::bond::asw_market_with_forward(
+        &bond,
+        &market,
+        as_of,
+        "USD-SOFR-3M",
+        0.0,
+        Some(bond.notional.amount()),
+        None,
+    )
+    .expect("asw mkt at par");
 
-    let rich_asw =
-        finstack_quant_valuations::instruments::fixed_income::bond::asw_market_with_forward(
-            &bond,
-            &market,
-            as_of,
-            "USD-SOFR-3M",
-            0.0,
-            Some(1.01 * bond.notional.amount()),
-            None,
-        )
-        .expect("asw rich");
+    let rich_asw = finstack_quant_valuations_fixed_income::bond::asw_market_with_forward(
+        &bond,
+        &market,
+        as_of,
+        "USD-SOFR-3M",
+        0.0,
+        Some(1.01 * bond.notional.amount()),
+        None,
+    )
+    .expect("asw rich");
 
     assert!(
         (ann_asw_par_px - par_asw).abs() < 1e-10,
@@ -584,7 +580,7 @@ fn test_asw_par_forward_returns_zero_for_zero_notional() {
         .try_insert(fwd)
         .expect("insert market curve");
 
-    let asw = finstack_quant_valuations::instruments::fixed_income::bond::asw_par_with_forward(
+    let asw = finstack_quant_valuations_fixed_income::bond::asw_par_with_forward(
         &bond,
         &market,
         as_of,
@@ -622,7 +618,7 @@ fn test_asw_par_forward_rejects_matured_schedule() {
         .try_insert(fwd)
         .expect("insert market curve");
 
-    let err = finstack_quant_valuations::instruments::fixed_income::bond::asw_par_with_forward(
+    let err = finstack_quant_valuations_fixed_income::bond::asw_par_with_forward(
         &bond,
         &market,
         as_of,
@@ -663,7 +659,7 @@ fn test_asw_market_forward_rejects_matured_schedule() {
         .try_insert(fwd)
         .expect("insert market curve");
 
-    let err = finstack_quant_valuations::instruments::fixed_income::bond::asw_market_with_forward(
+    let err = finstack_quant_valuations_fixed_income::bond::asw_market_with_forward(
         &bond,
         &market,
         as_of,
@@ -686,9 +682,9 @@ fn test_asw_market_forward_rejects_matured_schedule() {
 fn seasoned_asw_keeps_full_next_coupon_and_inverts_on_same_basis() {
     use finstack_quant_core::dates::{BusinessDayConvention, StubKind, Tenor};
     use finstack_quant_core::types::Rate;
-    use finstack_quant_valuations::instruments::BondQuoteInput;
-    use finstack_quant_valuations::instruments::PricingOptions;
-    use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::compute_quotes;
+    use finstack_quant_valuations_core::instruments::PricingOptions;
+    use finstack_quant_valuations_fixed_income::BondQuoteInput;
+    use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::compute_quotes;
     let as_of = date!(2025 - 07 - 01);
     let mut bond = Bond::fixed(
         "ASW-SEASONED",

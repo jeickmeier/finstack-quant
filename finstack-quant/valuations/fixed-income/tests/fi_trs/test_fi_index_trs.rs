@@ -3,14 +3,14 @@
 //! Tests cover instrument creation, validation, pricing, carry calculations,
 //! duration sensitivity, and index-specific behaviors.
 
-use super::test_utils::*;
+use crate::support::trs::*;
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency::*;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PayReceive;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::PayReceive;
 use rust_decimal::Decimal;
 
 // Construction and Validation Tests
@@ -763,7 +763,7 @@ fn test_fi_index_trs_zero_carry_when_yield_id_is_none() {
 /// corresponding scalar, the DurationDv01 metric must fail.
 #[test]
 fn test_fi_index_trs_duration_dv01_errors_on_missing_configured_duration() {
-    use finstack_quant_valuations::metrics::MetricId;
+    use finstack_quant_valuations_core::metrics::MetricId;
 
     let as_of = as_of_date();
     let market = create_market_context();
@@ -777,7 +777,7 @@ fn test_fi_index_trs_duration_dv01_errors_on_missing_configured_duration() {
         &market,
         as_of,
         &[MetricId::DurationDv01],
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
     assert!(
         result.is_err(),
@@ -795,14 +795,14 @@ fn test_fi_index_trs_duration_dv01_errors_on_missing_configured_duration() {
 /// Duration risk requires an explicit index-duration source.
 #[test]
 fn test_fi_index_trs_duration_dv01_requires_duration_id() {
-    use finstack_quant_valuations::metrics::MetricId;
+    use finstack_quant_valuations_core::metrics::MetricId;
     let trs = TestFIIndexTrsBuilder::new().duration_id(None).build();
     let error = trs
         .price_with_metrics(
             &create_market_context(),
             as_of_date(),
             &[MetricId::DurationDv01],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .expect_err("duration input is required");
     assert!(error.to_string().contains("duration_id"));
@@ -842,7 +842,7 @@ fn test_fi_index_trs_errors_on_price_scalar_for_yield() {
 /// Providing a `MarketScalar::Price` for duration should fail with a descriptive error.
 #[test]
 fn test_fi_index_trs_errors_on_price_scalar_for_duration() {
-    use finstack_quant_valuations::metrics::MetricId;
+    use finstack_quant_valuations_core::metrics::MetricId;
 
     let as_of = as_of_date();
 
@@ -862,7 +862,7 @@ fn test_fi_index_trs_errors_on_price_scalar_for_duration() {
         &market,
         as_of,
         &[MetricId::DurationDv01],
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
     assert!(
         result.is_err(),
@@ -884,16 +884,17 @@ fn test_fi_index_trs_errors_on_price_scalar_for_duration() {
 fn seasoned_fi_trs(
     initial_level: Option<f64>,
 ) -> (
-    finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap,
+    finstack_quant_valuations_fixed_income::fi_trs::FiIndexTotalReturnSwap,
     MarketContext,
 ) {
     use finstack_quant_cashflows::builder::ScheduleParams;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::types::Attributes;
-    use finstack_quant_valuations::instruments::TrsScheduleSpec;
-    use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
-    use finstack_quant_valuations::instruments::{FinancingLegSpec, IndexUnderlyingParams};
+    use finstack_quant_valuations_core::instruments::FinancingLegSpec;
+    use finstack_quant_valuations_core::instruments::TrsScheduleSpec;
+    use finstack_quant_valuations_fixed_income::IndexUnderlyingParams;
+    use finstack_quant_valuations_fixed_income::fi_trs::FiIndexTotalReturnSwap;
 
     let trs = FiIndexTotalReturnSwap::builder()
         .id("SEASONED-FI-TRS".into())
@@ -982,7 +983,7 @@ fn fi_trs_period_in_progress_requires_initial_level() {
 #[test]
 fn fi_trs_keeps_completed_unpaid_period_in_pv() {
     use finstack_quant_cashflows::builder::ScheduleParams;
-    use finstack_quant_valuations::instruments::TrsScheduleSpec;
+    use finstack_quant_valuations_core::instruments::TrsScheduleSpec;
 
     let (mut trs, market) = seasoned_fi_trs(Some(100.0));
     let mut params = ScheduleParams::quarterly_act360();
@@ -1054,8 +1055,8 @@ fn test_fi_index_trs_theta_across_a_financing_reset() {
             .price_with_metrics(
                 &market,
                 as_of,
-                &[finstack_quant_valuations::metrics::MetricId::Theta],
-                finstack_quant_valuations::instruments::PricingOptions::default(),
+                &[finstack_quant_valuations_core::metrics::MetricId::Theta],
+                finstack_quant_valuations_core::instruments::PricingOptions::default(),
             )
             .unwrap_or_else(|err| panic!("{compounding:?} theta across the start reset: {err}"));
         assert!(result.measures["theta"].is_finite(), "{compounding:?}");

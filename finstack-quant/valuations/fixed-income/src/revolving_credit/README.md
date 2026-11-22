@@ -217,7 +217,7 @@ running fee) with the dated `oid_eir_amortization` and
 
 No new fields are needed for these; each is a combination of the schedules
 above and is pinned by an executed test in
-`tests/instruments/revolving_credit/analyst_coverage.rs`:
+`fixed-income/tests/revolving_credit/analyst_coverage.rs`:
 
 - **Term-out**: a `CommitmentStep` to the drawn balance on the term-out date
   (availability ends, commitment fee stops) plus dated repayments for the

@@ -130,7 +130,7 @@ Shared parallel/bucketed DV01 shocks financing discount/forward curves and repri
 
 No constituent cashflows, roll-down, duration/convexity repricing, spread migration/default, or rebalancing dynamics are projected. Using yield as expected total return is a scenario/carry assumption, not a demonstrated risk-neutral price. The risk proxy and PV can have inconsistent yield responses by construction. A constituent-based forward mark, full price-index curve or joint rates/credit model are unimplemented alternatives; observed fixing-based realized returns are supported.
 
-[TRS integration cases](../../../../finstack-quant/valuations/tests/instruments/trs/test_fi_index_trs.rs) and colocated `duration_risk_requires_a_duration_input` provide located examples and required-input checks. [ISDA definitions](../../../REFERENCES.md#isda-2006-definitions) and [SIMM](../../../REFERENCES.md#isda-simm) are reference context, not certification of this proxy.  No independent constituent-index price reconciliation was established.
+[TRS integration cases](../../../../finstack-quant/valuations/fixed-income/tests/fi_trs/test_fi_index_trs.rs) and colocated `duration_risk_requires_a_duration_input` provide located examples and required-input checks. [ISDA definitions](../../../REFERENCES.md#isda-2006-definitions) and [SIMM](../../../REFERENCES.md#isda-simm) are reference context, not certification of this proxy.  No independent constituent-index price reconciliation was established.
 
 ## Independent arithmetic and qualification
 

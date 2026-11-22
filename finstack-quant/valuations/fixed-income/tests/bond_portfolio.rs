@@ -19,11 +19,11 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-use finstack_quant_valuations::metrics::{MetricContext, MetricId};
-use finstack_quant_valuations::pricer::STANDARD;
-use finstack_quant_valuations::results::ValuationResult;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations_core::results::ValuationResult;
+use finstack_quant_valuations_fixed_income::FIXED_INCOME;
+use finstack_quant_valuations_fixed_income::bond::Bond;
 use indexmap::IndexMap;
 use std::sync::Arc;
 use time::macros::date;
@@ -205,7 +205,7 @@ fn test_100_bond_portfolio_pricing() {
     assert_eq!(portfolio.len(), 100, "Portfolio should contain 100 bonds");
 
     // Step 3: Create metrics registry
-    let metrics_registry = STANDARD.metrics();
+    let metrics_registry = FIXED_INCOME.metrics();
 
     // Step 4: Price all bonds with full metrics (strict mode)
     let metric_ids = standard_bond_metrics();
@@ -317,7 +317,7 @@ fn test_dataframe_export_metric_keys() {
         pv,
         MetricContext::default_config(),
     );
-    let metrics_registry = STANDARD.metrics();
+    let metrics_registry = FIXED_INCOME.metrics();
     let computed_metrics = metrics_registry
         .compute(&metric_ids, &mut context)
         .expect("Metrics should compute");
