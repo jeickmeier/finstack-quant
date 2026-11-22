@@ -5,13 +5,16 @@
 //! - [`RevolvingCredit`]: deterministic draw/repay schedule, floating coupon.
 //! - [`AgencyMbsPassthrough`] / [`AgencyTba`]: prepayment-adjusted cashflows.
 //! - [`FiIndexTotalReturnSwap`]: carry-based TRS with yield/duration market data.
-//! - [`AgencyCmo`]: sequential and PAC waterfall allocation across collateral pools.
 //! - [`DollarRoll`]: front/back month settlement NPV and implied financing rate.
+//!
+//! Agency CMO waterfall benchmarks live in `finstack-quant-valuations-structured-credit`'s
+//! `cmo_pricing` target.
 
 #![allow(clippy::unwrap_used)]
 
-#[path = "support/record.rs"]
+#[path = "../../benches/support/record.rs"]
 mod record;
+#[path = "../../benches/support/mod.rs"]
 mod support;
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
@@ -27,21 +30,20 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::TrsScheduleSpec;
-use finstack_quant_valuations::instruments::fixed_income::cmo::AgencyCmo;
-use finstack_quant_valuations::instruments::fixed_income::dollar_roll::DollarRoll;
-use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
-use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{
+use finstack_quant_valuations_core::instruments::pricing::monte_carlo::resolve_mc_paths;
+use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions, TrsScheduleSpec};
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_core::results::ValuationResult;
+use finstack_quant_valuations_fixed_income::dollar_roll::DollarRoll;
+use finstack_quant_valuations_fixed_income::fi_trs::FiIndexTotalReturnSwap;
+use finstack_quant_valuations_fixed_income::mbs_passthrough::{
     AgencyMbsPassthrough, AgencyProgram, PoolType,
 };
-use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
+use finstack_quant_valuations_fixed_income::revolving_credit::{
     DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
-use finstack_quant_valuations::instruments::fixed_income::tba::{AgencyTba, TbaTerm};
-use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
-use finstack_quant_valuations::instruments::pricing::monte_carlo::resolve_mc_paths;
-use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations_fixed_income::tba::{AgencyTba, TbaTerm};
+use finstack_quant_valuations_fixed_income::term_loan::TermLoan;
 use rust_decimal::Decimal;
 use serde_json::json;
 use std::hint::black_box;
@@ -54,11 +56,7 @@ fn check_money(value: &Money, currency: Currency) {
     assert!(value.amount().is_finite());
 }
 
-fn check_valuation(
-    result: &finstack_quant_valuations::results::ValuationResult,
-    currency: Currency,
-    metrics: &[MetricId],
-) {
+fn check_valuation(result: &ValuationResult, currency: Currency, metrics: &[MetricId]) {
     check_money(&result.value, currency);
     assert!(result.measures.values().all(|value| value.is_finite()));
     for metric in metrics {
@@ -407,7 +405,7 @@ fn bench_term_loan_discount_margin(c: &mut Criterion) {
     let mut group = c.benchmark_group("term_loan_discount_margin");
 
     group.bench_function("5Y_quarterly", |b| {
-        use finstack_quant_valuations::instruments::PricingOptions;
+        // PricingOptions is imported at module scope.
 
         let as_of = as_of();
         let market = revolving_credit_market(as_of);
@@ -458,7 +456,7 @@ fn bench_term_loan_tree(c: &mut Criterion) {
     let mut group = c.benchmark_group("term_loan_tree");
 
     group.bench_function("5Y_callable", |b| {
-        use finstack_quant_valuations::instruments::fixed_income::term_loan::{
+        use finstack_quant_valuations_fixed_income::term_loan::{
             LoanCall, LoanCallSchedule, LoanCallType,
         };
 
@@ -492,7 +490,7 @@ fn bench_term_loan_tree(c: &mut Criterion) {
 fn bench_revolving_credit_mc(c: &mut Criterion) {
     let mut group = c.benchmark_group("revolving_credit_mc");
     group.bench_function("3Y_512_paths", |b| {
-        use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
+        use finstack_quant_valuations_fixed_income::revolving_credit::{
             StochasticUtilizationSpec, UtilizationProcess,
         };
 
@@ -582,7 +580,6 @@ fn bench_agency_mbs_pv(c: &mut Criterion) {
 
 /// MBS risk metrics: 512-path MC-OAS solve plus effective duration/convexity.
 fn bench_agency_mbs_metrics(c: &mut Criterion) {
-    use finstack_quant_valuations::instruments::PricingOptions;
     let mut group = c.benchmark_group("agency_mbs_metrics");
     for (label, metrics) in [
         ("oas", vec![MetricId::Oas]),
@@ -634,7 +631,6 @@ fn bench_agency_mbs_metrics(c: &mut Criterion) {
 
 /// Frozen B4 OAS sweeps: five axis points and four payment/seasoning controls.
 fn bench_agency_mbs_oas_scaling(c: &mut Criterion) {
-    use finstack_quant_valuations::instruments::PricingOptions;
     use time::macros::date;
 
     let mut group = c.benchmark_group("agency_mbs_oas_scaling");
@@ -960,99 +956,6 @@ fn bench_fi_trs_pv(c: &mut Criterion) {
     group.finish();
 }
 
-// CMO
-
-/// Five-tranche sequential CMO waterfall allocation.
-///
-/// Measures the sequential/PAC waterfall distribution over a monthly cashflow
-/// projection horizon for the five-tranche fixture.
-fn bench_cmo_waterfall_pv(c: &mut Criterion) {
-    use finstack_quant_valuations::instruments::fixed_income::cmo::{CmoTranche, CmoWaterfall};
-    use time::macros::date;
-    let mut group = c.benchmark_group("cmo_waterfall_pv");
-    group.bench_function("5t", |b| {
-        let as_of = as_of();
-        let market = MarketContext::new()
-            .try_insert(discount_forward_curve_support::flat_discount(
-                "USD-OIS", as_of, 0.05,
-            ))
-            .expect("insert market curve");
-        let n_tranches = 5;
-        let tranches: Vec<CmoTranche> = (0..n_tranches)
-            .map(|i| {
-                // Keep total coupon demand under the ~4% collateral
-                // pass-through so the deal passes interest-coverage
-                // validation at build.
-                let coupon = 0.03 + 0.001 * i as f64;
-                let balance = 10_000_000.0;
-                CmoTranche::sequential(
-                    format!("T{}", i).as_str(),
-                    Money::new(balance, Currency::USD).expect("valid money fixture"),
-                    coupon,
-                    (i + 1) as u32,
-                )
-            })
-            .collect();
-
-        let cmo = AgencyCmo::builder()
-            .id(InstrumentId::new("CMO-BENCH"))
-            .deal_name("BENCH-CMO".into())
-            .agency(AgencyProgram::Fnma)
-            .issue_date(date!(2024 - 01 - 01))
-            .waterfall(CmoWaterfall::new(tranches))
-            .reference_tranche_id("T0".to_string())
-            .collateral_wac(0.045)
-            .collateral_wam_months(360)
-            .discount_curve_id(CurveId::new("USD-OIS"))
-            .build()
-            .unwrap();
-
-        assert_eq!(cmo.waterfall.tranches.len(), n_tranches);
-        support::bench(
-            b,
-            || {
-                cmo.value(black_box(&market), black_box(as_of))
-                    .expect("CMO waterfall PV")
-            },
-            |value| check_money(value, Currency::USD),
-        );
-    });
-    group.finish();
-}
-
-/// Compare CMO structure types: sequential, PAC/support, IO/PO.
-fn bench_cmo_structure_type(c: &mut Criterion) {
-    let mut group = c.benchmark_group("cmo_structure_type");
-    for (label, fixture) in [
-        (
-            "sequential",
-            AgencyCmo::example as fn() -> finstack_quant_core::Result<AgencyCmo>,
-        ),
-        ("pac_support", AgencyCmo::example_pac_support),
-        ("io_po", AgencyCmo::example_io_po),
-    ] {
-        group.bench_function(label, |b| {
-            let as_of = as_of();
-            let market = MarketContext::new()
-                .try_insert(discount_forward_curve_support::flat_discount(
-                    "USD-OIS", as_of, 0.05,
-                ))
-                .expect("insert market curve");
-            let cmo = fixture().expect("CMO fixture");
-            assert!(!cmo.waterfall.tranches.is_empty());
-            support::bench(
-                b,
-                || {
-                    cmo.value(black_box(&market), black_box(as_of))
-                        .expect(label)
-                },
-                |value| check_money(value, Currency::USD),
-            );
-        });
-    }
-    group.finish();
-}
-
 // Dollar Roll
 
 /// Dollar roll NPV and implied-financing computation.
@@ -1120,8 +1023,6 @@ criterion_group!(
     bench_agency_mbs_metrics,
     bench_agency_mbs_oas_scaling,
     bench_fi_trs_pv,
-    bench_cmo_waterfall_pv,
-    bench_cmo_structure_type,
     bench_dollar_roll_pv,
 );
 criterion_main!(benches);

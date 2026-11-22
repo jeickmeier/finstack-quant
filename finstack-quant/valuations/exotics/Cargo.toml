@@ -49,5 +49,9 @@ name = "commodity_pricing"
 harness = false
 
 [[bench]]
+name = "mc_exotics_pricing"
+harness = false
+
+[[bench]]
 name = "rate_exotics_pricing"
 harness = false

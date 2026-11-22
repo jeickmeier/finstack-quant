@@ -54,6 +54,10 @@ name = "structured-credit"
 path = "tests/main.rs"
 
 [[bench]]
+name = "cmo_pricing"
+harness = false
+
+[[bench]]
 name = "structured_credit_pricing"
 harness = false
 

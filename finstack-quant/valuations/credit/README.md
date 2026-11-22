@@ -49,6 +49,7 @@ test-support crate live in `tests/`, compiled into the single `credit` target
 family's integration tests stay in the umbrella's `../tests/instruments/
 {cds,cds_index,cds_option,cds_tranche}/`: they bootstrap hazard curves and
 build `PricingOptions` through `finstack-quant-calibration`
-(`tests/support/credit.rs`). `cds_option_pricing` lives in `benches/`; the
-calibration-dependent benches (`cds_pricing`, `cds_index_pricing`,
-`cds_tranche_pricing`) stay in the umbrella's `../benches/`.
+(`tests/support/credit.rs`). Calibration-free benches (`cds_pricing`,
+`cds_index_pricing`, `cds_option_pricing`, `cds_tranche_pricing`) live in
+`benches/`; calibrated CS01 benches live in `finstack-quant-calibration`'s
+`credit_cs01_pricing` target.

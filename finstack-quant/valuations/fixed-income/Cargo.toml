@@ -76,6 +76,14 @@ name = "convertible_pricing"
 harness = false
 
 [[bench]]
+name = "fi_misc_pricing"
+harness = false
+
+[[bench]]
+name = "inflation_linked_bond_pricing"
+harness = false
+
+[[bench]]
 name = "merton_mc_pricing"
 harness = false
 

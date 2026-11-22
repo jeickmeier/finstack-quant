@@ -74,39 +74,11 @@ jsonschema-validate = [
 ]
 
 [[bench]]
-name = "option_pricing"
-harness = false
-
-[[bench]]
-name = "cds_pricing"
-harness = false
-
-[[bench]]
-name = "cds_tranche_pricing"
-harness = false
-
-[[bench]]
-name = "cds_index_pricing"
-harness = false
-
-[[bench]]
 name = "fourier_var_pricing"
 harness = false
 
 [[bench]]
 name = "cashflow_generation"
-harness = false
-
-[[bench]]
-name = "mc_exotics_pricing"
-harness = false
-
-[[bench]]
-name = "fi_misc_pricing"
-harness = false
-
-[[bench]]
-name = "inflation_pricing"
 harness = false
 
 [[bench]]

@@ -1,13 +1,8 @@
-//! CDS Tranche pricing benchmarks.
+//! CDS Tranche pricing benchmarks (calibration-free PV, correlation delta, JTD,
+//! par spread, Student-t, heterogeneous pools, and prepared reuse).
 //!
-//! Measures performance of CDS tranche operations using Gaussian Copula:
-//! - Present value (NPV) calculation
-//! - CS01 (credit spread sensitivity)
-//! - Correlation delta
-//! - Jump-to-default
-//! - Par spread calculation
-//!
-//! Tests across different tranches (equity, mezzanine, senior) and pool sizes.
+//! Calibrated CS01 and all-metrics benchmarks live in
+//! `finstack-quant-calibration`'s `credit_cs01_pricing` target.
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_cashflows::builder::ScheduleParams;
@@ -20,19 +15,14 @@ use finstack_quant_core::market_data::term_structures::{
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::correlation::CopulaSpec;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CdsTranche, CdsTranchePricer,
+use finstack_quant_valuations_core::instruments::{Instrument, PayReceive};
+use finstack_quant_valuations_credit::CdsDateRegime;
+use finstack_quant_valuations_credit::cds_tranche::{
+    CdsTranche, CdsTrancheParams, CdsTranchePricer,
 };
-use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations::results::ValuationResult;
-#[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
-#[path = "../tests/support/credit.rs"]
-mod credit_support;
-#[path = "support/record.rs"]
+#[path = "../../benches/support/record.rs"]
 mod record;
+#[path = "../../benches/support/mod.rs"]
 mod support;
 use serde_json::{Value, json};
 use std::hint::black_box;
@@ -42,12 +32,6 @@ use time::Month;
 fn validate_price(value: &Money) {
     assert_eq!(value.currency(), Currency::USD);
     assert!(value.amount().is_finite());
-}
-
-fn validate_cs01(result: &ValuationResult) {
-    validate_price(&result.value);
-    assert!(result.measures.values().all(|value| value.is_finite()));
-    assert!(result.measures.contains_key(&MetricId::Cs01));
 }
 
 fn create_tranche(attach_pct: f64, detach_pct: f64, tenor_years: i32) -> CdsTranche {
@@ -70,13 +54,13 @@ fn create_tranche(attach_pct: f64, detach_pct: f64, tenor_years: i32) -> CdsTran
         format!("CDX_IG42_{}_{}_{}", attach_pct, detach_pct, tenor_years),
         &tranche_params,
         &schedule_params,
-        finstack_quant_valuations::instruments::CdsDateRegime::Bespoke,
+        CdsDateRegime::Bespoke,
         "USD-OIS",
         "CDX.NA.IG.42",
         PayReceive::Receive,
     )
     .expect("Valid tranche parameters");
-    tranche.date_regime = finstack_quant_valuations::instruments::CdsDateRegime::Standard;
+    tranche.date_regime = CdsDateRegime::Standard;
     tranche.stub = finstack_quant_core::dates::StubKind::ShortBack;
     tranche
 }
@@ -104,21 +88,19 @@ fn create_market() -> MarketContext {
     let source_market = MarketContext::new()
         .try_insert(discount_curve)
         .expect("insert market curve");
-    let index_curve = credit_support::calibrated_hazard_curve_with_pillars(
-        &source_market,
-        base,
-        "CDX.NA.IG.42",
-        "CDX.NA.IG.42",
-        "USD-OIS",
-        &[
-            (365, 60.0),
-            (3 * 365, 75.0),
-            (5 * 365, 90.0),
-            (7 * 365, 110.0),
-            (10 * 365, 130.0),
-        ],
-    )
-    .unwrap();
+    let index_curve = HazardCurve::builder("CDX.NA.IG.42")
+        .base_date(base)
+        .recovery_rate(0.40)
+        .knots([
+            (1.0, 0.0060 / 0.60),
+            (3.0, 0.0075 / 0.60),
+            (5.0, 0.0090 / 0.60),
+            (7.0, 0.0110 / 0.60),
+            (10.0, 0.0130 / 0.60),
+        ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .build()
+        .unwrap();
 
     // Base correlation curve
     let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
@@ -172,21 +154,19 @@ fn create_market_with_issuers(num_issuers: usize) -> MarketContext {
     let source_market = MarketContext::new()
         .try_insert(discount_curve)
         .expect("insert market curve");
-    let index_curve = credit_support::calibrated_hazard_curve_with_pillars(
-        &source_market,
-        base,
-        "CDX.NA.IG.42",
-        "CDX.NA.IG.42",
-        "USD-OIS",
-        &[
-            (365, 65.0),
-            (3 * 365, 80.0),
-            (5 * 365, 95.0),
-            (7 * 365, 115.0),
-            (10 * 365, 135.0),
-        ],
-    )
-    .unwrap();
+    let index_curve = HazardCurve::builder("CDX.NA.IG.42")
+        .base_date(base)
+        .recovery_rate(0.40)
+        .knots([
+            (1.0, 0.0065 / 0.60),
+            (3.0, 0.0080 / 0.60),
+            (5.0, 0.0095 / 0.60),
+            (7.0, 0.0115 / 0.60),
+            (10.0, 0.0135 / 0.60),
+        ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .build()
+        .unwrap();
 
     let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
         .knots(vec![
@@ -621,45 +601,6 @@ fn bench_npv_case(
     );
 }
 
-fn bench_cds_tranche_cs01(c: &mut Criterion) {
-    let mut group = c.benchmark_group("cds_tranche_cs01");
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    group.bench_function("cs01", |b| {
-        let market = create_market();
-        let tranche = create_tranche(3.0, 7.0, 5);
-        support::bench(
-            b,
-            || {
-                tranche
-                    .price_with_metrics(
-                        black_box(&market),
-                        black_box(as_of),
-                        &[MetricId::Cs01],
-                        credit_support::pricing_options(),
-                    )
-                    .expect("CDS tranche CS01")
-            },
-            |result| {
-                validate_cs01(result);
-                capture_case(
-                    CaptureSpec {
-                        case_id: "cds_tranche_cs01/cs01",
-                        entry_point: "Instrument::price_with_metrics",
-                        requested_metrics: &["cs01"],
-                    },
-                    &tranche,
-                    &market,
-                    as_of,
-                    &CopulaSpec::Gaussian,
-                    || json!({"value": result.value, "metrics": result.measures}),
-                );
-            },
-        );
-    });
-
-    group.finish();
-}
-
 fn bench_cds_tranche_correlation_delta(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_tranche_correlation_delta");
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
@@ -760,64 +701,6 @@ fn bench_cds_tranche_par_spread(c: &mut Criterion) {
                     as_of,
                     pricer.get_copula_spec(),
                     || json!({"scalar": value, "unit": "basis_points"}),
-                );
-            },
-        );
-    });
-
-    group.finish();
-}
-
-fn bench_cds_tranche_all_metrics(c: &mut Criterion) {
-    let mut group = c.benchmark_group("cds_tranche_all_metrics");
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-
-    group.bench_function("all_metrics", |b| {
-        let market = create_market();
-        let tranche = create_tranche(3.0, 7.0, 5);
-        let pricer = CdsTranchePricer::new();
-        support::bench(
-            b,
-            || {
-                let cs01 = tranche
-                    .price_with_metrics(
-                        black_box(&market),
-                        black_box(as_of),
-                        &[MetricId::Cs01],
-                        credit_support::pricing_options(),
-                    )
-                    .expect("CDS tranche CS01");
-
-                let corr_delta = pricer
-                    .calculate_correlation_delta(&tranche, black_box(&market), black_box(as_of))
-                    .expect("CDS tranche correlation delta");
-                let jtd = pricer
-                    .calculate_jump_to_default(&tranche, black_box(&market), black_box(as_of))
-                    .expect("CDS tranche jump to default");
-                let par = pricer
-                    .calculate_par_spread(&tranche, black_box(&market), black_box(as_of))
-                    .expect("CDS tranche par spread");
-                (cs01, [corr_delta, jtd, par])
-            },
-            |(cs01, values)| {
-                validate_cs01(cs01);
-                assert!(values.iter().all(|value| value.is_finite()));
-                capture_case(
-                    CaptureSpec {
-                        case_id: "cds_tranche_all_metrics/all_metrics",
-                        entry_point: "price_with_metrics + calculate_correlation_delta + calculate_jump_to_default + calculate_par_spread",
-                        requested_metrics: &["cs01", "correlation_delta", "jump_to_default", "par_spread"],
-                    },
-                    &tranche, &market, as_of, pricer.get_copula_spec(),
-                    || json!({
-                        "value": cs01.value,
-                        "metrics": {
-                            "cs01_result": cs01.measures,
-                            "correlation_delta": values[0],
-                            "jump_to_default": values[1],
-                            "par_spread": values[2],
-                        },
-                    }),
                 );
             },
         );
@@ -1154,11 +1037,9 @@ fn bench_cds_tranche_prepared(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_cds_tranche_npv,
-    bench_cds_tranche_cs01,
     bench_cds_tranche_correlation_delta,
     bench_cds_tranche_jump_to_default,
     bench_cds_tranche_par_spread,
-    bench_cds_tranche_all_metrics,
     bench_cds_tranche_student_t_npv,
     bench_cds_tranche_heterogeneous,
     bench_cds_tranche_p5_controls,

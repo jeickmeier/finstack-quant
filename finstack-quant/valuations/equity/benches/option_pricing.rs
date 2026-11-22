@@ -3,9 +3,10 @@
 //! Measures performance of Black-Scholes pricing and Greeks:
 //! - Present value (call and put)
 //! - Full Greeks calculation (delta, gamma, vega, theta, rho)
-//! - Individual Greeks
+//! - Bucketed equity vega
 //!
-//! Market Standards Review (Week 5)
+//! Barrier option FD Greeks live in `finstack-quant-valuations-exotics`'s
+//! `mc_exotics_pricing` target.
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
@@ -18,18 +19,16 @@ use finstack_quant_core::market_data::surfaces::{
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::BarrierType;
-use finstack_quant_models::types::{ExerciseStyle, OptionType};
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
-use finstack_quant_valuations::instruments::exotics::barrier_option::BarrierOption;
-use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations::pricer::ModelKey;
+use finstack_quant_models::types::ExerciseStyle;
+use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_core::pricer::ModelKey;
+use finstack_quant_valuations_equity::equity_option::EquityOption;
 
 #[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
-#[path = "../equity/tests/support/options.rs"]
+#[path = "../tests/support/options.rs"]
 mod option_support;
+#[path = "../../benches/support/mod.rs"]
 mod support;
 use std::hint::black_box;
 use time::Month;
@@ -94,79 +93,6 @@ fn create_market() -> MarketContext {
         )
 }
 
-fn create_barrier_option() -> BarrierOption {
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    BarrierOption {
-        expiry_fixing: None,
-        id: "BARRIER-12M".into(),
-        underlying_ticker: "SPX".into(),
-        strike: 100.0,
-        barrier: 80.0,
-        rebate: None,
-        rebate_timing: None,
-        option_type: OptionType::Call,
-        barrier_type: BarrierType::DownAndOut,
-        expiry: as_of + time::Duration::days(365),
-        observed_barrier_breached: None,
-        quantity: 100.0,
-        currency: Currency::USD,
-        day_count: finstack_quant_core::dates::DayCount::Act365F,
-        monitoring: finstack_quant_valuations::instruments::Monitoring::Continuous,
-        discount_curve_id: "USD_DISC".into(),
-        spot_id: "SPX".into(),
-        vol_surface_id: "SPX_VOL".into(),
-        div_yield_id: Some("SPX_DIV".into()),
-        instrument_pricing_overrides: InstrumentPricingOverrides::default(),
-        metric_pricing_overrides: Default::default(),
-        scenario_pricing_overrides: Default::default(),
-        attributes: Default::default(),
-    }
-}
-
-fn create_barrier_market() -> MarketContext {
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let disc = DiscountCurve::builder("USD_DISC")
-        .base_date(as_of)
-        .knots([
-            (0.0, 1.0),
-            (0.5, 0.98),
-            (1.0, 0.96),
-            (2.0, 0.92),
-            (5.0, 0.80),
-        ])
-        .interp(InterpStyle::Linear)
-        .day_count(finstack_quant_core::dates::DayCount::Act365F)
-        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-        .build()
-        .unwrap();
-    let vol_surface = VolSurface::from_grid(
-        "SPX_VOL",
-        &[0.25, 0.5, 1.0, 2.0],
-        &[80.0, 90.0, 100.0, 110.0, 120.0],
-        &[0.25; 20],
-        VolGridOpts {
-            secondary_axis: VolSurfaceAxis::Strike,
-            quote_type: VolQuoteType::BlackLognormal,
-            interpolation_mode: VolInterpolationMode::Vol,
-        },
-        None,
-    )
-    .unwrap();
-
-    MarketContext::new()
-        .try_insert(disc)
-        .expect("insert market curve")
-        .insert_surface(vol_surface)
-        .insert_price(
-            "SPX",
-            MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
-        )
-        .insert_price(
-            "SPX_DIV",
-            MarketScalar::unitless(0.02).expect("valid scalar"),
-        )
-}
-
 fn bench_option_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("option_pv");
     for months in [3, 6, 12, 24].iter() {
@@ -226,7 +152,7 @@ fn bench_option_greeks(c: &mut Criterion) {
                                 black_box(&market),
                                 black_box(as_of),
                                 black_box(&greeks),
-                                finstack_quant_valuations::instruments::PricingOptions::default(),
+                                PricingOptions::default(),
                             )
                             .expect("equity option Greeks")
                     },
@@ -250,50 +176,6 @@ fn bench_option_greeks(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_barrier_option_fd_greeks(c: &mut Criterion) {
-    c.bench_function("barrier_option_fd_greeks_5_metrics", |b| {
-        let market = create_barrier_market();
-        let option = create_barrier_option();
-        let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-        let greeks = [
-            MetricId::Delta,
-            MetricId::Gamma,
-            MetricId::Vega,
-            MetricId::Vanna,
-            MetricId::Volga,
-        ];
-        assert_eq!(option.default_model(), ModelKey::BarrierBSContinuous);
-        assert!(option.expiry > as_of);
-        assert!(option.barrier < 100.0);
-        support::bench(
-            b,
-            || {
-                option
-                    .price_with_metrics(
-                        black_box(&market),
-                        black_box(as_of),
-                        black_box(&greeks),
-                        finstack_quant_valuations::instruments::PricingOptions::default(),
-                    )
-                    .expect("barrier option finite-difference Greeks")
-            },
-            |result| {
-                assert_eq!(result.value.currency(), Currency::USD);
-                assert!(result.value.amount().is_finite());
-                for metric in &greeks {
-                    assert!(
-                        result
-                            .measures
-                            .get(metric)
-                            .expect("requested Greek")
-                            .is_finite()
-                    );
-                }
-            },
-        );
-    });
-}
-
 fn bench_option_bucketed_vega(c: &mut Criterion) {
     c.bench_function("equity_option_bucketed_vega_4x5", |b| {
         let market = create_market();
@@ -313,7 +195,7 @@ fn bench_option_bucketed_vega(c: &mut Criterion) {
                         black_box(&market),
                         black_box(as_of),
                         black_box(&[MetricId::BucketedVega]),
-                        finstack_quant_valuations::instruments::PricingOptions::default(),
+                        PricingOptions::default(),
                     )
                     .expect("equity option bucketed vega")
             },
@@ -343,7 +225,6 @@ criterion_group!(
     benches,
     bench_option_pv,
     bench_option_greeks,
-    bench_barrier_option_fd_greeks,
     bench_option_bucketed_vega
 );
 criterion_main!(benches);

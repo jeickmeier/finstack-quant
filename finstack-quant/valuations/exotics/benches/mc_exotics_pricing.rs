@@ -1,10 +1,14 @@
-//! Monte Carlo and barrier PDE exotic instrument pricing benchmarks.
+//! Monte Carlo, barrier PDE, and analytical barrier FD Greeks exotic pricing benchmarks.
 //!
 //! `AsianOption`'s `Instrument::value` uses Turnbull–Wakeman for arithmetic averages; the Asian group
-//! selects `ModelKey::MonteCarloGBM` through the registry so timings reflect configured Monte Carlo paths.
+//! selects `ModelKey::MonteCarloGBM` through the `EXOTICS` family registry so timings reflect
+//! configured Monte Carlo paths.
 //!
-//! `CliquetOption` uses an internal GBM MC engine with step count driven by the number of reset dates.
-//! Barrier cases price total at-hit rebates under continuous and quarterly monitoring.
+//! Barrier cases price total at-hit rebates under continuous and quarterly monitoring, plus
+//! analytical barrier FD Greeks (`barrier_option_fd_greeks_5_metrics`).
+//!
+//! Equity path-dependent MC benchmarks (`autocallable_mc`, `cliquet_option_mc`) live in
+//! `finstack-quant-valuations-equity`'s `equity_exotics_pricing` target.
 
 #![allow(clippy::unwrap_used)]
 
@@ -13,37 +17,46 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
+use finstack_quant_core::market_data::surfaces::{
+    VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::Attributes;
-use finstack_quant_core::types::PayoutTiming;
-use finstack_quant_core::types::{BarrierType, CurveId, InstrumentId, PriceId};
+use finstack_quant_core::types::{
+    Attributes, BarrierType, CurveId, InstrumentId, PayoutTiming, PriceId,
+};
 use finstack_quant_models::monte_carlo::engine::PathCaptureMode;
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
-use finstack_quant_models::monte_carlo::payoff::autocallable::FinalPayoffType;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
 use finstack_quant_models::types::OptionType;
-use finstack_quant_valuations::instruments::equity::EquityPathModel;
-use finstack_quant_valuations::instruments::equity::autocallable::Autocallable;
-use finstack_quant_valuations::instruments::equity::cliquet_option::CliquetOption;
-use finstack_quant_valuations::instruments::exotics::asian_option::AsianOption;
-use finstack_quant_valuations::instruments::exotics::barrier_option::BarrierOption;
-use finstack_quant_valuations::instruments::exotics::lookback_option::{
-    LookbackOption, LookbackType,
-};
-use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::instruments::{Instrument, Monitoring};
-use finstack_quant_valuations::pricer::STANDARD;
-use finstack_quant_valuations::pricer::{InstrumentType, ModelKey, PricerKey};
+use finstack_quant_valuations_core::instruments::pricing::monte_carlo::merged_path_config;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::instruments::{Instrument, Monitoring, PricingOptions};
+use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_core::pricer::{InstrumentType, ModelKey, PricerKey, PricerRegistry};
+use finstack_quant_valuations_exotics::EXOTICS;
+use finstack_quant_valuations_exotics::exotics::asian_option::AsianOption;
+use finstack_quant_valuations_exotics::exotics::barrier_option::BarrierOption;
+use finstack_quant_valuations_exotics::exotics::lookback_option::{LookbackOption, LookbackType};
 use std::hint::black_box;
 use time::Month;
 
 use finstack_quant_valuations_test_support::volatility as volatility_support;
 
-#[path = "support/record.rs"]
+#[path = "../../benches/support/record.rs"]
 mod record;
+#[path = "../../benches/support/mod.rs"]
 mod support;
+
+fn exotics_pricer_registry() -> PricerRegistry {
+    let mut registry = PricerRegistry::new();
+    EXOTICS
+        .register_pricers(&mut registry)
+        .expect("register exotics pricers");
+    registry
+}
 
 fn assert_usd_value(value: &Money) {
     assert!(value.amount().is_finite());
@@ -55,12 +68,11 @@ fn path_config(
     instrument_id: &InstrumentId,
     antithetic_default: bool,
 ) -> PathDependentPricerConfig {
-    let mut config =
-        finstack_quant_valuations::instruments::pricing::monte_carlo::merged_path_config(
-            &PathDependentPricerConfig::default().with_antithetic(antithetic_default),
-            overrides,
-        )
-        .expect("valid MC benchmark configuration");
+    let mut config = merged_path_config(
+        &PathDependentPricerConfig::default().with_antithetic(antithetic_default),
+        overrides,
+    )
+    .expect("valid MC benchmark configuration");
     config.seed = overrides.model_config.mc_seed(instrument_id);
     config
 }
@@ -230,45 +242,6 @@ fn lookback_option(mc_paths: usize) -> LookbackOption {
         .unwrap()
 }
 
-fn autocallable_note(mc_paths: usize) -> Autocallable {
-    let observation_dates = vec![
-        Date::from_calendar_date(2025, Month::April, 1).unwrap(),
-        Date::from_calendar_date(2025, Month::July, 1).unwrap(),
-        Date::from_calendar_date(2025, Month::October, 1).unwrap(),
-        Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-    ];
-    let n = observation_dates.len();
-    Autocallable {
-        id: "AUTO-BENCH".into(),
-        underlying_ticker: "SPOT".into(),
-        payment_dates: observation_dates.clone(),
-        expiry: *observation_dates.last().unwrap(),
-        observation_dates,
-        autocall_barriers: vec![1.0; n],
-        coupons: vec![0.02; n],
-        coupon_barriers: vec![0.70; n],
-        memory_coupons: false,
-        final_barrier: 0.6,
-        final_payoff_type: FinalPayoffType::Participation {
-            participation_rate: 1.0,
-        },
-        cap_level: 1.5,
-        notional: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
-        day_count: DayCount::Act365F,
-        discount_curve_id: CurveId::new("USD-OIS"),
-        spot_id: "SPOT".into(),
-        vol_surface_id: CurveId::new("SPOT_VOL"),
-        path_model: finstack_quant_valuations::instruments::equity::EquityPathModel::AtmTermGbm,
-        div_yield_id: Some(finstack_quant_core::types::PriceId::new("SPOT_DIV")),
-        initial_level: None,
-        past_fixings: vec![],
-        instrument_pricing_overrides: InstrumentPricingOverrides::default().with_mc_paths(mc_paths),
-        metric_pricing_overrides: Default::default(),
-        scenario_pricing_overrides: Default::default(),
-        attributes: Attributes::new(),
-    }
-}
-
 fn bench_asian_option_mc(c: &mut Criterion) {
     let mut group = c.benchmark_group("asian_option_mc");
     // Register the 10,000-path/12-fixing pivot only once across the two axes.
@@ -311,7 +284,7 @@ fn bench_asian_option_mc(c: &mut Criterion) {
                     .zip([98.0, 101.0, 99.0, 102.0, 103.0, 100.0])
                     .collect();
             }
-            let registry = STANDARD.pricers();
+            let registry = exotics_pricer_registry();
             assert_eq!(option.instrument_pricing_overrides.model_config.mc_paths, Some(paths));
             assert_eq!(option.fixing_dates.len(), fixing_count);
             assert_eq!(option.past_fixings.len(), if seasoned { 6 } else { 0 });
@@ -325,7 +298,7 @@ fn bench_asian_option_mc(c: &mut Criterion) {
                             black_box(&market),
                             black_box(as_of),
                             &[],
-                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                            PricingOptions::default(),
                         )
                         .expect("Asian Monte Carlo price")
                 },
@@ -414,116 +387,6 @@ fn bench_lookback_option_mc(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_autocallable_mc(c: &mut Criterion) {
-    let mut group = c.benchmark_group("autocallable_mc");
-    let as_of = as_of();
-    let paths = 2_500_u64;
-    group.throughput(Throughput::Elements(paths));
-    group.bench_with_input(BenchmarkId::from_parameter(paths), &paths, |b, &paths| {
-        let market = create_mc_market(as_of, 100.0, 0.25, 0.05);
-        let note = autocallable_note(paths as usize);
-        assert_eq!(note.default_model(), ModelKey::MonteCarloGBM);
-        assert!(matches!(note.path_model, EquityPathModel::AtmTermGbm));
-        assert_eq!(
-            note.instrument_pricing_overrides.model_config.mc_paths,
-            Some(paths as usize)
-        );
-        support::bench(
-            b,
-            || {
-                note.value(black_box(&market), black_box(as_of))
-                    .expect("autocallable Monte Carlo price")
-            },
-            |value| {
-                assert_usd_value(value);
-                record::capture(&format!("autocallable_mc/{paths}"), || {
-                    let config = path_config(&note.instrument_pricing_overrides, &note.id, true);
-                    let maturity = note.day_count.year_fraction(as_of, note.expiry, DayCountContext::default()).expect("autocallable maturity");
-                    let required_times = future_times(&note.observation_dates, note.day_count, as_of);
-                    let grid = config.build_time_grid(maturity, &required_times).expect("autocallable observation grid");
-                    serde_json::json!({
-                        "fixture": mc_fixture_fields(&note, &market, as_of, ModelKey::MonteCarloGBM, &config, &grid),
-                        "output": {"value": value, "standard_error": null, "diagnostic_status": "Instrument::value returns PV only"},
-                    })
-                });
-            },
-        );
-    });
-    group.finish();
-}
-
-fn make_cliquet(as_of: Date, n_resets: usize) -> CliquetOption {
-    // Space resets evenly over 1 year
-    let reset_dates: Vec<Date> = (1..=n_resets)
-        .map(|i| {
-            let days = (365 * i / n_resets) as i64;
-            as_of + time::Duration::days(days)
-        })
-        .collect();
-    let expiry = *reset_dates.last().unwrap();
-
-    CliquetOption::builder()
-        .id(InstrumentId::new("CLIQ-BENCH"))
-        .underlying_ticker("SPOT".to_string())
-        .reset_dates(reset_dates)
-        .expiry(expiry)
-        .local_cap(0.05)
-        .local_floor(0.0)
-        .global_cap(0.20)
-        .global_floor(0.0)
-        .notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
-        .day_count(DayCount::Act365F)
-        .discount_curve_id(CurveId::new("USD-OIS"))
-        .spot_id("SPOT".into())
-        .vol_surface_id(CurveId::new("SPOT_VOL"))
-        .path_model(EquityPathModel::AtmTermGbm)
-        .div_yield_id_opt(Some(PriceId::new("SPOT_DIV")))
-        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-        .attributes(Attributes::new())
-        .build()
-        .unwrap()
-}
-
-/// Representative cliquet option MC cost with 12 reset periods.
-fn bench_cliquet_option_mc(c: &mut Criterion) {
-    let mut group = c.benchmark_group("cliquet_option_mc");
-    let as_of = as_of();
-    let n_resets = 12;
-    group.bench_with_input(
-        BenchmarkId::from_parameter(format!("{n_resets}resets")),
-        &n_resets,
-        |b, &n_resets| {
-            let market = create_mc_market(as_of, 100.0, 0.25, 0.05);
-            let option = make_cliquet(as_of, n_resets);
-            assert_eq!(option.default_model(), ModelKey::MonteCarloGBM);
-            assert!(matches!(option.path_model, EquityPathModel::AtmTermGbm));
-            assert_eq!(option.reset_dates.len(), n_resets);
-            support::bench(
-                b,
-                || {
-                    option
-                        .value(black_box(&market), black_box(as_of))
-                        .expect("cliquet Monte Carlo price")
-                },
-                |value| {
-                    assert_usd_value(value);
-                    record::capture(&format!("cliquet_option_mc/{n_resets}resets"), || {
-                        let config = path_config(&option.instrument_pricing_overrides, &option.id, true);
-                        let maturity = option.day_count.year_fraction(as_of, option.expiry, DayCountContext::default()).expect("cliquet maturity");
-                        let required_times = future_times(&option.reset_dates, option.day_count, as_of);
-                        let grid = config.build_time_grid(maturity, &required_times).expect("cliquet reset grid");
-                        serde_json::json!({
-                            "fixture": mc_fixture_fields(&option, &market, as_of, ModelKey::MonteCarloGBM, &config, &grid),
-                            "output": {"value": value, "standard_error": null, "diagnostic_status": "Instrument::value returns PV only"},
-                        })
-                    });
-                },
-            );
-        },
-    );
-    group.finish();
-}
-
 fn bench_barrier_monitoring(c: &mut Criterion) {
     let as_of = as_of();
     let mut group = c.benchmark_group("barrier_monitoring");
@@ -564,7 +427,7 @@ fn bench_barrier_monitoring(c: &mut Criterion) {
                 option.instrument_pricing_overrides =
                     InstrumentPricingOverrides::default().with_mc_paths(2_500);
                 option.monitoring = monitoring.clone();
-                let registry = STANDARD.pricers();
+                let registry = exotics_pricer_registry();
                 let key = PricerKey::new(InstrumentType::BarrierOption, model);
                 let pricer = registry.get_pricer(key).expect("barrier model available");
                 assert_eq!(pricer.key(), key);
@@ -644,12 +507,128 @@ fn bench_barrier_monitoring(c: &mut Criterion) {
     group.finish();
 }
 
+fn create_barrier_fd_option() -> BarrierOption {
+    let as_of = as_of();
+    BarrierOption {
+        expiry_fixing: None,
+        id: "BARRIER-12M".into(),
+        underlying_ticker: "SPX".into(),
+        strike: 100.0,
+        barrier: 80.0,
+        rebate: None,
+        rebate_timing: None,
+        option_type: OptionType::Call,
+        barrier_type: BarrierType::DownAndOut,
+        expiry: as_of + time::Duration::days(365),
+        observed_barrier_breached: None,
+        quantity: 100.0,
+        currency: Currency::USD,
+        day_count: DayCount::Act365F,
+        monitoring: Monitoring::Continuous,
+        discount_curve_id: "USD_DISC".into(),
+        spot_id: "SPX".into(),
+        vol_surface_id: "SPX_VOL".into(),
+        div_yield_id: Some("SPX_DIV".into()),
+        instrument_pricing_overrides: InstrumentPricingOverrides::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
+        attributes: Default::default(),
+    }
+}
+
+fn create_barrier_fd_market() -> MarketContext {
+    let as_of = as_of();
+    let disc = DiscountCurve::builder("USD_DISC")
+        .base_date(as_of)
+        .knots([
+            (0.0, 1.0),
+            (0.5, 0.98),
+            (1.0, 0.96),
+            (2.0, 0.92),
+            (5.0, 0.80),
+        ])
+        .interp(InterpStyle::Linear)
+        .day_count(DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+        .build()
+        .unwrap();
+    let vol_surface = VolSurface::from_grid(
+        "SPX_VOL",
+        &[0.25, 0.5, 1.0, 2.0],
+        &[80.0, 90.0, 100.0, 110.0, 120.0],
+        &[0.25; 20],
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
+            interpolation_mode: VolInterpolationMode::Vol,
+        },
+        None,
+    )
+    .unwrap();
+
+    MarketContext::new()
+        .try_insert(disc)
+        .expect("insert market curve")
+        .insert_surface(vol_surface)
+        .insert_price(
+            "SPX",
+            MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+        )
+        .insert_price(
+            "SPX_DIV",
+            MarketScalar::unitless(0.02).expect("valid scalar"),
+        )
+}
+
+fn bench_barrier_option_fd_greeks(c: &mut Criterion) {
+    c.bench_function("barrier_option_fd_greeks_5_metrics", |b| {
+        let market = create_barrier_fd_market();
+        let option = create_barrier_fd_option();
+        let as_of = as_of();
+        let greeks = [
+            MetricId::Delta,
+            MetricId::Gamma,
+            MetricId::Vega,
+            MetricId::Vanna,
+            MetricId::Volga,
+        ];
+        assert_eq!(option.default_model(), ModelKey::BarrierBSContinuous);
+        assert!(option.expiry > as_of);
+        assert!(option.barrier < 100.0);
+        support::bench(
+            b,
+            || {
+                option
+                    .price_with_metrics(
+                        black_box(&market),
+                        black_box(as_of),
+                        black_box(&greeks),
+                        PricingOptions::default(),
+                    )
+                    .expect("barrier option finite-difference Greeks")
+            },
+            |result| {
+                assert_eq!(result.value.currency(), Currency::USD);
+                assert!(result.value.amount().is_finite());
+                for metric in &greeks {
+                    assert!(
+                        result
+                            .measures
+                            .get(metric)
+                            .expect("requested Greek")
+                            .is_finite()
+                    );
+                }
+            },
+        );
+    });
+}
+
 criterion_group!(
     benches,
     bench_asian_option_mc,
     bench_lookback_option_mc,
-    bench_autocallable_mc,
-    bench_cliquet_option_mc,
     bench_barrier_monitoring,
+    bench_barrier_option_fd_greeks,
 );
 criterion_main!(benches);

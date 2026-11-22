@@ -195,9 +195,9 @@ this project keeps out of the normal loop. Lint with `mise run rust-lint`.
 
 Criterion benches in `benches/`: `swap_pricing` (IRS PV, DV01, par rate),
 `swaption_pricing` (Black and SABR), `cms_pricing`, `future_option_pricing`,
-`mc_pricing` (Hull-White Bermudan swaption LSMC and tree), `xccy_pricing`, and
-`linear_rates` (deposit, FRA, basis swap, cap/floor, repo, futures).
-Cross-family `inflation_pricing` stays in `../benches/`.
+`inflation_pricing` (inflation swaps and cap/floors), `mc_pricing` (Hull-White
+Bermudan swaption LSMC and tree), `xccy_pricing`, and `linear_rates` (deposit,
+FRA, basis swap, cap/floor, repo, futures).
 
 ```bash
 mise run rust-bench-crate -- finstack-quant-valuations-rates swap_pricing

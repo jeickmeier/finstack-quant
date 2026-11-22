@@ -51,7 +51,15 @@ name = "equity"
 path = "tests/main.rs"
 
 [[bench]]
+name = "equity_exotics_pricing"
+harness = false
+
+[[bench]]
 name = "equity_pricing"
+harness = false
+
+[[bench]]
+name = "option_pricing"
 harness = false
 
 [[bench]]

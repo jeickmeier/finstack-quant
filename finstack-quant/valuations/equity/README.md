@@ -70,7 +70,7 @@ tests. Cross-family suites (`trs/`, `metrics/{edge_cases,vanna_volga_pockets}`,
 and `real_estate/`, which references fixed-income instruments) stay in the
 umbrella's `../tests/`.
 
-Criterion benches in `benches/`: `equity_pricing` and
-`private_markets_fund_pricing`. Cross-family option/composite benches
-(`option_pricing`, `fd_greeks`, `composite_pricing`) stay in the umbrella's
+Criterion benches in `benches/`: `equity_exotics_pricing`, `equity_pricing`,
+`option_pricing`, and `private_markets_fund_pricing`. Cross-family and
+umbrella benches (`fd_greeks`, `composite_pricing`) stay in the umbrella's
 `../benches/`.

@@ -59,6 +59,10 @@ name = "future_option_pricing"
 harness = false
 
 [[bench]]
+name = "inflation_pricing"
+harness = false
+
+[[bench]]
 name = "linear_rates"
 harness = false
 

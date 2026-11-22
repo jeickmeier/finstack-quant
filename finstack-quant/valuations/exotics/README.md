@@ -136,6 +136,6 @@ and `test_cross_impl_parity`. Tests that round-trip `InstrumentJson`
 reach another family (`production_barrier_ndf_audit.rs`) stay in the umbrella's
 `../tests/`.
 
-Criterion benches in `benches/`: `commodity_pricing` and
-`rate_exotics_pricing`. Cross-family Monte Carlo benches (`mc_exotics_pricing`)
-stay in the umbrella's `../benches/`.
+Criterion benches in `benches/`: `commodity_pricing`, `mc_exotics_pricing`, and
+`rate_exotics_pricing`. Cross-family FD Greeks comparison (`fd_greeks`) stays
+in the umbrella's `../benches/`.

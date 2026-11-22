@@ -48,5 +48,17 @@ name = "credit"
 path = "tests/main.rs"
 
 [[bench]]
+name = "cds_index_pricing"
+harness = false
+
+[[bench]]
 name = "cds_option_pricing"
+harness = false
+
+[[bench]]
+name = "cds_pricing"
+harness = false
+
+[[bench]]
+name = "cds_tranche_pricing"
 harness = false
