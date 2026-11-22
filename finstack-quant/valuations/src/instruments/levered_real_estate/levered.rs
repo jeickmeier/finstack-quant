@@ -301,4 +301,119 @@ mod tests {
                 > 0.0
         );
     }
+
+    #[test]
+    fn levered_real_estate_rejects_cross_currency_financing_in_schedules_payoff_and_metrics() {
+        use crate::metrics::{MetricContext, MetricId};
+        use finstack_quant_core::Error;
+        use finstack_quant_core::dates::StubKind;
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+        use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
+        use finstack_quant_core::types::Rate;
+        use std::sync::Arc;
+
+        let as_of =
+            Date::from_calendar_date(2025, time::Month::January, 1).expect("valid as_of date");
+        let noi1 = Date::from_calendar_date(2026, time::Month::January, 1).expect("valid noi date");
+        let noi2 = Date::from_calendar_date(2027, time::Month::January, 1).expect("valid noi date");
+
+        let asset = RealEstateAsset::builder()
+            .id(InstrumentId::new("RE-USD-ASSET"))
+            .currency(Currency::USD)
+            .valuation_method(RealEstateValuationMethod::Dcf)
+            .noi_schedule(vec![(noi1, 120.0), (noi2, 120.0)])
+            .purchase_price_opt(Some(Money::from((1_000_i64, Currency::USD))))
+            .sale_price_opt(Some(Money::from((1_100_i64, Currency::USD))))
+            .discount_rate_opt(Some(0.10))
+            .day_count(DayCount::Act365F)
+            .attributes(Default::default())
+            .build()
+            .expect("asset should build");
+
+        let eur_bond = Bond::fixed(
+            "EUR-FIN-BOND",
+            Money::from((600_i64, Currency::EUR)),
+            Rate::from_percent(5.0).expect("valid coupon rate"),
+            as_of,
+            noi2,
+            StubKind::None,
+            "EUR-OIS",
+        )
+        .expect("EUR bond should build");
+
+        let equity = LeveredRealEstateEquity::builder()
+            .id(InstrumentId::new("RE-USD-EQUITY"))
+            .currency(Currency::USD)
+            .asset(asset)
+            .financing(vec![RealEstateFinancing::Bond(eur_bond)])
+            .attributes(Default::default())
+            .build()
+            .expect("levered equity should build");
+
+        let eur_curve = DiscountCurve::builder("EUR-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (5.0, (-0.04_f64 * 5.0).exp())])
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::MonotoneConvex)
+            .extrapolation(ExtrapolationPolicy::Extend)
+            .build()
+            .expect("EUR discount curve should build");
+        let market = MarketContext::new()
+            .try_insert(eur_curve)
+            .expect("insert EUR curve");
+
+        let assert_usd_eur_mismatch = |err: &Error, label: &str| {
+            assert!(
+                matches!(
+                    err,
+                    Error::CurrencyMismatch {
+                        expected: Currency::USD,
+                        actual: Currency::EUR,
+                    }
+                ),
+                "{label}: expected CurrencyMismatch {{ expected: USD, actual: EUR }}, got {err:?}"
+            );
+        };
+
+        let pv_err = equity
+            .value(&market, as_of)
+            .expect_err("PV must reject EUR financing on USD equity");
+        assert_usd_eur_mismatch(&pv_err, "value");
+
+        let eq_cf_err = levered_pricer::equity_cashflows(&equity, &market, as_of)
+            .expect_err("equity_cashflows must reject EUR financing on USD equity");
+        assert_usd_eur_mismatch(&eq_cf_err, "equity_cashflows");
+
+        let sched_err = equity
+            .cashflow_schedule(&market, as_of)
+            .expect_err("cashflow_schedule must reject EUR financing on USD equity");
+        assert_usd_eur_mismatch(&sched_err, "cashflow_schedule");
+
+        let payoff_err = equity
+            .financing_payoff_at_exit(&market, as_of)
+            .expect_err("financing_payoff_at_exit must reject EUR financing on USD equity");
+        assert_usd_eur_mismatch(&payoff_err, "financing_payoff_at_exit");
+
+        let registry = crate::pricer::STANDARD.metrics();
+        for metric_name in ["real_estate::dscr_min", "real_estate::ltv_at_origination"] {
+            let mut ctx = MetricContext::new(
+                Arc::new(equity.clone()),
+                Arc::new(market.clone()),
+                as_of,
+                Money::from((0_i64, Currency::USD)),
+                MetricContext::default_config(),
+            );
+            let err = registry
+                .compute(&[MetricId::custom(metric_name)], &mut ctx)
+                .expect_err("metric must reject EUR financing on USD equity");
+            match err {
+                Error::MetricCalculationFailed { cause, .. } => {
+                    assert_usd_eur_mismatch(cause.as_ref(), metric_name);
+                }
+                other => panic!(
+                    "{metric_name}: expected MetricCalculationFailed wrapping CurrencyMismatch, got {other:?}"
+                ),
+            }
+        }
+    }
 }

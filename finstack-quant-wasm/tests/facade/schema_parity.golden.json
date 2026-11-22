@@ -3933,7 +3933,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/listed_product_coverage.schema.json",
             "type_name": "ListedProductCoverage",
             "kind": "output",
-            "bytes": 17641
+            "bytes": 18968
           },
           {
             "path": "schemas/results/1/market_dependencies.schema.json",
@@ -6635,7 +6635,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/listed_product_coverage.schema.json",
             "type_name": "ListedProductCoverage",
             "kind": "output",
-            "bytes": 17641
+            "bytes": 18968
           },
           {
             "domain": "valuations",

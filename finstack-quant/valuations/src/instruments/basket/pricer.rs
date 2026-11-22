@@ -11,8 +11,8 @@ use finstack_quant_core::{
 /// Net asset value per basket unit after the elected accrued expense.
 pub(crate) fn nav(basket: &Basket, market: &MarketContext, as_of: Date) -> Result<Money> {
     let mut total = Money::from((0_i64, basket.reporting_currency));
-    for (index, constituent) in basket.constituents.iter().enumerate() {
-        let mark = marked_constituent(basket, index, constituent, market, as_of)?;
+    for constituent in &basket.constituents {
+        let mark = marked_constituent(basket, constituent, market, as_of)?;
         total = total
             .checked_add(mark.checked_mul_f64(constituent.units.unwrap_or(constituent.weight))?)?;
     }
@@ -25,32 +25,23 @@ pub(crate) fn nav(basket: &Basket, market: &MarketContext, as_of: Date) -> Resul
 /// Resolve a constituent's mark in the basket reporting currency.
 pub(crate) fn marked_constituent(
     basket: &Basket,
-    index: usize,
     constituent: &BasketConstituent,
     market: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
-    let mark = constituent_price(basket, index, constituent, market, as_of)?;
+    let mark = constituent_price(basket, constituent, market, as_of)?;
     to_basket_currency(basket, mark, market, as_of)
 }
 
 /// Price of one constituent in its own currency.
 fn constituent_price(
     basket: &Basket,
-    constituent_index: usize,
     constituent: &BasketConstituent,
     context: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
     match &constituent.reference {
-        ConstituentReference::Instrument(_) => {
-            let boxed_instrument = basket.boxed_constituent_at(constituent_index)?.ok_or(
-                finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
-                    id: constituent.id.clone(),
-                }),
-            )?;
-            boxed_instrument.value(context, as_of)
-        }
+        ConstituentReference::Instrument(json) => json.as_dyn_instrument().value(context, as_of),
         ConstituentReference::MarketData { price_id, .. } => {
             let scalar = context.get_price(price_id.as_ref())?;
             if let Some(money) = scalar.get_price() {

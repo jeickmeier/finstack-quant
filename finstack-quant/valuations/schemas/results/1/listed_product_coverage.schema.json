@@ -400,6 +400,51 @@
         }
       ]
     },
+    "ListedAssetClass": {
+      "description": "High-level asset class of a listed product family.",
+      "oneOf": [
+        {
+          "const": "rates",
+          "description": "Short-term and money-market interest rates.",
+          "type": "string"
+        },
+        {
+          "const": "fixed_income",
+          "description": "Government bonds and credit fixed-income products.",
+          "type": "string"
+        },
+        {
+          "const": "equity",
+          "description": "Equity indices and single-stock derivatives.",
+          "type": "string"
+        },
+        {
+          "const": "fx",
+          "description": "Foreign-exchange futures and options.",
+          "type": "string"
+        },
+        {
+          "const": "commodity",
+          "description": "Energy, metals, and agricultural commodities.",
+          "type": "string"
+        },
+        {
+          "const": "volatility",
+          "description": "Equity and cross-market volatility indices.",
+          "type": "string"
+        },
+        {
+          "const": "digital_assets",
+          "description": "Regulated cryptocurrency derivatives.",
+          "type": "string"
+        },
+        {
+          "const": "cross_asset",
+          "description": "Multi-asset or cross-asset index products.",
+          "type": "string"
+        }
+      ]
+    },
     "ListedCoverageStatus": {
       "description": "Readiness of the mapped valuation route.",
       "oneOf": [
@@ -489,8 +534,8 @@
   ],
   "properties": {
     "asset_class": {
-      "description": "Rates, fixed income, equity, FX, commodity, volatility, or digital assets.",
-      "type": "string"
+      "$ref": "#/$defs/ListedAssetClass",
+      "description": "Asset class of the listed product family."
     },
     "exchange": {
       "$ref": "#/$defs/ListedExchange",

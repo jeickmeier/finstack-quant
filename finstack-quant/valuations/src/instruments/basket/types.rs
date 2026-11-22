@@ -222,24 +222,6 @@ impl Basket {
             .build()
     }
 
-    /// Materialize the current definition of an instrument-backed constituent.
-    ///
-    /// # Arguments
-    ///
-    /// * `index` - Zero-based constituent position, aligned with [`Self::constituents`].
-    pub(crate) fn boxed_constituent_at(&self, index: usize) -> Result<Option<Box<dyn Instrument>>> {
-        let constituent = self.constituents.get(index).ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "basket constituent index {index} is out of range for basket with {} constituents",
-                self.constituents.len()
-            ))
-        })?;
-        match &constituent.reference {
-            ConstituentReference::Instrument(json) => Ok(Some(json.as_ref().clone().into_boxed()?)),
-            ConstituentReference::MarketData { .. } => Ok(None),
-        }
-    }
-
     /// Get total number of constituents
     pub fn constituent_count(&self) -> usize {
         self.constituents.len()
@@ -420,18 +402,6 @@ mod tests {
             deps.market_scalar_ids,
             vec!["AAPL-SPOT".to_string(), "UST10Y-PRICE".to_string()]
         );
-    }
-
-    #[test]
-    fn boxed_constituent_at_rejects_out_of_range_index() {
-        let basket = Basket::example().expect("example");
-        let Err(error) = basket.boxed_constituent_at(2) else {
-            panic!("index beyond the constituents must fail")
-        };
-
-        assert!(matches!(error, finstack_quant_core::Error::Validation(_)));
-        assert!(error.to_string().contains("index 2"));
-        assert!(error.to_string().contains("2 constituents"));
     }
 
     fn quoted_equity_constituent(id: &str, spot: f64, units: f64) -> BasketConstituent {

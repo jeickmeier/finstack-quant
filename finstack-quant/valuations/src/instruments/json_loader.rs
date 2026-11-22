@@ -372,7 +372,7 @@ macro_rules! define_instrument_json {
             }
 
             /// Borrow the payload as a runtime instrument.
-            fn as_dyn_instrument(&self) -> &dyn Instrument {
+            pub(crate) fn as_dyn_instrument(&self) -> &dyn Instrument {
                 match self {
                     $(Self::$variant(instrument) => instrument_payload!(as_dyn $kind instrument),)*
                 }
@@ -584,7 +584,8 @@ fn schema_example_error(
 pub fn market_dependencies_of(
     instrument: &InstrumentJson,
 ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
-    instrument.clone().into_boxed()?.market_dependencies()
+    instrument.validate_for_pricing()?;
+    instrument.as_dyn_instrument().market_dependencies()
 }
 
 /// Error for a payload whose `type` is not the one the caller asked for.

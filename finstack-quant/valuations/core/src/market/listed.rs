@@ -62,6 +62,64 @@ impl std::str::FromStr for ListedExchange {
     }
 }
 
+/// High-level asset class of a listed product family.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum ListedAssetClass {
+    /// Short-term and money-market interest rates.
+    Rates,
+    /// Government bonds and credit fixed-income products.
+    FixedIncome,
+    /// Equity indices and single-stock derivatives.
+    Equity,
+    /// Foreign-exchange futures and options.
+    Fx,
+    /// Energy, metals, and agricultural commodities.
+    Commodity,
+    /// Equity and cross-market volatility indices.
+    Volatility,
+    /// Regulated cryptocurrency derivatives.
+    DigitalAssets,
+    /// Multi-asset or cross-asset index products.
+    CrossAsset,
+}
+
+impl std::fmt::Display for ListedAssetClass {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Rates => "rates",
+            Self::FixedIncome => "fixed_income",
+            Self::Equity => "equity",
+            Self::Fx => "fx",
+            Self::Commodity => "commodity",
+            Self::Volatility => "volatility",
+            Self::DigitalAssets => "digital_assets",
+            Self::CrossAsset => "cross_asset",
+        })
+    }
+}
+
+impl std::str::FromStr for ListedAssetClass {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "rates" => Ok(Self::Rates),
+            "fixed_income" => Ok(Self::FixedIncome),
+            "equity" => Ok(Self::Equity),
+            "fx" => Ok(Self::Fx),
+            "commodity" => Ok(Self::Commodity),
+            "volatility" => Ok(Self::Volatility),
+            "digital_assets" => Ok(Self::DigitalAssets),
+            "cross_asset" => Ok(Self::CrossAsset),
+            _ => Err(format!(
+                "unknown listed asset class '{value}'; expected rates, fixed_income, equity, fx, commodity, volatility, digital_assets, or cross_asset"
+            )),
+        }
+    }
+}
+
 /// High-level listed product form.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -99,8 +157,8 @@ pub struct ListedProductCoverage {
     pub symbols: String,
     /// Human-readable exchange product family.
     pub name: String,
-    /// Rates, fixed income, equity, FX, commodity, volatility, or digital assets.
-    pub asset_class: String,
+    /// Asset class of the listed product family.
+    pub asset_class: ListedAssetClass,
     /// Future, option on future, or direct option.
     pub product_kind: ListedProductKind,
     /// Canonical valuation type selected by the library.
@@ -163,7 +221,6 @@ impl ListedProductCatalogFile {
                 )));
             }
             validate_nonblank(index, "name", &row.name)?;
-            validate_nonblank(index, "asset_class", &row.asset_class)?;
             if row.features.is_empty() {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "listed-product catalog row {index} must contain at least one feature"
@@ -271,7 +328,13 @@ mod tests {
         ] {
             assert!(catalog.iter().any(|row| row.exchange == exchange));
         }
-        for asset_class in ["rates", "fixed_income", "equity", "fx", "commodity"] {
+        for asset_class in [
+            ListedAssetClass::Rates,
+            ListedAssetClass::FixedIncome,
+            ListedAssetClass::Equity,
+            ListedAssetClass::Fx,
+            ListedAssetClass::Commodity,
+        ] {
             assert!(catalog.iter().any(|row| row.asset_class == asset_class));
         }
         assert!(catalog.iter().all(|row| !row.symbols.is_empty()
@@ -304,15 +367,19 @@ mod tests {
             .into_iter()
             .filter(|row| row.product_kind == ListedProductKind::OptionOnFuture)
         {
-            let expected = match row.asset_class.as_str() {
-                "rates" | "fixed_income" => InstrumentType::InterestRateFutureOption,
-                "equity" => InstrumentType::EquityFutureOption,
-                "volatility" => InstrumentType::VolatilityIndexFutureOption,
-                "fx" => InstrumentType::FxFutureOption,
-                "commodity" | "digital_assets" => InstrumentType::CommodityFutureOption,
-                other => panic!("unowned futures-option asset class: {other}"),
+            let expected = match row.asset_class {
+                ListedAssetClass::Rates | ListedAssetClass::FixedIncome => {
+                    Some(InstrumentType::InterestRateFutureOption)
+                }
+                ListedAssetClass::Equity => Some(InstrumentType::EquityFutureOption),
+                ListedAssetClass::Volatility => Some(InstrumentType::VolatilityIndexFutureOption),
+                ListedAssetClass::Fx => Some(InstrumentType::FxFutureOption),
+                ListedAssetClass::Commodity | ListedAssetClass::DigitalAssets => {
+                    Some(InstrumentType::CommodityFutureOption)
+                }
+                ListedAssetClass::CrossAsset => None,
             };
-            assert_eq!(row.instrument_type, expected);
+            assert_eq!(Some(row.instrument_type), expected);
         }
     }
 
@@ -340,5 +407,29 @@ mod tests {
             serde_json::from_str(EMBEDDED_LISTED_PRODUCT_CATALOG).expect("valid sidecar JSON");
         invalid_row["products"][0]["symbols"] = serde_json::Value::String(String::new());
         assert!(parse_catalog_json(&invalid_row.to_string()).is_err());
+
+        let mut invalid_asset_class: serde_json::Value =
+            serde_json::from_str(EMBEDDED_LISTED_PRODUCT_CATALOG).expect("valid sidecar JSON");
+        invalid_asset_class["products"][0]["asset_class"] =
+            serde_json::Value::String("unknown".to_string());
+        assert!(parse_catalog_json(&invalid_asset_class.to_string()).is_err());
+    }
+
+    #[test]
+    fn listed_asset_class_display_and_from_str_round_trip() {
+        for asset_class in [
+            ListedAssetClass::Rates,
+            ListedAssetClass::FixedIncome,
+            ListedAssetClass::Equity,
+            ListedAssetClass::Fx,
+            ListedAssetClass::Commodity,
+            ListedAssetClass::Volatility,
+            ListedAssetClass::DigitalAssets,
+            ListedAssetClass::CrossAsset,
+        ] {
+            let text = asset_class.to_string();
+            assert_eq!(text.parse::<ListedAssetClass>(), Ok(asset_class));
+        }
+        assert!("invalid".parse::<ListedAssetClass>().is_err());
     }
 }

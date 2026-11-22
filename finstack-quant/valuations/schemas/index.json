@@ -1208,7 +1208,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/listed_product_coverage.schema.json",
-      "bytes": 17641,
+      "bytes": 18968,
       "kind": "output",
       "path": "schemas/results/1/listed_product_coverage.schema.json",
       "summary": "Listed-product catalog coverage for one exchange product.",

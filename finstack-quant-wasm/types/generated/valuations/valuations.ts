@@ -4113,6 +4113,11 @@ export type InstrumentType =
 export type IrFutureReferencePeriod =
   "forward_starting" | "imm_quarter_in_arrears" | "calendar_month_in_arrears" | "business_month_in_arrears";
 /**
+ * High-level asset class of a listed product family.
+ */
+export type ListedAssetClass =
+  "rates" | "fixed_income" | "equity" | "fx" | "commodity" | "volatility" | "digital_assets" | "cross_asset";
+/**
  * Readiness of the mapped valuation route.
  */
 export type ListedCoverageStatus = "native" | "composed" | "partial";
@@ -20813,9 +20818,9 @@ export interface IrFutureConventions {
  */
 export interface ListedProductCoverage {
   /**
-   * Rates, fixed income, equity, FX, commodity, volatility, or digital assets.
+   * Asset class of the listed product family.
    */
-  asset_class: string;
+  asset_class: ListedAssetClass;
   /**
    * Exchange venue.
    */

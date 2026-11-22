@@ -10,7 +10,7 @@ use super::spec_support::{
     WeightingMethod, convert_amount, validate_history,
 };
 use crate::instruments::MarketDependencies;
-use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+use crate::instruments::json_loader::InstrumentJson;
 use crate::instruments::pricing_overrides::{
     InstrumentPricingOverrides, MetricPricingOverrides, ScenarioPricingOverrides,
 };
@@ -105,14 +105,6 @@ pub struct CompositeInstrument {
 }
 
 impl CompositeInstrument {
-    fn boxed_legs(&self) -> Result<Vec<Box<dyn Instrument>>> {
-        self.spec
-            .legs
-            .iter()
-            .map(|leg| leg.instrument.as_ref().clone().into_boxed())
-            .collect()
-    }
-
     /// Return a canonical fixed-quantity long/short equity example.
     ///
     /// Long `COMPOSITE-LONG` at 100 and short `COMPOSITE-SHORT` at 90, each
@@ -329,29 +321,25 @@ impl CompositeInstrument {
         as_of: Date,
         metrics: &[MetricId],
         options: PricingOptions,
-        price_cache: &mut BTreeMap<String, crate::results::ValuationResult>,
+        price_cache: &mut BTreeMap<(String, String), crate::results::ValuationResult>,
     ) -> Result<CompositeExposureReport> {
         let flattened = self.flatten_primitives()?;
         let mut paths = Vec::with_capacity(flattened.len());
         let mut supported = BTreeMap::<String, (MetricAggregation, Option<u64>)>::new();
         for mut exposure in flattened {
-            let instrument_json = exposure
-                .instrument()
-                .and_then(crate::instruments::json_loader::instrument_json_of)
-                .ok_or_else(|| {
-                    Error::Internal("primitive exposure lost its runtime instrument".to_string())
-                })?;
+            let base_instrument = exposure.instrument().ok_or_else(|| {
+                Error::Internal("primitive exposure lost its runtime instrument".to_string())
+            })?;
             let result = cached_valuation(
                 price_cache,
-                instrument_json,
+                exposure.instrument_id.as_str(),
                 &exposure.metric_defaults,
-                |definition| {
-                    let mut instrument = definition.into_boxed()?;
-                    if let Some(overrides) = instrument.get_metric_pricing_overrides_mut() {
-                        overrides.apply_defaults(&exposure.metric_defaults);
-                    }
-                    let mut leg_metrics =
-                        metrics_supported_by_leg(instrument.as_ref(), metrics, &options);
+                || {
+                    let defaulted =
+                        instrument_with_metric_defaults(base_instrument, &exposure.metric_defaults);
+                    let instrument: &dyn Instrument =
+                        defaulted.as_deref().unwrap_or(base_instrument);
+                    let mut leg_metrics = metrics_supported_by_leg(instrument, metrics, &options);
                     if leg_metrics.contains(&MetricId::Theta) {
                         leg_metrics.push(MetricId::ThetaPeriodDays);
                     }
@@ -470,24 +458,29 @@ impl CompositeInstrument {
         as_of: Date,
         metrics: &[MetricId],
         options: PricingOptions,
-        price_cache: &mut BTreeMap<String, crate::results::ValuationResult>,
+        price_cache: &mut BTreeMap<(String, String), crate::results::ValuationResult>,
     ) -> Result<Vec<CompositeLegValuation>> {
-        self.boxed_legs()?
+        self.spec
+            .legs
             .iter()
-            .zip(&self.spec.legs)
             .zip(&self.state.resolved_legs)
-            .map(|((leg_instrument, leg), resolved)| {
-                let defaulted = self.leg_with_metric_defaults(leg_instrument.as_ref());
-                let instrument = defaulted.as_ref().unwrap_or(leg_instrument);
-                let leg_metrics = metrics_supported_by_leg(instrument.as_ref(), metrics, &options);
+            .map(|(leg, resolved)| {
+                let leg_instrument = leg.instrument.as_dyn_instrument();
                 // The request owns the cache: market/date/options and requested metrics
-                // are identical to the primitive pass. Definition and inherited defaults
+                // are identical to the primitive pass. Identifier and inherited defaults
                 // distinguish only results that can safely be reused.
                 let valuation = cached_valuation(
                     price_cache,
-                    leg.instrument.as_ref().clone(),
+                    leg.instrument_id.as_str(),
                     &self.metric_pricing_overrides,
-                    |_| {
+                    || {
+                        let defaulted = instrument_with_metric_defaults(
+                            leg_instrument,
+                            &self.metric_pricing_overrides,
+                        );
+                        let instrument: &dyn Instrument =
+                            defaulted.as_deref().unwrap_or(leg_instrument);
+                        let leg_metrics = metrics_supported_by_leg(instrument, metrics, &options);
                         Ok(instrument.price_with_metrics(
                             market,
                             as_of,
@@ -521,20 +514,6 @@ impl CompositeInstrument {
             .collect()
     }
 
-    /// Clone `leg` with this composite's metric overrides applied as defaults.
-    ///
-    /// Returns `None` when there is nothing to apply, so callers keep using
-    /// the materialized leg.
-    fn leg_with_metric_defaults(&self, leg: &dyn Instrument) -> Option<Box<dyn Instrument>> {
-        if self.metric_pricing_overrides.is_empty() {
-            return None;
-        }
-        let mut leg = leg.clone_box();
-        leg.get_metric_pricing_overrides_mut()?
-            .apply_defaults(&self.metric_pricing_overrides);
-        Some(leg)
-    }
-
     fn base_value_raw_impl(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         self.value_legs(market, as_of, |instrument| {
             instrument.value_raw_with_currency(market, as_of)
@@ -548,11 +527,12 @@ impl CompositeInstrument {
         mut reprice: impl FnMut(&dyn Instrument) -> Result<(f64, Currency)>,
     ) -> Result<f64> {
         let values = self
-            .boxed_legs()?
+            .spec
+            .legs
             .iter()
             .zip(&self.state.resolved_legs)
-            .map(|(instrument, resolved)| {
-                let (amount, currency) = reprice(instrument.as_ref())?;
+            .map(|(leg, resolved)| {
+                let (amount, currency) = reprice(leg.instrument.as_dyn_instrument())?;
                 let converted = convert_amount(
                     market,
                     amount,
@@ -623,27 +603,50 @@ impl CompositeInstrument {
     }
 }
 
-/// Price `definition` through the per-request `price_cache`; `price` receives
-/// the definition back on a miss.
+/// Clone `instrument` with `defaults` applied to its metric pricing overrides.
 ///
-/// The key is the content hash of `definition`, extended by the debug form of
-/// `defaults` when any are inherited, so only results priced from the same
-/// definition under the same defaults are reused.
-fn cached_valuation(
-    price_cache: &mut BTreeMap<String, crate::results::ValuationResult>,
-    definition: InstrumentJson,
+/// Returns `None` when `defaults` is empty or the instrument has no metric
+/// pricing overrides to update, so callers keep using the borrowed instrument.
+fn instrument_with_metric_defaults(
+    instrument: &dyn Instrument,
     defaults: &MetricPricingOverrides,
-    price: impl FnOnce(InstrumentJson) -> Result<crate::results::ValuationResult>,
-) -> Result<crate::results::ValuationResult> {
-    let envelope = InstrumentEnvelope::new(definition);
-    let mut cache_key = envelope.content_hash()?;
-    if !defaults.is_empty() {
-        cache_key.push_str(&format!("{defaults:?}"));
+) -> Option<Box<dyn Instrument>> {
+    if defaults.is_empty() {
+        return None;
     }
+    let mut cloned = instrument.clone_box();
+    cloned
+        .get_metric_pricing_overrides_mut()?
+        .apply_defaults(defaults);
+    Some(cloned)
+}
+
+/// Price an instrument through the per-request `price_cache`.
+///
+/// The key is `(instrument_id, canonical_defaults_json)` because composite
+/// tree validation guarantees every reused `instrument_id` has an identical
+/// definition; inherited metric defaults distinguish results priced under
+/// different overrides.
+fn cached_valuation(
+    price_cache: &mut BTreeMap<(String, String), crate::results::ValuationResult>,
+    instrument_id: &str,
+    defaults: &MetricPricingOverrides,
+    price: impl FnOnce() -> Result<crate::results::ValuationResult>,
+) -> Result<crate::results::ValuationResult> {
+    let defaults_key = if defaults.is_empty() {
+        String::new()
+    } else {
+        serde_json::to_string(defaults).map_err(|err| {
+            Error::Internal(format!(
+                "failed to serialize metric pricing overrides: {err}"
+            ))
+        })?
+    };
+    let cache_key = (instrument_id.to_string(), defaults_key);
     if let Some(cached) = price_cache.get(&cache_key) {
         return Ok(cached.clone());
     }
-    let priced = price(envelope.instrument)?;
+    let priced = price()?;
     price_cache.insert(cache_key, priced.clone());
     Ok(priced)
 }
@@ -739,15 +742,21 @@ impl Instrument for CompositeInstrument {
         menu: &[MetricId],
         registry: &crate::metrics::MetricRegistry,
     ) -> Vec<MetricId> {
-        let Ok(legs) = self.boxed_legs() else {
+        if !self
+            .spec
+            .legs
+            .iter()
+            .all(|leg| leg.instrument.validate_for_pricing().is_ok())
+        {
             return Vec::new();
-        };
+        }
         menu.iter()
             .filter(|metric| {
                 if **metric == MetricId::Fx01 {
                     return self.spec.fx01_pair.is_some();
                 }
-                legs.iter().any(|leg| {
+                self.spec.legs.iter().any(|leg| {
+                    let leg = leg.instrument.as_dyn_instrument();
                     leg.applicable_metrics(std::slice::from_ref(*metric), registry)
                         .iter()
                         .any(|id| registry.metric_aggregation(id, leg.key()).is_some())
@@ -793,8 +802,9 @@ impl Instrument for CompositeInstrument {
 
     fn market_dependencies(&self) -> Result<MarketDependencies> {
         let mut dependencies = MarketDependencies::new();
-        for instrument in self.boxed_legs()? {
-            dependencies.merge(instrument.market_dependencies()?);
+        for leg in &self.spec.legs {
+            leg.instrument.validate_for_pricing()?;
+            dependencies.merge(leg.instrument.as_dyn_instrument().market_dependencies()?);
         }
         if let Some(pair) = self.spec.fx01_pair {
             dependencies.add_fx_pair(pair.base, pair.quote);
@@ -808,7 +818,9 @@ impl Instrument for CompositeInstrument {
         as_of: Date,
     ) -> Result<MarketDependencies> {
         let mut dependencies = MarketDependencies::new();
-        for instrument in self.boxed_legs()? {
+        for leg in &self.spec.legs {
+            leg.instrument.validate_for_pricing()?;
+            let instrument = leg.instrument.as_dyn_instrument();
             dependencies.merge(instrument.market_dependencies_at(market, as_of)?);
             let (_, currency) = instrument.value_raw_with_currency(market, as_of)?;
             if currency != self.spec.reporting_currency {

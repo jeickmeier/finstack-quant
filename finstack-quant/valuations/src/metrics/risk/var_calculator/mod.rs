@@ -7,9 +7,13 @@
 //!
 //! - VaR and Expected Shortfall interpretation: `docs/REFERENCES.md#mcneil-frey-embrechts-qrm`
 
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
-use super::{MarketHistory, apply_market_scenario, same_grid_coordinate};
+use super::{
+    MarketHistory, MarketScenario, RiskFactorShift, RiskFactorType, UnshiftedHazardPolicy,
+    apply_market_scenario, same_grid_coordinate,
+};
 use crate::instruments::Instrument;
 use crate::pricer::PricingDispatch;
 use finstack_quant_core::Result;
@@ -20,6 +24,7 @@ use finstack_quant_core::math::stats::quantile_sorted;
 use finstack_quant_core::math::summation::{NeumaierAccumulator, neumaier_sum};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxQuery};
+use finstack_quant_core::types::CurveId;
 
 pub use finstack_quant_valuations_core::metrics::risk::{VarConfig, VarMethod};
 
@@ -386,174 +391,322 @@ fn convert_amount_to_reporting(
     Ok(amount * rate)
 }
 
+/// Pre-resolved instrument market dependencies and FX pairs (including
+/// triangulation legs) used to filter Taylor scenarios without per-scenario
+/// dependency discovery.
+struct TaylorInstrumentDeps {
+    deps: crate::instruments::MarketDependencies,
+    fx_directions: Vec<(Currency, Currency)>,
+}
+
+impl TaylorInstrumentDeps {
+    fn resolve(
+        instrument: &dyn Instrument,
+        currency: Currency,
+        reporting_currency: Currency,
+        has_fx_shift: bool,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<Self> {
+        let deps = instrument.market_dependencies_at(market, as_of)?;
+        let mut fx_directions = Vec::new();
+        if has_fx_shift {
+            let queries = deps
+                .fx_pairs
+                .iter()
+                .map(|pair| (pair.base, pair.quote))
+                .chain((currency != reporting_currency).then_some((currency, reporting_currency)));
+            for (base, quote) in queries.filter(|(base, quote)| base != quote) {
+                fx_directions.push((base, quote));
+                let fx = market.fx_required()?;
+                let rate = fx.rate(FxQuery::new(
+                    base,
+                    quote,
+                    as_of,
+                    FxConversionPolicy::CashflowDate,
+                ))?;
+                if rate.triangulated
+                    && let Some(pivot) = fx.config().pivot_currency
+                {
+                    fx_directions.extend([(base, pivot), (pivot, quote)]);
+                }
+            }
+        }
+        Ok(Self {
+            deps,
+            fx_directions,
+        })
+    }
+
+    fn is_relevant(&self, factor: &RiskFactorType) -> bool {
+        match factor {
+            RiskFactorType::DiscountRate { curve_id, .. } => {
+                self.deps.curves.discount_curves.contains(curve_id)
+            }
+            RiskFactorType::ForwardRate { curve_id, .. } => {
+                self.deps.curves.forward_curves.contains(curve_id)
+            }
+            RiskFactorType::CreditSpread { curve_id, .. } => {
+                self.deps.curves.credit_curves.contains(curve_id)
+            }
+            RiskFactorType::EquitySpot { ticker } => self.deps.market_scalar_ids.contains(ticker),
+            RiskFactorType::ImpliedVol { vol_surface_id, .. } => self
+                .deps
+                .volatility_dependencies
+                .iter()
+                .any(|d| &d.vol_surface_id == vol_surface_id),
+            RiskFactorType::FxSpot { base, quote } => self
+                .fx_directions
+                .iter()
+                .any(|&(from, to)| (from, to) == (*base, *quote) || (from, to) == (*quote, *base)),
+        }
+    }
+
+    fn net_relevant_shifts(&self, scenario: &MarketScenario) -> Vec<RiskFactorShift> {
+        let mut net: Vec<RiskFactorShift> = Vec::new();
+        for shift in scenario
+            .shifts
+            .iter()
+            .filter(|shift| self.is_relevant(&shift.factor))
+        {
+            if let RiskFactorType::ImpliedVol {
+                vol_surface_id,
+                expiry_years,
+                strike,
+            } = &shift.factor
+                && let Some(existing) = net.iter_mut().find(|value| {
+                    matches!(
+                        &value.factor,
+                        RiskFactorType::ImpliedVol {
+                            vol_surface_id: id,
+                            expiry_years: exp,
+                            strike: k,
+                        } if id == vol_surface_id
+                            && same_grid_coordinate(*exp, *expiry_years)
+                            && same_grid_coordinate(*k, *strike)
+                    )
+                })
+            {
+                existing.shift += shift.shift;
+                continue;
+            }
+            net.push(shift.clone());
+        }
+        net
+    }
+}
+
 /// Keep only dependencies of this instrument. FX conversion into the reporting
 /// currency is itself a dependency, even for a fixed local-currency cash claim.
+#[cfg(test)]
 fn relevant_taylor_scenario(
     instrument: &dyn Instrument,
     currency: Currency,
     reporting_currency: Currency,
-    scenario: &super::MarketScenario,
+    scenario: &MarketScenario,
     market: &MarketContext,
     as_of: Date,
-) -> Result<super::MarketScenario> {
-    use super::RiskFactorType;
-    let deps = instrument.market_dependencies_at(market, as_of)?;
-    let mut fx_directions = Vec::new();
-    if scenario
+) -> Result<MarketScenario> {
+    let has_fx_shift = scenario
         .shifts
         .iter()
-        .any(|shift| matches!(shift.factor, RiskFactorType::FxSpot { .. }))
-    {
-        let queries = deps
-            .fx_pairs
-            .iter()
-            .map(|pair| (pair.base, pair.quote))
-            .chain((currency != reporting_currency).then_some((currency, reporting_currency)));
-        for (base, quote) in queries.filter(|(base, quote)| base != quote) {
-            fx_directions.push((base, quote));
-            let fx = market.fx_required()?;
-            let rate = fx.rate(FxQuery::new(
-                base,
-                quote,
-                as_of,
-                FxConversionPolicy::CashflowDate,
-            ))?;
-            if rate.triangulated
-                && let Some(pivot) = fx.config().pivot_currency
-            {
-                fx_directions.extend([(base, pivot), (pivot, quote)]);
-            }
-        }
-    }
-    let shifts: Vec<super::RiskFactorShift> = scenario
-        .shifts
-        .iter()
-        .filter(|shift| match &shift.factor {
-            RiskFactorType::DiscountRate { curve_id, .. } => {
-                deps.curves.discount_curves.contains(curve_id)
-            }
-            RiskFactorType::ForwardRate { curve_id, .. } => {
-                deps.curves.forward_curves.contains(curve_id)
-            }
-            RiskFactorType::CreditSpread { curve_id, .. } => {
-                deps.curves.credit_curves.contains(curve_id)
-            }
-            RiskFactorType::EquitySpot { ticker } => deps.market_scalar_ids.contains(ticker),
-            RiskFactorType::ImpliedVol { vol_surface_id, .. } => deps
-                .volatility_dependencies
-                .iter()
-                .any(|d| &d.vol_surface_id == vol_surface_id),
-            RiskFactorType::FxSpot { base, quote } => fx_directions
-                .iter()
-                .any(|&(from, to)| (from, to) == (*base, *quote) || (from, to) == (*quote, *base)),
-        })
-        .cloned()
-        .collect();
-    let mut net: Vec<super::RiskFactorShift> = Vec::with_capacity(shifts.len());
-    for shift in shifts {
-        if matches!(shift.factor, RiskFactorType::ImpliedVol { .. })
-            && let Some(existing) = net.iter_mut().find(|value| value.factor == shift.factor)
-        {
-            existing.shift += shift.shift;
-            continue;
-        }
-        net.push(shift);
-    }
-    Ok(super::MarketScenario {
-        shifts: net,
+        .any(|shift| matches!(shift.factor, RiskFactorType::FxSpot { .. }));
+    let deps = TaylorInstrumentDeps::resolve(
+        instrument,
+        currency,
+        reporting_currency,
+        has_fx_shift,
+        market,
+        as_of,
+    )?;
+    Ok(MarketScenario {
+        shifts: deps.net_relevant_shifts(scenario),
         ..scenario.clone()
     })
 }
 
-fn directional_taylor_pnl(
-    scenario: &super::MarketScenario,
-    market: &MarketContext,
-    base: f64,
-    mut price: impl FnMut(&super::MarketScenario) -> Result<f64>,
-) -> Result<f64> {
-    use super::RiskFactorType;
-    let mut normalized_size: f64 = 1.0;
-    let mut symmetric_limit = f64::INFINITY;
-    for shift in &scenario.shifts {
-        if !shift.shift.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(
-                "Taylor scenario shifts must be finite".into(),
-            ));
-        }
-        if shift.shift == 0.0 {
-            continue;
-        }
-        let unit = match &shift.factor {
-            RiskFactorType::DiscountRate { .. }
-            | RiskFactorType::ForwardRate { .. }
-            | RiskFactorType::CreditSpread { .. } => 1e-4,
-            _ => 0.01,
-        };
-        normalized_size = normalized_size.max(shift.shift.abs() / unit);
-        match &shift.factor {
+fn canonical_f64_bits(value: f64) -> u64 {
+    if value == 0.0 {
+        0.0_f64.to_bits()
+    } else {
+        value.to_bits()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum TaylorFactorKey {
+    DiscountRate {
+        curve_id: CurveId,
+        tenor_bits: u64,
+        grid_bits: Vec<u64>,
+        policies: Vec<(CurveId, u8)>,
+    },
+    ForwardRate {
+        curve_id: CurveId,
+        tenor_bits: u64,
+        grid_bits: Vec<u64>,
+    },
+    CreditSpread {
+        curve_id: CurveId,
+        tenor_bits: u64,
+    },
+    EquitySpot {
+        ticker: String,
+    },
+    FxSpot {
+        base: Currency,
+        quote: Currency,
+    },
+    ImpliedVol {
+        vol_surface_id: CurveId,
+        expiry_bits: u64,
+        strike_bits: u64,
+    },
+}
+
+impl TaylorFactorKey {
+    fn from_factor(
+        factor: &RiskFactorType,
+        unshifted_hazard_policies: &BTreeMap<CurveId, UnshiftedHazardPolicy>,
+    ) -> Self {
+        match factor {
+            RiskFactorType::DiscountRate {
+                curve_id,
+                tenor_years,
+                grid_years,
+            } => Self::DiscountRate {
+                curve_id: curve_id.clone(),
+                tenor_bits: canonical_f64_bits(*tenor_years),
+                grid_bits: grid_years.iter().copied().map(canonical_f64_bits).collect(),
+                policies: unshifted_hazard_policies
+                    .iter()
+                    .map(|(id, policy)| {
+                        let tag = match policy {
+                            UnshiftedHazardPolicy::FrozenIntensity => 0,
+                            UnshiftedHazardPolicy::RefitOriginalQuotes => 1,
+                        };
+                        (id.clone(), tag)
+                    })
+                    .collect(),
+            },
+            RiskFactorType::ForwardRate {
+                curve_id,
+                tenor_years,
+                grid_years,
+            } => Self::ForwardRate {
+                curve_id: curve_id.clone(),
+                tenor_bits: canonical_f64_bits(*tenor_years),
+                grid_bits: grid_years.iter().copied().map(canonical_f64_bits).collect(),
+            },
+            RiskFactorType::CreditSpread {
+                curve_id,
+                tenor_years,
+            } => Self::CreditSpread {
+                curve_id: curve_id.clone(),
+                tenor_bits: canonical_f64_bits(*tenor_years),
+            },
+            RiskFactorType::EquitySpot { ticker } => Self::EquitySpot {
+                ticker: ticker.clone(),
+            },
+            RiskFactorType::FxSpot { base, quote } => Self::FxSpot {
+                base: *base,
+                quote: *quote,
+            },
             RiskFactorType::ImpliedVol {
                 vol_surface_id,
                 expiry_years,
                 strike,
-            } => {
-                let surface = market.get_surface(vol_surface_id)?;
-                let row = surface
-                    .expiries()
-                    .iter()
-                    .position(|v| same_grid_coordinate(*v, *expiry_years));
-                let col = surface
-                    .secondary_values()
-                    .iter()
-                    .position(|v| same_grid_coordinate(*v, *strike));
-                let (Some(row), Some(col)) = (row, col) else {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Taylor volatility point ({expiry_years}, {strike}) must exactly match a grid node on '{vol_surface_id}'"
-                    )));
-                };
-                let vol = surface.vols()[row * surface.secondary_values().len() + col];
-                if vol + shift.shift < 0.0 {
-                    return Err(finstack_quant_core::Error::Validation(
-                        "Taylor volatility scenario would be negative".into(),
-                    ));
-                }
-                symmetric_limit = symmetric_limit.min(vol / shift.shift.abs());
-            }
-            RiskFactorType::EquitySpot { .. } | RiskFactorType::FxSpot { .. } => {
-                if shift.shift <= -1.0 {
-                    return Err(finstack_quant_core::Error::Validation(
-                        "Taylor relative-price scenario must leave a positive price".into(),
-                    ));
-                }
-                symmetric_limit = symmetric_limit.min(1.0 / shift.shift.abs());
-            }
-            _ => {}
+            } => Self::ImpliedVol {
+                vol_surface_id: vol_surface_id.clone(),
+                expiry_bits: canonical_f64_bits(*expiry_years),
+                strike_bits: canonical_f64_bits(*strike),
+            },
         }
     }
-    let scaled = |scale: f64| super::MarketScenario {
-        shifts: scenario
-            .shifts
-            .iter()
-            .map(|shift| super::RiskFactorShift {
-                factor: shift.factor.clone(),
-                shift: shift.shift * scale,
-            })
-            .collect(),
-        ..scenario.clone()
+}
+
+/// Validate a single non-zero Taylor shift against `market` and return the
+/// symmetric bump limit in factor units (`f64::INFINITY` if unbounded below).
+fn validate_taylor_shift_and_limit(shift: &RiskFactorShift, market: &MarketContext) -> Result<f64> {
+    if !shift.shift.is_finite() {
+        return Err(finstack_quant_core::Error::Validation(
+            "Taylor scenario shifts must be finite".into(),
+        ));
+    }
+    match &shift.factor {
+        RiskFactorType::ImpliedVol {
+            vol_surface_id,
+            expiry_years,
+            strike,
+        } => {
+            let surface = market.get_surface(vol_surface_id)?;
+            let row = surface
+                .expiries()
+                .iter()
+                .position(|v| same_grid_coordinate(*v, *expiry_years));
+            let col = surface
+                .secondary_values()
+                .iter()
+                .position(|v| same_grid_coordinate(*v, *strike));
+            let (Some(row), Some(col)) = (row, col) else {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Taylor volatility point ({expiry_years}, {strike}) must exactly match a grid node on '{vol_surface_id}'"
+                )));
+            };
+            let vol = surface.vols()[row * surface.secondary_values().len() + col];
+            if vol + shift.shift < 0.0 {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Taylor volatility scenario would be negative".into(),
+                ));
+            }
+            Ok(vol)
+        }
+        RiskFactorType::EquitySpot { .. } | RiskFactorType::FxSpot { .. } => {
+            if shift.shift <= -1.0 {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Taylor relative-price scenario must leave a positive price".into(),
+                ));
+            }
+            Ok(1.0)
+        }
+        RiskFactorType::DiscountRate { .. }
+        | RiskFactorType::ForwardRate { .. }
+        | RiskFactorType::CreditSpread { .. } => Ok(f64::INFINITY),
+    }
+}
+
+/// Compute first- and second-order finite-difference sensitivities `(delta, gamma)`
+/// for a single risk factor at `base_market`, in reporting currency per unit of shift.
+fn compute_factor_sensitivity(
+    factor: &RiskFactorType,
+    symmetric_limit: f64,
+    base_value: f64,
+    mut price_shift: impl FnMut(f64) -> Result<f64>,
+) -> Result<(f64, f64)> {
+    let unit: f64 = match factor {
+        RiskFactorType::DiscountRate { .. }
+        | RiskFactorType::ForwardRate { .. }
+        | RiskFactorType::CreditSpread { .. } => 1e-4,
+        RiskFactorType::EquitySpot { .. }
+        | RiskFactorType::FxSpot { .. }
+        | RiskFactorType::ImpliedVol { .. } => 0.01,
     };
-    let mut h = 1.0 / normalized_size;
+
     if symmetric_limit > 0.0 {
-        h = h.min(symmetric_limit * 0.5);
-        let up = price(&scaled(h))?;
-        let down = price(&scaled(-h))?;
-        Ok((up - down) / (2.0 * h) + 0.5 * (up - 2.0 * base + down) / (h * h))
+        let h = unit.min(symmetric_limit * 0.5);
+        let up = price_shift(h)?;
+        let down = price_shift(-h)?;
+        let delta = (up - down) / (2.0 * h);
+        let gamma = (up - 2.0 * base_value + down) / (h * h);
+        Ok((delta, gamma))
     } else {
-        h /= 3.0;
-        let p1 = price(&scaled(h))?;
-        let p2 = price(&scaled(2.0 * h))?;
-        let p3 = price(&scaled(3.0 * h))?;
-        let first = (-11.0 * base + 18.0 * p1 - 9.0 * p2 + 2.0 * p3) / (6.0 * h);
-        let second = (2.0 * base - 5.0 * p1 + 4.0 * p2 - p3) / (h * h);
-        Ok(first + 0.5 * second)
+        let h = unit / 3.0;
+        let p1 = price_shift(h)?;
+        let p2 = price_shift(2.0 * h)?;
+        let p3 = price_shift(3.0 * h)?;
+        let delta = (-11.0 * base_value + 18.0 * p1 - 9.0 * p2 + 2.0 * p3) / (6.0 * h);
+        let gamma = (2.0 * base_value - 5.0 * p1 + 4.0 * p2 - p3) / (h * h);
+        Ok((delta, gamma))
     }
 }
 
@@ -566,55 +719,126 @@ fn calculate_var_taylor(
     dispatch: &PricingDispatch,
     provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
 ) -> Result<VarResult> {
-    let base_values: Vec<_> = instruments
+    for scenario in history.iter() {
+        for shift in &scenario.shifts {
+            if !shift.shift.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Taylor scenario shifts must be finite".into(),
+                ));
+            }
+        }
+    }
+
+    let base_values_money: Vec<Money> = instruments
         .iter()
         .map(|instrument| reprice_with_dispatch(*instrument, base_market, as_of, dispatch))
         .collect::<Result<_>>()?;
     let reporting_currency = resolve_reporting_currency_from_values(
-        &base_values,
+        &base_values_money,
         config.reporting_currency,
         "Historical VaR",
     )?;
-    let mut pnls = Vec::with_capacity(history.len());
-    for scenario in history.iter() {
-        let mut total = NeumaierAccumulator::new();
-        for (instrument, base_money) in instruments.iter().zip(&base_values) {
-            let scenario = relevant_taylor_scenario(
-                *instrument,
-                base_money.currency(),
+    let base_values: Vec<f64> = base_values_money
+        .iter()
+        .map(|value| {
+            convert_amount_to_reporting(
+                value.amount(),
+                value.currency(),
                 reporting_currency,
-                scenario,
                 base_market,
                 as_of,
-            )?
-            .at_date(as_of);
-            if scenario.shifts.iter().all(|s| s.shift == 0.0) {
+                "Historical VaR",
+            )
+        })
+        .collect::<Result<_>>()?;
+
+    let has_fx_shift = history.scenarios.iter().any(|scenario| {
+        scenario
+            .shifts
+            .iter()
+            .any(|shift| matches!(shift.factor, RiskFactorType::FxSpot { .. }))
+    });
+
+    let mut scenario_totals: Vec<NeumaierAccumulator> = (0..history.len())
+        .map(|_| NeumaierAccumulator::new())
+        .collect();
+
+    for ((instrument, base_money), &base_value) in
+        instruments.iter().zip(&base_values_money).zip(&base_values)
+    {
+        let currency = base_money.currency();
+        let deps = TaylorInstrumentDeps::resolve(
+            *instrument,
+            currency,
+            reporting_currency,
+            has_fx_shift,
+            base_market,
+            as_of,
+        )?;
+
+        let mut sensitivities: HashMap<TaylorFactorKey, (f64, f64)> = HashMap::new();
+
+        for (scenario_idx, scenario) in history.iter().enumerate() {
+            let net_shifts = deps.net_relevant_shifts(scenario);
+            if net_shifts.iter().all(|shift| shift.shift == 0.0) {
                 continue;
             }
-            let currency = base_money.currency();
-            let reporting_value = |market: &MarketContext| {
-                let raw = dispatch.price_raw(*instrument, market, as_of)?;
-                convert_amount_to_reporting(
-                    raw,
-                    currency,
-                    reporting_currency,
-                    market,
-                    as_of,
-                    "Historical VaR",
-                )
-            };
-            let base = reporting_value(base_market)?;
-            total.add(directional_taylor_pnl(
-                &scenario,
-                base_market,
-                base,
-                |scaled| {
-                    let market = apply_market_scenario(scaled, base_market, provider.as_deref())?;
-                    reporting_value(&market)
-                },
-            )?)?;
+            for shift in net_shifts {
+                if shift.shift == 0.0 {
+                    continue;
+                }
+                let symmetric_limit = validate_taylor_shift_and_limit(&shift, base_market)?;
+                let key = TaylorFactorKey::from_factor(
+                    &shift.factor,
+                    &scenario.unshifted_hazard_policies,
+                );
+                let (delta, gamma) = if let Some(&cached) = sensitivities.get(&key) {
+                    cached
+                } else {
+                    let computed = compute_factor_sensitivity(
+                        &shift.factor,
+                        symmetric_limit,
+                        base_value,
+                        |bump_size| {
+                            let mut single_factor_scenario = MarketScenario::new(
+                                as_of,
+                                vec![RiskFactorShift {
+                                    factor: shift.factor.clone(),
+                                    shift: bump_size,
+                                }],
+                            );
+                            if matches!(shift.factor, RiskFactorType::DiscountRate { .. }) {
+                                single_factor_scenario.unshifted_hazard_policies =
+                                    scenario.unshifted_hazard_policies.clone();
+                            }
+                            let bumped_market = apply_market_scenario(
+                                &single_factor_scenario,
+                                base_market,
+                                provider.as_deref(),
+                            )?;
+                            let raw = dispatch.price_raw(*instrument, &bumped_market, as_of)?;
+                            convert_amount_to_reporting(
+                                raw,
+                                currency,
+                                reporting_currency,
+                                &bumped_market,
+                                as_of,
+                                "Historical VaR",
+                            )
+                        },
+                    )?;
+                    sensitivities.insert(key, computed);
+                    computed
+                };
+                let dx = shift.shift;
+                scenario_totals[scenario_idx].add(delta * dx + 0.5 * gamma * dx * dx)?;
+            }
         }
-        pnls.push(total.get_total()?);
     }
+
+    let pnls: Vec<f64> = scenario_totals
+        .into_iter()
+        .map(|acc| acc.get_total())
+        .collect::<Result<_>>()?;
     VarResult::from_distribution(pnls, config.confidence_level)
 }

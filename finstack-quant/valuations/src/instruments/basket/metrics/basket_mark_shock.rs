@@ -15,9 +15,8 @@ impl MetricCalculator for BasketMarkShockCalculator {
         let zero = Money::from((0_i64, basket.reporting_currency));
         let mut groups = BTreeMap::new();
         let mut total = zero;
-        for (index, constituent) in basket.constituents.iter().enumerate() {
-            let mark =
-                marked_constituent(basket, index, constituent, &context.curves, context.as_of)?;
+        for constituent in &basket.constituents {
+            let mark = marked_constituent(basket, constituent, &context.curves, context.as_of)?;
             let shocked = mark.checked_mul_f64(1.01)?;
             if mark != zero && shocked == mark {
                 return Err(finstack_quant_core::Error::Validation(format!(

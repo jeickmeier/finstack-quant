@@ -213,10 +213,14 @@ mod tests {
         for umbrella_resident in [
             InstrumentType::Composite,
             InstrumentType::Basket,
-            InstrumentType::RealEstateAsset,
             InstrumentType::LeveredRealEstateEquity,
         ] {
-            owner.insert(umbrella_resident, STANDARD.name());
+            if let Some(previous) = owner.insert(umbrella_resident, STANDARD.name()) {
+                panic!(
+                    "{umbrella_resident:?} is registered by both {previous} and {}",
+                    STANDARD.name()
+                );
+            }
         }
 
         let standard: Vec<InstrumentType> = crate::pricer::STANDARD

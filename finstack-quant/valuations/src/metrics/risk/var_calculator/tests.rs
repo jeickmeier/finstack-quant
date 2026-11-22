@@ -498,6 +498,143 @@ fn test_var_result_from_distribution() {
     assert!(result.expected_shortfall <= result.var);
 }
 
+#[derive(Clone, Debug)]
+struct CountingQuadraticSpotInstrument {
+    id: String,
+    spot_id: String,
+    pricings: Arc<std::sync::atomic::AtomicUsize>,
+    attributes: Attributes,
+}
+
+crate::impl_empty_cashflow_provider!(
+    CountingQuadraticSpotInstrument,
+    finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
+);
+
+impl Instrument for CountingQuadraticSpotInstrument {
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        true
+    }
+
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
+        let mut deps = crate::instruments::MarketDependencies::new();
+        deps.add_market_scalar_id(self.spot_id.as_str());
+        Ok(deps)
+    }
+
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn key(&self) -> crate::pricer::InstrumentType {
+        crate::pricer::InstrumentType::Equity
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
+    fn attributes(&self) -> &Attributes {
+        &self.attributes
+    }
+
+    fn attributes_mut(&mut self) -> &mut Attributes {
+        &mut self.attributes
+    }
+
+    fn clone_box(&self) -> Box<dyn Instrument> {
+        Box::new(self.clone())
+    }
+
+    fn base_value(&self, market: &MarketContext, _as_of: Date) -> Result<Money> {
+        self.pricings
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let spot = market
+            .get_price(&self.spot_id)?
+            .get_unitless()
+            .unwrap_or_default();
+        let value = 100.0 * spot + 0.5 * (spot - 100.0).powi(2);
+        Money::new(value, Currency::USD)
+    }
+}
+
+#[test]
+fn taylor_var_precomputes_sensitivities_in_constant_pricings_across_scenarios() -> Result<()> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let as_of = sample_as_of();
+    let pricings = Arc::new(AtomicUsize::new(0));
+    let instrument = CountingQuadraticSpotInstrument {
+        id: "COUNTING-EQ".to_string(),
+        spot_id: "SPOT-COUNT".to_string(),
+        pricings: Arc::clone(&pricings),
+        attributes: Attributes::new(),
+    };
+    let market = MarketContext::new().insert_price(
+        "SPOT-COUNT",
+        MarketScalar::unitless(100.0).expect("valid scalar"),
+    );
+
+    let scenarios: Vec<MarketScenario> = (0..50)
+        .map(|i| {
+            let shift = (i as f64 - 25.0) * 0.004;
+            MarketScenario::new(
+                as_of,
+                vec![RiskFactorShift {
+                    factor: RiskFactorType::EquitySpot {
+                        ticker: "SPOT-COUNT".to_string(),
+                    },
+                    shift,
+                }],
+            )
+        })
+        .collect();
+    let history = history_from_scenarios(as_of, 50, scenarios);
+
+    let taylor = calculate_var(
+        &[&instrument as &dyn Instrument],
+        &market,
+        &history,
+        as_of,
+        &VarConfig::var_95().with_method(VarMethod::TaylorApproximation),
+        PricingDispatch::InstrumentDefault,
+        None,
+    )?;
+
+    let taylor_pricings = pricings.load(Ordering::Relaxed);
+    assert!(
+        taylor_pricings <= 5,
+        "Taylor VaR should precompute sensitivities in O(1) pricings per factor, got {taylor_pricings}"
+    );
+    assert_eq!(taylor.num_scenarios, 50);
+
+    // For a quadratic payoff V(r) = 10_000 + 10_000*r + 5_000*r^2,
+    // second-order Taylor approximation matches full revaluation exactly.
+    let full = calculate_var(
+        &[&instrument as &dyn Instrument],
+        &market,
+        &history,
+        as_of,
+        &VarConfig::var_95(),
+        PricingDispatch::InstrumentDefault,
+        None,
+    )?;
+    for (t_pnl, f_pnl) in taylor.pnl_distribution.iter().zip(&full.pnl_distribution) {
+        assert!(
+            (t_pnl - f_pnl).abs() < 1e-6,
+            "Taylor P&L ({t_pnl}) should match exact quadratic P&L ({f_pnl})"
+        );
+    }
+
+    Ok(())
+}
+
 #[test]
 fn test_var_result_rejects_invalid_confidence() {
     for confidence_level in [0.0, 1.0, f64::NAN, f64::INFINITY] {
@@ -555,24 +692,20 @@ fn empty_portfolio_has_explicit_zero_var_state() -> Result<()> {
 }
 
 #[test]
-fn directional_taylor_has_zero_curvature_for_fixed_discount_linear_forward() -> Result<()> {
-    let as_of = sample_as_of();
-    let scenario = MarketScenario::new(
-        as_of,
-        vec![RiskFactorShift {
-            factor: RiskFactorType::ForwardRate {
-                curve_id: "F".into(),
-                tenor_years: 1.4,
-                grid_years: vec![1.4],
-            },
-            shift: 0.001,
-        }],
-    );
+fn factor_sensitivity_has_zero_curvature_for_fixed_discount_linear_forward() -> Result<()> {
+    let factor = RiskFactorType::ForwardRate {
+        curve_id: "F".into(),
+        tenor_years: 1.4,
+        grid_years: vec![1.4],
+    };
     let coefficient = 1_000_000.0 * 0.25 * 0.97;
-    let value =
-        directional_taylor_pnl(&scenario, &MarketContext::new(), coefficient * 0.04, |s| {
-            Ok(coefficient * (0.04 + s.shifts[0].shift))
+    let (delta, gamma) =
+        compute_factor_sensitivity(&factor, f64::INFINITY, coefficient * 0.04, |h| {
+            Ok(coefficient * (0.04 + h))
         })?;
-    assert!((value - coefficient * 0.001).abs() < 1e-8);
+    let shift = 0.001;
+    let value = delta * shift + 0.5 * gamma * shift * shift;
+    assert!(gamma.abs() < 1e-6);
+    assert!((value - coefficient * shift).abs() < 1e-8);
     Ok(())
 }

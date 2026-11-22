@@ -190,12 +190,13 @@ impl CompositeSpec {
                     leg.instrument_id
                 )
             })?;
-            let boxed = leg.instrument.as_ref().clone().into_boxed()?;
-            if boxed.id() != leg.instrument_id.as_str() {
+            leg.instrument.validate_for_pricing()?;
+            let instrument = leg.instrument.as_dyn_instrument();
+            if instrument.id() != leg.instrument_id.as_str() {
                 return Err(Error::Validation(format!(
                     "composite leg id '{}' does not match embedded instrument id '{}'",
                     leg.instrument_id,
-                    boxed.id()
+                    instrument.id()
                 )));
             }
             if let InstrumentJson::Composite(nested) = leg.instrument.as_ref() {

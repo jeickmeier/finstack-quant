@@ -33,7 +33,10 @@ pub(crate) fn financing_pv(
     for financing in &inst.financing {
         let pv = financing.as_instrument().value(market, as_of)?;
         if pv.currency() != inst.currency {
-            return Err(Error::Validation("financing PV currency mismatch".into()));
+            return Err(Error::CurrencyMismatch {
+                expected: inst.currency,
+                actual: pv.currency(),
+            });
         }
         total += pv.amount();
     }
@@ -69,7 +72,24 @@ pub(crate) fn financing_schedules_supported(
 ) -> finstack_quant_core::Result<Vec<finstack_quant_cashflows::builder::CashFlowSchedule>> {
     let mut schedules = Vec::with_capacity(inst.financing.len());
     for financing in &inst.financing {
-        schedules.push(financing.as_instrument().cashflow_schedule(market, as_of)?);
+        let sched = financing.as_instrument().cashflow_schedule(market, as_of)?;
+        let initial_currency = sched.get_notional().initial.currency();
+        if initial_currency != inst.currency {
+            return Err(Error::CurrencyMismatch {
+                expected: inst.currency,
+                actual: initial_currency,
+            });
+        }
+        for cf in sched.get_flows() {
+            let flow_currency = cf.get_amount().currency();
+            if flow_currency != inst.currency {
+                return Err(Error::CurrencyMismatch {
+                    expected: inst.currency,
+                    actual: flow_currency,
+                });
+            }
+        }
+        schedules.push(sched);
     }
     Ok(schedules)
 }
@@ -157,12 +177,18 @@ pub(crate) fn financing_payoff_at_exit(
 fn payoff_at(
     schedules: &[finstack_quant_cashflows::builder::CashFlowSchedule],
     exit: Date,
-    _currency: Currency,
+    currency: Currency,
 ) -> finstack_quant_core::Result<f64> {
     let mut payoff_amt = 0.0;
     for sched in schedules {
         let out_path = sched.outstanding_by_date()?;
         let payoff = outstanding_before(&out_path, exit, sched.get_notional().initial);
+        if payoff.currency() != currency {
+            return Err(Error::CurrencyMismatch {
+                expected: currency,
+                actual: payoff.currency(),
+            });
+        }
         payoff_amt += payoff.amount().abs();
     }
     Ok(payoff_amt)
