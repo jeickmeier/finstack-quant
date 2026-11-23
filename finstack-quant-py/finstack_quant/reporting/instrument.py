@@ -650,7 +650,6 @@ def instrument_tearsheet(
     ...         "timestamp": "2026-06-20T12:19:44Z",
     ...         "version": "0.11.0",
     ...     },
-    ...     "covenants": None,
     ... }
     >>> result = ValuationResult.from_json(json.dumps(payload))
     >>> instrument_tearsheet(result, sections=[]).title
