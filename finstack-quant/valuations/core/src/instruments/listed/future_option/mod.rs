@@ -2,12 +2,13 @@
 
 mod instrument_impl;
 mod pricing;
-mod types;
+pub(crate) mod types;
 
 #[cfg(test)]
 mod tests;
 
-pub use types::{
+#[cfg(test)]
+use types::{
     FutureOptionExercise, FutureOptionModel, FutureOptionPremiumStyle, FutureOptionSettlement,
     FutureOptionTerms,
 };

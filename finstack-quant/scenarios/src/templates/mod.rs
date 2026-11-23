@@ -13,8 +13,8 @@
 //! execution, continue to [`crate::ScenarioEngine`].
 
 mod json;
-mod metadata;
-mod registry;
+pub(crate) mod metadata;
+pub(crate) mod registry;
 
-pub use metadata::{AssetClass, TemplateMetadata, TemplateSeverity};
-pub use registry::TemplateRegistry;
+pub(crate) use metadata::TemplateMetadata;
+pub(crate) use registry::TemplateRegistry;

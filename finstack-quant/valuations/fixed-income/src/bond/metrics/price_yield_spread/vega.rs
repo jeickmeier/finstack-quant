@@ -3,7 +3,7 @@
 use super::embedded_option_value::{holder_option_value, resolve_oas_decimal};
 use crate::bond::Bond;
 use crate::bond::pricing::tree::{TreeModelChoice, bond_tree_config};
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_valuations_core::pricer::ModelKey;
 
@@ -97,7 +97,7 @@ impl MetricCalculator for BondVegaCalculator {
             )));
         }
 
-        let defaults = sens_config::resolve(context)?;
+        let defaults = bump_config::resolve(context)?;
         let bump = defaults.vol_bump_decimal;
         let (channel, base_vol) = short_rate_sigma(bond, context, model)?;
         let down_vol = (base_vol - bump).max(1e-8);

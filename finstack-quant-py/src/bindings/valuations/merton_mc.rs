@@ -7,7 +7,7 @@ use crate::errors::core_to_py;
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::merton_mc::{
     MertonMcResult, PathStatistics,
 };
-use finstack_quant_valuations::instruments::{
+use finstack_quant_valuations::instruments::fixed_income::{
     BarrierCrossing, MertonMcCalibrationSpec, MertonMcConfig, PikMode, PikSchedule,
 };
 use pyo3::prelude::*;

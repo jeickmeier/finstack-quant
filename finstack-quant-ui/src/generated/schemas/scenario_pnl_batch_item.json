@@ -111,7 +111,7 @@
     },
     "d_1ae797ba5cedb9641672": {
       "additionalProperties": false,
-      "description": "Report describing what happened during [`super::ScenarioEngine::apply`].\n\n# Examples\n```rust\nuse finstack_quant_scenarios::ApplicationReport;\n\nlet report = ApplicationReport {\n    operations_applied: 3,\n    user_operations: 1,\n    expanded_operations: 3,\n    changes: Default::default(),\n    applied_shocks: vec![],\n    warnings: vec![],\n    meta: None,\n    time_roll: None,\n};\n\nassert_eq!(report.operations_applied, 3);\nassert_eq!(report.user_operations, 1);\nassert_eq!(report.expanded_operations, 3);\n```",
+      "description": "Report describing what happened during [`crate::ScenarioEngine::apply`].\n\n# Examples\n```rust\nuse finstack_quant_scenarios::ApplicationReport;\n\nlet report = ApplicationReport {\n    operations_applied: 3,\n    user_operations: 1,\n    expanded_operations: 3,\n    changes: Default::default(),\n    applied_shocks: vec![],\n    warnings: vec![],\n    meta: None,\n    time_roll: None,\n};\n\nassert_eq!(report.operations_applied, 3);\nassert_eq!(report.user_operations, 1);\nassert_eq!(report.expanded_operations, 3);\n```",
       "properties": {
         "applied_shocks": {
           "description": "Size of every market and instrument shock applied, in application\norder: one entry per accepted effect, so the entries reconcile with\n[`changes`](Self::changes) (every market target named there appears\nhere at least once, and the instrument indices here union to\n`changes.changed_instrument_indices`).\n\nStatement-forecast operations, rate bindings and the time roll are not\nlisted. Empty when the scenario applied no market or instrument shock,\nand on reports deserialized from JSON written before this field\nexisted.",
@@ -1593,7 +1593,7 @@
       "description": "Report from time roll-forward operation.\n\n# Examples\n```rust\nuse finstack_quant_scenarios::RollForwardReport;\nuse indexmap::IndexMap;\nuse time::macros::date;\n\nlet report = RollForwardReport {\n    old_date: date!(2025 - 01 - 01),\n    new_date: date!(2025 - 02 - 01),\n    days: 31,\n    instrument_carry: vec![],\n    total_carry: IndexMap::new(),\n    failed_instruments: vec![],\n};\nassert_eq!(report.days, 31);\n```",
       "properties": {
         "days": {
-          "description": "Calendar days between `old_date` and `new_date`.\n\nAlways a calendar-day span, including under\n[`TimeRollMode::BusinessDays`](crate::spec::TimeRollMode::BusinessDays):\nthe target date is business-day adjusted, but the span back to\n`old_date` is still calendar days. Downstream ACT/365F annualization\ndepends on this.",
+          "description": "Calendar days between `old_date` and `new_date`.\n\nAlways a calendar-day span, including under\n[`TimeRollMode::BusinessDays`](crate::TimeRollMode::BusinessDays):\nthe target date is business-day adjusted, but the span back to\n`old_date` is still calendar days. Downstream ACT/365F annualization\ndepends on this.",
           "format": "int32",
           "type": "integer"
         },

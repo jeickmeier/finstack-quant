@@ -745,7 +745,7 @@ impl ConvertibleBond {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<ConvertibleGreeks> {
-        let bumps = finstack_quant_valuations_core::metrics::sensitivities::config::from_context_or_default(
+        let bumps = finstack_quant_valuations_core::metrics::sensitivities::bump_config::from_context_or_default(
             &finstack_quant_core::config::FinstackConfig::default(),
             Some(&self.metric_pricing_overrides),
         )?;

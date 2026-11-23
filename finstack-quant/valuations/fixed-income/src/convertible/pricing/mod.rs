@@ -13,20 +13,17 @@
 //! - `convertible_spot_ladder`: Price, delta, parity, premium and regime across share prices
 
 mod credit_tree;
-mod engine;
-mod spot_ladder;
+pub(crate) mod engine;
+pub(crate) mod spot_ladder;
 mod tree_pricer;
 mod valuator;
 
-pub use engine::{
-    DEFAULT_CONVERTIBLE_TREE_STEPS, calculate_accrued_interest, calculate_convertible_greeks,
-    calculate_parity, price_convertible_bond, settlement_date,
-};
+#[cfg(test)]
+pub(crate) use engine::{DEFAULT_CONVERTIBLE_TREE_STEPS, settlement_date};
 pub(crate) use engine::{
-    build_convertible_schedule, compute_conversion_value, price_bond_floor, settlement_dirty_price,
-};
-pub use spot_ladder::{
-    ConvertibleRegime, ConvertibleSpotLadder, ConvertibleSpotRow, convertible_spot_ladder,
+    build_convertible_schedule, calculate_accrued_interest, calculate_convertible_greeks,
+    calculate_parity, compute_conversion_value, price_bond_floor, price_convertible_bond,
+    settlement_dirty_price,
 };
 pub(crate) use tree_pricer::ConvertibleTreePricer;
 

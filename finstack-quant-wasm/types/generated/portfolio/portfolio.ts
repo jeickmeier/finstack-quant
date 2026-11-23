@@ -1274,7 +1274,7 @@ export type FbmSpec =
  * Stochastic process to simulate, with its parameters.
  *
  * Serialized as an internally tagged object: `{"type": "gbm", "r": 0.03, ...}`.
- * Parameters are re-validated when [`simulate_paths`] runs, so a spec read
+ * Parameters are re-validated when [`simulate_paths`](super::simulate_paths) runs, so a spec read
  * from JSON cannot bypass the range checks of the Rust constructors.
  */
 export type ProcessSpec =
@@ -2020,7 +2020,7 @@ export interface AllocationDiagnostics {
   weights_sum: number;
 }
 /**
- * Report describing what happened during [`super::ScenarioEngine::apply`].
+ * Report describing what happened during [`crate::ScenarioEngine::apply`].
  */
 export interface ApplicationReport {
   /**
@@ -2264,7 +2264,7 @@ export interface RollForwardReport {
    * Calendar days between `old_date` and `new_date`.
    *
    * Always a calendar-day span, including under
-   * [`TimeRollMode::BusinessDays`](crate::spec::TimeRollMode::BusinessDays):
+   * [`TimeRollMode::BusinessDays`](crate::TimeRollMode::BusinessDays):
    * the target date is business-day adjusted, but the span back to
    * `old_date` is still calendar days. Downstream ACT/365F annualization
    * depends on this.

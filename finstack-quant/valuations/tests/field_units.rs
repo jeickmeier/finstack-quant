@@ -11,9 +11,10 @@ fn bond_quote_set()
 -> finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::BondQuoteSet{
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_valuations::instruments::PricingOptions;
+    use finstack_quant_valuations::instruments::fixed_income::BondQuoteInput;
     use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
     use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::compute_quotes;
-    use finstack_quant_valuations::instruments::{BondQuoteInput, PricingOptions};
 
     let bond = Bond::example().expect("bond");
     let as_of = bond.issue_date;

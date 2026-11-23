@@ -5,7 +5,7 @@ use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::metrics::MetricContext;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::pricer::ModelKey;
 use finstack_quant_valuations_core::recalibration::{QuoteBump, RateMarketRecalibrationRequest};
 use std::sync::Arc;
@@ -42,7 +42,7 @@ pub(crate) fn hw1f_rate_greek(
 }
 
 fn rate_greek(context: &MetricContext, curve_id: &CurveId, second: bool) -> Result<f64> {
-    let config = sens_config::resolve(context)?;
+    let config = bump_config::resolve(context)?;
     let bump_bp = config.rate_bump_bp;
     let h = bump_bp * 1e-4;
     let target = context.curves.curve_target(curve_id)?;

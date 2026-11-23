@@ -151,7 +151,6 @@ pub mod ir_future_option;
 pub mod irs;
 /// Interest-rate-specific overnight arithmetic averaging and final-fixing helpers.
 pub(crate) mod overnight;
-/// Deposit module - Money market deposits.
 mod rate_bucketed_dv01;
 mod rate_recalibration;
 /// Rate-magnitude checks shared by the rates instruments.
@@ -172,12 +171,9 @@ mod family;
 mod schedule_pv;
 pub use family::RATES;
 
-/// Finite-difference step for Hull-White short-rate σ sensitivities
-/// (`MetricId::HwSigmaVega`): an **absolute** shift of 1e-4 (1bp of annual
-/// short-rate volatility). Results are reported per 0.01 absolute σ.
-pub(crate) const HW_SIGMA_BUMP: f64 = 1e-4;
 pub use schedule_pv::schedule_pv_raw;
 pub use swap_legs::{FixedLegSpec, FloatLegSpec, add_payment_delay, simple_average_unsupported};
+pub(crate) use vol_model::HW_SIGMA_BUMP;
 pub use vol_model::VolatilityModel;
 
 // `irs::marginable`'s unit tests `include!` the integration-test helper

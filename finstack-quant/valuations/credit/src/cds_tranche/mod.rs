@@ -85,4 +85,5 @@ mod types;
 pub use parameters::CdsTrancheParams;
 pub use types::{CdsTranche, CdsTrancheBuilder};
 
-pub use pricing::{CdsTranchePricer, PreparedTranche};
+pub use pricing::prepared::PreparedTranche;
+pub use pricing::pricer::CdsTranchePricer;

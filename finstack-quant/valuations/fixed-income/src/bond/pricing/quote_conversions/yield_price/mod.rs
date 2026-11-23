@@ -1,13 +1,15 @@
 //! Yield-to-price, day-count timing conventions, and workout-path inversion.
 
 mod conventions;
-mod discounting;
+pub(crate) mod discounting;
 #[cfg(test)]
 mod tests;
-mod workout;
+pub(crate) mod workout;
 
-pub use discounting::{df_from_yield, price_from_ytm, price_from_ytm_compounded_params};
-pub use workout::price_from_ytw;
+#[cfg(test)]
+pub(super) use discounting::df_from_yield;
+pub(crate) use discounting::price_from_ytm;
+pub(crate) use workout::price_from_ytw;
 
 pub(crate) use conventions::{
     act365l_flow_times, bond_flow_times, clean_price_from_japanese_simple_yield, flow_times,

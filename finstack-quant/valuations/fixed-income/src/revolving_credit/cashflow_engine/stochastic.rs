@@ -42,7 +42,8 @@ impl<'a> CashflowEngine<'a> {
         let (overnight_fwd, term_basis_curves) = match &self.facility.rate {
             RateSpec::Floating(spec) => {
                 let overnight =
-                    super::super::utils::resolved_overnight_compounding(spec)?.is_some();
+                    super::super::schedule_projection::resolved_overnight_compounding(spec)?
+                        .is_some();
                 match self.market {
                     Some(market) if overnight => (
                         Some(market.get_forward(spec.forward_curve_id.as_str())?),
@@ -205,12 +206,14 @@ impl<'a> CashflowEngine<'a> {
                 // the fixing date has passed. Future reset dates remain
                 // stochastic.
                 let coupon_rate = match &self.facility.rate {
-                    RateSpec::Fixed { rate } => {
-                        super::super::utils::fixed_rate_at(self.facility, *rate, sub_start)
-                    }
+                    RateSpec::Fixed { rate } => super::super::schedule_projection::fixed_rate_at(
+                        self.facility,
+                        *rate,
+                        sub_start,
+                    ),
                     RateSpec::Floating(spec) => {
                         let reset_effective = self.reset_effective_at(sub_start);
-                        let fixing_date = super::super::utils::floating_fixing_date(
+                        let fixing_date = super::super::schedule_projection::floating_fixing_date(
                             spec,
                             reset_effective,
                             self.facility.calendar_id.as_deref(),
@@ -228,8 +231,8 @@ impl<'a> CashflowEngine<'a> {
                                     rate
                                 }
                                 _ => {
-                                    let rate = super::super::utils::project_revolver_floating_rate(
-                                        super::super::utils::RevolverFloatingProjection {
+                                    let rate = super::super::schedule_projection::project_revolver_floating_rate(
+                                        super::super::schedule_projection::RevolverFloatingProjection {
                                             accrual_start: period_start,
                                             accrual_end: period_end,
                                             as_of: self.as_of,
@@ -250,7 +253,7 @@ impl<'a> CashflowEngine<'a> {
                                 }
                             }
                         } else {
-                            let params = super::super::utils::floating_params_at(
+                            let params = super::super::schedule_projection::floating_params_at(
                                 self.facility,
                                 spec,
                                 sub_start,
@@ -269,7 +272,7 @@ impl<'a> CashflowEngine<'a> {
                                         let (obs_start, obs_end, obs_accrual) =
                                             self.term_reset_window(period, reset_effective)?;
                                         simulated
-                                            + super::super::utils::index_basis_at(
+                                            + super::super::schedule_projection::index_basis_at(
                                                 reset_effective,
                                                 anchor,
                                                 fwd.as_ref(),

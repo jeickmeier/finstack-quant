@@ -1,13 +1,15 @@
 //! Asian option pricers (Monte Carlo and analytical).
 
-mod analytic;
+pub(crate) mod analytic;
 mod common;
 mod mc;
 #[cfg(test)]
 mod tests;
 
-pub use analytic::{AsianOptionAnalyticalGeometricPricer, AsianOptionSemiAnalyticalTwPricer};
-pub use mc::AsianOptionMcPricer;
+pub(crate) use analytic::{
+    AsianOptionAnalyticalGeometricPricer, AsianOptionSemiAnalyticalTwPricer,
+};
+pub(crate) use mc::AsianOptionMcPricer;
 
 pub(crate) use common::resolve_spot;
 pub(super) use common::{expired_value, map_fixings_to_steps};

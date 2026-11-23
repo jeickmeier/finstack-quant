@@ -3008,7 +3008,7 @@ export interface StatementValuationCut {
   observed_through: DateWire;
 }
 /**
- * Headline DCF assumptions of [`evaluate_dcf`]: discount rate, terminal value,
+ * Headline DCF assumptions of [`evaluate_dcf`](crate::analysis::evaluate_dcf): discount rate, terminal value,
  * cash-flow node and optional net-debt override.
  *
  * The serde form is the host input of `evaluate_dcf`: `wacc` and

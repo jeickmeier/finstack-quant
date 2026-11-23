@@ -20,7 +20,7 @@ impl MetricCalculator for Correlation01Calculator {
         let option: &QuantoOption = context.instrument_as()?;
         let as_of = context.as_of;
 
-        if crate::shared::greeks_expired(option.day_count, as_of, option.expiry)? {
+        if crate::market_inputs::greeks_expired(option.day_count, as_of, option.expiry)? {
             return Ok(0.0);
         }
 

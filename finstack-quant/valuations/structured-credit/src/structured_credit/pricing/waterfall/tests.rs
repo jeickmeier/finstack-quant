@@ -1,5 +1,8 @@
 use super::allocation::{to_currency_units, water_fill_allocation};
 use super::*;
+use crate::structured_credit::types::{CoverageTestAction, RecipientType, WaterfallDistribution};
+use finstack_quant_core::FxHashMap;
+use finstack_quant_core::market_data::context::MarketContext;
 
 #[cfg(test)]
 mod to_currency_units_tests {

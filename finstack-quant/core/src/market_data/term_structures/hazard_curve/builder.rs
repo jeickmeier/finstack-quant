@@ -2,6 +2,11 @@
 
 use super::super::common::{signed_curve_year_fraction, validate_curve_clock};
 use super::*;
+use crate::InputError;
+use crate::currency::Currency;
+use crate::dates::{Date, DayCount};
+use crate::math::interp::exact_f64_eq;
+use crate::types::CurveId;
 
 /// Fluent builder for [`HazardCurve`].
 ///

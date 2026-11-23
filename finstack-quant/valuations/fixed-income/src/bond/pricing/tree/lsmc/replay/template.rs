@@ -137,7 +137,7 @@ impl ReplayTemplate {
                     FloatingRateModel::Overnight(model) => model
                         .sources
                         .values()
-                        .any(|source| matches!(source, OvernightRateSource::Conditional(_))),
+                        .any(|source| matches!(source, ObservedRateSource::Conditional(_))),
                     FloatingRateModel::Term(ObservedRateSource::Fixed(_)) => false,
                 }
         }) {

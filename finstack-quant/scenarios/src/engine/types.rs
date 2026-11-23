@@ -379,7 +379,7 @@ pub struct RollForwardReport {
     /// Calendar days between `old_date` and `new_date`.
     ///
     /// Always a calendar-day span, including under
-    /// [`TimeRollMode::BusinessDays`](crate::spec::TimeRollMode::BusinessDays):
+    /// [`TimeRollMode::BusinessDays`](crate::TimeRollMode::BusinessDays):
     /// the target date is business-day adjusted, but the span back to
     /// `old_date` is still calendar days. Downstream ACT/365F annualization
     /// depends on this.
@@ -399,7 +399,7 @@ pub struct RollForwardReport {
     pub failed_instruments: Vec<(String, String)>,
 }
 
-/// Report describing what happened during [`super::ScenarioEngine::apply`].
+/// Report describing what happened during [`crate::ScenarioEngine::apply`].
 ///
 /// # Examples
 /// ```rust
@@ -509,7 +509,7 @@ impl ApplicationReport {
 /// # Arguments
 ///
 /// * `inventory` - Instruments to encode, typically the shocked copies left in
-///   [`ExecutionContext::instruments`] after [`super::ScenarioEngine::apply`].
+///   [`ExecutionContext::instruments`] after [`crate::ScenarioEngine::apply`].
 ///
 /// # Errors
 ///

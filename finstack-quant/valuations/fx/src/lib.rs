@@ -104,10 +104,10 @@ pub mod fx_variance_swap;
 /// NDF module - Non-deliverable forwards.
 pub mod ndf;
 pub use ndf::conventions::NdfQuoteConvention;
+pub(crate) mod market_inputs;
 /// Quanto option module - Cross-currency quanto options.
 pub mod quanto_option;
-pub(crate) mod shared;
-pub use shared::FxSpotBasis;
+pub use market_inputs::forward::FxSpotBasis;
 
 mod family;
 pub use family::FX;

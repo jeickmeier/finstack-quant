@@ -2,11 +2,12 @@
 
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::{Error, Result};
+use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::fixed_income::ConversionSpec;
 use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     StructuredCredit, StructuredCreditTranche,
 };
-use finstack_quant_valuations::instruments::{ConversionSpec, Instrument};
 use std::sync::Arc;
 
 /// Snapshot of extractable model parameters from an instrument.

@@ -17,7 +17,7 @@
 //! - Turnbull, S. M., & Wakeman, L. M. (1991). "A Quick Algorithm for Pricing
 //!   European Average Options." `docs/REFERENCES.md#turnbull-wakeman-1991`
 
-use crate::CommodityUnderlyingParams;
+use crate::commodity::CommodityUnderlyingParams;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;

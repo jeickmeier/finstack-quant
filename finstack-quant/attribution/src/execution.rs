@@ -98,7 +98,7 @@ impl AttributionSpec {
     /// [`finstack_quant_core::Error::Internal`].
     pub fn execute(&self) -> Result<AttributionResult> {
         contain_panic("execute", || {
-            crate::helpers::validate_attribution_period(
+            crate::pnl_support::validate_attribution_period(
                 self.inputs.as_of_t0,
                 self.inputs.as_of_t1,
             )?;

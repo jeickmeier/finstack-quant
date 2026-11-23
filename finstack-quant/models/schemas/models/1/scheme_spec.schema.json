@@ -5,7 +5,7 @@
   "oneOf": [
     {
       "const": "default",
-      "description": "The process's canonical scheme: its exact transition where one exists,\nquadratic-exponential for square-root variance, Euler otherwise. See\nthe [module table](self#supported-pairs).",
+      "description": "The process's canonical scheme: its exact transition where one exists,\nquadratic-exponential for square-root variance, Euler otherwise. See\nthe [module table](super#supported-pairs).",
       "type": "string"
     },
     {

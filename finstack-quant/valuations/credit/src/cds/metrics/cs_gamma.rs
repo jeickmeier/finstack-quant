@@ -54,7 +54,7 @@
 use crate::cds::CreditDefaultSwap;
 use crate::cs01::with_prepared_cds_risk_context;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::reprice_with_hazard;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_valuations_core::recalibration::{
@@ -73,7 +73,7 @@ impl MetricCalculator for CsGammaCalculator {
 
         // Read bump size from config — same field as CS01 so the Taylor
         // expansion ΔPV ≈ CS01·Δb + ½·CS-Gamma·Δs² uses consistent shocks.
-        let bump_bp = sens_config::resolve(context)?.credit_spread_bump_bp;
+        let bump_bp = bump_config::resolve(context)?.credit_spread_bump_bp;
 
         if bump_bp.abs() <= 1e-10 {
             return Ok(0.0);

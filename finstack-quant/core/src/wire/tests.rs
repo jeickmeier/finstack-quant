@@ -1,5 +1,6 @@
 use super::*;
 use rust_decimal::Decimal;
+use serde::Serialize;
 use serde_json::json;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]

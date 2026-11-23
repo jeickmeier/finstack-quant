@@ -2,7 +2,10 @@
 //! accounts, target OC, step-down, shifting interest, early amortization,
 //! controlled accumulation) layered onto a deal's base waterfall each period.
 
-use super::*;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::money::Money;
+use serde::{Deserialize, Serialize};
 
 /// Declarative, additively-applied waterfall rules layered onto a deal's base
 /// waterfall.

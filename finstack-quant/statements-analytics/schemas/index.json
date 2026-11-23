@@ -92,7 +92,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corporate_dcf_request.schema.json",
-      "bytes": 39159,
+      "bytes": 39190,
       "kind": "input",
       "path": "schemas/statements_analytics/1/corporate_dcf_request.schema.json",
       "summary": "Named cash-flow and terminal assumptions on an explicit statement valuation cut.",

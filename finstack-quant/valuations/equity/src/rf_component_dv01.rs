@@ -8,7 +8,7 @@
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::{
     MetricCalculator, MetricContext, sensitivity_central_diff,
 };
@@ -59,7 +59,7 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
-        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
+        let bump_bp = bump_config::resolve(context)?.rate_bump_bp;
         let delta = bump_bp / 10_000.0;
         let market = context.curves.as_ref();
         let as_of = context.as_of;

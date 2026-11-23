@@ -14,7 +14,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::instruments::{GreekBumps, Instrument};
-use finstack_quant_valuations_core::metrics::sensitivities::config as sensitivities;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use serde::{Deserialize, Serialize};
 
 use super::engine::{
@@ -222,7 +222,7 @@ pub fn convertible_spot_ladder(
     bond.validate_for_pricing()?;
     let market_spot = bond.spot_value(market.get_price(&bond.spot_id)?)?;
     let spots = ladder_spots(market_spot, spots)?;
-    let bumps = GreekBumps::from(&sensitivities::from_context_or_default(
+    let bumps = GreekBumps::from(&bump_config::from_context_or_default(
         &FinstackConfig::default(),
         Some(&bond.metric_pricing_overrides),
     )?);

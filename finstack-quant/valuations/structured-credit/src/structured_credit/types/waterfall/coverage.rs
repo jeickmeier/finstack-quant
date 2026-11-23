@@ -1,8 +1,9 @@
 //! Coverage-test declarations: the collateral valuation rules and the OC,
 //! IC and borrowing-base tests placed as waterfall positions.
 
-use super::*;
+use finstack_quant_core::types::CreditRating;
 use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
 
 /// Collateral valuation rules for the OC tests: rating haircuts, the value
 /// carried for defaulted collateral, the excess-CCC bucket and discount

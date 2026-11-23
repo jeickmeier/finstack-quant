@@ -1,16 +1,31 @@
 //! Discount-curve construction, queries, and forward derivation.
 
+use super::super::common::factor::FactorCore;
 use super::super::common::factor::{dated_points_to_knots, zero_rate_points_to_factors};
 use super::super::common::{
     signed_curve_year_fraction, stable_positive_log_ratio, validate_curve_clock,
 };
-use super::{DiscountCurve, DiscountCurveBuilder};
+use super::DiscountCurveBuilder;
+use super::wire::RawDiscountCurve;
 use crate::math::Compounding;
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, exact_f64_eq};
 use crate::{
     dates::{Date, DayCount},
     types::CurveId,
 };
+
+/// Piece-wise discount factor curve supporting explicit interpolation and tails.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(try_from = "RawDiscountCurve", into = "RawDiscountCurve")]
+pub struct DiscountCurve {
+    pub(crate) id: CurveId,
+    pub(crate) core: FactorCore,
+    /// Exact typed recipe used to replay calibration after quote shocks.
+    pub(crate) rate_calibration: Option<super::super::RateCalibrationRecipe>,
+    /// Opaque FX policy stamp when bootstrap used cross-currency assumptions.
+    pub(crate) fx_policy: Option<String>,
+}
 
 impl DiscountCurve {
     /// Construct a flat continuously-compounded discount curve.

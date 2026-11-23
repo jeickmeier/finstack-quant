@@ -65,7 +65,7 @@ impl ReplayTemplate {
                         if overnight
                             .sources
                             .values()
-                            .any(|source| matches!(source, OvernightRateSource::Conditional(_)))
+                            .any(|source| matches!(source, ObservedRateSource::Conditional(_)))
                         {
                             return Err(Error::Validation(format!(
                                 "Bond '{}' overnight PIK capitalizing on {} still requires unobserved fixings",
@@ -318,7 +318,7 @@ impl ReplayTemplate {
             )?;
             if let FloatingRateModel::Overnight(overnight) = &rate_model {
                 for source in overnight.sources.values() {
-                    if let OvernightRateSource::Conditional(source) = source
+                    if let ObservedRateSource::Conditional(source) = source
                         && source.observation_step > payment_step
                     {
                         return Err(Error::Validation(format!(

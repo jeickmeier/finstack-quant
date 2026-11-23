@@ -4,7 +4,7 @@ use super::{
     BarrierState, barrier_pricing_context, barrier_state, notional_value, validate_monitoring_state,
 };
 use crate::fx_barrier_option::types::FxBarrierOption;
-use crate::shared::FxOptionInputs;
+use crate::market_inputs::FxOptionInputs;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;

@@ -315,6 +315,100 @@ fn stable_sinh_ratio(numerator: f64, denominator: f64) -> f64 {
     (numerator - denominator).exp() * num_term / den_term
 }
 
+/// Build and evaluate a uniform Almgren-Chriss market-impact estimate.
+///
+/// The model's impact coefficients are derived from `avg_daily_volume` using
+/// the same empirical calibration as [`AlmgrenChrissModel::from_profile`],
+/// evaluated on a synthetic profile with a 0.2% (20 bp) proportional
+/// bid-ask spread around the reference price:
+///
+/// ```text
+/// gamma = permanent_impact_coef × spread / (2 · ADV)      // spread = 0.002 · mid
+/// eta   = temporary_impact_coef × volatility · mid / √ADV
+/// ```
+///
+/// so `permanent_impact_coef` and `temporary_impact_coef` are dimensionless
+/// multipliers on the ADV-derived base calibration (`1.0` keeps the base
+/// calibration; `0.0` disables that component), and a deeper market (larger
+/// ADV) produces a strictly smaller impact cost, all else equal. Callers who
+/// have externally calibrated *absolute* `gamma`/`eta` coefficients should
+/// construct [`AlmgrenChrissModel::new`] directly instead.
+///
+/// # Arguments
+///
+/// * `position_size` - Signed quantity to execute; its sign determines trade
+///   direction while its magnitude determines participation.
+/// * `avg_daily_volume` - Positive average daily tradable volume in the same
+///   quantity units as `position_size`. Feeds the coefficient calibration
+///   above.
+/// * `volatility` - Positive daily volatility as a decimal fraction.
+/// * `execution_horizon_days` - Intended execution horizon in trading days.
+/// * `permanent_impact_coef` - Dimensionless multiplier on the ADV-derived
+///   permanent-impact calibration.
+/// * `temporary_impact_coef` - Dimensionless multiplier on the ADV-derived
+///   temporary-impact calibration; must be positive.
+/// * `reference_price` - Optional positive mid price; `None` uses unit price
+///   and reports scale-free impact.
+///
+/// # Errors
+///
+/// Returns an error when the liquidity inputs are not finite and positive, or
+/// when the underlying model/profile validation fails.
+pub fn almgren_chriss_impact(
+    position_size: f64,
+    avg_daily_volume: f64,
+    volatility: f64,
+    execution_horizon_days: f64,
+    permanent_impact_coef: f64,
+    temporary_impact_coef: f64,
+    reference_price: Option<f64>,
+) -> Result<ImpactEstimate> {
+    if !avg_daily_volume.is_finite() || avg_daily_volume <= 0.0 {
+        return Err(invalid_input(
+            "avg_daily_volume must be finite and positive",
+        ));
+    }
+    if !volatility.is_finite() || volatility <= 0.0 {
+        return Err(invalid_input("volatility must be finite and positive"));
+    }
+    if let Some(price) = reference_price
+        && (!price.is_finite() || price <= 0.0)
+    {
+        return Err(invalid_input("reference_price must be finite and positive"));
+    }
+
+    let mid = reference_price.unwrap_or(1.0);
+    let profile = LiquidityProfile::new(
+        "AC_CALIBRATION",
+        mid,
+        mid * 0.999,
+        mid * 1.001,
+        avg_daily_volume,
+        1.0,
+        0.0,
+    )?;
+    // Route ADV into the coefficients via the `from_profile` calibration
+    // (gamma = spread / (2·ADV), eta = σ·mid / √ADV); the caller's
+    // coefficients scale that base multiplicatively. Previously the raw
+    // coefficients were used directly, leaving `avg_daily_volume` validated
+    // but inert — ADV 1e6 and 1e9 produced bit-identical costs.
+    let base = AlmgrenChrissModel::from_profile(&profile, volatility)?;
+    let model = AlmgrenChrissModel::new(
+        permanent_impact_coef * base.gamma(),
+        temporary_impact_coef * base.eta(),
+        0.5,
+    )?;
+    let params = TradeParams {
+        quantity: position_size,
+        horizon_days: execution_horizon_days,
+        daily_volatility: volatility,
+        profile,
+        risk_aversion: None,
+        reference_price,
+    };
+    model.estimate_cost(&params)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

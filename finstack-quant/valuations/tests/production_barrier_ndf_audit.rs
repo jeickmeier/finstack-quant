@@ -13,8 +13,9 @@ use finstack_quant_core::{
     money::Money,
     types::BarrierType,
 };
+use finstack_quant_valuations::instruments::fx::NdfQuoteConvention;
 use finstack_quant_valuations::instruments::{
-    Instrument, NdfQuoteConvention, exotics::barrier_option::BarrierOption, fx::ndf::Ndf,
+    Instrument, exotics::barrier_option::BarrierOption, fx::ndf::Ndf,
 };
 use time::macros::date;
 

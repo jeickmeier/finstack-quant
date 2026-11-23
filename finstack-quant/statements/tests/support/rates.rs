@@ -4,8 +4,9 @@ use finstack_quant_core::{
     money::Money,
     types::{CurveId, InstrumentId},
 };
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
-use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec, PayReceive};
+use finstack_quant_valuations::instruments::rates::{FixedLegSpec, FloatLegSpec};
 use rust_decimal::Decimal;
 
 pub fn usd_irs_swap(

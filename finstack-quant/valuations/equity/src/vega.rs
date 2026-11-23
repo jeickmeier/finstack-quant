@@ -3,7 +3,7 @@
 //! Provides parallel and key-rate vega calculators for instruments with volatility surfaces.
 
 use finstack_quant_core::math::summation::NeumaierAccumulator;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::{
     MetricCalculator, MetricContext, MetricId, VOL_POINTS_PER_ABSOLUTE_VOL,
     apply_parallel_surface_bumps_in_place, bumped_volatility_override_dyn,
@@ -96,7 +96,7 @@ impl KeyRateVega {
 impl MetricCalculator for KeyRateVega {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let instrument = context.instrument.as_ref();
-        let defaults = sens_config::resolve(context)?;
+        let defaults = bump_config::resolve(context)?;
 
         let dependencies = instrument.market_dependencies()?;
         let vol_surface_ids = if volatility_override(instrument).is_some() {

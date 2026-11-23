@@ -14,7 +14,7 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
 use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::{
     Cs01Request, compute_key_rate_cs01_series_with_context_raw,
     compute_parallel_cs01_with_context_raw, cs01_reval, resolve_optional_cs01_curves,
@@ -163,7 +163,7 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         with_prepared_cds_risk_context::<I>(context, None, "CS01", |context, prepared| {
-            let bump_bp = sens_config::resolve(context)?.credit_spread_bump_bp;
+            let bump_bp = bump_config::resolve(context)?.credit_spread_bump_bp;
             let reval = cs01_reval(context);
             let request = prepared.cs01_request(bump_bp);
             let cs01 = compute_parallel_cs01_with_context_raw(
@@ -203,7 +203,7 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         with_prepared_cds_risk_context::<I>(context, None, "bucketed CS01", |context, prepared| {
-            let defaults = sens_config::resolve(context)?;
+            let defaults = bump_config::resolve(context)?;
             let bump_bp = defaults.credit_spread_bump_bp;
             let series_id =
                 MetricId::composite(&MetricId::BucketedCs01, &[prepared.hazard_id.as_str()]);

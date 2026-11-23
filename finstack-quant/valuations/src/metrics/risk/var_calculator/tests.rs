@@ -1,13 +1,19 @@
 use super::*;
 use crate::instruments::Instrument;
+use crate::metrics::risk::{MarketHistory, apply_market_scenario};
 use crate::metrics::risk::{MarketScenario, RiskFactorShift, RiskFactorType};
+use crate::pricer::PricingDispatch;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::{FxConversionPolicy, FxQuery};
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::CurveId;
+use finstack_quant_valuations_core::metrics::risk::{VarConfig, VarMethod};
 use std::sync::Arc;
 use time::macros::date;
 

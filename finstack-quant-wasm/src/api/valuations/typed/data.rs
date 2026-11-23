@@ -24,7 +24,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, CoverageRules, CoverageTestSpec, LiquidationSpec, PenaltyStep, PoolAsset,
     PrepaymentPenalty, Tranche, TrancheCashflows, TrancheStructure, Waterfall,
 };
-use finstack_quant_valuations::instruments::{MertonMcConfig, PikSchedule};
+use finstack_quant_valuations::instruments::fixed_income::{MertonMcConfig, PikSchedule};
 use wasm_bindgen::prelude::*;
 
 // ---------------------------------------------------------------------------

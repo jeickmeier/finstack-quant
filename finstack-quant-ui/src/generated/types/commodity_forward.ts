@@ -493,7 +493,7 @@ export interface DA38276Db343Bce9463B5 {
  * ```rust
  * use finstack_quant_valuations_exotics::commodity::commodity_forward::CommodityForward;
  * use finstack_quant_valuations_core::instruments::Position;
- * use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
+ * use finstack_quant_valuations_exotics::commodity::CommodityUnderlyingParams;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::types::{CurveId, InstrumentId};

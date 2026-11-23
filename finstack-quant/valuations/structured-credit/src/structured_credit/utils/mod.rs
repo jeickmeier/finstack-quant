@@ -7,4 +7,4 @@
 pub(crate) mod amortization;
 pub(crate) mod validation;
 
-pub use validation::{ValidationError, validate_tiers};
+pub(crate) use validation::validate_tiers;

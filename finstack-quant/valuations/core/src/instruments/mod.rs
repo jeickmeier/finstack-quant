@@ -99,13 +99,14 @@ pub use breakeven::{BreakevenConfig, BreakevenMode, BreakevenTarget};
 pub use dependencies::{
     FxPair, InstrumentCurves, MarketDependencies, RatesCurveKind, VolatilityDependency,
 };
-pub use pricing::trs::{
+pub use pricing::trs::engine::{
     FinancingLegFlows, PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
 };
-pub use traits::{
-    GreekBumps, Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
-    OptionGreeksRequest, PricingOptions,
+pub use traits::instrument::Instrument;
+pub use traits::option_greeks::{
+    GreekBumps, OptionGreekKind, OptionGreeks, OptionGreeksProvider, OptionGreeksRequest,
 };
+pub use traits::pricing_options::PricingOptions;
 
 pub use legs::FinancingLegSpec;
 pub use legs::PayReceive;
@@ -117,11 +118,11 @@ pub use parameters::quanto::QuantoSpec;
 
 pub use parameters::trs_common::TrsScheduleSpec;
 
-pub use listed::future_option::FutureOptionExercise;
-pub use listed::future_option::FutureOptionModel;
-pub use listed::future_option::FutureOptionPremiumStyle;
-pub use listed::future_option::FutureOptionSettlement;
-pub use listed::future_option::FutureOptionTerms;
+pub use listed::future_option::types::FutureOptionExercise;
+pub use listed::future_option::types::FutureOptionModel;
+pub use listed::future_option::types::FutureOptionPremiumStyle;
+pub use listed::future_option::types::FutureOptionSettlement;
+pub use listed::future_option::types::FutureOptionTerms;
 pub use listed::terms::ListedFutureSettlement;
 pub use listed::terms::ListedFutureTerms;
 

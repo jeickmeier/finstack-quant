@@ -652,6 +652,36 @@ impl MetricContext {
     }
 }
 
+// Error helper functions
+
+/// Create a typed NotFound error for a missing metric.
+///
+/// Use this when a metric dependency or required metric is not available.
+///
+/// # Arguments
+///
+/// * `metric` - Required metric identifier that was absent from a valuation
+///   result or dependency set; it is embedded in the returned `metric:` ID.
+///
+/// # Examples
+///
+/// ```
+/// use finstack_quant_valuations_core::metrics::{metric_not_found, MetricId};
+/// use finstack_quant_core::Result;
+/// use finstack_quant_core::FxHashMap;
+///
+/// fn get_metric(id: MetricId, results: &FxHashMap<MetricId, f64>) -> Result<f64> {
+///     results.get(&id).copied().ok_or_else(|| metric_not_found(id))
+/// }
+/// ```
+#[inline]
+pub fn metric_not_found(metric: MetricId) -> finstack_quant_core::Error {
+    finstack_quant_core::InputError::NotFound {
+        id: format!("metric:{metric}"),
+    }
+    .into()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

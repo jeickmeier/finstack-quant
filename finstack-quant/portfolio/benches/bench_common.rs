@@ -33,14 +33,18 @@ use finstack_quant_models::types::{ExerciseStyle, OptionType};
 use finstack_quant_portfolio::Portfolio;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
-use finstack_quant_valuations::instruments::CreditParams;
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::SettlementType;
+use finstack_quant_valuations::instruments::credit_derivatives::CreditParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
     CdsOption, CdsOptionParams,
 };
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
+use finstack_quant_valuations::instruments::credit_derivatives::{
+    PremiumLegSpec, ProtectionLegSpec,
+};
 use finstack_quant_valuations::instruments::equity::equity_option::{
     EquityOption, EquityOptionMarketData, EquityOptionParams,
 };
@@ -54,6 +58,9 @@ use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond:
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
 };
+use finstack_quant_valuations::instruments::fixed_income::{
+    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
+};
 use finstack_quant_valuations::instruments::fx::fx_option::{
     FxDeltaConvention, FxDeltaConventionKind, FxOption,
 };
@@ -62,10 +69,6 @@ use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::rates::inflation_swap::InflationSwap;
 use finstack_quant_valuations::instruments::rates::repo::{CollateralSpec, CollateralType, Repo};
 use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
-use finstack_quant_valuations::instruments::{
-    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
-};
-use finstack_quant_valuations::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
 use finstack_quant_valuations::market::conventions::{CdsConvention, CdsValuationConvention};
 use finstack_quant_valuations::results::structured_credit::TrancheSeniority;
 use rust_decimal_macros::dec;
@@ -742,7 +745,8 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let cds_id = format!("CDS_{}", i);
         let convention = CdsConvention::IsdaNa;
         let premium = PremiumLegSpec {
-            date_regime: finstack_quant_valuations::instruments::CdsDateRegime::Standard,
+            date_regime:
+                finstack_quant_valuations::instruments::credit_derivatives::CdsDateRegime::Standard,
             start: base,
             end: maturity_5y(),
             frequency: convention.get_spec().expect("CDS registry").frequency,
@@ -870,7 +874,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let swaption_id = format!("SWAPTION_{}", i);
         let expiry = Date::from_calendar_date(2026, Month::July, 1).unwrap();
         let swap_end = Date::from_calendar_date(2030, Month::July, 1).unwrap();
-        let fixed = finstack_quant_valuations::instruments::FixedLegSpec {
+        let fixed = finstack_quant_valuations::instruments::rates::FixedLegSpec {
             discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
             rate: rust_decimal::Decimal::try_from(0.04).expect("valid literal"),
             frequency: Tenor::semi_annual(),
@@ -884,7 +888,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             payment_lag_days: 0,
             end_of_month: false,
         };
-        let float = finstack_quant_valuations::instruments::FloatLegSpec {
+        let float = finstack_quant_valuations::instruments::rates::FloatLegSpec {
             discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
             index_id: "USD-SOFR-3M".into(),
             forward_curve_id: finstack_quant_core::types::CurveId::new("USD-SOFR-3M"),
@@ -909,7 +913,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             .expiry(expiry)
             .settlement(SettlementType::Physical)
             .cash_settlement_method(CashSettlementMethod::default())
-            .vol_model(finstack_quant_valuations::instruments::VolatilityModel::Black)
+            .vol_model(finstack_quant_valuations::instruments::rates::VolatilityModel::Black)
             .vol_surface_id(finstack_quant_core::types::CurveId::new("SWAPTION-VOL"))
             .underlying_fixed_leg(fixed)
             .underlying_float_leg(float)
@@ -1075,13 +1079,14 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             tranche_id.clone(),
             &tranche_params,
             &schedule_params,
-            finstack_quant_valuations::instruments::CdsDateRegime::Bespoke,
+            finstack_quant_valuations::instruments::credit_derivatives::CdsDateRegime::Bespoke,
             "USD-OIS",
             "CORP-HAZARD",
             PayReceive::Pay,
         )
         .expect("Valid tranche parameters");
-        tranche.date_regime = finstack_quant_valuations::instruments::CdsDateRegime::Standard;
+        tranche.date_regime =
+            finstack_quant_valuations::instruments::credit_derivatives::CdsDateRegime::Standard;
         tranche.stub = finstack_quant_core::dates::StubKind::ShortBack;
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(

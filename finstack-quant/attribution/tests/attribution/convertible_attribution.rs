@@ -23,7 +23,7 @@ use finstack_quant_attribution::{
 use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
-use finstack_quant_valuations::instruments::{
+use finstack_quant_valuations::instruments::fixed_income::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
 };
 use finstack_quant_valuations::metrics::MetricId;

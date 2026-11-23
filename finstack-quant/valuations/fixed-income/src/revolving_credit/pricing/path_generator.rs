@@ -54,7 +54,7 @@ use finstack_quant_cashflows::builder::RateSpec;
 /// * `market` - Market context for curves
 /// * `payment_dates` - Observation dates on which factor state is recorded:
 ///   the contractual accrual boundaries plus term-index reset dates (see
-///   `utils::build_observation_dates`), sorted ascending.
+///   `schedule_projection::build_observation_dates`), sorted ascending.
 /// * `as_of` - Valuation date; simulation starts here (not at the commitment
 ///   date) with the facility's current utilization as the known t₀ state.
 ///   Observation dates at or before `as_of` record the t₀ state.
@@ -132,7 +132,7 @@ pub(crate) fn generate_three_factor_paths(
         RateSpec::Fixed { rate } => (InterestRateSpec::Fixed { rate: *rate }, None, 0.0),
         RateSpec::Floating(spec) => {
             let overnight =
-                crate::revolving_credit::utils::resolved_overnight_compounding_for_index(
+                crate::revolving_credit::schedule_projection::resolved_overnight_compounding_for_index(
                     spec.forward_curve_id.as_str(),
                     spec.compounding.as_ref(),
                 )?;
@@ -871,7 +871,8 @@ mod tests {
             antithetic: false,
         };
         let dates =
-            crate::revolving_credit::utils::build_accrual_boundary_dates(&facility).expect("dates");
+            crate::revolving_credit::schedule_projection::build_accrual_boundary_dates(&facility)
+                .expect("dates");
 
         let paths = generate_three_factor_paths(
             &stochastic,

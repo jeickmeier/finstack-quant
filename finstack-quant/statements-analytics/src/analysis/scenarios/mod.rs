@@ -16,13 +16,4 @@ pub(crate) mod sensitivity;
 pub(crate) mod types;
 pub(crate) mod variance;
 
-pub use scenario_set::{ScenarioDefinition, ScenarioDiff, ScenarioResults, ScenarioSet};
-pub use sensitivity::{generate_tornado_entries, run_sensitivity};
-pub use types::{
-    ParameterSpec, SensitivityConfig, SensitivityMode, SensitivityResult, SensitivityScenario,
-    TornadoEntry,
-};
-pub use variance::{
-    BridgeChart, BridgeStep, VarianceConfig, VarianceReport, VarianceRow, run_variance,
-    variance_bridge,
-};
+pub(crate) use types::TornadoEntry;

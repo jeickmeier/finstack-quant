@@ -1,7 +1,7 @@
 //! Generic sequential bootstrapping algorithm.
 
-use super::helpers::BracketDiagnostics;
-use super::helpers::{ScanStrategy, bracket_solve_1d};
+use super::bracketing::BracketDiagnostics;
+use super::bracketing::{ScanStrategy, bracket_solve_1d};
 use super::traits::BootstrapTarget;
 use crate::constants::{OBJECTIVE_VALID_ABS_MAX, RESIDUAL_PENALTY_ABS_MIN};
 use crate::report::{CalibrationDiagnostics, QuoteQuality};
@@ -309,7 +309,7 @@ fn validate_and_commit_knot<T: BootstrapTarget>(
 /// is preserved.
 ///
 /// The algorithm uses a scan-then-bracket approach (see
-/// [`bracket_solve_1d`](super::helpers)):
+/// [`bracket_solve_1d`](super::bracketing)):
 /// 1. **Scan**: Evaluates the objective on a caller-supplied grid to find a
 ///    sign-change bracket (the bracket whose midpoint is closest to the
 ///    initial guess wins).
@@ -590,7 +590,7 @@ where
 {
     let resid_values: Vec<f64> = residuals.values().copied().collect();
     let n = residuals.len();
-    let bump_h = super::helpers::diagnostics_bump_h(config);
+    let bump_h = super::bracketing::diagnostics_bump_h(config);
 
     let mut per_quote = Vec::with_capacity(n);
 

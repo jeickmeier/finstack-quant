@@ -19,14 +19,11 @@
 mod copula_based;
 mod factor_correlated;
 mod intensity_process;
-mod per_name;
-mod spec;
-mod traits;
+pub(crate) mod per_name;
+pub(crate) mod spec;
+pub(crate) mod traits;
 
 pub(crate) use copula_based::CopulaBasedDefault;
 pub(crate) use factor_correlated::FactorCorrelatedDefault;
 pub(crate) use intensity_process::IntensityProcessDefault;
-pub use per_name::PerNameCopulaDefault;
-pub use per_name::PoolGranularity;
-pub use spec::StochasticDefaultSpec;
-pub use traits::StochasticDefault;
+pub(crate) use traits::StochasticDefault;

@@ -8,7 +8,7 @@
 //!
 //! - [`CallableRangeAccrual`](crate::exotics::callable_range_accrual::CallableRangeAccrual) for instrument definition
 //! - [`crate::exotics::range_accrual::RangeAccrual`] for the underlying range accrual leg
-//! - [`crate::BermudanCallProvision`]
+//! - [`crate::exotics::BermudanCallProvision`]
 
 pub(crate) mod metrics;
 pub(crate) mod pricer;

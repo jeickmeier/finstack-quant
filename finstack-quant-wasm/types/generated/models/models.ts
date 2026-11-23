@@ -1309,7 +1309,7 @@ export type OptionGreeks =
  * Stochastic process to simulate, with its parameters.
  *
  * Serialized as an internally tagged object: `{"type": "gbm", "r": 0.03, ...}`.
- * Parameters are re-validated when [`simulate_paths`] runs, so a spec read
+ * Parameters are re-validated when [`simulate_paths`](super::simulate_paths) runs, so a spec read
  * from JSON cannot bypass the range checks of the Rust constructors.
  */
 export type ProcessSpec =

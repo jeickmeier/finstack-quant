@@ -1,10 +1,11 @@
 //! Historical SIMM v2.6 paragraph 11: scale expiries before factor netting.
 
-use super::{
-    SIMM_CURVATURE_Z, SimmBucketDetail, SimmCalculator, SimmComponentDetail, SimmCreditSector,
-    SimmRiskClass, SimmWeightedSensitivity, correlated_norm, inter_bucket_pairwise,
-};
+use super::calculator::SimmCalculator;
+use super::params::SIMM_CURVATURE_Z;
+use crate::calculators::traits::{SimmBucketDetail, SimmComponentDetail, SimmWeightedSensitivity};
+use crate::regulatory::frtb::aggregation::{correlated_norm, inter_bucket_pairwise};
 use crate::types::simm_curvature::{fx_pair, tenor_days};
+use crate::types::{SimmCreditSector, SimmRiskClass};
 use crate::types::{SimmCurvatureSensitivity, commodity_bucket_id, ordered_tenor_pair};
 use finstack_quant_core::{Error, FxHashMap, Result, currency::Currency};
 

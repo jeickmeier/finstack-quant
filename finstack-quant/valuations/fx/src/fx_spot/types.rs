@@ -201,7 +201,7 @@ impl FxSpot {
                 )));
             };
             let calendar = calendar_by_id_strict(&format!("{base}+{quote}"))?;
-            crate::shared::spot_date_from_lag(as_of, settlement_days, calendar)
+            crate::market_inputs::spot_date_from_lag(as_of, settlement_days, calendar)
         }
     }
 
@@ -337,8 +337,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
         self.validate_economics()?;
         let settle_date = self.effective_settlement_date(as_of)?;
 
-        if crate::shared::event_has_occurred(settle_date, as_of) {
-            return crate::shared::settled_schedule(self.notional()?);
+        if crate::market_inputs::event_has_occurred(settle_date, as_of) {
+            return crate::market_inputs::settled_schedule(self.notional()?);
         }
 
         let flows = {

@@ -3,7 +3,6 @@
 //! Computes Recovery01 (recovery rate sensitivity) using finite differences.
 //! Recovery01 measures the change in PV for a 1% (100bp) change in recovery rate.
 
-use super::effective_recovery;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
@@ -68,5 +67,17 @@ impl MetricCalculator for Recovery01Calculator {
         };
 
         Ok(recovery01)
+    }
+}
+
+/// Recovery rate a bumped spec actually applies: the flat `rate`, or one
+/// minus the average of the severity vector when it is present. Used by the
+/// recovery/severity sensitivities to measure the achieved bump width.
+fn effective_recovery(spec: &finstack_quant_cashflows::builder::RecoveryModelSpec) -> f64 {
+    match &spec.severity_vector {
+        Some(severities) if !severities.is_empty() => {
+            1.0 - severities.iter().sum::<f64>() / severities.len() as f64
+        }
+        _ => spec.rate,
     }
 }

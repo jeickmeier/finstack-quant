@@ -348,9 +348,10 @@ pub(super) fn bond_workout_ladder() -> Result<Vec<Value>> {
 
 /// The quote set of the example bond at 98.5 clean on a sloping curve.
 pub(super) fn bond_quote_set() -> Result<Vec<Value>> {
+    use crate::instruments::PricingOptions;
+    use crate::instruments::fixed_income::BondQuoteInput;
     use crate::instruments::fixed_income::bond::Bond;
     use crate::instruments::fixed_income::bond::pricing::quote_conversions;
-    use crate::instruments::{BondQuoteInput, PricingOptions};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
 
@@ -375,7 +376,7 @@ pub(super) fn bond_quote_set() -> Result<Vec<Value>> {
 
 /// A quote of each form: a price, a yield and a spread.
 pub(super) fn bond_quote_input() -> Result<Vec<Value>> {
-    use crate::instruments::BondQuoteInput;
+    use crate::instruments::fixed_income::BondQuoteInput;
 
     [
         BondQuoteInput::CleanPricePct(98.5),

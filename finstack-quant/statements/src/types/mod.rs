@@ -13,11 +13,11 @@ pub use forecast_params::{
     ForecastBootstrapMode, ForecastFadeShape, ForecastSpec, ForecastTrendMethod, GrowthPctParams,
     MeanRevertingParams, OverrideParams, SeasonalParams, TimeSeriesParams,
 };
-pub(crate) use model::validated_explicit_value_type;
-pub use model::{
-    CapitalFxPolicy, CapitalStructureSpec, DebtInstrumentSpec, FINANCIAL_MODEL_CONTRACT,
-    FinancialModelSpec, FinancialStatementInstrument,
+pub use model::capital_structure::{
+    CapitalFxPolicy, CapitalStructureSpec, DebtInstrumentSpec, FinancialStatementInstrument,
 };
+pub use model::spec::{FINANCIAL_MODEL_CONTRACT, FinancialModelSpec};
+pub(crate) use model::validated_explicit_value_type;
 pub use node::{
     ForecastMethod, NodeId, NodeSpec, NodeType, NodeValueType, RollupMethod, SeasonalMode,
 };

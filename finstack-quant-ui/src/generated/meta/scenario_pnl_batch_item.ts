@@ -102,7 +102,7 @@ export default [
   {
     "path": "#/$defs/d_1ae797ba5cedb9641672",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json#/$defs/ApplicationReport",
-    "description": "Report describing what happened during [`super::ScenarioEngine::apply`].\n\n# Examples\n```rust\nuse finstack_quant_scenarios::ApplicationReport;\n\nlet report = ApplicationReport {\n    operations_applied: 3,\n    user_operations: 1,\n    expanded_operations: 3,\n    changes: Default::default(),\n    applied_shocks: vec![],\n    warnings: vec![],\n    meta: None,\n    time_roll: None,\n};\n\nassert_eq!(report.operations_applied, 3);\nassert_eq!(report.user_operations, 1);\nassert_eq!(report.expanded_operations, 3);\n```"
+    "description": "Report describing what happened during [`crate::ScenarioEngine::apply`].\n\n# Examples\n```rust\nuse finstack_quant_scenarios::ApplicationReport;\n\nlet report = ApplicationReport {\n    operations_applied: 3,\n    user_operations: 1,\n    expanded_operations: 3,\n    changes: Default::default(),\n    applied_shocks: vec![],\n    warnings: vec![],\n    meta: None,\n    time_roll: None,\n};\n\nassert_eq!(report.operations_applied, 3);\nassert_eq!(report.user_operations, 1);\nassert_eq!(report.expanded_operations, 3);\n```"
   },
   {
     "path": "#/$defs/d_1ae797ba5cedb9641672/properties/applied_shocks",
@@ -1621,7 +1621,7 @@ export default [
   {
     "path": "#/$defs/d_e522e5edf7d16d48a413/properties/days",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json#/$defs/RollForwardReport/properties/days",
-    "description": "Calendar days between `old_date` and `new_date`.\n\nAlways a calendar-day span, including under\n[`TimeRollMode::BusinessDays`](crate::spec::TimeRollMode::BusinessDays):\nthe target date is business-day adjusted, but the span back to\n`old_date` is still calendar days. Downstream ACT/365F annualization\ndepends on this.",
+    "description": "Calendar days between `old_date` and `new_date`.\n\nAlways a calendar-day span, including under\n[`TimeRollMode::BusinessDays`](crate::TimeRollMode::BusinessDays):\nthe target date is business-day adjusted, but the span back to\n`old_date` is still calendar days. Downstream ACT/365F annualization\ndepends on this.",
     "format": "int32"
   },
   {

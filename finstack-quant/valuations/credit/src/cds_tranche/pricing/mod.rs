@@ -61,8 +61,8 @@ mod expected_loss;
 mod heterogeneous;
 mod integration;
 mod pool;
-mod prepared;
-mod pricer;
+pub(crate) mod prepared;
+pub(crate) mod pricer;
 mod sensitivities;
 
 #[cfg(test)]
@@ -76,5 +76,4 @@ mod performance_diagnostics;
 #[path = "../../../tests/performance/calibration.rs"]
 mod calibration_performance_diagnostics;
 
-pub use prepared::PreparedTranche;
-pub use pricer::CdsTranchePricer;
+pub(crate) use pricer::CdsTranchePricer;

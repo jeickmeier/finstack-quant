@@ -7,7 +7,7 @@ use super::bump::{
 #[cfg(doc)]
 use crate::instruments::Instrument;
 use crate::metrics::finite_difference::{VOL_POINTS_PER_ABSOLUTE_VOL, active_minimum_vol};
-use crate::metrics::sensitivities::config as sens_config;
+use crate::metrics::sensitivities::bump_config;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
 
@@ -31,7 +31,7 @@ pub struct GenericFdDelta;
 impl MetricCalculator for GenericFdDelta {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let as_of = context.as_of;
-        let defaults = sens_config::resolve(context)?;
+        let defaults = bump_config::resolve(context)?;
 
         let dependencies = context.instrument.market_dependencies()?;
         let spot_id = spot_id(&dependencies, "delta")?.clone();
@@ -88,7 +88,7 @@ pub struct GenericFdVega;
 impl MetricCalculator for GenericFdVega {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let as_of = context.as_of;
-        let defaults = sens_config::resolve(context)?;
+        let defaults = bump_config::resolve(context)?;
 
         let dependencies = context.instrument.market_dependencies()?;
         let vol_surface_ids = bumped_vol_surface_ids(

@@ -54,7 +54,7 @@ impl RevolvingCredit {
                 break;
             }
             if event.date > anchor {
-                balance = super::super::utils::apply_draw_repay_event(
+                balance = super::super::schedule_projection::apply_draw_repay_event(
                     balance,
                     event,
                     self.commitment_at(event.date),

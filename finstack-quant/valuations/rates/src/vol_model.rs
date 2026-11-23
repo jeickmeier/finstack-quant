@@ -36,3 +36,8 @@ impl std::str::FromStr for VolatilityModel {
         }
     }
 }
+
+/// Finite-difference step for Hull-White short-rate σ sensitivities
+/// (`MetricId::HwSigmaVega`): an **absolute** shift of 1e-4 (1bp of annual
+/// short-rate volatility). Results are reported per 0.01 absolute σ.
+pub(crate) const HW_SIGMA_BUMP: f64 = 1e-4;

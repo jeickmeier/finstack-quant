@@ -43,5 +43,5 @@ pub use assignment::{FactorAssignmentReport, PositionAssignment, UnmatchedEntry}
 pub use credit_vol_report::{
     CreditVolReport, LevelVolContribution, PositionVolContribution, build_credit_vol_report,
 };
-pub use model::FactorModel;
+pub use model::engine::FactorModel;
 pub use whatif::{FactorContributionDelta, PositionChange, StressPnl, StressResult, WhatIfResult};

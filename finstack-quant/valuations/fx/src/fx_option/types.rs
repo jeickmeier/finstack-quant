@@ -218,7 +218,7 @@ impl FxOptionDelivery {
 #[serde(deny_unknown_fields)]
 pub struct FxOption {
     /// Selected spot quote's fixed value-date basis.
-    pub spot_basis: crate::shared::FxSpotBasis,
+    pub spot_basis: crate::market_inputs::FxSpotBasis,
     /// Booked payoff and settlement profile.
     pub delivery: FxOptionDelivery,
     /// Unique instrument identifier
@@ -290,7 +290,7 @@ pub struct FxOption {
 #[serde(deny_unknown_fields)]
 pub struct FxOptionParams {
     /// Selected spot quote's fixed value-date basis.
-    pub spot_basis: crate::shared::FxSpotBasis,
+    pub spot_basis: crate::market_inputs::FxSpotBasis,
     /// Booked payoff and settlement profile.
     pub delivery: FxOptionDelivery,
     /// Unique instrument identifier.
@@ -368,12 +368,12 @@ impl FxOption {
 
     /// Create a canonical example FX option for testing and documentation.
     ///
-    /// Returns an EUR/USD call expiring on the stable FX example epoch (`crate::shared::FAR_EXPIRY`). The
+    /// Returns an EUR/USD call expiring on the stable FX example epoch (`crate::market_inputs::FAR_EXPIRY`). The
     /// example is intentionally future-dated so docs and demos hit the live
     /// pricing path rather than the expired-option intrinsic-only branch.
     pub fn example() -> finstack_quant_core::Result<Self> {
         Self::builder()
-            .spot_basis(crate::shared::FxSpotBasis::Cash)
+            .spot_basis(crate::market_inputs::FxSpotBasis::Cash)
             .delivery(FxOptionDelivery::CashAtExpiry)
             .id(InstrumentId::new("FXOPT-EURUSD-CALL"))
             .base_currency(Currency::EUR)
@@ -385,7 +385,7 @@ impl FxOption {
                 Currency::USD,
                 "generic_interbank",
             )?)
-            .expiry(crate::shared::FAR_EXPIRY)
+            .expiry(crate::market_inputs::FAR_EXPIRY)
             .day_count(DayCount::Act365F)
             .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -590,7 +590,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxOption {
         as_of: finstack_quant_core::dates::Date,
     ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
         // FxOption always resolves its spot through the FX matrix.
-        Some(crate::shared::fx_valuation_details(
+        Some(crate::market_inputs::fx_valuation_details(
             market,
             self.base_currency,
             self.quote_currency,
@@ -660,8 +660,8 @@ impl FxOption {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
         requested_bump_abs: f64,
-    ) -> finstack_quant_core::Result<Option<crate::shared::VolScenarios<Self>>> {
-        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
+    ) -> finstack_quant_core::Result<Option<crate::market_inputs::VolScenarios<Self>>> {
+        if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(None);
         }
 
@@ -672,9 +672,9 @@ impl FxOption {
         {
             finstack_quant_valuations_core::instruments::pricing::volatility::validate_sigma(iv)?
         } else {
-            crate::shared::collect_fx_option_inputs(crate::fx_option::pricer::input_request(
-                self, market, as_of,
-            ))?
+            crate::market_inputs::collect_fx_option_inputs(
+                crate::fx_option::pricer::input_request(self, market, as_of),
+            )?
             .sigma
         };
         if sigma <= 0.0 {
@@ -790,7 +790,7 @@ mod validation_tests {
                 FxDeltaConvention::new(FxDeltaConventionKind::Forward, Currency::USD, "test")
                     .expect("valid delta convention"),
             )
-            .expiry(crate::shared::FAR_EXPIRY)
+            .expiry(crate::market_inputs::FAR_EXPIRY)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("USD-OIS"))

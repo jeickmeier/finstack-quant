@@ -520,7 +520,8 @@ impl Ndf {
         // settlement date from spot; the fixing steps back from it.
         let joint_cal =
             calendar_by_id_strict(&format!("{base_calendar_id}+{settlement_calendar_id}"))?;
-        let spot_date = crate::shared::spot_date_from_lag(trade_date, settlement_days, joint_cal)?;
+        let spot_date =
+            crate::market_inputs::spot_date_from_lag(trade_date, settlement_days, joint_cal)?;
         let maturity = finstack_quant_core::dates::fx::fx_forward_date(
             spot_date,
             tenor,
@@ -680,7 +681,7 @@ impl Ndf {
     fn settlement_amount(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         let observed_fixing = if let Some(fixed_rate) = self.observed_fixing {
             fixed_rate
-        } else if crate::shared::event_has_occurred(self.fixing_date, as_of) {
+        } else if crate::market_inputs::event_has_occurred(self.fixing_date, as_of) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "NDF {} is past fixing date ({}) but no observed_fixing is set. \
                  Use with_observed_fixing() to set the observed rate.",
@@ -767,7 +768,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for Ndf {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         // End-of-day policy: settlement remains live on maturity.
-        if crate::shared::event_has_occurred(self.maturity, as_of) {
+        if crate::market_inputs::event_has_occurred(self.maturity, as_of) {
             return Ok(Money::from((0_i64, self.settlement_currency)));
         }
 
@@ -790,8 +791,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         self.validate()?;
-        if crate::shared::event_has_occurred(self.maturity, as_of) {
-            return crate::shared::settled_schedule(Some(Money::from((
+        if crate::market_inputs::event_has_occurred(self.maturity, as_of) {
+            return crate::market_inputs::settled_schedule(Some(Money::from((
                 0_i64,
                 self.settlement_currency,
             ))));

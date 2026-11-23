@@ -2256,7 +2256,7 @@ export interface D_0A43177Fe4B231Ba916E {
    * Calendar days between `old_date` and `new_date`.
    *
    * Always a calendar-day span, including under
-   * [`TimeRollMode::BusinessDays`](crate::spec::TimeRollMode::BusinessDays):
+   * [`TimeRollMode::BusinessDays`](crate::TimeRollMode::BusinessDays):
    * the target date is business-day adjusted, but the span back to
    * `old_date` is still calendar days. Downstream ACT/365F annualization
    * depends on this.

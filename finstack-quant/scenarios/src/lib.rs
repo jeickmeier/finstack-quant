@@ -125,19 +125,21 @@ mod utils;
 /// Structured warning enum surfaced via `ApplicationReport.warnings`.
 mod warning;
 
-pub use engine::{
+pub use engine::runner::ScenarioEngine;
+pub use engine::types::{
     ApplicationEnvelope, ApplicationReport, AppliedShock, AppliedShockTarget, ExecutionContext,
-    LevelChange, RollForwardReport, ScenarioChangeManifest, ScenarioEngine, ScenarioMarketTarget,
-    ShockMagnitude, ShockNode, ShockUnit, instrument_envelopes,
+    LevelChange, RollForwardReport, ScenarioChangeManifest, ScenarioMarketTarget, ShockMagnitude,
+    ShockNode, ShockUnit, instrument_envelopes,
 };
 pub use envelope::{ScenarioEnvelope, ScenarioSchema};
 pub use error::{Error, Result};
 pub use horizon::{HorizonAnalysis, HorizonReport, HorizonResult, HorizonSummary};
-pub use spec::{
-    CurveKind, OperationSpec, RateBindingSpec, ScenarioSpec, ScenarioValidationReport,
-    TenorMatchMode, TimeRollMode, validate_scenario_spec,
-};
-pub use templates::{AssetClass, TemplateMetadata, TemplateRegistry, TemplateSeverity};
+pub use spec::operations::OperationSpec;
+pub use spec::scenario::ScenarioSpec;
+pub use spec::types::{CurveKind, RateBindingSpec, TenorMatchMode, TimeRollMode};
+pub use spec::validation::{ScenarioValidationReport, validate_scenario_spec};
+pub use templates::metadata::{AssetClass, TemplateMetadata, TemplateSeverity};
+pub use templates::registry::TemplateRegistry;
 pub use warning::Warning;
 
 /// Compiles the crate `README.md` Rust samples as doctests.

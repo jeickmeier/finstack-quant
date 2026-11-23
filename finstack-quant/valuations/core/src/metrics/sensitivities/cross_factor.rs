@@ -10,7 +10,7 @@ use crate::metrics::finite_difference::{
     active_minimum_vol, bump_scalar_price, bumped_volatility_override_dyn, central_mixed,
     volatility_override,
 };
-use crate::metrics::sensitivities::config as sens_config;
+use crate::metrics::sensitivities::bump_config;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
@@ -300,7 +300,7 @@ pub fn make_rates_bumper(context: &MetricContext) -> Result<Option<FactorBumper>
         return Ok(None);
     }
 
-    let defaults = sens_config::resolve(context)?;
+    let defaults = bump_config::resolve(context)?;
     Ok(Some(FactorBumper::ParallelCurve {
         curve_ids,
         bump_bp: defaults.rate_bump_bp,
@@ -319,7 +319,7 @@ pub fn make_credit_bumper(context: &MetricContext) -> Result<Option<FactorBumper
         return Ok(None);
     }
 
-    let defaults = sens_config::resolve(context)?;
+    let defaults = bump_config::resolve(context)?;
     for id in &deps.curves.credit_curves {
         super::cs01::require_hazard_replay(
             context.curves.get_hazard(id.as_str())?.as_ref(),
@@ -367,7 +367,7 @@ pub fn make_vol_bumper(context: &MetricContext) -> Result<Option<FactorBumper>> 
         return Ok(None);
     }
 
-    let defaults = sens_config::resolve(context)?;
+    let defaults = bump_config::resolve(context)?;
     let mut minimum = active_minimum_vol(
         context.instrument.as_ref(),
         &context.curves,
@@ -410,7 +410,7 @@ pub fn make_spot_bumper(context: &MetricContext) -> Result<Option<FactorBumper>>
         return Ok(None);
     };
 
-    let defaults = sens_config::resolve(context)?;
+    let defaults = bump_config::resolve(context)?;
     Ok(Some(FactorBumper::Spot {
         price_id: price_id.clone(),
         bump_pct: defaults.spot_bump_decimal,
@@ -428,7 +428,7 @@ pub fn make_fx_bumper(context: &MetricContext) -> Result<Option<FactorBumper>> {
         return Ok(None);
     }
 
-    let defaults = sens_config::resolve(context)?;
+    let defaults = bump_config::resolve(context)?;
     Ok(Some(FactorBumper::Fx {
         pairs: deps.fx_pairs,
         bump_pct: defaults.spot_bump_decimal,

@@ -125,3 +125,20 @@ pub enum YieldCompounding {
     /// periodic compounding and the discount factors match [`Self::Street`].
     Moosmuller,
 }
+
+/// One candidate early-exit for yield-to-worst enumeration.
+///
+/// Represents a single admissible exercise date and the corresponding clean
+/// redemption price expressed as a percentage of par (e.g. `103.0` for 103%).
+#[derive(Debug, Clone)]
+pub(crate) struct ExitCandidate {
+    /// Whether the exit is an issuer call, a holder put or contractual maturity.
+    pub(crate) kind: super::WorkoutExitKind,
+    /// The exact admissible exercise date, clipped to
+    /// `[as_of, bond.maturity]`.
+    pub(crate) date: finstack_quant_core::dates::Date,
+    /// Clean redemption price as percent of par (e.g. `103.0` for 103%).
+    pub(crate) price_pct_of_par: f64,
+    /// Deterministic make-whole term retained for issuer-call candidates.
+    pub(crate) make_whole: Option<crate::bond::MakeWholeSpec>,
+}

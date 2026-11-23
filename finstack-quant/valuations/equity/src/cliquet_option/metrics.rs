@@ -15,7 +15,7 @@ use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
 use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 
 impl SpotPinnable for CliquetOption {
     fn unpinned_spot(&self) -> Option<(&PriceId, Currency)> {
@@ -83,7 +83,7 @@ pub(crate) struct RhoCalculator;
 
 impl MetricCalculator for RhoCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
+        let bump_bp = bump_config::resolve(context)?.rate_bump_bp;
         let option: &CliquetOption = context.instrument_as()?;
         let as_of = context.as_of;
         let base_pv = context.base_value.amount();

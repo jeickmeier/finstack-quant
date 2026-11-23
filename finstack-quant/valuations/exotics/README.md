@@ -76,7 +76,7 @@ CommoditySpotOptionMcPricer}` and
 type is the shared `instruments::SettlementType`.
 
 `CommodityUnderlyingParams` — `commodity_type`, `ticker`, `unit`, `currency` —
-is the shared underlying type at `instruments::CommodityUnderlyingParams`, and
+is the shared underlying type at `instruments::commodity::CommodityUnderlyingParams`, and
 `AveragingMethod` comes from `instruments::AveragingMethod` (defined in
 `../exotics/asian_option/`), not from this directory.
 

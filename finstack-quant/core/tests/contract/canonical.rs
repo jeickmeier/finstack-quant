@@ -256,7 +256,7 @@ fn persisted_contract_fields_do_not_use_fx_hash_maps() {
         .parent()
         .expect("core crate is inside workspace");
     let checks = [
-        ("core/src/market_data/hierarchy/mod.rs", "HierarchyNode"),
+        ("core/src/market_data/hierarchy/tree.rs", "HierarchyNode"),
         ("models/src/credit/rating_factors.rs", "RatingFactorTable"),
         (
             "models/src/volatility/arbitrage/types.rs",
@@ -266,13 +266,13 @@ fn persisted_contract_fields_do_not_use_fx_hash_maps() {
             "core/src/market_data/term_structures/credit_index.rs",
             "CreditIndexData",
         ),
-        ("calibration/src/api/schema.rs", "CalibrationPlan"),
+        ("calibration/src/api/schema/envelope.rs", "CalibrationPlan"),
         (
-            "valuations/structured-credit/src/structured_credit/types/mod.rs",
+            "valuations/structured-credit/src/structured_credit/types/deal.rs",
             "MarketConditions",
         ),
         (
-            "valuations/structured-credit/src/structured_credit/types/waterfall/mod.rs",
+            "valuations/structured-credit/src/structured_credit/types/waterfall/spec.rs",
             "WaterfallDistribution",
         ),
         (

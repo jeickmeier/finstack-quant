@@ -1,7 +1,7 @@
 //! Tests for market conventions.
 
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
-use finstack_quant_valuations::instruments::BondConvention;
+use finstack_quant_valuations::instruments::fixed_income::BondConvention;
 use std::str::FromStr;
 
 #[test]

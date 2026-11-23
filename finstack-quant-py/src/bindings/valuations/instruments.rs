@@ -162,10 +162,9 @@ impl PyBond {
                 rate_from_py(coupon_rate, "coupon_rate")?,
                 py_to_date(issue_date)?,
                 py_to_date(maturity)?,
-                enum_from_str::<finstack_quant_valuations::instruments::BondConvention>(
-                    convention,
-                    "convention",
-                )?,
+                enum_from_str::<
+                    finstack_quant_valuations::instruments::fixed_income::BondConvention,
+                >(convention, "convention")?,
                 discount_curve_id,
             )
             .map_err(core_to_py)?;
@@ -189,7 +188,7 @@ impl PyBond {
         let params = floating_bond_params(params)?;
         finstack_quant_valuations::instruments::fixed_income::bond::Bond::floating_with_convention(
             params,
-            enum_from_str::<finstack_quant_valuations::instruments::BondConvention>(
+            enum_from_str::<finstack_quant_valuations::instruments::fixed_income::BondConvention>(
                 convention,
                 "convention",
             )?,

@@ -1,6 +1,6 @@
 //! Snowball / Inverse Floater structured note instrument definition.
 
-use crate::BermudanCallProvision;
+use crate::exotics::BermudanCallProvision;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;

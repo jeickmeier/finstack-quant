@@ -104,8 +104,6 @@
 //! - [`crate::swaption::BermudanSwaptionLmmPricer`] for LMM Bermudan pricing
 //! - [`crate::VolatilityModel`] for selecting Black vs Normal
 
-use finstack_quant_core::dates::Date;
-
 /// Swaption risk metrics (delta, vega, theta, rho)
 pub(crate) mod metrics;
 /// European and Bermudan swaption pricing engines (Black/Normal, Hull-White, LSMC, LMM).
@@ -114,46 +112,16 @@ pub(crate) mod metrics;
 /// re-exported once at `swaption::`; the internal Monte Carlo kernels are
 /// exercised by in-crate `#[cfg(test)]` no-arbitrage numéraire tests.
 pub(crate) mod pricing;
+mod tenor;
 pub(crate) mod types;
 
-pub use pricing::{
-    BermudanSwaptionLmmPricer, BermudanSwaptionPricer, BermudanSwaptionPricerConfig,
-    BermudanSwaptionTreeValuator, PreparedHullWhiteModel, SimpleSwaptionBlackPricer,
-    SimpleSwaptionNormalPricer, lmm_bermudan_mc_config,
+pub use pricing::bermudan::{
+    BermudanSwaptionPricer, BermudanSwaptionPricerConfig, PreparedHullWhiteModel,
 };
-pub use types::{
-    BermudanSchedule, BermudanSwaption, BermudanSwaptionBuilder, BermudanSwaptionParams,
-    BermudanType, CashSettlementMethod, GreekInputs, Swaption, SwaptionBuilder,
-};
-
-/// Convert effective swap dates to the canonical market tenor coordinate.
-///
-/// Swaption cubes are rectangular grids labeled by contractual month/year
-/// tenors (for example, 2Y, 5Y, 10Y), not by day-count year fractions. Business
-/// day adjustment and settlement lag can shorten or lengthen the actual accrual
-/// interval by a few days without changing that market tenor label.
-///
-/// # Arguments
-///
-/// * `start` - Contractual effective date of the underlying swap.
-/// * `end` - Contractual maturity date of the underlying swap.
-///
-/// # Errors
-///
-/// Returns a validation error when `end` is not after `start` or the dates do
-/// not define a positive whole-month tenor.
-pub fn contractual_swap_tenor_years(start: Date, end: Date) -> finstack_quant_core::Result<f64> {
-    if end <= start {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "swaption underlying maturity {end} must be after effective start {start}"
-        )));
-    }
-    let months = (end.year() - start.year()) * 12 + i32::from(end.month() as u8)
-        - i32::from(start.month() as u8);
-    if months <= 0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "swaption underlying dates {start} to {end} do not define a positive monthly tenor"
-        )));
-    }
-    Ok(f64::from(months) / 12.0)
-}
+pub use pricing::black::{SimpleSwaptionBlackPricer, SimpleSwaptionNormalPricer};
+pub use pricing::lmm::{BermudanSwaptionLmmPricer, lmm_bermudan_mc_config};
+pub use pricing::tree_valuator::BermudanSwaptionTreeValuator;
+pub use tenor::contractual_swap_tenor_years;
+pub use types::bermudan::{BermudanSwaption, BermudanSwaptionBuilder, BermudanSwaptionParams};
+pub use types::definitions::{BermudanSchedule, BermudanType, CashSettlementMethod};
+pub use types::swaption::{GreekInputs, Swaption, SwaptionBuilder};

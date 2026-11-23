@@ -115,7 +115,7 @@ impl MetricCalculator for ConvexityCalculator {
             context.as_of,
         )?;
         let ytm_bump_bp =
-            finstack_quant_valuations_core::metrics::sensitivities::config::resolve(context)?
+            finstack_quant_valuations_core::metrics::sensitivities::bump_config::resolve(context)?
                 .ytm_bump_bp
                 .unwrap_or(DEFAULT_CONVEXITY_YTM_BUMP_BP);
         calculate_tranche_convexity(flows, disc.as_ref(), settlement, ytm_bump_bp)

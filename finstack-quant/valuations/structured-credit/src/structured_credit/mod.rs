@@ -28,67 +28,82 @@ pub(crate) mod pricing;
 pub(crate) mod types;
 pub(crate) mod utils;
 
-pub use utils::{ValidationError, validate_tiers};
+pub use utils::validation::{ValidationError, validate_tiers};
 
-pub use types::MarketConditions;
-pub use types::{
-    AdvanceRate, AdvancingPolicy, AfcSpec, AllocationMode, AssetPool, AssetType, BalloonSpec,
-    BorrowingBaseReport, BorrowingBaseRules, CallAssumption, CallExercisePolicy, CallScope,
-    CardPortfolioSpec, CccBucketRule, CollateralInstrument, ConcentrationLimit, ConcentrationScope,
-    ControlledAccumulationSpec, CoveragePlacement, CoverageRules, CoverageTestAction,
-    CoverageTestSpec, CoverageTestType, CoverageTrigger, CreditModelConfig, DealFees, DealType,
-    DefaultedValuation, DelinquencyModel, DiscountObligationRule, DiversionRecord,
-    EarlyAmortizationSpec, EligibilityRule, EquityHistory, ExcessSpreadSpec, FundingSource,
-    HedgeSwap, IncentiveFeeSpec, InstrumentCollateral, InstrumentExerciseOverride, LiquidationSpec,
-    LiveCollateral, LossAllocationPolicy, LossRecognition, ManagementFeeType, Metadata,
-    ModificationSpec, PaymentCalculation, PaymentRecord, PaymentType, PenaltyStep, PoolAccounts,
-    PoolAsset, PoolConcentrationEntry, PoolReport, PoolStats, PrepaymentPenalty, PutExercisePolicy,
-    Recipient, RecipientType, ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod,
-    RepLine, ReserveAccountSpec, ReserveInterestDestination, ReserveTarget, RoundingConvention,
-    ShiftMode, ShiftingInterestSpec, ShiftingInterestStep, SpecialServicingSpec,
-    StandardDealFamily, StandardDealParams, StepDownSpec, StepDownTrigger, StructuredCredit,
-    StructuredCreditBuilder, StructuredCreditTranche, SwapNotional, SwapPriority, TargetOcSpec,
-    TemplateFees, Tranche, TrancheAccrualPeriod, TrancheBuilder, TrancheCashflows, TrancheDraw,
-    TrancheReadvance, TrancheStructure, TriggerConsequence, Waterfall, WaterfallBuilder,
-    WaterfallDistribution, WaterfallRules, WaterfallTier, calculate_pool_stats, pool_report,
-    standard_deal_families,
+pub use types::borrowing_base::{
+    AdvanceRate, BorrowingBaseReport, BorrowingBaseRules, ConcentrationLimit, ConcentrationScope,
+    EligibilityRule, LiveCollateral,
+};
+pub use types::call::{CallAssumption, CallScope};
+pub use types::card::CardPortfolioSpec;
+pub use types::cmbs::{BalloonSpec, PenaltyStep, PrepaymentPenalty, SpecialServicingSpec};
+pub use types::collateral::{
+    CallExercisePolicy, CollateralInstrument, InstrumentCollateral, InstrumentExerciseOverride,
+    PutExercisePolicy, ReserveInterestDestination,
+};
+pub use types::constructors::{StandardDealFamily, StandardDealParams, standard_deal_families};
+pub use types::deal::MarketConditions;
+pub use types::deal::{CreditModelConfig, Metadata, StructuredCredit, StructuredCreditBuilder};
+pub use types::delinquency::{AdvancingPolicy, DelinquencyModel, ModificationSpec};
+pub use types::draws::{TrancheDraw, TrancheReadvance};
+pub use types::enums::{
+    AssetType, DealType, LossAllocationPolicy, LossRecognition, TriggerConsequence,
+};
+pub use types::hedges::{HedgeSwap, SwapNotional, SwapPriority};
+pub use types::npl::LiquidationSpec;
+pub use types::pool::analytics::calculate_pool_stats;
+pub use types::pool::asset::PoolAsset;
+pub use types::pool::asset_pool::AssetPool;
+pub use types::pool::config::{
+    PoolAccounts, PoolStats, ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod,
+    RepLine,
+};
+pub use types::pool_report::{PoolConcentrationEntry, PoolReport, pool_report};
+pub use types::results::{TrancheAccrualPeriod, TrancheCashflows};
+pub use types::setup::{DealFees, IncentiveFeeSpec};
+pub use types::tranche_view::StructuredCreditTranche;
+pub use types::tranches::{CoverageTrigger, Tranche, TrancheBuilder, TrancheStructure};
+pub use types::waterfall::builder::WaterfallBuilder;
+pub use types::waterfall::coverage::{
+    CccBucketRule, CoveragePlacement, CoverageRules, CoverageTestAction, CoverageTestSpec,
+    CoverageTestType, DefaultedValuation, DiscountObligationRule,
+};
+pub use types::waterfall::rules::{
+    AfcSpec, ControlledAccumulationSpec, EarlyAmortizationSpec, ExcessSpreadSpec,
+    ReserveAccountSpec, ReserveTarget, ShiftMode, ShiftingInterestSpec, ShiftingInterestStep,
+    StepDownSpec, StepDownTrigger, TargetOcSpec, WaterfallRules,
+};
+pub use types::waterfall::spec::{
+    AllocationMode, DiversionRecord, EquityHistory, FundingSource, ManagementFeeType,
+    PaymentCalculation, PaymentRecord, PaymentType, Recipient, RecipientType, RoundingConvention,
+    TemplateFees, Waterfall, WaterfallDistribution, WaterfallTier,
 };
 
-pub use pricing::execute_waterfall;
+pub use pricing::waterfall::execute::execute_waterfall;
 
 pub use pricing::coverage::{TestContext, TestResult};
-pub use pricing::waterfall::WaterfallContext;
-pub use pricing::{
+pub use pricing::simulation_engine::orchestration::SimulationRun;
+pub use pricing::simulation_engine::state::{
     CoverageTestBreach, CoverageTestDiagnostic, NonWaterfallPayment, NonWaterfallSource,
-    PeriodDiagnostics, SimulationDiagnostics, SimulationRun, TrancheCreditEnhancement,
+    PeriodDiagnostics, SimulationDiagnostics, TrancheCreditEnhancement,
 };
+pub use pricing::waterfall::execute::WaterfallContext;
 
-pub use metrics::{
-    // Deal and pool metric calculators
-    AbsChargeOffCalculator,
-    AbsCreditEnhancementCalculator,
-    AbsExcessSpreadCalculator,
+pub use metrics::deal_specific::abs::{
+    AbsChargeOffCalculator, AbsCreditEnhancementCalculator, AbsExcessSpreadCalculator,
     AbsPaymentRateCalculator,
-    CdrCalculator,
-    CloWarfCalculator,
-    CmbsDscrCalculator,
-    CprCalculator,
-    EquityMetrics,
-    OasConfig,
-    OasResult,
-    ScenarioCell,
-    ScenarioGrid,
-    ScenarioTable,
-    TrancheMetrics,
-    calculate_equity_metrics,
-    calculate_tranche_convexity,
-    calculate_tranche_cs01,
-    calculate_tranche_duration,
-    calculate_tranche_wal,
-    calculate_tranche_z_spread,
-    tranche_breakeven_cdr,
-    tranche_discount_margin,
-    tranche_metrics,
-    tranche_oas,
-    tranche_scenario_table,
+};
+pub use metrics::deal_specific::cmbs::CmbsDscrCalculator;
+pub use metrics::pool::{CdrCalculator, CloWarfCalculator, CprCalculator};
+pub use metrics::pricing::wal::calculate_tranche_wal;
+pub use metrics::risk::breakeven_cdr::tranche_breakeven_cdr;
+pub use metrics::risk::convexity::calculate_tranche_convexity;
+pub use metrics::risk::duration::calculate_tranche_duration;
+pub use metrics::risk::oas::{OasConfig, OasResult, tranche_oas};
+pub use metrics::risk::spreads::{
+    calculate_tranche_cs01, calculate_tranche_z_spread, tranche_discount_margin,
+};
+pub use metrics::scenario::{ScenarioCell, ScenarioGrid, ScenarioTable, tranche_scenario_table};
+pub use metrics::summary::{
+    EquityMetrics, TrancheMetrics, calculate_equity_metrics, tranche_metrics,
 };

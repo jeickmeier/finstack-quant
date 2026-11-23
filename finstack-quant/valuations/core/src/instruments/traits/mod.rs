@@ -23,14 +23,8 @@
 //! note and prices it; the instrument families in the umbrella crate are the
 //! full-scale implementations.
 
-mod instrument;
+pub(crate) mod instrument;
 #[macro_use]
 mod macros;
-mod option_greeks;
-mod pricing_options;
-
-pub use instrument::Instrument;
-pub use option_greeks::{
-    GreekBumps, OptionGreekKind, OptionGreeks, OptionGreeksProvider, OptionGreeksRequest,
-};
-pub use pricing_options::PricingOptions;
+pub(crate) mod option_greeks;
+pub(crate) mod pricing_options;

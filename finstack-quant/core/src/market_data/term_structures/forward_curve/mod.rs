@@ -37,37 +37,12 @@
 //! assert!(fc.rate_between(0.0, 0.25, 0.25).expect("valid rate") > 0.0);
 //! ```
 
-use super::common::factor::FactorCore;
-use crate::dates::{Date, DayCount, Tenor};
-use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
-use crate::types::CurveId;
-
-/// Positive normalized factor curve for projecting floating-rate index fixings.
-///
-/// Stores strictly positive projection factors `(t_i, P_x(t_i))` anchored at
-/// `(0.0, 1.0)` on an explicit [`DayCount`] clock (plus resolved holiday calendar
-/// when using `Bus/252`), optional index tenor metadata ([`Tenor`]), an explicit
-/// interpolation style, and an explicit extrapolation policy.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(try_from = "RawForwardCurve", into = "RawForwardCurve")]
-pub struct ForwardCurve {
-    pub(crate) id: CurveId,
-    pub(crate) core: FactorCore,
-    /// Optional index accrual tenor metadata associated with this projection source.
-    pub(crate) index_tenor: Option<Tenor>,
-    /// Exact typed recipe used to replay calibration after quote shocks.
-    pub(crate) rate_calibration: Option<super::RateCalibrationRecipe>,
-    /// Opaque FX policy stamp when bootstrap used cross-currency assumptions.
-    pub(crate) fx_policy: Option<String>,
-}
-
-mod builder;
-mod curve;
+pub(crate) mod builder;
+pub(crate) mod curve;
 #[cfg(test)]
 mod tests;
 mod transform;
 mod wire;
 
-pub use builder::ForwardCurveBuilder;
-use wire::RawForwardCurve;
+pub(crate) use builder::ForwardCurveBuilder;
+pub(crate) use curve::ForwardCurve;

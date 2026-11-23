@@ -10,7 +10,7 @@ use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
-use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
+use finstack_quant_valuations_exotics::commodity::CommodityUnderlyingParams;
 use finstack_quant_valuations_exotics::commodity::commodity_swap::CommoditySwap;
 use time::Month;
 

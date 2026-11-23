@@ -495,7 +495,7 @@ export interface D_630447734299C7A44378 {
  *
  * ```rust
  * use finstack_quant_valuations_exotics::commodity::commodity_swaption::CommoditySwaption;
- * use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
+ * use finstack_quant_valuations_exotics::commodity::CommodityUnderlyingParams;
  * use finstack_quant_models::types::OptionType;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::{Date, Tenor, TenorUnit};

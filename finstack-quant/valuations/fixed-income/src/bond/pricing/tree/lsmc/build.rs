@@ -69,10 +69,10 @@ pub(super) fn build_overnight_coupon(
             Err(error) => Some(spec.rate_spec.fallback.index_rate(error)?),
         };
         let source = if let Some(rate) = observed {
-            OvernightRateSource::Fixed(rate)
+            ObservedRateSource::Fixed(rate)
         } else if let Some(forward) = forward.as_ref() {
             if observation_date < forward.base_date() {
-                OvernightRateSource::Fixed(spec.rate_spec.fallback.index_rate(Error::Validation(format!(
+                ObservedRateSource::Fixed(spec.rate_spec.fallback.index_rate(Error::Validation(format!(
                         "overnight observation {observation_date} for index '{forward_curve_id}' precedes forward-curve base {}",
                         forward.base_date()
                     )),
@@ -105,7 +105,7 @@ pub(super) fn build_overnight_coupon(
                         "bond hazard LSMC overnight observation {observation_date} to {observation_end} maps to one tree step"
                     )));
                 }
-                OvernightRateSource::Conditional(ConditionalRate {
+                ObservedRateSource::Conditional(ConditionalRate {
                     observation_step,
                     accrual,
                     base_index_rate,
@@ -115,7 +115,7 @@ pub(super) fn build_overnight_coupon(
                 })
             }
         } else {
-            OvernightRateSource::Fixed(spec.rate_spec.fallback.index_rate(Error::Validation(format!(
+            ObservedRateSource::Fixed(spec.rate_spec.fallback.index_rate(Error::Validation(format!(
                     "forward curve '{forward_curve_id}' is required for stochastic overnight observation {observation_date}"
                 )),
             )?)
@@ -125,7 +125,7 @@ pub(super) fn build_overnight_coupon(
 
     let mut max_history_steps = 0_usize;
     for observation in observations.observations() {
-        let Some(OvernightRateSource::Conditional(source)) =
+        let Some(ObservedRateSource::Conditional(source)) =
             sources.get(&observation.observation_date)
         else {
             continue;

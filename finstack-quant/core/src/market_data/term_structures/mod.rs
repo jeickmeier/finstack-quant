@@ -149,11 +149,14 @@ pub use base_correlation::{
 };
 pub(super) use credit_index::deserialize_issuer_map;
 pub use credit_index::{CreditIndexData, CreditIndexDataBuilder};
-pub use discount_curve::{DiscountCurve, DiscountCurveBuilder};
-pub use forward_curve::{ForwardCurve, ForwardCurveBuilder};
+pub use discount_curve::builder::DiscountCurveBuilder;
+pub use discount_curve::curve::DiscountCurve;
+pub use forward_curve::builder::ForwardCurveBuilder;
+pub use forward_curve::curve::ForwardCurve;
 pub use forward_variance::ForwardVarianceCurve;
 pub use hazard_calibration::{HazardCalibrationInput, HazardCalibrationRecipe};
-pub use hazard_curve::{HazardCurve, HazardCurveBuilder, Seniority};
+pub use hazard_curve::builder::HazardCurveBuilder;
+pub use hazard_curve::curve::{HazardCurve, Seniority};
 pub use inflation::{InflationCurve, InflationCurveBuilder};
 pub use parametric_curve::{NelsonSiegelModel, NsVariant, ParametricCurve, ParametricCurveBuilder};
 pub use price_curve::{PriceCurve, PriceCurveBuilder, PriceCurveKind};

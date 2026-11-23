@@ -72,12 +72,14 @@ pub use buckets::{
     parse_key_rate_label, validate_buckets_strictly_increasing,
 };
 pub use finite_difference::bump_surface_vol_absolute;
+pub use ids::group::MetricGroup;
+pub use ids::metric_id::MetricId;
 #[doc(hidden)]
-pub use ids::closest_metric_names;
-pub use ids::{MetricGroup, MetricId, MetricUnit};
+pub use ids::suggest::closest_metric_names;
+pub use ids::unit::MetricUnit;
 pub use period_cash::{PeriodCash, collect_period_cash};
-pub use registry::{MetricAggregation, MetricRegistry, MetricRegistryError};
-pub use traits::{MetricCalculator, MetricContext, MetricSeed};
+pub use registry::engine::{MetricAggregation, MetricRegistry, MetricRegistryError};
+pub use traits::{MetricCalculator, MetricContext, MetricSeed, metric_not_found};
 #[doc(hidden)]
 pub use universal::{PricerPublishedMetric, register_universal_metrics};
 
@@ -97,33 +99,3 @@ pub use finite_difference::{
 };
 #[doc(hidden)]
 pub use sensitivities::fd_greeks::bump::clone_with_crn_seed_if_supported;
-
-// Error helper functions
-
-/// Create a typed NotFound error for a missing metric.
-///
-/// Use this when a metric dependency or required metric is not available.
-///
-/// # Arguments
-///
-/// * `metric` - Required metric identifier that was absent from a valuation
-///   result or dependency set; it is embedded in the returned `metric:` ID.
-///
-/// # Examples
-///
-/// ```
-/// use finstack_quant_valuations_core::metrics::{metric_not_found, MetricId};
-/// use finstack_quant_core::Result;
-/// use finstack_quant_core::FxHashMap;
-///
-/// fn get_metric(id: MetricId, results: &FxHashMap<MetricId, f64>) -> Result<f64> {
-///     results.get(&id).copied().ok_or_else(|| metric_not_found(id))
-/// }
-/// ```
-#[inline]
-pub fn metric_not_found(metric: MetricId) -> finstack_quant_core::Error {
-    finstack_quant_core::InputError::NotFound {
-        id: format!("metric:{metric}"),
-    }
-    .into()
-}

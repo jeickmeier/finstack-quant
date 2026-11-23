@@ -56,8 +56,10 @@ pub use types::{
     ConvertibleBond, ConvertibleBondBuilder, ConvertibleGreeks, ConvertibleSettlement,
 };
 
-pub use pricing::{
-    ConvertibleRegime, ConvertibleSpotLadder, ConvertibleSpotRow, DEFAULT_CONVERTIBLE_TREE_STEPS,
-    calculate_accrued_interest, calculate_convertible_greeks, calculate_parity,
-    convertible_spot_ladder, price_convertible_bond, settlement_date,
+pub use pricing::engine::{
+    DEFAULT_CONVERTIBLE_TREE_STEPS, calculate_accrued_interest, calculate_convertible_greeks,
+    calculate_parity, price_convertible_bond, settlement_date,
+};
+pub use pricing::spot_ladder::{
+    ConvertibleRegime, ConvertibleSpotLadder, ConvertibleSpotRow, convertible_spot_ladder,
 };

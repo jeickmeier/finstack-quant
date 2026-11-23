@@ -1,6 +1,8 @@
 //! Validated construction.
 
+use super::generation::BuilderInternal;
 use super::*;
+use crate::dates::{BusinessDayConvention, Date, DateExt, HolidayCalendar, Tenor, adjust};
 
 /// Fluent builder that collects a complete [`ScheduleSpec`].
 ///
@@ -79,7 +81,7 @@ use super::*;
 /// - [`GridMode`] for the regular grid
 /// - [`BusinessDayConvention`] for adjustment rules
 ///
-/// [`BusinessDayConvention`]: super::BusinessDayConvention
+/// [`BusinessDayConvention`]: crate::dates::BusinessDayConvention
 #[derive(Clone, Debug)]
 pub struct ScheduleBuilder {
     start: Date,

@@ -6,7 +6,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Calculates Macaulay duration for structured credit.
@@ -98,7 +98,7 @@ impl MetricCalculator for ModifiedDurationCalculator {
         let curve = context
             .curves
             .get_discount(deal.discount_curve_id.as_str())?;
-        let ytm_bump_bp = sens_config::resolve(context)?
+        let ytm_bump_bp = bump_config::resolve(context)?
             .ytm_bump_bp
             .unwrap_or(DEFAULT_DURATION_YTM_BUMP_BP);
         calculate_tranche_duration(flows, &curve, quote.settlement, ytm_bump_bp)

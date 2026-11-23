@@ -156,7 +156,7 @@ impl<'a> CashflowEngine<'a> {
         // Overnight facilities compound daily fixings over the whole window.
         let slice_on_resets = match &self.facility.rate {
             RateSpec::Floating(spec) => {
-                super::super::utils::resolved_overnight_compounding(spec)?.is_none()
+                super::super::schedule_projection::resolved_overnight_compounding(spec)?.is_none()
             }
             RateSpec::Fixed { .. } => false,
         };
@@ -288,7 +288,7 @@ impl<'a> CashflowEngine<'a> {
                 if reset_date_opt.is_none() {
                     reset_date_opt = match (&self.facility.rate, sub_reset_effective_date) {
                         (RateSpec::Floating(spec), Some(date)) => {
-                            Some(super::super::utils::floating_fixing_date(
+                            Some(super::super::schedule_projection::floating_fixing_date(
                                 spec,
                                 date,
                                 self.facility.calendar_id.as_deref(),
@@ -300,25 +300,31 @@ impl<'a> CashflowEngine<'a> {
 
                 let interest_rate = match &self.facility.rate {
                     RateSpec::Fixed { rate } => {
-                        let rate =
-                            super::super::utils::fixed_rate_at(self.facility, *rate, sub_start);
+                        let rate = super::super::schedule_projection::fixed_rate_at(
+                            self.facility,
+                            *rate,
+                            sub_start,
+                        );
                         let interest = current_balance.checked_mul_f64(rate * dt)?;
                         total_interest = total_interest.checked_add(interest)?;
                         rate
                     }
                     RateSpec::Floating(spec) => {
-                        let params = super::super::utils::floating_params_at(
+                        let params = super::super::schedule_projection::floating_params_at(
                             self.facility,
                             spec,
                             sub_start,
                         )?;
                         let reset_effective = sub_reset_effective_date.unwrap_or(period_start);
-                        let fixing_date = super::super::utils::floating_fixing_date(
+                        let fixing_date = super::super::schedule_projection::floating_fixing_date(
                             spec,
                             reset_effective,
                             self.facility.calendar_id.as_deref(),
                         )?;
-                        let overnight = super::super::utils::resolved_overnight_compounding(spec)?;
+                        let overnight =
+                            super::super::schedule_projection::resolved_overnight_compounding(
+                                spec,
+                            )?;
 
                         let coupon_rate = if overnight.is_some() {
                             let fwd = fwd_curve.as_ref().ok_or_else(|| {
@@ -326,8 +332,8 @@ impl<'a> CashflowEngine<'a> {
                                     "forward curve required for floating rate".into(),
                                 )
                             })?;
-                            super::super::utils::project_revolver_floating_rate(
-                                super::super::utils::RevolverFloatingProjection {
+                            super::super::schedule_projection::project_revolver_floating_rate(
+                                super::super::schedule_projection::RevolverFloatingProjection {
                                     accrual_start: sub_start,
                                     accrual_end: sub_end,
                                     as_of: self.as_of,
@@ -412,11 +418,12 @@ impl<'a> CashflowEngine<'a> {
                 if sub_end != period_end {
                     for event in draw_repay_events.iter() {
                         if event.date == sub_end {
-                            current_balance = super::super::utils::apply_draw_repay_event(
-                                current_balance,
-                                event,
-                                self.facility.commitment_at(event.date),
-                            )?;
+                            current_balance =
+                                super::super::schedule_projection::apply_draw_repay_event(
+                                    current_balance,
+                                    event,
+                                    self.facility.commitment_at(event.date),
+                                )?;
                         }
                     }
                     if self

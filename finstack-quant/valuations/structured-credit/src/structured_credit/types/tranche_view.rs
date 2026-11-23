@@ -8,6 +8,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{Attributes, InstrumentId};
 use finstack_quant_core::{Error, Result};
+use finstack_quant_models::credit::pool::CorrelationStructure;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricContext, MetricSeed};
 use serde::{Deserialize, Serialize};
@@ -109,7 +110,7 @@ impl StructuredCreditTranche {
     ///
     /// # Arguments
     /// * `correlation` - Replacement calibrated collateral correlation assumptions.
-    pub fn set_correlation(&mut self, correlation: super::CorrelationStructure) {
+    pub fn set_correlation(&mut self, correlation: CorrelationStructure) {
         self.deal.credit_model.correlation_structure = Some(correlation);
     }
 

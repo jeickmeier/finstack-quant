@@ -9,7 +9,7 @@
 //! Spot, volatility and rate bump sizes are resolved per request from the
 //! `valuations.sensitivities.v1` config extension and
 //! `metric_pricing_overrides.bump_config` (see
-//! `metrics::sensitivities::config`); calculators never hard-code them.
+//! `metrics::sensitivities::bump_config`); calculators never hard-code them.
 //! Interest-rate and credit bumps are expressed in bp (**1.0 = 1bp**) when
 //! passed to `BumpSpec::parallel_bp`.
 

@@ -77,14 +77,17 @@ pub use rate_helpers::{
     FloatingRateParams, apply_bp_bounds, calculate_floating_rate, observed_index_fixing,
     project_floating_rate, project_index_rate, project_overnight_rate,
 };
-pub use schedule::{
-    CashFlowMeta, CashFlowSchedule, CashflowRepresentation, merge_cashflow_schedules,
-    outstanding_on,
+pub use schedule::merge::{merge_cashflow_schedules, outstanding_on};
+pub use schedule::types::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
+pub use specs::amortization::{AmortizationSpec, Notional};
+pub use specs::coupon::{
+    CouponType, FixedCouponSpec, FloatingCouponSpec, FloatingLegCompounding, FloatingRateFallback,
+    FloatingRateSpec, OvernightIndexConstraintApplication, StepUpCouponSpec,
 };
-pub use specs::{
-    AmortizationSpec, CouponType, DefaultModelSpec, FeeAccrualBasis, FeeBase, FeeSpec, FeeTier,
-    FixedCouponSpec, FloatingCouponSpec, FloatingLegCompounding, FloatingRateFallback,
-    FloatingRateSpec, Notional, OvernightIndexConstraintApplication, PrepaymentModelSpec,
-    PrincipalEventSpec, PrincipalExchange, RateSpec, RecoveryModelSpec, RollRule, ScheduleParams,
-    StepUpCouponSpec, evaluate_fee_tiers,
-};
+pub use specs::default::DefaultModelSpec;
+pub use specs::fees::{FeeAccrualBasis, FeeBase, FeeSpec, FeeTier, evaluate_fee_tiers};
+pub use specs::prepayment::PrepaymentModelSpec;
+pub use specs::principal::{PrincipalEventSpec, PrincipalExchange};
+pub use specs::rate::RateSpec;
+pub use specs::recovery::RecoveryModelSpec;
+pub use specs::schedule::{RollRule, ScheduleParams};

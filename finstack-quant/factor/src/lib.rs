@@ -97,15 +97,18 @@ mod sensitivity_matrix;
 pub use config::{BumpSizeConfig, FactorModelConfig, RiskMeasure, UnmatchedPolicy};
 pub use covariance::FactorCovarianceMatrix;
 pub use envelope::{FactorModelConfigEnvelope, FactorModelConfigSchema};
-pub use matching::{
-    AttributeFilter, CREDIT_GENERIC_FACTOR_ID, CreditHierarchicalConfig, DependencyFilter,
-    FactorMatchEntry, FactorMatchError, FactorMatcher, FactorNode, HierarchicalConfig,
-    ISSUER_ID_META_KEY, MappingRule, MatchingConfig, bucket_factor_id, parse_bucket_factor_id,
+pub use matching::config::{HierarchicalConfig, MatchingConfig};
+pub use matching::credit::{
+    CREDIT_GENERIC_FACTOR_ID, CreditHierarchicalConfig, ISSUER_ID_META_KEY, bucket_factor_id,
+    parse_bucket_factor_id,
 };
-pub use primitives::{
-    CurveType, DependencyType, FactorDefinition, FactorId, FactorType, MarketDependency,
-    MarketMapping,
+pub use matching::filter::{AttributeFilter, DependencyFilter};
+pub use matching::matchers::{
+    FactorMatchEntry, FactorMatchError, FactorMatcher, FactorNode, MappingRule,
 };
+pub use primitives::definition::{FactorDefinition, MarketMapping};
+pub use primitives::dependency::{CurveType, DependencyType, MarketDependency};
+pub use primitives::factor_types::{FactorId, FactorType};
 pub use sensitivity_matrix::SensitivityMatrix;
 
 /// Compiles the crate `README.md` Rust samples as doctests.

@@ -1,5 +1,9 @@
 use super::*;
 use crate::structured_credit::AssetType;
+use crate::structured_credit::types::DealType;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::money::Money;
 
 mod pool_tests {
     use super::*;

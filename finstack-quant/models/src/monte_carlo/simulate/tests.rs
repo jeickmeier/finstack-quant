@@ -1,9 +1,24 @@
 //! Tests for [`simulate_paths`](super::simulate_paths): the GBM bit pin, the
 //! process x scheme matrix, analytic moments per process, and input errors.
 
+use super::runner::{dispatch, scheme_tag};
 use super::*;
+use crate::monte_carlo::discretization::exact::{ExactGbm, ExactMultiGbm};
+use crate::monte_carlo::discretization::qe_heston::QeHeston;
+use crate::monte_carlo::engine::{MAX_CAPTURED_PATHS, McEngine};
 use crate::monte_carlo::engine::{McEngineConfig, PathCaptureConfig};
 use crate::monte_carlo::payoff::vanilla::European;
+use crate::monte_carlo::process::brownian::BrownianParams;
+use crate::monte_carlo::process::cir::CirParams;
+use crate::monte_carlo::process::gbm::{GbmParams, GbmProcess, MultiGbmProcess};
+use crate::monte_carlo::process::gbm_dividends::Dividend;
+use crate::monte_carlo::process::heston::{HestonProcess, HestonProcessParams};
+use crate::monte_carlo::process::local_vol::LocalVolParams;
+use crate::monte_carlo::process::multi_ou::MultiOuParams;
+use crate::monte_carlo::process::ou::HullWhite1FParams;
+use crate::monte_carlo::process::schwartz_smith::{SchwartzSmithParams, SchwartzSmithProcess};
+use crate::monte_carlo::rng::philox::PhiloxRng;
+use crate::monte_carlo::traits::{Discretization, ProcessMetadata, StochasticProcess};
 use crate::types::OptionType;
 use crate::volatility::local_vol::LocalVolSurface;
 use finstack_quant_core::currency::Currency;

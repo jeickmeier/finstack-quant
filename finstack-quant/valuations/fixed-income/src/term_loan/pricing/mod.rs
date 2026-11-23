@@ -7,5 +7,5 @@ pub(crate) mod call;
 pub(crate) mod discounting;
 pub(crate) mod tree_engine;
 
-pub use discounting::TermLoanDiscountingPricer;
-pub use tree_engine::TermLoanTreePricer;
+pub(crate) use discounting::TermLoanDiscountingPricer;
+pub(crate) use tree_engine::TermLoanTreePricer;

@@ -38,10 +38,13 @@ mod toggle_exercise;
 
 pub use dynamic_recovery::{DynamicRecoveryModel, DynamicRecoverySpec};
 pub use endogenous_hazard::{EndogenousHazardSpec, LeverageHazardMap};
-pub use merton::{
-    AssetDynamics, MertonBarrierType, MertonImpliedEquity, MertonModel, MertonReport,
-    MertonReportMeasure, MertonReportRequest, MertonReportSource, SimulatedPaths, merton_report,
+pub use merton::dynamics::{AssetDynamics, MertonBarrierType};
+pub use merton::model::MertonModel;
+pub use merton::report::{
+    MertonImpliedEquity, MertonReport, MertonReportMeasure, MertonReportRequest,
+    MertonReportSource, merton_report,
 };
+pub use merton::simulation::SimulatedPaths;
 pub use rating_factors::{RatingFactorTable, moodys_warf_factor};
 pub use toggle_exercise::{
     CreditState, CreditStateVariable, OptimalToggle, StochasticToggle, ThresholdDirection,

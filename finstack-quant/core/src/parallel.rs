@@ -105,6 +105,12 @@ where
     items.into_iter().map(f).collect()
 }
 
+/// Recover the inner guard from a mutex or rwlock acquisition result if a previous holder panicked.
+#[inline]
+pub(crate) fn recover_lock<T>(res: std::result::Result<T, std::sync::PoisonError<T>>) -> T {
+    res.unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 #[cfg(test)]
 mod tests {
     use super::try_map_ordered;

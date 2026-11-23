@@ -157,7 +157,7 @@ pub use config::{
 };
 
 /// Solver configuration (Brent/Newton).
-pub use solver::SolverConfig;
+pub use solver::config::SolverConfig;
 
 /// Calibration diagnostics and results.
 pub use report::{

@@ -6,7 +6,7 @@ use finstack_quant_core::{
 use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::rates::irs::{InterestRateSwap};
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
-use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec};
+use finstack_quant_valuations::instruments::rates::{FixedLegSpec, FloatLegSpec};
 use rust_decimal::Decimal;
 
 pub fn usd_irs_swap(

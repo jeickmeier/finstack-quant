@@ -6,8 +6,8 @@ use super::unified::{
     DEFAULT_CREDIT_SPREAD_IMPLIED_VOL, DEFAULT_UTIL_CREDIT_CORR, RevolvingCreditPricer,
 };
 use crate::revolving_credit::cashflow_engine::CashflowEngine;
+use crate::revolving_credit::schedule_projection::resolve_fixings;
 use crate::revolving_credit::types::{DrawRepaySpec, RevolvingCredit, RevolvingCreditMcRun};
-use crate::revolving_credit::utils::resolve_fixings;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
 use finstack_quant_cashflows::{ScheduleBuildOpts, schedule_from_classified_flows};
 use finstack_quant_core::cashflow::{CFKind, CashFlowParams};
@@ -293,7 +293,8 @@ impl RevolvingCreditPricer {
         let engine = CashflowEngine::new(facility, Some(market), as_of, fixings)?;
         // Factor state is observed on accrual boundaries plus term-index
         // reset dates so intra-period resets re-fix the coupon.
-        let observation_dates = crate::revolving_credit::utils::build_observation_dates(facility)?;
+        let observation_dates =
+            crate::revolving_credit::schedule_projection::build_observation_dates(facility)?;
 
         // Generate 3-factor paths (simulation starts at as_of for seasoned facilities)
         let paths = generate_three_factor_paths(

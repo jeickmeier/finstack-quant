@@ -12,22 +12,19 @@
 //! - `hw_cashflows`: Hull-White exercise cashflow projection
 //! - `swap_rate_utils`: shared Hull-White zero-coupon bond pricing
 
-mod bermudan;
-mod black;
+pub(crate) mod bermudan;
+pub(crate) mod black;
 mod hull_white;
 pub(crate) mod hw_cashflows;
-mod lmm;
+pub(crate) mod lmm;
 mod lmm_bermudan;
 mod monte_carlo_lsmc;
 mod swap_rate_utils;
-mod tree_valuator;
+pub(crate) mod tree_valuator;
 
 #[cfg(test)]
 #[path = "tests/numeraire.rs"]
 mod numeraire_tests;
 
-pub use bermudan::{BermudanSwaptionPricer, BermudanSwaptionPricerConfig, PreparedHullWhiteModel};
-pub use black::{SimpleSwaptionBlackPricer, SimpleSwaptionNormalPricer};
 pub(crate) use hull_white::SwaptionHullWhitePricer;
-pub use lmm::{BermudanSwaptionLmmPricer, lmm_bermudan_mc_config};
-pub use tree_valuator::BermudanSwaptionTreeValuator;
+pub(crate) use tree_valuator::BermudanSwaptionTreeValuator;

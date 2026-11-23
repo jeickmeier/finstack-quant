@@ -4,16 +4,15 @@
 //! markets funds, including return of capital, preferred IRR hurdles, catch-up
 //! provisions, promote splits, and clawback mechanisms.
 
-mod engine;
-mod ledger;
+pub(crate) mod engine;
+pub(crate) mod ledger;
 mod reconciliation;
-mod spec;
+pub(crate) mod spec;
 #[cfg(test)]
 mod tests;
 
-pub use engine::EquityWaterfallEngine;
-pub use ledger::{AllocationLedger, AllocationRow, FundEvent, FundEventKind};
-pub use spec::{
-    CatchUpMode, ClawbackSpec, PeFundWaterfallSpec, PeFundWaterfallTranche, WaterfallSpecBuilder,
-    WaterfallStyle,
-};
+pub(crate) use engine::EquityWaterfallEngine;
+pub(crate) use ledger::{AllocationLedger, FundEvent, FundEventKind};
+#[cfg(test)]
+pub(super) use spec::{CatchUpMode, ClawbackSpec};
+pub(crate) use spec::{PeFundWaterfallSpec, PeFundWaterfallTranche, WaterfallStyle};

@@ -20,11 +20,14 @@ use finstack_quant_core::{
     money::Money,
     types::{CurveId, InstrumentId},
 };
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::instruments::credit_derivatives::constants::isda::STANDARD_RECOVERY_SENIOR;
+use finstack_quant_valuations::instruments::credit_derivatives::{
+    PremiumLegSpec, ProtectionLegSpec,
+};
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
 use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use finstack_quant_valuations::market::conventions::{CdsConvention, CdsValuationConvention};
 use rust_decimal::Decimal;
@@ -230,7 +233,8 @@ pub fn cds_buy_protection(
         .side(PayReceive::Pay)
         .convention(convention)
         .premium_leg(PremiumLegSpec {
-            date_regime: finstack_quant_valuations::instruments::CdsDateRegime::Standard,
+            date_regime:
+                finstack_quant_valuations::instruments::credit_derivatives::CdsDateRegime::Standard,
             start,
             end: maturity,
             frequency,
@@ -295,7 +299,8 @@ pub fn cds_sell_protection(
         .side(PayReceive::Receive)
         .convention(convention)
         .premium_leg(PremiumLegSpec {
-            date_regime: finstack_quant_valuations::instruments::CdsDateRegime::Standard,
+            date_regime:
+                finstack_quant_valuations::instruments::credit_derivatives::CdsDateRegime::Standard,
             start,
             end: maturity,
             frequency,

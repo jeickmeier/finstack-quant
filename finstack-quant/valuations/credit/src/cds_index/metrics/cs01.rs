@@ -28,7 +28,7 @@ use crate::cds_index::{CdsIndex, IndexPricing};
 use finstack_quant_core::Result;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::{
     Cs01Request, compute_key_rate_cs01_series_with_context_raw, cs01_reval,
 };
@@ -40,7 +40,7 @@ pub(crate) struct Cs01Calculator;
 impl MetricCalculator for Cs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let provider = context.recalibration_provider("cs01")?;
-        let bump_bp = sens_config::resolve(context)?.credit_spread_bump_bp;
+        let bump_bp = bump_config::resolve(context)?.credit_spread_bump_bp;
         let idx: &CdsIndex = context.instrument_as()?;
         idx.cs01_with_bump(&context.curves, context.as_of, provider.as_ref(), bump_bp)
     }
@@ -83,7 +83,7 @@ impl MetricCalculator for CdsIndexBucketedCs01Calculator {
             return Ok(0.0);
         }
 
-        let defaults = sens_config::resolve(context)?;
+        let defaults = bump_config::resolve(context)?;
         let bump_bp = defaults.credit_spread_bump_bp;
 
         let credit_ids = index_credit_curve_ids(&index)?;

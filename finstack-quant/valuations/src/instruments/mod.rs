@@ -147,21 +147,6 @@
 //! - Fixed-income risk and hedging intuition: `docs/REFERENCES.md#tuckman-serrat-fixed-income`
 
 pub use finstack_quant_valuations_core::instruments::*;
-pub use finstack_quant_valuations_credit::{
-    CdsDateRegime, CreditParams, PremiumLegSpec, ProtectionLegSpec,
-};
-pub use finstack_quant_valuations_equity::EquityUnderlyingParams;
-pub use finstack_quant_valuations_exotics::{
-    BermudanCallProvision, CommodityConvention, CommodityUnderlyingParams,
-};
-pub use finstack_quant_valuations_fixed_income::{
-    AntiDilutionPolicy, BarrierCrossing, BondConvention, BondQuoteInput, CalibrationParameter,
-    ConversionEvent, ConversionPolicy, ConversionSpec, DilutionEvent, DividendAdjustment,
-    IndexUnderlyingParams, MertonMcCalibrationSpec, MertonMcConfig, PikMode, PikSchedule,
-    PriceTrigger,
-};
-pub use finstack_quant_valuations_fx::NdfQuoteConvention;
-pub use finstack_quant_valuations_rates::{FixedLegSpec, FloatLegSpec, VolatilityModel};
 
 // Cross-family instruments owned by the umbrella crate.
 pub(crate) mod basket;

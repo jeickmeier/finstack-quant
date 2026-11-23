@@ -4,8 +4,10 @@ use crate::revolving_credit::RevolvingCreditFees;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::{DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::money::Money;
 use time::Month;
 use time::macros::date;
@@ -232,9 +234,10 @@ fn act365l_slices_preserve_actual_coupon_denominators_in_both_engines() {
                 .recovery_rate(0.0)
                 .build()
                 .expect("facility");
-            let mut reset_grid = crate::revolving_credit::utils::build_reset_dates(&facility)
-                .expect("reset dates")
-                .unwrap_or_else(|| vec![start]);
+            let mut reset_grid =
+                crate::revolving_credit::schedule_projection::build_reset_dates(&facility)
+                    .expect("reset dates")
+                    .unwrap_or_else(|| vec![start]);
             reset_grid.push(end);
             let mut date_factors = Vec::with_capacity(reset_grid.len());
             let mut factor = 1.0_f64;
@@ -253,8 +256,9 @@ fn act365l_slices_preserve_actual_coupon_denominators_in_both_engines() {
                 finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
             )
             .expect("flat term curve");
-            let observations = crate::revolving_credit::utils::build_observation_dates(&facility)
-                .expect("observation dates");
+            let observations =
+                crate::revolving_credit::schedule_projection::build_observation_dates(&facility)
+                    .expect("observation dates");
             let n = observations.len();
             let time_points = observations
                 .iter()

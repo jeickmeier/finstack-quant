@@ -114,6 +114,13 @@ repos:
         files: (\.rs|scripts/check_lint_suppressions\.py|scripts/rust_source\.py)$
         pass_filenames: false
 
+      - id: rust-mod-purity
+        name: Rust mod.rs purity and mixed-root check (check_mod_rs_purity.py)
+        entry: uv run --no-sync python scripts/check_mod_rs_purity.py
+        language: system
+        files: (^finstack-quant/.*\.rs|scripts/check_mod_rs_purity\.py|scripts/rust_source\.py)$
+        pass_filenames: false
+
       - id: python-lint
         name: Python lint and binding docs (mise run python-lint)
         entry: mise run python-lint

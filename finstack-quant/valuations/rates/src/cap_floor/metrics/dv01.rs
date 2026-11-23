@@ -7,7 +7,7 @@
 
 use crate::cap_floor::CapFloor;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::sensitivities::dv01::{
     Dv01CalculatorConfig, UnifiedDv01Calculator,
 };
@@ -35,7 +35,7 @@ impl MetricCalculator for Dv01Calculator {
                 return UnifiedDv01Calculator::new(Dv01CalculatorConfig::parallel_discount_only())
                     .calculate(context);
             }
-            let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
+            let bump_bp = bump_config::resolve(context)?.rate_bump_bp;
             let bumped_up = crate::rate_recalibration::bump_single_ois_rate_market_cached(
                 context,
                 &cap_floor.discount_curve_id,
@@ -58,7 +58,7 @@ impl MetricCalculator for Dv01Calculator {
                 .calculate(context);
         }
 
-        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
+        let bump_bp = bump_config::resolve(context)?.rate_bump_bp;
 
         let discount_id = &cap_floor.discount_curve_id;
         let forward_id = &cap_floor.forward_curve_id;

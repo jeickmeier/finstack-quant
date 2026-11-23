@@ -570,7 +570,7 @@ fn deterministic_estimate(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::BermudanCallProvision;
+    use crate::exotics::BermudanCallProvision;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DateExt, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;

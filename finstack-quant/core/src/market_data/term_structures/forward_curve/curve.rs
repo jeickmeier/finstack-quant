@@ -1,16 +1,38 @@
 //! Forward-curve construction, positive-factor evaluation, and interval rate queries.
 
 use super::super::DiscountCurve;
+use super::super::common::factor::FactorCore;
 use super::super::common::factor::{
     dated_points_to_knots, df_between_admitted_factors, simple_rate_from_factors,
     zero_rate_points_to_factors,
 };
 use super::super::common::{signed_curve_year_fraction, validate_curve_clock};
-use super::{ForwardCurve, ForwardCurveBuilder};
+use super::ForwardCurveBuilder;
+use super::wire::RawForwardCurve;
 use crate::dates::{Date, DayCount, Tenor};
 use crate::math::Compounding;
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, exact_f64_eq};
 use crate::types::CurveId;
+
+/// Positive normalized factor curve for projecting floating-rate index fixings.
+///
+/// Stores strictly positive projection factors `(t_i, P_x(t_i))` anchored at
+/// `(0.0, 1.0)` on an explicit [`DayCount`] clock (plus resolved holiday calendar
+/// when using `Bus/252`), optional index tenor metadata ([`Tenor`]), an explicit
+/// interpolation style, and an explicit extrapolation policy.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(try_from = "RawForwardCurve", into = "RawForwardCurve")]
+pub struct ForwardCurve {
+    pub(crate) id: CurveId,
+    pub(crate) core: FactorCore,
+    /// Optional index accrual tenor metadata associated with this projection source.
+    pub(crate) index_tenor: Option<Tenor>,
+    /// Exact typed recipe used to replay calibration after quote shocks.
+    pub(crate) rate_calibration: Option<super::super::RateCalibrationRecipe>,
+    /// Opaque FX policy stamp when bootstrap used cross-currency assumptions.
+    pub(crate) fx_policy: Option<String>,
+}
 
 impl ForwardCurve {
     /// Create a builder for a [`ForwardCurve`] with explicit required choices.

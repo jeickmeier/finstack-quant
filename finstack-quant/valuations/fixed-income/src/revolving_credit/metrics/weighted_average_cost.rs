@@ -32,12 +32,16 @@ impl MetricCalculator for ApproxWeightedAverageCostCalculator {
 
         let base_rate = match &facility.rate {
             finstack_quant_cashflows::builder::RateSpec::Fixed { rate } => {
-                crate::revolving_credit::utils::fixed_rate_at(facility, *rate, context.as_of)
+                crate::revolving_credit::schedule_projection::fixed_rate_at(
+                    facility,
+                    *rate,
+                    context.as_of,
+                )
             }
             finstack_quant_cashflows::builder::RateSpec::Floating(spec) => {
                 let fwd = context.curves.get_forward(spec.forward_curve_id.as_str())?;
                 let index_rate = average_forward_rate(&fwd, facility, context.as_of)?;
-                let params = crate::revolving_credit::utils::floating_params_at(
+                let params = crate::revolving_credit::schedule_projection::floating_params_at(
                     facility,
                     spec,
                     context.as_of,
@@ -100,7 +104,7 @@ fn average_forward_rate(
     if as_of >= facility.maturity {
         return Ok(0.0);
     }
-    let periods = crate::revolving_credit::utils::build_payment_periods(facility)?;
+    let periods = crate::revolving_credit::schedule_projection::build_payment_periods(facility)?;
     let (mut weighted, mut weight) = (0.0, 0.0);
     for period in periods.iter().filter(|period| period.accrual_end > as_of) {
         let remaining_start = period.accrual_start.max(as_of);

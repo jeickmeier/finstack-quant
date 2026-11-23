@@ -1,6 +1,6 @@
 //! Callable Range Accrual instrument definition.
 
-use crate::BermudanCallProvision;
+use crate::exotics::BermudanCallProvision;
 use crate::exotics::range_accrual::{BoundsType, RangeAccrualTerms};
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::money::Money;

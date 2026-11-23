@@ -39,7 +39,7 @@ impl MetricCalculator for Dv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let swap: &VarianceSwap = context.instrument_as()?;
         let bump_bp =
-            finstack_quant_valuations_core::metrics::sensitivities::config::resolve(context)?
+            finstack_quant_valuations_core::metrics::sensitivities::bump_config::resolve(context)?
                 .rate_bump_bp;
 
         let base_pv = context.base_value.amount();

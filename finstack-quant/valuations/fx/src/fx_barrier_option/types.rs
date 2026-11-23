@@ -288,7 +288,7 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxBar
                 greeks.vega = self.option_vega(market, as_of, request.bumps)?
             }
             finstack_quant_valuations_core::instruments::OptionGreekKind::Rho => {
-                greeks.rho_bp = crate::shared::discount_rho_greek(
+                greeks.rho_bp = crate::market_inputs::discount_rho_greek(
                     self,
                     self.day_count,
                     self.expiry,
@@ -299,7 +299,7 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxBar
                 )?
             }
             finstack_quant_valuations_core::instruments::OptionGreekKind::ForeignRho => {
-                greeks.foreign_rho_bp = crate::shared::discount_rho_greek(
+                greeks.foreign_rho_bp = crate::market_inputs::discount_rho_greek(
                     self,
                     self.day_count,
                     self.expiry,
@@ -334,7 +334,7 @@ impl FxBarrierOption {
             Some(spot_id) => finstack_quant_valuations_core::metrics::bump_scalar_price(
                 market, spot_id, bump_pct,
             ),
-            None => crate::shared::fx_matrix_bumped_market(
+            None => crate::market_inputs::fx_matrix_bumped_market(
                 market,
                 self.base_currency,
                 self.quote_currency,
@@ -353,7 +353,7 @@ impl FxBarrierOption {
         spot: f64,
         bump_pct: f64,
     ) -> finstack_quant_core::Result<f64> {
-        crate::shared::spot_delta(self, as_of, spot, bump_pct, |pct| {
+        crate::market_inputs::spot_delta(self, as_of, spot, bump_pct, |pct| {
             self.spot_bumped_market(market, as_of, pct)
         })
     }
@@ -364,7 +364,7 @@ impl FxBarrierOption {
         as_of: finstack_quant_core::dates::Date,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
+        if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
         let spot = crate::fx_barrier_option::pricer::resolve_fx_spot(self, market, as_of)?;
@@ -383,13 +383,13 @@ impl FxBarrierOption {
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_valuations_core::instruments::Instrument;
 
-        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
+        if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
         let base_pv = self.value(market, as_of)?.amount();
         let current_spot = crate::fx_barrier_option::pricer::resolve_fx_spot(self, market, as_of)?;
-        Ok(Some(crate::shared::spot_gamma(
+        Ok(Some(crate::market_inputs::spot_gamma(
             self,
             as_of,
             base_pv,
@@ -406,17 +406,18 @@ impl FxBarrierOption {
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_valuations_core::instruments::Instrument;
 
-        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
+        if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
-        let (vol_bump, (up, market_up), (down, market_down)) = crate::shared::active_vol_scenarios(
-            self,
-            &self.instrument_pricing_overrides,
-            market,
-            self.vol_surface_id.as_str(),
-            bumps.vol_bump_decimal,
-        )?;
+        let (vol_bump, (up, market_up), (down, market_down)) =
+            crate::market_inputs::active_vol_scenarios(
+                self,
+                &self.instrument_pricing_overrides,
+                market,
+                self.vol_surface_id.as_str(),
+                bumps.vol_bump_decimal,
+            )?;
         let pv_up = up.value(&market_up, as_of)?.amount();
         let pv_down = down.value(&market_down, as_of)?.amount();
         let width =
@@ -429,7 +430,7 @@ impl FxBarrierOption {
         as_of: finstack_quant_core::dates::Date,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
+        if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
@@ -440,7 +441,7 @@ impl FxBarrierOption {
 
         // Spot delta in each vol scenario (central diff in spot).
         let (vol_bump, (inst_vol_up, market_vol_up), (inst_vol_dn, market_vol_dn)) =
-            crate::shared::active_vol_scenarios(
+            crate::market_inputs::active_vol_scenarios(
                 self,
                 &self.instrument_pricing_overrides,
                 market,
@@ -468,17 +469,18 @@ impl FxBarrierOption {
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_valuations_core::instruments::Instrument;
 
-        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
+        if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
-        let (vol_bump, (up, market_up), (dn, market_dn)) = crate::shared::active_vol_scenarios(
-            self,
-            &self.instrument_pricing_overrides,
-            market,
-            self.vol_surface_id.as_str(),
-            bumps.vol_bump_decimal,
-        )?;
+        let (vol_bump, (up, market_up), (dn, market_dn)) =
+            crate::market_inputs::active_vol_scenarios(
+                self,
+                &self.instrument_pricing_overrides,
+                market,
+                self.vol_surface_id.as_str(),
+                bumps.vol_bump_decimal,
+            )?;
         let pv_up = up.value(&market_up, as_of)?.amount();
         let pv_dn = dn.value(&market_dn, as_of)?.amount();
         let width = vol_bump * finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;

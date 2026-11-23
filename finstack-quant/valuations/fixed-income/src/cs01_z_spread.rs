@@ -52,7 +52,7 @@ use finstack_quant_core::math::z_spread_discount_factor;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::{
     GenericBucketedCs01, GenericParallelCs01,
 };
@@ -316,7 +316,7 @@ where
         let disc = curves.get_discount(inputs.discount_curve_id.as_str())?;
         let cached = cache_flows(&inputs, disc.as_ref())?;
 
-        let bump_bp = sens_config::resolve(context)?.credit_spread_bump_bp;
+        let bump_bp = bump_config::resolve(context)?.credit_spread_bump_bp;
 
         let inst_id = instrument.id();
         let cs01 = if cached.is_empty() {
@@ -396,7 +396,7 @@ where
         let disc = curves.get_discount(inputs.discount_curve_id.as_str())?;
         let cached = cache_flows(&inputs, disc.as_ref())?;
 
-        let defaults = sens_config::resolve(context)?;
+        let defaults = bump_config::resolve(context)?;
         let buckets = defaults.cs01_buckets_years;
         let bump_bp = defaults.credit_spread_bump_bp;
         validate_buckets_strictly_increasing(&buckets)?;

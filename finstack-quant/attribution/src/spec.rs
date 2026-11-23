@@ -261,7 +261,7 @@ pub fn attribute_pnl_many(
         return Ok(Vec::new());
     }
     crate::execution::contain_panic("execute", || {
-        crate::helpers::validate_attribution_period(inputs.as_of_t0, inputs.as_of_t1)?;
+        crate::pnl_support::validate_attribution_period(inputs.as_of_t0, inputs.as_of_t1)?;
         let market_t0 = finstack_quant_core::market_data::context::MarketContext::try_from(
             inputs.market_t0.clone(),
         )?;

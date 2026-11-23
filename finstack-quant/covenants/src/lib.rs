@@ -82,10 +82,12 @@ pub mod schema;
 pub(crate) mod series;
 pub mod templates;
 
-pub use engine::{
-    BoundKind, ConsequenceApplication, Covenant, CovenantAssessment, CovenantAssessmentState,
-    CovenantBreach, CovenantConsequence, CovenantEngine, CovenantScope, CovenantSpec, CovenantType,
-    CovenantWaiver, CovenantWindow, InstrumentMutator, SpringingCondition, ThresholdTest,
+pub use engine::covenant_engine::{CovenantAssessment, CovenantAssessmentState, CovenantEngine};
+pub use engine::helpers::InstrumentMutator;
+pub use engine::types::{
+    BoundKind, ConsequenceApplication, Covenant, CovenantBreach, CovenantConsequence,
+    CovenantScope, CovenantSpec, CovenantType, CovenantWaiver, CovenantWindow, SpringingCondition,
+    ThresholdTest,
 };
 pub use forward::{
     CovenantForecast, CovenantForecastConfig, FutureBreach, ModelTimeSeries,

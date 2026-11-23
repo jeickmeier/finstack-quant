@@ -1,4 +1,8 @@
 use super::*;
+use crate::instruments::Instrument;
+use crate::pricer::{InstrumentType, ModelKey, PricerKey, PricingError};
+use finstack_quant_core::market_data::context::MarketContext;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 // ─── Parity tests: instrument trait path vs registry path ────────────────

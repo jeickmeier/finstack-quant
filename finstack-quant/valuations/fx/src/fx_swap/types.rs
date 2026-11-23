@@ -223,7 +223,8 @@ impl FxSwap {
         let calendar = finstack_quant_core::dates::calendar_by_id_strict(&format!(
             "{base_calendar_id}+{quote_calendar_id}"
         ))?;
-        let near_date = crate::shared::spot_date_from_lag(trade_date, settlement_days, calendar)?;
+        let near_date =
+            crate::market_inputs::spot_date_from_lag(trade_date, settlement_days, calendar)?;
         let far_date = finstack_quant_core::dates::fx::fx_forward_date(
             near_date,
             far_tenor,
@@ -255,7 +256,7 @@ impl FxSwap {
         payment_date: Date,
         amount: Money,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        let flows = if crate::shared::event_has_occurred(payment_date, as_of) {
+        let flows = if crate::market_inputs::event_has_occurred(payment_date, as_of) {
             Vec::new()
         } else {
             vec![(payment_date, amount)]
@@ -361,7 +362,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxSwap {
         use super::pricing_helper::FxSwapPricingContext;
 
         // End-of-day policy: far-leg settlement remains live on its event date.
-        if crate::shared::event_has_occurred(self.far_date, as_of) {
+        if crate::market_inputs::event_has_occurred(self.far_date, as_of) {
             return Ok(finstack_quant_core::money::Money::from((
                 0_i64,
                 self.quote_currency,
@@ -391,8 +392,11 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
         use super::pricing_helper::FxSwapPricingContext;
 
         self.validate()?;
-        if crate::shared::event_has_occurred(self.far_date, as_of) {
-            return crate::shared::settled_schedule(Some(Money::from((0_i64, self.base_currency))));
+        if crate::market_inputs::event_has_occurred(self.far_date, as_of) {
+            return crate::market_inputs::settled_schedule(Some(Money::from((
+                0_i64,
+                self.base_currency,
+            ))));
         }
 
         let ctx = FxSwapPricingContext::build(self, curves, as_of)?;

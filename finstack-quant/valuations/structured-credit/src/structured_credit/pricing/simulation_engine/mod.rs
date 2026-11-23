@@ -35,14 +35,14 @@ mod exercise;
 mod hedges;
 mod instrument_flows;
 mod instrument_paths;
-mod orchestration;
+pub(crate) mod orchestration;
 pub(crate) mod period_helpers;
 mod pool_flow_source;
 mod pool_flows;
 mod recovery;
 mod reserve;
 mod simulate_period;
-mod state;
+pub(crate) mod state;
 mod triggers;
 
 use conservation::{assert_cash_conserved, recycle_reinvestment_principal};
@@ -57,9 +57,10 @@ use pool_flows::{
 };
 use recovery::RecoveryQueue;
 use simulate_period::simulate_period;
-pub use state::{
-    CoverageTestBreach, CoverageTestDiagnostic, NonWaterfallPayment, NonWaterfallSource,
-    PeriodDiagnostics, SimulationDiagnostics, TrancheCreditEnhancement,
+#[cfg(test)]
+pub(super) use state::CoverageTestBreach;
+pub(crate) use state::{
+    NonWaterfallPayment, NonWaterfallSource, PeriodDiagnostics, SimulationDiagnostics,
 };
 use state::{SimulationState, StateTemplate, WRITEDOWN_DE_MINIMIS, step_down_metrics};
 
@@ -70,7 +71,7 @@ use period_helpers::{current_collateral_wac, term_rate_for_period};
 
 pub(crate) use instrument_flows::PreparedInstrumentSchedules;
 pub(crate) use instrument_paths::InstrumentPathFlowSource;
-pub use orchestration::SimulationRun;
+pub(crate) use orchestration::SimulationRun;
 pub(crate) use orchestration::{
     PreparedDealSimulation, prepare_deal_simulation, simulate_prepared, simulate_with_source,
 };

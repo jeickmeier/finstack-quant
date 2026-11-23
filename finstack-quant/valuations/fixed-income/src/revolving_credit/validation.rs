@@ -458,7 +458,7 @@ impl RevolvingCredit {
                     },
                 )?;
                 let _ = finstack_quant_cashflows::builder::FloatingRateParams::try_from(spec)?;
-                let _ = crate::revolving_credit::utils::resolved_overnight_compounding_for_index(
+                let _ = crate::revolving_credit::schedule_projection::resolved_overnight_compounding_for_index(
                     spec.forward_curve_id.as_str(),
                     spec.compounding.as_ref(),
                 )?;

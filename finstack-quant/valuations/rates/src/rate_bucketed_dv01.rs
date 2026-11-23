@@ -2,7 +2,7 @@ use finstack_quant_core::Result;
 use finstack_quant_core::market_data::term_structures::RateCalibrationCurveRole;
 use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_valuations_core::instruments::RatesCurveKind;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::sensitivities::dv01::{
     Dv01CalculatorConfig, UnifiedDv01Calculator, rate_quote_dv01_series,
 };
@@ -71,7 +71,7 @@ impl MetricCalculator for RateDv01 {
                 crate::rate_recalibration::rebuild_rate_market(context, request, metric_name)?;
             context.reprice_raw(&bumped, context.as_of)
         };
-        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
+        let bump_bp = bump_config::resolve(context)?.rate_bump_bp;
         if !self.0 {
             return sensitivity_central_diff(
                 reprice(QuoteBump::ParallelBp(bump_bp))?,

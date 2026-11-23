@@ -125,8 +125,10 @@ fn test_convention_custom_defaults() {
 fn test_builder_pattern() {
     use finstack_quant_core::types::Attributes;
     use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
+    use finstack_quant_valuations::instruments::credit_derivatives::{
+        PremiumLegSpec, ProtectionLegSpec,
+    };
     use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-    use finstack_quant_valuations::instruments::{PremiumLegSpec, ProtectionLegSpec};
 
     let start = test_date(2025, Month::January, 1);
     let end = test_date(2030, Month::January, 1);
@@ -139,7 +141,8 @@ fn test_builder_pattern() {
         .side(PayReceive::Pay)
         .convention(convention)
         .premium_leg(PremiumLegSpec {
-            date_regime: finstack_quant_valuations::instruments::CdsDateRegime::Standard,
+            date_regime:
+                finstack_quant_valuations::instruments::credit_derivatives::CdsDateRegime::Standard,
             start,
             end,
             frequency: convention.get_spec().expect("CDS registry").frequency,

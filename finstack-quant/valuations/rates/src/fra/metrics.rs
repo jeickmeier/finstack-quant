@@ -14,7 +14,7 @@ use finstack_quant_core::Result;
 use finstack_quant_core::market_data::term_structures::{
     RateCalibrationQuote, RateCalibrationRecipe,
 };
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::{
     MetricCalculator, MetricContext, MetricRegistry, sensitivity_central_diff,
 };
@@ -101,7 +101,7 @@ impl MetricCalculator for FraRateCurveDv01Calculator {
             return generic_fallback(context);
         }
 
-        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
+        let bump_bp = bump_config::resolve(context)?.rate_bump_bp;
 
         let discount_id = &fra.discount_curve_id;
         let forward_id = &fra.forward_curve_id;

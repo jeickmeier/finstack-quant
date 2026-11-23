@@ -13,7 +13,7 @@
  * - Correlation / base-corr `Pts` are **decimal correlation** (`0.02` = +0.02)
  *
  * Hierarchy-targeted variants are resolved into direct identifiers during
- * [`crate::engine::ScenarioEngine::apply`] using the market hierarchy attached
+ * [`crate::ScenarioEngine::apply`] using the market hierarchy attached
  * to the execution context.
  */
 export type D_4A1Bd77A72C86Da677De =
@@ -1074,7 +1074,7 @@ export type D_4A1Bd77A72C86Da677De =
       /**
        * Whether to continue applying the remaining scenario operations after the roll.
        *
-       * When `false`, [`crate::engine::ScenarioEngine::apply`] returns
+       * When `false`, [`crate::ScenarioEngine::apply`] returns
        * immediately after the roll-forward step.
        */
       apply_shocks?: boolean;

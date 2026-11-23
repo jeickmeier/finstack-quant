@@ -13,7 +13,7 @@ use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithPa
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
 use finstack_quant_valuations_core::instruments::SettlementType;
 use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
+use finstack_quant_valuations_exotics::commodity::CommodityUnderlyingParams;
 use finstack_quant_valuations_exotics::commodity::commodity_spot_option::{
     CommodityMcParams, CommoditySpotOption,
 };

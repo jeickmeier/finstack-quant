@@ -3,8 +3,11 @@
 use super::super::common::signed_curve_year_fraction;
 use super::builder::surviving_source_knots;
 use super::*;
+use crate::dates::Date;
 use crate::market_data::bumps::{BumpSpec, Bumpable};
+use crate::math::interp::exact_f64_eq;
 use crate::math::units::ONE_BASIS_POINT;
+use crate::types::CurveId;
 
 impl HazardCurve {
     /// Return a copy of this curve with its `recovery_rate` metadata replaced.

@@ -35,3 +35,6 @@ mod rounding;
 mod types;
 
 pub use types::{FormatOpts, Money};
+
+#[cfg(test)]
+mod tests;

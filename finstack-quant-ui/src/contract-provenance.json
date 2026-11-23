@@ -19,7 +19,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_forward.schema.json",
-          "sha256": "9b84e9d8042cb2c597cf7992a03d4d6f95ab9dbe02f0a1607aa4a33a8317016f",
+          "sha256": "e3d502b72c47b8f877d0603afbf87b2139d0b2dfd4e31f7e51c560e9f574566f",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -54,21 +54,21 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_swap.schema.json",
-          "sha256": "55eb035141757af68adc9b87483a687036f65436de6d73ffb421f3c4ebf455db",
+          "sha256": "5e54f183531067248fa3fbcb0a81f697a81f4c70aa3d93df4f9020a08fbb0bff",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_swaption.schema.json",
-          "sha256": "fce39481c4459534adb67ec0a01e6cac4165749b76a3529a2476944b7b502ca7",
+          "sha256": "673d868941fda18cc6395ef296c578df1d3e3ad9988c262aa5d16e67c4c6fbc2",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "98c839d99289bb1d6c0a6e4d2236fb7120e20b86ff4abc3389738c970e7af29f",
+          "sha256": "94a9eed4a80717fbd5a5e14af2461442e72237fd5e625f674d036635c5280ded",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "9ac65ab903ac0c49ece8e7438f4233003d6f2c5f37db8c771e072a9787f9ff54",
+          "sha256": "3c6bdb74ddc5004b3525ac5443beca9aada977651295f1fd780a3d1b016d18c2",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -1416,7 +1416,7 @@
           "uri": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
           "pointer": "#",
           "source": "finstack-quant/scenarios/schemas/scenarios/1/scenario_spec.schema.json",
-          "sha256": "e252d1c45732996d6c8d79fcf0fce5d3e084e84a273892cb0a48d28b46b3a475",
+          "sha256": "23b6924a3b24153c3c92ff200c0246cf37ccfac3c5a912d1c2aa0b115a4a1d24",
           "description": "Bare scenario specification: the ordered operations the scenario engine applies."
         }
       ]
@@ -2149,7 +2149,7 @@
           "uri": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
           "pointer": "#",
           "source": "finstack-quant/portfolio/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
-          "sha256": "ee5df434018264c28a5656ea38ca193d26dfd37bf35b92e1b9f2eebab0894b8b",
+          "sha256": "64670295dcc98feb9e4e09cf47e942ca155acd739a3edc6a49dae50c73c99cc6",
           "description": "One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`."
         }
       ]

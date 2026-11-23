@@ -16,7 +16,7 @@ use finstack_quant_models::closed_form::d1_d2_black76;
 use finstack_quant_valuations_core::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
 use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
 use finstack_quant_valuations_core::metrics::bump_surface_vol_absolute;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricRegistry};
 
 /// Register CMS option metrics with the registry.
@@ -50,7 +50,7 @@ pub(crate) struct DeltaCalculator;
 
 impl MetricCalculator for DeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
+        let bump_bp = bump_config::resolve(context)?.rate_bump_bp;
         let forward_curve_id = context
             .instrument_as::<CmsOption>()?
             .forward_curve_id
@@ -78,7 +78,7 @@ pub(crate) struct VegaCalculator;
 
 impl MetricCalculator for VegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let vol_bump = sens_config::resolve(context)?.vol_bump_decimal;
+        let vol_bump = bump_config::resolve(context)?.vol_bump_decimal;
         let as_of = context.as_of;
         let vol_surface_id = {
             let option: &CmsOption = context.instrument_as()?;
@@ -119,7 +119,7 @@ pub(crate) struct RhoCalculator;
 
 impl MetricCalculator for RhoCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
+        let bump_bp = bump_config::resolve(context)?.rate_bump_bp;
         let as_of = context.as_of;
         let discount_curve_id = {
             let option: &CmsOption = context.instrument_as()?;
@@ -153,7 +153,7 @@ impl MetricCalculator for VannaCalculator {
         if context.pricing_model()
             == Some(finstack_quant_valuations_core::pricer::ModelKey::StaticReplication)
         {
-            let cfg = sens_config::resolve(context)?;
+            let cfg = bump_config::resolve(context)?;
             let rate_bump_bp = cfg.rate_bump_bp;
             let vol_bump = cfg.vol_bump_decimal;
             let as_of = context.as_of;
@@ -338,7 +338,7 @@ impl MetricCalculator for VolgaCalculator {
         };
         let base_pv = context.reprice_raw(&std::sync::Arc::clone(&context.curves), as_of)?;
 
-        let vol_bump = sens_config::resolve(context)?.vol_bump_decimal;
+        let vol_bump = bump_config::resolve(context)?.vol_bump_decimal;
 
         let curves_vol_up =
             bump_surface_vol_absolute(&context.curves, vol_surface_id.as_str(), vol_bump)?;

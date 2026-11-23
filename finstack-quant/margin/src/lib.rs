@@ -89,7 +89,7 @@ pub mod xva;
 /// Regulatory capital frameworks (FRTB SBA, SA-CCR).
 pub mod regulatory;
 
-pub use calculators::im::simm::SimmVersion;
+pub use calculators::im::simm::params::SimmVersion;
 pub use traits::Marginable;
 
 /// Compiles the crate `README.md` Rust samples as doctests.

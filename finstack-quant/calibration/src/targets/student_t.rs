@@ -35,7 +35,7 @@ use crate::build::BuildCtx;
 use crate::build::cds_tranche::{CdsTrancheBuildOverrides, build_cds_tranche_instrument};
 use crate::config::CalibrationConfig;
 use crate::quotes::MarketQuote;
-use crate::solver::helpers::{ScanStrategy, bracket_solve_1d};
+use crate::solver::bracketing::{ScanStrategy, bracket_solve_1d};
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;

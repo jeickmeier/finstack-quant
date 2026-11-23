@@ -1055,7 +1055,7 @@ pub(super) mod tests {
         use finstack_quant_core::dates::{Date, DayCount};
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
-        use finstack_quant_valuations::instruments::BermudanCallProvision;
+        use finstack_quant_valuations::instruments::exotics::BermudanCallProvision;
         use finstack_quant_valuations::instruments::exotics::callable_range_accrual::CallableRangeAccrual;
         use finstack_quant_valuations::instruments::exotics::range_accrual::{
             BoundsType, RangeAccrualTerms,

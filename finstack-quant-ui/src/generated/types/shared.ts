@@ -46163,7 +46163,7 @@ export interface ScenarioPricingOverrides50 {
  * ```rust
  * use finstack_quant_valuations_exotics::commodity::commodity_forward::CommodityForward;
  * use finstack_quant_valuations_core::instruments::Position;
- * use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
+ * use finstack_quant_valuations_exotics::commodity::CommodityUnderlyingParams;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -46417,7 +46417,7 @@ export interface ScenarioPricingOverrides51 {
  *
  * ```rust
  * use finstack_quant_valuations_exotics::commodity::commodity_swap::CommoditySwap;
- * use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
+ * use finstack_quant_valuations_exotics::commodity::CommodityUnderlyingParams;
  * use finstack_quant_valuations_core::instruments::PayReceive;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};
@@ -46617,7 +46617,7 @@ export interface ScenarioPricingOverrides52 {
  *
  * ```rust
  * use finstack_quant_valuations_exotics::commodity::commodity_swaption::CommoditySwaption;
- * use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
+ * use finstack_quant_valuations_exotics::commodity::CommodityUnderlyingParams;
  * use finstack_quant_models::types::OptionType;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::{Date, Tenor, TenorUnit};

@@ -1878,7 +1878,7 @@
       "type": "object"
     },
     "ProcessSpec": {
-      "description": "Stochastic process to simulate, with its parameters.\n\nSerialized as an internally tagged object: `{\"type\": \"gbm\", \"r\": 0.03, ...}`.\nParameters are re-validated when [`simulate_paths`] runs, so a spec read\nfrom JSON cannot bypass the range checks of the Rust constructors.",
+      "description": "Stochastic process to simulate, with its parameters.\n\nSerialized as an internally tagged object: `{\"type\": \"gbm\", \"r\": 0.03, ...}`.\nParameters are re-validated when [`simulate_paths`](super::simulate_paths) runs, so a spec read\nfrom JSON cannot bypass the range checks of the Rust constructors.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2546,7 +2546,7 @@
       "oneOf": [
         {
           "const": "default",
-          "description": "The process's canonical scheme: its exact transition where one exists,\nquadratic-exponential for square-root variance, Euler otherwise. See\nthe [module table](self#supported-pairs).",
+          "description": "The process's canonical scheme: its exact transition where one exists,\nquadratic-exponential for square-root variance, Euler otherwise. See\nthe [module table](super#supported-pairs).",
           "type": "string"
         },
         {

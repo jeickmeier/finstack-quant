@@ -11,8 +11,8 @@ use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::StubKind;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::PayReceive;
+use finstack_quant_valuations::instruments::credit_derivatives::CreditParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
@@ -135,7 +135,7 @@ fn cds_tranche_new_carries_schedule_stub_and_date_regime() {
         "TR-STUB",
         &params,
         &schedule,
-        finstack_quant_valuations::instruments::CdsDateRegime::Bespoke,
+        finstack_quant_valuations::instruments::credit_derivatives::CdsDateRegime::Bespoke,
         "USD-OIS",
         "CDX.NA.IG.HAZARD",
         PayReceive::Pay,
@@ -144,13 +144,13 @@ fn cds_tranche_new_carries_schedule_stub_and_date_regime() {
     assert_eq!(tranche.stub, StubKind::LongFront);
     assert_eq!(
         tranche.date_regime,
-        finstack_quant_valuations::instruments::CdsDateRegime::Bespoke
+        finstack_quant_valuations::instruments::credit_derivatives::CdsDateRegime::Bespoke
     );
 
     let standard = CdsTranche::example().expect("example");
     assert_eq!(
         standard.date_regime,
-        finstack_quant_valuations::instruments::CdsDateRegime::Standard
+        finstack_quant_valuations::instruments::credit_derivatives::CdsDateRegime::Standard
     );
 
     // The tranche grid comes from its date regime, never a cashflows roll rule.
@@ -160,7 +160,7 @@ fn cds_tranche_new_carries_schedule_stub_and_date_regime() {
             "TR-IMM",
             &params,
             &schedule,
-            finstack_quant_valuations::instruments::CdsDateRegime::Bespoke,
+            finstack_quant_valuations::instruments::credit_derivatives::CdsDateRegime::Bespoke,
             "USD-OIS",
             "CDX.NA.IG.HAZARD",
             PayReceive::Pay,

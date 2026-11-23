@@ -526,7 +526,7 @@ impl PyCdsTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let regime: finstack_quant_valuations::instruments::CdsDateRegime =
+        let regime: finstack_quant_valuations::instruments::credit_derivatives::CdsDateRegime =
             value.parse().map_err(crate::errors::core_to_py)?;
         builder_set!(
             slf,

@@ -1836,7 +1836,7 @@ mod tests {
     /// consumer reconcile against their own computation of the price change.
     #[test]
     fn test_mark_to_market_pnl_captured_at_construction_and_preserved() {
-        use crate::helpers::apply_total_return_carry;
+        use crate::pnl_support::apply_total_return_carry;
         let raw_pnl = Money::from((1000_i64, Currency::USD));
         let mut attr = PnlAttribution::new(
             raw_pnl,
@@ -1852,7 +1852,7 @@ mod tests {
         // Simulate total-return adjustment (coupon income paid in period).
         let coupon = Money::from((50_i64, Currency::USD));
         let theta = Money::from((30_i64, Currency::USD));
-        let carry_inputs = crate::helpers::TotalReturnCarryInputs {
+        let carry_inputs = crate::pnl_support::TotalReturnCarryInputs {
             cash_paid: coupon,
             income_cash_paid: coupon,
             delta_accrued: None,

@@ -1,3 +1,4 @@
+use super::super::{CapFloorQuote, SwapFrequency};
 use super::*;
 use crate::hull_white::pricing::{
     normal_caplet_price, scheduled_bachelier_cap_floor_price,

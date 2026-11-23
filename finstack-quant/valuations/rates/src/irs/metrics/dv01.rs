@@ -14,7 +14,7 @@
 
 use crate::irs::InterestRateSwap;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::sensitivities::dv01::{
     Dv01CalculatorConfig, UnifiedDv01Calculator,
 };
@@ -54,7 +54,7 @@ impl MetricCalculator for IrsDv01Calculator {
                 .calculate(context);
         }
 
-        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
+        let bump_bp = bump_config::resolve(context)?.rate_bump_bp;
         let bumped_market = |bp: f64| {
             if single_curve_ois {
                 crate::rate_recalibration::bump_single_ois_rate_market_cached(

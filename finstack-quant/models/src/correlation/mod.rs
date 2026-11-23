@@ -41,10 +41,11 @@ mod latent_factor;
 mod portfolio_loss;
 mod recovery;
 
-pub use copula::{
-    Copula, CopulaSpec, FactorPairIntegrand, GaussianCopula, MultiFactorCopula,
-    RandomFactorLoadingCopula, StudentTCopula,
-};
+pub use copula::gaussian::GaussianCopula;
+pub use copula::multi_factor::MultiFactorCopula;
+pub use copula::random_factor_loading::RandomFactorLoadingCopula;
+pub use copula::spec::{Copula, CopulaSpec, FactorPairIntegrand};
+pub use copula::student_t::StudentTCopula;
 pub use error::{Error, Result};
 pub use latent_factor::{
     LatentFactorKind, LatentFactorSpec, LatentMultiFactor, LatentSingleFactor, LatentTwoFactor,
@@ -53,4 +54,6 @@ pub use portfolio_loss::{
     CreditExposure, MAX_PORTFOLIO_LOSS_PATHS, PortfolioLossConfig, PortfolioLossResult,
     TrancheLossStatistics, simulate_portfolio_loss,
 };
-pub use recovery::{ConstantRecovery, CorrelatedRecovery, RecoveryModel, RecoverySpec};
+pub use recovery::constant::ConstantRecovery;
+pub use recovery::correlated::CorrelatedRecovery;
+pub use recovery::spec::{RecoveryModel, RecoverySpec};

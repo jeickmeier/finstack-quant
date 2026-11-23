@@ -659,7 +659,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/path_simulation_spec.schema.json",
-      "bytes": 44439,
+      "bytes": 44463,
       "kind": "input",
       "path": "schemas/models/1/path_simulation_spec.schema.json",
       "summary": "Complete, serializable description of one path simulation.",
@@ -866,7 +866,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/scheme_spec.schema.json",
-      "bytes": 1200,
+      "bytes": 1201,
       "kind": "component",
       "path": "schemas/models/1/scheme_spec.schema.json",
       "summary": "Time-discretization scheme used to advance the process.",

@@ -4,7 +4,7 @@
 //! It does not include forward/futures convexity from stochastic domestic
 //! rates, foreign rates, or their correlations with FX.
 
-use crate::shared::{FxForwardRateRequest, covered_interest_parity_forward};
+use crate::market_inputs::{FxForwardRateRequest, covered_interest_parity_forward};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -158,7 +158,7 @@ impl FxFuture {
             domestic_discount_curve_id: &self.domestic_discount_curve_id,
             foreign_discount_curve_id: &self.foreign_discount_curve_id,
             quoted_spot: self.quoted_spot,
-            spot_basis: crate::shared::FxSpotBasis::Cash,
+            spot_basis: crate::market_inputs::FxSpotBasis::Cash,
             context: "FxFuture",
         })
     }

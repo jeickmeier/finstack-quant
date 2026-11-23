@@ -3,6 +3,8 @@
 use super::super::common::define_factor_transform_wire;
 use super::super::common::factor::validate_canonical_raw_origin;
 use super::*;
+use crate::dates::{Date, DayCount, Tenor};
+use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 
 define_factor_transform_wire!(ForwardCurveTransformWire, "ForwardCurveTransform");
 

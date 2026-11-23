@@ -31,7 +31,7 @@ pub(crate) mod lsmc;
 mod tests;
 mod tree_pricer;
 
-pub use bond_valuator::BondValuator;
+pub use bond_valuator::valuator::BondValuator;
 #[cfg(test)]
 use config::TreePricerConfig;
 pub(crate) use config::bond_tree_settings;

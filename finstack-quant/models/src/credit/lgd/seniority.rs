@@ -12,6 +12,7 @@
 use finstack_quant_core::InputError;
 use finstack_quant_core::Result;
 use finstack_quant_core::math::random::Pcg64Rng;
+use finstack_quant_core::wire::serde_parse;
 
 /// Debt seniority classification for recovery rate modeling.
 ///
@@ -318,6 +319,53 @@ impl SeniorityCalibration {
             .find(|(c, _)| *c == class)
             .map(|(_, b)| b)
     }
+}
+
+/// Return recovery distribution parameters for a class and exact calibration ID.
+///
+/// # Arguments
+///
+/// * `seniority` - Debt-seniority label accepted by [`SeniorityClass`], such as `senior_secured`.
+/// * `calibration_id` - Exact registry methodology ID, such as `moodys_recovery_1982_2023`
+///   or `sp_recovery_historical`; aliases, whitespace and case variants are rejected.
+///
+/// # Errors
+///
+/// Returns a validation error for an unknown seniority class or absent class,
+/// and a not-found error for an unknown calibration ID.
+pub fn seniority_recovery_stats(
+    seniority: &str,
+    calibration_id: &str,
+) -> finstack_quant_core::Result<BetaRecovery> {
+    let class = serde_parse::<SeniorityClass>(seniority)?;
+    let calibration = SeniorityCalibration::from_registry_id(calibration_id)?;
+    calibration.get(class).copied().ok_or_else(|| {
+        finstack_quant_core::Error::Validation("seniority not in calibration".into())
+    })
+}
+
+/// List the seniority recovery calibration IDs the embedded credit registry holds.
+///
+/// Each ID is accepted unchanged as the `calibration_id` of
+/// [`seniority_recovery_stats`] and [`SeniorityCalibration::from_registry_id`].
+/// The registry's default calibration comes first, followed by the others in
+/// registry order, so a caller that offers a choice can start from the first.
+///
+/// # Errors
+///
+/// Returns a validation error if the embedded registry is malformed.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_models::credit::lgd::seniority_calibration_ids;
+///
+/// let ids = seniority_calibration_ids()?;
+/// assert_eq!(ids[0], "moodys_recovery_1982_2023");
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn seniority_calibration_ids() -> finstack_quant_core::Result<Vec<String>> {
+    Ok(crate::credit::registry::embedded_registry()?.seniority_calibration_ids())
 }
 
 #[cfg(test)]

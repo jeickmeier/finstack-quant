@@ -1378,7 +1378,7 @@
       ]
     },
     "OperationSpec": {
-      "description": "Individual operation within a scenario.\n\nEach variant represents a specific type of shock or adjustment that can be\napplied to market data, instruments, statements, or the valuation horizon.\nUnits are encoded in the variant name and field docs:\n- `Pct` fields use percentage points (`5.0 = +5%`)\n- `Bp` fields use additive rate basis points (1 bp = 1e-4)\n- Vol-index `Pts` are **index points** (`1.0` on 18.5 → 19.5)\n- Correlation / base-corr `Pts` are **decimal correlation** (`0.02` = +0.02)\n\nHierarchy-targeted variants are resolved into direct identifiers during\n[`crate::engine::ScenarioEngine::apply`] using the market hierarchy attached\nto the execution context.",
+      "description": "Individual operation within a scenario.\n\nEach variant represents a specific type of shock or adjustment that can be\napplied to market data, instruments, statements, or the valuation horizon.\nUnits are encoded in the variant name and field docs:\n- `Pct` fields use percentage points (`5.0 = +5%`)\n- `Bp` fields use additive rate basis points (1 bp = 1e-4)\n- Vol-index `Pts` are **index points** (`1.0` on 18.5 → 19.5)\n- Correlation / base-corr `Pts` are **decimal correlation** (`0.02` = +0.02)\n\nHierarchy-targeted variants are resolved into direct identifiers during\n[`crate::ScenarioEngine::apply`] using the market hierarchy attached\nto the execution context.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2029,7 +2029,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Hierarchy-targeted parallel curve shift.\n\nDuring [`crate::engine::ScenarioEngine::apply`], the engine resolves\n`target` against the market-data hierarchy and expands this into one\n[`OperationSpec::CurveParallelBp`] per matched curve. When multiple\nhierarchy operations reach the same curve, [`ScenarioSpec::resolution_mode`]\ndetermines whether they accumulate or only the most specific match survives.",
+          "description": "Hierarchy-targeted parallel curve shift.\n\nDuring [`crate::ScenarioEngine::apply`], the engine resolves\n`target` against the market-data hierarchy and expands this into one\n[`OperationSpec::CurveParallelBp`] per matched curve. When multiple\nhierarchy operations reach the same curve, [`ScenarioSpec::resolution_mode`]\ndetermines whether they accumulate or only the most specific match survives.",
           "properties": {
             "bp": {
               "description": "Additive rate shift in basis points.",
@@ -2170,11 +2170,11 @@
         },
         {
           "additionalProperties": false,
-          "description": "Roll the valuation horizon forward before any later scenario operations run.\n\n`period` uses tenor-style strings such as `\"1D\"`, `\"1W\"`, `\"1M\"`, and\n`\"1Y\"`. [`TimeRollMode`] controls whether the roll uses business-day-aware\ndate arithmetic, pure calendar arithmetic, or fixed approximate day counts.\n\nThis operation is handled in phase 0 of\n[`crate::engine::ScenarioEngine::apply`], before market or statement\nshocks. If `apply_shocks` is `false`, the engine stops after the time roll\nand returns an [`crate::engine::ApplicationReport`] without applying the\nremaining operations in the scenario.\n\n# Example\n```rust\nuse finstack_quant_scenarios::{OperationSpec, TimeRollMode};\n\nlet op = OperationSpec::TimeRollForward {\n    period: \"1M\".into(),\n    apply_shocks: true,\n    roll_mode: TimeRollMode::BusinessDays,\n};\n```",
+          "description": "Roll the valuation horizon forward before any later scenario operations run.\n\n`period` uses tenor-style strings such as `\"1D\"`, `\"1W\"`, `\"1M\"`, and\n`\"1Y\"`. [`TimeRollMode`] controls whether the roll uses business-day-aware\ndate arithmetic, pure calendar arithmetic, or fixed approximate day counts.\n\nThis operation is handled in phase 0 of\n[`crate::ScenarioEngine::apply`], before market or statement\nshocks. If `apply_shocks` is `false`, the engine stops after the time roll\nand returns an [`crate::engine::ApplicationReport`] without applying the\nremaining operations in the scenario.\n\n# Example\n```rust\nuse finstack_quant_scenarios::{OperationSpec, TimeRollMode};\n\nlet op = OperationSpec::TimeRollForward {\n    period: \"1M\".into(),\n    apply_shocks: true,\n    roll_mode: TimeRollMode::BusinessDays,\n};\n```",
           "properties": {
             "apply_shocks": {
               "default": true,
-              "description": "Whether to continue applying the remaining scenario operations after the roll.\n\nWhen `false`, [`crate::engine::ScenarioEngine::apply`] returns\nimmediately after the roll-forward step.",
+              "description": "Whether to continue applying the remaining scenario operations after the roll.\n\nWhen `false`, [`crate::ScenarioEngine::apply`] returns\nimmediately after the roll-forward step.",
               "type": "boolean"
             },
             "kind": {

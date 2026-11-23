@@ -70,7 +70,7 @@ use time::macros::date;
 #[serde(deny_unknown_fields, remote = "Self")]
 pub struct FxForward {
     /// Basis of the selected spot quote, held fixed across reprices.
-    pub spot_basis: crate::shared::FxSpotBasis,
+    pub spot_basis: crate::market_inputs::FxSpotBasis,
     /// Unique instrument identifier.
     pub id: InstrumentId,
     /// Base currency (foreign currency, numerator of the pair).
@@ -238,7 +238,7 @@ impl FxForward {
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .maturity(date!(2025 - 06 - 15))
-            .spot_basis(crate::shared::FxSpotBasis::Cash)
+            .spot_basis(crate::market_inputs::FxSpotBasis::Cash)
             .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
@@ -285,7 +285,8 @@ impl FxForward {
         let calendar = finstack_quant_core::dates::calendar_by_id_strict(&format!(
             "{base_calendar_id}+{quote_calendar_id}"
         ))?;
-        let spot_date = crate::shared::spot_date_from_lag(trade_date, settlement_days, calendar)?;
+        let spot_date =
+            crate::market_inputs::spot_date_from_lag(trade_date, settlement_days, calendar)?;
         let maturity = finstack_quant_core::dates::fx::fx_forward_date(
             spot_date,
             tenor,
@@ -299,7 +300,7 @@ impl FxForward {
             .base_currency(base_currency)
             .quote_currency(quote_currency)
             .maturity(maturity)
-            .spot_basis(crate::shared::FxSpotBasis::ValueDate { date: spot_date })
+            .spot_basis(crate::market_inputs::FxSpotBasis::ValueDate { date: spot_date })
             .notional(notional)
             .domestic_discount_curve_id(domestic_discount_curve_id)
             .foreign_discount_curve_id(foreign_discount_curve_id)
@@ -473,18 +474,20 @@ impl FxForward {
     /// - Required discount curves are not found
     /// - FX rate is not available and no spot override is set
     pub fn market_forward_rate(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
-        crate::shared::covered_interest_parity_forward(crate::shared::FxForwardRateRequest {
-            market,
-            as_of,
-            maturity: self.maturity,
-            base_currency: self.base_currency,
-            quote_currency: self.quote_currency,
-            domestic_discount_curve_id: &self.domestic_discount_curve_id,
-            foreign_discount_curve_id: &self.foreign_discount_curve_id,
-            quoted_spot: self.quoted_spot,
-            spot_basis: self.spot_basis,
-            context: "FxForward",
-        })
+        crate::market_inputs::covered_interest_parity_forward(
+            crate::market_inputs::FxForwardRateRequest {
+                market,
+                as_of,
+                maturity: self.maturity,
+                base_currency: self.base_currency,
+                quote_currency: self.quote_currency,
+                domestic_discount_curve_id: &self.domestic_discount_curve_id,
+                foreign_discount_curve_id: &self.foreign_discount_curve_id,
+                quoted_spot: self.quoted_spot,
+                spot_basis: self.spot_basis,
+                context: "FxForward",
+            },
+        )
     }
 
     fn contractual_forward_rate(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
@@ -555,15 +558,15 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxForward {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         // End-of-day policy: the settlement legs remain live on maturity.
-        if crate::shared::event_has_occurred(self.maturity, as_of) {
+        if crate::market_inputs::event_has_occurred(self.maturity, as_of) {
             return Ok(finstack_quant_core::money::Money::from((
                 0_i64,
                 self.quote_currency,
             )));
         }
 
-        let inputs =
-            crate::shared::collect_fx_forward_inputs(crate::shared::FxForwardRateRequest {
+        let inputs = crate::market_inputs::collect_fx_forward_inputs(
+            crate::market_inputs::FxForwardRateRequest {
                 market,
                 as_of,
                 maturity: self.maturity,
@@ -574,7 +577,8 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxForward {
                 quoted_spot: self.quoted_spot,
                 spot_basis: self.spot_basis,
                 context: "FxForward",
-            })?;
+            },
+        )?;
         let pv = self.contract_rate.map_or(0.0, |contract_rate| {
             self.notional.amount()
                 * (inputs.spot * inputs.df_foreign - contract_rate * inputs.df_domestic)
@@ -590,7 +594,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxForward {
     ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
         // FX-policy visibility per layer; `quoted_spot` short-circuits the
         // matrix lookup, so triangulation does not apply then.
-        Some(crate::shared::fx_valuation_details(
+        Some(crate::market_inputs::fx_valuation_details(
             market,
             self.base_currency,
             self.quote_currency,
@@ -609,8 +613,11 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         self.validate()?;
-        if crate::shared::event_has_occurred(self.maturity, as_of) {
-            return crate::shared::settled_schedule(Some(Money::from((0_i64, self.base_currency))));
+        if crate::market_inputs::event_has_occurred(self.maturity, as_of) {
+            return crate::market_inputs::settled_schedule(Some(Money::from((
+                0_i64,
+                self.base_currency,
+            ))));
         }
         let contract_rate = self.contractual_forward_rate(market, as_of)?;
         let base_amount = Money::new(self.notional.amount(), self.base_currency)?;
@@ -722,7 +729,7 @@ mod tests {
     #[test]
     fn test_validation_same_currency_fails() {
         let forward = FxForward {
-            spot_basis: crate::shared::FxSpotBasis::Cash,
+            spot_basis: crate::market_inputs::FxSpotBasis::Cash,
             id: InstrumentId::new("TEST"),
             base_currency: Currency::EUR,
             quote_currency: Currency::EUR, // Same as base - invalid
@@ -753,7 +760,7 @@ mod tests {
     #[test]
     fn test_validation_notional_currency_mismatch_fails() {
         let forward = FxForward {
-            spot_basis: crate::shared::FxSpotBasis::Cash,
+            spot_basis: crate::market_inputs::FxSpotBasis::Cash,
             id: InstrumentId::new("TEST"),
             base_currency: Currency::EUR,
             quote_currency: Currency::USD,
@@ -784,7 +791,7 @@ mod tests {
     #[test]
     fn test_validation_negative_contract_rate_fails() {
         let forward = FxForward {
-            spot_basis: crate::shared::FxSpotBasis::Cash,
+            spot_basis: crate::market_inputs::FxSpotBasis::Cash,
             id: InstrumentId::new("TEST"),
             base_currency: Currency::EUR,
             quote_currency: Currency::USD,
@@ -815,7 +822,7 @@ mod tests {
     #[test]
     fn test_validation_negative_spot_override_fails() {
         let forward = FxForward {
-            spot_basis: crate::shared::FxSpotBasis::Cash,
+            spot_basis: crate::market_inputs::FxSpotBasis::Cash,
             id: InstrumentId::new("TEST"),
             base_currency: Currency::EUR,
             quote_currency: Currency::USD,
@@ -852,7 +859,7 @@ mod tests {
     fn forward_points_set_contract_rate_without_pinning_market_spot() {
         let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid date");
         let forward = FxForward::builder()
-            .spot_basis(crate::shared::FxSpotBasis::Cash)
+            .spot_basis(crate::market_inputs::FxSpotBasis::Cash)
             .id(InstrumentId::new("EURUSD-POINTS"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
@@ -918,7 +925,7 @@ mod tests {
         let market = test_market(as_of);
 
         let forward = FxForward::builder()
-            .spot_basis(crate::shared::FxSpotBasis::Cash)
+            .spot_basis(crate::market_inputs::FxSpotBasis::Cash)
             .id(InstrumentId::new("EURUSD-CF"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)

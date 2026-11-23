@@ -205,7 +205,7 @@ impl FxTouchOption {
             .barrier_direction(BarrierDirection::Down)
             .payout_amount(Money::from((1_000_000_i64, Currency::USD)))
             .payout_timing(PayoutTiming::AtExpiry)
-            .expiry(crate::shared::FAR_EXPIRY)
+            .expiry(crate::market_inputs::FAR_EXPIRY)
             .monitoring_start_date_opt(Some(date!(2024 - 01 - 01)))
             .day_count(DayCount::Act365F)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -334,7 +334,7 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxTou
                 greeks.vega = self.option_vega(market, as_of, request.bumps)?
             }
             finstack_quant_valuations_core::instruments::OptionGreekKind::Rho => {
-                greeks.rho_bp = crate::shared::discount_rho_greek(
+                greeks.rho_bp = crate::market_inputs::discount_rho_greek(
                     self,
                     self.day_count,
                     self.expiry,
@@ -345,7 +345,7 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxTou
                 )?
             }
             finstack_quant_valuations_core::instruments::OptionGreekKind::ForeignRho => {
-                greeks.foreign_rho_bp = crate::shared::discount_rho_greek(
+                greeks.foreign_rho_bp = crate::market_inputs::discount_rho_greek(
                     self,
                     self.day_count,
                     self.expiry,
@@ -386,7 +386,7 @@ impl FxTouchOption {
         as_of: finstack_quant_core::dates::Date,
         bump_pct: f64,
     ) -> finstack_quant_core::Result<finstack_quant_core::market_data::context::MarketContext> {
-        crate::shared::fx_matrix_bumped_market(
+        crate::market_inputs::fx_matrix_bumped_market(
             market,
             self.base_currency,
             self.quote_currency,
@@ -401,7 +401,7 @@ impl FxTouchOption {
         as_of: finstack_quant_core::dates::Date,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
+        if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
@@ -409,7 +409,7 @@ impl FxTouchOption {
         if current_spot * bumps.spot_bump_decimal <= 0.0 {
             return Ok(Some(0.0));
         }
-        Ok(Some(crate::shared::spot_delta(
+        Ok(Some(crate::market_inputs::spot_delta(
             self,
             as_of,
             current_spot,
@@ -425,13 +425,13 @@ impl FxTouchOption {
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_valuations_core::instruments::Instrument;
 
-        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
+        if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
         let base_pv = self.value(market, as_of)?.amount();
         let current_spot = self.matrix_spot(market, as_of)?;
-        Ok(Some(crate::shared::spot_gamma(
+        Ok(Some(crate::market_inputs::spot_gamma(
             self,
             as_of,
             base_pv,
@@ -448,7 +448,7 @@ impl FxTouchOption {
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_valuations_core::instruments::Instrument;
 
-        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
+        if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
@@ -471,13 +471,14 @@ impl FxTouchOption {
             ));
         }
 
-        let (vol_bump, (up, market_up), (down, market_down)) = crate::shared::active_vol_scenarios(
-            self,
-            &self.instrument_pricing_overrides,
-            market,
-            self.vol_surface_id.as_str(),
-            bumps.vol_bump_decimal,
-        )?;
+        let (vol_bump, (up, market_up), (down, market_down)) =
+            crate::market_inputs::active_vol_scenarios(
+                self,
+                &self.instrument_pricing_overrides,
+                market,
+                self.vol_surface_id.as_str(),
+                bumps.vol_bump_decimal,
+            )?;
         let pv_up = up.value(&market_up, as_of)?.amount();
         let pv_down = down.value(&market_down, as_of)?.amount();
         let width =

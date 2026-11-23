@@ -1,7 +1,6 @@
 //! Smoke tests for direct `CashflowProvider` coverage.
 
 use finstack_quant_cashflows::CashflowProvider;
-use finstack_quant_valuations::instruments::FloatLegSpec;
 use finstack_quant_valuations::instruments::Position;
 use finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;
 use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
@@ -19,6 +18,7 @@ use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
 use finstack_quant_valuations::instruments::fx::fx_swap::FxSwap;
 use finstack_quant_valuations::instruments::fx::ndf::Ndf;
+use finstack_quant_valuations::instruments::rates::FloatLegSpec;
 fn assert_provider<T: CashflowProvider>(_instrument: &T) {}
 use finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;
 use finstack_quant_valuations::instruments::rates::cms_swap::CmsSwap;
@@ -140,7 +140,7 @@ fn basis_swap_exposes_cashflow_provider_bridge() {
 
     let start = Date::from_calendar_date(2024, Month::January, 3).expect("valid date");
     let end = Date::from_calendar_date(2025, Month::January, 3).expect("valid date");
-    let primary_leg = finstack_quant_valuations::instruments::FloatLegSpec {
+    let primary_leg = finstack_quant_valuations::instruments::rates::FloatLegSpec {
         end_of_month: false,
         fixing_calendar_id: None,
         index_id: "3M-SOFR".into(),
@@ -158,7 +158,7 @@ fn basis_swap_exposes_cashflow_provider_bridge() {
         reset_lag_days: 0,
         compounding: Default::default(),
     };
-    let reference_leg = finstack_quant_valuations::instruments::FloatLegSpec {
+    let reference_leg = finstack_quant_valuations::instruments::rates::FloatLegSpec {
         index_id: "6M-SOFR".into(),
         forward_curve_id: CurveId::new("6M-SOFR"),
         ..primary_leg.clone()

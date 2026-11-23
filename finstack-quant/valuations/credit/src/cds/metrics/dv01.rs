@@ -16,7 +16,7 @@ use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
 use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::{
     MetricCalculator, MetricContext, sensitivity_central_diff,
 };
@@ -79,7 +79,7 @@ pub(crate) fn calculate_credit_dv01(
         MetricId, format_key_rate_label, validate_buckets_strictly_increasing,
     };
 
-    let settings = sens_config::resolve(context)?;
+    let settings = bump_config::resolve(context)?;
     let bp = settings.rate_bump_bp;
     if bp.abs() <= 1e-10 {
         return Ok(0.0);

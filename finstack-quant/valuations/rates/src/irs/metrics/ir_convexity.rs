@@ -25,7 +25,7 @@ use finstack_quant_core::Result;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::RatesCurveKind;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Parallel IR convexity (second-order rate sensitivity).
@@ -35,7 +35,7 @@ impl MetricCalculator for IrConvexityCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let irs: &InterestRateSwap = context.instrument_as()?;
         let as_of = context.as_of;
-        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
+        let bump_bp = bump_config::resolve(context)?.rate_bump_bp;
 
         let base_pv = irs.value_raw(context.curves.as_ref(), as_of)?;
 
@@ -119,7 +119,7 @@ impl MetricCalculator for CrossGammaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let irs: &InterestRateSwap = context.instrument_as()?;
         let as_of = context.as_of;
-        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
+        let bump_bp = bump_config::resolve(context)?.rate_bump_bp;
 
         if irs.fixed_leg.discount_curve_id == irs.float_leg.forward_curve_id {
             return Ok(0.0);

@@ -12,7 +12,7 @@
 use crate::real_estate::{RealEstateAsset, RealEstateValuationMethod};
 use finstack_quant_core::Error;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Reject configurations whose value does not depend on a cap rate.
@@ -75,7 +75,7 @@ pub(super) struct CapRate01Calculator;
 
 impl MetricCalculator for CapRate01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
+        let bump_bp = bump_config::resolve(context)?.rate_bump_bp;
         let bump = bump_bp / 10_000.0;
         let market = context.curves.as_ref();
         let as_of = context.as_of;

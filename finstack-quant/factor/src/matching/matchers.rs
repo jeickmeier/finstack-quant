@@ -311,7 +311,17 @@ impl FactorMatcher for CascadeMatcher {
 }
 
 #[cfg(test)]
-use super::deepest_match;
+pub(crate) fn deepest_match(
+    matcher: &dyn FactorMatcher,
+    dependency: &crate::MarketDependency,
+    attributes: &finstack_quant_core::types::Attributes,
+) -> Option<crate::FactorId> {
+    matcher
+        .match_factor(dependency, attributes)
+        .ok()
+        .flatten()
+        .and_then(|entries| entries.last().map(|entry| entry.factor_id.clone()))
+}
 
 #[cfg(test)]
 mod tests_mapping_table {

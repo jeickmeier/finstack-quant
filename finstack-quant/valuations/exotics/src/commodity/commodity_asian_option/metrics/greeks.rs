@@ -12,7 +12,7 @@ use crate::commodity::bump_price_curve_pct;
 use crate::commodity::commodity_asian_option::CommodityAsianOption;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Delta calculator for commodity Asian options (forward curve sensitivity).
@@ -38,7 +38,7 @@ impl MetricCalculator for AsianDeltaCalculator {
             return Ok(0.0);
         }
 
-        let bump_pct = sens_config::resolve(context)?.spot_bump_decimal;
+        let bump_pct = bump_config::resolve(context)?.spot_bump_decimal;
 
         let (fwd_sum, fwd_count) = asian.future_forwards(&context.curves, context.as_of)?;
         let avg_fwd = fwd_sum / fwd_count as f64;

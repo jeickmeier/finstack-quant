@@ -718,7 +718,9 @@ mod tests {
     use rust_decimal::Decimal;
 
     use super::*;
-    use crate::instruments::rates::{cap_floor::RateOptionType, repo::CollateralSpec};
+    use crate::instruments::rates::{
+        FloatLegSpec, cap_floor::RateOptionType, repo::CollateralSpec,
+    };
     use finstack_quant_valuations_core::instruments::envelope::{
         MAX_JSON_BYTES, instrument_load_error,
     };

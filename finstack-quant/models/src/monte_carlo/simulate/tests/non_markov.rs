@@ -2,17 +2,28 @@
 //! `rough_bergomi`, `rough_heston` and `cheyette_rough`, and the fractional
 //! noise choice.
 
+use super::runner::dispatch;
 use super::tests::{assert_mean, engine_states, error_message, mean_var, spec, terminal};
 use super::*;
+use crate::monte_carlo::discretization::lmm_predictor_corrector::LmmPredictorCorrector;
+use crate::monte_carlo::discretization::rough_bergomi::RoughBergomiEuler;
+use crate::monte_carlo::discretization::rough_heston::RoughHestonHybrid;
 use crate::monte_carlo::engine::simulate_path_fractional;
 use crate::monte_carlo::process::cheyette_rough::BaseVolatility;
+use crate::monte_carlo::process::cheyette_rough::CheyetteRoughVolParams;
+use crate::monte_carlo::process::gbm::GbmParams;
+use crate::monte_carlo::process::lmm::{LmmParams, LmmProcess};
+use crate::monte_carlo::process::rough_bergomi::{RoughBergomiParams, RoughBergomiProcess};
+use crate::monte_carlo::process::rough_heston::{RoughHestonParams, RoughHestonProcess};
 use crate::monte_carlo::rng::fbm::FractionalNoiseGenerator;
+use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::rng::volterra::RiemannLiouvilleVolterra;
-use crate::monte_carlo::traits::{PathState, Payoff};
+use crate::monte_carlo::traits::{Discretization, PathState, Payoff, RandomStream};
 use crate::volatility::heston::HestonParams;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::term_structures::ForwardVarianceCurve;
 use finstack_quant_core::math::fractional::HurstExponent;
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;
 
 /// Steps of the shared uniform grid on `[0, 1]`; `0.5` is a grid time, as the

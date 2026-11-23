@@ -72,5 +72,5 @@ pub use spec::{
 };
 pub use types::{TermLoan, TermLoanBuilder};
 
-pub use pricing::TermLoanDiscountingPricer;
-pub use pricing::TermLoanTreePricer;
+pub use pricing::discounting::TermLoanDiscountingPricer;
+pub use pricing::tree_engine::TermLoanTreePricer;

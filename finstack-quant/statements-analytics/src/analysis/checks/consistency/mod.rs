@@ -5,10 +5,10 @@
 //! bounds, effective tax rates fall in expected ranges, and working-capital
 //! changes on the cash flow statement match balance-sheet deltas.
 
-mod growth_rate;
-mod tax_rate;
-mod working_capital;
+pub(crate) mod growth_rate;
+pub(crate) mod tax_rate;
+pub(crate) mod working_capital;
 
-pub use growth_rate::GrowthRateConsistency;
-pub use tax_rate::EffectiveTaxRateCheck;
-pub use working_capital::WorkingCapitalConsistency;
+pub(crate) use growth_rate::GrowthRateConsistency;
+pub(crate) use tax_rate::EffectiveTaxRateCheck;
+pub(crate) use working_capital::WorkingCapitalConsistency;

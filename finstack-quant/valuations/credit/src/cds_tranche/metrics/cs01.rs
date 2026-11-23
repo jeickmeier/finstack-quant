@@ -7,7 +7,7 @@ use finstack_quant_core::market_data::{
 };
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::{
     Cs01Request, compute_key_rate_cs01_series_for_hazard, require_hazard_replay,
 };
@@ -27,7 +27,7 @@ impl MetricCalculator for CdsTrancheCs01Calculator {
         let tranche = context.instrument_as::<CdsTranche>()?.clone();
         let index = context.curves.get_credit_index(&tranche.credit_index_id)?;
         let hazards = active_hazards(&index);
-        let bump = sens_config::resolve(context)?.credit_spread_bump_bp;
+        let bump = bump_config::resolve(context)?.credit_spread_bump_bp;
         let provider = context.recalibration_provider("cs01")?;
         let dispatch = context.clone_pricer_dispatch();
         let revalue = |market: &finstack_quant_core::market_data::context::MarketContext| {
@@ -76,7 +76,7 @@ impl MetricCalculator for CdsTrancheBucketedCs01Calculator {
         let tranche = context.instrument_as::<CdsTranche>()?.clone();
         let index = context.curves.get_credit_index(&tranche.credit_index_id)?;
         let hazards = active_hazards(&index);
-        let bump = sens_config::resolve(context)?.credit_spread_bump_bp;
+        let bump = bump_config::resolve(context)?.credit_spread_bump_bp;
         let request = Cs01Request::generic(bump, tranche.discount_curve_id.clone());
         let instrument = Arc::clone(&context.instrument);
         let dispatch = context.clone_pricer_dispatch();

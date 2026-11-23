@@ -215,7 +215,7 @@ fn overnight_replay_preserves_index_rates_across_curve_clocks() {
         };
         let mut projected = 0;
         for source in model.sources.values() {
-            if let OvernightRateSource::Conditional(source) = source {
+            if let ObservedRateSource::Conditional(source) = source {
                 projected += 1;
                 assert!(
                     (source.base_index_rate - 0.04).abs() < 1e-12,

@@ -65,7 +65,7 @@ fn collect_quanto_inputs(
     // The quanto drift adjustment uses ATM-forward FX vol, so absolute-strike
     // surfaces must be queried at the CIRP forward rather than moneyness 1.0.
     let sigma_fx = if let Some(fx_vol_surface_id) = &inst.fx_vol_surface_id {
-        let s_fx = crate::shared::resolve_fx_spot(
+        let s_fx = crate::market_inputs::resolve_fx_spot(
             curves,
             as_of,
             inst.base_currency,

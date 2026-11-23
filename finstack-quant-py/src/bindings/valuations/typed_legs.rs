@@ -31,12 +31,14 @@ use super::convert::{enum_to_py_string, opt_repr};
 #[derive(Clone)]
 pub struct PyFixedLegSpec {
     /// Inner canonical Rust fixed-leg spec.
-    pub(crate) inner: finstack_quant_valuations::instruments::FixedLegSpec,
+    pub(crate) inner: finstack_quant_valuations::instruments::rates::FixedLegSpec,
 }
 
 impl PyFixedLegSpec {
     /// Wrap a Rust fixed-leg spec.
-    pub(crate) fn from_inner(inner: finstack_quant_valuations::instruments::FixedLegSpec) -> Self {
+    pub(crate) fn from_inner(
+        inner: finstack_quant_valuations::instruments::rates::FixedLegSpec,
+    ) -> Self {
         Self { inner }
     }
 }
@@ -50,7 +52,7 @@ impl PyFixedLegSpec {
         text_signature = "(*, discount_curve_id, rate, frequency, day_count, start, end, business_day_convention='modified_following', calendar_id=None, stub='short_front', payment_lag_days=0, end_of_month=False)"
     )]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
-        let inner: finstack_quant_valuations::instruments::FixedLegSpec =
+        let inner: finstack_quant_valuations::instruments::rates::FixedLegSpec =
             fields_with_decimal_from_py(py, fields, "FixedLegSpec", "rate", decimal_rate_from_any)?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
@@ -129,12 +131,14 @@ crate::bindings::macros::py_getters!(PyFixedLegSpec |s| {
 #[derive(Clone)]
 pub struct PyFloatLegSpec {
     /// Inner canonical Rust floating-leg spec.
-    pub(crate) inner: finstack_quant_valuations::instruments::FloatLegSpec,
+    pub(crate) inner: finstack_quant_valuations::instruments::rates::FloatLegSpec,
 }
 
 impl PyFloatLegSpec {
     /// Wrap a Rust floating-leg spec.
-    pub(crate) fn from_inner(inner: finstack_quant_valuations::instruments::FloatLegSpec) -> Self {
+    pub(crate) fn from_inner(
+        inner: finstack_quant_valuations::instruments::rates::FloatLegSpec,
+    ) -> Self {
         Self { inner }
     }
 }
@@ -148,7 +152,7 @@ impl PyFloatLegSpec {
         text_signature = "(*, discount_curve_id, index_id, forward_curve_id, spread_bp, frequency, day_count, start, end, business_day_convention='modified_following', calendar_id=None, stub='short_front', reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_days=0, end_of_month=False)"
     )]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
-        let inner: finstack_quant_valuations::instruments::FloatLegSpec =
+        let inner: finstack_quant_valuations::instruments::rates::FloatLegSpec =
             fields_with_decimal_from_py(
                 py,
                 fields,
@@ -267,7 +271,7 @@ crate::bindings::macros::py_getters!(PyFloatLegSpec |s| {
 #[derive(Clone)]
 pub struct PyPremiumLegSpec {
     /// Inner canonical Rust premium-leg spec.
-    pub(crate) inner: finstack_quant_valuations::instruments::PremiumLegSpec,
+    pub(crate) inner: finstack_quant_valuations::instruments::credit_derivatives::PremiumLegSpec,
 }
 
 #[pymethods]
@@ -279,7 +283,7 @@ impl PyPremiumLegSpec {
         text_signature = "(*, start, end, frequency, day_count, coupon_bp, discount_curve_id, date_regime, stub='short_front', business_day_convention='modified_following', calendar_id=None)"
     )]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
-        let inner: finstack_quant_valuations::instruments::PremiumLegSpec =
+        let inner: finstack_quant_valuations::instruments::credit_derivatives::PremiumLegSpec =
             fields_with_decimal_from_py(
                 py,
                 fields,
@@ -357,7 +361,7 @@ crate::bindings::macros::py_getters!(PyPremiumLegSpec |s| {
 #[derive(Clone)]
 pub struct PyProtectionLegSpec {
     /// Inner canonical Rust protection-leg spec.
-    pub(crate) inner: finstack_quant_valuations::instruments::ProtectionLegSpec,
+    pub(crate) inner: finstack_quant_valuations::instruments::credit_derivatives::ProtectionLegSpec,
 }
 
 #[pymethods]
@@ -366,12 +370,13 @@ impl PyProtectionLegSpec {
     #[new]
     #[pyo3(text_signature = "(credit_curve_id, recovery_rate, settlement_delay)")]
     fn new(credit_curve_id: &str, recovery_rate: f64, settlement_delay: u16) -> PyResult<Self> {
-        let inner = finstack_quant_valuations::instruments::ProtectionLegSpec::new(
-            credit_curve_id.to_string(),
-            recovery_rate,
-            settlement_delay,
-        )
-        .map_err(core_to_py)?;
+        let inner =
+            finstack_quant_valuations::instruments::credit_derivatives::ProtectionLegSpec::new(
+                credit_curve_id.to_string(),
+                recovery_rate,
+                settlement_delay,
+            )
+            .map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -388,7 +393,7 @@ impl PyProtectionLegSpec {
 
 crate::bindings::macros::wire_methods!(
     PyFixedLegSpec,
-    finstack_quant_valuations::instruments::FixedLegSpec,
+    finstack_quant_valuations::instruments::rates::FixedLegSpec,
     "FixedLegSpec",
     module = "finstack_quant.valuations.instruments._typed_legs",
     validate,
@@ -397,7 +402,7 @@ crate::bindings::macros::wire_methods!(
 
 crate::bindings::macros::wire_methods!(
     PyFloatLegSpec,
-    finstack_quant_valuations::instruments::FloatLegSpec,
+    finstack_quant_valuations::instruments::rates::FloatLegSpec,
     "FloatLegSpec",
     module = "finstack_quant.valuations.instruments._typed_legs",
     validate,
@@ -406,7 +411,7 @@ crate::bindings::macros::wire_methods!(
 
 crate::bindings::macros::wire_methods!(
     PyPremiumLegSpec,
-    finstack_quant_valuations::instruments::PremiumLegSpec,
+    finstack_quant_valuations::instruments::credit_derivatives::PremiumLegSpec,
     "PremiumLegSpec",
     module = "finstack_quant.valuations.instruments._typed_legs",
     to_dict
@@ -414,7 +419,7 @@ crate::bindings::macros::wire_methods!(
 
 crate::bindings::macros::wire_methods!(
     PyProtectionLegSpec,
-    finstack_quant_valuations::instruments::ProtectionLegSpec,
+    finstack_quant_valuations::instruments::credit_derivatives::ProtectionLegSpec,
     "ProtectionLegSpec",
     module = "finstack_quant.valuations.instruments._typed_legs",
     validate,

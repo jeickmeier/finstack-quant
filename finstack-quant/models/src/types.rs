@@ -249,6 +249,11 @@ impl OptionMarketParams {
     }
 }
 
+/// Validation error for a caller input outside its domain.
+pub(crate) fn invalid_input(message: impl Into<String>) -> finstack_quant_core::Error {
+    finstack_quant_core::Error::Validation(message.into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

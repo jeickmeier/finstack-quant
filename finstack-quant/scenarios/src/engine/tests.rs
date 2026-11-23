@@ -1,5 +1,7 @@
 use super::*;
+use crate::spec::ScenarioSpec;
 use crate::spec::{OperationSpec, TimeRollMode};
+use crate::warning::Warning;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::hierarchy::{
     HierarchyTarget, MarketDataHierarchy, ResolutionMode,

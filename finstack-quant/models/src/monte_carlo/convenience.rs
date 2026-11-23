@@ -141,6 +141,26 @@ pub fn path_dependent_pricer(
     Ok(PathDependentPricer::new(config))
 }
 
+/// Reject a non-finite or non-positive volatility before a convenience pricer runs.
+///
+/// The generic GBM process accepts `sigma == 0` (a deterministic forward), but
+/// the host-facing convenience entry points require a strictly positive
+/// volatility so a sign slip or a zero placeholder surfaces as a validation
+/// error instead of a silent degenerate price.
+///
+/// # Arguments
+///
+/// * `vol` - Annualized lognormal volatility as a decimal; must be finite and
+///   strictly positive.
+pub(crate) fn require_positive_vol(vol: f64) -> finstack_quant_core::Result<()> {
+    if !vol.is_finite() || vol <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Monte Carlo convenience pricers require a finite, strictly positive volatility, got {vol}"
+        )));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

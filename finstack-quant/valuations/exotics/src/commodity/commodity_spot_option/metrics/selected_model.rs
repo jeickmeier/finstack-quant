@@ -23,7 +23,8 @@ pub(crate) fn selected_commodity_greek(
     }
     let option: &CommoditySpotOption = context.instrument_as()?;
     let forward = option.forward_price(&context.curves, context.as_of)?;
-    let config = finstack_quant_valuations_core::metrics::sensitivities::config::resolve(context)?;
+    let config =
+        finstack_quant_valuations_core::metrics::sensitivities::bump_config::resolve(context)?;
     let h = (forward * config.spot_bump_decimal)
         .max(1e-6)
         .min(forward * 0.5);

@@ -185,7 +185,7 @@ impl JsBond {
                 issue_date,
                 maturity,
                 convention
-                    .parse::<finstack_quant_valuations::instruments::BondConvention>()
+                    .parse::<finstack_quant_valuations::instruments::fixed_income::BondConvention>()
                     .map_err(to_js_err)?,
                 discount_curve_id,
             )
@@ -283,7 +283,7 @@ impl JsBond {
         finstack_quant_valuations::instruments::fixed_income::bond::Bond::floating_with_convention(
             params,
             js_string(&convention, "convention")?
-                .parse::<finstack_quant_valuations::instruments::BondConvention>()
+                .parse::<finstack_quant_valuations::instruments::fixed_income::BondConvention>()
                 .map_err(to_js_err)?,
         )
         .map(|inner| JsBond { inner })

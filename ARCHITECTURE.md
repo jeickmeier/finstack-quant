@@ -28,7 +28,7 @@ domain crate as a module (`finstack_quant::core`, `finstack_quant::valuations`,
 | [`models`](finstack-quant/models/README.md) | Model kernels: closed form, Monte Carlo (`models::monte_carlo`), PDE, trees, Fourier, volatility, short rate, credit, copulas and correlation, liquidity | core, cashflows |
 | [`factor`](finstack-quant/factor/README.md) | Multi-asset factor models: definitions, matching, covariance, risk decomposition, credit-factor calibration | core, analytics |
 | [`valuations/macros`](finstack-quant/valuations/macros/README.md) | `FinancialBuilder` derive | — |
-| [`valuations/core`](finstack-quant/valuations/core/README.md) | Pricing framework: `Instrument` trait, `Pricer` / `PricerRegistry`, `Family`, `MetricId` and metric registry, `ValuationResult`, market conventions. No instrument types | core, cashflows, covenants, margin, models, valuations/macros |
+| [`valuations/core`](finstack-quant/valuations/core/README.md) | Pricing framework: `Instrument` trait, `Pricer` / `PricerRegistry`, `Family`, `MetricId` and metric registry, `ValuationResult`, market conventions. No instrument types | core, cashflows, margin, models, valuations/macros |
 | [`valuations/rates`](finstack-quant/valuations/rates/README.md) | Rates and inflation instruments | valuations/core, core, cashflows, margin, models, valuations/macros |
 | [`valuations/fixed-income`](finstack-quant/valuations/fixed-income/README.md) | Bonds, loans, agency MBS/TBA, dollar rolls, FI TRS, bond futures | valuations/core, core, cashflows, covenants, margin, models, valuations/macros |
 | [`valuations/credit`](finstack-quant/valuations/credit/README.md) | CDS, CDS indices, tranches, CDS options | valuations/core, core, cashflows, margin, models, valuations/macros |
@@ -36,7 +36,7 @@ domain crate as a module (`finstack_quant::core`, `finstack_quant::valuations`,
 | [`valuations/fx`](finstack-quant/valuations/fx/README.md) | FX spot, forwards, swaps, NDFs, futures, vanilla and exotic options | valuations/core, core, cashflows, models, valuations/macros |
 | [`valuations/exotics`](finstack-quant/valuations/exotics/README.md) | Asian, barrier, lookback, range accrual, TARN, snowball, commodities | valuations/core, core, cashflows, models, valuations/macros |
 | [`valuations/structured-credit`](finstack-quant/valuations/structured-credit/README.md) | Structured credit deals, agency CMOs, asset-backed facilities | valuations/core, valuations/fixed-income, valuations/rates, core, cashflows, models, valuations/macros |
-| [`valuations`](finstack-quant/valuations/README.md) | Umbrella over the framework and the seven family crates under one path tree; instruments that hold other families' legs (basket, composite, levered real estate); the `STANDARD` registry; the JSON loader (the closed world of instrument types); schemas | valuations/core, the seven family crates, core, cashflows, covenants, margin, models, valuations/macros |
+| [`valuations`](finstack-quant/valuations/README.md) | Umbrella over the framework and the seven family crates under one path tree; instruments that hold other families' legs (basket, composite, levered real estate); the `STANDARD` registry; the JSON loader (the closed world of instrument types); schemas | valuations/core, the seven family crates, core, cashflows, models, valuations/macros |
 | [`calibration`](finstack-quant/calibration/README.md) | Curve, hazard, inflation and vol bootstraps; SABR fits; base correlation; global calibration | valuations/core, valuations/rates, valuations/credit, core, cashflows, models |
 | [`attribution`](finstack-quant/attribution/README.md) | Multi-period P&L attribution (waterfall, Taylor, metrics-based) | calibration, valuations, factor, models, core, cashflows |
 | [`statements`](finstack-quant/statements/README.md) | Statement model graph and period evaluation (Value > Forecast > Formula) | valuations, core, cashflows |
@@ -57,7 +57,7 @@ umbrella and its proc-macro crate `finstack-quant-wasm/macros` (package
 core → analytics, arrow-interchange, cashflows, covenants, features, margin
 core + cashflows → models
 core + analytics → factor
-core + cashflows + covenants + margin + models + macros → valuations/core
+core + cashflows + margin + models + macros → valuations/core
 valuations/core (+ core, cashflows, models, macros) → rates, fixed-income, credit, equity, fx, exotics
 fixed-income + rates → structured-credit
 valuations/core + the seven family crates → valuations

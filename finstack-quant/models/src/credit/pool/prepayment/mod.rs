@@ -19,11 +19,10 @@
 mod factor_correlated;
 mod regime_switching;
 mod richard_roll;
-mod spec;
-mod traits;
+pub(crate) mod spec;
+pub(crate) mod traits;
 
 pub(crate) use factor_correlated::FactorCorrelatedPrepay;
 pub(crate) use regime_switching::RegimeSwitchingPrepay;
 pub(crate) use richard_roll::RichardRollPrepay;
-pub use spec::StochasticPrepaySpec;
-pub use traits::{PrepaymentState, StochasticPrepayment};
+pub(crate) use traits::StochasticPrepayment;

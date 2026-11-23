@@ -17,7 +17,7 @@ use finstack_quant_valuations_core::instruments::GreekBumps;
 /// Compute every tree Greek once, seed the siblings, and return `requested`.
 fn tree_greek(context: &mut MetricContext, requested: MetricId) -> Result<f64> {
     let bumps = GreekBumps::from(
-        &finstack_quant_valuations_core::metrics::sensitivities::config::resolve(context)?,
+        &finstack_quant_valuations_core::metrics::sensitivities::bump_config::resolve(context)?,
     );
     let bond = context.instrument_as::<ConvertibleBond>()?;
     let greeks = calculate_convertible_greeks(bond, &context.curves, bumps, context.as_of)?;

@@ -54,3 +54,6 @@ pub(crate) mod metrics;
 mod types;
 
 pub use types::{BasisSwap, BasisSwapBuilder};
+
+#[cfg(test)]
+mod tests;

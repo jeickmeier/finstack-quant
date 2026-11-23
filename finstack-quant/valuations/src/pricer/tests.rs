@@ -1,0 +1,179 @@
+use super::*;
+use crate::results::ValuationResult;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::money::Money;
+use std::collections::BTreeMap;
+use std::ptr;
+
+struct DummyPricer;
+
+impl Pricer for DummyPricer {
+    fn key(&self) -> PricerKey {
+        PricerKey::new(InstrumentType::Deposit, ModelKey::Tree)
+    }
+
+    fn price_dyn(
+        &self,
+        _instrument: &dyn crate::instruments::Instrument,
+        _market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> std::result::Result<ValuationResult, PricingError> {
+        Ok(ValuationResult::stamped(
+            "dummy",
+            as_of,
+            Money::from((0_i64, Currency::USD)),
+        ))
+    }
+}
+
+#[test]
+fn registration_key_comes_from_the_pricer() {
+    let mut registry = PricerRegistry::new();
+    let key = DummyPricer.key();
+
+    registry.register(DummyPricer).expect("registration");
+
+    assert!(registry.get_pricer(key).is_some());
+}
+
+/// `register` returns a typed collision error without overwriting.
+#[test]
+fn register_rejects_duplicate_key() {
+    let mut registry = PricerRegistry::new();
+    let key = PricerKey::new(InstrumentType::Deposit, ModelKey::Tree);
+
+    registry.register(DummyPricer).expect("first registration");
+    let error = registry
+        .register(DummyPricer)
+        .expect_err("duplicate registration must fail");
+    assert_eq!(error, PricingError::DuplicateRegistration { key });
+    assert!(registry.get_pricer(key).is_some());
+}
+
+#[test]
+fn replace_is_the_explicit_overwrite_operation() {
+    let mut registry = PricerRegistry::new();
+    let key = PricerKey::new(InstrumentType::Deposit, ModelKey::Tree);
+    registry.register(DummyPricer).expect("first registration");
+    registry.replace(DummyPricer);
+    assert!(registry.get_pricer(key).is_some());
+}
+
+#[test]
+fn standard_registry_returns_shared_singleton() {
+    assert!(ptr::eq(STANDARD.pricers(), STANDARD.pricers()));
+    assert!(ptr::eq(
+        STANDARD.pricers(),
+        STANDARD.shared_pricers().as_ref(),
+    ));
+    assert!(ptr::eq(STANDARD.metrics(), STANDARD.metrics()));
+}
+
+#[test]
+fn cloned_standard_registry_is_independently_mutable() {
+    let key = PricerKey::new(InstrumentType::Deposit, ModelKey::Tree);
+    assert!(STANDARD.pricers().get_pricer(key).is_none());
+
+    let mut cloned = STANDARD.pricers().clone();
+    cloned
+        .register(DummyPricer)
+        .expect("new clone registration");
+
+    assert!(cloned.get_pricer(key).is_some());
+    assert!(STANDARD.pricers().get_pricer(key).is_none());
+}
+
+/// Every pricer has exactly one owning family, and the umbrella is the
+/// union of the families plus the instruments that register with
+/// `STANDARD` because they hold legs of several families.
+#[test]
+fn families_own_disjoint_instrument_types_that_cover_the_standard_registry() {
+    let mut owner: BTreeMap<InstrumentType, &str> = BTreeMap::new();
+    for family in FAMILIES {
+        let pricers = family
+            .build_pricers()
+            .unwrap_or_else(|error| panic!("{} pricer table: {error}", family.name()));
+        for instrument_type in pricers.all_models_grouped().keys() {
+            if let Some(previous) = owner.insert(*instrument_type, family.name()) {
+                panic!(
+                    "{instrument_type:?} is registered by both {previous} and {}",
+                    family.name()
+                );
+            }
+        }
+    }
+    for umbrella_resident in [
+        InstrumentType::Composite,
+        InstrumentType::Basket,
+        InstrumentType::LeveredRealEstateEquity,
+    ] {
+        if let Some(previous) = owner.insert(umbrella_resident, STANDARD.name()) {
+            panic!(
+                "{umbrella_resident:?} is registered by both {previous} and {}",
+                STANDARD.name()
+            );
+        }
+    }
+
+    let standard: Vec<InstrumentType> = crate::pricer::STANDARD
+        .pricers()
+        .all_models_grouped()
+        .keys()
+        .copied()
+        .collect();
+    let owned: Vec<InstrumentType> = owner.keys().copied().collect();
+    assert_eq!(owned, standard);
+}
+
+/// Resolving through a family answers exactly as the merged umbrella
+/// does for every instrument type the family owns: same models, and the
+/// same applicable metrics aside from the umbrella-level historical VaR
+/// metrics registered in [`register_standard_metrics`].
+#[test]
+fn family_registries_match_the_umbrella_for_owned_types() {
+    let umbrella_risk_metrics = [
+        crate::metrics::MetricId::ExpectedShortfall,
+        crate::metrics::MetricId::HVar,
+    ];
+    let standard_models = STANDARD.pricers().all_models_grouped();
+    let standard_metrics = STANDARD.metrics();
+    for family in FAMILIES {
+        let models = family.pricers().all_models_grouped();
+        assert!(!models.is_empty(), "{} registers no pricers", family.name());
+        for (instrument_type, family_models) in &models {
+            assert_eq!(
+                Some(family_models),
+                standard_models.get(instrument_type),
+                "{} models for {instrument_type:?}",
+                family.name()
+            );
+            let standard_for_type = standard_metrics.metrics_for_instrument(*instrument_type);
+            for id in &umbrella_risk_metrics {
+                assert!(
+                    standard_for_type.contains(id),
+                    "umbrella missing {id} for {instrument_type:?}"
+                );
+            }
+            let mut expected = family.metrics().metrics_for_instrument(*instrument_type);
+            for id in &umbrella_risk_metrics {
+                if !expected.contains(id) {
+                    expected.push(id.clone());
+                }
+            }
+            expected.sort_by(|a, b| a.as_str().cmp(b.as_str()));
+            assert_eq!(
+                expected,
+                standard_for_type,
+                "{} metrics for {instrument_type:?}",
+                family.name()
+            );
+        }
+    }
+}
+
+#[test]
+fn built_in_metric_owners_are_unique() {
+    STANDARD
+        .build_metrics()
+        .expect("each built-in metric slot must have one owner");
+}

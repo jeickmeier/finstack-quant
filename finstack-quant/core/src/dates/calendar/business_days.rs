@@ -605,6 +605,13 @@ fn joint_calendar(id: &str) -> crate::Result<&'static dyn HolidayCalendar> {
     Ok(composite)
 }
 
+/// Identifier of the holiday-free [`WEEKENDS_ONLY`](crate::dates::WEEKENDS_ONLY) calendar.
+///
+/// Use it wherever a calendar id is required but only Saturday/Sunday
+/// adjustment applies; [`calendar_by_id_strict`]
+/// resolves it to [`WEEKENDS_ONLY`](crate::dates::WEEKENDS_ONLY).
+pub const WEEKENDS_ONLY_ID: &str = "weekends_only";
+
 #[cfg(test)]
 mod serde_tests {
     use super::*;
@@ -919,5 +926,13 @@ mod joint_calendar_tests {
             super::canonical_calendar_id("GBLO + nyse").expect("joint id"),
             "gblo+nyse"
         );
+    }
+}
+
+#[cfg(test)]
+mod weekends_only_id_tests {
+    #[test]
+    fn weekends_only_id_matches_the_generated_calendar() {
+        assert_eq!(super::super::WEEKENDS_ONLY.id, super::WEEKENDS_ONLY_ID);
     }
 }

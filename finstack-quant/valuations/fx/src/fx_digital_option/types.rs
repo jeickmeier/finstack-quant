@@ -193,7 +193,7 @@ impl FxDigitalOption {
             .option_type(OptionType::Call)
             .payout_type(DigitalPayoutType::CashOrNothing)
             .payout_amount(Money::from((1_000_000_i64, Currency::USD)))
-            .expiry(crate::shared::FAR_EXPIRY)
+            .expiry(crate::market_inputs::FAR_EXPIRY)
             .day_count(DayCount::Act365F)
             .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))

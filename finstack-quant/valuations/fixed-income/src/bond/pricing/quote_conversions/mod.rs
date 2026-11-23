@@ -11,7 +11,6 @@
 mod annuity;
 mod breakeven_ladder;
 mod compute;
-mod field_units;
 mod spread_price;
 mod types;
 mod workout_ladder;
@@ -22,13 +21,14 @@ pub use annuity::{
 };
 pub use breakeven_ladder::{BondBreakevenLadder, BondBreakevenRow, bond_breakeven_ladder};
 pub use compute::compute_quotes;
-pub use field_units::bond_quote_set_field_units;
 pub use spread_price::{price_from_dm, price_from_oas, price_from_z_spread};
+pub(crate) use types::ExitCandidate;
 pub use types::{BondQuoteSet, YieldCompounding};
 pub use workout_ladder::{BondWorkoutLadder, BondWorkoutRow, WorkoutExitKind, bond_workout_ladder};
-pub use yield_price::{
-    df_from_yield, price_from_ytm, price_from_ytm_compounded_params, price_from_ytw,
+pub use yield_price::discounting::{
+    df_from_yield, price_from_ytm, price_from_ytm_compounded_params,
 };
+pub use yield_price::workout::price_from_ytw;
 
 pub(crate) use annuity::{
     asw_index_conventions, asw_leg_schedule, curve_par_rate, floating_leg_pv_and_annuity,
@@ -44,23 +44,6 @@ pub(crate) use yield_price::{
     enumerate_exit_paths, exercise_redemption_amount, flow_times, japanese_simple_yield,
     price_from_ytm_timed, solve_ytw_from_flows,
 };
-
-/// One candidate early-exit for yield-to-worst enumeration.
-///
-/// Represents a single admissible exercise date and the corresponding clean
-/// redemption price expressed as a percentage of par (e.g. `103.0` for 103%).
-#[derive(Debug, Clone)]
-pub(crate) struct ExitCandidate {
-    /// Whether the exit is an issuer call, a holder put or contractual maturity.
-    pub(crate) kind: WorkoutExitKind,
-    /// The exact admissible exercise date, clipped to
-    /// `[as_of, bond.maturity]`.
-    pub(crate) date: finstack_quant_core::dates::Date,
-    /// Clean redemption price as percent of par (e.g. `103.0` for 103%).
-    pub(crate) price_pct_of_par: f64,
-    /// Deterministic make-whole term retained for issuer-call candidates.
-    pub(crate) make_whole: Option<crate::bond::MakeWholeSpec>,
-}
 
 #[cfg(test)]
 mod tests;

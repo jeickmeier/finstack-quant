@@ -4587,7 +4587,7 @@ export type MoveUnit = "basis_point" | "vol_point" | "percent" | "price_unit";
  * - Correlation / base-corr `Pts` are **decimal correlation** (`0.02` = +0.02)
  *
  * Hierarchy-targeted variants are resolved into direct identifiers during
- * [`crate::engine::ScenarioEngine::apply`] using the market hierarchy attached
+ * [`crate::ScenarioEngine::apply`] using the market hierarchy attached
  * to the execution context.
  */
 export type OperationSpec =
@@ -4937,7 +4937,7 @@ export type OperationSpec =
       /**
        * Whether to continue applying the remaining scenario operations after the roll.
        *
-       * When `false`, [`crate::engine::ScenarioEngine::apply`] returns
+       * When `false`, [`crate::ScenarioEngine::apply`] returns
        * immediately after the roll-forward step.
        */
       apply_shocks?: boolean;
@@ -18763,7 +18763,7 @@ export interface ResolvedCompositeLeg {
   quantity: number;
 }
 /**
- * Report describing what happened during [`super::ScenarioEngine::apply`].
+ * Report describing what happened during [`crate::ScenarioEngine::apply`].
  */
 export interface ApplicationReport {
   /**
@@ -19007,7 +19007,7 @@ export interface RollForwardReport {
    * Calendar days between `old_date` and `new_date`.
    *
    * Always a calendar-day span, including under
-   * [`TimeRollMode::BusinessDays`](crate::spec::TimeRollMode::BusinessDays):
+   * [`TimeRollMode::BusinessDays`](crate::TimeRollMode::BusinessDays):
    * the target date is business-day adjusted, but the span back to
    * `old_date` is still calendar days. Downstream ACT/365F annualization
    * depends on this.

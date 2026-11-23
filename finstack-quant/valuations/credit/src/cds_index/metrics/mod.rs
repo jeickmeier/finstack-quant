@@ -19,34 +19,7 @@ mod dv01;
 mod expected_loss;
 mod jump_to_default;
 mod recovery01;
+mod register;
 mod simple;
 
-use finstack_quant_valuations_core::metrics::MetricRegistry;
-
-/// Register all CDS Index metrics with the registry
-pub(crate) fn register_cds_index_metrics(
-    registry: &mut MetricRegistry,
-) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::pricer::InstrumentType;
-
-    // Standard metrics using macro
-    finstack_quant_valuations_core::register_metrics! {
-        registry: registry,
-        instrument: InstrumentType::CdsIndex,
-        metrics: [
-            (ParSpread, simple::ParSpreadCalculator),
-            (Cs01, cs01::Cs01Calculator, NativeMoney),
-            (BucketedCs01, cs01::CdsIndexBucketedCs01Calculator, NativeMoney),
-            (ProtectionLegPv, simple::ProtectionLegPvCalculator),
-            (PremiumLegPv, simple::PremiumLegPvCalculator),
-            (ExpectedLoss, expected_loss::ExpectedLossCalculator),
-            (JumpToDefault, jump_to_default::JumpToDefaultCalculator),
-            (Dv01, dv01::CdsIndexDv01Calculator(false)),
-            (BucketedDv01, dv01::CdsIndexDv01Calculator(true)),
-            (RiskyPv01, simple::RiskyPv01Calculator),
-            // Recovery01 (custom metric - recovery rate sensitivity)
-            (Recovery01, recovery01::Recovery01Calculator),
-        ]
-    }
-    Ok(())
-}
+pub(crate) use register::register_cds_index_metrics;

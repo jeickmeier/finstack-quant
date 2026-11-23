@@ -2,6 +2,8 @@
 
 use super::*;
 use crate::dates::imm::is_imm_date;
+use crate::dates::{Date, DateExt, Tenor};
+use smallvec::SmallVec;
 
 pub(super) type Buffer = SmallVec<[Date; 32]>;
 

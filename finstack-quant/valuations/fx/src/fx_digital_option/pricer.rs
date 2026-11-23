@@ -1,7 +1,7 @@
 //! FX digital option pricer implementation.
 
 use crate::fx_digital_option::types::{DigitalPayoutType, FxDigitalOption};
-use crate::shared::{FxOptionInputRequest, FxOptionInputs, collect_fx_option_inputs};
+use crate::market_inputs::{FxOptionInputRequest, FxOptionInputs, collect_fx_option_inputs};
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -120,7 +120,7 @@ fn input_request<'a>(
         quote_currency: inst.quote_currency,
         expiry: inst.expiry,
         delivery: inst.expiry,
-        spot_basis: crate::shared::FxSpotBasis::Cash,
+        spot_basis: crate::market_inputs::FxSpotBasis::Cash,
         day_count: inst.day_count,
         domestic_discount_curve_id: &inst.domestic_discount_curve_id,
         foreign_discount_curve_id: &inst.foreign_discount_curve_id,

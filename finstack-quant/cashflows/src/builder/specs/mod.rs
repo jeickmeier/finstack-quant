@@ -26,68 +26,26 @@
 //! - Behavioral models for credit instruments (prepayment, default, recovery)
 //! - Helper constructors for common market conventions (USD, EUR, GBP, etc.)
 
-mod amortization;
-mod coupon;
-mod default;
-mod fees;
-mod prepayment;
-mod principal;
-mod rate;
-mod recovery;
-mod schedule;
+pub(crate) mod amortization;
+pub(crate) mod coupon;
+pub(crate) mod default;
+pub(crate) mod fees;
+pub(crate) mod prepayment;
+pub(crate) mod principal;
+pub(crate) mod rate;
+pub(crate) mod recovery;
+pub(crate) mod schedule;
+mod vectors;
 
-/// Read a per-month vector at a seasoning month: month 0 and month 1 read
-/// the first entry, months past the end hold the last one.
-///
-/// # Errors
-///
-/// Returns `Error::Validation` when the vector is empty or the entry is not
-/// finite and non-negative; the caller names the field.
-pub(super) fn vector_at(
-    values: &[f64],
-    seasoning_months: u32,
-    name: &str,
-) -> finstack_quant_core::Result<f64> {
-    let Some(last) = values.len().checked_sub(1) else {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "{name} must hold at least one value"
-        )));
-    };
-    let index = (seasoning_months.saturating_sub(1) as usize).min(last);
-    let value = values[index];
-    if !value.is_finite() || value < 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "{name}[{index}] ({value}) must be finite and non-negative"
-        )));
-    }
-    Ok(value)
-}
-
-/// Reject any per-month vector entry that is not a finite decimal in `[0, 1]`.
-///
-/// # Errors
-///
-/// Returns `Error::Validation` naming `name[index]` for the first offending entry.
-pub(super) fn check_unit_vector(values: &[f64], name: &str) -> finstack_quant_core::Result<()> {
-    for (index, value) in values.iter().enumerate() {
-        if !value.is_finite() || !(0.0..=1.0).contains(value) {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "{name}[{index}] ({value}) must be a decimal in [0, 1]"
-            )));
-        }
-    }
-    Ok(())
-}
-
-pub use amortization::{AmortizationSpec, Notional};
-pub use coupon::{
-    CouponType, FixedCouponSpec, FloatingCouponSpec, FloatingLegCompounding, FloatingRateFallback,
-    FloatingRateSpec, OvernightIndexConstraintApplication, StepUpCouponSpec,
+pub(crate) use amortization::AmortizationSpec;
+#[cfg(test)]
+pub(crate) use coupon::FloatingRateFallback;
+pub(crate) use coupon::{
+    CouponType, FixedCouponSpec, FloatingCouponSpec, FloatingLegCompounding, FloatingRateSpec,
+    OvernightIndexConstraintApplication, StepUpCouponSpec,
 };
-pub use default::DefaultModelSpec;
-pub use fees::{FeeAccrualBasis, FeeBase, FeeSpec, FeeTier, evaluate_fee_tiers};
-pub use prepayment::PrepaymentModelSpec;
-pub use principal::{PrincipalEventSpec, PrincipalExchange};
-pub use rate::RateSpec;
-pub use recovery::RecoveryModelSpec;
-pub use schedule::{RollRule, ScheduleParams};
+pub(crate) use fees::{FeeAccrualBasis, FeeBase, FeeSpec};
+pub(crate) use principal::{PrincipalEventSpec, PrincipalExchange};
+pub(crate) use schedule::{RollRule, ScheduleParams};
+
+use vectors::{check_unit_vector, vector_at};

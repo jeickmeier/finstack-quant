@@ -45,10 +45,10 @@ mod types;
 mod utils;
 
 pub use generic::Interpolator;
-pub use strategies::{
-    CubicHermiteStrategy, LinearStrategy, LogLinearStrategy, MonotoneConvexStrategy,
-    PiecewiseQuadraticForwardStrategy,
-};
+pub use strategies::cubic_hermite::CubicHermiteStrategy;
+pub use strategies::linear::{LinearStrategy, LogLinearStrategy};
+pub use strategies::monotone_convex::MonotoneConvexStrategy;
+pub use strategies::piecewise_quadratic::PiecewiseQuadraticForwardStrategy;
 pub use types::{ExtrapolationPolicy, InterpStyle};
 
 pub(crate) use types::Interp;

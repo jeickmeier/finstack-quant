@@ -1,9 +1,11 @@
+use super::super::config::StochasticPricerConfig;
 use super::collector::{PathTrancheMetrics, ScenarioCollector, expected_shortfall};
 use super::factors::PREPAY_FACTOR_SEED_SALT;
 use super::*;
 use crate::structured_credit::pricing::stochastic::calibrations::{
     clo_default_spec, rmbs_default_spec, rmbs_prepay_spec,
 };
+use crate::structured_credit::types::StructuredCredit;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_models::correlation::{LatentFactorSpec, RecoverySpec};
 use finstack_quant_models::credit::pool::{StochasticDefaultSpec, StochasticPrepaySpec};

@@ -530,6 +530,40 @@ fn first_arg_dimension(arg_dims: &[Dimension]) -> Dimension {
     arg_dims.first().copied().unwrap_or(Dimension::Unknown)
 }
 
+/// Parse and compile a formula in one step.
+///
+/// This is a convenience function that combines parsing and compilation.
+///
+/// # Arguments
+/// * `formula` - DSL expression to parse then compile
+///
+/// # Returns
+/// Shared [`Expr`](finstack_quant_core::expr::Expr) for the period-aware statements evaluator.
+///
+/// # Example
+///
+/// ```rust
+/// use finstack_quant_statements::dsl::parse_and_compile;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let expr = parse_and_compile("revenue - cogs")?;
+/// # let _ = expr;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Errors
+///
+/// Returns a formula-parse error if `formula` is not one complete valid DSL
+/// expression, or a compilation error if the parsed AST contains an unsupported
+/// capital-structure component or invalid function/operator form. It performs
+/// no model-specific reference or dimension validation; those require the
+/// model's node set and value types.
+pub fn parse_and_compile(formula: &str) -> crate::error::Result<finstack_quant_core::expr::Expr> {
+    let ast = super::parser::parse_formula(formula)?;
+    compile(&ast)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

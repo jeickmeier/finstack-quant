@@ -1,6 +1,6 @@
 use super::*;
 use crate::fx_barrier_option::types::FxBarrierOption;
-use crate::shared::FxOptionInputs;
+use crate::market_inputs::FxOptionInputs;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;

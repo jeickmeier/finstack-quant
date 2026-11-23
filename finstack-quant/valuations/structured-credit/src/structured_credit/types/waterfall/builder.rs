@@ -2,6 +2,7 @@
 //! template and the placement of coverage tests and hedge payments.
 
 use super::*;
+use finstack_quant_core::currency::Currency;
 
 impl Waterfall {
     /// Start building a waterfall in `currency`; tiers are added with

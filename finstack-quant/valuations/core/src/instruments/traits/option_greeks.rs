@@ -75,7 +75,7 @@ pub struct GreekBumps {
 
 impl Default for GreekBumps {
     fn default() -> Self {
-        (&crate::metrics::sensitivities::config::SensitivitiesConfig::default()).into()
+        (&crate::metrics::sensitivities::bump_config::SensitivitiesConfig::default()).into()
     }
 }
 

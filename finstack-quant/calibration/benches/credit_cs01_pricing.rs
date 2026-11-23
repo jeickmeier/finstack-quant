@@ -18,6 +18,7 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_models::correlation::CopulaSpec;
+use finstack_quant_valuations::instruments::credit_derivatives::CdsDateRegime;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::{
     CdsTradeParams, CreditDefaultSwap,
 };
@@ -27,7 +28,7 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
     CdsTranche, CdsTrancheParams, CdsTranchePricer,
 };
-use finstack_quant_valuations::instruments::{CdsDateRegime, Instrument, PayReceive};
+use finstack_quant_valuations::instruments::{Instrument, PayReceive};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::results::ValuationResult;
 use serde_json::{Value, json};

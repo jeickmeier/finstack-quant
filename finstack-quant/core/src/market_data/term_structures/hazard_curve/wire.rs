@@ -1,6 +1,8 @@
 //! Validated serialization adapters for [`HazardCurve`].
 
 use super::*;
+use crate::currency::Currency;
+use crate::dates::{Date, DayCount};
 
 /// Raw serializable state of a [`HazardCurve`].
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

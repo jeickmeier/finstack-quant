@@ -571,6 +571,19 @@ pub(crate) fn modified_sharpe(
     )
 }
 
+/// `numerator / 0.0` with signed infinity for nonzero finite numerators and
+/// `NaN` for zero or non-finite numerators.
+#[inline]
+pub(crate) fn zero_denom_ratio(numerator: f64) -> f64 {
+    if !numerator.is_finite() || numerator == 0.0 {
+        f64::NAN
+    } else if numerator > 0.0 {
+        f64::INFINITY
+    } else {
+        f64::NEG_INFINITY
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

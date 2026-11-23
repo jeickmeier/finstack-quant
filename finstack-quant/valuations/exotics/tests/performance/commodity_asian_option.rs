@@ -5,7 +5,7 @@
 //! establish the existing TW/Kemna-Vorst contract, not exact arithmetic-Asian
 //! distribution accuracy. The core normal CDF is a shared numerical primitive.
 
-use crate::CommodityUnderlyingParams;
+use crate::commodity::CommodityUnderlyingParams;
 use crate::commodity::commodity_asian_option::types::CommodityAsianOption;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};

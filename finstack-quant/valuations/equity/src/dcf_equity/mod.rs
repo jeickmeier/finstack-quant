@@ -13,3 +13,6 @@ pub use types::{
     DilutionSecurity, DiscountedCashFlow, EquityBridge, ForecastTiming, TerminalValueSpec,
     ValuationDiscounts,
 };
+
+#[cfg(test)]
+mod tests;

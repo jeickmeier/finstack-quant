@@ -881,8 +881,6 @@ pub(super) fn validate_displacements(
     }
 }
 
-use super::validate_axis;
-
 /// Validate axes, row-major dimensions and annualized volatility quotes.
 pub(super) fn validate_grid(
     expiries: &[f64],
@@ -954,6 +952,22 @@ pub(super) fn validate_secondary_domain(
             }
         }
         VolQuoteType::Normal => {}
+    }
+    Ok(())
+}
+
+/// Validate a surface axis: non-empty, finite, and strictly increasing if `len > 1`.
+pub(super) fn validate_axis(axis: &[f64]) -> crate::Result<()> {
+    if axis.is_empty() {
+        return Err(crate::InputError::TooFewPoints.into());
+    }
+    if axis.iter().any(|x| !x.is_finite()) {
+        return Err(crate::Error::Validation(
+            "surface axis values must be finite".to_string(),
+        ));
+    }
+    if axis.len() > 1 {
+        crate::math::interp::validate_knots(axis)?;
     }
     Ok(())
 }

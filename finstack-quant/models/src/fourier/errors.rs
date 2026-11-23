@@ -1,0 +1,17 @@
+//! Fourier model validation and numerical error constructors.
+
+/// Inputs rejected before pricing (volatility, term count, truncation
+/// multiplier): a validation error.
+pub(crate) fn invalid_input(message: impl Into<String>) -> finstack_quant_core::Error {
+    finstack_quant_core::Error::Validation(format!("Fourier model failure: {}", message.into()))
+}
+
+/// Pricing that failed numerically (degenerate truncation range, non-finite
+/// characteristic function or price): `Calibration { category: "fourier" }`,
+/// a computation error.
+pub(crate) fn numerical(message: impl Into<String>) -> finstack_quant_core::Error {
+    finstack_quant_core::Error::Calibration {
+        message: message.into(),
+        category: "fourier".to_string(),
+    }
+}

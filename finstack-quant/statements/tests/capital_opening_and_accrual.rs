@@ -19,8 +19,8 @@ use finstack_quant_statements::capital_structure::{
 };
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{AmountOrScalar, FinancialStatementInstrument};
-use finstack_quant_valuations::instruments::BondConvention;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::fixed_income::BondConvention;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 use indexmap::IndexMap;

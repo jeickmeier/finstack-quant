@@ -46,7 +46,7 @@ pub(crate) fn accrued_interest(
     schedule: &CashFlowSchedule,
     settlement: Date,
 ) -> Result<f64> {
-    let periods = crate::revolving_credit::utils::build_payment_periods(facility)?;
+    let periods = crate::revolving_credit::schedule_projection::build_payment_periods(facility)?;
     let Some(period) = periods
         .iter()
         .find(|p| p.accrual_start <= settlement && settlement < p.accrual_end)

@@ -32,14 +32,14 @@ pub(crate) fn compute_pv(
                 .to_string(),
         ));
     }
-    let crate::shared::FxOptionInputs {
+    let crate::market_inputs::FxOptionInputs {
         spot,
         r_domestic: r_d,
         r_foreign: r_f,
         sigma,
         t,
         ..
-    } = crate::shared::collect_fx_option_inputs(input_request(inst, curves, as_of))?;
+    } = crate::market_inputs::collect_fx_option_inputs(input_request(inst, curves, as_of))?;
 
     if t <= 0.0 {
         let observed_barrier_breached = inst.observed_barrier_breached.ok_or_else(|| {
@@ -85,15 +85,15 @@ fn input_request<'a>(
     inst: &'a FxTouchOption,
     curves: &'a MarketContext,
     as_of: Date,
-) -> crate::shared::FxOptionInputRequest<'a> {
-    crate::shared::FxOptionInputRequest {
+) -> crate::market_inputs::FxOptionInputRequest<'a> {
+    crate::market_inputs::FxOptionInputRequest {
         market: curves,
         as_of,
         base_currency: inst.base_currency,
         quote_currency: inst.quote_currency,
         expiry: inst.expiry,
         delivery: inst.expiry,
-        spot_basis: crate::shared::FxSpotBasis::Cash,
+        spot_basis: crate::market_inputs::FxSpotBasis::Cash,
         day_count: inst.day_count,
         domestic_discount_curve_id: &inst.domestic_discount_curve_id,
         foreign_discount_curve_id: &inst.foreign_discount_curve_id,

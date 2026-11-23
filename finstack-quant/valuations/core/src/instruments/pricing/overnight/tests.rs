@@ -1,5 +1,12 @@
 use super::*;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::{
+    Date, DateExt, DayCount, DayCountContext, HolidayCalendar, Tenor,
+};
+use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+use finstack_quant_core::market_data::traits::Discounting;
 use time::macros::date;
 
 #[test]

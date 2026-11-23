@@ -6,10 +6,10 @@
 mod corkscrew;
 mod scorecards;
 
-pub use corkscrew::{
+pub use corkscrew::extension::{
     AccountType, CorkscrewAccount, CorkscrewConfig, CorkscrewExtension, CorkscrewReport,
     CorkscrewStatus,
 };
-pub use scorecards::{
+pub use scorecards::extension::{
     CreditScorecardExtension, ScorecardConfig, ScorecardMetric, ScorecardReport, ScorecardStatus,
 };

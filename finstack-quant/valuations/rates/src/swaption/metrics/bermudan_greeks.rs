@@ -121,7 +121,7 @@ pub(crate) struct BermudanDeltaCalculator;
 impl MetricCalculator for BermudanDeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let bump_bp =
-            finstack_quant_valuations_core::metrics::sensitivities::config::resolve(context)?
+            finstack_quant_valuations_core::metrics::sensitivities::bump_config::resolve(context)?
                 .rate_bump_bp;
         let swaption = context.instrument_as::<BermudanSwaption>()?;
 

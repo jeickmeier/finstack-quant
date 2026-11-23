@@ -134,7 +134,7 @@ impl QuantoOption {
             .underlying_ticker("NKY".to_string())
             .strike(35_000.0)
             .option_type(finstack_quant_models::types::OptionType::Call)
-            .expiry(crate::shared::FAR_EXPIRY)
+            .expiry(crate::market_inputs::FAR_EXPIRY)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .quantity_opt(Some(4_000.0))
             .payoff_fx_rate_opt(Some(1.0 / 140.0))
@@ -279,7 +279,7 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for Quant
                 greeks.theta = self.option_theta(market, as_of, request.bumps)?
             }
             finstack_quant_valuations_core::instruments::OptionGreekKind::Rho => {
-                greeks.rho_bp = crate::shared::discount_rho_greek(
+                greeks.rho_bp = crate::market_inputs::discount_rho_greek(
                     self,
                     self.day_count,
                     self.expiry,
@@ -290,7 +290,7 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for Quant
                 )?
             }
             finstack_quant_valuations_core::instruments::OptionGreekKind::ForeignRho => {
-                greeks.foreign_rho_bp = crate::shared::discount_rho_greek(
+                greeks.foreign_rho_bp = crate::market_inputs::discount_rho_greek(
                     self,
                     self.day_count,
                     self.expiry,
@@ -318,7 +318,7 @@ impl QuantoOption {
         as_of: finstack_quant_core::dates::Date,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
+        if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
         Ok(Some(
@@ -339,7 +339,7 @@ impl QuantoOption {
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_valuations_core::instruments::Instrument;
 
-        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
+        if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
@@ -347,7 +347,7 @@ impl QuantoOption {
         let current_spot = finstack_quant_valuations_core::metrics::scalar_numeric_value(
             market.get_price(&self.spot_id)?,
         );
-        Ok(Some(crate::shared::spot_gamma(
+        Ok(Some(crate::market_inputs::spot_gamma(
             self,
             as_of,
             base_pv,
@@ -370,19 +370,20 @@ impl QuantoOption {
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_valuations_core::instruments::Instrument;
 
-        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
+        if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
         // Central difference on the equity vol source pricing reads
         // (implied-vol override, else the equity surface), per vol point.
-        let (vol_bump, (up, market_up), (down, market_down)) = crate::shared::active_vol_scenarios(
-            self,
-            &self.instrument_pricing_overrides,
-            market,
-            self.vol_surface_id.as_str(),
-            bumps.vol_bump_decimal,
-        )?;
+        let (vol_bump, (up, market_up), (down, market_down)) =
+            crate::market_inputs::active_vol_scenarios(
+                self,
+                &self.instrument_pricing_overrides,
+                market,
+                self.vol_surface_id.as_str(),
+                bumps.vol_bump_decimal,
+            )?;
         let pv_up = up.value(&market_up, as_of)?.amount();
         let pv_down = down.value(&market_down, as_of)?.amount();
         let width =
@@ -407,7 +408,7 @@ impl QuantoOption {
         as_of: finstack_quant_core::dates::Date,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
+        if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
@@ -419,7 +420,7 @@ impl QuantoOption {
         }
         // Spot delta in each equity-vol scenario (central diff in spot).
         let (vol_bump, (inst_vol_up, market_vol_up), (inst_vol_dn, market_vol_dn)) =
-            crate::shared::active_vol_scenarios(
+            crate::market_inputs::active_vol_scenarios(
                 self,
                 &self.instrument_pricing_overrides,
                 market,
@@ -457,17 +458,18 @@ impl QuantoOption {
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_valuations_core::instruments::Instrument;
 
-        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
+        if crate::market_inputs::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(Some(0.0));
         }
 
-        let (vol_bump, (up, market_up), (dn, market_dn)) = crate::shared::active_vol_scenarios(
-            self,
-            &self.instrument_pricing_overrides,
-            market,
-            self.vol_surface_id.as_str(),
-            bumps.vol_bump_decimal,
-        )?;
+        let (vol_bump, (up, market_up), (dn, market_dn)) =
+            crate::market_inputs::active_vol_scenarios(
+                self,
+                &self.instrument_pricing_overrides,
+                market,
+                self.vol_surface_id.as_str(),
+                bumps.vol_bump_decimal,
+            )?;
         let pv_up = up.value(&market_up, as_of)?.amount();
         let pv_dn = dn.value(&market_dn, as_of)?.amount();
         // Report volga per **vol point squared** (consistent with vega and
@@ -554,7 +556,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for QuantoOption {
         as_of: finstack_quant_core::dates::Date,
     ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
         // `fx_spot_id` short-circuits the matrix, so triangulation does not apply.
-        Some(crate::shared::fx_valuation_details(
+        Some(crate::market_inputs::fx_valuation_details(
             market,
             self.base_currency,
             self.quote_currency,

@@ -362,7 +362,7 @@ impl CdsIndex {
         as_of: Date,
         provider: &dyn RecalibrationProvider,
     ) -> Result<f64> {
-        let bump_bp = finstack_quant_valuations_core::metrics::sensitivities::config::SensitivitiesConfig::default()
+        let bump_bp = finstack_quant_valuations_core::metrics::sensitivities::bump_config::SensitivitiesConfig::default()
             .credit_spread_bump_bp;
         self.cs01_with_bump(curves, as_of, provider, bump_bp)
     }

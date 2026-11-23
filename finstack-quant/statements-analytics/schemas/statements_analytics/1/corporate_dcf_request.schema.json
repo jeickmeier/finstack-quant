@@ -817,7 +817,7 @@
     },
     "DcfInputs": {
       "additionalProperties": false,
-      "description": "Headline DCF assumptions of [`evaluate_dcf`]: discount rate, terminal value,\ncash-flow node and optional net-debt override.\n\nThe serde form is the host input of `evaluate_dcf`: `wacc` and\n`terminal_value` are required, `ufcf_node` defaults to\n[`DEFAULT_UFCF_NODE`] and `net_debt_override` to `None`; an unknown field\nis rejected. For example\n`{\"wacc\": 0.10, \"terminal_value\": {\"type\": \"gordon_growth\", \"stable_growth_rate\": 0.02}}`.",
+      "description": "Headline DCF assumptions of [`evaluate_dcf`](crate::analysis::evaluate_dcf): discount rate, terminal value,\ncash-flow node and optional net-debt override.\n\nThe serde form is the host input of `evaluate_dcf`: `wacc` and\n`terminal_value` are required, `ufcf_node` defaults to\n[`DEFAULT_UFCF_NODE`] and `net_debt_override` to `None`; an unknown field\nis rejected. For example\n`{\"wacc\": 0.10, \"terminal_value\": {\"type\": \"gordon_growth\", \"stable_growth_rate\": 0.02}}`.",
       "properties": {
         "net_debt_override": {
           "default": null,

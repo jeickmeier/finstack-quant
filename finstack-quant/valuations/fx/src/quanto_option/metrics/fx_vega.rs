@@ -14,7 +14,7 @@
 use crate::quanto_option::QuantoOption;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::{
     MetricCalculator, MetricContext, VOL_POINTS_PER_ABSOLUTE_VOL, bump_surface_vol_absolute,
 };
@@ -24,11 +24,11 @@ pub struct FxVegaCalculator;
 
 impl MetricCalculator for FxVegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let bump = sens_config::resolve(context)?.vol_bump_decimal;
+        let bump = bump_config::resolve(context)?.vol_bump_decimal;
         let option: &QuantoOption = context.instrument_as()?;
         let as_of = context.as_of;
 
-        if crate::shared::greeks_expired(option.day_count, as_of, option.expiry)? {
+        if crate::market_inputs::greeks_expired(option.day_count, as_of, option.expiry)? {
             return Ok(0.0);
         }
 

@@ -8,7 +8,7 @@ use super::{FxConversionPolicy, FxProvider};
 use crate::InputError;
 use crate::currency::Currency;
 use crate::dates::Date;
-use crate::{FxHashMap, recover_lock as recover};
+use crate::{FxHashMap, recover_lock};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, RwLock};
 
@@ -104,9 +104,9 @@ impl SimpleFxProvider {
             .iter()
             .map(|&(from, to, rate)| ((from, to), rate))
             .collect();
-        let _writer = recover(self.writer.lock());
+        let _writer = recover_lock(self.writer.lock());
         self.ensure_revision_available()?;
-        let mut guard = recover(self.quotes.write());
+        let mut guard = recover_lock(self.quotes.write());
         for (pair, rate) in validated {
             guard.insert(pair, rate);
         }
@@ -121,9 +121,9 @@ impl SimpleFxProvider {
         quotes: &[(Currency, Currency, Date, FxConversionPolicy, f64)],
     ) -> crate::Result<()> {
         let validated = validate_pinned_batch(quotes, "duplicate scoped provider quote for")?;
-        let _writer = recover(self.writer.lock());
+        let _writer = recover_lock(self.writer.lock());
         self.ensure_revision_available()?;
-        let mut quotes = recover(self.pinned_quotes.write());
+        let mut quotes = recover_lock(self.pinned_quotes.write());
         quotes.extend(validated);
         self.advance_revision();
         Ok(())
@@ -210,13 +210,13 @@ impl FxProvider for SimpleFxProvider {
             return Ok(1.0);
         }
         let scoped = {
-            let pinned = recover(self.pinned_quotes.read());
+            let pinned = recover_lock(self.pinned_quotes.read());
             directional_rate(|a, b| pinned.get(&(a, b, on, policy)).copied(), from, to)?
         };
         let rate = match scoped {
             Some(rate) => Some(rate),
             None => {
-                let quotes = recover(self.quotes.read());
+                let quotes = recover_lock(self.quotes.read());
                 directional_rate(|a, b| quotes.get(&(a, b)).copied(), from, to)?
             }
         };
@@ -229,11 +229,11 @@ impl FxProvider for SimpleFxProvider {
     }
 
     fn snapshot(&self) -> crate::Result<Option<FxProviderSnapshot>> {
-        let quotes = recover(self.quotes.read())
+        let quotes = recover_lock(self.quotes.read())
             .iter()
             .map(|(&(from, to), &rate)| (from, to, rate))
             .collect();
-        let pinned_quotes = recover(self.pinned_quotes.read())
+        let pinned_quotes = recover_lock(self.pinned_quotes.read())
             .iter()
             .map(|(&(from, to, on, policy), &rate)| (from, to, on, policy, rate))
             .collect();

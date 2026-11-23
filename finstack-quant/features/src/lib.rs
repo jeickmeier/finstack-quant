@@ -109,7 +109,7 @@ pub use panel::{
     PanelOperation, PanelTransformColumn, PanelTransformResult, PanelTransformSpec,
     transform_panel, transform_panel_json,
 };
-pub use timeseries::{TimeSeriesOp, transform_timeseries};
+pub use timeseries::ops::{TimeSeriesOp, transform_timeseries};
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

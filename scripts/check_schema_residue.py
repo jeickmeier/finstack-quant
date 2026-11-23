@@ -60,7 +60,7 @@ SCHEMA_REJECTION_MARKER = "schema-rejection-test"
 # its naming policy mechanically; stale entries fail the check.
 ENUM_NAMING_EXCEPTIONS = {
     ("finstack-quant/attribution/src/spec.rs", "AttributionSchema"): "exact namespaced schema marker",
-    ("finstack-quant/core/src/dates/daycount/mod.rs", "DayCount"): "contractually fixed day-count spellings",
+    ("finstack-quant/core/src/dates/daycount/convention.rs", "DayCount"): "contractually fixed day-count spellings",
     ("finstack-quant/core/src/types/ratings.rs", "CreditRating"): "external agency rating codes",
     (
         "finstack-quant/factor/src/credit/hierarchy/model.rs",
@@ -76,7 +76,7 @@ ENUM_NAMING_EXCEPTIONS = {
     ("finstack-quant/scenarios/src/templates/json.rs", "ScenarioTemplateSchema"): "exact namespaced schema marker",
     ("finstack-quant/test-utils/src/golden/types.rs", "Tolerance"): "contractually fixed tolerance unit tags",
     (
-        "finstack-quant/calibration/src/api/schema.rs",
+        "finstack-quant/calibration/src/api/schema/envelope.rs",
         "CalibrationSchema",
     ): "exact namespaced schema marker",
     (

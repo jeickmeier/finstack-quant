@@ -8,7 +8,7 @@ use finstack_quant_core::market_data::surfaces::{
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
-use finstack_quant_valuations::instruments::NdfQuoteConvention;
+use finstack_quant_valuations::instruments::fx::NdfQuoteConvention;
 use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
 use finstack_quant_valuations::instruments::fx::fx_option::FxOption;
 use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;

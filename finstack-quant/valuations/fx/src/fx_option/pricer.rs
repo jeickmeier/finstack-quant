@@ -1,7 +1,7 @@
 //! FX option pricer implementation using the Garman-Kohlhagen model.
 
 use crate::fx_option::FxOption;
-use crate::shared::{
+use crate::market_inputs::{
     FxOptionInputRequest, FxOptionInputs, FxOptionInputsNoVol, collect_fx_option_inputs,
     collect_fx_option_inputs_no_vol,
 };
@@ -35,8 +35,8 @@ pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -
                 "deliverable FX option requires a confirmed exercise outcome at expiry".into(),
             ));
         }
-        let settlement =
-            crate::shared::collect_fx_forward_inputs(crate::shared::FxForwardRateRequest {
+        let settlement = crate::market_inputs::collect_fx_forward_inputs(
+            crate::market_inputs::FxForwardRateRequest {
                 market: curves,
                 as_of,
                 maturity: date,
@@ -47,7 +47,8 @@ pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -
                 quoted_spot: None,
                 spot_basis: inst.spot_basis,
                 context: "FxOption physical exercise",
-            })?;
+            },
+        )?;
         let sign = if inst.option_type == OptionType::Call {
             1.0
         } else {
@@ -58,7 +59,7 @@ pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -
             * (settlement.spot * settlement.df_foreign - inst.strike * settlement.df_domestic);
         return Money::from_model_value(amount, inst.quote_currency);
     }
-    if crate::shared::event_has_occurred(inst.expiry, as_of) {
+    if crate::market_inputs::event_has_occurred(inst.expiry, as_of) {
         return Ok(Money::from((0_i64, inst.quote_currency)));
     }
     let FxOptionInputs {
@@ -163,7 +164,7 @@ pub(crate) fn compute_greeks(
 ) -> Result<FxOptionGreeks> {
     #[cfg(test)]
     COMPUTE_GREEKS_CALLS.with(|count| count.set(count.get() + 1));
-    if crate::shared::event_has_occurred(inst.expiry, as_of) {
+    if crate::market_inputs::event_has_occurred(inst.expiry, as_of) {
         return Ok(FxOptionGreeks::default());
     }
     inst.validate()?;

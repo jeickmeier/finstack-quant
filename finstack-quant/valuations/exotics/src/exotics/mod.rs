@@ -112,3 +112,5 @@ pub mod range_accrual;
 pub mod snowball;
 /// TARN (Target Redemption Note) module.
 pub mod tarn;
+
+pub use bermudan_call::BermudanCallProvision;

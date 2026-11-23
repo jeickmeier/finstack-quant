@@ -59,7 +59,7 @@ impl<'a> MetricsContext<'a> {
         attribution: &mut crate::PnlAttribution,
         invalid: &mut bool,
     ) -> finstack_quant_core::money::Money {
-        crate::helpers::factor_money_or_invalid(
+        crate::pnl_support::factor_money_or_invalid(
             amount,
             self.ccy,
             label,
@@ -106,7 +106,7 @@ impl<'a> MetricsContext<'a> {
         }
         let mut rate_shifts = Vec::with_capacity(rates_curves.len());
         for (id, family) in &rates_curves {
-            if let Some(shift) = crate::helpers::measured_unless_missing(
+            if let Some(shift) = crate::pnl_support::measured_unless_missing(
                 measure_rate_curve_shift_bp(id.as_str(), *family, market_t0, market_t1),
             )? {
                 rate_shifts.push(shift);
@@ -196,7 +196,7 @@ impl<'a> MetricsContext<'a> {
             Err(error) => (None, Some(error.to_string())),
         };
         let fx_shift_pct = match instrument.fx_exposure() {
-            Some((base_currency, quote_currency)) => crate::helpers::measured_unless_missing(
+            Some((base_currency, quote_currency)) => crate::pnl_support::measured_unless_missing(
                 measure_fx_quote_diff(
                     &FxQuoteDiffParams {
                         base: base_currency,
@@ -258,7 +258,7 @@ fn average_credit(
         {
             continue;
         }
-        if let Some(shift) = crate::helpers::measured_unless_missing(
+        if let Some(shift) = crate::pnl_support::measured_unless_missing(
             measure_credit_curve_shift_bp(id.as_str(), t0, t1),
         )? {
             shifts.push(shift);
@@ -284,7 +284,7 @@ fn average_hazard_intensity(
         {
             continue;
         }
-        if let Some(shift) = crate::helpers::measured_unless_missing(
+        if let Some(shift) = crate::pnl_support::measured_unless_missing(
             measure_hazard_intensity_shift_bp(id.as_str(), t0, t1),
         )? {
             shifts.push(shift);
@@ -301,7 +301,7 @@ fn average_spot(
     let Some(id) = deps.market_scalar_ids.first() else {
         return Ok(None);
     };
-    crate::helpers::measured_unless_missing(measure_scalar_proportional_diff(
+    crate::pnl_support::measured_unless_missing(measure_scalar_proportional_diff(
         id,
         id,
         t0,
@@ -332,7 +332,7 @@ fn volatility_shift(
                 && surface.secondary_axis()
                     == finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike
             {
-                let (opening, closing) = crate::helpers::volatility_expiry_times(
+                let (opening, closing) = crate::pnl_support::volatility_expiry_times(
                     &surface,
                     &closing_surface,
                     expiry,

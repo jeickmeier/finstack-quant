@@ -96,7 +96,7 @@ where
 
         let base_pv =
             matches!(self.kind, OptionGreekKind::Volga).then(|| context.base_value.amount());
-        let bumps = GreekBumps::from(&super::config::resolve(context)?);
+        let bumps = GreekBumps::from(&super::bump_config::resolve(context)?);
         let inst: &I = context.instrument_as()?;
         let greeks = inst.option_greeks(
             &context.curves,

@@ -8,8 +8,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::money::Money;
 pub use finstack_quant_test_utils::assert::{in_range, relative_eq};
-use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::PayReceive;
+use finstack_quant_valuations::instruments::credit_derivatives::CreditParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
     CdsIndex, CdsIndexConstituent, CdsIndexParams,
 };

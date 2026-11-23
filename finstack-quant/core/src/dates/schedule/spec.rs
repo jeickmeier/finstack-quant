@@ -1,6 +1,9 @@
 //! Serializable schedule specification.
 
+use super::generation::BuilderInternal;
 use super::*;
+use crate::InputError;
+use crate::dates::{BusinessDayConvention, Date, Tenor};
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]

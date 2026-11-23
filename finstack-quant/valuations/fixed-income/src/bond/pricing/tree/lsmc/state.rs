@@ -162,14 +162,12 @@ impl ConditionalRate {
 }
 
 #[derive(Clone)]
-pub(super) enum OvernightRateSource {
+pub(super) enum ObservedRateSource {
     Fixed(f64),
     Conditional(ConditionalRate),
 }
 
-pub(super) type ObservedRateSource = OvernightRateSource;
-
-impl OvernightRateSource {
+impl ObservedRateSource {
     pub(super) fn rate(&self, path: &[RatesCreditPathState]) -> Result<f64> {
         match self {
             Self::Fixed(rate) => Ok(*rate),
@@ -180,7 +178,7 @@ impl OvernightRateSource {
 
 #[derive(Clone)]
 pub(super) struct OvernightCoupon {
-    pub(super) sources: BTreeMap<Date, OvernightRateSource>,
+    pub(super) sources: BTreeMap<Date, ObservedRateSource>,
     pub(super) max_history_steps: usize,
 }
 

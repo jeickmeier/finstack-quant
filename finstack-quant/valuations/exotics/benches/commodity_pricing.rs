@@ -31,7 +31,7 @@ use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPr
 use finstack_quant_valuations_core::instruments::{PayReceive, PricingOptions, SettlementType};
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_core::pricer::ModelKey;
-use finstack_quant_valuations_exotics::CommodityUnderlyingParams;
+use finstack_quant_valuations_exotics::commodity::CommodityUnderlyingParams;
 use finstack_quant_valuations_exotics::commodity::commodity_asian_option::CommodityAsianOption;
 use finstack_quant_valuations_exotics::commodity::commodity_forward::CommodityForward;
 use finstack_quant_valuations_exotics::commodity::commodity_spot_option::CommoditySpotOption;

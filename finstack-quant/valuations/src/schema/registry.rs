@@ -1,0 +1,817 @@
+//! Complete valuations JSON-Schema artifact registry.
+
+use super::common_examples::{
+    attributes_examples, business_day_convention_examples, currency_examples, date_examples,
+    day_count_examples, decimal_examples, diagnostic_examples, empty_override_examples,
+    id_examples, instrument_examples, money_examples, scenario_override_examples, tenor_examples,
+    validation_report_examples, valuation_result_examples,
+};
+use super::examples;
+use crate::instruments::json_loader::{InstrumentEnvelope, instrument_registry};
+use crate::instruments::pricing_overrides::{
+    InstrumentPricingOverrides, MetricPricingOverrides, ScenarioPricingOverrides,
+};
+use finstack_quant_core::schema::{SchemaArtifact, SchemaKind};
+use finstack_quant_valuations_core::schema::package_valuations_schema;
+use std::sync::OnceLock;
+
+/// The crate's schema registry as a shared, lazily built slice.
+///
+/// [`artifacts`] builds a fresh `Vec` because the instrument entries are
+/// assembled at runtime; callers that need a borrow with a `'static` lifetime -
+/// the language bindings, for one - use this cached view instead.
+#[must_use]
+pub fn artifacts_slice() -> &'static [SchemaArtifact] {
+    static CACHE: OnceLock<Vec<SchemaArtifact>> = OnceLock::new();
+    CACHE.get_or_init(artifacts)
+}
+
+/// The crate's complete schema registry, sorted by artifact path.
+///
+/// This lives in the library, not the generator binary, so the generator, the
+/// contract tests and the bindings all render from one definition. Render an
+/// entry with [`SchemaArtifact::generate`].
+#[must_use]
+pub fn artifacts() -> Vec<SchemaArtifact> {
+    use crate::instruments::MarketDependencies;
+    use crate::instruments::cashflow_export::{CurrencyLadder, InstrumentCashflowEnvelope};
+    use crate::instruments::composite::{CompositeHistoryRow, CompositeRebalanceResult};
+    use crate::instruments::credit_derivatives::cds::CdsTradeParams;
+    use crate::instruments::credit_derivatives::cds_index::CdsIndexParams;
+    use crate::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
+    use crate::instruments::fixed_income::BondQuoteInput;
+    use crate::instruments::fixed_income::asset_backed_facility::FacilityProjection;
+    use crate::instruments::fixed_income::bond::FloatingBondParams;
+    use crate::instruments::fixed_income::bond::pricing::merton_mc::MertonMcResult;
+    use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
+        BondBreakevenLadder, BondQuoteSet, BondWorkoutLadder,
+    };
+    use crate::instruments::fixed_income::convertible::{ConvertibleGreeks, ConvertibleSpotLadder};
+    use crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult;
+    use crate::instruments::fixed_income::structured_credit::{
+        BorrowingBaseReport, EquityMetrics, OasConfig, OasResult, PoolAccounts, PoolReport,
+        PoolStats, ScenarioGrid, ScenarioTable, SimulationDiagnostics, SimulationRun,
+        StandardDealFamily, StandardDealParams, TrancheCashflows, TrancheMetrics,
+    };
+    use crate::instruments::fx::fx_forward::FxForwardTradeDateParams;
+    use crate::instruments::fx::fx_option::FxOptionParams;
+    use crate::instruments::fx::fx_swap::FxSwapTradeDateParams;
+    use crate::instruments::fx::ndf::NdfTradeDateParams;
+    use crate::instruments::json_loader::InstrumentJson;
+    use crate::instruments::rates::cap_floor::CapFloorParams;
+    use crate::instruments::rates::cms_swap::CmsSwapScheduleParams;
+    use crate::instruments::rates::irs::ConventionSwapParams;
+    use crate::instruments::rates::swaption::BermudanSwaptionParams;
+    use crate::market::conventions::{
+        CdsConventionSpec, InflationSwapConventions, IrFutureConventions, RateIndexConventions,
+        SwaptionConventions, XccyConventions,
+    };
+    use crate::market::listed::ListedProductCoverage;
+    use crate::metrics::risk::MarketHistory;
+    use crate::metrics::risk::var_calculator::VarResult;
+    use crate::pricer::{MetricMetadata, PriceExtras};
+    use crate::results::{
+        EquityMetricsFieldUnits, MetricFieldUnit, PoolReportFieldUnits, ScenarioTableFieldUnits,
+        SimulationFieldUnits, TrancheSolveFieldUnits, ValuationResult,
+    };
+    use finstack_quant_core::contract::{Diagnostic, ValidationReport};
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
+    use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::{Attributes, InstrumentId};
+    use finstack_quant_core::wire::{DateWire, DecimalWire};
+
+    let mut artifacts = vec![
+        finstack_quant_core::schema_artifact!(
+            Attributes,
+            "common",
+            "attributes",
+            Component,
+            "User-defined tags and key-value metadata for classification."
+        )
+        .with_examples(attributes_examples),
+        finstack_quant_core::schema_artifact!(
+            Diagnostic,
+            "common",
+            "diagnostic",
+            Component,
+            "One structured finding emitted while loading a persisted contract."
+        )
+        .with_examples(diagnostic_examples),
+        finstack_quant_core::schema_artifact!(
+            ValidationReport,
+            "common",
+            "validation_report",
+            Component,
+            "Bounded structured diagnostics emitted by persisted-contract validation.",
+            title = "Validation Report"
+        )
+        .with_examples(validation_report_examples),
+        finstack_quant_core::schema_artifact!(
+            BusinessDayConvention,
+            "common",
+            "business_day_convention",
+            Component,
+            "Business-day adjustment convention.",
+            title = "Business Day Convention"
+        )
+        .with_examples(business_day_convention_examples),
+        finstack_quant_core::schema_artifact!(
+            Currency,
+            "common",
+            "currency",
+            Component,
+            "ISO 4217 currency code."
+        )
+        .with_examples(currency_examples),
+        finstack_quant_core::schema_artifact!(
+            DateWire,
+            "common",
+            "date",
+            Component,
+            "ISO 8601 calendar date string.",
+            title = "Date"
+        )
+        .with_examples(date_examples),
+        finstack_quant_core::schema_artifact!(
+            DayCount,
+            "common",
+            "day_count",
+            Component,
+            "Day-count convention.",
+            title = "Day Count"
+        )
+        .with_examples(day_count_examples),
+        finstack_quant_core::schema_artifact!(
+            DecimalWire,
+            "common",
+            "decimal",
+            Component,
+            "Exact decimal encoded as a JSON string.",
+            title = "Decimal"
+        )
+        .with_examples(decimal_examples),
+        finstack_quant_core::schema_artifact!(
+            InstrumentId,
+            "common",
+            "id",
+            Component,
+            "Opaque string identifier.",
+            title = "Id"
+        )
+        .with_examples(id_examples),
+        finstack_quant_core::schema_artifact!(
+            Money,
+            "common",
+            "money",
+            Component,
+            "Currency-tagged monetary amount."
+        )
+        .with_examples(money_examples),
+        finstack_quant_core::schema_artifact!(
+            InstrumentPricingOverrides,
+            "common",
+            "instrument_pricing_overrides",
+            Component,
+            "Instrument-owned market quote and model configuration overrides.",
+            title = "Instrument Pricing Overrides"
+        )
+        .with_examples(empty_override_examples),
+        finstack_quant_core::schema_artifact!(
+            MetricPricingOverrides,
+            "common",
+            "metric_pricing_overrides",
+            Component,
+            "Metric-time pricing and finite-difference configuration.",
+            title = "Metric Pricing Overrides"
+        )
+        .with_examples(empty_override_examples),
+        finstack_quant_core::schema_artifact!(
+            ScenarioPricingOverrides,
+            "common",
+            "scenario_pricing_overrides",
+            Component,
+            "Scenario-only price and spread shocks.",
+            title = "Scenario Pricing Overrides"
+        )
+        .with_examples(scenario_override_examples),
+        finstack_quant_core::schema_artifact!(
+            Tenor,
+            "common",
+            "tenor",
+            Component,
+            "Parsed financial tenor."
+        )
+        .with_examples(tenor_examples),
+        finstack_quant_core::schema_artifact!(
+            InstrumentJson,
+            "common",
+            "instrument_json",
+            Component,
+            "Tagged `{type, spec}` payload for one instrument, without the envelope marker."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+        .with_summary(
+            "The instrument union embedded by portfolio positions and candidates; the same \
+             branches as the instrument envelope's `instrument` field.",
+        )
+        .with_examples(examples::instrument_json),
+        SchemaArtifact::new::<InstrumentEnvelope>(
+            "schemas/instruments/1/instrument.schema.json",
+            concat!(
+                "https://finstack_quant.dev/schemas/instrument/1/",
+                "instrument.schema.json"
+            ),
+            "Finstack Quant Instrument",
+            "Canonical v1 envelope for every supported financial instrument.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Input)
+        .with_summary(
+            "The seventy-branch union of every instrument type. Prefer the per-type schema \
+             beside it: this document is too large to hand to a model.",
+        )
+        .with_examples(instrument_examples),
+        finstack_quant_core::schema_artifact!(
+            InstrumentCashflowEnvelope,
+            "results",
+            "instrument_cashflow",
+            Component,
+            "Native cashflow rows, reporting-currency PV and reconciliation status.",
+            title = "Instrument Cashflow"
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::instrument_cashflow),
+        finstack_quant_core::schema_artifact!(
+            CurrencyLadder,
+            "results",
+            "currency_ladder",
+            Component,
+            "One row currency's calendar-year non-principal, principal and native PV ladder."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::currency_ladder),
+        finstack_quant_core::schema_artifact!(
+            ValuationResult,
+            "results",
+            "valuation_result",
+            Component,
+            "Canonical valuation result containing PV and typed metrics.",
+            title = "Valuation Result"
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_summary("PV plus requested measures, with rounding and FX policy stamps.")
+        .with_examples(valuation_result_examples),
+        finstack_quant_core::schema_artifact!(
+            CompositeRebalanceResult,
+            "results",
+            "composite_rebalance_result",
+            Component,
+            "Result of resolving a new composite holdings state."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::composite_rebalance_result),
+        finstack_quant_core::schema_artifact!(
+            EnhancedMonteCarloResult,
+            "results",
+            "enhanced_monte_carlo_result",
+            Component,
+            "Revolving-credit Monte Carlo value with per-path details."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::enhanced_monte_carlo_result),
+        finstack_quant_core::schema_artifact!(
+            OasConfig,
+            "common",
+            "oas_config",
+            Input,
+            "Structured-credit OAS solver configuration: paths, stochastic dimensions and seed."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::oas_config),
+        finstack_quant_core::schema_artifact!(
+            ScenarioGrid,
+            "common",
+            "scenario_grid",
+            Input,
+            "Structured-credit CPR x CDR x severity grid swept by the tranche scenario table."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::scenario_grid),
+        finstack_quant_core::schema_artifact!(
+            OasResult,
+            "results",
+            "oas_result",
+            Component,
+            "Structured-credit option-adjusted spread and its solver diagnostics."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::oas_result),
+        finstack_quant_core::schema_artifact!(
+            ScenarioTable,
+            "results",
+            "scenario_table",
+            Component,
+            "Structured-credit scenario grid results for one tranche."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::scenario_table),
+        finstack_quant_core::schema_artifact!(
+            TrancheMetrics,
+            "results",
+            "tranche_metrics",
+            Component,
+            "Per-tranche risk and spread metrics from the tranche's own projected cashflows."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::tranche_metrics),
+        finstack_quant_core::schema_artifact!(
+            BorrowingBaseReport,
+            "results",
+            "borrowing_base_report",
+            Component,
+            "Asset-backed facility borrowing base, availability and advance-rate test."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::borrowing_base_report),
+        finstack_quant_core::schema_artifact!(
+            CompositeHistoryRow,
+            "results",
+            "composite_history_row",
+            Component,
+            "One dated composite holdings state and its accumulated trades."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::composite_history_row),
+        finstack_quant_core::schema_artifact!(
+            VarResult,
+            "results",
+            "var_result",
+            Component,
+            "Historical-simulation portfolio VaR, expected shortfall and P&L distribution."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::var_result),
+        finstack_quant_core::schema_artifact!(
+            ListedProductCoverage,
+            "results",
+            "listed_product_coverage",
+            Component,
+            "Listed-product catalog coverage for one exchange product."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::listed_product_coverage),
+        finstack_quant_core::schema_artifact!(
+            MetricFieldUnit,
+            "results",
+            "metric_field_unit",
+            Component,
+            "The display unit of one scalar field of a result struct."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::metric_field_unit),
+        finstack_quant_core::schema_artifact!(
+            TrancheSolveFieldUnits,
+            "results",
+            "tranche_solve_field_units",
+            Component,
+            "The display units of the tranche break-even CDR, discount margin and OAS results."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::tranche_solve_field_units),
+        finstack_quant_core::schema_artifact!(
+            ScenarioTableFieldUnits,
+            "results",
+            "scenario_table_field_units",
+            Component,
+            "The display units of a scenario table's axes and measures."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::scenario_table_field_units),
+        finstack_quant_core::schema_artifact!(
+            EquityMetricsFieldUnits,
+            "results",
+            "equity_metrics_field_units",
+            Component,
+            "The display units of an equity tranche's invested amount, IRR, MOIC, NAV and cash-on-cash."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::equity_metrics_field_units),
+        finstack_quant_core::schema_artifact!(
+            SimulationFieldUnits,
+            "results",
+            "simulation_field_units",
+            Component,
+            "The display units of a simulation's coverage, diversion, enhancement and excess-spread series."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::simulation_field_units),
+        finstack_quant_core::schema_artifact!(
+            MetricMetadata,
+            "results",
+            "metric_metadata",
+            Component,
+            "Canonical per-key metric interpretation for host presentation."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::metric_metadata),
+        finstack_quant_core::schema_artifact!(
+            EquityMetrics,
+            "results",
+            "equity_metrics",
+            Component,
+            "Equity-tranche return metrics: IRR, MOIC, NAV and cash-on-cash."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::equity_metrics),
+        finstack_quant_core::schema_artifact!(
+            PoolStats,
+            "results",
+            "pool_stats",
+            Component,
+            "Collateral-pool statistics: WAC, spread, maturity, diversity and concentration."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::pool_stats),
+        finstack_quant_core::schema_artifact!(
+            BondQuoteSet,
+            "results",
+            "bond_quote_set",
+            Component,
+            "Every price, yield and spread quote of a bond, solved from any one of them."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::bond_quote_set),
+        finstack_quant_core::schema_artifact!(
+            BondBreakevenLadder,
+            "results",
+            "bond_breakeven_ladder",
+            Component,
+            "Carry, sensitivity, and signed breakeven across the requested bond horizons."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::bond_breakeven_ladder),
+        finstack_quant_core::schema_artifact!(
+            BondWorkoutLadder,
+            "results",
+            "bond_workout_ladder",
+            Component,
+            "Yield and I-spread to every call, put and maturity exit of a bond, with the worst marked."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::bond_workout_ladder),
+        finstack_quant_core::schema_artifact!(
+            PoolReport,
+            "results",
+            "pool_report",
+            Component,
+            "Collateral-pool statistics, WARF and concentration by obligor, industry and rating."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::pool_report),
+        finstack_quant_core::schema_artifact!(
+            PoolReportFieldUnits,
+            "results",
+            "pool_report_field_units",
+            Component,
+            "The display units of the collateral-pool report fields."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::pool_report_field_units),
+        finstack_quant_core::schema_artifact!(
+            TrancheCashflows,
+            "results",
+            "tranche_cashflows",
+            Component,
+            "Projected cashflows of one structured-credit tranche, by component."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::tranche_cashflows),
+        finstack_quant_core::schema_artifact!(
+            BondQuoteInput,
+            "common",
+            "bond_quote_input",
+            Input,
+            "The one market quote a bond's quote set is solved from: a price, a yield or a spread."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::bond_quote_input),
+        finstack_quant_core::schema_artifact!(
+            PoolAccounts,
+            "common",
+            "pool_accounts",
+            Component,
+            "Account balances and performance tallies of a seasoned structured-credit pool."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::pool_accounts),
+        finstack_quant_core::schema_artifact!(
+            StandardDealParams,
+            "common",
+            "standard_deal_params",
+            Component,
+            "Inputs for the standard structured-credit registry constructor."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::standard_deal_params),
+        finstack_quant_core::schema_artifact!(
+            StandardDealFamily,
+            "results",
+            "standard_deal_family",
+            Component,
+            "One deal family the standard structured-credit constructor accepts, with its registry profile and an example of its inputs."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::standard_deal_family),
+        finstack_quant_core::schema_artifact!(
+            SimulationRun,
+            "results",
+            "simulation_run",
+            Component,
+            "Tranche cashflows and deal accounting from one deterministic simulation."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::simulation_run),
+        finstack_quant_core::schema_artifact!(
+            SimulationDiagnostics,
+            "results",
+            "simulation_diagnostics",
+            Component,
+            "Deal-level accounting produced alongside the tranche cashflows."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::simulation_diagnostics),
+        finstack_quant_core::schema_artifact!(
+    MarketDependencies,
+    "results",
+    "market_dependencies",
+    Component,
+    "Market data an instrument needs to price: curves, spots, surfaces, FX pairs and fixings."
+)
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::market_dependencies),
+        finstack_quant_core::schema_artifact!(
+            ConvertibleGreeks,
+            "results",
+            "convertible_greeks",
+            Component,
+            "Tree price and Greeks of a convertible bond."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::convertible_greeks),
+        finstack_quant_core::schema_artifact!(
+            ConvertibleSpotLadder,
+            "results",
+            "convertible_spot_ladder",
+            Component,
+            "Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::convertible_spot_ladder),
+        finstack_quant_core::schema_artifact!(
+            FacilityProjection,
+            "results",
+            "facility_projection",
+            Component,
+            "Projected cashflows of an asset-backed facility and its residual."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::facility_projection),
+        finstack_quant_core::schema_artifact!(
+            MertonMcResult,
+            "results",
+            "merton_mc_result",
+            Component,
+            "Merton Monte Carlo price of a PIK or toggle bond with path statistics."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::merton_mc_result),
+        finstack_quant_core::schema_artifact!(
+            CdsIndexParams,
+            "common",
+            "cds_index_params",
+            Component,
+            "Preset identity, coupon and convention of a standard CDS index series."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+        .with_examples(examples::cds_index_params),
+        finstack_quant_core::schema_artifact!(
+            CdsTradeParams,
+            "common",
+            "cds_trade_params",
+            Input,
+            "Trade terms (id, notional, side, dates, recovery, curves) of a standard-convention CDS index trade."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::cds_trade_params),
+        finstack_quant_core::schema_artifact!(
+            FloatingBondParams,
+            "common",
+            "floating_bond_params",
+            Input,
+            "Identifier, notional, index, spread, dates, frequency, day count and curve of a floating-rate note."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::floating_bond_params),
+        finstack_quant_core::schema_artifact!(
+            FxForwardTradeDateParams,
+            "common",
+            "fx_forward_trade_date_params",
+            Input,
+            "Trade-date, tenor and spot-roll inputs of an FX forward built from its trade date."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::fx_forward_trade_date_params),
+        finstack_quant_core::schema_artifact!(
+            FxSwapTradeDateParams,
+            "common",
+            "fx_swap_trade_date_params",
+            Input,
+            "Trade-date, far tenor and spot-roll inputs of an FX swap built from its trade date."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::fx_swap_trade_date_params),
+        finstack_quant_core::schema_artifact!(
+            NdfTradeDateParams,
+            "common",
+            "ndf_trade_date_params",
+            Input,
+            "Trade-date, tenor, contract rate and fixing inputs of an NDF built from its trade date."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::ndf_trade_date_params),
+        finstack_quant_core::schema_artifact!(
+            FxOptionParams,
+            "common",
+            "fx_option_params",
+            Input,
+            "Pair, strike, expiry, notional, volatility surface, call/put and delta convention of a European FX option."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::fx_option_params),
+        finstack_quant_core::schema_artifact!(
+            CapFloorParams,
+            "common",
+            "cap_floor_params",
+            Input,
+            "Option type, notional, strike, schedule and curves of a standard cap, floor, caplet or floorlet."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::cap_floor_params),
+        finstack_quant_core::schema_artifact!(
+            CmsSwapScheduleParams,
+            "common",
+            "cms_swap_schedule_params",
+            Input,
+            "Schedule, CMS terms, funding leg, notional and curves of a CMS swap built from its schedule."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::cms_swap_schedule_params),
+        finstack_quant_core::schema_artifact!(
+            BermudanSwaptionParams,
+            "common",
+            "bermudan_swaption_params",
+            Input,
+            "Option type, notional, strike, underlying swap dates, exercise schedule and curves of a co-terminal Bermudan swaption."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::bermudan_swaption_params),
+        finstack_quant_core::schema_artifact!(
+            ConventionSwapParams,
+            "common",
+            "convention_swap_params",
+            Input,
+            "Identifier, notional, side, fixed rate, dates, rate index and curves of a vanilla swap built from market conventions."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::convention_swap_params),
+        finstack_quant_core::schema_artifact!(
+            CdsTrancheParams,
+            "common",
+            "cds_tranche_params",
+            Component,
+            "Attachment, detachment, notional and coupon of a CDS index tranche."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+        .with_examples(examples::cds_tranche_params),
+        finstack_quant_core::schema_artifact!(
+            MarketHistory,
+            "common",
+            "market_history",
+            Component,
+            "Historical market scenarios for historical VaR and expected shortfall."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+        .with_examples(examples::market_history),
+        finstack_quant_core::schema_artifact!(
+            PriceExtras,
+            "common",
+            "price_extras",
+            Input,
+            "Metric-pricing override patch, market history and step-trace flag of one price call."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::price_extras),
+        finstack_quant_core::schema_artifact!(
+            RateIndexConventions,
+            "common",
+            "rate_index_conventions",
+            Component,
+            "Market conventions of one interest-rate index."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+        .with_examples(examples::rate_index_conventions),
+        finstack_quant_core::schema_artifact!(
+            CdsConventionSpec,
+            "common",
+            "cds_convention_spec",
+            Component,
+            "Market conventions of one CDS currency and documentation clause."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+        .with_examples(examples::cds_convention_spec),
+        finstack_quant_core::schema_artifact!(
+            SwaptionConventions,
+            "common",
+            "swaption_conventions",
+            Component,
+            "Market conventions of one swaption market."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+        .with_examples(examples::swaption_conventions),
+        finstack_quant_core::schema_artifact!(
+            InflationSwapConventions,
+            "common",
+            "inflation_swap_conventions",
+            Component,
+            "Market conventions of one inflation-swap market."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+        .with_examples(examples::inflation_swap_conventions),
+        finstack_quant_core::schema_artifact!(
+            XccyConventions,
+            "common",
+            "xccy_conventions",
+            Component,
+            "Market conventions of one cross-currency swap pair."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+        .with_examples(examples::xccy_conventions),
+        finstack_quant_core::schema_artifact!(
+            IrFutureConventions,
+            "common",
+            "ir_future_conventions",
+            Component,
+            "Contract conventions of one interest-rate future."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+        .with_examples(examples::ir_future_conventions),
+    ];
+
+    artifacts.extend(instrument_registry().iter().map(|entry| entry.artifact));
+    artifacts
+}

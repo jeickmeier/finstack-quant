@@ -13,12 +13,12 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::types::{FinancialModelSpec, FinancialStatementInstrument};
+use finstack_quant_valuations::instruments::PayReceive;
+use finstack_quant_valuations::instruments::fixed_income::BondConvention;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit;
 use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
-use finstack_quant_valuations::instruments::{
-    BondConvention, FixedLegSpec, FloatLegSpec, PayReceive,
-};
+use finstack_quant_valuations::instruments::rates::{FixedLegSpec, FloatLegSpec};
 use rust_decimal::Decimal;
 use time::macros::date;
 

@@ -1,6 +1,6 @@
 //! `impl_instrument_base!` and the other exported macros that write the
 //! `Instrument` boilerplate for a family type.
-/// Implements the standard boilerplate methods for the [`Instrument`](super::Instrument) trait.
+/// Implements the standard boilerplate methods for the [`Instrument`](crate::instruments::Instrument) trait.
 ///
 /// Most instruments store their ID as `self.id` (an `InstrumentId`), attributes as
 /// `self.attributes`, have a fixed [`InstrumentType`](crate::pricer::InstrumentType) key
@@ -115,7 +115,7 @@ macro_rules! impl_focused_pricing_overrides {
 }
 
 /// Serde impls for an instrument whose derives use `#[serde(remote = "Self")]`:
-/// deserialization runs [`Instrument::validate_invariants`](super::Instrument::validate_invariants),
+/// deserialization runs [`Instrument::validate_invariants`](crate::instruments::Instrument::validate_invariants),
 /// the same check `builder().build()` runs.
 ///
 /// `remote = "Self"` turns the derived `Serialize`/`Deserialize` impls into

@@ -106,7 +106,7 @@ the coupon). `from_conventions` gets this right; hand-built legs must set it.
 ```rust
 use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
 use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec};
+use finstack_quant_valuations::instruments::rates::{FixedLegSpec, FloatLegSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::money::Money;

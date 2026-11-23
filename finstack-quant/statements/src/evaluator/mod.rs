@@ -56,7 +56,8 @@ pub use cashflow_export::{
 pub use cell::UnavailableReason;
 pub use context::EvaluationContext;
 pub use dag::DependencyGraph;
-pub use engine::{Evaluator, ObservationCutoff, PreparedEvaluation};
+pub use engine::prepared::PreparedEvaluation;
+pub use engine::runner::{Evaluator, ObservationCutoff};
 pub use formula::evaluate_formula;
 pub use monte_carlo::{
     MAX_MONTE_CARLO_SAMPLES, MonteCarloConfig, MonteCarloContext, MonteCarloIncomplete,

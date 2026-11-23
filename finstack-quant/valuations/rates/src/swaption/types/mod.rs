@@ -7,10 +7,9 @@
 //! rate, annuity, and day-count based year fractions that reuse core library
 //! functionality.
 
-mod bermudan;
-mod definitions;
-mod swaption;
+pub(crate) mod bermudan;
+pub(crate) mod definitions;
+pub(crate) mod swaption;
 
-pub use bermudan::{BermudanSwaption, BermudanSwaptionBuilder, BermudanSwaptionParams};
-pub use definitions::{BermudanSchedule, BermudanType, CashSettlementMethod};
-pub use swaption::{GreekInputs, Swaption, SwaptionBuilder};
+pub(crate) use definitions::BermudanType;
+pub(crate) use swaption::Swaption;

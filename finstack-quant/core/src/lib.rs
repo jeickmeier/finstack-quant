@@ -139,13 +139,9 @@ pub mod wire;
 /// Deterministic-hasher map and set used across Finstack (re-exported from `rustc_hash`).
 pub use rustc_hash::{FxHashMap, FxHashSet};
 
-pub use error::{Error, ErrorKind, InputError, NonFiniteKind, Result, format_chain};
-
-/// Recover the inner guard from a mutex or rwlock acquisition result if a previous holder panicked.
-#[inline]
-pub(crate) fn recover_lock<T>(res: std::result::Result<T, std::sync::PoisonError<T>>) -> T {
-    res.unwrap_or_else(std::sync::PoisonError::into_inner)
-}
+pub use error::inputs::{InputError, NonFiniteKind};
+pub use error::types::{Error, ErrorKind, Result, format_chain};
+pub(crate) use parallel::recover_lock;
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

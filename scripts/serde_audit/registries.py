@@ -118,7 +118,7 @@ NON_MAINTAINED_SERDE_EXCEPTIONS = (
 RESULT_ALIAS_EXCEPTIONS = tuple(
     entry
     for crate, path in (
-        ("core", "src/error/mod.rs"),
+        ("core", "src/error/types.rs"),
         ("models", "src/correlation/error.rs"),
         ("portfolio", "src/error.rs"),
         ("scenarios", "src/error.rs"),
@@ -187,10 +187,10 @@ REVIEWED_EXCEPTIONS = (
 )
 MAINTAINED_CONTRACTS = frozenset({
     ("valuations", "src/instruments/json_loader.rs", "InstrumentEnvelope"),
-    ("calibration", "src/api/schema.rs", "CalibrationEnvelope"),
-    ("calibration", "src/api/schema.rs", "CalibrationResultEnvelope"),
+    ("calibration", "src/api/schema/envelope.rs", "CalibrationEnvelope"),
+    ("calibration", "src/api/schema/envelope.rs", "CalibrationResultEnvelope"),
     ("core", "src/market_data/context/state_serde.rs", "MarketContextState"),
-    ("statements", "src/types/model.rs", "FinancialModelSpec"),
+    ("statements", "src/types/model/spec.rs", "FinancialModelSpec"),
     ("scenarios", "src/envelope.rs", "ScenarioEnvelope"),
     ("factor-model", "src/envelope.rs", "FactorModelConfigEnvelope"),
     ("factor-model", "src/credit/hierarchy.rs", "CreditFactorModel"),

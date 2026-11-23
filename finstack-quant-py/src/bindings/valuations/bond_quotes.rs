@@ -2,7 +2,7 @@
 
 use pyo3::prelude::*;
 
-use finstack_quant_valuations::instruments::BondQuoteInput;
+use finstack_quant_valuations::instruments::fixed_income::BondQuoteInput;
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::{
     self, BondQuoteSet,
 };

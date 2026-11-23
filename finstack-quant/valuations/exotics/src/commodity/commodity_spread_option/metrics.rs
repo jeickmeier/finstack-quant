@@ -10,7 +10,7 @@ use crate::commodity::bump_price_curve_pct;
 use crate::commodity::commodity_spread_option::CommoditySpreadOption;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::{
     MetricCalculator, MetricContext, MetricRegistry, VOL_POINTS_PER_ABSOLUTE_VOL,
 };
@@ -25,7 +25,7 @@ impl MetricCalculator for SpreadDeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let inst: &CommoditySpreadOption = context.instrument_as()?;
 
-        let bump_pct = sens_config::resolve(context)?.spot_bump_decimal;
+        let bump_pct = bump_config::resolve(context)?.spot_bump_decimal;
 
         let curve_id = match self.leg {
             1 => &inst.leg1_forward_curve_id,
@@ -67,7 +67,7 @@ impl MetricCalculator for SpreadVegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let inst: &CommoditySpreadOption = context.instrument_as()?;
 
-        let vol_bump = sens_config::resolve(context)?.vol_bump_decimal;
+        let vol_bump = bump_config::resolve(context)?.vol_bump_decimal;
 
         let bump = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute;
         let bump_market = |amount: f64| match self.leg {

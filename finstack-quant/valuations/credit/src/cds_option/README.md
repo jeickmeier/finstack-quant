@@ -159,7 +159,7 @@ Building one explicitly:
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
     CdsOption, CdsOptionParams, CdsOptionStrike,
 };
-use finstack_quant_valuations::instruments::CreditParams;
+use finstack_quant_valuations::instruments::credit_derivatives::CreditParams;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;

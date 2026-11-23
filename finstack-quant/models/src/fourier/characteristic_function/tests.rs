@@ -1,0 +1,303 @@
+use super::*;
+use num_complex::Complex64;
+
+/// Estimate cumulants via finite differences of ln(phi(u)).
+///
+/// Uses centered differences at zero with a separate step for each derivative
+/// order, followed by Richardson extrapolation. Higher derivatives need larger
+/// steps to avoid amplifying floating-point cancellation by `h^-n`.
+/// Assumes four finite cumulants and a smooth characteristic function near zero;
+/// prefer closed-form expressions when available. Non-finite evaluations propagate
+/// as non-finite cumulants rather than being replaced by plausible values.
+///
+/// # Arguments
+///
+/// * `cf` - Risk-neutral characteristic function evaluated at complex Fourier
+///   frequencies and the requested maturity.
+/// * `t` - Time to maturity in years supplied to every characteristic-function
+///   evaluation.
+pub(crate) fn cumulants_from_cf(cf: &dyn CharacteristicFunction, t: f64) -> Cumulants {
+    let ln_phi = |u: f64| cf.cf(Complex64::new(u, 0.0), t).ln();
+    let origin = ln_phi(0.0);
+    // Estimate location/scale only to keep the differencing interval local
+    // when log returns have a large mean or spread.
+    let probe_h = 1e-4;
+    let probe = ln_phi(probe_h);
+    let location = (probe.im - origin.im) / probe_h;
+    let variance = -2.0 * (probe.re - origin.re) / (probe_h * probe_h);
+    let scale = location.abs().max(variance.abs().sqrt()).max(1.0);
+    let estimate = |order: i32| {
+        let h = f64::EPSILON.powf(1.0 / f64::from(order + 4)) / scale;
+        let centered = |step: f64| {
+            let plus = ln_phi(step);
+            let minus = ln_phi(-step);
+            match order {
+                1 => (plus.im - minus.im) / (2.0 * step),
+                2 => -(plus.re + minus.re - 2.0 * origin.re) / step.powi(2),
+                3 => {
+                    -(ln_phi(2.0 * step).im - 2.0 * plus.im + 2.0 * minus.im
+                        - ln_phi(-2.0 * step).im)
+                        / (2.0 * step.powi(3))
+                }
+                _ => {
+                    (ln_phi(2.0 * step).re - 4.0 * plus.re + 6.0 * origin.re - 4.0 * minus.re
+                        + ln_phi(-2.0 * step).re)
+                        / step.powi(4)
+                }
+            }
+        };
+        (4.0 * centered(h) - centered(2.0 * h)) / 3.0
+    };
+    Cumulants {
+        c1: estimate(1),
+        c2: estimate(2),
+        c3: estimate(3),
+        c4: estimate(4),
+    }
+}
+
+mod unit_tests {
+    use super::*;
+
+    #[test]
+    fn bs_cf_normalization() {
+        let bs = BlackScholesCf {
+            r: 0.05,
+            q: 0.02,
+            sigma: 0.2,
+        };
+        let val = bs.cf(Complex64::new(0.0, 0.0), 1.0);
+        assert!(
+            (val.re - 1.0).abs() < 1e-12,
+            "cf(0,t) should be 1, got {val}"
+        );
+        assert!(val.im.abs() < 1e-12);
+    }
+
+    #[test]
+    fn bs_cf_boundedness() {
+        let bs = BlackScholesCf {
+            r: 0.05,
+            q: 0.0,
+            sigma: 0.2,
+        };
+        for u_re in [0.5, 1.0, 5.0, 10.0, 50.0] {
+            let val = bs.cf(Complex64::new(u_re, 0.0), 1.0);
+            assert!(
+                val.norm() <= 1.0 + 1e-10,
+                "|cf({u_re},1)| = {} > 1",
+                val.norm()
+            );
+        }
+    }
+
+    #[test]
+    fn vg_cf_normalization() {
+        let vg = VarianceGammaCf {
+            r: 0.05,
+            q: 0.0,
+            sigma: 0.12,
+            nu: 0.2,
+            theta: -0.14,
+        };
+        let val = vg.cf(Complex64::new(0.0, 0.0), 1.0);
+        assert!(
+            (val.re - 1.0).abs() < 1e-10,
+            "VG cf(0,t) should be 1, got {val}"
+        );
+    }
+
+    #[test]
+    fn merton_cf_normalization() {
+        let merton = MertonJumpCf {
+            r: 0.05,
+            q: 0.0,
+            sigma: 0.2,
+            lambda: 1.0,
+            mu_j: -0.05,
+            sigma_j: 0.1,
+        };
+        let val = merton.cf(Complex64::new(0.0, 0.0), 1.0);
+        assert!(
+            (val.re - 1.0).abs() < 1e-10,
+            "Merton cf(0,t) should be 1, got {val}"
+        );
+    }
+
+    #[test]
+    fn bs_cumulants_closed_form() {
+        let bs = BlackScholesCf {
+            r: 0.05,
+            q: 0.02,
+            sigma: 0.2,
+        };
+        let c = bs.cumulants(1.0);
+        let s2 = 0.2 * 0.2;
+        assert!(
+            (c.c1 - (0.05 - 0.02 - 0.5 * s2)).abs() < 1e-10,
+            "c1 mismatch: {}",
+            c.c1
+        );
+        assert!((c.c2 - s2).abs() < 1e-10, "c2 mismatch: {}", c.c2);
+        assert!(c.c3.abs() < 1e-10, "BS c3 should be 0: {}", c.c3);
+        assert!(c.c4.abs() < 1e-10, "BS c4 should be 0: {}", c.c4);
+    }
+
+    #[test]
+    fn numerical_cumulants_match_closed_form_for_bs() {
+        let bs = BlackScholesCf {
+            r: 0.05,
+            q: 0.0,
+            sigma: 0.3,
+        };
+        let closed = bs.cumulants(1.0);
+        let numerical = cumulants_from_cf(&bs, 1.0);
+        assert!(
+            (closed.c1 - numerical.c1).abs() < 1e-6,
+            "c1: closed={}, numerical={}",
+            closed.c1,
+            numerical.c1
+        );
+        assert!(
+            (closed.c2 - numerical.c2).abs() < 1e-6,
+            "c2: closed={}, numerical={}",
+            closed.c2,
+            numerical.c2
+        );
+    }
+
+    #[test]
+    fn cf_models_roundtrip_through_json() {
+        let bs = BlackScholesCf {
+            r: 0.05,
+            q: 0.01,
+            sigma: 0.2,
+        };
+        let bs_restored: BlackScholesCf =
+            serde_json::from_str(&serde_json::to_string(&bs).expect("serialize BS"))
+                .expect("deserialize BS");
+        assert_eq!(bs_restored.r, bs.r);
+        assert_eq!(bs_restored.q, bs.q);
+        assert_eq!(bs_restored.sigma, bs.sigma);
+
+        let merton = MertonJumpCf {
+            r: 0.04,
+            q: 0.01,
+            sigma: 0.2,
+            lambda: 0.7,
+            mu_j: -0.05,
+            sigma_j: 0.1,
+        };
+        let merton_restored: MertonJumpCf =
+            serde_json::from_str(&serde_json::to_string(&merton).expect("serialize Merton"))
+                .expect("deserialize Merton");
+        assert_eq!(merton_restored.r, merton.r);
+        assert_eq!(merton_restored.lambda, merton.lambda);
+        assert_eq!(merton_restored.mu_j, merton.mu_j);
+
+        let vg = VarianceGammaCf::new(0.05, 0.01, 0.12, 0.2, -0.14).expect("valid VG");
+        let vg_restored: VarianceGammaCf =
+            serde_json::from_str(&serde_json::to_string(&vg).expect("serialize VG"))
+                .expect("deserialize VG");
+        assert_eq!(vg_restored.r, vg.r);
+        assert_eq!(vg_restored.nu, vg.nu);
+        assert_eq!(vg_restored.theta, vg.theta);
+        assert!(vg_restored.validate().is_ok());
+    }
+
+    #[test]
+    fn vg_deserialized_invalid_parameters_fail_validate() {
+        let vg: VarianceGammaCf =
+            serde_json::from_str(r#"{"r":0.05,"q":0.0,"sigma":0.5,"nu":4.0,"theta":0.2}"#)
+                .expect("serde allows struct-literal compatibility");
+
+        assert!(vg.validate().is_err());
+    }
+
+    #[test]
+    fn merton_cumulants_match_numerical_cf_estimates() {
+        let merton = MertonJumpCf {
+            r: 0.04,
+            q: 0.01,
+            sigma: 0.2,
+            lambda: 0.35,
+            mu_j: -0.03,
+            sigma_j: 0.08,
+        };
+        let closed = merton.cumulants(1.25);
+        let numerical = cumulants_from_cf(&merton, 1.25);
+
+        assert!((closed.c1 - numerical.c1).abs() < 1e-6);
+        assert!((closed.c2 - numerical.c2).abs() < 1e-6);
+    }
+
+    #[test]
+    fn numerical_cumulants_resolve_all_four_orders() {
+        let models: Vec<Box<dyn CharacteristicFunction>> = vec![
+            Box::new(BlackScholesCf {
+                r: 0.05,
+                q: 0.0,
+                sigma: 0.1,
+            }),
+            Box::new(BlackScholesCf {
+                r: 0.05,
+                q: 0.0,
+                sigma: 0.3,
+            }),
+            Box::new(MertonJumpCf {
+                r: 0.04,
+                q: 0.01,
+                sigma: 0.2,
+                lambda: 0.35,
+                mu_j: -0.03,
+                sigma_j: 0.08,
+            }),
+            Box::new(VarianceGammaCf::new(0.05, 0.01, 0.12, 0.2, -0.14).expect("valid VG")),
+        ];
+        for model in models {
+            for time in [0.25, 1.0, 5.0] {
+                let actual = cumulants_from_cf(model.as_ref(), time);
+                let expected = model.cumulants(time);
+                for (order, got, want) in [
+                    (1, actual.c1, expected.c1),
+                    (2, actual.c2, expected.c2),
+                    (3, actual.c3, expected.c3),
+                    (4, actual.c4, expected.c4),
+                ] {
+                    assert!(
+                        (got - want).abs() < 1e-6 * (1.0 + want.abs()),
+                        "order={order}, time={time}, actual={got}, expected={want}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn merton_converges_to_bs_as_lambda_zero() {
+        let sigma = 0.2;
+        let bs = BlackScholesCf {
+            r: 0.05,
+            q: 0.0,
+            sigma,
+        };
+        // Use lambda = 0 exactly for the convergence test.
+        let merton = MertonJumpCf {
+            r: 0.05,
+            q: 0.0,
+            sigma,
+            lambda: 0.0,
+            mu_j: -0.05,
+            sigma_j: 0.1,
+        };
+        for u_re in [0.5, 1.0, 5.0, 10.0] {
+            let u = Complex64::new(u_re, 0.0);
+            let bs_val = bs.cf(u, 1.0);
+            let merton_val = merton.cf(u, 1.0);
+            assert!(
+                (bs_val - merton_val).norm() < 1e-12,
+                "Merton should converge to BS at u={u_re}: bs={bs_val}, merton={merton_val}"
+            );
+        }
+    }
+}

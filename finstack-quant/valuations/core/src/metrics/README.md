@@ -106,7 +106,7 @@ the implementation defines that invariant.
 `finite_difference.rs` is reachable only through the hidden `metrics::*` re-exports and holds the curve and scalar
 bump helpers plus `CORRELATION_BUMP`. Spot, volatility, rate, credit-spread and
 yield bump sizes are never hard-coded: calculators resolve them with
-`sensitivities::config::resolve(context)`, which layers
+`sensitivities::bump_config::resolve(context)`, which layers
 `metric_pricing_overrides.bump_config` over the `valuations.sensitivities.v1`
 config extension. Option-greek providers receive them as `GreekBumps`. The only
 public item from `finite_difference.rs` is `bump_surface_vol_absolute`.

@@ -14,7 +14,7 @@ use std::sync::Arc;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
-use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
+use finstack_quant_valuations_core::metrics::sensitivities::bump_config;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::{
     cs01_reval, reprice_with_hazard, resolve_optional_cs01_curves,
 };
@@ -64,7 +64,7 @@ impl MetricCalculator for DirectHazardParallelHazard01 {
         else {
             return Ok(0.0);
         };
-        let bump_bp = sens_config::resolve(context)?.credit_spread_bump_bp;
+        let bump_bp = bump_config::resolve(context)?.credit_spread_bump_bp;
         let hazard = context.curves.get_hazard(hazard_id.as_str())?;
         let min_lambda = hazard
             .iter_knots()
@@ -89,7 +89,7 @@ impl MetricCalculator for DirectHazardBucketedHazard01 {
         else {
             return Ok(0.0);
         };
-        let bump_bp = sens_config::resolve(context)?.credit_spread_bump_bp;
+        let bump_bp = bump_config::resolve(context)?.credit_spread_bump_bp;
         let hazard = context.curves.get_hazard(hazard_id.as_str())?;
         let knots: Vec<(f64, f64)> = hazard.iter_knots().collect();
 

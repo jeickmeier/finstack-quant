@@ -28,7 +28,7 @@
 use crate::instruments::Instrument;
 use crate::instruments::RatesCurveKind;
 use crate::metrics::MetricCalculator;
-use crate::metrics::sensitivities::config as sens_config;
+use crate::metrics::sensitivities::bump_config;
 use crate::metrics::{MetricContext, MetricId};
 
 use finstack_quant_core::market_data::bumps::BumpSpec;
@@ -210,7 +210,7 @@ impl UnifiedDv01Calculator {
 impl MetricCalculator for UnifiedDv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         // Resolve bump size from config, then layer instrument overrides.
-        let defaults = sens_config::resolve(context)?;
+        let defaults = bump_config::resolve(context)?;
         let bump_bp = defaults.rate_bump_bp;
 
         let curves = self.collect_curves(context.instrument.as_ref(), context.curves.as_ref())?;

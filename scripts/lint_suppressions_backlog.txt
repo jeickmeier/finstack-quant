@@ -9,6 +9,6 @@
 # impls and infallible `&'static` accessors. Removing them means either a
 # fallible replacement for each `Default` or generating the assets as Rust
 # constants (the `core/build/generate_reference_data.py` pattern).
-finstack-quant/margin/src/registry/mod.rs: clippy::expect_used: embedded margin registry, read by Default impls
+finstack-quant/margin/src/registry/loader.rs: clippy::expect_used: embedded margin registry, read by Default impls
 finstack-quant/models/src/monte_carlo/registry.rs: clippy::expect_used: embedded Monte Carlo defaults, read by pricer-config Default impls
 finstack-quant/statements-analytics/src/analysis/ecl/policy.rs: clippy::expect_used: embedded ECL policy registry, read by EclConfig/StagingConfig/CeclConfig Default

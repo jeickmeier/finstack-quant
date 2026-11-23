@@ -35,5 +35,7 @@ pub(crate) mod types;
 
 pub(crate) mod heston_mc_pricer;
 
-pub use pricer::{AsianOptionAnalyticalGeometricPricer, AsianOptionSemiAnalyticalTwPricer};
+pub use pricer::analytic::{
+    AsianOptionAnalyticalGeometricPricer, AsianOptionSemiAnalyticalTwPricer,
+};
 pub use types::{AsianOption, AsianOptionBuilder};

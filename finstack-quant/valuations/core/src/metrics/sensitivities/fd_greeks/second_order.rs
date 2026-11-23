@@ -5,7 +5,7 @@ use super::bump::{
     eval_raw_with_scratch_bumps, is_expired, spot_id, symmetric_volatility_step,
 };
 use crate::metrics::finite_difference::VOL_POINTS_PER_ABSOLUTE_VOL;
-use crate::metrics::sensitivities::config as sens_config;
+use crate::metrics::sensitivities::bump_config;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
 
@@ -19,7 +19,7 @@ pub struct GenericFdGamma;
 impl MetricCalculator for GenericFdGamma {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let as_of = context.as_of;
-        let defaults = sens_config::resolve(context)?;
+        let defaults = bump_config::resolve(context)?;
 
         let dependencies = context.instrument.market_dependencies()?;
         let spot_id = spot_id(&dependencies, "gamma")?.clone();
@@ -75,7 +75,7 @@ pub struct GenericFdVolga;
 impl MetricCalculator for GenericFdVolga {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let as_of = context.as_of;
-        let defaults = sens_config::resolve(context)?;
+        let defaults = bump_config::resolve(context)?;
 
         // If expired, volga is zero — mirror vanna's guard. On an expired
         // option, vega ≈ 0, so volga = (vega(σ+h) - vega(σ-h))/h^2 amplifies
@@ -145,7 +145,7 @@ pub struct GenericFdVanna;
 impl MetricCalculator for GenericFdVanna {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let as_of = context.as_of;
-        let defaults = sens_config::resolve(context)?;
+        let defaults = bump_config::resolve(context)?;
 
         // If expired, vanna is zero (avoid bumping / repricing beyond expiry).
         if is_expired(context.instrument.as_ref(), as_of)? {

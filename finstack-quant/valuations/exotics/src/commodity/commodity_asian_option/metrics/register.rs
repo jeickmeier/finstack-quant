@@ -1,0 +1,21 @@
+//! Metric registration and calculators.
+
+use finstack_quant_valuations_core::metrics::MetricRegistry;
+use finstack_quant_valuations_core::pricer::InstrumentType;
+
+/// Register commodity Asian option metrics with the registry.
+pub(crate) fn register_commodity_asian_option_metrics(
+    registry: &mut MetricRegistry,
+) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
+    finstack_quant_valuations_core::register_metrics! {
+        registry: registry,
+        instrument: InstrumentType::CommodityAsianOption,
+        metrics: [
+            (Delta, super::greeks::AsianDeltaCalculator),
+            (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega),
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_discount_only())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_discount_only())),
+        ]
+    }
+    Ok(())
+}

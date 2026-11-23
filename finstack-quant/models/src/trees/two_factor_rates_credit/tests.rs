@@ -1,4 +1,5 @@
 use super::*;
+use finstack_quant_cashflows::builder::FloatingRateParams;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::interp::InterpStyle;

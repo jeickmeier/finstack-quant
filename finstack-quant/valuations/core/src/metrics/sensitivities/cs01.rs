@@ -60,7 +60,7 @@
 use crate::market::conventions::CdsValuationConvention;
 use crate::market::conventions::ids::CdsDocClause;
 use crate::metrics::finite_difference::sensitivity_central_diff;
-use crate::metrics::sensitivities::config as sens_config;
+use crate::metrics::sensitivities::bump_config;
 use crate::metrics::{MetricContext, MetricId};
 use crate::recalibration::{DealCdsQuoteOverride, QuoteBump};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -440,7 +440,7 @@ impl MetricCalculator for GenericParallelCs01 {
             finstack_quant_core::Error::Validation("CS01 requires a credit curve identifier".into())
         })?;
 
-        let bump_bp = sens_config::resolve(context)?.credit_spread_bump_bp;
+        let bump_bp = bump_config::resolve(context)?.credit_spread_bump_bp;
 
         let reval = cs01_reval(context);
 
@@ -473,7 +473,7 @@ impl MetricCalculator for GenericBucketedCs01 {
             finstack_quant_core::Error::Validation("CS01 requires a credit curve identifier".into())
         })?;
 
-        let defaults = sens_config::resolve(context)?;
+        let defaults = bump_config::resolve(context)?;
         let bump_bp = defaults.credit_spread_bump_bp;
 
         let reval = cs01_reval(context);
